@@ -23,7 +23,10 @@ public record AutomationRuleResponse(
         String seasonalMode,
         Integer generationHorizonDays,
         boolean active,
-        List<Window> windows
+        List<Window> windows,
+        boolean readyStockRequired,
+        int bookingHorizonDays,
+        int productionLeadMinutes
 ) {
     public record Window(
             Long id,

@@ -143,6 +143,6 @@ class StorefrontHighlightsControllerTest {
     private CartAvailabilityService.Availability result(boolean available) {
         var today = LocalDate.ofInstant(now, ZoneId.of("Asia/Kolkata"));
         return new CartAvailabilityService.Availability("PICKUP", today, today.plusDays(30),
-                List.of(new CartAvailabilityService.DateAvailability(today, available, List.of())));
+                List.of(new CartAvailabilityService.DateAvailability(today, available, List.of(), List.of(), null)));
     }
 }

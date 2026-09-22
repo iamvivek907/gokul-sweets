@@ -19,6 +19,13 @@ public class AdminInventoryAutomationController {
     private final InventoryAutomationWorkspaceService workspaceService;
     private final InventoryAutomationGenerationService generationService;
     private final StaffAuthorizationService authorizationService;
+    private final com.gokulsweets.restaurant.inventory.automation.repository.InventoryAutomationRunItemRepository runItems;
+
+    @GetMapping("/runs/{runId}/explanation")
+    public java.util.List<AutomationRunExplanation> explain(@PathVariable Long branchId, @PathVariable Long runId) {
+        authorize(branchId, PermissionName.INVENTORY_VIEW);
+        return runItems.explain(branchId, runId);
+    }
 
     @GetMapping
     public ResponseEntity<AutomationWorkspaceResponse> getWorkspace(

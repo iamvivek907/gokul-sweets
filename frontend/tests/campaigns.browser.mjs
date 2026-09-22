@@ -19,7 +19,7 @@ const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 try {
     await page.route("**/api/storefront/campaigns", route => route.fulfill({json: fixtures}));
     await page.route("**/_next/image**", route => route.fulfill({contentType: "image/png", body: png}));
-    await page.goto("http://127.0.0.1:3309");
+    await page.goto(process.env.BROWSER_BASE ?? "http://127.0.0.1:3309");
     await page.getByRole("heading", {name: "Scheduled campaign", exact: true}).waitFor();
     assert.equal(await page.locator("video").count(), 0, "Reduced motion uses static fallback instead of video.");
     assert.equal(await page.getByRole("heading", {name: "Expired campaign"}).count(), 0);
@@ -29,11 +29,11 @@ try {
     await hero.dispatchEvent("error");
     await page.getByRole("heading", {name: "Next active campaign", exact: true}).waitFor();
     await page.getByRole("img", {name: "Next active campaign"}).dispatchEvent("error");
-    await page.getByRole("heading", {name: "A little sweetness, ready for you."}).waitFor();
+    await page.getByRole("heading", {name: "Sweet moments. Savour every bite."}).waitFor();
     await page.unroute("**/api/storefront/campaigns");
     await page.route("**/api/storefront/campaigns", route => route.fulfill({status: 503, json: {message: "Synthetic campaign outage"}}));
     await page.reload();
-    await page.getByRole("heading", {name: "A little sweetness, ready for you."}).waitFor();
+    await page.getByRole("heading", {name: "Sweet moments. Savour every bite."}).waitFor();
     await page.getByRole("link", {name: "Order Now", exact: true}).waitFor();
     console.log("PASS: campaign schedules, priority, reduced motion, media-failure next/default fallback, optional API-failure ordering CTA.");
 } finally {await browser.close();}

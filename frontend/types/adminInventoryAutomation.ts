@@ -36,6 +36,9 @@ export interface InventoryAutomationRule {
     generationHorizonDays: number | null;
     active: boolean;
     windows: AutomationWindow[];
+    readyStockRequired: boolean;
+    bookingHorizonDays: number;
+    productionLeadMinutes: number;
 }
 
 export interface InventoryAutomationRun {

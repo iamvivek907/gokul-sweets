@@ -7,13 +7,19 @@ export interface SlotAvailability {
     normalAvailable: boolean;
     priorityAvailable: boolean;
     reason: string | null;
+    code?: string | null;
+    issues?: ItemAvailability[];
 }
 
+export interface ItemAvailability {
+    productId: number; productName: string; unit: "GRAM" | "PIECE"; requestedQuantity: number;
+    availableQuantity: number | null; available: boolean; code: string | null; reason: string | null; expectedReadyAt: string | null;
+}
 export interface CartAvailability {
     fulfilmentType: "PICKUP";
     today: string;
     maximumDate: string;
-    dates: {date: string; available: boolean; slots: SlotAvailability[]}[];
+    dates: {date: string; available: boolean; slots: SlotAvailability[]; items?: ItemAvailability[]; reason?: string | null}[];
 }
 
 export function availabilityItems(items: CartItem[]) {

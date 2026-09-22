@@ -52,7 +52,23 @@ class CartAvailabilityServiceTest {
         assertThat(result.dates().get(1).available()).isTrue();
         assertThat(result.dates().get(1).slots().get(0).normalAvailable()).isFalse();
         assertThat(result.dates().get(1).slots().get(1).slot().id()).isEqualTo(3L);
+        assertThat(result.dates().getFirst().items().getFirst().code()).isEqualTo("QUANTITY_TOO_LARGE");
+        assertThat(result.dates().getFirst().items().getFirst().availableQuantity()).isEqualByComparingTo("200");
         verify(validation).validateCart(1L, request);
+        verify(allocations, times(1)).findByBranchProductIdInAndServiceDateBetween(any(), any(), any());
+        verify(policies, times(1)).findByBranchProductIdIn(any());
+        todayStock.setHeldQuantity(BigDecimal.ZERO);
+        todayStock.setStatus(InventoryAllocationStatus.DRAFT);
+        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("AWAITING_APPROVAL");
+        todayStock.setStatus(InventoryAllocationStatus.APPROVED);
+        policy.setReadyStockRequired(true);
+        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("READY_STOCK_REQUIRED");
+        todayStock.setStatus(InventoryAllocationStatus.READY); todayStock.setReadyQuantity(BigDecimal.valueOf(500));
+        assertThat(service.check(1L, today, 2, request).dates().getFirst().available()).isTrue();
+        first.setBookedCount(first.getCapacity());
+        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("SLOT_FULL");
+        first.setActive(false);
+        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("NO_SLOTS");
     }
 
     private InventoryDailyAllocation stock(BranchProduct bp, LocalDate date) {

@@ -83,6 +83,18 @@ class SmartOrderingRulesTest {
         assertThat(rules.preparationReason(slot(LocalDate.now(clock), LocalTime.of(13, 0)), policy, allocation)).isNull();
     }
 
+    @Test void leadTimeCrossesIndiaMidnightWithoutAddingAWholeDay() {
+        var midnightClock = Clock.fixed(Instant.parse("2026-09-22T18:25:00Z"), ZoneId.of("Asia/Kolkata"));
+        var midnightRules = new SmartOrderingRules(features, settings, midnightClock);
+        var policy = new BranchInventoryPolicy(); policy.setBookingHorizonDays(3); policy.setProductionLeadMinutes(15);
+        assertThat(midnightRules.preparationReason(slot(LocalDate.of(2026, 9, 23), LocalTime.of(0, 9)), policy, null)).contains("preparation");
+        assertThat(midnightRules.preparationReason(slot(LocalDate.of(2026, 9, 23), LocalTime.of(0, 10)), policy, null)).isNull();
+        var allocation = new InventoryDailyAllocation();
+        allocation.setExpectedReadyAt(LocalDateTime.of(2026, 9, 23, 0, 30));
+        assertThat(midnightRules.preparationReason(slot(LocalDate.of(2026, 9, 23), LocalTime.of(0, 29)), policy, allocation)).contains("ready later");
+        assertThat(midnightRules.preparationReason(slot(LocalDate.of(2026, 9, 23), LocalTime.of(0, 30)), policy, allocation)).isNull();
+    }
+
     static PickupSlot slot(LocalDate date, LocalTime time) {
         var branch = new Branch(); branch.setId(1L); branch.setActive(true);
         var slot = new PickupSlot(); slot.setId(1L); slot.setBranch(branch);

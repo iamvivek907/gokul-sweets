@@ -2,6 +2,8 @@
 
 import ProductCard
     from "@/components/menu/ProductCard";
+import type {ItemAvailability} from "@/services/availabilityApi";
+import styles from "./CustomerHomeExperience.module.css";
 
 import type {
     MenuProduct
@@ -13,6 +15,9 @@ import type {
 
 
 interface ProductGridProps {
+    pickupItems?: ItemAvailability[];
+    pickupChecking?: boolean;
+    dateAware?: boolean;
 
     products:
         MenuProduct[];
@@ -48,7 +53,10 @@ export default function ProductGrid({
     weights,
     onIncrease,
     onDecrease,
-    onAdd
+    onAdd,
+    pickupItems,
+    pickupChecking,
+    dateAware
 }: ProductGridProps) {
 
     if (
@@ -103,6 +111,7 @@ export default function ProductGrid({
 
 
     return (
+        <div className={dateAware ? styles.products : undefined}>
         <div
             className="
                 grid
@@ -119,10 +128,16 @@ export default function ProductGrid({
             {products.map(
                 product => (
 
+                    <div key={product.id}>
+                    {dateAware && <p role="status" className={`mb-2 rounded-xl px-3 py-2 text-xs ${pickupItems?.find(item => item.productId === product.id)?.available ? "bg-green-50 text-green-900" : "bg-[#fff0dc] text-[#754321]"}`}>
+                        {(() => {
+                            const item = pickupItems?.find(value => value.productId === product.id);
+                            if (!item) return pickupChecking ? "Pickup check pending - not confirmed" : "Choose pickup to check availability";
+                            if (!item.available) return `${item.reason}${item.code === "QUANTITY_TOO_LARGE" ? ` Up to ${item.availableQuantity} ${item.unit === "GRAM" ? "g" : "pieces"} remain.` : ""}`;
+                            return `Pickup options available${item.availableQuantity == null ? "" : ` - up to ${item.availableQuantity} ${item.unit === "GRAM" ? "g" : "pieces"} now`}. Final cart checked at checkout.`;
+                        })()}
+                    </p>}
                     <ProductCard
-                        key={
-                            product.id
-                        }
                         product={
                             product
                         }
@@ -157,10 +172,12 @@ export default function ProductGrid({
                             onAdd
                         }
                     />
+                    </div>
 
                 )
             )}
 
+        </div>
         </div>
     );
 }

@@ -29,9 +29,10 @@ public class CampaignController {
     }
 
     @PostMapping("/api/admin/homepage-campaigns")
-    public HomepageCampaign create(@Valid @RequestBody CampaignRequest request) {
+    public HomepageCampaign create(@Valid @RequestBody CampaignRequest request,
+                                   @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.save(null, request);
+        return service.create(request, requestId);
     }
 
     @PutMapping("/api/admin/homepage-campaigns/{id}")
@@ -42,9 +43,10 @@ public class CampaignController {
 
     @PostMapping(value = "/api/admin/homepage-campaigns/{id}/media", consumes = "multipart/form-data")
     public HomepageCampaign upload(@PathVariable Long id, @RequestParam MultipartFile file,
-                                   @RequestParam(defaultValue = "false") boolean fallback) {
+                                   @RequestParam(defaultValue = "false") boolean fallback,
+                                   @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.upload(id, file, fallback);
+        return service.upload(id, file, fallback, requestId);
     }
 
     @DeleteMapping("/api/admin/homepage-campaigns/{id}/media")

@@ -81,6 +81,38 @@ class CampaignServiceTest {
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
+    @Test void uploadRetryAndMetadataSaveDoNotRepeatStorageOperations() {
+        var c = campaign();
+        var key = UUID.randomUUID();
+        var storedHash = new java.util.concurrent.atomic.AtomicReference<String>();
+        when(repository.mediaRequestHash(1L, false, key)).thenAnswer(ignored -> Optional.ofNullable(storedHash.get()));
+        doAnswer(invocation -> {storedHash.set(invocation.getArgument(3)); return null;})
+                .when(repository).recordMediaRequest(eq(1L), eq(false), eq(key), anyString());
+        var file = new MockMultipartFile("file", "image.png", "image/png", new byte[12]);
+        when(repository.findForUpdate(1L)).thenReturn(Optional.of(c));
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(storage.uploadCampaignMedia(1L, file, false)).thenReturn(new R2StorageService.CampaignMedia("new", "image/png"));
+        TransactionSynchronizationManager.initSynchronization();
+        service.upload(1L, file, false, key);
+        service.upload(1L, file, false, key);
+        service.save(1L, request(false));
+        service.save(1L, request(true));
+        verify(storage, times(1)).uploadCampaignMedia(1L, file, false);
+        verifyNoMoreInteractions(storage);
+        assertThat(TransactionSynchronizationManager.getSynchronizations()).hasSize(1);
+    }
+
+    @Test void repeatedCreationKeyReturnsExistingDraftWithoutAnotherSave() {
+        var c = campaign(); var key = UUID.randomUUID();
+        when(repository.createDraft(eq(key), anyString(), eq("Test"), eq("HERO"))).thenAnswer(invocation -> {
+            c.setCreationRequestHash(invocation.getArgument(1)); return 0;
+        });
+        when(repository.findByCreationRequestId(key)).thenReturn(Optional.of(c));
+        assertThat(service.create(request(false), key)).isSameAs(c);
+        verify(repository, never()).save(any());
+        verifyNoInteractions(storage);
+    }
+
     private HomepageCampaign campaign() {
         var c = new HomepageCampaign(); c.setId(1L); c.setTitle("Test"); c.setActive(true); c.setMediaUrl("old"); c.setMediaType("image/png");
         return c;

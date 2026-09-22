@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
-const base = "http://127.0.0.1:3309";
-const api = "http://127.0.0.1:18309";
+const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3309";
+const api = process.env.BROWSER_API ?? "http://127.0.0.1:18309";
+const branchId = Number(process.env.BROWSER_BRANCH ?? 1001);
+const productName = process.env.BROWSER_PRODUCT ?? "Test Gulab Jamun";
 const branches = await (await fetch(`${api}/api/branches`)).json();
-const branch = branches.find(value => value.id === 1001);
+const branch = branches.find(value => value.id === branchId);
 assert.ok(branch, "Seed the isolated test database first.");
 const browser = await chromium.launch({headless: true});
 const context = await browser.newContext({viewport: {width: 390, height: 844}, reducedMotion: "reduce"});
@@ -20,9 +22,10 @@ await page.addInitScript(branch => {
 }, branch);
 try {
     await page.goto(base);
-    await page.getByRole("heading", {name: "A little sweetness, ready for you."}).waitFor();
-    await page.getByRole("button", {name: "Add Test Gulab Jamun to cart"}).first().click();
-    const dialog = page.getByRole("dialog", {name: "Test Gulab Jamun"});
+    await page.getByRole("heading", {name: "Sweet moments. Savour every bite."}).waitFor();
+    await page.getByRole("link", {name: "Order Now", exact: true}).click();
+    await page.getByRole("button", {name: `Add ${productName} to cart`}).first().click();
+    const dialog = page.getByRole("dialog", {name: productName});
     await dialog.waitFor();
     await dialog.getByRole("button", {name: "500 g", exact: true}).click();
     const buttons = dialog.getByRole("button");
@@ -37,9 +40,9 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Mobile storefront must not overflow horizontally.");
     await page.goto(`${base}/checkout/pickup`);
     await page.getByRole("heading", {name: "When would you like to collect?"}).waitFor();
-    const availableDate = page.getByRole("button").filter({hasText: /Available$/}).first();
+    const availableDate = page.getByRole("button").filter({hasText: /Times available$/}).first();
     await availableDate.click();
-    await page.getByRole("button", {name: "Normal pickup", exact: true}).first().click();
+    await page.getByLabel("Pickup time", {exact: true}).selectOption(await page.locator('#smart-pickup-time option[value$=":NORMAL"]').first().getAttribute("value"));
     await page.getByRole("button", {name: "Continue", exact: true}).waitFor();
     await page.getByRole("button", {name: "Continue", exact: true}).click();
     await page.waitForURL("**/checkout/customer");
@@ -49,10 +52,13 @@ try {
     // A slow response for an old quantity cannot override the current cart's availability.
     let releaseOld;
     const oldRequest = new Promise(resolve => {releaseOld = resolve;});
+    let markStarted;
+    const started = new Promise(resolve => {markStarted = resolve;});
     let calls = 0;
-    await page.route("**/api/branches/1001/availability", async route => {
+    await page.route(`**/api/branches/${branchId}/availability`, async route => {
         calls++;
         if (calls === 1) {
+            markStarted();
             await oldRequest;
             await route.fulfill({json: {fulfilmentType: "PICKUP", dates: [], today: "2026-01-01", maximumDate: "2026-01-01"}});
         } else {
@@ -62,6 +68,7 @@ try {
     });
     await page.goto(`${base}/checkout/pickup`);
     await page.getByText("Checking dates and times for your cart...").waitFor();
+    await Promise.race([started, new Promise((_, reject) => setTimeout(() => reject(new Error("Preview request did not start")), 10_000))]);
     await page.evaluate(() => {
         const cart = JSON.parse(localStorage.getItem("gokul-cart"));
         cart.items[0].weightGrams = 250;
@@ -71,18 +78,18 @@ try {
     await page.getByRole("heading", {name: "Choose a date", exact: true}).waitFor();
     releaseOld();
     await page.waitForTimeout(200);
-    assert.ok(await page.getByRole("button").filter({hasText: /Available$/}).count() > 0, "Stale response must not erase current alternatives.");
-    await page.unroute("**/api/branches/1001/availability");
+    assert.ok(await page.getByRole("button").filter({hasText: /Times available$/}).count() > 0, "Stale response must not erase current alternatives.");
+    await page.unroute(`**/api/branches/${branchId}/availability`);
 
-    await page.route("**/api/branches/1001/availability", route => route.fulfill({status: 503, json: {message: "Synthetic unavailable-check failure"}}));
+    await page.route(`**/api/branches/${branchId}/availability`, route => route.fulfill({status: 503, json: {message: "Synthetic unavailable-check failure"}}));
     const preservedCart = await page.evaluate(() => localStorage.getItem("gokul-cart"));
     await page.reload();
-    await page.getByText(/Live suggestions could not be loaded/).waitFor();
+    await page.getByText("We couldn't check pickup times. Your cart is saved. Try again.").waitFor();
     await page.getByRole("button", {name: "Use standard pickup selection"}).click();
     await page.locator("#pickup-date").waitFor();
     assert.equal(await page.evaluate(() => localStorage.getItem("gokul-cart")), preservedCart);
     assert.equal(await page.evaluate(() => localStorage.getItem("gokul-customer-details")), originalCustomer);
-    await page.unroute("**/api/branches/1001/availability");
+    await page.unroute(`**/api/branches/${branchId}/availability`);
 
     await page.route("**/api/storefront/features", route => route.fulfill({json: {
         smartAvailability: false, smartPickupSelection: false, customerHomeV2: false, homepageCampaigns: false,

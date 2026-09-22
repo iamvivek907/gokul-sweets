@@ -157,6 +157,13 @@ public class InventoryAutomationGenerationService {
                 processDate(run, rule, policy, windows.getOrDefault(rule.getId(), List.of()),
                         date, today, historyByProductAndDay, targets, managedByAllocationId);
             }
+            if (features.isInventoryAutomationV2() && ruleThrough.isBefore(throughDate)) {
+                addItem(run, rule, fromDate.isAfter(ruleThrough) ? fromDate : ruleThrough.plusDays(1),
+                        InventoryAutomationOutcome.SKIPPED, null, null,
+                        "Remaining dates through " + throughDate + " were not generated: the product, rule or global planning window ends on "
+                                + ruleThrough + ". Review the configured ordering and planning windows.");
+                incrementSkipped(run);
+            }
         }
 
         run.setRunStatus(run.getErrorCount() > 0

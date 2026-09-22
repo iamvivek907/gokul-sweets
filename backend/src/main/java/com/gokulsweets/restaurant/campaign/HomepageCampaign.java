@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 import java.time.Instant;
+import java.util.UUID;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Table(name = "homepage_campaigns")
@@ -38,6 +40,10 @@ public class HomepageCampaign {
     private Instant createdAt;
     @Column(nullable = false)
     private Instant updatedAt;
+    @JsonIgnore private UUID creationRequestId;
+    @JsonIgnore @Column(length = 64) private String creationRequestHash;
+    @JsonIgnore private UUID mediaRequestId;
+    @JsonIgnore private UUID fallbackRequestId;
 
     @PrePersist
     void create() { createdAt = Instant.now(); updatedAt = createdAt; }
