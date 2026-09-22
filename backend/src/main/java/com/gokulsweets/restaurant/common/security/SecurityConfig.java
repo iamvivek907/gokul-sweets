@@ -4,6 +4,7 @@ import com.gokulsweets.restaurant.security.StaffUserDetailsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
@@ -37,7 +38,9 @@ public class SecurityConfig {
     ) {
         DaoAuthenticationProvider provider =
                 new DaoAuthenticationProvider(staffUserDetailsService);
+
         provider.setPasswordEncoder(passwordEncoder);
+
         return provider;
     }
 
@@ -48,6 +51,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(
                 webCorsProperties.getAllowedOrigins()
         );
+
         configuration.setAllowedMethods(
                 List.of(
                         "GET",
@@ -58,13 +62,23 @@ public class SecurityConfig {
                         "OPTIONS"
                 )
         );
+
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Location"));
+
+        configuration.setExposedHeaders(
+                List.of("Location")
+        );
+
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
                 new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+
+        source.registerCorsConfiguration(
+                "/**",
+                configuration
+        );
+
         return source;
     }
 
@@ -73,36 +87,54 @@ public class SecurityConfig {
             HttpSecurity http,
             AuthenticationProvider authenticationProvider
     ) throws Exception {
+
         http
                 .cors(Customizer.withDefaults())
+
                 .csrf(csrf -> csrf.disable())
+
                 .authenticationProvider(authenticationProvider)
+
                 .authorizeHttpRequests(auth -> auth
+
+                        // Allow browser CORS preflight requests
+                        .requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll()
+
                         .requestMatchers("/error")
                         .permitAll()
 
                         .requestMatchers("/api/print-agent/**")
                         .permitAll()
 
+                        // Admin APIs require authentication
                         .requestMatchers("/api/admin/**")
                         .authenticated()
 
                         .requestMatchers(
                                 "/actuator/health",
+
                                 "/api/branches",
                                 "/api/branches/**",
+
                                 "/api/categories",
                                 "/api/categories/**",
+
                                 "/api/products",
                                 "/api/products/**",
+
                                 "/api/menu",
                                 "/api/menu/**",
+
                                 "/api/tax-categories",
                                 "/api/tax-categories/**",
+
                                 "/api/orders",
                                 "/api/orders/**",
+
                                 "/api/payments",
                                 "/api/payments/**",
+
                                 "/api/reviews",
                                 "/api/reviews/**"
                         )
@@ -111,6 +143,7 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated()
                 )
+
                 .httpBasic(Customizer.withDefaults());
 
         return http.build();
