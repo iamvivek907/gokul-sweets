@@ -49,7 +49,7 @@ public class PickupSlotController {
 
     private void authorizeSlot(Long slotId) {
         authorization.requirePermission(PermissionName.BRANCH_MANAGE);
-        PickupSlot slot = repository.findById(slotId)
+        PickupSlot slot = repository.findWithBranchById(slotId)
                 .orElseThrow(() -> new IllegalArgumentException("Pickup slot not found."));
         authorization.requireBranchAccess(slot.getBranch().getId());
     }
