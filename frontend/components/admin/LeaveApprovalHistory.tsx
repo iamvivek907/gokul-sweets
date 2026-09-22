@@ -1,0 +1,392 @@
+"use client";
+
+import {
+    useEffect,
+    useState
+} from "react";
+
+import {
+    useAdminAuth
+} from "@/contexts/AdminAuthContext";
+
+import {
+    getMyLeaveApprovalHistory
+} from "@/services/adminLeaveApprovalHistoryApi";
+
+import type {
+    LeaveApprovalHistoryItem
+} from "@/types/adminLeaveApprovalHistory";
+
+
+function pretty(
+    value: string
+) {
+
+    return value
+        .toLowerCase()
+        .split("_")
+        .map(
+            part =>
+                part.charAt(0)
+                    .toUpperCase()
+                +
+                part.slice(1)
+        )
+        .join(" ");
+}
+
+
+function formatDateTime(
+    value: string
+) {
+
+    const date =
+        new Date(
+            value
+        );
+
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+
+        return value;
+    }
+
+
+    return new Intl.DateTimeFormat(
+        "en-IN",
+        {
+            dateStyle: "medium",
+            timeStyle: "short"
+        }
+    ).format(
+        date
+    );
+}
+
+
+export default function LeaveApprovalHistory({
+    leaveRequestId
+}: {
+    leaveRequestId: number;
+}) {
+
+    const {
+        authorization
+    } =
+        useAdminAuth();
+
+
+    const [
+        result,
+        setResult
+    ] =
+        useState<{
+            leaveRequestId: number;
+            history: LeaveApprovalHistoryItem[];
+            error: string | null;
+        } | null>(
+            null
+        );
+
+
+    const loading =
+        result?.leaveRequestId
+        !== leaveRequestId;
+
+
+    const history =
+        result?.leaveRequestId
+        === leaveRequestId
+            ? result.history
+            : [];
+
+
+    const error =
+        result?.leaveRequestId
+        === leaveRequestId
+            ? result.error
+            : null;
+
+
+    useEffect(
+        () => {
+
+            if (
+                authorization === null
+            ) {
+
+                return;
+            }
+
+
+            const controller =
+                new AbortController();
+
+
+            getMyLeaveApprovalHistory(
+                leaveRequestId,
+                authorization,
+                controller.signal
+            )
+                .then(
+                    historyResult => {
+
+                        setResult({
+                            leaveRequestId,
+                            history:
+                                historyResult,
+                            error:
+                                null
+                        });
+                    }
+                )
+                .catch(
+                    exception => {
+
+                        if (
+                            exception instanceof DOMException
+                            &&
+                            exception.name === "AbortError"
+                        ) {
+
+                            return;
+                        }
+
+
+                        setResult({
+                            leaveRequestId,
+                            history: [],
+                            error:
+                                exception instanceof Error
+                                    ? exception.message
+                                    : "Unable to load approval history."
+                        });
+                    }
+                );
+
+
+            return () => {
+
+                controller.abort();
+            };
+
+        },
+        [
+            authorization,
+            leaveRequestId
+        ]
+    );
+
+
+    if (loading) {
+
+        return (
+            <div
+                className="
+                    mt-6
+                    rounded-xl
+                    border
+                    border-[#eadfd6]
+                    bg-[#fffaf3]
+                    p-4
+                    text-sm
+                    text-[#756763]
+                "
+            >
+                Loading approval history...
+            </div>
+        );
+    }
+
+
+    if (error) {
+
+        return (
+            <div
+                className="
+                    mt-6
+                    rounded-xl
+                    border
+                    border-red-200
+                    bg-red-50
+                    p-4
+                    text-sm
+                    text-red-700
+                "
+            >
+                {error}
+            </div>
+        );
+    }
+
+
+    if (
+        history.length === 0
+    ) {
+
+        return null;
+    }
+
+
+    return (
+        <div
+            className="
+                mt-6
+                border-t
+                border-[#eadfd6]
+                pt-6
+            "
+        >
+
+            <h3
+                className="
+                    text-sm
+                    font-bold
+                    text-[#241715]
+                "
+            >
+                Approval History
+            </h3>
+
+
+            <p
+                className="
+                    mt-1
+                    text-xs
+                    text-[#756763]
+                "
+            >
+                See submission, approval, rejection, send-back and resubmission activity.
+            </p>
+
+
+            <div
+                className="
+                    mt-4
+                    space-y-3
+                "
+            >
+
+                {
+                    history.map(
+                        item => (
+
+                            <div
+                                key={
+                                    item.id
+                                }
+                                className="
+                                    rounded-xl
+                                    border
+                                    border-[#eadfd6]
+                                    bg-white
+                                    p-4
+                                "
+                            >
+
+                                <div
+                                    className="
+                                        flex
+                                        flex-col
+                                        gap-2
+                                        sm:flex-row
+                                        sm:items-start
+                                        sm:justify-between
+                                    "
+                                >
+
+                                    <div>
+
+                                        <p
+                                            className="
+                                                text-sm
+                                                font-bold
+                                                text-[#241715]
+                                            "
+                                        >
+                                            {pretty(item.action)}
+                                        </p>
+
+
+                                        <p
+                                            className="
+                                                mt-1
+                                                text-xs
+                                                text-[#756763]
+                                            "
+                                        >
+                                            {item.actorName}
+                                        </p>
+
+                                    </div>
+
+
+                                    <p
+                                        className="
+                                            text-xs
+                                            text-[#756763]
+                                        "
+                                    >
+                                        {formatDateTime(item.createdAt)}
+                                    </p>
+
+                                </div>
+
+
+                                {
+                                    item.comment
+                                    && (
+
+                                        <div
+                                            className="
+                                                mt-3
+                                                rounded-lg
+                                                bg-[#fffaf3]
+                                                px-3
+                                                py-2.5
+                                            "
+                                        >
+
+                                            <p
+                                                className="
+                                                    text-xs
+                                                    font-semibold
+                                                    text-[#756763]
+                                                "
+                                            >
+                                                Comment
+                                            </p>
+
+
+                                            <p
+                                                className="
+                                                    mt-1
+                                                    whitespace-pre-wrap
+                                                    text-sm
+                                                    leading-6
+                                                    text-[#241715]
+                                                "
+                                            >
+                                                {item.comment}
+                                            </p>
+
+                                        </div>
+
+                                    )
+                                }
+
+                            </div>
+
+                        )
+                    )
+                }
+
+            </div>
+
+        </div>
+    );
+}

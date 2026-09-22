@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+/* =========================================================
+   GOKUL SWEETS DESIGN TOKENS
+   ========================================================= */
+
+:root {
+
+    --background: #fffaf3;
+    --surface: #ffffff;
+
+    --surface-soft: #fff4e5;
+
+    --foreground: #241715;
+
+    --muted: #756763;
+
+    --primary: #7a1625;
+    --primary-dark: #5d0f1b;
+    --primary-light: #9e2838;
+
+    --gold: #c88a20;
+    --gold-soft: #f6dfad;
+
+    --success: #198754;
+    --danger: #c0392b;
+
+    --border: #eadfd6;
+
+    --shadow-soft:
+        0 8px 30px rgba(60, 30, 20, 0.08);
+
+    --shadow-card:
+        0 5px 18px rgba(60, 30, 20, 0.07);
+
+    --radius-small: 10px;
+    --radius-medium: 16px;
+    --radius-large: 24px;
+}
+
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    min-height: 100vh;
+
+    background:
+        var(--background);
+
+    color:
+        var(--foreground);
+
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+
+    -webkit-font-smoothing:
+        antialiased;
+
+    text-rendering:
+        optimizeLegibility;
+
+    /*
+     * Prevent accidental text selection
+     * throughout the app.
+     */
+    -webkit-user-select:
+        none;
+
+    user-select:
+        none;
+
+    /*
+     * Removes mobile tap flash.
+     */
+    -webkit-tap-highlight-color:
+        transparent;
+}
+
+
+/* =========================================================
+   ALLOW TEXT SELECTION WHERE NECESSARY
+   ========================================================= */
+
+input,
+textarea,
+select,
+.selectable-text {
+
+    -webkit-user-select:
+        text;
+
+    user-select:
+        text;
+}
+
+
+/* =========================================================
+   TOUCH BEHAVIOR
+   ========================================================= */
+
+button,
+a {
+
+    touch-action:
+        manipulation;
+}
+
+
+/* =========================================================
+   BASIC ELEMENTS
+   ========================================================= */
+
+button,
+input,
+textarea,
+select {
+
+    font:
+        inherit;
+}
+
+button {
+    border:
+        none;
+}
+
+a {
+    color:
+        inherit;
+
+    text-decoration:
+        none;
+}
+
+
+/* =========================================================
+   MOBILE APP CONTAINER
+   ========================================================= */
+
+.app-container {
+
+    width:
+        100%;
+
+    max-width:
+        1180px;
+
+    margin:
+        0 auto;
+
+    min-height:
+        100vh;
+}
+
+
+/* =========================================================
+   PAGE
+   ========================================================= */
+
+.page-content {
+
+    padding:
+        16px;
+
+    padding-bottom:
+        110px;
+}
+
+
+/* =========================================================
+   UTILITY
+   ========================================================= */
+
+.no-scrollbar {
+
+    scrollbar-width:
+        none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display:
+        none;
+}
