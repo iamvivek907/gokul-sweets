@@ -19,6 +19,9 @@ public class WebCorsProperties {
 
     @NotEmpty
     private List<String> allowedOrigins = new ArrayList<>(
-            List.of("http://localhost:3000")
+            List.of(
+                    "http://localhost:3000",
+                    "https://gokul-sweets-dev.vercel.app"
+            )
     );
 }
