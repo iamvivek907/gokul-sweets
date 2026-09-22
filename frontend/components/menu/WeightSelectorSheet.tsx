@@ -3,6 +3,7 @@
 import {
     useEffect,
     useId,
+    useRef,
     useState
 } from "react";
 
@@ -161,6 +162,28 @@ function WeightSelectorDialog({
     onClose,
     onConfirm
 }: WeightSelectorDialogProps) {
+    const dialogRef = useRef<HTMLElement>(null);
+    useEffect(() => {
+        const previouslyFocused = document.activeElement;
+        const dialog = dialogRef.current;
+        const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex="0"]'
+        ) ?? []);
+        focusable()[0]?.focus();
+        function trapFocus(event: KeyboardEvent) {
+            if (event.key !== "Tab") return;
+            const elements = focusable();
+            const first = elements[0];
+            const last = elements[elements.length - 1];
+            if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
+            if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
+        }
+        dialog?.addEventListener("keydown", trapFocus);
+        return () => {
+            dialog?.removeEventListener("keydown", trapFocus);
+            if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+        };
+    }, []);
 
     const minimum =
         product.minimumWeightGrams
@@ -471,6 +494,7 @@ function WeightSelectorDialog({
         >
 
             <section
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="weight-selector-title"

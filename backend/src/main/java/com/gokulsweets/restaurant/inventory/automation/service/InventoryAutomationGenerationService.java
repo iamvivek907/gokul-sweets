@@ -48,6 +48,7 @@ public class InventoryAutomationGenerationService {
     private final InventoryLedgerService ledgerService;
     private final InventoryAutomationProperties properties;
     private final Clock inventoryClock;
+    private final com.gokulsweets.restaurant.config.EnhancementProperties features;
 
     @Transactional
     public AutomationRunResponse generate(
@@ -110,6 +111,13 @@ public class InventoryAutomationGenerationService {
                         allocation -> new Key(allocation.getBranchProduct().getId(), allocation.getServiceDate()),
                         Function.identity()
                 ));
+        if (features.isInventoryAutomationV2()) {
+            // Match checkout's date/product lock order when regenerating a range; preserve concurrent reservations.
+            targets.values().stream().filter(allocation -> branchProductIds.contains(allocation.getBranchProduct().getId()))
+                    .sorted(Comparator.comparing(InventoryDailyAllocation::getServiceDate)
+                            .thenComparing(allocation -> allocation.getBranchProduct().getId()))
+                    .forEach(allocation -> entityManager.refresh(allocation, LockModeType.PESSIMISTIC_WRITE));
+        }
         List<Long> targetIds = targets.values().stream()
                 .map(InventoryDailyAllocation::getId)
                 .toList();
@@ -366,6 +374,7 @@ public class InventoryAutomationGenerationService {
         int horizon = rule.getGenerationHorizonDays() == null
                 ? policy.getBookingHorizonDays()
                 : Math.min(rule.getGenerationHorizonDays(), policy.getBookingHorizonDays());
+        if (features.isInventoryAutomationV2()) horizon = Math.min(horizon, features.getFutureOrderingDays());
         return requested.isBefore(today.plusDays(horizon)) ? requested : today.plusDays(horizon);
     }
 

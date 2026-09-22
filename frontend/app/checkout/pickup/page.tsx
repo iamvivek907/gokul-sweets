@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import SmartPickupSelection from "@/components/checkout/SmartPickupSelection";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import {
     useEffect,
@@ -258,6 +260,17 @@ function isSlotAvailable(
 
 
 export default function PickupPage() {
+    const features = useStorefrontFeatures();
+    const [fallback, setFallback] = useState(false);
+    const pending = useSyncExternalStore(subscribeToPendingOrder, getPendingOrderSnapshot, getServerPendingOrderSnapshot);
+    // Unauthenticated previews must not add back another order's private holds. Owned checkout edits keep their existing flow.
+    if (features?.smartPickupSelection && !fallback && !parsePendingOrder(pending)) {
+        return <SmartPickupSelection features={features} onFallback={() => setFallback(true)} />;
+    }
+    return <LegacyPickupPage />;
+}
+
+function LegacyPickupPage() {
 
     const router =
         useRouter();

@@ -15,6 +15,9 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
+    {href: "/admin/homepage-campaigns", label: "Homepage Campaigns", permissions: ["MENU_MANAGE"]},
+    {href: "/admin/tax-categories", label: "Tax Categories", permissions: ["MENU_MANAGE"]},
+    {href: "/admin/pickup-scheduling", label: "Pickup Scheduling", permissions: ["BRANCH_MANAGE"]},
     {href: "/admin", label: "Dashboard", exact: true},
     {href: "/admin/me", label: "My Details"},
     {

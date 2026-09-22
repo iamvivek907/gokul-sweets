@@ -5939,14 +5939,12 @@ function OrderDetailDrawer({
                                                                         text-[#756763]
                                                                     "
                                                                 >
-                                                                    {
-                                                                        item.quantity
-                                                                    } ×{" "}
-                                                                    {
-                                                                        formatPrice(
-                                                                            item.unitPrice
-                                                                        )
-                                                                    }
+                                                                    Quantity: {item.saleMode === "WEIGHT"
+                                                                        ? `${item.weightGrams ?? "Not recorded"} g`
+                                                                        : `${item.quantity} pcs`}
+                                                                    <br />
+                                                                    Unit price: {formatPrice(item.unitPrice)}
+                                                                    {item.saleMode === "WEIGHT" ? " / kg" : " / pc"}
                                                                 </p>
 
                                                             </div>

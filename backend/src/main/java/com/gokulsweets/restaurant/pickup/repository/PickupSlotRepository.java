@@ -13,6 +13,10 @@ import java.util.Optional;
 
 public interface PickupSlotRepository extends JpaRepository<PickupSlot, Long> {
 
+    List<PickupSlot> findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+            Long branchId, LocalDate startDate, LocalDate endDate
+    );
+
     List<PickupSlot> findByBranchIdAndSlotDateAndActiveTrueOrderByStartTimeAsc(
             Long branchId,
             LocalDate slotDate

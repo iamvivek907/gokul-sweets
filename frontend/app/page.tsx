@@ -3,6 +3,7 @@ import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
+import CustomerHomeExperience from "@/components/menu/CustomerHomeExperience";
 
 
 const MENU_HIGHLIGHTS = [
@@ -70,6 +71,10 @@ const PICKUP_STEPS = [
 
 
 export default function Home() {
+    return <CustomerHomeExperience fallback={<LegacyHome />} />;
+}
+
+function LegacyHome() {
 
     return (
         <AppShell>

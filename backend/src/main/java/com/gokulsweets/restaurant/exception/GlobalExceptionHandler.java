@@ -23,6 +23,14 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiErrorResponse> handleUploadSize(
+            org.springframework.web.multipart.MaxUploadSizeExceededException exception, HttpServletRequest request
+    ) {
+        return loggedResponse(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE",
+                "Media must be 5 MB or smaller.", request);
+    }
+
     @ExceptionHandler(PaymentSignatureException.class)
     public ResponseEntity<ApiErrorResponse> handlePaymentSignature(
             PaymentSignatureException exception,

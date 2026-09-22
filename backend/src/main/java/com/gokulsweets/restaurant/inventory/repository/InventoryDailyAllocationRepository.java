@@ -16,6 +16,10 @@ import java.util.Optional;
 public interface InventoryDailyAllocationRepository
         extends JpaRepository<InventoryDailyAllocation, Long> {
 
+    List<InventoryDailyAllocation> findByBranchProductIdInAndServiceDateBetween(
+            Collection<Long> branchProductIds, LocalDate fromDate, LocalDate throughDate
+    );
+
     @EntityGraph(attributePaths = {"branchProduct", "branchProduct.branch", "branchProduct.product", "branchProduct.product.category"})
     Optional<InventoryDailyAllocation> findByBranchProductIdAndServiceDate(Long branchProductId, LocalDate serviceDate);
 

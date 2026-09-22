@@ -26,6 +26,7 @@ public class InventoryAutomationScheduler {
     private final InventoryAutomationGenerationService generationService;
     private final InventoryAutomationProperties properties;
     private final Clock inventoryClock;
+    private final com.gokulsweets.restaurant.config.EnhancementProperties features;
 
     @Scheduled(
             cron = "${inventory.automation.cron:0 15 1 * * *}",
@@ -41,7 +42,9 @@ public class InventoryAutomationScheduler {
                         generationService.generate(
                                 branchId,
                                 today,
-                                today.plusDays(properties.getMaximumRunDays() - 1L),
+                                today.plusDays(features.isInventoryAutomationV2()
+                                        ? Math.min(features.getFutureOrderingDays(), properties.getMaximumRunDays() - 1L)
+                                        : properties.getMaximumRunDays() - 1L),
                                 InventoryAutomationTrigger.SCHEDULED,
                                 properties.getSystemActor()
                         );

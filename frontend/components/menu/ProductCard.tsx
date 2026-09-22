@@ -266,7 +266,7 @@ export default function ProductCard({
 
                 {/* Rating */}
 
-                <div className="mt-1.5 flex min-h-5 items-center">
+                <div className="product-card-rating mt-1.5 flex min-h-5 items-center">
 
                     {
                         ratingLoading
@@ -357,6 +357,7 @@ export default function ProductCard({
                 {/* Price + Add */}
 
                 <div className="
+                    product-card-purchase
                     mt-auto
                     flex
                     items-center
@@ -398,6 +399,7 @@ export default function ProductCard({
 
                     <div
                         className={`
+                            product-card-controls
                             relative
                             h-10
                             shrink-0

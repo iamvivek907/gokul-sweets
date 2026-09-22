@@ -1,0 +1,29 @@
+.products :global(.product-card-purchase) {
+    flex-wrap: wrap;
+}
+
+.products :global(.product-card-controls) {
+    height: 44px;
+    width: 156px;
+}
+
+.products button {
+    min-height: 44px;
+}
+
+.products [role="group"] {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+
+/* Ratings are not fetched on this surface; do not invent "new" or zero-rating claims. */
+.products :global(.product-card-rating) {
+    display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .products * {
+        transition: none !important;
+        animation: none !important;
+        translate: none !important;
+    }
+}

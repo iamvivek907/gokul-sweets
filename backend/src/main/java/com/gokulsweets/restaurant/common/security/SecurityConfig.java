@@ -113,6 +113,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/actuator/health",
+                                "/api/storefront/**",
 
                                 "/api/branches",
                                 "/api/branches/**",

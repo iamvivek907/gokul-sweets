@@ -450,7 +450,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                             <option value="AUTO_APPROVE_GUARANTEED">Auto-approve guaranteed quantity</option>
                         </select>
                     </Field>
-                    <Field label={`Guaranteed quantity (${inventoryInputUnit(rule.inventoryUnit)})`} helpKey="guaranteed">
+                    <Field label={`Guaranteed online quantity (${inventoryInputUnit(rule.inventoryUnit)})`} helpKey="guaranteed">
                         <input type="number" min="0" step={rule.inventoryUnit === "GRAM" ? .05 : 1} value={draft.guaranteedQuantity} onChange={event => update("guaranteedQuantity", Number(event.target.value))} className={formControlClass} />
                     </Field>
                     <Field label="Lookback weeks" helpKey="lookbackWeeks">
@@ -472,7 +472,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                             <option value="MANUAL_ONLY">Manual allocation only</option>
                         </select>
                     </Field>
-                    <Field label="Generation horizon days" helpKey="generationHorizon">
+                    <Field label="Automatic planning window (days)" helpKey="generationHorizon">
                         <input type="number" min="0" max="365" value={draft.generationHorizonDays ?? ""} onChange={event => update("generationHorizonDays", event.target.value === "" ? null : Number(event.target.value))} className={formControlClass} placeholder="Use policy horizon" />
                     </Field>
                 </div>

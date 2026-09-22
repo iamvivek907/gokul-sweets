@@ -40,6 +40,13 @@ public class OrderValidationService {
     private final PickupSlotRepository pickupSlotRepository;
 
     private final PickupSlotValidationService pickupSlotValidationService;
+    private final SmartOrderingRules smartOrderingRules;
+
+    @Transactional(readOnly = true)
+    public List<ValidatedOrderItem> validateCart(Long branchId, List<CreateOrderItemRequest> items) {
+        validateBranch(branchId);
+        return validateProducts(branchId, normalizeItems(items));
+    }
 
     // =========================================================
     // VALIDATE NEW ORDER
@@ -68,6 +75,7 @@ public class OrderValidationService {
                         request.pickupSlotId(),
                         branch.getId()
                 );
+        smartOrderingRules.validateWindow(pickupSlot);
 
         /*
          * New orders must validate that their requested
@@ -272,6 +280,7 @@ public class OrderValidationService {
                             requestedPickupSlotId,
                             branch.getId()
                     );
+            smartOrderingRules.validateWindow(requestedPickupSlot);
 
             validatePickupTypeForNewReservation(
                     requestedPickupType,

@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.text.Normalizer;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +38,77 @@ public class R2StorageService {
     @Value("${cloudflare.r2.public-url}")
     private String publicUrl;
 
+    public record CampaignMedia(String url, String contentType) {}
+
+    public CampaignMedia uploadCampaignMedia(Long campaignId, MultipartFile file, boolean staticOnly) {
+        if (file == null || file.isEmpty() || file.getSize() > MAX_IMAGE_SIZE) {
+            throw new IllegalArgumentException("Choose a campaign file of 5 MB or smaller.");
+        }
+        String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        Set<String> allowed = staticOnly ? ALLOWED_CONTENT_TYPES
+                : Set.of("image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm");
+        if (!allowed.contains(type)) throw new IllegalArgumentException("Unsupported campaign media type.");
+        try {
+            byte[] bytes = file.getBytes();
+            if (!matchesSignature(type, bytes)) throw new IllegalArgumentException("File content does not match its media type.");
+            if ((type.equals("image/png") || type.equals("image/webp"))
+                    && hasAnimationChunk(type, bytes)) {
+                throw new IllegalArgumentException("Animated PNG/WebP is not supported. Use GIF/video with a static fallback.");
+            }
+            String extension = switch (type) {
+                case "image/gif" -> ".gif";
+                case "video/mp4" -> ".mp4";
+                case "video/webm" -> ".webm";
+                default -> getExtension(type);
+            };
+            String key = "campaigns/" + campaignId + "/" + UUID.randomUUID() + extension;
+            r2Client.putObject(PutObjectRequest.builder().bucket(bucketName).key(key).contentType(type)
+                            .contentLength(file.getSize()).cacheControl("public, max-age=31536000, immutable").build(),
+                    RequestBody.fromBytes(bytes));
+            return new CampaignMedia(buildPublicUrl(key), type);
+        } catch (IOException exception) {
+            throw new IllegalStateException("Unable to read campaign media.", exception);
+        }
+    }
+
+    static boolean matchesSignature(String type, byte[] bytes) {
+        if (bytes.length < 12) return false;
+        String prefix = new String(bytes, 0, 12, StandardCharsets.ISO_8859_1);
+        return switch (type) {
+            case "image/jpeg" -> (bytes[0] & 255) == 255 && (bytes[1] & 255) == 216 && (bytes[2] & 255) == 255;
+            case "image/png" -> prefix.startsWith("\u0089PNG\r\n\u001a\n");
+            case "image/webp" -> prefix.startsWith("RIFF") && prefix.substring(8).equals("WEBP");
+            case "image/gif" -> prefix.startsWith("GIF87a") || prefix.startsWith("GIF89a");
+            case "video/mp4" -> prefix.substring(4, 8).equals("ftyp");
+            case "video/webm" -> (bytes[0] & 255) == 0x1A && (bytes[1] & 255) == 0x45
+                    && (bytes[2] & 255) == 0xDF && (bytes[3] & 255) == 0xA3;
+            default -> false;
+        };
+    }
+
+    static boolean hasAnimationChunk(String type, byte[] bytes) {
+        // Reject animation chunks so a file advertised as a static fallback cannot ignore reduced-motion preferences.
+        boolean png = type.equals("image/png");
+        var buffer = java.nio.ByteBuffer.wrap(bytes).order(png
+                ? java.nio.ByteOrder.BIG_ENDIAN : java.nio.ByteOrder.LITTLE_ENDIAN);
+        long offset = png ? 8 : 12;
+        while (offset + 8 <= bytes.length) {
+            int position = (int) offset;
+            String chunk = new String(bytes, position + (png ? 4 : 0), 4, StandardCharsets.US_ASCII);
+            if (chunk.equals(png ? "acTL" : "ANIM")) return true;
+            long length = Integer.toUnsignedLong(buffer.getInt(position + (png ? 0 : 4)));
+            offset += (png ? 12 : 8) + length + (!png ? length % 2 : 0);
+        }
+        return false;
+    }
+
+    public void deleteCampaignMedia(String url) {
+        String key = extractKeyFromPublicUrl(url);
+        if (key == null || !key.startsWith("campaigns/") || key.contains("..")) {
+            throw new IllegalArgumentException("Only managed campaign media can be removed.");
+        }
+        r2Client.deleteObject(DeleteObjectRequest.builder().bucket(bucketName).key(key).build());
+    }
 
     public String uploadProductImage(
             Long productId,
