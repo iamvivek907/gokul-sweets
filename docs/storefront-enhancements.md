@@ -156,6 +156,9 @@ creation timestamps from the last 30 days. Candidates must belong to the live br
 and have a feasible minimum-quantity pickup within the horizon. At most four of each are
 shown. No history means no fabricated trend; an optional failure omits the sections while
 the real menu/quick-add remains. Exact customer quantities are checked at pickup/checkout.
+Optional highlights are cached per application instance for 30 seconds, keyed by branch,
+business date and ordering horizon, with at most 128 entries. Concurrent requests share
+the same cached refresh; cart and checkout availability checks remain uncached.
 No product photos, trend data or special products are synthesized.
 
 ### Campaigns and R2

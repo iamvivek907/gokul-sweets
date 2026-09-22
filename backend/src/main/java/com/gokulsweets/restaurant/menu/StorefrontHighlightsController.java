@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.sql.Date;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.function.Function;
@@ -21,18 +22,40 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class StorefrontHighlightsController {
+    private static final int MAX_CACHED_HIGHLIGHTS = 128;
+    private static final int CACHE_TTL_SECONDS = 30;
     private final EnhancementProperties features;
     private final MenuService menu;
     private final JdbcTemplate jdbc;
     private final CartAvailabilityService availability;
     private final Clock inventoryClock;
+    private final Map<CacheKey, CacheEntry> highlightsCache = new LinkedHashMap<>(16, 0.75f, true);
 
     @GetMapping("/api/branches/{branchId}/storefront-highlights")
     public Highlights highlights(@PathVariable Long branchId) {
         if (!features.isCustomerHomeV2()) return new Highlights(List.of(), List.of());
+        LocalDate today = LocalDate.now(inventoryClock);
+        CacheKey key = new CacheKey(branchId, today, features.getFutureOrderingDays());
+        CacheEntry entry;
+        synchronized (highlightsCache) {
+            entry = highlightsCache.computeIfAbsent(key, ignored -> new CacheEntry());
+            if (highlightsCache.size() > MAX_CACHED_HIGHLIGHTS) {
+                highlightsCache.remove(highlightsCache.keySet().iterator().next());
+            }
+        }
+        // Only optional homepage hints are cached; cart and checkout still validate live availability.
+        synchronized (entry) {
+            if (entry.highlights == null || !inventoryClock.instant().isBefore(entry.expiresAt)) {
+                entry.highlights = loadHighlights(branchId, today);
+                entry.expiresAt = inventoryClock.instant().plusSeconds(CACHE_TTL_SECONDS);
+            }
+            return entry.highlights;
+        }
+    }
+
+    private Highlights loadHighlights(Long branchId, LocalDate today) {
         Map<Long, MenuProductResponse> products = menu.getMenu(branchId).stream().flatMap(category -> category.products().stream())
                 .filter(MenuProductResponse::available).collect(Collectors.toMap(MenuProductResponse::id, Function.identity()));
-        LocalDate today = LocalDate.now(inventoryClock);
         // Rank by order count, not mixed piece/gram quantities. Reuse reporting aggregates, never recalculate orders.
         List<Long> trending = jdbc.queryForList("""
                 SELECT product_id FROM analytics_product_daily
@@ -65,6 +88,12 @@ public class StorefrontHighlightsController {
                 return false;
             }
         })).limit(4).toList();
+    }
+
+    private record CacheKey(Long branchId, LocalDate date, int futureOrderingDays) {}
+    private static class CacheEntry {
+        private Highlights highlights;
+        private Instant expiresAt;
     }
 
     public record Highlights(List<Long> trendingProductIds, List<Long> newProductIds) {}
