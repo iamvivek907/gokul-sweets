@@ -59,3 +59,25 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Independent regression suite for additive enhancements; the legacy test task remains unchanged.
+sourceSets {
+	enhancementTest {
+		compileClasspath += sourceSets.main.output
+		runtimeClasspath += sourceSets.main.output
+	}
+}
+configurations {
+	enhancementTestImplementation.extendsFrom testImplementation
+	enhancementTestRuntimeOnly.extendsFrom testRuntimeOnly
+}
+tasks.register('enhancementTest', Test) {
+	description = 'Runs storefront and ordering enhancement regressions.'
+	group = 'verification'
+	testClassesDirs = sourceSets.enhancementTest.output.classesDirs
+	classpath = sourceSets.enhancementTest.runtimeClasspath
+	useJUnitPlatform()
+}
+tasks.named('check') {
+	dependsOn tasks.named('enhancementTest')
+}

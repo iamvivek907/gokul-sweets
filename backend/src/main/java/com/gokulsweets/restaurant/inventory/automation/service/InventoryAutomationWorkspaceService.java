@@ -206,7 +206,8 @@ public class InventoryAutomationWorkspaceService {
                                 window.getId(), window.getName(), window.getStartDate(),
                                 window.getEndDate(), window.isActive()
                         ))
-                        .toList()
+                        .toList(),
+                policy.isReadyStockRequired(), policy.getBookingHorizonDays(), policy.getProductionLeadMinutes()
         );
     }
 }

@@ -15,11 +15,13 @@ import SocialFollowPopup
 interface AppShellProps {
 
     children: ReactNode;
+    showSocialPopup?: boolean;
 }
 
 
 export default function AppShell({
-    children
+    children,
+    showSocialPopup = true
 }: AppShellProps) {
 
     return (
@@ -55,7 +57,7 @@ export default function AppShell({
             <BottomNavigation />
 
 
-            <SocialFollowPopup />
+            {showSocialPopup && <SocialFollowPopup />}
 
         </div>
     );

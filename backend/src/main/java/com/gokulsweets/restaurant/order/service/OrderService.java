@@ -432,7 +432,8 @@ public class OrderService {
         orderInventoryReservationService
                 .synchronizePendingOrder(
                         savedOrder,
-                        validatedOrder
+                        validatedOrder,
+                        pickupReservationChanged
                 );
 
         log.info(

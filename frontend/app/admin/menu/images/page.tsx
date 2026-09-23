@@ -1,8 +1,10 @@
 "use client";
+import Link from "next/link";
 
 import {
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 
@@ -78,6 +80,9 @@ const ALLOWED_IMAGE_TYPES = [
 /* -------------------------------------------------------------------------- */
 
 export default function ImageManagementPage() {
+    const restoredProduct = useRef<number | null>(null);
+    const restored = useRef(false);
+    const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
     const {
         profile
@@ -156,6 +161,13 @@ export default function ImageManagementPage() {
         refreshing,
         setRefreshing
     ] = useState(false);
+
+    useEffect(() => {
+        if (!preferencesLoaded) return;
+        sessionStorage.setItem("gokul-admin-image-context", JSON.stringify({
+            branchId: selectedBranchId, search, category: categoryFilter, image: imageFilter, productId: selectedProduct?.id ?? restoredProduct.current
+        }));
+    }, [preferencesLoaded, selectedBranchId, search, categoryFilter, imageFilter, selectedProduct]);
 
 
     /* ---------------------------------------------------------------------- */
@@ -246,6 +258,18 @@ export default function ImageManagementPage() {
                             );
 
 
+                    if (!restored.current) {
+                        try {
+                            const saved = JSON.parse(sessionStorage.getItem("gokul-admin-image-context") ?? "null");
+                            if (saved) {
+                                setSelectedBranchId(saved.branchId ?? null); setSearch(saved.search ?? "");
+                                setCategoryFilter(saved.category ?? "ALL");
+                                if (["ALL", "WITH_IMAGE", "WITHOUT_IMAGE"].includes(saved.image)) setImageFilter(saved.image);
+                                restoredProduct.current = saved.productId ?? null;
+                            }
+                        } catch (error) {console.warn("Image management preferences could not be restored.", error);}
+                        restored.current = true; setPreferencesLoaded(true);
+                    }
                     setBranches(
                         allowedBranches
                     );
@@ -382,6 +406,13 @@ export default function ImageManagementPage() {
     /* ---------------------------------------------------------------------- */
     /* Apply filters                                                          */
     /* ---------------------------------------------------------------------- */
+
+    useEffect(() => {
+        if (!restoredProduct.current || !products.length) return;
+        const product = products.find(item => item.id === restoredProduct.current);
+        if (product) setSelectedProduct(product);
+        restoredProduct.current = null;
+    }, [products]);
 
     const filteredProducts =
         useMemo(
@@ -659,9 +690,7 @@ export default function ImageManagementPage() {
 
                         <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-500">
 
-                            <span>
-                                Menu
-                            </span>
+                            <Link href="/admin/menu" className="inline-flex min-h-11 items-center underline">Back to menu</Link>
 
                             <span>
                                 /

@@ -48,6 +48,7 @@ public class InventoryAutomationGenerationService {
     private final InventoryLedgerService ledgerService;
     private final InventoryAutomationProperties properties;
     private final Clock inventoryClock;
+    private final com.gokulsweets.restaurant.config.EnhancementProperties features;
 
     @Transactional
     public AutomationRunResponse generate(
@@ -110,6 +111,13 @@ public class InventoryAutomationGenerationService {
                         allocation -> new Key(allocation.getBranchProduct().getId(), allocation.getServiceDate()),
                         Function.identity()
                 ));
+        if (features.isInventoryAutomationV2()) {
+            // Match checkout's date/product lock order when regenerating a range; preserve concurrent reservations.
+            targets.values().stream().filter(allocation -> branchProductIds.contains(allocation.getBranchProduct().getId()))
+                    .sorted(Comparator.comparing(InventoryDailyAllocation::getServiceDate)
+                            .thenComparing(allocation -> allocation.getBranchProduct().getId()))
+                    .forEach(allocation -> entityManager.refresh(allocation, LockModeType.PESSIMISTIC_WRITE));
+        }
         List<Long> targetIds = targets.values().stream()
                 .map(InventoryDailyAllocation::getId)
                 .toList();
@@ -148,6 +156,13 @@ public class InventoryAutomationGenerationService {
             for (LocalDate date = fromDate; !date.isAfter(ruleThrough); date = date.plusDays(1)) {
                 processDate(run, rule, policy, windows.getOrDefault(rule.getId(), List.of()),
                         date, today, historyByProductAndDay, targets, managedByAllocationId);
+            }
+            if (features.isInventoryAutomationV2() && ruleThrough.isBefore(throughDate)) {
+                addItem(run, rule, fromDate.isAfter(ruleThrough) ? fromDate : ruleThrough.plusDays(1),
+                        InventoryAutomationOutcome.SKIPPED, null, null,
+                        "Remaining dates through " + throughDate + " were not generated: the product, rule or global planning window ends on "
+                                + ruleThrough + ". Review the configured ordering and planning windows.");
+                incrementSkipped(run);
             }
         }
 
@@ -366,6 +381,7 @@ public class InventoryAutomationGenerationService {
         int horizon = rule.getGenerationHorizonDays() == null
                 ? policy.getBookingHorizonDays()
                 : Math.min(rule.getGenerationHorizonDays(), policy.getBookingHorizonDays());
+        if (features.isInventoryAutomationV2()) horizon = Math.min(horizon, features.getFutureOrderingDays());
         return requested.isBefore(today.plusDays(horizon)) ? requested : today.plusDays(horizon);
     }
 

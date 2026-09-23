@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
     useEffect,
@@ -272,9 +273,7 @@ export default function MenuScreen() {
                         result
                     );
 
-                    setSelectedCategoryId(
-                        null
-                    );
+                    setSelectedCategoryId(Number(new URLSearchParams(window.location.search).get("category")) || null);
 
                     setSearch(
                         ""
@@ -713,6 +712,7 @@ export default function MenuScreen() {
         ||
         effectiveCategoryId !== null;
 
+    const pickupCheck = useDateAvailability(filteredProducts);
 
     function handleAddToCart(
         product: MenuProduct
@@ -1031,9 +1031,9 @@ export default function MenuScreen() {
                                     text-[#756763]
                                 "
                             >
-                                Choose your favourites now.
-                                You&apos;ll select a convenient pickup
-                                time during checkout.
+                                {pickupCheck.features?.smartAvailability
+                                    ? "Choose a pickup date to see what fits, or browse first and decide later."
+                                    : "Choose your favourites now. You'll select a convenient pickup time during checkout."}
                             </p>
 
                         </div>
@@ -1140,6 +1140,7 @@ export default function MenuScreen() {
 
                 </header>
 
+                <PickupContext check={pickupCheck} />
 
                 <div
                     className="
@@ -1294,7 +1295,7 @@ export default function MenuScreen() {
                                                         filteredProducts.length === 1
                                                             ? "item"
                                                             : "items"
-                                                    } available`
+                                                    } on the menu`
                                             }
                                         </h2>
 
@@ -1324,6 +1325,9 @@ export default function MenuScreen() {
 
 
                                 <ProductGrid
+                                    pickupItems={pickupCheck.items}
+                                    pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
+                                    dateAware={!!pickupCheck.features?.smartAvailability}
                                     products={
                                         filteredProducts
                                     }

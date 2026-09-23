@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.pickup.repository;
 
 import com.gokulsweets.restaurant.pickup.PickupSlot;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,6 +13,14 @@ import java.util.List;
 import java.util.Optional;
 
 public interface PickupSlotRepository extends JpaRepository<PickupSlot, Long> {
+
+    @EntityGraph(attributePaths = "branch")
+    List<PickupSlot> findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+            Long branchId, LocalDate startDate, LocalDate endDate
+    );
+
+    @EntityGraph(attributePaths = "branch")
+    Optional<PickupSlot> findWithBranchById(Long slotId);
 
     List<PickupSlot> findByBranchIdAndSlotDateAndActiveTrueOrderByStartTimeAsc(
             Long branchId,

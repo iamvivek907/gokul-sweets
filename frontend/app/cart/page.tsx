@@ -1,4 +1,5 @@
 "use client";
+import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
     useState
@@ -40,6 +41,7 @@ import type {
 
 
 export default function CartPage() {
+    const pickupCheck = useDateAvailability();
 
     const router =
         useRouter();
@@ -150,6 +152,7 @@ export default function CartPage() {
 
     return (
         <AppShell>
+            <PickupContext check={pickupCheck} cart />
 
             <section
                 className="

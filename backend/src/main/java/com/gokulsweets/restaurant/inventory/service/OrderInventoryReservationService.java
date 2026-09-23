@@ -41,6 +41,8 @@ public class OrderInventoryReservationService {
     private final InventoryQuantityService quantityService;
     private final InventoryLedgerService ledgerService;
     private final Clock inventoryClock;
+    private final com.gokulsweets.restaurant.config.EnhancementProperties features;
+    private final com.gokulsweets.restaurant.order.service.SmartOrderingRules smartOrderingRules;
 
     /*
      * Synchronizes the complete pending order, not one item at a time.
@@ -57,6 +59,11 @@ public class OrderInventoryReservationService {
             Order order,
             ValidatedOrderData validatedOrder
     ) {
+        synchronizePendingOrder(order, validatedOrder, false);
+    }
+
+    @Transactional
+    public void synchronizePendingOrder(Order order, ValidatedOrderData validatedOrder, boolean pickupChanged) {
         if (!properties.isEnforcementEnabled()) {
             return;
         }
@@ -89,6 +96,13 @@ public class OrderInventoryReservationService {
                         order.getReservationExpiresAt()
                 )
         ) {
+            if (features.isSmartAvailability() && pickupChanged) {
+                // Same-date holds can be reused, but moving to an earlier slot must still meet preparation promises.
+                var locked = lockAllRequiredAllocations(existing, requested);
+                for (RequestedHold hold : requested.values()) {
+                    validatePolicyForOrder(order, requireLockedAllocation(locked, hold.key()), requirePolicy(hold.branchProductId()));
+                }
+            }
             return;
         }
 
@@ -527,6 +541,10 @@ public class OrderInventoryReservationService {
             InventoryDailyAllocation allocation,
             BranchInventoryPolicy policy
     ) {
+        if (features.isSmartAvailability()) {
+            String reason = smartOrderingRules.preparationReason(order.getPickupSlot(), policy, allocation);
+            if (reason != null) throw new InventoryConflictException("PICKUP_NOT_READY", reason);
+        }
         LocalDateTime now = LocalDateTime.now(inventoryClock);
         LocalDate pickupDate = order.getPickupSlot().getSlotDate();
         LocalDateTime pickupAt = LocalDateTime.of(

@@ -1134,13 +1134,15 @@ const INPUT_CLASS =
     `;
 
 
-function SettingField({
+export function SettingField({
     label,
     help,
+    htmlFor,
     children
 }: {
     label: string;
     help?: string;
+    htmlFor?: string;
     children: React.ReactNode;
 }) {
 
@@ -1148,6 +1150,7 @@ function SettingField({
         <div>
 
             <label
+                htmlFor={htmlFor}
                 className="
                     mb-2
                     block
@@ -1186,7 +1189,7 @@ function SettingField({
 }
 
 
-function SettingToggle({
+export function SettingToggle({
     label,
     description,
     checked,

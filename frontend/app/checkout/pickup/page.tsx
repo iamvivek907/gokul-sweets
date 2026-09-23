@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import SmartPickupSelection from "@/components/checkout/SmartPickupSelection";
+import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
 
 import {
     useEffect,
@@ -258,6 +260,26 @@ function isSlotAvailable(
 
 
 export default function PickupPage() {
+    const {features, error: configurationError, retry} = useStorefrontConfiguration();
+    const [fallback, setFallback] = useState(false);
+    const pending = useSyncExternalStore(subscribeToPendingOrder, getPendingOrderSnapshot, getServerPendingOrderSnapshot);
+    if (!features && !fallback) return <AppShell showSocialPopup={false}>
+        {configurationError ? <div role="alert"><p>{configurationError}</p>
+            <button className="min-h-11 p-3 underline" onClick={retry}>Retry settings</button>
+            <button className="min-h-11 p-3 underline" onClick={() => setFallback(true)}>Use standard pickup selection</button></div>
+            : <p role="status">Loading pickup options...</p>}
+    </AppShell>;
+    // Unauthenticated previews must not add back another order's private holds. Owned checkout edits keep their existing flow.
+    if (features?.smartPickupSelection && !fallback && !parsePendingOrder(pending)) {
+        return <>{configurationError && <p role="status" className="p-3 text-center text-sm">{configurationError} Keeping your pickup layout.
+            <button onClick={retry} className="min-h-11 px-3 underline">Retry settings</button></p>}
+            <SmartPickupSelection features={features} onFallback={() => setFallback(true)} /></>;
+    }
+    return <>{features?.smartPickupSelection && parsePendingOrder(pending) && <p className="p-4 text-center text-sm">
+        Editing a reserved order: your existing pickup selector keeps its held stock.</p>}<LegacyPickupPage /></>;
+}
+
+function LegacyPickupPage() {
 
     const router =
         useRouter();

@@ -240,6 +240,10 @@ export interface AdminOrderItem {
 
     productName: string;
 
+    saleMode?: "UNIT" | "WEIGHT";
+
+    weightGrams?: number | null;
+
     quantity: number;
 
     unitPrice: number;
