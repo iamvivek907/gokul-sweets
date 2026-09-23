@@ -10,6 +10,8 @@ import BottomNavigation
 
 import SocialFollowPopup
     from "./SocialFollowPopup";
+import CustomerFooter
+    from "./CustomerFooter";
 
 
 interface AppShellProps {
@@ -28,6 +30,8 @@ export default function AppShell({
         <div
             className="
                 app-container
+                flex
+                flex-col
                 min-h-dvh
                 w-full
                 min-w-0
@@ -44,6 +48,7 @@ export default function AppShell({
             <main
                 className="
                     page-content
+                    flex-1
                     w-full
                     min-w-0
                     max-w-full
@@ -53,6 +58,7 @@ export default function AppShell({
                 {children}
             </main>
 
+            <CustomerFooter />
 
             <BottomNavigation />
 

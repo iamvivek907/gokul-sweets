@@ -101,12 +101,56 @@ function formatDateForApi(
     return `${year}-${month}-${day}`;
 }
 
+function formatDateInTimeZone(
+    date: Date,
+    timeZone: string
+): string {
+    const formatter =
+        new Intl.DateTimeFormat(
+            "en-CA",
+            {
+                timeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }
+        );
+
+    const parts =
+        formatter.formatToParts(date);
+
+    const year =
+        parts.find(
+            part => part.type === "year"
+        )?.value;
+
+    const month =
+        parts.find(
+            part => part.type === "month"
+        )?.value;
+
+    const day =
+        parts.find(
+            part => part.type === "day"
+        )?.value;
+
+    if (
+        !year
+        || !month
+        || !day
+    ) {
+        return formatDateForApi(date);
+    }
+
+    return `${year}-${month}-${day}`;
+}
 
 function getToday():
     string {
 
-    return formatDateForApi(
-        new Date()
+    return formatDateInTimeZone(
+        new Date(),
+        "Asia/Kolkata"
     );
 }
 
@@ -126,20 +170,22 @@ function subscribeToDate():
 
 
 function getMaximumPickupDate(
+    fromDate: string,
     numberOfDays: number
 ): string {
-
     const date =
-        new Date();
+        new Date(
+            `${fromDate}T12:00:00+05:30`
+        );
 
-    date.setDate(
-        date.getDate()
+    date.setUTCDate(
+        date.getUTCDate()
         + numberOfDays
     );
 
-
-    return formatDateForApi(
-        date
+    return formatDateInTimeZone(
+        date,
+        "Asia/Kolkata"
     );
 }
 
@@ -230,6 +276,20 @@ function formatCurrency(
     );
 }
 
+function clampDateWithinBounds(
+    value: string,
+    minimum: string,
+    maximum: string
+): string {
+    if (value < minimum) {
+        return minimum;
+    }
+    if (maximum && value > maximum) {
+        return maximum;
+    }
+    return value;
+}
+
 
 function isSlotAvailable(
     slot: PickupSlot
@@ -276,10 +336,16 @@ export default function PickupPage() {
             <SmartPickupSelection features={features} onFallback={() => setFallback(true)} /></>;
     }
     return <>{features?.smartPickupSelection && parsePendingOrder(pending) && <p className="p-4 text-center text-sm">
-        Editing a reserved order: your existing pickup selector keeps its held stock.</p>}<LegacyPickupPage /></>;
+        Editing a reserved order: your existing pickup selector keeps its held stock.</p>}<LegacyPickupPage fallbackToday={features?.today ?? null} fallbackFutureOrderingDays={features?.futureOrderingDays ?? null} /></>;
 }
 
-function LegacyPickupPage() {
+function LegacyPickupPage({
+    fallbackToday,
+    fallbackFutureOrderingDays
+}: {
+    fallbackToday: string | null;
+    fallbackFutureOrderingDays: number | null;
+}) {
 
     const router =
         useRouter();
@@ -349,17 +415,25 @@ function LegacyPickupPage() {
     const today =
         useSyncExternalStore(
             subscribeToDate,
-            getToday,
+            () =>
+                fallbackToday
+                ?? getToday(),
             getServerToday
         );
 
 
     const maximumDate =
-        today
+        today && fallbackFutureOrderingDays !== null
             ? getMaximumPickupDate(
-                7
+                today,
+                fallbackFutureOrderingDays
             )
-            : "";
+            : today
+                ? getMaximumPickupDate(
+                    today,
+                    7
+                )
+                : "";
 
 
     const [
@@ -440,8 +514,12 @@ function LegacyPickupPage() {
 
 
     const pickupDate =
-        selectedDate
-        ?? today;
+        clampDateWithinBounds(
+            selectedDate
+            ?? today,
+            today,
+            maximumDate
+        );
 
 
     /*
@@ -789,6 +867,12 @@ function LegacyPickupPage() {
     function handleDateChange(
         value: string
     ) {
+        const nextDate =
+            clampDateWithinBounds(
+                value,
+                today,
+                maximumDate
+            );
 
         setLoading(
             true
@@ -821,7 +905,7 @@ function LegacyPickupPage() {
 
 
         setSelectedDate(
-            value
+            nextDate
         );
     }
 

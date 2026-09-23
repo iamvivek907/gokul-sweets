@@ -1,9 +1,9 @@
 package com.gokulsweets.restaurant.payment.provider.razorpay;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gokulsweets.restaurant.payment.exception.PaymentSignatureException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;

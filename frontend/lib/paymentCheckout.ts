@@ -72,11 +72,105 @@ export async function openPaymentCheckout(
         );
     }
 
+    if (
+        payment.provider ===
+        "PHONEPE"
+    ) {
+        return openPhonePe(
+            payment
+        );
+    }
+
 
     return {
         kind: "failed",
         message: "The selected payment provider is not supported."
     };
+}
+
+async function openPhonePe(
+    payment: PaymentResponse
+): Promise<CheckoutOutcome> {
+
+    if (
+        !payment.paymentUrl
+    ) {
+        return {
+            kind: "failed",
+            message: "PhonePe checkout link is unavailable for this payment."
+        };
+    }
+
+    const popup =
+        window.open(
+            payment.paymentUrl,
+            "_blank",
+            "noopener,noreferrer"
+        );
+
+    if (
+        !popup
+    ) {
+        return {
+            kind: "failed",
+            message: "Unable to open PhonePe. Please allow pop-ups and try again."
+        };
+    }
+
+    let latest =
+        await refreshPayment(
+            payment.paymentId
+        );
+
+    if (
+        FINAL_PAYMENT_STATUSES.has(
+            latest.paymentStatus
+        )
+    ) {
+        return {
+            kind: "updated",
+            payment: latest
+        };
+    }
+
+    for (
+        let attempt = 0;
+        attempt < CONFIRMATION_POLL_ATTEMPTS;
+        attempt++
+    ) {
+        await delay(
+            CONFIRMATION_POLL_INTERVAL_MS
+        );
+
+        latest =
+            await refreshPayment(
+                payment.paymentId
+            );
+
+        if (
+            FINAL_PAYMENT_STATUSES.has(
+                latest.paymentStatus
+            )
+        ) {
+            return {
+                kind: "updated",
+                payment: latest
+            };
+        }
+
+        if (
+            popup.closed
+        ) {
+            break;
+        }
+    }
+
+    return popup.closed
+        ? {kind: "dismissed"}
+        : {
+            kind: "updated",
+            payment: latest
+        };
 }
 
 

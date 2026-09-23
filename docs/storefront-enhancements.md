@@ -540,6 +540,44 @@ Flyway checksums. Older application code can ignore the additive V52 fields/tabl
    bypassing authorization. Recheck the normal backend suite once its unrelated
    Jackson test-source mismatch is repaired in its own scope.
 
+## Payment provider toggles and PhonePe onboarding
+
+Payment provider selection stays backend-config driven. The customer frontend does **not**
+offer a public toggle.
+
+- `PAYMENT_ENABLED_PROVIDERS` controls which providers are allowed at runtime.
+  Example: `RAZORPAY,PAYTM,PHONEPE`
+- `PAYMENT_DEFAULT_PROVIDER` controls the provider used when `/api/payments` receives
+  no explicit provider.
+- Existing Razorpay/Paytm behavior is unchanged when PhonePe is not enabled.
+
+PhonePe environment variables (required when PhonePe is enabled or defaulted):
+
+- `PHONEPE_MERCHANT_ID`
+- `PHONEPE_SALT_KEY`
+- `PHONEPE_SALT_INDEX` (default `1`)
+- `PHONEPE_REDIRECT_URL` (customer redirect after hosted checkout)
+- `PHONEPE_CALLBACK_URL` (optional callback URL configured with PhonePe)
+- Optional overrides:
+  - `PHONEPE_BASE_URL` (default `https://api.phonepe.com/apis/hermes`)
+  - `PHONEPE_CREATE_PAYMENT_PATH` (default `/pg/v1/pay`)
+  - `PHONEPE_STATUS_PATH_TEMPLATE` (default `/pg/v1/status/{merchantId}/{merchantTransactionId}`)
+  - `PHONEPE_CONNECT_TIMEOUT_SECONDS` (default `10`)
+  - `PHONEPE_REQUEST_TIMEOUT_SECONDS` (default `20`)
+
+Safe switch examples:
+
+1. Keep Razorpay default, make PhonePe available:
+   `PAYMENT_ENABLED_PROVIDERS=RAZORPAY,PAYTM,PHONEPE`
+   `PAYMENT_DEFAULT_PROVIDER=RAZORPAY`
+2. Switch default to PhonePe after credentials are configured:
+   `PAYMENT_ENABLED_PROVIDERS=RAZORPAY,PAYTM,PHONEPE`
+   `PAYMENT_DEFAULT_PROVIDER=PHONEPE`
+
+The PhonePe adapter includes hosted-payment creation, status polling and signed callback
+verification scaffolding (`X-VERIFY`) with provider-order reconciliation. Live signature
+and gateway behavior must still be validated with real PhonePe credentials in DEV/UAT.
+
 These revisions were developed and verified on
 `iamvivek907-storefront-and-ordering-enhancements` in
 `/Users/macbookairm1/.copilot/repos/copilot-worktrees/gokul-sweets/iamvivek907-fictional-engine`.
