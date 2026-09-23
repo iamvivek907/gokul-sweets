@@ -11,12 +11,12 @@ import com.gokulsweets.restaurant.payment.provider.RefundResult;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
-import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @Component
 @RequiredArgsConstructor
-public class PhonePePaymentProvider
-        implements PaymentProvider {
+public class PhonePePaymentProvider implements PaymentProvider {
 
     private final PhonePeClient client;
     private final PhonePeProperties properties;
@@ -35,20 +35,22 @@ public class PhonePePaymentProvider
         properties.requireRedirectConfiguration();
 
         /*
-         * This ID is persisted as providerOrderId.
+         * This is our own merchant-side identifier.
          *
-         * It must be:
-         * - unique
-         * - <= 63 characters
-         * - only letters/numbers/_/-
+         * It is stored in Payment.providerOrderId and must be used
+         * for all subsequent PhonePe status checks.
          */
         String merchantOrderId =
                 "GKS-PPE-" + payment.getId();
 
+        /*
+         * PhonePe redirects the customer back to our payment page.
+         *
+         * Example:
+         * https://gokul-sweets-dev.vercel.app/payment/GKS-20260923-490EAC17BE04497A
+         */
         String redirectUrl =
-                buildRedirectUrl(
-                        order.getOrderNumber()
-                );
+                buildRedirectUrl(order.getOrderNumber());
 
         PhonePeClient.CreatePaymentResponse created =
                 client.createPayment(
@@ -56,6 +58,17 @@ public class PhonePePaymentProvider
                         payment.getAmount(),
                         redirectUrl
                 );
+
+        if (created.orderId() == null
+                || created.orderId().isBlank()) {
+
+            throw new IllegalStateException(
+                    created.message() == null
+                            || created.message().isBlank()
+                            ? "PhonePe did not return a PhonePe order ID."
+                            : created.message()
+            );
+        }
 
         if (created.redirectUrl() == null
                 || created.redirectUrl().isBlank()) {
@@ -71,11 +84,11 @@ public class PhonePePaymentProvider
         /*
          * Mapping:
          *
-         * providerPaymentId = PhonePe orderId
+         * providerPaymentId = PhonePe generated orderId
          * providerOrderId   = our merchantOrderId
-         * paymentSessionId  = null
+         * paymentSessionId  = not used by PhonePe V2
          * paymentUrl        = PhonePe redirectUrl
-         * checkoutKeyId     = null
+         * checkoutKeyId     = not used
          */
         return new PaymentCreationResult(
                 created.orderId(),
@@ -94,9 +107,7 @@ public class PhonePePaymentProvider
                 requireProviderOrderId(payment);
 
         PhonePeClient.StatusResponse status =
-                client.checkStatus(
-                        merchantOrderId
-                );
+                client.checkStatus(merchantOrderId);
 
         String state =
                 status.state() == null
@@ -119,6 +130,7 @@ public class PhonePePaymentProvider
                             PaymentStatus.FAILED,
                             status.transactionId(),
                             status.errorMessage() == null
+                                    || status.errorMessage().isBlank()
                                     ? "PhonePe reported that the payment failed."
                                     : status.errorMessage()
                     );
@@ -133,16 +145,7 @@ public class PhonePePaymentProvider
     }
 
     @Override
-    public RefundResult refund(
-            Payment payment
-    ) {
-        /*
-         * We are deliberately not implementing automatic refunds
-         * in this first V2 migration.
-         *
-         * Your existing PaymentStatusService will continue to
-         * represent the refund lifecycle correctly.
-         */
+    public RefundResult refund(Payment payment) {
         return new RefundResult(
                 PaymentStatus.REFUND_FAILED,
                 null,
@@ -151,9 +154,7 @@ public class PhonePePaymentProvider
     }
 
     @Override
-    public RefundResult verifyRefund(
-            Payment payment
-    ) {
+    public RefundResult verifyRefund(Payment payment) {
         return new RefundResult(
                 PaymentStatus.REFUND_FAILED,
                 null,
@@ -178,13 +179,15 @@ public class PhonePePaymentProvider
     private String buildRedirectUrl(
             String orderNumber
     ) {
-        return properties
-                .getRedirectUrl()
-                .replaceAll("/+$", "")
+        String baseUrl =
+                properties.getRedirectUrl()
+                        .replaceAll("/+$", "");
+
+        return baseUrl
                 + "/payment/"
-                + java.net.URLEncoder.encode(
+                + URLEncoder.encode(
                 orderNumber,
-                java.nio.charset.StandardCharsets.UTF_8
+                StandardCharsets.UTF_8
         );
     }
 }
