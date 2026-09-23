@@ -10,6 +10,33 @@ import type {
 
 /*
  * =========================================================
+ * PAYMENT LOOKUP RESPONSE
+ * =========================================================
+ *
+ * The backend always returns JSON:
+ *
+ * {
+ *     "payment": null
+ * }
+ *
+ * or:
+ *
+ * {
+ *     "payment": {
+ *         ...
+ *     }
+ * }
+ *
+ * This avoids attempting response.json() on an empty HTTP body.
+ */
+
+export interface PaymentLookupResponse {
+    payment: PaymentResponse | null;
+}
+
+
+/*
+ * =========================================================
  * CREATE PAYMENT
  * =========================================================
  */
@@ -55,20 +82,22 @@ export function getPaymentProviderConfiguration(
  * GET PAYMENT FOR ORDER
  * =========================================================
  *
- * This is important after PhonePe / Paytm / other external
- * checkout redirects.
+ * Used when returning from an external payment provider.
  *
- * We use the order number from the URL to recover the payment
- * from the backend when browser localStorage does not contain
- * the payment session anymore.
+ * The order number in the URL is the authoritative recovery
+ * key. Browser localStorage is only a convenience.
+ *
+ * This is particularly important for PhonePe because the user
+ * can leave the merchant site and return through a different
+ * browser/app context.
  */
 
 export function getPaymentForOrder(
     orderNumber: string,
     signal?: AbortSignal
-): Promise<PaymentResponse> {
+): Promise<PaymentLookupResponse> {
 
-    return apiClient<PaymentResponse>(
+    return apiClient<PaymentLookupResponse>(
         `/api/payments/order/${encodeURIComponent(orderNumber)}`,
         {
             method: "GET",
