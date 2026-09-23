@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.order.service;
 
+import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.order.dto.admin.AdminBatchPreparationItemResponse;
 import com.gokulsweets.restaurant.order.dto.admin.AdminBatchPreparationResponse;
 import com.gokulsweets.restaurant.order.dto.admin.AdminOrderQueueItemResponse;
@@ -39,6 +40,8 @@ public class AdminOrderBatchPreparationService {
 
     private final StaffAuthorizationService
             staffAuthorizationService;
+
+    private final ApplicationClock applicationClock;
 
 
     /*
@@ -302,7 +305,7 @@ public class AdminOrderBatchPreparationService {
 
 
         LocalDateTime generatedAt =
-                LocalDateTime.now();
+               applicationClock.now();
 
 
         log.info(

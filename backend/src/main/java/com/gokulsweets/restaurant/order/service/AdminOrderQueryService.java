@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.order.service;
 
+import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.order.config.PreparationWindowProperties;
 import com.gokulsweets.restaurant.order.dto.OrderItemResponse;
 import com.gokulsweets.restaurant.order.dto.admin.AdminOrderDetailResponse;
@@ -68,6 +69,8 @@ public class AdminOrderQueryService {
     private final PreparationWindowProperties
             preparationWindowProperties;
 
+    private final ApplicationClock  applicationClock;
+
 
     /*
      * =========================================================
@@ -106,11 +109,10 @@ public class AdminOrderQueryService {
 
 
         int safeSize =
-                Math.min(
-                        Math.max(
-                                size,
-                                1
-                        ),
+                Math.clamp(
+                        size,
+                        1
+                        ,
                         MAX_PAGE_SIZE
                 );
 
@@ -220,8 +222,7 @@ public class AdminOrderQueryService {
                         1;
 
 
-        LocalDateTime now =
-                LocalDateTime.now();
+        LocalDateTime now = applicationClock.now();
 
 
         QueueCutoffs cutoffs =
@@ -348,8 +349,7 @@ public class AdminOrderQueryService {
                 );
 
 
-        LocalDateTime now =
-                LocalDateTime.now();
+        LocalDateTime now = applicationClock.now();
 
 
         QueueCutoffs cutoffs =
@@ -863,11 +863,10 @@ public class AdminOrderQueryService {
         }
 
 
-        return Math.min(
-                Math.max(
-                        limit,
-                        1
-                ),
+        return Math.clamp(
+                limit,
+                1
+                ,
                 MAX_QUEUE_LIMIT
         );
     }

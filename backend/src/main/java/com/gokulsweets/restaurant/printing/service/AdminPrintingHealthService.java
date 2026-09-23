@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.printing.service;
 
+import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.printing.dto.admin.AdminPrintingHealthResponse;
 import com.gokulsweets.restaurant.printing.entity.PrintAgentHeartbeat;
 import com.gokulsweets.restaurant.printing.entity.PrintJob;
@@ -44,6 +45,8 @@ public class AdminPrintingHealthService {
     private final StaffAuthorizationService
             staffAuthorizationService;
 
+    private final ApplicationClock  applicationClock;
+
 
     @Transactional(readOnly = true)
     public AdminPrintingHealthResponse getHealth(
@@ -63,8 +66,7 @@ public class AdminPrintingHealthService {
                 );
 
 
-        LocalDateTime now =
-                LocalDateTime.now();
+        LocalDateTime now = applicationClock.now();
 
 
         Optional<PrintAgentHeartbeat> heartbeat =

@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.staff.approval;
 
 import com.gokulsweets.restaurant.branch.Branch;
+import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.staff.StaffUser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +20,8 @@ public class ApprovalWorkflowService {
 
     private final ApprovalRequestHistoryRepository
             historyRepository;
+
+    private final ApplicationClock  applicationClock;
 
 
     /*
@@ -68,8 +71,7 @@ public class ApprovalWorkflowService {
                         summary
                 );
 
-        LocalDateTime now =
-                LocalDateTime.now();
+        LocalDateTime now = applicationClock.now();
 
         ApprovalRequest request =
                 new ApprovalRequest();
@@ -215,7 +217,7 @@ public class ApprovalWorkflowService {
         );
 
         request.setResolvedAt(
-                LocalDateTime.now()
+                applicationClock.now()
         );
 
         ApprovalRequest saved =
@@ -308,7 +310,7 @@ public class ApprovalWorkflowService {
         );
 
         request.setSubmittedAt(
-                LocalDateTime.now()
+                applicationClock.now()
         );
 
         request.setResolvedAt(
@@ -386,7 +388,7 @@ public class ApprovalWorkflowService {
         );
 
         request.setResolvedAt(
-                LocalDateTime.now()
+                applicationClock.now()
         );
 
         ApprovalRequest saved =
