@@ -1,9 +1,6 @@
 package com.gokulsweets.restaurant.payment.controller;
 
-import com.gokulsweets.restaurant.payment.dto.CreatePaymentRequest;
-import com.gokulsweets.restaurant.payment.dto.PaymentProviderConfigurationResponse;
-import com.gokulsweets.restaurant.payment.dto.PaymentResponse;
-import com.gokulsweets.restaurant.payment.dto.RazorpayPaymentVerificationRequest;
+import com.gokulsweets.restaurant.payment.dto.*;
 import com.gokulsweets.restaurant.payment.provider.PaymentProviderRegistry;
 import com.gokulsweets.restaurant.payment.service.PaymentCheckoutService;
 import com.gokulsweets.restaurant.payment.service.RazorpayVerificationService;
@@ -64,16 +61,16 @@ public class PaymentController {
      * =========================================================
      */
     @GetMapping("/order/{orderNumber}")
-    public ResponseEntity<PaymentResponse> getPaymentForOrder(
+    public ResponseEntity<PaymentLookupResponse> getPaymentForOrder(
             @PathVariable String orderNumber
     ) {
+        PaymentResponse payment =
+                paymentCheckoutService.findLatestPaymentForOrder(
+                        orderNumber.trim().toUpperCase()
+                );
 
         return ResponseEntity.ok(
-                paymentCheckoutService.getLatestPaymentForOrder(
-                        orderNumber
-                                .trim()
-                                .toUpperCase()
-                )
+                new PaymentLookupResponse(payment)
         );
     }
 
@@ -104,4 +101,5 @@ public class PaymentController {
                 )
         );
     }
+
 }

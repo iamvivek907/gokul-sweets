@@ -168,4 +168,15 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("orderIds")
             Collection<Long> orderIds
     );
+
+    @EntityGraph(attributePaths = {"order"})
+    @Query("""
+        SELECT payment
+        FROM Payment payment
+        WHERE payment.order.orderNumber = :orderNumber
+        ORDER BY payment.createdAt DESC, payment.id DESC
+        """)
+    List<Payment> findLatestForOrder(
+            @Param("orderNumber") String orderNumber
+    );
 }

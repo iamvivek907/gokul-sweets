@@ -499,4 +499,23 @@ public class PaymentCheckoutService {
                 payment.getExpiresAt()
         );
     }
+
+    public PaymentResponse findLatestPaymentForOrder(String orderNumber) {
+        return paymentRepository
+                .findLatestForOrder(orderNumber)
+                .stream()
+                .findFirst()
+                .map(payment -> {
+                    PaymentProvider provider = providerRegistry.require(
+                            payment.getProvider()
+                    );
+
+                    return toResponse(
+                            payment,
+                            null,
+                            provider
+                    );
+                })
+                .orElse(null);
+    }
 }
