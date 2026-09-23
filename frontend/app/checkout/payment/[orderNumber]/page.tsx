@@ -51,6 +51,7 @@ import {
 
 import {
     createPayment,
+    getPaymentForOrder,
     refreshPayment
 } from "@/services/paymentApi";
 
@@ -71,15 +72,11 @@ type PaymentStatusName =
 
 
 function getPaymentStatus(
-    payment:
-        PaymentResponse
-        | null
+    payment: PaymentResponse | null
 ): PaymentStatusName {
 
     return payment
-        ? String(
-            payment.paymentStatus
-        )
+        ? String(payment.paymentStatus)
         : "";
 }
 
@@ -95,9 +92,7 @@ function formatCurrency(
             currency: "INR",
             maximumFractionDigits: 2
         }
-    ).format(
-        amount
-    );
+    ).format(amount);
 }
 
 
@@ -125,9 +120,7 @@ function formatExpiry(
             hour: "numeric",
             minute: "2-digit"
         }
-    ).format(
-        date
-    );
+    ).format(date);
 }
 
 
@@ -159,11 +152,10 @@ function formatStatusLabel(
             return "Refund needs attention";
 
         default:
-            return status
-                .replaceAll(
-                    "_",
-                    " "
-                );
+            return status.replaceAll(
+                "_",
+                " "
+            );
     }
 }
 
@@ -195,7 +187,7 @@ function statusBadgeClass(
 function mergePaymentResponse(
     refreshed: PaymentResponse,
     existing:
-        PaymentResponse
+        | PaymentResponse
         | ReturnType<typeof parsePendingPayment>
         | null
 ): PaymentResponse {
@@ -231,6 +223,14 @@ function mergePaymentResponse(
 }
 
 
+/*
+ * =========================================================
+ * PAYMENT INITIALIZATION PROMISES
+ * =========================================================
+ *
+ * Prevents duplicate payment initialization for the same
+ * order while the page is mounting.
+ */
 const paymentInitializationPromises =
     new Map<
         string,
@@ -400,29 +400,12 @@ export default function PaymentPage() {
      * =========================================================
      * STORE PAYMENT LOCALLY
      * =========================================================
-     *
-     * IMPORTANT:
-     *
-     * We deliberately keep FAILED / EXPIRED / REFUND_* payment
-     * records in local storage.
-     *
-     * A late provider success may move:
-     *
-     * FAILED / EXPIRED
-     *     ->
-     * REFUND_PENDING
-     *     ->
-     * REFUNDED / REFUND_FAILED
-     *
-     * Keeping paymentId lets this page continue checking the
-     * authoritative backend state.
      */
 
     const persistPayment =
         useCallback(
             (
-                response:
-                    PaymentResponse
+                response: PaymentResponse
             ) => {
 
                 const fingerprint =
@@ -494,13 +477,9 @@ export default function PaymentPage() {
     const completePaidPayment =
         useCallback(
             (
-                response:
-                    PaymentResponse
+                response: PaymentResponse
             ) => {
 
-                /*
-                 * Only PAID clears the cart.
-                 */
                 clearPendingPayment();
 
                 clearPendingOrder();
@@ -546,8 +525,7 @@ export default function PaymentPage() {
     const applyPaymentResult =
         useCallback(
             (
-                response:
-                    PaymentResponse
+                response: PaymentResponse
             ) => {
 
                 persistPayment(
@@ -576,9 +554,10 @@ export default function PaymentPage() {
 
                 /*
                  * A terminal checkout must no longer remain the
-                 * editable "pending order" for cart/offers.
+                 * editable pending order.
                  *
-                 * Keep the paymentId for refund reconciliation.
+                 * The payment itself remains persisted so late
+                 * provider success/refund reconciliation can occur.
                  */
                 if (
                     status ===
@@ -601,11 +580,6 @@ export default function PaymentPage() {
                 }
 
 
-                /*
-                 * These are normal backend states, not frontend
-                 * errors. The dedicated status UI below explains
-                 * them to the customer.
-                 */
                 setError(
                     null
                 );
@@ -621,6 +595,17 @@ export default function PaymentPage() {
      * =========================================================
      * INITIAL PAYMENT FLOW
      * =========================================================
+     *
+     * IMPORTANT:
+     *
+     * The paymentId in browser storage is only a convenience.
+     *
+     * The order number in the URL is sufficient to recover the
+     * payment from the backend.
+     *
+     * This is especially important for PhonePe because the user
+     * can leave the merchant site, enter PhonePe, and return
+     * through a different browser/app context.
      */
 
     useEffect(
@@ -646,15 +631,10 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 1. Existing locally stored payment FIRST
+                             * 1. LOCAL PAYMENT RECOVERY
                              * -------------------------------------------------
                              *
-                             * This is intentionally checked before requiring a
-                             * local pending-order record.
-                             *
-                             * FAILED / EXPIRED orders clear pendingOrder, but
-                             * their paymentId must remain refreshable so a late
-                             * A late provider success/refund can still be observed.
+                             * Fast path for normal browser navigation.
                              */
                             if (
                                 storedPayment
@@ -678,7 +658,54 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 2. Creating a NEW payment requires live checkout
+                             * 2. BACKEND PAYMENT RECOVERY
+                             * -------------------------------------------------
+                             *
+                             * This is the important PhonePe/PWA fix.
+                             *
+                             * The URL contains:
+                             *
+                             * /checkout/payment/{orderNumber}
+                             *
+                             * Therefore we can recover the latest payment
+                             * without relying on localStorage.
+                             */
+                            const backendPayment =
+                                await getPaymentForOrder(
+                                    orderNumber
+                                );
+
+
+                            if (
+                                backendPayment
+                                &&
+                                backendPayment.orderNumber ===
+                                    orderNumber
+                            ) {
+
+                                /*
+                                 * We already have a payment attempt.
+                                 *
+                                 * NEVER create another payment attempt.
+                                 *
+                                 * Refresh the provider status instead.
+                                 */
+                                const refreshed =
+                                    await refreshPayment(
+                                        backendPayment.paymentId
+                                    );
+
+
+                                return mergePaymentResponse(
+                                    refreshed,
+                                    backendPayment
+                                );
+                            }
+
+
+                            /*
+                             * -------------------------------------------------
+                             * 3. CREATING A NEW PAYMENT REQUIRES LIVE CHECKOUT
                              * -------------------------------------------------
                              */
                             if (
@@ -696,7 +723,7 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 3. Never pay a stale cart
+                             * 4. NEVER PAY A STALE CART
                              * -------------------------------------------------
                              */
                             if (
@@ -710,7 +737,7 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 4. Check backend order before POST /payments
+                             * 5. CHECK BACKEND ORDER BEFORE CREATING PAYMENT
                              * -------------------------------------------------
                              */
                             const backendOrder =
@@ -729,7 +756,9 @@ export default function PaymentPage() {
 
 
                             /*
-                             * Backend already confirms success.
+                             * -------------------------------------------------
+                             * 6. BACKEND ALREADY CONFIRMS SUCCESS
+                             * -------------------------------------------------
                              */
                             if (
                                 backendPaymentStatus ===
@@ -770,8 +799,31 @@ export default function PaymentPage() {
 
 
                             /*
-                             * Before creating a NEW payment attempt, the
-                             * original reservation must still be active.
+                             * -------------------------------------------------
+                             * 7. SAFETY AGAINST DUPLICATE PAYMENT CREATION
+                             * -------------------------------------------------
+                             *
+                             * Normally this branch is no longer reached for
+                             * a recoverable PENDING payment because step 2
+                             * already recovered it.
+                             *
+                             * Keep it as a final safety barrier.
+                             */
+                            if (
+                                backendPaymentStatus ===
+                                    "PENDING"
+                            ) {
+
+                                throw new Error(
+                                    "A payment attempt already exists for this order, but the payment record could not be recovered. Please check My Orders."
+                                );
+                            }
+
+
+                            /*
+                             * -------------------------------------------------
+                             * 8. CHECK RESERVATION EXPIRY
+                             * -------------------------------------------------
                              */
                             const reservationExpiresAtMs =
                                 new Date(
@@ -805,28 +857,13 @@ export default function PaymentPage() {
 
 
                             /*
-                             * If the backend knows a payment exists but local
-                             * storage lost its paymentId, never create a second
-                             * competing attempt.
-                             */
-                            if (
-                                backendPaymentStatus ===
-                                    "PENDING"
-                            ) {
-
-                                throw new Error(
-                                    "A payment attempt already exists for this order, but this browser no longer has its payment session. Please check My Orders instead of starting another payment."
-                                );
-                            }
-
-
-                            /*
-                             * Terminal backend order with no recoverable local
-                             * payment session.
+                             * -------------------------------------------------
+                             * 9. ORDER MUST STILL BE WAITING FOR PAYMENT
+                             * -------------------------------------------------
                              */
                             if (
                                 backendOrder.orderStatus !==
-                                    "PENDING_PAYMENT"
+                                "PENDING_PAYMENT"
                             ) {
 
                                 clearPendingOrder();
@@ -840,8 +877,13 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 5. Create exactly one new default payment attempt
+                             * 10. CREATE EXACTLY ONE NEW PAYMENT ATTEMPT
                              * -------------------------------------------------
+                             *
+                             * We deliberately omit provider here.
+                             *
+                             * The backend default provider controls the
+                             * selection.
                              */
                             return createPayment({
                                 orderNumber
@@ -911,6 +953,15 @@ export default function PaymentPage() {
                     );
 
                 } finally {
+
+                    /*
+                     * Do not keep completed initialization promises
+                     * forever.
+                     */
+                    paymentInitializationPromises.delete(
+                        orderNumber
+                    );
+
 
                     if (
                         !cancelled
@@ -1028,14 +1079,8 @@ export default function PaymentPage() {
 
     /*
      * =========================================================
-     * REFUND PENDING AUTO REFRESH
+     * PAYMENT STATUS
      * =========================================================
-     *
-     * The browser does NOT perform refunds.
-     *
-     * Backend PaymentRefundScheduler owns provider refund status.
-     * This lightweight refresh only asks our backend for the
-     * latest locally persisted payment state.
      */
 
     const paymentStatus =
@@ -1045,11 +1090,11 @@ export default function PaymentPage() {
 
 
     /*
-     * Razorpay can briefly remain authorised/pending while
-     * capture completes. Signed webhooks remain the durable
-     * fallback; this refresh keeps the visible page in sync so
-     * the customer never has to press "Refresh status".
+     * =========================================================
+     * PENDING PAYMENT AUTO REFRESH
+     * =========================================================
      */
+
     useEffect(
         () => {
 
@@ -1093,6 +1138,12 @@ export default function PaymentPage() {
         ]
     );
 
+
+    /*
+     * =========================================================
+     * REFUND PENDING AUTO REFRESH
+     * =========================================================
+     */
 
     useEffect(
         () => {
@@ -1193,10 +1244,12 @@ export default function PaymentPage() {
                     payment
                 );
 
+
             if (
                 outcome.kind ===
                 "updated"
             ) {
+
                 applyPaymentResult(
                     outcome.payment
                 );
@@ -1205,6 +1258,7 @@ export default function PaymentPage() {
                 outcome.kind ===
                 "failed"
             ) {
+
                 setError(
                     outcome.message
                 );
@@ -1212,7 +1266,11 @@ export default function PaymentPage() {
                 await refreshCurrentPayment();
 
             } else {
-                /* Closing the gateway is not an order cancellation. */
+
+                /*
+                 * Closing the payment gateway does not cancel
+                 * the backend payment.
+                 */
                 await refreshCurrentPayment();
             }
 
@@ -1249,18 +1307,6 @@ export default function PaymentPage() {
 
     function handleChooseNewPickupSlot() {
 
-        /*
-         * Keep:
-         * - cart
-         * - branch
-         * - customer details
-         *
-         * Clear only the dead checkout reservation.
-         *
-         * Keep the old paymentId in pendingPayment storage long
-         * enough for reconciliation/refund visibility. A future
-         * payment attempt for a different order will overwrite it.
-         */
         clearPendingOrder();
 
 
@@ -2250,8 +2296,7 @@ export default function PaymentPage() {
                                         "
                                     >
                                         {
-                                            payment
-                                                .providerPaymentId
+                                            payment.providerPaymentId
                                         }
                                     </span>
 
@@ -2296,8 +2341,7 @@ export default function PaymentPage() {
                                     >
                                         {
                                             formatExpiry(
-                                                payment
-                                                    .expiresAt
+                                                payment.expiresAt
                                             )
                                         }
                                     </span>
@@ -2347,8 +2391,8 @@ export default function PaymentPage() {
                                 >
                                     We always verify the payment
                                     through the backend. A pending
-                                    attempt remains active until
-                                    the provider reports a final result or
+                                    attempt remains active until the
+                                    provider reports a final result or
                                     the backend payment deadline is
                                     reached.
                                 </p>
@@ -2389,18 +2433,14 @@ export default function PaymentPage() {
                                     font-bold
                                     text-white
                                     transition
-
                                     hover:bg-[#5d0f1b]
-
                                     disabled:cursor-not-allowed
                                     disabled:bg-[#c9b9b4]
                                 "
                             >
                                 {
                                     openingPayment
-
                                         ? "Opening payment..."
-
                                         : `Pay ${formatCurrency(
                                             payment.amount
                                         )}`
@@ -2450,21 +2490,16 @@ export default function PaymentPage() {
                                     font-semibold
                                     text-[#7a1625]
                                     transition
-
                                     hover:bg-[#fffaf3]
-
                                     disabled:cursor-not-allowed
                                     disabled:opacity-50
                                 "
                             >
                                 {
                                     refreshing
-
                                         ? "Checking latest status..."
-
                                         : isRefundPending
                                             ? "Check Refund Status"
-
                                             : "Check Payment Status"
                                 }
                             </button>
@@ -2496,7 +2531,6 @@ export default function PaymentPage() {
                                     font-bold
                                     text-white
                                     transition
-
                                     hover:bg-[#5d0f1b]
                                 "
                             >
