@@ -47,6 +47,12 @@ const CONFIRMATION_POLL_INTERVAL_MS =
     1500;
 
 
+/*
+ * =========================================================
+ * OPEN PAYMENT CHECKOUT
+ * =========================================================
+ */
+
 export async function openPaymentCheckout(
     payment: PaymentResponse
 ): Promise<CheckoutOutcome> {
@@ -72,10 +78,12 @@ export async function openPaymentCheckout(
         );
     }
 
+
     if (
         payment.provider ===
         "PHONEPE"
     ) {
+
         return openPhonePe(
             payment
         );
@@ -88,6 +96,38 @@ export async function openPaymentCheckout(
     };
 }
 
+
+/*
+ * =========================================================
+ * PHONEPE
+ * =========================================================
+ *
+ * PhonePe Standard Checkout V2 returns a hosted checkout
+ * URL from the backend.
+ *
+ * We intentionally navigate the CURRENT browser tab instead
+ * of opening a popup/new tab.
+ *
+ * PhonePe will redirect the customer back to:
+ *
+ * /payment/{orderNumber}
+ *
+ * The PaymentPage then refreshes the backend payment status.
+ *
+ * Once the backend reports PAID, PaymentPage performs:
+ *
+ * /orders/{orderNumber}
+ *
+ * This avoids:
+ *
+ * - popup blockers
+ * - a second browser tab
+ * - duplicate status polling
+ * - the customer being left on the payment page after success
+ *
+ * Razorpay and Paytm continue using their existing flows.
+ */
+
 async function openPhonePe(
     payment: PaymentResponse
 ): Promise<CheckoutOutcome> {
@@ -95,84 +135,51 @@ async function openPhonePe(
     if (
         !payment.paymentUrl
     ) {
+
         return {
             kind: "failed",
             message: "PhonePe checkout link is unavailable for this payment."
         };
     }
 
-    const popup =
-        window.open(
-            payment.paymentUrl,
-            "_blank",
-            "noopener,noreferrer"
-        );
 
-    if (
-        !popup
-    ) {
-        return {
-            kind: "failed",
-            message: "Unable to open PhonePe. Please allow pop-ups and try again."
-        };
-    }
+    /*
+     * Navigate to the PhonePe hosted checkout in the
+     * current browser tab.
+     *
+     * The backend created this URL using the order-specific
+     * redirect URL:
+     *
+     * https://gokul-sweets-dev.vercel.app/payment/{orderNumber}
+     */
+    window.location.assign(
+        payment.paymentUrl
+    );
 
-    let latest =
-        await refreshPayment(
-            payment.paymentId
-        );
 
-    if (
-        FINAL_PAYMENT_STATUSES.has(
-            latest.paymentStatus
-        )
-    ) {
-        return {
-            kind: "updated",
-            payment: latest
-        };
-    }
-
-    for (
-        let attempt = 0;
-        attempt < CONFIRMATION_POLL_ATTEMPTS;
-        attempt++
-    ) {
-        await delay(
-            CONFIRMATION_POLL_INTERVAL_MS
-        );
-
-        latest =
-            await refreshPayment(
-                payment.paymentId
-            );
-
-        if (
-            FINAL_PAYMENT_STATUSES.has(
-                latest.paymentStatus
-            )
-        ) {
-            return {
-                kind: "updated",
-                payment: latest
-            };
-        }
-
-        if (
-            popup.closed
-        ) {
-            break;
-        }
-    }
-
-    return popup.closed
-        ? {kind: "dismissed"}
-        : {
-            kind: "updated",
-            payment: latest
-        };
+    /*
+     * The current page will normally unload immediately
+     * after window.location.assign().
+     *
+     * This return value only satisfies CheckoutOutcome.
+     *
+     * The PaymentPage loaded after PhonePe's redirect is
+     * responsible for refreshing the payment and handling
+     * the final PAID → /orders/{orderNumber} transition.
+     */
+    return {
+        kind: "dismissed"
+    };
 }
 
+
+/*
+ * =========================================================
+ * RAZORPAY
+ * =========================================================
+ *
+ * Existing Razorpay flow intentionally preserved.
+ */
 
 function openRazorpay(
     payment: PaymentResponse
@@ -314,6 +321,14 @@ function openRazorpay(
 }
 
 
+/*
+ * =========================================================
+ * PAYTM
+ * =========================================================
+ *
+ * Existing Paytm flow intentionally preserved.
+ */
+
 function openPaytm(
     payment: PaymentResponse
 ): Promise<CheckoutOutcome> {
@@ -424,6 +439,18 @@ function openPaytm(
 }
 
 
+/*
+ * =========================================================
+ * WAIT FOR PAYMENT CONFIRMATION
+ * =========================================================
+ *
+ * Used by Razorpay and Paytm.
+ *
+ * PhonePe does NOT use this browser-side polling flow.
+ * PhonePe returns to PaymentPage, which owns the normal
+ * payment refresh lifecycle.
+ */
+
 async function waitForPaymentConfirmation(
     initial:
         PaymentResponse
@@ -474,6 +501,12 @@ async function waitForPaymentConfirmation(
     return latest;
 }
 
+
+/*
+ * =========================================================
+ * DELAY
+ * =========================================================
+ */
 
 function delay(
     milliseconds:
