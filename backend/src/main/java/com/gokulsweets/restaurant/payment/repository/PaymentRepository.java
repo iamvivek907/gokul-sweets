@@ -16,41 +16,64 @@ import java.util.Optional;
 
 public interface PaymentRepository extends JpaRepository<Payment, Long> {
 
-    List<Payment> findByOrderIdOrderByCreatedAtDesc(Long orderId);
+    List<Payment> findByOrderIdOrderByCreatedAtDesc(
+            Long orderId
+    );
 
-    Optional<Payment> findByProviderPaymentId(String providerPaymentId);
+
+    Optional<Payment> findByProviderPaymentId(
+            String providerPaymentId
+    );
+
 
     Optional<Payment> findByProviderAndProviderPaymentId(
             PaymentProviderType provider,
             String providerPaymentId
     );
 
-    Optional<Payment> findByProviderOrderId(String providerOrderId);
+
+    Optional<Payment> findByProviderOrderId(
+            String providerOrderId
+    );
+
 
     Optional<Payment> findByProviderAndProviderOrderId(
             PaymentProviderType provider,
             String providerOrderId
     );
 
-    Optional<Payment> findByProviderRefundId(String providerRefundId);
 
-    Optional<Payment> findByRefundReferenceId(String refundReferenceId);
+    Optional<Payment> findByProviderRefundId(
+            String providerRefundId
+    );
+
+
+    Optional<Payment> findByRefundReferenceId(
+            String refundReferenceId
+    );
+
 
     boolean existsByOrderIdAndPaymentStatus(
             Long orderId,
             PaymentStatus paymentStatus
     );
 
-    boolean existsByOrderId(Long orderId);
+
+    boolean existsByOrderId(
+            Long orderId
+    );
+
 
     List<Payment> findTop100ByPaymentStatusAndExpiresAtBeforeOrderByExpiresAtAsc(
             PaymentStatus paymentStatus,
             LocalDateTime expiresAt
     );
 
+
     List<Payment> findTop100ByPaymentStatusOrderByUpdatedAtAsc(
             PaymentStatus paymentStatus
     );
+
 
     @EntityGraph(attributePaths = {"order"})
     @Query("""
@@ -58,7 +81,10 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             FROM Payment payment
             WHERE payment.id = :paymentId
             """)
-    Optional<Payment> findByIdWithOrder(@Param("paymentId") Long paymentId);
+    Optional<Payment> findByIdWithOrder(
+            @Param("paymentId") Long paymentId
+    );
+
 
     @EntityGraph(attributePaths = {"order"})
     @Query("""
@@ -73,7 +99,25 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("status") PaymentStatus status
     );
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+
+    /*
+     * =========================================================
+     * LATEST PAYMENT FOR ORDER
+     * =========================================================
+     *
+     * Used when the browser returns from an external payment
+     * provider and localStorage no longer contains paymentId.
+     */
+    @EntityGraph(attributePaths = {"order"})
+    Optional<Payment> findFirstByOrderOrderNumberOrderByCreatedAtDesc(
+            String orderNumber
+    );
+
+
+    @Modifying(
+            flushAutomatically = true,
+            clearAutomatically = true
+    )
     @Query("""
             UPDATE Payment payment
             SET payment.paymentStatus = :newStatus
@@ -86,7 +130,11 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             @Param("newStatus") PaymentStatus newStatus
     );
 
-    @Modifying(flushAutomatically = true, clearAutomatically = true)
+
+    @Modifying(
+            flushAutomatically = true,
+            clearAutomatically = true
+    )
     @Query("""
             UPDATE Payment payment
             SET payment.paymentStatus = :newStatus
@@ -95,11 +143,16 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             """)
     int transitionStatusFromAny(
             @Param("paymentId") Long paymentId,
-            @Param("expectedStatuses") Collection<PaymentStatus> expectedStatuses,
+            @Param("expectedStatuses")
+            Collection<PaymentStatus> expectedStatuses,
             @Param("newStatus") PaymentStatus newStatus
     );
 
-    Optional<Payment> findFirstByOrderIdOrderByCreatedAtDesc(Long orderId);
+
+    Optional<Payment> findFirstByOrderIdOrderByCreatedAtDesc(
+            Long orderId
+    );
+
 
     @Query("""
             SELECT payment
@@ -112,6 +165,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
               )
             """)
     List<Payment> findLatestPaymentsForOrders(
-            @Param("orderIds") Collection<Long> orderIds
+            @Param("orderIds")
+            Collection<Long> orderIds
     );
 }
