@@ -41,6 +41,7 @@ public class PhonePeProperties {
     private String orderStatusPathTemplate =
             "/checkout/v2/order/{merchantOrderId}/status";
 
+    @NotBlank
     private String redirectUrl = "";
 
     private String webhookUrl = "";
