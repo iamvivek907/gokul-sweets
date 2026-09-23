@@ -71,6 +71,12 @@ type PaymentStatusName =
     | string;
 
 
+/*
+ * =========================================================
+ * HELPERS
+ * =========================================================
+ */
+
 function getPaymentStatus(
     payment: PaymentResponse | null
 ): PaymentStatusName {
@@ -103,7 +109,6 @@ function formatExpiry(
     const date =
         new Date(value);
 
-
     if (
         Number.isNaN(
             date.getTime()
@@ -112,7 +117,6 @@ function formatExpiry(
 
         return value;
     }
-
 
     return new Intl.DateTimeFormat(
         "en-IN",
@@ -184,6 +188,18 @@ function statusBadgeClass(
 }
 
 
+/*
+ * =========================================================
+ * PAYMENT RESPONSE MERGE
+ * =========================================================
+ *
+ * refreshPayment() intentionally returns provider-specific
+ * checkout fields as null because those fields are not
+ * persisted in the Payment entity.
+ *
+ * Preserve the locally-known values when they exist.
+ */
+
 function mergePaymentResponse(
     refreshed: PaymentResponse,
     existing:
@@ -231,12 +247,19 @@ function mergePaymentResponse(
  * Prevents duplicate payment initialization for the same
  * order while the page is mounting.
  */
+
 const paymentInitializationPromises =
     new Map<
         string,
         Promise<PaymentResponse | null>
     >();
 
+
+/*
+ * =========================================================
+ * PAGE
+ * =========================================================
+ */
 
 export default function PaymentPage() {
 
@@ -496,7 +519,6 @@ export default function PaymentPage() {
                         "gokul-selected-pickup-slot"
                     );
 
-
                     window.localStorage.removeItem(
                         "gokul-customer-details"
                     );
@@ -559,6 +581,7 @@ export default function PaymentPage() {
                  * The payment itself remains persisted so late
                  * provider success/refund reconciliation can occur.
                  */
+
                 if (
                     status ===
                         "FAILED"
@@ -598,14 +621,12 @@ export default function PaymentPage() {
      *
      * IMPORTANT:
      *
-     * The paymentId in browser storage is only a convenience.
+     * Browser localStorage is NOT authoritative.
      *
-     * The order number in the URL is sufficient to recover the
-     * payment from the backend.
+     * The order number in the URL is enough to recover an
+     * existing payment from the backend.
      *
-     * This is especially important for PhonePe because the user
-     * can leave the merchant site, enter PhonePe, and return
-     * through a different browser/app context.
+     * This is the critical PhonePe redirect recovery.
      */
 
     useEffect(
@@ -636,6 +657,7 @@ export default function PaymentPage() {
                              *
                              * Fast path for normal browser navigation.
                              */
+
                             if (
                                 storedPayment
                                 &&
@@ -663,17 +685,27 @@ export default function PaymentPage() {
                              *
                              * This is the important PhonePe/PWA fix.
                              *
-                             * The URL contains:
+                             * The backend returns:
                              *
-                             * /checkout/payment/{orderNumber}
+                             * {
+                             *     "payment": null
+                             * }
                              *
-                             * Therefore we can recover the latest payment
-                             * without relying on localStorage.
+                             * or:
+                             *
+                             * {
+                             *     "payment": { ... }
+                             * }
                              */
-                            const backendPayment =
+
+                            const lookup =
                                 await getPaymentForOrder(
                                     orderNumber
                                 );
+
+
+                            const backendPayment =
+                                lookup.payment;
 
 
                             if (
@@ -684,12 +716,13 @@ export default function PaymentPage() {
                             ) {
 
                                 /*
-                                 * We already have a payment attempt.
+                                 * A payment already exists.
                                  *
                                  * NEVER create another payment attempt.
                                  *
-                                 * Refresh the provider status instead.
+                                 * Ask the provider for the current state.
                                  */
+
                                 const refreshed =
                                     await refreshPayment(
                                         backendPayment.paymentId
@@ -708,6 +741,7 @@ export default function PaymentPage() {
                              * 3. CREATING A NEW PAYMENT REQUIRES LIVE CHECKOUT
                              * -------------------------------------------------
                              */
+
                             if (
                                 !pendingOrder
                                 ||
@@ -726,6 +760,7 @@ export default function PaymentPage() {
                              * 4. NEVER PAY A STALE CART
                              * -------------------------------------------------
                              */
+
                             if (
                                 pendingOrder.cartFingerprint !==
                                 currentCartFingerprint
@@ -740,6 +775,7 @@ export default function PaymentPage() {
                              * 5. CHECK BACKEND ORDER BEFORE CREATING PAYMENT
                              * -------------------------------------------------
                              */
+
                             const backendOrder =
                                 await getCustomerOrder(
                                     orderNumber
@@ -760,6 +796,7 @@ export default function PaymentPage() {
                              * 6. BACKEND ALREADY CONFIRMS SUCCESS
                              * -------------------------------------------------
                              */
+
                             if (
                                 backendPaymentStatus ===
                                     "PAID"
@@ -803,12 +840,11 @@ export default function PaymentPage() {
                              * 7. SAFETY AGAINST DUPLICATE PAYMENT CREATION
                              * -------------------------------------------------
                              *
-                             * Normally this branch is no longer reached for
-                             * a recoverable PENDING payment because step 2
-                             * already recovered it.
-                             *
-                             * Keep it as a final safety barrier.
+                             * Normally this branch should not be reached for
+                             * a recoverable payment because step 2 already
+                             * recovered it.
                              */
+
                             if (
                                 backendPaymentStatus ===
                                     "PENDING"
@@ -825,6 +861,7 @@ export default function PaymentPage() {
                              * 8. CHECK RESERVATION EXPIRY
                              * -------------------------------------------------
                              */
+
                             const reservationExpiresAtMs =
                                 new Date(
                                     backendOrder.reservationExpiresAt
@@ -861,6 +898,7 @@ export default function PaymentPage() {
                              * 9. ORDER MUST STILL BE WAITING FOR PAYMENT
                              * -------------------------------------------------
                              */
+
                             if (
                                 backendOrder.orderStatus !==
                                 "PENDING_PAYMENT"
@@ -880,11 +918,11 @@ export default function PaymentPage() {
                              * 10. CREATE EXACTLY ONE NEW PAYMENT ATTEMPT
                              * -------------------------------------------------
                              *
-                             * We deliberately omit provider here.
+                             * Provider intentionally omitted.
                              *
-                             * The backend default provider controls the
-                             * selection.
+                             * Backend default provider controls selection.
                              */
+
                             return createPayment({
                                 orderNumber
                             });
@@ -954,10 +992,6 @@ export default function PaymentPage() {
 
                 } finally {
 
-                    /*
-                     * Do not keep completed initialization promises
-                     * forever.
-                     */
                     paymentInitializationPromises.delete(
                         orderNumber
                     );
@@ -1227,6 +1261,34 @@ export default function PaymentPage() {
         }
 
 
+        /*
+         * If PhonePe was recovered from the backend after the
+         * browser lost localStorage, the PaymentResponse does
+         * not contain paymentUrl because that URL is not stored
+         * in the Payment entity.
+         *
+         * Do not attempt to create another payment.
+         * Keep checking the existing provider payment instead.
+         */
+
+        if (
+            payment.provider ===
+                "PHONEPE"
+            &&
+            !payment.paymentUrl
+        ) {
+
+            setError(
+                "Your existing PhonePe payment is being checked. Please wait for the provider status to update."
+            );
+
+
+            await refreshCurrentPayment();
+
+            return;
+        }
+
+
         setOpeningPayment(
             true
         );
@@ -1271,6 +1333,7 @@ export default function PaymentPage() {
                  * Closing the payment gateway does not cancel
                  * the backend payment.
                  */
+
                 await refreshCurrentPayment();
             }
 
@@ -1604,6 +1667,21 @@ export default function PaymentPage() {
 
     /*
      * =========================================================
+     * PHONEPE RECOVERY WITHOUT LOCAL CHECKOUT URL
+     * =========================================================
+     */
+
+    const phonePeStatusOnly =
+        isPending
+        &&
+        payment.provider ===
+            "PHONEPE"
+        &&
+        !payment.paymentUrl;
+
+
+    /*
+     * =========================================================
      * PAGE
      * =========================================================
      */
@@ -1715,6 +1793,54 @@ export default function PaymentPage() {
                                 Return to the cart and continue
                                 checkout so the backend can
                                 validate the current items.
+                            </p>
+
+                        </div>
+
+                    )
+                }
+
+
+                {
+                    phonePeStatusOnly
+                    && (
+
+                        <div
+                            className="
+                                mb-5
+                                rounded-2xl
+                                border
+                                border-blue-100
+                                bg-blue-50
+                                p-4
+                            "
+                        >
+
+                            <p
+                                className="
+                                    text-sm
+                                    font-bold
+                                    text-blue-800
+                                "
+                            >
+                                Existing PhonePe payment found
+                            </p>
+
+
+                            <p
+                                className="
+                                    mt-1
+                                    text-sm
+                                    leading-6
+                                    text-blue-700
+                                "
+                            >
+                                We recovered the payment from the
+                                backend. The browser no longer has
+                                the original checkout link, so we
+                                will continue checking the existing
+                                PhonePe payment instead of creating
+                                a duplicate payment.
                             </p>
 
                         </div>
@@ -2376,8 +2502,11 @@ export default function PaymentPage() {
                                         text-blue-800
                                     "
                                 >
-                                    Closing the payment window does not cancel
-                                    your order immediately.
+                                    {
+                                        phonePeStatusOnly
+                                            ? "Your existing PhonePe payment is being checked."
+                                            : "Closing the payment window does not cancel your order immediately."
+                                    }
                                 </p>
 
 
@@ -2389,12 +2518,11 @@ export default function PaymentPage() {
                                         text-blue-700
                                     "
                                 >
-                                    We always verify the payment
-                                    through the backend. A pending
-                                    attempt remains active until the
-                                    provider reports a final result or
-                                    the backend payment deadline is
-                                    reached.
+                                    {
+                                        phonePeStatusOnly
+                                            ? "We found the payment on the backend and will not create a duplicate payment. The status is checked automatically."
+                                            : "We always verify the payment through the backend. A pending attempt remains active until the provider reports a final result or the backend payment deadline is reached."
+                                    }
                                 </p>
 
                             </div>
@@ -2405,6 +2533,8 @@ export default function PaymentPage() {
 
                     {
                         isPending
+                        &&
+                        !phonePeStatusOnly
                         && (
 
                             <button
