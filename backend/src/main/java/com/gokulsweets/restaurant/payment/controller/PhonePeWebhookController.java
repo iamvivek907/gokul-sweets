@@ -3,11 +3,7 @@ package com.gokulsweets.restaurant.payment.controller;
 import com.gokulsweets.restaurant.payment.service.PhonePeCallbackService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/payments/webhooks/phonepe")
@@ -19,9 +15,23 @@ public class PhonePeWebhookController {
     @PostMapping
     public ResponseEntity<Void> receive(
             @RequestBody byte[] rawBody,
-            @RequestHeader("X-VERIFY") String signature
+            @RequestHeader(
+                    name = "x-phonepe-checksum-key-id",
+                    required = false
+            )
+            String checksumKeyId,
+            @RequestHeader(
+                    name = "x-phonepe-checksum-signature",
+                    required = false
+            )
+            String checksumSignature
     ) {
-        callbackService.process(rawBody, signature);
+        callbackService.process(
+                rawBody,
+                checksumKeyId,
+                checksumSignature
+        );
+
         return ResponseEntity.ok().build();
     }
 }

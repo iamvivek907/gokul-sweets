@@ -2,8 +2,8 @@ package com.gokulsweets.restaurant.payment.service;
 
 import com.gokulsweets.restaurant.payment.entity.Payment;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
-import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeClient;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
+import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -16,8 +16,6 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 public class PhonePeCallbackService {
 
-    private static final String CALLBACK_PATH = "/api/payments/webhooks/phonepe";
-
     private final PhonePeClient phonePeClient;
     private final ObjectMapper objectMapper;
     private final PaymentRepository paymentRepository;
@@ -26,69 +24,240 @@ public class PhonePeCallbackService {
     @Transactional
     public void process(
             byte[] rawBody,
-            String signature
+            String checksumKeyId,
+            String checksumSignature
     ) {
-        phonePeClient.verifyCallbackSignature(rawBody, signature, CALLBACK_PATH);
+        phonePeClient.verifyWebhookSignature(
+                rawBody,
+                checksumKeyId,
+                checksumSignature
+        );
 
         JsonNode root = parse(rawBody);
-        String encodedResponse = requiredText(root, "response");
-        JsonNode response = phonePeClient.decodeCallbackResponse(encodedResponse);
 
-        JsonNode data = response.path("data");
-        String merchantTransactionId = requiredText(data, "merchantTransactionId");
-        String providerTransactionId = textOrNull(data, "transactionId");
-        String state = requiredText(data, "state").trim().toUpperCase();
+        String event =
+                requiredText(
+                        root,
+                        "event"
+                );
 
-        Payment payment = paymentRepository
-                .findByProviderAndProviderOrderId(
-                        PaymentProviderType.PHONEPE,
-                        merchantTransactionId
+        JsonNode payload =
+                root.path("payload");
+
+        if (payload.isMissingNode()
+                || payload.isNull()) {
+
+            throw new IllegalArgumentException(
+                    "PhonePe webhook payload is missing."
+            );
+        }
+
+        String merchantOrderId =
+                requiredText(
+                        payload,
+                        "merchantOrderId"
+                );
+
+        String state =
+                requiredText(
+                        payload,
+                        "state"
                 )
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "PhonePe callback does not match a local payment."
-                ));
+                        .trim()
+                        .toUpperCase();
 
-        switch (state) {
-            case "COMPLETED" -> paymentStatusService.markPaid(
-                    payment.getId(),
-                    providerTransactionId
-            );
-            case "FAILED" -> paymentStatusService.markFailed(
-                    payment.getId(),
-                    "PhonePe reported that the payment failed."
-            );
+        Payment payment =
+                paymentRepository
+                        .findByProviderAndProviderOrderId(
+                                PaymentProviderType.PHONEPE,
+                                merchantOrderId
+                        )
+                        .orElseThrow(() ->
+                                new IllegalArgumentException(
+                                        "PhonePe webhook does not match a local payment."
+                                )
+                        );
+
+        String providerTransactionId =
+                extractLatestTransactionId(
+                        payload
+                );
+
+        switch (event) {
+
+            case "checkout.order.completed" -> {
+
+                /*
+                 * PhonePe says payment status should be based
+                 * on root payload.state.
+                 */
+                if (!"COMPLETED".equals(state)) {
+                    log.warn(
+                            "PhonePe completed event has unexpected state: paymentId={}, state={}",
+                            payment.getId(),
+                            state
+                    );
+
+                    return;
+                }
+
+                paymentStatusService.markPaid(
+                        payment.getId(),
+                        providerTransactionId
+                );
+            }
+
+            case "checkout.order.failed" -> {
+
+                if (!"FAILED".equals(state)) {
+                    log.warn(
+                            "PhonePe failed event has unexpected state: paymentId={}, state={}",
+                            payment.getId(),
+                            state
+                    );
+
+                    return;
+                }
+
+                paymentStatusService.markFailed(
+                        payment.getId(),
+                        buildFailureReason(payload)
+                );
+            }
+
             default -> log.debug(
-                    "PhonePe callback received non-terminal state: paymentId={}, state={}",
+                    "Ignoring unsupported PhonePe webhook event: paymentId={}, event={}, state={}",
                     payment.getId(),
+                    event,
                     state
             );
         }
     }
 
-    private JsonNode parse(byte[] rawBody) {
+    private String extractLatestTransactionId(
+            JsonNode payload
+    ) {
+        JsonNode paymentDetails =
+                payload.path("paymentDetails");
+
+        if (!paymentDetails.isArray()
+                || paymentDetails.isEmpty()) {
+            return null;
+        }
+
+        /*
+         * PhonePe returns payment attempts here.
+         * Use the latest available transaction ID.
+         */
+        for (int index =
+             paymentDetails.size() - 1;
+             index >= 0;
+             index--) {
+
+            String transactionId =
+                    textOrNull(
+                            paymentDetails.get(index),
+                            "transactionId"
+                    );
+
+            if (transactionId != null) {
+                return transactionId;
+            }
+        }
+
+        return null;
+    }
+
+    private String buildFailureReason(
+            JsonNode payload
+    ) {
+        JsonNode paymentDetails =
+                payload.path("paymentDetails");
+
+        if (paymentDetails.isArray()
+                && !paymentDetails.isEmpty()) {
+
+            JsonNode latest =
+                    paymentDetails.get(
+                            paymentDetails.size() - 1
+                    );
+
+            String errorCode =
+                    textOrNull(
+                            latest,
+                            "errorCode"
+                    );
+
+            String detailedErrorCode =
+                    textOrNull(
+                            latest,
+                            "detailedErrorCode"
+                    );
+
+            if (errorCode != null
+                    && detailedErrorCode != null) {
+
+                return "PhonePe payment failed: "
+                        + errorCode
+                        + " ("
+                        + detailedErrorCode
+                        + ").";
+            }
+
+            if (errorCode != null) {
+                return "PhonePe payment failed: "
+                        + errorCode
+                        + ".";
+            }
+        }
+
+        return "PhonePe reported that the payment failed.";
+    }
+
+    private JsonNode parse(
+            byte[] rawBody
+    ) {
         try {
-            return objectMapper.readTree(rawBody);
+            return objectMapper.readTree(
+                    rawBody
+            );
         } catch (Exception exception) {
             throw new IllegalArgumentException(
-                    "PhonePe callback payload is invalid.",
+                    "PhonePe webhook payload is invalid.",
                     exception
             );
         }
     }
 
-    private String requiredText(JsonNode node, String field) {
-        String value = textOrNull(node, field);
+    private String requiredText(
+            JsonNode node,
+            String field
+    ) {
+        String value =
+                textOrNull(
+                        node,
+                        field
+                );
+
         if (value == null) {
             throw new IllegalArgumentException(
-                    "PhonePe callback field is missing: " + field
+                    "PhonePe webhook field is missing: "
+                            + field
             );
         }
+
         return value;
     }
 
-    private String textOrNull(JsonNode node, String field) {
-        JsonNode value = node.path(field);
-        return value.isTextual() && !value.asText().isBlank()
+    private String textOrNull(
+            JsonNode node,
+            String field
+    ) {
+        JsonNode value =
+                node.path(field);
+
+        return value.isTextual()
+                && !value.asText().isBlank()
                 ? value.asText()
                 : null;
     }

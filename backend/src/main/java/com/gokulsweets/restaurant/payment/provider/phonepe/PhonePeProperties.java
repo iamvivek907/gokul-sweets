@@ -17,25 +17,37 @@ import org.springframework.validation.annotation.Validated;
 public class PhonePeProperties {
 
     @NotBlank
-    private String merchantId = "";
+    private String clientId = "";
 
     @NotBlank
-    private String saltKey = "";
+    private String clientSecret = "";
 
     @NotBlank
-    private String saltIndex = "1";
+    private String clientVersion = "";
 
     @NotBlank
-    private String baseUrl = "https://api.phonepe.com/apis/hermes";
+    private String baseUrl = "";
 
     @NotBlank
-    private String createPaymentPath = "/pg/v1/pay";
+    private String authorizationBaseUrl = "";
 
     @NotBlank
-    private String statusPathTemplate = "/pg/v1/status/{merchantId}/{merchantTransactionId}";
+    private String authorizationPath = "/v1/oauth/token";
+
+    @NotBlank
+    private String createPaymentPath = "/checkout/v2/pay";
+
+    @NotBlank
+    private String orderStatusPathTemplate =
+            "/checkout/v2/order/{merchantOrderId}/status";
 
     private String redirectUrl = "";
-    private String callbackUrl = "";
+
+    private String webhookUrl = "";
+
+    private String webhookChecksumKeyId = "";
+
+    private String webhookChecksumSecret = "";
 
     @Min(1)
     @Max(60)
@@ -45,10 +57,35 @@ public class PhonePeProperties {
     @Max(120)
     private int requestTimeoutSeconds = 20;
 
+    @Min(5)
+    @Max(300)
+    private int tokenExpirySafetySeconds = 30;
+
     public void requireApiConfiguration() {
-        if (merchantId.isBlank() || saltKey.isBlank() || saltIndex.isBlank()) {
+        if (clientId.isBlank()
+                || clientSecret.isBlank()
+                || clientVersion.isBlank()) {
             throw new IllegalStateException(
                     "PhonePe API credentials are not configured."
+            );
+        }
+    }
+
+    public void requireRedirectConfiguration() {
+        if (redirectUrl == null || redirectUrl.isBlank()) {
+            throw new IllegalStateException(
+                    "PhonePe redirect URL is not configured."
+            );
+        }
+    }
+
+    public void requireWebhookConfiguration() {
+        if (webhookChecksumKeyId == null
+                || webhookChecksumKeyId.isBlank()
+                || webhookChecksumSecret == null
+                || webhookChecksumSecret.isBlank()) {
+            throw new IllegalStateException(
+                    "PhonePe webhook HMAC credentials are not configured."
             );
         }
     }
