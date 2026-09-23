@@ -1,6 +1,7 @@
 import {apiClient} from "@/services/apiClient";
 import type {
     CreatePaymentRequest,
+    PaymentProviderConfigurationResponse,
     PaymentResponse,
     RazorpayVerificationRequest
 } from "@/types/payment";
@@ -14,6 +15,15 @@ export function createPayment(
         body: JSON.stringify(request),
         signal
     });
+}
+
+export function getPaymentProviderConfiguration(
+    signal?: AbortSignal
+): Promise<PaymentProviderConfigurationResponse> {
+    return apiClient<PaymentProviderConfigurationResponse>(
+        "/api/payments/providers",
+        {method: "GET", signal}
+    );
 }
 
 export function refreshPayment(

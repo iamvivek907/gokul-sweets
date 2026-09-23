@@ -844,10 +844,7 @@ export default function PaymentPage() {
                              * -------------------------------------------------
                              */
                             return createPayment({
-                                orderNumber,
-
-                                provider:
-                                    "RAZORPAY"
+                                orderNumber
                             });
                         }
                     )();
@@ -2123,7 +2120,10 @@ export default function PaymentPage() {
                                 payment.provider ===
                                     "RAZORPAY"
                                     ? "Razorpay"
-                                    : "Paytm"
+                                    : payment.provider ===
+                                        "PAYTM"
+                                        ? "Paytm"
+                                        : "PhonePe"
                             }
                         </span>
 

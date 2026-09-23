@@ -65,6 +65,18 @@ public class PickupSlotService {
             Long branchId,
             LocalDate date
     ) {
+        LocalDate today =
+                LocalDate.now(
+                        BUSINESS_ZONE
+                );
+
+        if (
+                date.isBefore(today)
+        ) {
+            throw new IllegalArgumentException(
+                    "This pickup date has already passed."
+            );
+        }
 
         log.debug(
                 "Fetching pickup slots: branchId={}, date={}",

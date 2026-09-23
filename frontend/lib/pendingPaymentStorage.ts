@@ -6,7 +6,7 @@ import type {
 
 const STORAGE_KEY = "gokul-pending-payment";
 const CHANGE_EVENT = "gokul-pending-payment-change";
-const PROVIDERS: PaymentProviderType[] = ["RAZORPAY", "PAYTM"];
+const PROVIDERS: PaymentProviderType[] = ["RAZORPAY", "PAYTM", "PHONEPE"];
 const STATUSES: PaymentStatus[] = [
     "PENDING",
     "PAID",

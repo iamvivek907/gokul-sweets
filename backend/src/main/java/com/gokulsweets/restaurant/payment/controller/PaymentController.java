@@ -1,12 +1,15 @@
 package com.gokulsweets.restaurant.payment.controller;
 
 import com.gokulsweets.restaurant.payment.dto.CreatePaymentRequest;
+import com.gokulsweets.restaurant.payment.dto.PaymentProviderConfigurationResponse;
 import com.gokulsweets.restaurant.payment.dto.PaymentResponse;
 import com.gokulsweets.restaurant.payment.dto.RazorpayPaymentVerificationRequest;
+import com.gokulsweets.restaurant.payment.provider.PaymentProviderRegistry;
 import com.gokulsweets.restaurant.payment.service.PaymentCheckoutService;
 import com.gokulsweets.restaurant.payment.service.RazorpayVerificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +25,17 @@ public class PaymentController {
 
     private final PaymentCheckoutService paymentCheckoutService;
     private final RazorpayVerificationService razorpayVerificationService;
+    private final PaymentProviderRegistry providerRegistry;
+
+    @GetMapping("/providers")
+    public ResponseEntity<PaymentProviderConfigurationResponse> providers() {
+        return ResponseEntity.ok(
+                new PaymentProviderConfigurationResponse(
+                        providerRegistry.defaultProvider(),
+                        providerRegistry.enabledProviders()
+                )
+        );
+    }
 
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(

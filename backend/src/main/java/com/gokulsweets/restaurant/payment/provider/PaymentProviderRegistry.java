@@ -66,7 +66,8 @@ public class PaymentProviderRegistry {
 
         if (!enabledProviders.contains(selected)) {
             throw new IllegalArgumentException(
-                    "The selected payment provider is not enabled."
+                    "The selected payment provider is not enabled. Enabled providers: "
+                            + enabledProviders
             );
         }
 
@@ -81,6 +82,10 @@ public class PaymentProviderRegistry {
 
     public PaymentProviderType defaultProvider() {
         return defaultProvider;
+    }
+
+    public Set<PaymentProviderType> enabledProviders() {
+        return enabledProviders;
     }
 
     private Set<PaymentProviderType> parseEnabled(String value) {

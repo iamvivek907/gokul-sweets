@@ -83,8 +83,8 @@ public class CartAvailabilityService {
                 for (int index = 0; index < items.size(); index++) {
                     var item = items.get(index);
                     var checked = stock.get(index);
-                    if (checked.available() && inventoryProperties.isEnforcementEnabled()) {
-                        var policy = policies.get(item.branchProduct().getId());
+                    var policy = policies.get(item.branchProduct().getId());
+                    if (checked.available() && policy != null) {
                         var allocation = allocations.get(new StockKey(item.branchProduct().getId(), date));
                         String timing = rules.preparationReason(slot, policy, allocation);
                         if (timing != null) checked = checked.unavailable(
