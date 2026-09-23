@@ -184,7 +184,7 @@ public class PhonePePaymentProvider implements PaymentProvider {
                         .replaceAll("/+$", "");
 
         return baseUrl
-                + "/checkout/payment/"
+                + "/payment/"
                 + URLEncoder.encode(
                 orderNumber,
                 StandardCharsets.UTF_8
