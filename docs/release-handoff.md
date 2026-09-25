@@ -3,8 +3,11 @@
 Every story starts from the current `dev` SHA, its Jira description and epic.
 Create one focused PR to `dev`; move that story from To Do to In Progress when
 the PR opens. Complete the PR template and keep its evidence current. The CI
-workflow in `.github/workflows/verify.yml` runs on every PR to `dev` and can
-also run manually. It uses synthetic CI credentials and an isolated PostgreSQL
+workflow in `.github/workflows/verify.yml` runs on every branch push (including
+the `dev` push made by merging a PR), every PR targeting `dev`, and manually.
+The same tests therefore run on the branch commit and on the merged `dev`
+commit. A branch with an open PR can have both push and PR runs. CI uses synthetic
+credentials and an isolated PostgreSQL
 service; it never exercises real payment or messaging accounts.
 
 ## Automated gates
@@ -12,7 +15,7 @@ service; it never exercises real payment or messaging accounts.
 | Gate | Command / coverage | Failure handling |
 | --- | --- | --- |
 | Frontend | `npm ci`, `npm run lint`, `npx tsc --noEmit`, Node tests in UTC and Los Angeles, `npm run build` with explicit HTTPS test origin | Fix failures before recommending merge; build-time test origin is not a DEV deployment. |
-| Backend | Java 21, Gradle wrapper `./gradlew --no-daemon clean check bootJar` with isolated PostgreSQL 17 | Includes JUnit, Flyway startup and enhancement tests; investigate failures before merge. CI uses its own database and cannot assert production schema state. |
+| Backend | Java 21, Gradle wrapper `./gradlew --no-daemon clean build bootJar` with isolated PostgreSQL 17 | `build` includes `check` (JUnit `test` plus `enhancementTest`) and packages the backend; explicit `bootJar` ensures the executable JAR. Investigate failures before merge. CI uses its own database and cannot assert production schema state. |
 | Browser/provider integration | Manual DEV browser and provider tests; browser scripts in `frontend/tests/*.browser.mjs` require running API, seeded data and Playwright | Record exact setup, screenshots/API results and failure; do not describe unrun scripts as passed. |
 | Migrations | Review every new Flyway migration for backwards compatible reads/writes and rollout order; verify Flyway version on DEV after deployment | Mismatch, failed migration or unreviewed irreversible data change blocks Done. |
 
