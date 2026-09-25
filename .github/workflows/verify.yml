@@ -1,0 +1,73 @@
+name: Verify pull request
+
+on:
+  pull_request:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - name: Node regression tests in UTC and a DST browser zone
+        run: |
+          TZ=UTC node --test tests/*.test.mjs tests/*.test.cjs
+          TZ=America/Los_Angeles node --test tests/*.test.mjs tests/*.test.cjs
+      - name: Production build with a non-secret HTTPS test API origin
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: https://api-ci.example.invalid
+          NEXT_PUBLIC_API_BASE_URL: https://api-ci.example.invalid
+
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gokul_test
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: restaurant_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gokul_test -d restaurant_test"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      DATABASE_URL: jdbc:postgresql://localhost:5432/restaurant_test
+      DATABASE_USERNAME: gokul_test
+      DATABASE_PASSWORD: test-only
+      R2_ACCOUNT_ID: ci-only
+      R2_ACCESS_KEY_ID: ci-only
+      R2_SECRET_ACCESS_KEY: ci-only
+      PHONEPE_CLIENT_ID: ci-only
+      PHONEPE_CLIENT_SECRET: ci-only
+      PHONEPE_REDIRECT_URL: https://ci.example.invalid/checkout
+      INVENTORY_AUTOMATION_SCHEDULER_ENABLED: 'false'
+      GOKUL_ENVIRONMENT_ISOLATION_ENABLED: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: JUnit, enhancement regressions, and build
+        run: ./gradlew --no-daemon clean check bootJar
