@@ -1,5 +1,7 @@
 package com.gokulsweets.restaurant.order.entity;
 
+import com.gokulsweets.restaurant.config.ApplicationClock;
+
 import com.gokulsweets.restaurant.product.Product;
 import com.gokulsweets.restaurant.product.ProductSaleMode;
 import jakarta.persistence.*;
@@ -65,6 +67,6 @@ public class OrderItem {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = ApplicationClock.legacyTimestampNow();
     }
 }

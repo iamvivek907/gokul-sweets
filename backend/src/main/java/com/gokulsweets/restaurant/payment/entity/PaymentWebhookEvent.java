@@ -1,5 +1,7 @@
 package com.gokulsweets.restaurant.payment.entity;
 
+import com.gokulsweets.restaurant.config.ApplicationClock;
+
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -54,10 +56,10 @@ public class PaymentWebhookEvent {
     @PrePersist
     protected void onCreate() {
         if (processedAt == null) {
-            processedAt = LocalDateTime.now();
+            processedAt = ApplicationClock.legacyTimestampNow();
         }
         if (createdAt == null) {
-            createdAt = LocalDateTime.now();
+            createdAt = ApplicationClock.legacyTimestampNow();
         }
     }
 }

@@ -4,6 +4,8 @@ import {
     useState
 } from "react";
 
+import {parseBusinessTimestamp} from "@/lib/businessTime";
+
 
 export interface ReservationCountdown {
 
@@ -55,7 +57,7 @@ export function useReservationCountdown(
 
 
                 const parsed =
-                    new Date(
+                    parseBusinessTimestamp(
                         reservationExpiresAt
                     );
 

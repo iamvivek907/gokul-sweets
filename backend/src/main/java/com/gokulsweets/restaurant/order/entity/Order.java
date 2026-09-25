@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.order.entity;
 
 import com.gokulsweets.restaurant.branch.Branch;
+import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.customer.CustomerContact;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
@@ -264,7 +265,7 @@ public class Order {
     protected void onCreate() {
 
         LocalDateTime now =
-                LocalDateTime.now();
+                ApplicationClock.legacyTimestampNow();
 
         createdAt =
                 now;
@@ -277,7 +278,7 @@ public class Order {
     protected void onUpdate() {
 
         updatedAt =
-                LocalDateTime.now();
+                ApplicationClock.legacyTimestampNow();
     }
 
     public void addItem(

@@ -15,6 +15,7 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import {parseBusinessTimestamp} from "@/lib/businessTime";
 
 
 import CheckoutOffersPanel
@@ -961,7 +962,7 @@ try {
 
 
                 const reservationExpiresAtMs =
-                    new Date(
+                    parseBusinessTimestamp(
                         serverOrder.reservationExpiresAt
                     ).getTime();
 

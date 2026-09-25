@@ -20,6 +20,9 @@ public class EnhancementProperties {
     private boolean customerHomeV2;
     private boolean homepageCampaigns;
 
+    /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
+    private boolean istTimeFixEnabled = true;
+
     @Min(1) @Max(60)
     private int futureOrderingDays = 30;
 }

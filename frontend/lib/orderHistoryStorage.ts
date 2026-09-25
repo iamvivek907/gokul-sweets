@@ -1,6 +1,7 @@
 import type {
     OrderHistoryEntry
 } from "@/types/orderHistory";
+import {parseBusinessTimestamp} from "@/lib/businessTime";
 
 
 const STORAGE_KEY =
@@ -83,11 +84,11 @@ function parseEntries(
                     first,
                     second
                 ) =>
-                    new Date(
+                    parseBusinessTimestamp(
                         second.createdAt
                     ).getTime()
                     -
-                    new Date(
+                    parseBusinessTimestamp(
                         first.createdAt
                     ).getTime()
             );
@@ -232,11 +233,11 @@ export function addOrderToHistory(
                     first,
                     second
                 ) =>
-                    new Date(
+                    parseBusinessTimestamp(
                         second.createdAt
                     ).getTime()
                     -
-                    new Date(
+                    parseBusinessTimestamp(
                         first.createdAt
                     ).getTime()
             );

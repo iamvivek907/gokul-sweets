@@ -2,6 +2,7 @@ import type {
     CustomerOrderSummaryResponse,
     OrderStatus
 } from "@/types/order";
+import {formatBusinessTimestamp, parseBusinessDate} from "@/lib/businessTime";
 
 
 export type OrderHistoryFilter =
@@ -188,8 +189,7 @@ export function formatOrderDate(
     value: string
 ): string {
 
-    const date =
-        new Date(`${value}T00:00:00`);
+    const date = parseBusinessDate(value);
 
     if (Number.isNaN(date.getTime())) {
         return value;
@@ -200,7 +200,8 @@ export function formatOrderDate(
         {
             day: "numeric",
             month: "short",
-            year: "numeric"
+            year: "numeric",
+            timeZone: "Asia/Kolkata"
         }
     ).format(date);
 }
@@ -213,14 +214,14 @@ export function formatOrderTime(
     const [hour, minute] =
         value.split(":");
 
-    const date = new Date();
-    date.setHours(Number(hour), Number(minute), 0, 0);
+    const date = new Date(Date.UTC(2020, 0, 1, Number(hour), Number(minute)));
 
     return new Intl.DateTimeFormat(
         "en-IN",
         {
             hour: "numeric",
-            minute: "2-digit"
+            minute: "2-digit",
+            timeZone: "UTC"
         }
     ).format(date);
 }
@@ -230,17 +231,9 @@ export function getOrderMonthLabel(
     createdAt: string
 ): string {
 
-    const date = new Date(createdAt);
-
-    if (Number.isNaN(date.getTime())) {
-        return "Earlier Orders";
-    }
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            month: "long",
-            year: "numeric"
-        }
-    ).format(date);
+    const formatted = formatBusinessTimestamp(createdAt, {
+        month: "long",
+        year: "numeric"
+    });
+    return formatted === createdAt ? "Earlier Orders" : formatted;
 }
