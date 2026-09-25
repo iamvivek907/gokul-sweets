@@ -62,6 +62,8 @@ public class OrderService {
     private final OrderInventoryReservationService
             orderInventoryReservationService;
 
+    private final PickupCommitmentCheck pickupCommitmentCheck;
+
     @Value(
             "${checkout.reservation-expiry-minutes:15}"
     )
@@ -128,6 +130,10 @@ public class OrderService {
                         .validate(
                                 request
                         );
+
+        // A read-only whole-cart preflight; guarded slot update and locked inventory
+        // holds below are still the source of truth when another order races us.
+        pickupCommitmentCheck.checkNewOrder(validatedOrder, request.items());
 
         OrderCalculationResult calculation =
                 orderCalculationService

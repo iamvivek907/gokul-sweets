@@ -11,6 +11,7 @@ export interface StorefrontFeatures {
     homepageCampaigns: boolean;
     persistentPickupContext: boolean;
     cartSwitchPreview: boolean;
+    authoritativePickupCommitment: boolean;
     futureOrderingDays: number;
     today: string;
 }
