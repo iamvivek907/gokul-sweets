@@ -37,6 +37,18 @@ export interface CreateOrderRequest {
     customerPhone: string;
     pickupType: PickupType;
     items: CreateOrderItemRequest[];
+    quoteToken?: string;
+}
+
+export interface CheckoutQuote {
+    items: {name: string; unitPrice: string; taxRate: string; taxAmount: string; total: string}[];
+    subtotal: string;
+    taxAmount: string;
+    priorityCharge: string;
+    totalAmount: string;
+    currency: string;
+    expiresAt: string;
+    token: string;
 }
 
 
@@ -44,6 +56,7 @@ export interface UpdatePendingOrderRequest {
     pickupSlotId: number;
     pickupType: PickupType;
     items: CreateOrderItemRequest[];
+    quoteToken?: string;
 }
 
 

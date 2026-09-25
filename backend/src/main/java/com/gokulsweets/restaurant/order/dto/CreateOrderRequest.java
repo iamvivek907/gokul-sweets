@@ -37,6 +37,11 @@ public record CreateOrderRequest(
         PickupType pickupType,
 
         @NotEmpty(message = "At least one order item is required.")
-        List<@Valid CreateOrderItemRequest> items
+        List<@Valid CreateOrderItemRequest> items,
+        String quoteToken
 ) {
+    public CreateOrderRequest(Long branchId, Long pickupSlotId, String customerName,
+                              String customerPhone, PickupType pickupType, List<CreateOrderItemRequest> items) {
+        this(branchId, pickupSlotId, customerName, customerPhone, pickupType, items, null);
+    }
 }

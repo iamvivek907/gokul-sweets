@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.payment.service;
 
 import com.gokulsweets.restaurant.payment.dto.PaymentResponse;
+import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.payment.entity.Payment;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
@@ -14,6 +15,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +28,7 @@ public class PaymentCheckoutService {
     private final PaymentStatusService paymentStatusService;
     private final PaymentProviderRegistry providerRegistry;
     private final PaymentAttemptPersistenceService persistenceService;
+    private final EnhancementProperties features;
 
 
     /*
@@ -57,6 +61,16 @@ public class PaymentCheckoutService {
 
             Payment existing =
                     existingPending.getFirst();
+
+            if (features.isAcceptedCheckoutQuote() &&
+                    (existing.getOrder().getReservationExpiresAt() == null ||
+                            !existing.getOrder().getReservationExpiresAt().isAfter(
+                                    LocalDateTime.now(ZoneId.of("Asia/Kolkata"))) ||
+                            existing.getExpiresAt() == null ||
+                            !existing.getExpiresAt().isAfter(LocalDateTime.now(ZoneId.of("Asia/Kolkata"))))) {
+                throw new IllegalStateException(
+                        "This payment window expired. Check your order status before starting a new checkout.");
+            }
 
 
             if (

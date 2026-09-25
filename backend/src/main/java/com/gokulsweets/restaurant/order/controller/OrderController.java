@@ -8,6 +8,7 @@ import com.gokulsweets.restaurant.order.dto.OrderResponse;
 import com.gokulsweets.restaurant.order.dto.UpdatePendingOrderRequest;
 import com.gokulsweets.restaurant.order.service.OrderQueryService;
 import com.gokulsweets.restaurant.order.service.OrderService;
+import com.gokulsweets.restaurant.order.service.CheckoutQuoteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +34,18 @@ public class OrderController {
     private final OrderService orderService;
 
     private final OrderQueryService orderQueryService;
+    private final CheckoutQuoteService checkoutQuoteService;
+
+    @PostMapping("/quote")
+    public CheckoutQuoteService.Quote previewQuote(@Valid @RequestBody CreateOrderRequest request) {
+        return checkoutQuoteService.preview(request, null);
+    }
+
+    @PostMapping("/{orderNumber}/quote")
+    public CheckoutQuoteService.Quote previewPendingQuote(@PathVariable String orderNumber,
+                                                            @Valid @RequestBody CreateOrderRequest request) {
+        return checkoutQuoteService.preview(request, orderNumber);
+    }
 
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(

@@ -16,7 +16,11 @@ public record UpdatePendingOrderRequest(
         PickupType pickupType,
 
         @NotEmpty(message = "At least one order item is required.")
-        List<@Valid CreateOrderItemRequest> items
+        List<@Valid CreateOrderItemRequest> items,
+        String quoteToken
 
 ) {
+    public UpdatePendingOrderRequest(Long pickupSlotId, PickupType pickupType, List<CreateOrderItemRequest> items) {
+        this(pickupSlotId, pickupType, items, null);
+    }
 }
