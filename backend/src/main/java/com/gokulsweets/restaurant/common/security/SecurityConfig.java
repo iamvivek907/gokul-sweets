@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.common.security;
 
 import com.gokulsweets.restaurant.security.StaffUserDetailsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.env.Environment;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,7 @@ public class SecurityConfig {
 
     private final StaffUserDetailsService staffUserDetailsService;
     private final WebCorsProperties webCorsProperties;
+    private final Environment environment;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -49,7 +51,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(
-                webCorsProperties.getAllowedOrigins()
+                webCorsProperties.effectiveAllowedOrigins(environment)
         );
 
         configuration.setAllowedMethods(

@@ -26,7 +26,7 @@ public class EnvironmentIsolationGuard {
         validate(new Settings(
                 environment.getProperty("gokul.environment-isolation.environment", ""),
                 environment.getProperty("gokul.environment-isolation.api-origin", ""),
-                cors.getAllowedOrigins(), phonePe.getRedirectUrl(), phonePe.getWebhookUrl(),
+                cors.effectiveAllowedOrigins(environment), phonePe.getRedirectUrl(), phonePe.getWebhookUrl(),
                 environment.getProperty("spring.datasource.url", ""),
                 environment.getProperty("cloudflare.r2.bucket-name", ""),
                 environment.getProperty("cloudflare.r2.public-url", ""),

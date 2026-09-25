@@ -27,6 +27,7 @@ non-secret, customer-safe effective flags and the India business date.
 | `inventory.enforcement-enabled` | Existing value: ON | Inventory safety: checks sellable stock on commit. **Do not change as an enhancement rollback.** |
 | `inventory.automation.scheduler-enabled` | Existing value: ON | Inventory operations: existing scheduled generation. **Do not change as an enhancement rollback.** |
 | `gokul.web.allowed-origins` / `GOKUL_ALLOWED_ORIGINS` | Localhost only | Security/operations: exact browser origins allowed to call backend. No wildcard or URL path. DEV and PROD must explicitly set their own origin list; never combine them. |
+| `gokul.web.environment-cors-enabled` / `GOKUL_ENVIRONMENT_CORS_ENABLED` | OFF | CORS owner: when ON, `GOKUL_DEPLOYMENT_ENVIRONMENT=DEV` accepts only `https://dev.gokulsweets.in`; PROD accepts only `https://gokulsweets.in`. A conflicting explicit `GOKUL_ALLOWED_ORIGINS` rejects startup. OFF retains the existing allowlist. This can be enabled independently of the wider environment-isolation flag. |
 | `payment.enabled-providers`, `payment.default-provider` / `PAYMENT_ENABLED_PROVIDERS`, `PAYMENT_DEFAULT_PROVIDER` | Existing provider values | Payments: enable/default only configured providers; verify redirect, callback and secrets within the same environment. |
 | `cloudflare.r2.*` / `R2_*` | Bucket/public URL defaults; credentials empty | Storage: image bucket and version URLs. DEV and PROD require separate deployed credentials and bucket policies. |
 | `gokul.environment-isolation.*` / `GOKUL_ENVIRONMENT_ISOLATION_ENABLED`, `GOKUL_DEPLOYMENT_ENVIRONMENT`, `GOKUL_PUBLIC_API_ORIGIN` | OFF / unset | Operations: when ON, backend fails startup unless the declared DEV or PROD storefront matches exact CORS, PhonePe return base and backend webhook; requires explicit PostgreSQL URL, separated R2 bucket and public URL, and PhonePe identifiers. Keep OFF until those dependencies are configured. |
@@ -124,6 +125,37 @@ With the isolation switch ON, new PhonePe merchant order IDs use
 This prevents a new callback for the same numeric payment ID from matching
 the other environment's new payment row; separate webhook credentials and
 provider accounts are still required.
+
+### DEV CORS and page-load check (SCRUM-16)
+
+For the Render backend at `https://api-dev.gokulsweets.in`, set
+`GOKUL_DEPLOYMENT_ENVIRONMENT=DEV` and `GOKUL_ENVIRONMENT_CORS_ENABLED=true`.
+Set `GOKUL_ALLOWED_ORIGINS=https://dev.gokulsweets.in` or remove that override;
+the enabled policy derives this exact origin. A conflicting explicit value
+causes startup to fail instead of silently adding PROD. Do **not** add
+`https://api-dev.gokulsweets.in` as an allowed browser origin: that is the
+destination API host. Keep `GOKUL_ENVIRONMENT_ISOLATION_ENABLED=false` until
+its separate database, R2 and payment prerequisites are configured.
+
+In Vercel, set `NEXT_PUBLIC_API_URL=https://api-dev.gokulsweets.in` and
+either unset `NEXT_PUBLIC_API_BASE_URL` or set it to the same origin. Rebuild
+the DEV frontend after changing these build-time variables. Confirm the Vercel
+domain is `https://dev.gokulsweets.in`, with no trailing slash or path in any
+of the origin variables.
+
+After Render is awake, check this read-only preflight:
+
+```bash
+curl -i -X OPTIONS 'https://api-dev.gokulsweets.in/api/storefront/features' \
+  -H 'Origin: https://dev.gokulsweets.in' \
+  -H 'Access-Control-Request-Method: GET'
+```
+
+Expect `Access-Control-Allow-Origin: https://dev.gokulsweets.in`, then open
+the DEV home and menu and confirm `/api/storefront/features` returns JSON.
+Repeat the preflight with `Origin: https://gokulsweets.in` and confirm no
+allow-origin header. A Render sleeping-service page or timeout is not evidence
+that CORS is correct or incorrect; wait for health/JSON before diagnosing CORS.
 
 Rotate credentials known to have existed in Git history (R2 access keys and
 payment/webhook secrets): revoke the old key at its provider, provision new
