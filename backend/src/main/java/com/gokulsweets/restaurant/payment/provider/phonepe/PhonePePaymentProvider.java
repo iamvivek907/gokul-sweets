@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.payment.provider.phonepe;
 
+import com.gokulsweets.restaurant.config.EnvironmentIsolationGuard;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.payment.entity.Payment;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
@@ -20,6 +21,7 @@ public class PhonePePaymentProvider implements PaymentProvider {
 
     private final PhonePeClient client;
     private final PhonePeProperties properties;
+    private final EnvironmentIsolationGuard isolationGuard;
 
     @Override
     public PaymentProviderType providerType() {
@@ -41,7 +43,7 @@ public class PhonePePaymentProvider implements PaymentProvider {
          * for all subsequent PhonePe status checks.
          */
         String merchantOrderId =
-                "GKS-PPE-" + payment.getId();
+                isolationGuard.phonePeMerchantOrderId(payment.getId());
 
         /*
          * PhonePe redirects the customer back to our payment page.

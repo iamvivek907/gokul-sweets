@@ -24,6 +24,7 @@ class RuntimeConfigurationTest {
         }
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("inventory.automation.scheduler-enabled")).isEqualTo("true");
+        assertThat(properties.getProperty("gokul.environment-isolation.enabled")).endsWith(":false}");
     }
 
     @Test
