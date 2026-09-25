@@ -25,6 +25,8 @@ public class EnhancementProperties {
     private boolean cartSwitchPreview;
     /** Recheck the whole cart and chosen slot before atomic pickup and stock reservation. */
     private boolean authoritativePickupCommitment;
+    /** Require a fresh signed, server-priced quote before creating or editing a checkout. */
+    private boolean acceptedCheckoutQuote;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

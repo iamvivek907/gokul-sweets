@@ -43,6 +43,7 @@ import {
 
 import {
     createOrder,
+    previewCheckoutQuote,
     getCustomerOrder,
     updatePendingCheckout
 } from "@/services/orderApi";
@@ -62,8 +63,10 @@ import {
 
 import type {
     CreateOrderRequest,
+    CheckoutQuote,
     UpdatePendingOrderRequest
 } from "@/types/order";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import {
     addOrderToHistory
@@ -599,6 +602,9 @@ function ReviewInventoryIssue({
 
 export default function ReviewPage() {
 
+    const quoteEnabled = useStorefrontFeatures()?.acceptedCheckoutQuote === true;
+    const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
+
     const router =
         useRouter();
 
@@ -889,6 +895,17 @@ export default function ReviewPage() {
             pendingOrder.branchId ===
                 branch.id;
 
+        const quoteRequest: CreateOrderRequest = {
+            branchId: branch.id,
+            pickupSlotId: pickupSelection.slot.id,
+            customerName,
+            customerPhone,
+            pickupType: pickupSelection.pickupType,
+            items: requestItems
+        };
+        const quoteOrderNumber = localPendingOrderCandidate ? pendingOrder?.orderNumber : undefined;
+        const quoteKey = JSON.stringify([quoteRequest, quoteOrderNumber]);
+
 
         setSubmitting(true);
 setOrderError(null);
@@ -920,6 +937,14 @@ try {
         );
 
         return;
+    }
+
+    if (quoteEnabled) {
+        if (!acceptedQuote || acceptedQuote.key !== quoteKey ||
+            Date.parse(acceptedQuote.quote.expiresAt) <= Date.now()) {
+            setAcceptedQuote({key: quoteKey, quote: await previewCheckoutQuote(quoteRequest, quoteOrderNumber)});
+            return;
+        }
     }
 
 
@@ -1000,7 +1025,8 @@ try {
                                 pickupSelection.pickupType,
 
                             items:
-                                requestItems
+                                requestItems,
+                            quoteToken: quoteEnabled ? acceptedQuote?.quote.token : undefined
                         };
 
 
@@ -1080,6 +1106,8 @@ try {
                  */
                 clearPendingOrder();
 
+                setAcceptedQuote(null);
+
                 idempotencyKeyRef.current =
                     null;
             }
@@ -1108,7 +1136,8 @@ try {
                         pickupSelection.pickupType,
 
                     items:
-                        requestItems
+                        requestItems,
+                    quoteToken: quoteEnabled ? acceptedQuote?.quote.token : undefined
                 };
 
 
@@ -1193,6 +1222,8 @@ try {
             );
 
         } catch (exception) {
+
+            setAcceptedQuote(null);
 
             console.error(
                 "Unable to prepare order:",
@@ -2368,6 +2399,20 @@ try {
 
                 {/* Offers + final price */}
 
+                {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
+                    <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-white p-4" role="status">
+                        <p className="font-bold">Review your server confirmed price</p>
+                        {acceptedQuote.quote.items.map((line, index) => (
+                            <p className="mt-2 text-sm" key={`${line.name}-${index}`}>
+                                {line.name}: ₹{line.total} (unit ₹{line.unitPrice}, tax {line.taxRate}%)
+                            </p>
+                        ))}
+                        <p className="mt-3 text-sm">Items ₹{acceptedQuote.quote.subtotal} · Tax ₹{acceptedQuote.quote.taxAmount} · Pickup charge ₹{acceptedQuote.quote.priorityCharge}</p>
+                        <p className="mt-2 font-bold">Total before optional offers ₹{acceptedQuote.quote.totalAmount}</p>
+                        <p className="mt-2 text-xs">This quote expires at {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. After confirmation, the payment page shows your reservation deadline. <Link className="underline" href="/about#cancellation-policy">Review the cancellation policy</Link> before paying.</p>
+                    </div>
+                )}
+
                 {
                     preparedOrderNumber
                         ? (
@@ -2459,7 +2504,9 @@ try {
                                     {
                                         submitting
                                             ? "Preparing your order..."
-                                            : "Check Final Price & Offers"
+                                            : quoteEnabled && acceptedQuote
+                                                ? "Accept price and reserve pickup"
+                                                : "Check Final Price & Offers"
                                     }
                                 </button>
 

@@ -12,6 +12,7 @@ export interface StorefrontFeatures {
     persistentPickupContext: boolean;
     cartSwitchPreview: boolean;
     authoritativePickupCommitment: boolean;
+    acceptedCheckoutQuote: boolean;
     futureOrderingDays: number;
     today: string;
 }

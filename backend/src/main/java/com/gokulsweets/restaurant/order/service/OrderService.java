@@ -63,6 +63,7 @@ public class OrderService {
             orderInventoryReservationService;
 
     private final PickupCommitmentCheck pickupCommitmentCheck;
+    private final CheckoutQuoteService checkoutQuoteService;
 
     @Value(
             "${checkout.reservation-expiry-minutes:15}"
@@ -140,6 +141,9 @@ public class OrderService {
                         .calculate(
                                 validatedOrder
                         );
+
+        // Verify the exact accepted server price before creating any slot or stock hold.
+        checkoutQuoteService.accept(request, null, calculation, request.quoteToken());
 
         reservePickupCapacity(
                 validatedOrder
@@ -322,6 +326,9 @@ public class OrderService {
                         .calculate(
                                 validatedOrder
                         );
+
+        // A pending checkout edit may also change tax, price or pickup charge.
+        checkoutQuoteService.acceptUpdate(order, request, calculation);
 
         /*
          * Reserve first and release second. Both operations
