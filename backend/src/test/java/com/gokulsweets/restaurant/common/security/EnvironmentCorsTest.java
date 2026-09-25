@@ -30,7 +30,7 @@ class EnvironmentCorsTest {
                 .isEqualTo("https://dev.gokulsweets.in");
         assertThat(cors.checkOrigin("https://gokulsweets.in")).isNull();
         assertThat(cors.checkOrigin("https://api-dev.gokulsweets.in")).isNull();
-        assertThat(cors.checkMethod(org.springframework.http.HttpMethod.GET)).isNotNull();
+        assertThat(cors.getAllowedMethods()).contains("GET", "OPTIONS");
     }
 
     @Test
