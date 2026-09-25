@@ -44,6 +44,7 @@ interface LoadedOrder {
     orderNumber: string;
     order: CustomerOrderResponse | null;
     error: string | null;
+    checkedAt: number;
 }
 
 
@@ -141,7 +142,8 @@ export default function OrderDetailPage() {
                     return {
                         orderNumber,
                         order: response,
-                        error: null
+                        error: null,
+                        checkedAt: Date.now()
                     };
 
                 } catch (exception) {
@@ -158,6 +160,7 @@ export default function OrderDetailPage() {
                     return {
                         orderNumber,
                         order: null,
+                        checkedAt: Date.now(),
                         error:
                             exception instanceof Error
                                 ? exception.message
@@ -309,7 +312,7 @@ export default function OrderDetailPage() {
 
     const pendingPreparation = order.orderStatus === "CONFIRMED" || order.orderStatus === "PREPARING";
     const pastPickupWindow = pendingPreparation &&
-        parseBusinessTimestamp(`${order.pickupDate}T${order.pickupEndTime}`).getTime() <= Date.now();
+        parseBusinessTimestamp(`${order.pickupDate}T${order.pickupEndTime}`).getTime() <= currentOrder.checkedAt;
 
     return (
         <AppShell>
