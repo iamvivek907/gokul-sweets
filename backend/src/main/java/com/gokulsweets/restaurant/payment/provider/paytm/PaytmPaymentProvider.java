@@ -49,9 +49,6 @@ public class PaytmPaymentProvider implements PaymentProvider {
             );
         }
 
-        if ("TXN_SUCCESS".equals(response.body().resultInfo().resultStatus())) {
-            reconciliationPolicy.validatePaytmStatus(payment, response.body());
-        }
         if (!"S".equalsIgnoreCase(
                 response.body().resultInfo().resultStatus()
         )) {
@@ -94,6 +91,10 @@ public class PaytmPaymentProvider implements PaymentProvider {
             throw new IllegalStateException(
                     "Invalid transaction status received from Paytm."
             );
+        }
+
+        if ("TXN_SUCCESS".equals(response.body().resultInfo().resultStatus())) {
+            reconciliationPolicy.validatePaytmStatus(payment, response.body());
         }
 
         return switch (response.body().resultInfo().resultStatus()) {
