@@ -13,6 +13,7 @@ export interface StorefrontFeatures {
     cartSwitchPreview: boolean;
     authoritativePickupCommitment: boolean;
     acceptedCheckoutQuote: boolean;
+    truthfulOrderTracking: boolean;
     futureOrderingDays: number;
     today: string;
 }

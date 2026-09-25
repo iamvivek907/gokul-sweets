@@ -18,6 +18,8 @@ public record CustomerOrderSummaryResponse(
         PickupType pickupType,
         BigDecimal totalAmount,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        LocalDateTime estimatedReadyAt,
+        LocalDateTime delayReportedAt
 ) {
 }

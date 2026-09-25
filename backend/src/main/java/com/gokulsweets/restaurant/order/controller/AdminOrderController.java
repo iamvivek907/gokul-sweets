@@ -5,6 +5,7 @@ import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.lifecycle.service.AdminOrderLifecycleCoordinator;
 import com.gokulsweets.restaurant.order.service.AdminOrderBatchPreparationService;
 import com.gokulsweets.restaurant.order.service.AdminOrderQueryService;
+import com.gokulsweets.restaurant.order.service.OrderDelayService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +21,15 @@ public class AdminOrderController {
     private final AdminOrderQueryService adminOrderQueryService;
     private final AdminOrderLifecycleCoordinator lifecycleCoordinator;
     private final AdminOrderBatchPreparationService adminOrderBatchPreparationService;
+    private final OrderDelayService orderDelayService;
+
+    @PatchMapping("/{orderNumber}/delay")
+    public ResponseEntity<AdminOrderDetailResponse> reportDelay(
+            @PathVariable String orderNumber,
+            @Valid @RequestBody UpdateOrderDelayRequest request
+    ) {
+        return ResponseEntity.ok(orderDelayService.report(orderNumber, request));
+    }
 
     @GetMapping
     public ResponseEntity<AdminOrderPageResponse> getOrders(

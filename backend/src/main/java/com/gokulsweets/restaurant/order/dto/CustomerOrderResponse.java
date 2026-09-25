@@ -48,6 +48,11 @@ public record CustomerOrderResponse(
 
         LocalDateTime createdAt,
 
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+
+        String branchPhone,
+        LocalDateTime estimatedReadyAt,
+        String delayReason,
+        LocalDateTime delayReportedAt
 ) {
 }

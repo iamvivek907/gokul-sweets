@@ -105,6 +105,10 @@ export interface CustomerOrderResponse {
     paymentStatus: PaymentStatus | null;
     branchName: string;
     branchAddress: string;
+    branchPhone?: string | null;
+    estimatedReadyAt?: string | null;
+    delayReason?: string | null;
+    delayReportedAt?: string | null;
     pickupDate: string;
     pickupStartTime: string;
     pickupEndTime: string;
@@ -130,6 +134,8 @@ export interface CustomerOrderSummaryResponse {
     orderNumber: string;
     orderStatus: OrderStatus;
     branchName: string;
+    estimatedReadyAt?: string | null;
+    delayReportedAt?: string | null;
     pickupDate: string;
     pickupStartTime: string;
     pickupEndTime: string;
