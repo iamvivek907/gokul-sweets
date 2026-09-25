@@ -4,11 +4,10 @@ import type {
     AdminPrintJobPageResponse,
     PrintJobStatus
 } from "@/types/adminPrintJobs";
+import {ADMIN_API_BASE_URL} from "@/lib/constants";
 
 
-const API_BASE =
-    process.env.NEXT_PUBLIC_API_BASE_URL
-    ?? "http://localhost:8080";
+const API_BASE = ADMIN_API_BASE_URL;
 
 
 async function getErrorMessage(

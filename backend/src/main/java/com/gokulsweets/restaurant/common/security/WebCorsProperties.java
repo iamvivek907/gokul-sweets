@@ -1,6 +1,8 @@
 package com.gokulsweets.restaurant.common.security;
 
 import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -17,14 +19,9 @@ import java.util.List;
 @Setter
 public class WebCorsProperties {
 
+    // The deployment environment supplies the exact customer origin. In the
+    // absence of that setting, only local development is allowed to use the API.
     @NotEmpty
-    private List<String> allowedOrigins = new ArrayList<>(
-            List.of(
-                    "http://localhost:3000",
-                    "https://gokul-sweets-dev.vercel.app",
-                    "https://dev.gokulsweets.in",
-                    "https://gokulsweets.in",
-                    "https://api-dev.gokulsweets.in"
-            )
-    );
+    private List<@NotBlank @Pattern(regexp = "https://[^/\\s*]+(?::[0-9]+)?|http://localhost(?::[0-9]+)?") String>
+            allowedOrigins = new ArrayList<>(List.of("http://localhost:3000"));
 }
