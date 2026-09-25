@@ -31,6 +31,8 @@ public class EnhancementProperties {
     private boolean paymentReconciliationV2;
     /** Allow authorized branch staff to publish an honest revised readiness estimate. */
     private boolean truthfulOrderTracking;
+    /** Remove only the matching pending checkout cart when server payment is PAID. */
+    private boolean paidCartRecovery;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

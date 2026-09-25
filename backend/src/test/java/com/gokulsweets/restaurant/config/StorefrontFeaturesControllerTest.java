@@ -18,6 +18,7 @@ class StorefrontFeaturesControllerTest {
         var result = new StorefrontFeaturesController(properties, clock).features();
         assertThat(result.persistentPickupContext()).isFalse();
         assertThat(result.cartSwitchPreview()).isFalse();
+        assertThat(result.paidCartRecovery()).isFalse();
         assertThat(result.authoritativePickupCommitment()).isFalse();
         assertThat(result.today()).isEqualTo(LocalDate.of(2026, 9, 26));
     }
@@ -32,8 +33,10 @@ class StorefrontFeaturesControllerTest {
         assertThat(result.smartPickupSelection()).isFalse();
         assertThat(result.cartSwitchPreview()).isFalse();
         properties.setCartSwitchPreview(true);
+        properties.setPaidCartRecovery(true);
         var previewEnabled = new StorefrontFeaturesController(properties, clock).features();
         assertThat(previewEnabled.cartSwitchPreview()).isTrue();
+        assertThat(previewEnabled.paidCartRecovery()).isTrue();
         assertThat(previewEnabled.smartAvailability()).isFalse();
         properties.setAuthoritativePickupCommitment(true);
         assertThat(new StorefrontFeaturesController(properties, clock).features().authoritativePickupCommitment()).isFalse();

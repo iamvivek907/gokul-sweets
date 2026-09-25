@@ -14,6 +14,7 @@ export interface StorefrontFeatures {
     authoritativePickupCommitment: boolean;
     acceptedCheckoutQuote: boolean;
     truthfulOrderTracking: boolean;
+    paidCartRecovery: boolean;
     futureOrderingDays: number;
     today: string;
 }
