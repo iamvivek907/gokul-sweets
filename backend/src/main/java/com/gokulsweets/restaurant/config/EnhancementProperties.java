@@ -21,6 +21,8 @@ public class EnhancementProperties {
     private boolean homepageCampaigns;
     /** Show the selected pickup branch and slot across the customer ordering journey. */
     private boolean persistentPickupContext;
+    /** Require a server-backed cart preview before changing a pickup branch or date. */
+    private boolean cartSwitchPreview;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

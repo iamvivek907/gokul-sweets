@@ -10,6 +10,7 @@ export interface StorefrontFeatures {
     customerHomeV2: boolean;
     homepageCampaigns: boolean;
     persistentPickupContext: boolean;
+    cartSwitchPreview: boolean;
     futureOrderingDays: number;
     today: string;
 }

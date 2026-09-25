@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import SmartPickupSelection from "@/components/checkout/SmartPickupSelection";
+import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
+import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
 import {parseBusinessTimestamp} from "@/lib/businessTime";
 
@@ -337,15 +339,18 @@ export default function PickupPage() {
             <SmartPickupSelection features={features} onFallback={() => setFallback(true)} /></>;
     }
     return <>{features?.smartPickupSelection && parsePendingOrder(pending) && <p className="p-4 text-center text-sm">
-        Editing a reserved order: your existing pickup selector keeps its held stock.</p>}<LegacyPickupPage fallbackToday={features?.today ?? null} fallbackFutureOrderingDays={features?.futureOrderingDays ?? null} /></>;
+        Editing a reserved order: your existing pickup selector keeps its held stock.</p>}<LegacyPickupPage fallbackToday={features?.today ?? null} fallbackFutureOrderingDays={features?.futureOrderingDays ?? null}
+        cartSwitchPreview={!!features?.cartSwitchPreview} /></>;
 }
 
 function LegacyPickupPage({
     fallbackToday,
-    fallbackFutureOrderingDays
+    fallbackFutureOrderingDays,
+    cartSwitchPreview
 }: {
     fallbackToday: string | null;
     fallbackFutureOrderingDays: number | null;
+    cartSwitchPreview: boolean;
 }) {
 
     const router =
@@ -359,12 +364,15 @@ function LegacyPickupPage({
 
 
     const {
+        items,
         branchId,
         itemCount,
         subtotal,
         isEmpty
     } =
         useCart();
+
+    const [proposedDate, setProposedDate] = useState<string | null>(null);
 
 
     const pendingOrderSnapshot =
@@ -875,6 +883,16 @@ function LegacyPickupPage({
                 maximumDate
             );
 
+        if (cartSwitchPreview && !isEmpty && branch && nextDate && nextDate !== pickupDate) {
+            setProposedDate(nextDate);
+            return;
+        }
+
+        applyDateChange(nextDate);
+    }
+
+    function applyDateChange(nextDate: string) {
+
         setLoading(
             true
         );
@@ -1119,6 +1137,14 @@ function LegacyPickupPage({
      */
     return (
         <AppShell>
+
+            {proposedDate && branch && <CartSwitchDialog branchId={branch.id} branchName={branch.name}
+                date={proposedDate} items={items} onKeep={() => setProposedDate(null)}
+                onSwitch={(preview: CartSwitchPreview) => {
+                    if (preview.conflicts) return;
+                    applyDateChange(proposedDate);
+                    setProposedDate(null);
+                }} />}
 
             <section
                 className="
