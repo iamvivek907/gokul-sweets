@@ -3,6 +3,7 @@
 import Link from "next/link";
 import SmartPickupSelection from "@/components/checkout/SmartPickupSelection";
 import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
+import {parseBusinessTimestamp} from "@/lib/businessTime";
 
 import {
     useEffect,
@@ -613,7 +614,7 @@ function LegacyPickupPage({
 
 
                 const expiresAt =
-                    new Date(
+                    parseBusinessTimestamp(
                         result.reservationExpiresAt
                     ).getTime();
 

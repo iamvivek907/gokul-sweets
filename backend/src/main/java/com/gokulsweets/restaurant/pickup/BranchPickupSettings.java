@@ -1,5 +1,7 @@
 package com.gokulsweets.restaurant.pickup;
 
+import com.gokulsweets.restaurant.config.ApplicationClock;
+
 import com.gokulsweets.restaurant.branch.Branch;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -92,7 +94,7 @@ public class BranchPickupSettings {
     protected void onCreate() {
 
         LocalDateTime now =
-                LocalDateTime.now();
+                ApplicationClock.legacyTimestampNow();
 
         createdAt = now;
         updatedAt = now;
@@ -102,6 +104,6 @@ public class BranchPickupSettings {
     protected void onUpdate() {
 
         updatedAt =
-                LocalDateTime.now();
+                ApplicationClock.legacyTimestampNow();
     }
 }

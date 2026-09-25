@@ -47,7 +47,7 @@ public class PhonePePaymentProvider implements PaymentProvider {
          * PhonePe redirects the customer back to our payment page.
          *
          * Example:
-         * https://gokul-sweets-dev.vercel.app/checkout/payment/GKS-20260923-490EAC17BE04497A
+         * https://dev.gokulsweets.in/checkout/payment/GKS-20260923-490EAC17BE04497A
          */
         String redirectUrl =
                 buildRedirectUrl(order.getOrderNumber());

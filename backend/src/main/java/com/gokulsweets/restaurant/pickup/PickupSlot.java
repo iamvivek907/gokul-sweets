@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.pickup;
 
 import com.gokulsweets.restaurant.branch.Branch;
+import com.gokulsweets.restaurant.config.ApplicationClock;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -63,14 +64,14 @@ public class PickupSlot {
 
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = ApplicationClock.legacyTimestampNow();
         createdAt = now;
         updatedAt = now;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        updatedAt = ApplicationClock.legacyTimestampNow();
     }
 
     @Column(nullable = false)

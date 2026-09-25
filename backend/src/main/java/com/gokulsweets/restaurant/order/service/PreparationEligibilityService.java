@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.order.service;
 
 import com.gokulsweets.restaurant.order.config.PreparationWindowProperties;
+import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
@@ -32,7 +33,7 @@ public class PreparationEligibilityService {
 
         return evaluate(
                 order,
-                LocalDateTime.now()
+                ApplicationClock.legacyTimestampNow()
         );
     }
 

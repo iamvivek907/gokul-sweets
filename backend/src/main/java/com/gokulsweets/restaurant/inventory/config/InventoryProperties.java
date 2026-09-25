@@ -38,5 +38,4 @@ public class InventoryProperties {
     @Min(1000)
     private long holdExpiryCheckMilliseconds = 30000;
 
-    private String businessZone = "Asia/Kolkata";
 }

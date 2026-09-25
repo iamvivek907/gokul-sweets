@@ -15,6 +15,7 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
 
 import {
     useCart
@@ -105,26 +106,9 @@ function formatCurrency(
 function formatExpiry(
     value: string
 ): string {
-
-    const date =
-        new Date(value);
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-
-        return value;
-    }
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(date);
+    return formatBusinessTimestamp(value, {
+        hour: "numeric", minute: "2-digit"
+    });
 }
 
 
@@ -863,7 +847,7 @@ export default function PaymentPage() {
                              */
 
                             const reservationExpiresAtMs =
-                                new Date(
+                                parseBusinessTimestamp(
                                     backendOrder.reservationExpiresAt
                                 ).getTime();
 
