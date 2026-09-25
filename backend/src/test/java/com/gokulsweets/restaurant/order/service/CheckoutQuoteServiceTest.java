@@ -63,8 +63,9 @@ class CheckoutQuoteServiceTest {
         String expired = "1000000000." + quote.token().split("\\.")[1];
         assertThatThrownBy(() -> service.accept(request, null, amounts, expired))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("expired");
-        assertThatThrownBy(() -> service.accept(request, null, amounts,
-                quote.token().substring(0, quote.token().length() - 1) + "A"))
+        String tampered = quote.token().substring(0, quote.token().length() - 1)
+                + (quote.token().endsWith("A") ? "B" : "A");
+        assertThatThrownBy(() -> service.accept(request, null, amounts, tampered))
                 .isInstanceOf(IllegalStateException.class);
     }
 
