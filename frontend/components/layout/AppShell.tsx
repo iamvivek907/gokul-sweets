@@ -12,6 +12,7 @@ import SocialFollowPopup
     from "./SocialFollowPopup";
 import CustomerFooter
     from "./CustomerFooter";
+import PickupJourneyContext from "./PickupJourneyContext";
 
 
 interface AppShellProps {
@@ -43,6 +44,8 @@ export default function AppShell({
         >
 
             <Header />
+
+            <PickupJourneyContext />
 
 
             <main

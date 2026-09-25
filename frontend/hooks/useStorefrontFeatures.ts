@@ -9,6 +9,7 @@ export interface StorefrontFeatures {
     inventoryAutomationV2: boolean;
     customerHomeV2: boolean;
     homepageCampaigns: boolean;
+    persistentPickupContext: boolean;
     futureOrderingDays: number;
     today: string;
 }

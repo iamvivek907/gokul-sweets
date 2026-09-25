@@ -23,7 +23,7 @@ class SmartOrderingRulesTest {
 
     @Test void allFlagsDefaultOffAndSelectionRequiresAvailability() {
         var controller = new StorefrontFeaturesController(features, clock);
-        assertThat(controller.features()).isEqualTo(new StorefrontFeaturesController.Features(false, false, false, false, false, 30, LocalDate.of(2026, 9, 22)));
+        assertThat(controller.features()).isEqualTo(new StorefrontFeaturesController.Features(false, false, false, false, false, false, 30, LocalDate.of(2026, 9, 22)));
         features.setSmartPickupSelection(true);
         assertThat(controller.features().smartPickupSelection()).isFalse();
         features.setSmartAvailability(true);
