@@ -29,6 +29,7 @@ non-secret, customer-safe effective flags and the India business date.
 | `gokul.web.allowed-origins` / `GOKUL_ALLOWED_ORIGINS` | Localhost only | Security/operations: exact browser origins allowed to call backend. No wildcard or URL path. DEV and PROD must explicitly set their own origin list; never combine them. |
 | `payment.enabled-providers`, `payment.default-provider` / `PAYMENT_ENABLED_PROVIDERS`, `PAYMENT_DEFAULT_PROVIDER` | Existing provider values | Payments: enable/default only configured providers; verify redirect, callback and secrets within the same environment. |
 | `cloudflare.r2.*` / `R2_*` | Bucket/public URL defaults; credentials empty | Storage: image bucket and version URLs. DEV and PROD require separate deployed credentials and bucket policies. |
+| `gokul.environment-isolation.*` / `GOKUL_ENVIRONMENT_ISOLATION_ENABLED`, `GOKUL_DEPLOYMENT_ENVIRONMENT`, `GOKUL_PUBLIC_API_ORIGIN` | OFF / unset | Operations: when ON, backend fails startup unless the declared DEV or PROD storefront matches exact CORS, PhonePe return base and backend webhook; requires explicit PostgreSQL URL, separated R2 bucket and public URL, and PhonePe identifiers. Keep OFF until those dependencies are configured. |
 
 Other preparation, reservation, lifecycle, payment timeout, printing and report
 settings stay in the same backend properties file with their existing defaults.
@@ -61,6 +62,16 @@ publishing. Preview deployments need explicit appropriate API settings too.
 
 The PhonePe redirect base is extended by `PhonePePaymentProvider` with
 `/payment/{orderNumber}`; test a full payment return before setting a final value.
+For example, the DEV base is `https://dev.gokulsweets.in/checkout`; the complete
+return is `https://dev.gokulsweets.in/checkout/payment/{orderNumber}`. With
+`GOKUL_ENVIRONMENT_ISOLATION_ENABLED=true`, set `GOKUL_DEPLOYMENT_ENVIRONMENT=DEV`
+or `PROD` and `GOKUL_PUBLIC_API_ORIGIN` to the matching HTTPS backend origin.
+The startup guard checks the actual webhook URL ends in
+`/api/payments/webhooks/phonepe`, rejects combined DEV/PROD CORS, rejects the
+shared default R2 bucket, and disallows PhonePe sandbox on PROD. Set separate
+`R2_BUCKET_NAME` values before turning it on. This guard cannot establish that
+two different database URLs, payment clients, R2 keys or message providers
+really belong to different accounts; verify those identities outside this app.
 The frontend `NEXT_PUBLIC_*` values are embedded at build time. Build each environment
 with the corresponding API URL and toggle, or adopt an explicit runtime config endpoint.
 Do not infer the backend hostname from the storefront domain.
@@ -91,6 +102,46 @@ removes the defaults from the current tree, but the old values remain in Git
 history. Rotate the affected R2 and payment/webhook credentials with their
 providers, then update the matching deployment environments. Rewriting Git
 history alone does not invalidate a credential.
+
+## DEV / PROD isolation handoff (SCRUM-16)
+
+Before enabling the switch, record a **redacted** inventory for each deployment:
+frontend build SHA and `NEXT_PUBLIC_API_URL`, backend SHA and public API origin,
+`GOKUL_ALLOWED_ORIGINS`, `PHONEPE_REDIRECT_URL`, `PHONEPE_WEBHOOK_URL`, payment
+provider mode and credential **identifiers**, database host/name, R2 account and
+bucket, OTP sender/project, push app, analytics property, SMS/WhatsApp/email
+sender and notification enable flags. Never record tokens, passwords or key
+material in Jira. DEV and PROD must have different writeable DBs, R2 buckets,
+payment webhook secrets and customer messaging credentials. Disable customer
+messages on DEV until a test recipient allowlist exists. OTP, push and outbound
+messaging are not yet active in the repository; apply the same isolation when
+those integrations are added. Analytics must use separate properties or remain
+OFF in DEV.
+
+With the isolation switch ON, new PhonePe merchant order IDs use
+`GKS-DEV-PPE-{id}` or `GKS-PROD-PPE-{id}`. Existing persisted
+`GKS-PPE-{id}` payments still verify using their stored provider order ID.
+This prevents a new callback for the same numeric payment ID from matching
+the other environment's new payment row; separate webhook credentials and
+provider accounts are still required.
+
+Rotate credentials known to have existed in Git history (R2 access keys and
+payment/webhook secrets): revoke the old key at its provider, provision new
+scoped credentials per environment, update the environment store, then confirm
+the old key no longer works. This requires access to the providers and secret
+stores; a code PR alone cannot perform or verify rotation.
+
+DEV release gate: inspect the embedded frontend API origin; start backend with
+the isolation switch ON; verify an OPTIONS request from the DEV origin succeeds
+and one from PROD is denied; create a sandbox payment and verify its return is
+the DEV checkout URL; send a signed sandbox webhook only to the DEV backend,
+repeat the same event to confirm idempotency, and verify it changes no PROD
+order. Check R2 upload/delete and DB writes hit DEV resources only. Send no
+real customer notifications. Exercise one intentionally mismatched redirect
+and one combined CORS configuration in a disposable deployment and confirm
+startup is rejected. Check the flag OFF returns to existing configuration
+behaviour. Record exact SHA, provider mode, redacted settings, evidence, and
+pending verification in Jira before declaring this story done.
 
 ## Release checks
 
