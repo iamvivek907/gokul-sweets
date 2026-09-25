@@ -19,6 +19,8 @@ public class EnhancementProperties {
     private boolean inventoryAutomationV2;
     private boolean customerHomeV2;
     private boolean homepageCampaigns;
+    /** Show the selected pickup branch and slot across the customer ordering journey. */
+    private boolean persistentPickupContext;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

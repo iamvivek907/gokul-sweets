@@ -15,6 +15,7 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import ConfirmedPickupContext from "@/components/order/ConfirmedPickupContext";
 import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
 
 import {
@@ -1681,6 +1682,8 @@ export default function PaymentPage() {
                     pb-10
                 "
             >
+
+                <ConfirmedPickupContext orderNumber={orderNumber} />
 
                 <div
                     className="
