@@ -23,6 +23,8 @@ public class EnhancementProperties {
     private boolean persistentPickupContext;
     /** Require a server-backed cart preview before changing a pickup branch or date. */
     private boolean cartSwitchPreview;
+    /** Recheck the whole cart and chosen slot before atomic pickup and stock reservation. */
+    private boolean authoritativePickupCommitment;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

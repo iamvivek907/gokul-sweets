@@ -20,11 +20,13 @@ public class StorefrontFeaturesController {
                 properties.isInventoryAutomationV2(), properties.isCustomerHomeV2(),
                 properties.isHomepageCampaigns(), properties.isPersistentPickupContext(),
                 properties.isCartSwitchPreview(),
+                properties.isSmartAvailability() && properties.isAuthoritativePickupCommitment(),
                 properties.getFutureOrderingDays(), LocalDate.now(inventoryClock));
     }
 
     public record Features(boolean smartAvailability, boolean smartPickupSelection,
                            boolean inventoryAutomationV2, boolean customerHomeV2,
                            boolean homepageCampaigns, boolean persistentPickupContext, boolean cartSwitchPreview,
+                           boolean authoritativePickupCommitment,
                            int futureOrderingDays, LocalDate today) {}
 }
