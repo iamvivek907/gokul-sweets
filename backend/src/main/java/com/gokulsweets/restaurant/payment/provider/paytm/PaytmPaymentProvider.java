@@ -10,6 +10,7 @@ import com.gokulsweets.restaurant.payment.provider.PaymentVerificationResult;
 import com.gokulsweets.restaurant.payment.provider.RefundResult;
 import com.gokulsweets.restaurant.payment.provider.paytm.dto.PaytmInitiateResponse;
 import com.gokulsweets.restaurant.payment.provider.paytm.dto.PaytmStatusResponse;
+import com.gokulsweets.restaurant.payment.service.PaymentReconciliationPolicy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -20,6 +21,7 @@ import org.springframework.stereotype.Component;
 public class PaytmPaymentProvider implements PaymentProvider {
 
     private final PaytmClient paytmClient;
+    private final PaymentReconciliationPolicy reconciliationPolicy;
 
     @Override
     public PaymentProviderType providerType() {
@@ -46,6 +48,7 @@ public class PaytmPaymentProvider implements PaymentProvider {
                     "Invalid response received from Paytm."
             );
         }
+
         if (!"S".equalsIgnoreCase(
                 response.body().resultInfo().resultStatus()
         )) {
@@ -88,6 +91,10 @@ public class PaytmPaymentProvider implements PaymentProvider {
             throw new IllegalStateException(
                     "Invalid transaction status received from Paytm."
             );
+        }
+
+        if ("TXN_SUCCESS".equals(response.body().resultInfo().resultStatus())) {
+            reconciliationPolicy.validatePaytmStatus(payment, response.body());
         }
 
         return switch (response.body().resultInfo().resultStatus()) {
