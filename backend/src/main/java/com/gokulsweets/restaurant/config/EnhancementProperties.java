@@ -27,6 +27,8 @@ public class EnhancementProperties {
     private boolean authoritativePickupCommitment;
     /** Require a fresh signed, server-priced quote before creating or editing a checkout. */
     private boolean acceptedCheckoutQuote;
+    /** Reconcile late provider success against the payment and reservation deadlines before fulfilment. */
+    private boolean paymentReconciliationV2;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

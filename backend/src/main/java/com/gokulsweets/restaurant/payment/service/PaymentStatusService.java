@@ -44,6 +44,7 @@ public class PaymentStatusService {
 
     private final OrderInventoryReservationService
             orderInventoryReservationService;
+    private final PaymentReconciliationPolicy reconciliationPolicy;
 
     // =========================================================
     // MARK PAID
@@ -149,6 +150,15 @@ public class PaymentStatusService {
                     providerPaymentId
             );
 
+            return;
+        }
+
+        // A callback or browser refresh can beat the one-minute expiry scheduler.
+        // Release the hold once, then route this verified late success to refund.
+        if (existingPayment.getPaymentStatus() == PaymentStatus.PENDING
+                && reconciliationPolicy.isLate(existingPayment, LocalDateTime.now(BUSINESS_ZONE))) {
+            markExpired(paymentId);
+            prepareLateSuccessRefund(getPayment(paymentId), providerPaymentId);
             return;
         }
 
