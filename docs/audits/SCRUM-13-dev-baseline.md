@@ -48,6 +48,16 @@ that single observation as a performance baseline. The deployed frontend build's
 `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_API_BASE_URL` values, backend origin,
 release SHA and private API status were not available here.
 
+## Local verification on this baseline
+
+After `npm ci --offline --ignore-scripts --no-audit --no-fund` in `frontend`, the
+command `node --test tests/businessTime.test.cjs tests/campaigns.test.mjs`
+passed **4/4 tests** (legacy IST offsets, India midnight service date, campaign
+interval priority, and browser-independent India campaign scheduling). These
+unit checks do not verify deployed DEV, the database or payment providers.
+`git diff --check` passed for this audit file. No JUnit suite or browser journey
+was run for this documentation-only change.
+
 ## Configuration and release risks to resolve next
 
 1. `backend/src/main/resources/application.properties` sets five additive
