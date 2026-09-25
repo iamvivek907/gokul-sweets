@@ -11,6 +11,8 @@ import {availabilityItems, checkCartAvailability, type CartAvailability} from "@
 import {savePickupSlot} from "@/lib/checkoutStorage";
 import type {PickupType} from "@/types/pickup";
 import {usePickupIntent, savePickupIntent} from "@/hooks/usePickupIntent";
+import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
+import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 
 function dateLabel(date: string) {
     return new Intl.DateTimeFormat("en-IN", {weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata"})
@@ -25,6 +27,7 @@ export default function SmartPickupSelection({features, onFallback}: {
     const {branch} = useSelectedBranch();
     const intent = usePickupIntent(branch?.id);
     const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [proposedDate, setProposedDate] = useState<string | null>(null);
     const [selection, setSelection] = useState<{id: number; type: PickupType} | null>(null);
     const [revision, setRevision] = useState(0);
     const [result, setResult] = useState<{key: string; data: CartAvailability} | null>(null);
@@ -45,6 +48,21 @@ export default function SmartPickupSelection({features, onFallback}: {
     const unavailable = currentDate?.slots.filter(value => !value.normalAvailable && !value.priorityAvailable) ?? [];
     const next = data?.dates.flatMap(day => day.slots.filter(slot => slot.normalAvailable || slot.priorityAvailable)
         .map(slot => ({day, slot})))[0];
+
+    function chooseDate(nextDate: string) {
+        if (features.cartSwitchPreview && cart.items.length && nextDate !== date) {
+            setProposedDate(nextDate);
+            return;
+        }
+        chooseDateApproved(nextDate);
+    }
+
+    function chooseDateApproved(nextDate: string) {
+        setSelectedDate(nextDate);
+        if (branch) savePickupIntent(branch.id, nextDate);
+        setSelection(null);
+        setMessage("");
+    }
 
     useEffect(() => {stateVersion.current += 1;}, [date, selection]);
 
@@ -94,6 +112,13 @@ export default function SmartPickupSelection({features, onFallback}: {
     }
 
     return <AppShell showSocialPopup={false}>
+        {proposedDate && branch && <CartSwitchDialog branchId={branch.id} branchName={branch.name}
+            date={proposedDate} items={cart.items} onKeep={() => setProposedDate(null)}
+            onSwitch={(preview: CartSwitchPreview) => {
+                if (preview.conflicts) return;
+                chooseDateApproved(proposedDate);
+                setProposedDate(null);
+            }} />}
         <nav aria-label="Order progress" className="mb-5 text-sm text-[#756763]">
             <Link href="/menu">Branch & menu</Link> / <Link href="/cart">Your cart</Link> / <strong>Pickup time</strong> / Review
         </nav>
@@ -111,8 +136,14 @@ export default function SmartPickupSelection({features, onFallback}: {
                 {!data && !error && <p role="status" className="mt-5">Checking dates and times for your cart...</p>}
                 {data && <div className="mt-6 space-y-6">
                     {next && !available && <button className="min-h-12 rounded-xl bg-[#fff0dc] px-4 py-3 text-left font-semibold"
-                        onClick={() => {setSelectedDate(next.day.date); savePickupIntent(branch!.id, next.day.date);
-                            setSelection({id: next.slot.slot.id, type: next.slot.normalAvailable ? "NORMAL" : "PRIORITY"});}}>
+                        onClick={() => {
+                            if (features.cartSwitchPreview) chooseDate(next.day.date);
+                            else {
+                                setSelectedDate(next.day.date);
+                                savePickupIntent(branch!.id, next.day.date);
+                                setSelection({id: next.slot.slot.id, type: next.slot.normalAvailable ? "NORMAL" : "PRIORITY"});
+                            }
+                        }}>
                         Next pickup for all items: {dateLabel(next.day.date)}, {next.slot.slot.startTime.slice(0, 5)}
                         {!next.slot.normalAvailable ? ` (priority + INR ${next.slot.slot.priorityCharge})` : ""}
                     </button>}
@@ -120,7 +151,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                         <h2 className="mb-3 font-bold">Choose a date</h2>
                         <div className="flex gap-2 overflow-x-auto pb-3">{data.dates.map(day => <button key={day.date}
                             type="button" disabled={continuing} aria-pressed={date === day.date}
-                            onClick={() => {setSelectedDate(day.date); savePickupIntent(branch!.id, day.date); setSelection(null); setMessage("");}}
+                            onClick={() => chooseDate(day.date)}
                             className={`min-h-16 min-w-28 rounded-xl border px-3 py-2 text-sm ${date === day.date ? "border-[#7a1625] bg-[#fff1e9]" : "border-[#eadfd6] bg-white"}`}>
                             <span className="block font-bold">{dateLabel(day.date)}</span>
                             <span className={day.available ? "text-green-800" : "text-[#756763]"}>{day.available ? "Times available" : "No matching time"}</span>

@@ -12,6 +12,13 @@ import {
 import {
     useSelectedBranch
 } from "@/hooks/useSelectedBranch";
+import {useCart} from "@/hooks/useCart";
+import {usePickupIntent, savePickupIntent} from "@/hooks/usePickupIntent";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {saveCart} from "@/lib/cartStorage";
+import {clearPickupSlot} from "@/lib/checkoutStorage";
+import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
+import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 
 import type {
     Branch
@@ -25,6 +32,10 @@ export default function BranchSelector() {
         selectBranch
     } =
         useSelectedBranch();
+    const cart = useCart();
+    const features = useStorefrontFeatures();
+    const pickup = usePickupIntent(branch?.id);
+    const [proposedBranch, setProposedBranch] = useState<Branch | null>(null);
 
 
     const [
@@ -149,9 +160,20 @@ export default function BranchSelector() {
         selectedBranch: Branch
     ) {
 
+        if (features?.cartSwitchPreview && branch?.id !== selectedBranch.id && !cart.isEmpty) {
+            setProposedBranch(selectedBranch);
+            closePopover();
+            return;
+        }
+
         selectBranch(
             selectedBranch
         );
+
+        closePopover();
+    }
+
+    function closePopover() {
 
 
         const popover =
@@ -172,6 +194,22 @@ export default function BranchSelector() {
                 }
             ).hidePopover();
         }
+    }
+
+    function confirmSwitch(preview: CartSwitchPreview) {
+        if (!proposedBranch) return;
+        if (!preview.conflicts) {
+            // Replace prices only with the verified destination menu; preserve quantities and weights.
+            saveCart({branchId: proposedBranch.id, items: preview.lines.map(line => ({
+                ...line.item, product: line.proposed!
+            }))});
+        }
+        // A conflicted cart remains attached to its original branch and cannot be silently checked out.
+        clearPickupSlot();
+        savePickupIntent(proposedBranch.id, preview.date);
+        selectBranch(proposedBranch);
+        setProposedBranch(null);
+        closePopover();
     }
 
 
@@ -196,6 +234,10 @@ export default function BranchSelector() {
 
     return (
         <div>
+
+            {proposedBranch && <CartSwitchDialog branchId={proposedBranch.id} branchName={proposedBranch.name}
+                date={pickup.date ?? features?.today ?? ""} items={cart.items}
+                onKeep={() => setProposedBranch(null)} onSwitch={confirmSwitch} />}
 
             <button
                 type="button"

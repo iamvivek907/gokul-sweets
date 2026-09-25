@@ -7,6 +7,9 @@ import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
 import {availabilityItems, checkCartAvailability, type CartAvailability} from "@/services/availabilityApi";
+import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
+import {clearPickupSlot} from "@/lib/checkoutStorage";
+import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 import type {MenuProduct} from "@/types/menu";
 
 export function useDateAvailability(products?: MenuProduct[]) {
@@ -56,16 +59,32 @@ export function useDateAvailability(products?: MenuProduct[]) {
 
 export default function PickupContext({check, cart = false}: {check: ReturnType<typeof useDateAvailability>; cart?: boolean}) {
     const {features, branch, intent, data, items, error, hasItems, retry} = check;
+    const currentCart = useCart();
+    const [proposedDate, setProposedDate] = useState<string | null>(null);
     if (!features?.smartAvailability || !branch) return null;
     const maximum = new Date(`${features.today}T12:00:00+05:30`);
     maximum.setUTCDate(maximum.getUTCDate() + features.futureOrderingDays);
     const max = maximum.toISOString().slice(0, 10);
     return <section aria-label="Pickup context" className="my-4 rounded-2xl border border-[#eadfd6] bg-white p-4">
+        {proposedDate && <CartSwitchDialog branchId={branch.id} branchName={branch.name} date={proposedDate}
+            items={currentCart.items} onKeep={() => setProposedDate(null)} onSwitch={(preview: CartSwitchPreview) => {
+                if (preview.conflicts) return;
+                clearPickupSlot();
+                savePickupIntent(branch.id, proposedDate);
+                setProposedDate(null);
+            }} />}
         <div className="flex flex-wrap items-end justify-between gap-3">
             <div><p className="text-xs font-semibold uppercase text-[#756763]">Pickup at {branch.name}</p>
                 <label className="mt-2 block text-sm font-bold">Pickup date
                     <input aria-label="Pickup date" type="date" min={features.today} max={max} value={intent.date ?? ""}
-                        onChange={event => savePickupIntent(branch.id, event.target.value)}
+                        onChange={event => {
+                            const date = event.target.value;
+                            if (features.cartSwitchPreview && !currentCart.isEmpty && date) setProposedDate(date);
+                            else {
+                                if (features.cartSwitchPreview) clearPickupSlot();
+                                savePickupIntent(branch.id, date);
+                            }
+                        }}
                         className="ml-3 min-h-11 rounded-xl border border-[#eadfd6] px-3" />
                 </label></div>
             {intent.selection && <Link href="/checkout/pickup" className="min-h-11 py-3 text-sm underline">
