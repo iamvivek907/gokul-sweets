@@ -23,7 +23,8 @@ public class WebCorsProperties {
                     "http://localhost:3000",
                     "https://gokul-sweets-dev.vercel.app",
                     "https://dev.gokulsweets.in",
-                    "https://gokulsweets.in"
+                    "https://gokulsweets.in",
+                    "https://api-dev.gokulsweets.in"
             )
     );
 }
