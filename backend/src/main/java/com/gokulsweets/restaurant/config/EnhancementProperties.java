@@ -29,6 +29,8 @@ public class EnhancementProperties {
     private boolean acceptedCheckoutQuote;
     /** Reconcile late provider success against the payment and reservation deadlines before fulfilment. */
     private boolean paymentReconciliationV2;
+    /** Allow authorized branch staff to publish an honest revised readiness estimate. */
+    private boolean truthfulOrderTracking;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

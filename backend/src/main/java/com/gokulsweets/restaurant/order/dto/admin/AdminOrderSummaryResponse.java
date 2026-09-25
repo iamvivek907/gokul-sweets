@@ -35,6 +35,8 @@ public record AdminOrderSummaryResponse(
 
         PaymentStatus paymentStatus,
 
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        LocalDateTime estimatedReadyAt,
+        LocalDateTime delayReportedAt
 ) {
 }

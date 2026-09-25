@@ -575,7 +575,10 @@ public class AdminOrderQueryService {
 
                 order.getCreatedAt(),
 
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getEstimatedReadyAt(),
+                order.getDelayReason(),
+                order.getDelayReportedAt()
         );
     }
 
@@ -718,7 +721,9 @@ public class AdminOrderQueryService {
 
                 paymentStatus,
 
-                order.getCreatedAt()
+                order.getCreatedAt(),
+                order.getEstimatedReadyAt(),
+                order.getDelayReportedAt()
         );
     }
 

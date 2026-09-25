@@ -126,6 +126,16 @@ public class Order {
     )
     private String customerPhoneNormalized;
 
+    // Staff-reported customer estimate; original pickup slot remains the booked slot.
+    @Column(name = "estimated_ready_at")
+    private LocalDateTime estimatedReadyAt;
+
+    @Column(name = "delay_reason", length = 300)
+    private String delayReason;
+
+    @Column(name = "delay_reported_at")
+    private LocalDateTime delayReportedAt;
+
     /*
      * Guest/unverified customer grouping.
      *

@@ -58,6 +58,24 @@ async function getErrorMessage(
     return fallback;
 }
 
+export async function reportAdminOrderDelay(
+    orderNumber: string,
+    estimatedReadyAt: string,
+    reason: string,
+    authorization: string
+): Promise<AdminOrderDetail> {
+    const response = await adminFetch(
+        `/api/admin/orders/${encodeURIComponent(orderNumber)}/delay`,
+        authorization,
+        {method: "PATCH", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({estimatedReadyAt, reason})}
+    );
+    if (!response.ok) {
+        throw new Error(await getErrorMessage(response, "Could not publish the revised ready time."));
+    }
+    return response.json() as Promise<AdminOrderDetail>;
+}
+
 
 /*
  * =========================================================

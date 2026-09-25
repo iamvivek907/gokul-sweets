@@ -22,10 +22,13 @@ import {
     getAdminPreparationQueueCounts,
     getNextOrderStatus,
     getRequiredPermissionForTransition,
+    reportAdminOrderDelay,
     startNextAdminOrders,
     startSelectedAdminOrders,
     updateAdminOrderStatus
 } from "@/services/adminOrdersApi";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {formatBusinessTimestamp} from "@/lib/businessTime";
 
 import type {
     AdminBatchPreparationResponse,
@@ -4447,6 +4450,8 @@ function OrderCard({
     ) => void;
 }) {
 
+    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
+
     return (
         <article
             className="
@@ -4547,6 +4552,12 @@ function OrderCard({
 
                     </div>
 
+
+                    {trackingEnabled && order.estimatedReadyAt && order.delayReportedAt && (
+                        <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-[#6b3900]">
+                            Ready estimate {formatBusinessTimestamp(order.estimatedReadyAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST · Reported {formatBusinessTimestamp(order.delayReportedAt, {hour: "numeric", minute: "2-digit"})} IST
+                        </p>
+                    )}
 
                     <p
                         className="
@@ -4755,6 +4766,30 @@ function OrderDetailDrawer({
 
     onClose: () => void;
 }) {
+
+    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
+    const [delayTime, setDelayTime] = useState("");
+    const [delayReason, setDelayReason] = useState("");
+    const [delaySaving, setDelaySaving] = useState(false);
+    const [delayError, setDelayError] = useState<string | null>(null);
+    const [delaySuccess, setDelaySuccess] = useState<string | null>(null);
+
+    async function publishDelay() {
+        if (!order || delaySaving || !hasPermission("ORDER_MARK_READY")) return;
+        setDelaySaving(true);
+        setDelayError(null);
+        setDelaySuccess(null);
+        try {
+            await reportAdminOrderDelay(order.orderNumber,
+                `${delayTime}:00`, delayReason.trim(), authorization);
+            await onRefresh();
+            setDelaySuccess("Ready estimate published to the customer order page.");
+        } catch (error) {
+            setDelayError(error instanceof Error ? error.message : "Could not publish the delay.");
+        } finally {
+            setDelaySaving(false);
+        }
+    }
 
     const router =
     useRouter();
@@ -5580,6 +5615,27 @@ function OrderDetailDrawer({
                                         )
                                     }
 
+
+                                    {trackingEnabled && order && (
+                                        <section className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm" aria-label="Order delay">
+                                            <h3 className="font-bold">Customer ready time update · {order.orderNumber}</h3>
+                                            {order.estimatedReadyAt && order.delayReportedAt && (
+                                                <p className="mt-2">Current estimate: {formatBusinessTimestamp(order.estimatedReadyAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. Reported {formatBusinessTimestamp(order.delayReportedAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. {order.delayReason}</p>
+                                            )}
+                                            {(order.orderStatus === "CONFIRMED" || order.orderStatus === "PREPARING") && hasPermission("ORDER_MARK_READY") && (
+                                                <form className="mt-3 space-y-3" onSubmit={event => {event.preventDefault(); void publishDelay();}}>
+                                                    <label className="block font-semibold" htmlFor="order-delay-time">Revised ready time (IST)</label>
+                                                    <input id="order-delay-time" type="datetime-local" required value={delayTime} onChange={event => setDelayTime(event.target.value)} className="min-h-11 w-full rounded-lg border p-2" />
+                                                    <label className="block font-semibold" htmlFor="order-delay-reason">Reason shown to customer</label>
+                                                    <textarea id="order-delay-reason" minLength={10} maxLength={300} required value={delayReason} onChange={event => setDelayReason(event.target.value)} className="w-full rounded-lg border p-2" />
+                                                    <p className="text-xs">The original booked slot remains on the order. Contact the customer to agree any pickup change.</p>
+                                                    <button type="submit" disabled={delaySaving || actionLoading || refreshing} className="min-h-11 rounded-lg bg-[#7a1625] px-4 font-bold text-white disabled:opacity-50">{delaySaving ? "Publishing..." : "Publish ready estimate"}</button>
+                                                </form>
+                                            )}
+                                            {delayError && <p role="alert" className="mt-2 text-red-700">{delayError}</p>}
+                                            {delaySuccess && <p role="status" className="mt-2 text-green-800">{delaySuccess}</p>}
+                                        </section>
+                                    )}
 
                                     {
                                         nextStatus

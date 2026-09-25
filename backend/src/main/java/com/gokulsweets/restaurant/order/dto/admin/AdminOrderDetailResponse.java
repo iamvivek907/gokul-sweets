@@ -53,6 +53,9 @@ public record AdminOrderDetailResponse(
 
         LocalDateTime createdAt,
 
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        LocalDateTime estimatedReadyAt,
+        String delayReason,
+        LocalDateTime delayReportedAt
 ) {
 }

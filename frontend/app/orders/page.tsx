@@ -13,6 +13,8 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import {formatBusinessTimestamp} from "@/lib/businessTime";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import {
     getOrderHistorySnapshot,
@@ -67,6 +69,8 @@ const FILTERS: Array<{
 
 
 export default function OrdersPage() {
+
+    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
 
     const router = useRouter();
 
@@ -397,6 +401,11 @@ export default function OrdersPage() {
                                         </div>
 
                                         <p className="mt-3 text-xs leading-5 text-[#756763]">{status.message}</p>
+                                        {trackingEnabled && order.estimatedReadyAt && order.delayReportedAt && (
+                                            <p className="mt-2 rounded-xl bg-amber-50 p-3 text-xs text-[#6b3900]">
+                                                Revised ready estimate {formatBusinessTimestamp(order.estimatedReadyAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. Updated {formatBusinessTimestamp(order.delayReportedAt, {hour: "numeric", minute: "2-digit"})} IST. Open this order for help.
+                                            </p>
+                                        )}
 
                                         <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl bg-[#fffaf3] p-4 text-sm">
                                             <div>

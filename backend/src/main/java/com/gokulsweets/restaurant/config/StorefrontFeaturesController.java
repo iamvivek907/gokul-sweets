@@ -22,6 +22,7 @@ public class StorefrontFeaturesController {
                 properties.isCartSwitchPreview(),
                 properties.isSmartAvailability() && properties.isAuthoritativePickupCommitment(),
                 properties.isAcceptedCheckoutQuote(),
+                properties.isTruthfulOrderTracking(),
                 properties.getFutureOrderingDays(), LocalDate.now(inventoryClock));
     }
 
@@ -30,5 +31,6 @@ public class StorefrontFeaturesController {
                            boolean homepageCampaigns, boolean persistentPickupContext, boolean cartSwitchPreview,
                            boolean authoritativePickupCommitment,
                            boolean acceptedCheckoutQuote,
+                           boolean truthfulOrderTracking,
                            int futureOrderingDays, LocalDate today) {}
 }

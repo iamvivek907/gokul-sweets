@@ -21,7 +21,7 @@ class RuntimeConfigurationTest {
         for (var feature : List.of("smart-availability", "smart-pickup-selection",
                 "inventory-automation-v2", "customer-home-v2", "homepage-campaigns",
                 "persistent-pickup-context", "cart-switch-preview", "authoritative-pickup-commitment",
-                "accepted-checkout-quote", "payment-reconciliation-v2")) {
+                "accepted-checkout-quote", "payment-reconciliation-v2", "truthful-order-tracking")) {
             assertThat(properties.getProperty("gokul.features." + feature)).endsWith(":false}");
         }
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
@@ -50,6 +50,7 @@ class RuntimeConfigurationTest {
             assertThat(features.isAuthoritativePickupCommitment()).isFalse();
             assertThat(features.isAcceptedCheckoutQuote()).isFalse();
             assertThat(features.isPaymentReconciliationV2()).isFalse();
+            assertThat(features.isTruthfulOrderTracking()).isFalse();
             features.setFutureOrderingDays(0);
             assertThat(validator.validate(features)).isNotEmpty();
             features.setFutureOrderingDays(61);

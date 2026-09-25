@@ -14,7 +14,9 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
-import {formatBusinessTimestamp} from "@/lib/businessTime";
+import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import Link from "next/link";
 
 import OrderReviewCard
     from "@/components/order/OrderReviewCard";
@@ -42,6 +44,7 @@ interface LoadedOrder {
     orderNumber: string;
     order: CustomerOrderResponse | null;
     error: string | null;
+    checkedAt: number;
 }
 
 
@@ -95,6 +98,8 @@ function formatUpdatedAt(value: string): string {
 
 export default function OrderDetailPage() {
 
+    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
+
     const router = useRouter();
 
     const params =
@@ -137,7 +142,8 @@ export default function OrderDetailPage() {
                     return {
                         orderNumber,
                         order: response,
-                        error: null
+                        error: null,
+                        checkedAt: Date.now()
                     };
 
                 } catch (exception) {
@@ -154,6 +160,7 @@ export default function OrderDetailPage() {
                     return {
                         orderNumber,
                         order: null,
+                        checkedAt: Date.now(),
                         error:
                             exception instanceof Error
                                 ? exception.message
@@ -303,6 +310,10 @@ export default function OrderDetailPage() {
             "PICKED_UP"
         ].includes(order.orderStatus);
 
+    const pendingPreparation = order.orderStatus === "CONFIRMED" || order.orderStatus === "PREPARING";
+    const pastPickupWindow = pendingPreparation &&
+        parseBusinessTimestamp(`${order.pickupDate}T${order.pickupEndTime}`).getTime() <= currentOrder.checkedAt;
+
     return (
         <AppShell>
             <section className="mx-auto w-full max-w-3xl px-4 pb-28 pt-5 sm:px-6 sm:pt-7">
@@ -336,6 +347,28 @@ export default function OrderDetailPage() {
                         <p className="font-bold">{status.label}</p>
                         <p className="mt-1 text-sm leading-6">{status.message}</p>
                     </div>
+
+                    {trackingEnabled && order.estimatedReadyAt && order.delayReportedAt && (
+                        <div role="status" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-[#241715]">
+                            <p className="font-bold">{pendingPreparation ? "Revised ready estimate" : "Previous ready time update"}</p>
+                            <p className="mt-1">{formatUpdatedAt(order.estimatedReadyAt)} IST</p>
+                            <p className="mt-1">{order.delayReason}</p>
+                            <p className="mt-2 text-xs">Reported {formatUpdatedAt(order.delayReportedAt)} IST. Your booked pickup slot is shown below; confirm any collection change with the branch.</p>
+                        </div>
+                    )}
+                    {trackingEnabled && pastPickupWindow && !order.estimatedReadyAt && (
+                        <div role="status" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm">
+                            The booked pickup window has passed and the shop has not reported a revised ready time. Contact the branch before travelling; the status above is the latest confirmed update.
+                        </div>
+                    )}
+
+                    {trackingEnabled && (
+                        <div className="mt-5 rounded-2xl border border-[#eadfd6] p-4 text-sm text-[#241715]">
+                            <p>Placed {formatUpdatedAt(order.createdAt)} IST</p>
+                            <p className="mt-2">Payment: {order.paymentStatus === "PAID" ? "Paid" : order.paymentStatus ? order.paymentStatus.replaceAll("_", " ").toLowerCase() : "No payment attempt recorded"}</p>
+                            <p className="mt-2">Latest shop status: {status.label} · checked {formatUpdatedAt(order.updatedAt)} IST</p>
+                        </div>
+                    )}
 
                     {showOperationalTimeline && (
                         <div className="mt-7">
@@ -377,6 +410,14 @@ export default function OrderDetailPage() {
                             <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">Pickup from</p>
                             <p className="mt-2 font-bold text-[#241715]">{order.branchName}</p>
                             <p className="mt-1 text-sm leading-6 text-[#756763]">{order.branchAddress}</p>
+                            {trackingEnabled && order.branchPhone && (
+                                <a className="mt-3 inline-block font-bold text-[#7a1625] underline" href={`tel:${order.branchPhone.replace(/[^+\d]/g, "")}`}>
+                                    Call {order.branchName}: {order.branchPhone}
+                                </a>
+                            )}
+                            {trackingEnabled && (
+                                <p className="mt-2 text-xs text-[#756763]">For help, quote order {order.orderNumber}. {!order.branchPhone && <Link className="underline" href="/about#our-branches">Find branch contact details</Link>}</p>
+                            )}
                         </div>
                         <div className="rounded-2xl bg-[#fffaf3] p-4">
                             <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">Pickup time</p>

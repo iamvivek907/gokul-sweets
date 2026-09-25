@@ -76,6 +76,8 @@ export interface AdminOrderSummary {
     paymentStatus: PaymentStatus | null;
 
     createdAt: string;
+    estimatedReadyAt?: string | null;
+    delayReportedAt?: string | null;
 }
 
 
@@ -265,6 +267,9 @@ export interface AdminOrderDetail {
     branchName: string;
 
     branchAddress: string;
+    estimatedReadyAt?: string | null;
+    delayReason?: string | null;
+    delayReportedAt?: string | null;
 
     customerName: string;
 

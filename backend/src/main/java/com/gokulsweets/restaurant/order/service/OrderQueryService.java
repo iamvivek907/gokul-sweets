@@ -77,7 +77,11 @@ public class OrderQueryService {
                 order.getTotalAmount(),
                 order.getReservationExpiresAt(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getBranch().getPhone(),
+                order.getEstimatedReadyAt(),
+                order.getDelayReason(),
+                order.getDelayReportedAt()
         );
     }
 
@@ -136,7 +140,9 @@ public class OrderQueryService {
                 order.getPickupType(),
                 order.getTotalAmount(),
                 order.getCreatedAt(),
-                order.getUpdatedAt()
+                order.getUpdatedAt(),
+                order.getEstimatedReadyAt(),
+                order.getDelayReportedAt()
         );
     }
 
