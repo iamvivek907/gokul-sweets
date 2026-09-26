@@ -18,7 +18,8 @@ public class StorefrontFeaturesController {
         return new Features(properties.isSmartAvailability(),
                 properties.isSmartAvailability() && properties.isSmartPickupSelection(),
                 properties.isInventoryAutomationV2(), properties.isCustomerHomeV2(),
-                properties.isHomepageCampaigns(), properties.isPreHomeIntentGateway(), properties.isPersistentPickupContext(),
+                properties.isHomepageCampaigns(), properties.isPreHomeIntentGateway(),
+                properties.isContextualStorefrontV2(), properties.isPersistentPickupContext(),
                 properties.isCartSwitchPreview(),
                 properties.isPersistentPickupContext() && properties.isCartSwitchPreview() && properties.isInPlaceBranchSwitch(),
                 properties.isSmartAvailability() && properties.isAuthoritativePickupCommitment(),
@@ -31,7 +32,7 @@ public class StorefrontFeaturesController {
 
     public record Features(boolean smartAvailability, boolean smartPickupSelection,
                            boolean inventoryAutomationV2, boolean customerHomeV2,
-                           boolean homepageCampaigns, boolean preHomeIntentGateway,
+                           boolean homepageCampaigns, boolean preHomeIntentGateway, boolean contextualStorefrontV2,
                            boolean persistentPickupContext, boolean cartSwitchPreview,
                            boolean inPlaceBranchSwitch,
                            boolean authoritativePickupCommitment,
