@@ -8,7 +8,8 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 
 export default function Header() {
-    const futuristic = useStorefrontFeatures()?.futuristicStorefrontV2 === true;
+    const features = useStorefrontFeatures();
+    const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
     const {branch} = useSelectedBranch();
 
     return (
