@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import BranchMenuGallery from "@/components/menu/BranchMenuGallery";
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
@@ -958,6 +959,7 @@ export default function MenuScreen() {
 
             <section
                 className={`
+                    ${pickupCheck.features?.contextualStorefrontV2 ? "gokul-editorial-menu" : ""}
                     mx-auto
                     max-w-295
                     future-menu-width
@@ -969,6 +971,8 @@ export default function MenuScreen() {
                     }
                 `}
             >
+
+                {pickupCheck.features?.contextualStorefrontV2 && <BranchMenuGallery branch={branch} products={allProducts} />}
 
                 <header
                     className="
@@ -1019,7 +1023,7 @@ export default function MenuScreen() {
                                     sm:text-4xl
                                 "
                             >
-                                Explore our menu
+                                {pickupCheck.features?.contextualStorefrontV2 ? "Find something worth sharing" : "Explore our menu"}
                             </h1>
 
 
@@ -1200,6 +1204,7 @@ export default function MenuScreen() {
 
 
                 <div
+                    id="gokul-menu-items"
                     className="
                         mt-6
                     "
