@@ -591,6 +591,7 @@ export default function MobileMenu() {
                                             href={
                                                 item.href
                                             }
+                                            aria-current={active ? "page" : undefined}
                                             onClick={
                                                 closeMenu
                                             }
