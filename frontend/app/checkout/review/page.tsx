@@ -15,6 +15,7 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import BranchSelector from "@/components/branch/BranchSelector";
 import {parseBusinessTimestamp} from "@/lib/businessTime";
 
 
@@ -602,7 +603,9 @@ function ReviewInventoryIssue({
 
 export default function ReviewPage() {
 
-    const quoteEnabled = useStorefrontFeatures()?.acceptedCheckoutQuote === true;
+    const storefrontFeatures = useStorefrontFeatures();
+    const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
+    const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
     const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
 
     const router =
@@ -1933,6 +1936,8 @@ try {
                         </div>
 
 
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            {inPlaceBranchSwitch && <BranchSelector compact />}
                         <Link
                             href="/checkout/pickup"
                             className="
@@ -1947,8 +1952,9 @@ try {
                                 hover:bg-[#fff0dc]
                             "
                         >
-                            Change
+                            {inPlaceBranchSwitch ? "Change time" : "Change"}
                         </Link>
+                        </div>
 
                     </div>
 
