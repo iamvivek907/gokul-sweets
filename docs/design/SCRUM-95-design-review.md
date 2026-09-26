@@ -42,3 +42,7 @@ Please review the prototype on the PR preview at `/design/scrum-95-checkout-prot
 ## Visual feedback revision · 26 Sep 2026
 
 The owner found the first draft too similar to a conventional website and the header shop change dated. The current prototype explores a darker, more distinctive editorial treatment: a luminous brand mark, layered wine surfaces, warm gold actions and selection states, and a compact header control that names the active pickup shop. The pickup panel echoes that shop without creating a second selection state. The visual direction remains a prototype, not final brand approval; test its legibility and contrast on the actual phone before implementation. Avoid glow on dense item totals, warnings or form copy.
+
+## Implementation approval and status
+
+On 26 Sep 2026 at about 18:08 IST, the owner approved the revised futuristic checkout direction in chat and asked to proceed. The PR now applies that direction to the actual checkout behind the default-OFF `checkoutExperienceV2` feature response. This approval covers the SCRUM-95 visual direction; it does not approve SCRUM-24's overall brand system or establish DEV payment/inventory QA. The existing quote, reservation and provider handlers remain the source of truth. An in-review time change refreshes cart availability and invalidates the previous quote before another commitment.
