@@ -33,27 +33,29 @@ for the browser and the server authkey are different credentials.
 
 V57 adds an environment-scoped verified phone registry. The internal
 `VerifiedCustomerSubjectStore` creates a subject after
-server-side proof verification and rejects malformed phones. The registry does
-not grant access to older orders or consent: recycled numbers require an
-explicit recovery and reassignment policy before any customer-facing identity
-flow is enabled. Protect the registry as personal data under retention rules.
+server-side proof verification and rejects malformed phones. The owner selected
+phone-OTP-only recovery of previously verified orders. A recycled number can
+therefore expose those orders to its new holder. Guest orders and old consent
+are excluded. Protect the registry and transfer audit as personal data.
 
 V60 changes subsequent verification of the same phone to rotate the subject
 under a database transaction lock and revoke its previous sessions. Consent
-is never inherited merely because the number received another OTP. Orders
-transfer only if the exchange also presents a still-live old session for the
-same subject and newly verified OTP for the same phone in one transaction.
-A phone-only verification never transfers them. A restricted old-to-new audit trail
-supports a later, separately verified account recovery process; it is not
-queried by the customer login API. Re-verification signs out other devices,
-including those owned by the same customer. Complete an explicit recovery
-policy before enabling historical order access.
+is never inherited merely because the number received another OTP. When
+`GOKUL_IDENTITY_PHONE_ONLY_ORDER_RECOVERY=true`, V63 applies the owner-selected
+policy: a fresh provider-verified OTP transfers all prior verified order
+ownership for that phone to the new subject, even when the prior session is
+lost. It defaults OFF, retaining the prior-session-plus-OTP continuity rule.
+The transfer and per-order audit are atomic; the
+rotation audit records the count. Guest orders and consent do not transfer.
+Re-verification signs out other devices. A new holder of a recycled number
+can recover the old holder's verified orders; the owner selected this tradeoff
+on 27 Sep 2026.
 
 V58 and the internal `VerifiedIdentityExchange` verify MSG91 proof before a
 database transaction that claims its digest, records the verified subject and
 issues a session atomically. The digest is globally unique, including across
 DEV and PROD. A repeated proof fails even if two instances race. Failed
-issuance rolls back the claim. Activation still requires phone reassignment controls and a tested MSG91 DEV
+issuance rolls back the claim. Activation still requires a tested MSG91 DEV
 response contract. Do not expose the issuance service directly to untrusted
 callers: only the exchange calls it with a server-verified phone.
 
@@ -83,18 +85,16 @@ active verified cookie comes from an allowed HTTPS storefront Origin and its
 current DEV/PROD subject has the same verified mobile as the checkout phone.
 The insert happens during first order creation; an idempotency retry cannot
 claim an existing guest order. A missing, expired or revoked cookie and a
-different phone leave the order as a guest order. The record keeps its original
-subject UUID when a phone is reverified without a live old session, so a new
-holder cannot automatically see the old holder's orders. Guest orders are never adopted by
-phone alone. Authenticated `/api/customer/identity/orders` and its order detail
+different phone leave the order as a guest order. Guest orders are never adopted
+by phone alone. Authenticated `/api/customer/identity/orders` and its order detail
 route read only records belonging to the current environment and exact session
 subject, returning 401 without a session and 404 for a foreign order. My Orders
 combines that list with the browser's existing guest order numbers without
-clearing cart or local history. Reverification rotates the subject; older
-verified orders follow a new OTP only when the browser has the live prior
-session. Cross-device recovery after losing that session requires an owner-
-approved policy proving more than phone possession. The current view is not
-complete account recovery.
+clearing cart or local history. With phone-only recovery enabled,
+reverification rotates the subject and transfers verified orders to the new
+session after phone OTP. The new holder of a
+reassigned phone can see those orders; OTP does not prove the original
+purchaser's identity.
 
 The flag owner must verify MSG91's widget send/resend thresholds, cooldown,
 expiry, token response and mobile flows in DEV. Only then set
@@ -137,7 +137,8 @@ the frontend. The widget proof is sent with credentials to the backend exchange
 and is never persisted in browser storage. Guest pickup remains available.
 Verify the widget callback's exact proof shape and mobile behavior against a
 DEV MSG91 account before enabling this flow. Provider send/resend limits and
-phone reassignment controls remain mandatory for release.
+the privacy impact of the chosen phone-only recovery policy must be reviewed
+before release.
 
 Identity expiry, proof claims and rate-limit windows use UTC `Instant` values
 and PostgreSQL `TIMESTAMP WITH TIME ZONE`; no server-local date is used for

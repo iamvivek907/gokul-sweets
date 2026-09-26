@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.customer.identity;
 
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VerifiedCustomerSubjectStore {
     private final JdbcTemplate jdbc;
+    private final Environment settings;
 
     @Transactional
     public UUID recordVerifiedPhone(ConsentEnvironment environment, String verifiedPhone, Instant now) {
@@ -31,7 +33,8 @@ public class VerifiedCustomerSubjectStore {
             throw new IllegalArgumentException("A provider-verified Indian mobile is required");
         }
         // Serialize first verification and repeat verification across app instances.
-        // A reused phone must never inherit a prior holder's sessions or consent.
+        // A reused phone loses its prior sessions and consent. Owner-selected
+        // phone-only order recovery deliberately transfers verified orders.
         jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
                 rs -> { rs.next(); return null; }, environment.name() + ":" + verifiedPhone);
         UUID prior = jdbc.query("""
@@ -56,19 +59,28 @@ public class VerifiedCustomerSubjectStore {
                     UPDATE verified_customer_subjects SET id = ?, last_verified_at = GREATEST(last_verified_at, ?)
                     WHERE environment = ? AND verified_phone = ?
                     """, current, Timestamp.from(now), environment.name(), verifiedPhone);
-            jdbc.update("""
-                    INSERT INTO verified_subject_rotations
-                        (environment, prior_subject_id, new_subject_id, rotated_at, reason)
-                    VALUES (?, ?, ?, ?, 'PHONE_REVERIFICATION')
-                    """, environment.name(), prior, current, Timestamp.from(now));
-            // Only possession of both the still-live old session and the newly
-            // verified phone proves continuity. Never carry consent across.
-            if (prior.equals(previousSessionSubject)) {
-                jdbc.update("""
+            int transferred = 0;
+            int updated = 0;
+            if (prior.equals(previousSessionSubject)
+                    || settings.getProperty("gokul.identity.phone-only-order-recovery", Boolean.class, false)) {
+                transferred = jdbc.update("""
+                        INSERT INTO verified_order_transfer_audit
+                            (order_id, environment, prior_subject_id, new_subject_id, transferred_at)
+                        SELECT order_id, environment, verified_subject_id, ?, ?
+                        FROM verified_order_ownership
+                        WHERE environment = ? AND verified_subject_id = ?
+                        """, current, Timestamp.from(now), environment.name(), prior);
+                updated = jdbc.update("""
                         UPDATE verified_order_ownership SET verified_subject_id = ?
                         WHERE environment = ? AND verified_subject_id = ?
                         """, current, environment.name(), prior);
             }
+            if (transferred != updated) throw new IllegalStateException("Order transfer count changed");
+            jdbc.update("""
+                    INSERT INTO verified_subject_rotations
+                        (environment, prior_subject_id, new_subject_id, rotated_at, reason, transferred_order_count)
+                    VALUES (?, ?, ?, ?, 'PHONE_REVERIFICATION', ?)
+                    """, environment.name(), prior, current, Timestamp.from(now), transferred);
         }
         return current;
     }
