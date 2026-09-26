@@ -14,6 +14,7 @@ export interface StorefrontFeatures {
     controlledCampaignPublishing: boolean;
     accessibleOrderingV2: boolean;
     checkoutExperienceV2: boolean;
+    futuristicStorefrontV2: boolean;
     persistentPickupContext: boolean;
     cartSwitchPreview: boolean;
     inPlaceBranchSwitch: boolean;
