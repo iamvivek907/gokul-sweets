@@ -13,13 +13,16 @@ import java.util.Objects;
 public class VerifiedIdentityExchange {
     private final Msg91WidgetProofVerifier verifier;
     private final VerifiedIdentityIssuance issuance;
+    private final IdentityExchangeRateLimiter rateLimiter;
 
     public VerifiedCustomerSessionStore.IssuedSession exchange(
-            ConsentEnvironment environment, String accessToken, Instant now) {
+            ConsentEnvironment environment, String sourceAddress, String accessToken, Instant now) {
         Objects.requireNonNull(environment);
         Objects.requireNonNull(now);
+        rateLimiter.checkSource(environment, sourceAddress, now);
         // Network verification precedes the short database transaction.
         String verifiedPhone = verifier.verifiedPhone(accessToken);
+        rateLimiter.checkVerifiedPhone(environment, verifiedPhone, now);
         return issuance.issue(environment, accessToken, verifiedPhone, now);
     }
 }

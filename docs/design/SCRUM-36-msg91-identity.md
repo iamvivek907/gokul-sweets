@@ -46,3 +46,12 @@ issuance rolls back the claim. No public exchange endpoint or cookie exists;
 activation still requires phone reassignment controls and a tested MSG91 DEV
 response contract. Do not expose the issuance service directly to untrusted
 callers: only the exchange calls it with a server-verified phone.
+
+V59 adds shared, atomic limits to the internal exchange: five attempts per
+server-observed source address per 15 minutes before provider verification,
+and five per verified phone per hour before session issuance. HMAC digests
+keep IP and phone values out of this table. Set a dedicated 32+ character
+`GOKUL_IDENTITY_RATE_LIMIT_KEY` before enabling the identity flag; missing
+configuration fails closed. Expired windows are purged hourly. A future HTTP
+controller must pass a trusted server-derived source address, never a raw
+browser header, and add device and provider-send limits before activation.
