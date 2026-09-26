@@ -44,7 +44,8 @@ import type {
 
 export default function CartPage() {
     const pickupCheck = useDateAvailability();
-    const inPlaceBranchSwitch = useStorefrontFeatures()?.inPlaceBranchSwitch === true;
+    const features = useStorefrontFeatures();
+    const inPlaceBranchSwitch = features?.inPlaceBranchSwitch === true;
 
     const router =
         useRouter();
@@ -431,6 +432,7 @@ export default function CartPage() {
                                         items.map(
                                             item => (
                                                 <CartItem
+                                                    refined={features?.contextualStorefrontV2 === true}
                                                     key={
                                                         item.product.id
                                                     }
@@ -483,6 +485,7 @@ export default function CartPage() {
                                 >
 
                                     <CartSummary
+                                        refined={features?.contextualStorefrontV2 === true}
                                         itemCount={
                                             itemCount
                                         }
