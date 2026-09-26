@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.order.controller;
 
 import com.gokulsweets.restaurant.common.security.WebCorsProperties;
 import com.gokulsweets.restaurant.customer.identity.IdentityClientConnection;
+import com.gokulsweets.restaurant.customer.identity.VerifiedOrderAccess;
 import com.gokulsweets.restaurant.order.dto.CreateOrderRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import com.gokulsweets.restaurant.order.dto.CustomerOrderHistoryRequest;
@@ -43,6 +44,7 @@ public class OrderController {
     private final IdentityClientConnection clientConnection;
     private final WebCorsProperties cors;
     private final Environment settings;
+    private final VerifiedOrderAccess orderAccess;
 
     @PostMapping("/quote")
     public CheckoutQuoteService.Quote previewQuote(@Valid @RequestBody CreateOrderRequest request) {
@@ -51,7 +53,9 @@ public class OrderController {
 
     @PostMapping("/{orderNumber}/quote")
     public CheckoutQuoteService.Quote previewPendingQuote(@PathVariable String orderNumber,
-                                                            @Valid @RequestBody CreateOrderRequest request) {
+                                                            @Valid @RequestBody CreateOrderRequest request,
+                                                            HttpServletRequest servletRequest) {
+        orderAccess.requireOrder(orderNumber, servletRequest);
         return checkoutQuoteService.preview(request, orderNumber);
     }
 
@@ -107,8 +111,11 @@ public class OrderController {
 
             @Valid
             @RequestBody
-            UpdatePendingOrderRequest request
+            UpdatePendingOrderRequest request,
+            HttpServletRequest servletRequest
     ) {
+
+        orderAccess.requireOrder(orderNumber, servletRequest);
 
         log.debug(
                 "Received pending checkout update: orderNumber={}, pickupSlotId={}, pickupType={}, itemCount={}",
@@ -135,7 +142,8 @@ public class OrderController {
 
             @Valid
             @RequestBody
-            CustomerOrderHistoryRequest request
+            CustomerOrderHistoryRequest request,
+            HttpServletRequest servletRequest
     ) {
 
         log.debug(
@@ -145,7 +153,8 @@ public class OrderController {
 
         return ResponseEntity.ok(
                 orderQueryService.getCustomerOrderHistory(
-                        request.orderNumbers()
+                        request.orderNumbers().stream()
+                                .filter(number -> orderAccess.mayRead(number, servletRequest)).toList()
                 )
         );
     }
@@ -154,8 +163,11 @@ public class OrderController {
     public ResponseEntity<CustomerOrderResponse> getOrder(
 
             @PathVariable
-            String orderNumber
+            String orderNumber,
+            HttpServletRequest servletRequest
     ) {
+
+        orderAccess.requireOrder(orderNumber, servletRequest);
 
         return ResponseEntity.ok(
                 orderQueryService.getCustomerOrder(
