@@ -95,4 +95,4 @@
 .future .categoryPhoto > span{color:#ffe0b2}
 .future .highlight{background:linear-gradient(145deg,#ffffff1b,#ffffff08);border-color:#d8ad9885}
 .future .later{background:linear-gradient(135deg,#54405a99,#312838);border-color:#d6aa967c}
-.future .home a:focus-visible{outline-color:#91d4f3}
+.future a:focus-visible{outline-color:#91d4f3}
