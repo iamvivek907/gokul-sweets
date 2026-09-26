@@ -34,3 +34,35 @@ test('only network, rate-limit and server responses trigger automatic retry', ()
     for (const status of [0, 429, 502, 503]) assert.equal(isTemporaryPaymentFailure(status), true);
     for (const status of [400, 401, 404]) assert.equal(isTemporaryPaymentFailure(status), false);
 });
+
+test('a final provider response stops the active payment timer immediately', async () => {
+    const hookSource = fs.readFileSync(path.join(__dirname, '../hooks/usePaymentPolling.ts'), 'utf8');
+    const hookCode = ts.transpileModule(hookSource, {
+        compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}
+    }).outputText;
+    const effects = [];
+    const timers = new Map();
+    let nextId = 0;
+    const hookExports = {};
+    vm.runInNewContext(hookCode, {
+        exports: hookExports,
+        require: name => name === 'react'
+            ? {useRef: value => ({current: value}), useEffect: callback => {effects.push(callback);}}
+            : {nextPaymentPollDelayMs: () => 15_000},
+        window: {setTimeout: callback => {const id = ++nextId; timers.set(id, callback); return id;},
+            clearTimeout: id => timers.delete(id), addEventListener() {}, removeEventListener() {}},
+        document: {hidden: false, addEventListener() {}, removeEventListener() {}},
+        navigator: {onLine: true}, Date, Math
+    });
+    let checks = 0;
+    hookExports.usePaymentPolling(true, 42, 'PENDING', Date.now() + 60_000, false,
+        async () => {checks++; return {success: true, permanent: true};});
+    effects.forEach(effect => effect());
+    assert.equal(timers.size, 1);
+    const callback = [...timers.values()][0];
+    timers.clear();
+    callback();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(checks, 1);
+    assert.equal(timers.size, 0);
+});
