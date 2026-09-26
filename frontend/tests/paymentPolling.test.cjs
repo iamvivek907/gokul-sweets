@@ -1,0 +1,36 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const test = require('node:test');
+const vm = require('node:vm');
+const ts = require('typescript');
+
+const source = fs.readFileSync(path.join(__dirname, '../lib/paymentPolling.ts'), 'utf8');
+const compiled = ts.transpileModule(source, {
+    compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}
+}).outputText;
+const exported = {};
+vm.runInNewContext(compiled, {exports: exported, Math, Number, Date});
+const {nextPaymentPollDelayMs, retryAfterDelayMs, isTemporaryPaymentFailure} = exported;
+
+test('pending payment checks start slowly and repeated provider failures back off', () => {
+    assert.equal(nextPaymentPollDelayMs(0, 0), 15_000);
+    assert.equal(nextPaymentPollDelayMs(2, 0), 30_000);
+    assert.equal(nextPaymentPollDelayMs(0, 1), 30_000);
+    assert.equal(nextPaymentPollDelayMs(0, 2), 60_000);
+    assert.equal(nextPaymentPollDelayMs(0, 5), 120_000);
+    assert.ok(nextPaymentPollDelayMs(0, 2, 1) > 60_000);
+});
+
+test('Retry-After is honoured for seconds and HTTP dates without unbounded delays', () => {
+    const now = Date.parse('2026-09-26T06:00:00Z');
+    assert.equal(retryAfterDelayMs('45', now), 45_000);
+    assert.equal(retryAfterDelayMs('Sat, 26 Sep 2026 06:02:00 GMT', now), 120_000);
+    assert.equal(retryAfterDelayMs('1000', now), 300_000);
+    assert.equal(retryAfterDelayMs('invalid', now), null);
+});
+
+test('only network, rate-limit and server responses trigger automatic retry', () => {
+    for (const status of [0, 429, 502, 503]) assert.equal(isTemporaryPaymentFailure(status), true);
+    for (const status of [400, 401, 404]) assert.equal(isTemporaryPaymentFailure(status), false);
+});

@@ -1,4 +1,5 @@
 import {API_BASE_URL} from "@/lib/constants";
+import {retryAfterDelayMs} from "@/lib/paymentPolling";
 
 interface ApiRequestOptions extends RequestInit {
     cacheMode?: "no-store" | "force-cache";
@@ -19,7 +20,8 @@ export class ApiError extends Error {
         message: string,
         public readonly status: number,
         public readonly code: string,
-        public readonly details: Record<string, unknown>
+        public readonly details: Record<string, unknown>,
+        public readonly retryAfterMs: number | null = null
     ) {
         super(message);
         this.name = "ApiError";
@@ -100,7 +102,8 @@ export async function apiClient<T>(
             `Request failed (${response.status}).`,
             response.status,
             body.code ?? "REQUEST_FAILED",
-            body.details ?? {}
+            body.details ?? {},
+            retryAfterDelayMs(response.headers.get("Retry-After"), Date.now())
         );
     }
 
