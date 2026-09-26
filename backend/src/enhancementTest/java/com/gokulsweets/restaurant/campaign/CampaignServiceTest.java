@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.campaign;
 
 import com.gokulsweets.restaurant.storage.R2StorageService;
+import com.gokulsweets.restaurant.config.EnhancementProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockMultipartFile;
@@ -15,7 +16,9 @@ class CampaignServiceTest {
     private final HomepageCampaignRepository repository = mock(HomepageCampaignRepository.class);
     private final R2StorageService storage = mock(R2StorageService.class);
     private final Instant now = Instant.parse("2026-10-01T00:00:00Z");
-    private final CampaignService service = new CampaignService(repository, storage, Clock.fixed(now, ZoneOffset.UTC));
+    private final EnhancementProperties flags = new EnhancementProperties();
+    private final CampaignPublicationRepository publications = mock(CampaignPublicationRepository.class);
+    private final CampaignService service = new CampaignService(repository, storage, Clock.fixed(now, ZoneOffset.UTC), flags, publications);
 
     @AfterEach void clearSynchronization() {
         if (TransactionSynchronizationManager.isSynchronizationActive()) TransactionSynchronizationManager.clearSynchronization();
@@ -111,6 +114,57 @@ class CampaignServiceTest {
         assertThat(service.create(request(false), key)).isSameAs(c);
         verify(repository, never()).save(any());
         verifyNoInteractions(storage);
+    }
+
+    @Test void draftDoesNotReplacePublishedSnapshotAndRollbackRejectsAnotherCampaignsRevision() {
+        flags.setControlledCampaignPublishing(true);
+        var draft = campaign(); draft.setPublishedRevision(41L);
+        var live = CampaignPublication.from(draft, now); live.setId(41L);
+        when(repository.findAllByOrderByDisplayOrderAscIdAsc()).thenReturn(List.of(draft));
+        when(publications.findById(41L)).thenReturn(Optional.of(live));
+        when(repository.findForUpdate(1L)).thenReturn(Optional.of(draft));
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        service.save(1L, new CampaignRequest("HERO", "New draft", null, null, null, null, null, false, 0, "New photo", null));
+        assertThat(service.active()).extracting(HomepageCampaign::getTitle).containsExactly("Test");
+        assertThat(draft.getPublishedRevision()).isEqualTo(41L);
+        live.setCampaignId(2L);
+        assertThatThrownBy(() -> service.rollback(1L, 41L)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("another campaign");
+    }
+
+    @Test void publicationSwitchesOnlyAfterValidSnapshotAndRestoresHistoricalRevision() {
+        flags.setControlledCampaignPublishing(true);
+        var draft = campaign();
+        when(repository.findForUpdate(1L)).thenReturn(Optional.of(draft));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(repository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(publications.saveAndFlush(any())).thenAnswer(invocation -> {
+            CampaignPublication published = invocation.getArgument(0); published.setId(42L); return published;
+        });
+        assertThatThrownBy(() -> service.save(1L, request(true))).hasMessageContaining("image description");
+        verifyNoInteractions(publications);
+        var accepted = new CampaignRequest("HERO", "New version", null, null, null, null, null, true, 0, "Sweets in a box", null);
+        service.save(1L, accepted);
+        assertThat(draft.getPublishedRevision()).isEqualTo(42L);
+        var previous = CampaignPublication.from(draft, now); previous.setId(41L);
+        when(publications.findById(41L)).thenReturn(Optional.of(previous));
+        service.rollback(1L, 41L);
+        assertThat(draft.getPublishedRevision()).isEqualTo(41L);
+    }
+
+    @Test void staleEditorCannotOverwriteDraftOrRestorePublication() {
+        flags.setControlledCampaignPublishing(true);
+        var draft = campaign(); draft.setEditVersion(8);
+        when(repository.findForUpdate(1L)).thenReturn(Optional.of(draft));
+        var newDraft = new CampaignRequest("HERO", "Stale", null, null, null, null, null, false, 0, "Sweets", null);
+        assertThatThrownBy(() -> service.save(1L, newDraft, 7L))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT");
+        assertThatThrownBy(() -> service.rollback(1L, 42L, null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(publications);
     }
 
     private HomepageCampaign campaign() {

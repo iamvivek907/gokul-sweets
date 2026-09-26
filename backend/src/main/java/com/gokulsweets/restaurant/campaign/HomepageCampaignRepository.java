@@ -31,4 +31,11 @@ public interface HomepageCampaignRepository extends JpaRepository<HomepageCampai
     @Modifying
     @Query(value = "insert into campaign_media_requests(campaign_id,fallback,request_id,request_hash) values (:id,:fallback,:key,:hash)", nativeQuery = true)
     void recordMediaRequest(Long id, boolean fallback, UUID key, String hash);
+
+    @Query(value = "select request_hash from campaign_mobile_requests where campaign_id=:id and request_id=:key", nativeQuery = true)
+    Optional<String> mobileRequestHash(Long id, UUID key);
+
+    @Modifying
+    @Query(value = "insert into campaign_mobile_requests(campaign_id,request_id,request_hash) values (:id,:key,:hash)", nativeQuery = true)
+    void recordMobileRequest(Long id, UUID key, String hash);
 }

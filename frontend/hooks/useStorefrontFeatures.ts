@@ -11,6 +11,7 @@ export interface StorefrontFeatures {
     homepageCampaigns: boolean;
     preHomeIntentGateway: boolean;
     contextualStorefrontV2: boolean;
+    controlledCampaignPublishing: boolean;
     persistentPickupContext: boolean;
     cartSwitchPreview: boolean;
     inPlaceBranchSwitch: boolean;

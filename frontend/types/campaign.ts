@@ -6,6 +6,11 @@ export interface HomepageCampaign {
     mediaUrl: string | null;
     mediaType: string | null;
     fallbackMediaUrl: string | null;
+    mobileMediaUrl?: string | null;
+    altText?: string | null;
+    branchId?: number | null;
+    publishedRevision?: number | null;
+    editVersion?: number;
     ctaLabel: string | null;
     ctaTarget: string | null;
     startAt: string | null;
@@ -14,4 +19,9 @@ export interface HomepageCampaign {
     displayOrder: number;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface CampaignPublication extends HomepageCampaign {
+    campaignId: number;
+    publishedAt: string;
 }

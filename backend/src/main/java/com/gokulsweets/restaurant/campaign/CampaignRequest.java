@@ -10,8 +10,13 @@ public record CampaignRequest(
         @Size(max = 60) String ctaLabel,
         @Pattern(regexp = "^/(menu|cart|about)$") String ctaTarget,
         Instant startAt, Instant endAt,
-        boolean active, @Min(0) @Max(10000) int displayOrder
+        boolean active, @Min(0) @Max(10000) int displayOrder,
+        @Size(max = 180) String altText, @Positive Long branchId
 ) {
+    public CampaignRequest(String type, String title, String subtitle, String ctaLabel, String ctaTarget,
+                           Instant startAt, Instant endAt, boolean active, int displayOrder) {
+        this(type, title, subtitle, ctaLabel, ctaTarget, startAt, endAt, active, displayOrder, null, null);
+    }
     public void validate() {
         if (startAt != null && endAt != null && !endAt.isAfter(startAt)) {
             throw new IllegalArgumentException("Campaign end must be after its start.");

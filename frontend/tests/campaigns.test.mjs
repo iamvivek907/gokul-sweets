@@ -23,3 +23,10 @@ test("India campaign times round-trip independently of browser timezone", () => 
     assert.equal(fromIndiaDateTimeInput(""), null);
     assert.equal(toIndiaDateTimeInput(null), "");
 });
+
+test("targeted campaigns never appear at another shop and global campaigns remain", () => {
+    const base = {active: true, mediaUrl: "/test.png", displayOrder: 1, startAt: null, endAt: null};
+    const campaigns = [{...base, id: 1, branchId: 7}, {...base, id: 2, branchId: null}, {...base, id: 3, branchId: 8}];
+    assert.deepEqual(visibleCampaigns(campaigns, Date.now(), 7).map(item => item.id), [1, 2]);
+    assert.deepEqual(visibleCampaigns(campaigns, Date.now(), -1).map(item => item.id), [2]);
+});
