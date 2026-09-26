@@ -1,4 +1,5 @@
 interface CartSummaryProps {
+    refined?: boolean;
 
     itemCount:
         number;
@@ -15,7 +16,7 @@ interface CartSummaryProps {
 
 
 function formatCurrency(
-    amount: number
+    amount: number, exact = false
 ) {
 
     return new Intl.NumberFormat(
@@ -26,7 +27,7 @@ function formatCurrency(
             currency:
                 "INR",
             maximumFractionDigits:
-                0
+                exact ? 2 : 0
         }
     ).format(
         amount
@@ -35,6 +36,7 @@ function formatCurrency(
 
 
 export default function CartSummary({
+    refined = false,
     itemCount,
     subtotal,
     canContinue,
@@ -76,7 +78,7 @@ export default function CartSummary({
                     text-[#241715]
                 "
             >
-                Order Summary
+                {refined ? "Your cart estimate" : "Order Summary"}
             </h2>
 
 
@@ -136,7 +138,7 @@ export default function CartSummary({
                             text-[#241715]
                         "
                     >
-                        Cart subtotal
+                        {refined ? "Items subtotal · estimate" : "Cart subtotal"}
                     </span>
 
 
@@ -147,7 +149,7 @@ export default function CartSummary({
                             text-[#7a1625]
                         "
                     >
-                        {formatCurrency(subtotal)}
+                        {formatCurrency(subtotal, refined)}
                     </span>
 
                 </div>
@@ -171,7 +173,7 @@ export default function CartSummary({
                         text-[#241715]
                     "
                 >
-                    Final payable amount comes later
+                    {refined ? "See every charge before payment" : "Final payable amount comes later"}
                 </p>
 
 
@@ -183,8 +185,9 @@ export default function CartSummary({
                         text-[#756763]
                     "
                 >
-                    Pickup charges, tax and any eligible rebate
-                    are recalculated by Gokul Sweets before payment.
+                    {refined
+                        ? "Your branch’s latest item prices, any applicable pickup charge or tax, and discounts appear together in the final quote. You review the total before paying."
+                        : "Pickup charges, tax and any eligible rebate are recalculated by Gokul Sweets before payment."}
                 </p>
 
             </div>
