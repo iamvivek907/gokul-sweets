@@ -16,6 +16,7 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
 import ConfirmedPickupContext from "@/components/order/ConfirmedPickupContext";
 import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
 import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
@@ -1775,6 +1776,7 @@ export default function PaymentPage() {
     return (
 
         <AppShell>
+            <CheckoutExperienceFrame enabled={features?.checkoutExperienceV2 === true} stage="payment">
 
             <section
                 className="
@@ -2944,6 +2946,7 @@ export default function PaymentPage() {
 
             </section>
 
+        </CheckoutExperienceFrame>
         </AppShell>
     );
 }
