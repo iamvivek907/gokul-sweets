@@ -11,6 +11,7 @@ export interface StorefrontFeatures {
     homepageCampaigns: boolean;
     persistentPickupContext: boolean;
     cartSwitchPreview: boolean;
+    inPlaceBranchSwitch: boolean;
     authoritativePickupCommitment: boolean;
     acceptedCheckoutQuote: boolean;
     truthfulOrderTracking: boolean;

@@ -7,6 +7,7 @@ import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {usePickupIntent} from "@/hooks/usePickupIntent";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {formatBusinessTime, parseBusinessDate} from "@/lib/businessTime";
+import BranchSelector from "@/components/branch/BranchSelector";
 
 export function pickupDateLabel(date: string): string {
     const value = parseBusinessDate(date);
@@ -42,7 +43,8 @@ export default function PickupJourneyContext() {
                 {slot && selection && <p className="mt-1 text-xs text-[#756763]">{selection.pickupType === "PRIORITY" ? "Priority" : "Normal"} · Time is checked again at checkout</p>}
             </div>
             <div className="flex gap-3">
-                <Link href="/" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">Change branch</Link>
+                {features.inPlaceBranchSwitch ? <BranchSelector compact /> :
+                    <Link href="/" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">Change branch</Link>}
                 <Link href="/checkout/pickup" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">{slot ? "Change time" : "Choose time"}</Link>
             </div>
         </div>

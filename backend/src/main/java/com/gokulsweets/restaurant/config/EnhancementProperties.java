@@ -23,6 +23,8 @@ public class EnhancementProperties {
     private boolean persistentPickupContext;
     /** Require a server-backed cart preview before changing a pickup branch or date. */
     private boolean cartSwitchPreview;
+    /** Show the branch selector in checkout and actionable conflicts on the cart. */
+    private boolean inPlaceBranchSwitch;
     /** Recheck the whole cart and chosen slot before atomic pickup and stock reservation. */
     private boolean authoritativePickupCommitment;
     /** Require a fresh signed, server-priced quote before creating or editing a checkout. */
