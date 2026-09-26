@@ -22,7 +22,7 @@ class IdentityExchangeRateLimiterIntegrationTest {
             limiter.checkSource(ConsentEnvironment.DEV, "192.0.2.5", now);
         }
         assertThatThrownBy(() -> limiter.checkSource(ConsentEnvironment.DEV, "192.0.2.5", now))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IdentityExchangeRateLimiter.Limited.class);
         limiter.checkSource(ConsentEnvironment.PROD, "192.0.2.5", now);
         limiter.checkSource(ConsentEnvironment.DEV, "192.0.2.6", now);
         limiter.checkSource(ConsentEnvironment.DEV, "192.0.2.5", now.plusSeconds(901));
@@ -37,7 +37,7 @@ class IdentityExchangeRateLimiterIntegrationTest {
             limiter.checkVerifiedPhone(ConsentEnvironment.DEV, "+919876543210", now);
         }
         assertThatThrownBy(() -> limiter.checkVerifiedPhone(ConsentEnvironment.DEV, "+919876543210", now))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IdentityExchangeRateLimiter.Limited.class);
         limiter.checkVerifiedPhone(ConsentEnvironment.DEV, "+919876543210", now.plusSeconds(3601));
     }
 }

@@ -60,7 +60,7 @@ public class IdentityExchangeRateLimiter {
                 """, Integer.class, environment.name(), scope, digest(key, scope, value),
                 Timestamp.from(now), Timestamp.from(now.minus(window)), Timestamp.from(now.minus(window)));
         if (count == null || count > maximum) {
-            throw new IllegalStateException("Identity verification is temporarily limited");
+            throw new Limited();
         }
     }
 
@@ -80,5 +80,9 @@ public class IdentityExchangeRateLimiter {
     public void removeExpiredWindows() {
         jdbc.update("DELETE FROM identity_exchange_limits WHERE window_start < ?",
                 Timestamp.from(Instant.now().minus(Duration.ofHours(2))));
+    }
+
+    public static class Limited extends RuntimeException {
+        public Limited() { super("Identity verification is temporarily limited"); }
     }
 }
