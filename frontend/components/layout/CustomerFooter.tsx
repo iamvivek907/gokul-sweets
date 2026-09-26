@@ -2,7 +2,7 @@ export default function CustomerFooter() {
     return (
         <footer
             aria-label="Customer footer"
-            className="
+            className="customer-site-footer
                 border-t
                 border-[#eadfd6]
                 bg-white
