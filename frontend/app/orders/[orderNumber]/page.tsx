@@ -16,6 +16,7 @@ import AppShell
     from "@/components/layout/AppShell";
 import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {reconcilePaidCart} from "@/lib/paidCartRecovery";
 import Link from "next/link";
 
 import OrderReviewCard
@@ -98,7 +99,8 @@ function formatUpdatedAt(value: string): string {
 
 export default function OrderDetailPage() {
 
-    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
+    const features = useStorefrontFeatures();
+    const trackingEnabled = features?.truthfulOrderTracking === true;
 
     const router = useRouter();
 
@@ -122,6 +124,12 @@ export default function OrderDetailPage() {
             : null;
 
     const order = currentOrder?.order ?? null;
+
+    useEffect(() => {
+        if (features?.paidCartRecovery && order?.paymentStatus === "PAID") {
+            reconcilePaidCart(orderNumber);
+        }
+    }, [features?.paidCartRecovery, order?.paymentStatus, orderNumber]);
 
     const fetchOrder =
         useCallback(

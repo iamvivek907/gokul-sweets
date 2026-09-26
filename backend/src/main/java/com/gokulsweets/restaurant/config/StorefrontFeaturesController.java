@@ -23,6 +23,7 @@ public class StorefrontFeaturesController {
                 properties.isSmartAvailability() && properties.isAuthoritativePickupCommitment(),
                 properties.isAcceptedCheckoutQuote(),
                 properties.isTruthfulOrderTracking(),
+                properties.isPaidCartRecovery(),
                 properties.getFutureOrderingDays(), LocalDate.now(inventoryClock));
     }
 
@@ -32,5 +33,6 @@ public class StorefrontFeaturesController {
                            boolean authoritativePickupCommitment,
                            boolean acceptedCheckoutQuote,
                            boolean truthfulOrderTracking,
+                           boolean paidCartRecovery,
                            int futureOrderingDays, LocalDate today) {}
 }
