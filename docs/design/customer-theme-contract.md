@@ -12,3 +12,9 @@ The approved Sprint 2 customer visual direction lives in the shared customer she
 - A deliberate rebrand should change this contract and shared components in one reviewed PR. Do not restyle a single story into a separate visual system.
 
 The `frontend/tests/customerThemeContract.test.cjs` regression runs in GitHub Actions. It checks that the shell still owns both navigations, loads the scoped stylesheet, and uses the server's effective feature flags. Visual review is still necessary for new pages; a static check cannot prove every layout is consistent.
+
+## Approved branch menu and pickup presentation
+
+When the backend enables the customer visual flag and `contextualStorefrontV2`, `/menu` uses the editorial branch layout. Its gallery shows only real live-menu product photos, labelled by product name; it never pretends to show a branch interior. A branded fallback replaces missing imagery. Prices, units, availability, cart actions and branch switching retain their existing authoritative sources. The standard menu remains the flag-OFF path.
+
+When effective `checkoutExperienceV2` enables the enhanced pickup step, the same editorial shell presents available slot choices as buttons instead of a long dropdown. The existing cart-wide availability response determines enabled times, priority charges and conflict recovery; the standard selector remains the OFF path. The global loading surface shares the approved teal palette and respects reduced-motion settings. Future restaurant-table, bulk occasion and banquet booking work follows `branch-booking-visual-contract.md` after that contract is merged.

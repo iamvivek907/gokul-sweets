@@ -42,3 +42,65 @@
 .editorial-storefront .gokul-footer-bottom{border-color:#baccc2}
 .editorial-storefront .customer-site-footer a:hover{text-decoration:underline}
 @media(max-width:700px){.editorial-storefront .gokul-footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* SCRUM-26: branch-level menu in the approved editorial visual language. */
+.editorial-storefront .gokul-editorial-menu{max-width:1380px;padding:clamp(1rem,3vw,3rem);color:#173a37}
+.gokul-branch-gallery{margin-bottom:1.6rem;color:#173a37}
+.gokul-branch-intro{padding:.4rem 0 1.4rem}
+.gokul-overline{text-transform:uppercase;letter-spacing:.16em;font-size:.8rem;font-weight:700;color:#a83232}
+.gokul-branch-intro h1{font:500 clamp(2.6rem,5vw,5rem)/1.05 Georgia,serif;letter-spacing:-.05em;margin:.7rem 0;color:#173a37}
+.gokul-branch-intro>p:not(.gokul-overline){font-size:1rem;line-height:1.65;color:#435d58}
+.gokul-branch-meta{display:flex;flex-wrap:wrap;align-items:center;gap:1rem;margin-top:1rem;color:#435d58;font-size:.9rem}
+.gokul-gallery-photos{display:grid;grid-template-columns:2fr 1fr;grid-template-rows:repeat(2,180px);gap:.65rem;overflow:hidden;border-radius:1.1rem}
+.gokul-gallery-tile{position:relative;overflow:hidden;background:#e9ede8}
+.gokul-gallery-tile-0{grid-row:1/3}.gokul-gallery-tile span{position:absolute;bottom:0;left:0;right:0;padding:2rem 1rem 1rem;background:linear-gradient(transparent,#102e2bbb);color:white;font-size:.9rem;font-weight:700}
+.gokul-gallery-fallback{display:flex;align-items:end;min-height:290px;padding:2.4rem;border-radius:1.1rem;background:linear-gradient(115deg,#143936,#37645b 65%,#b88262);color:white}
+.gokul-gallery-fallback strong{font:500 clamp(2.3rem,5vw,4rem)/1 Georgia,serif}
+.gokul-branch-tabs{display:flex;gap:clamp(1rem,4vw,3rem);overflow-x:auto;min-height:4rem;align-items:center;border-bottom:1px solid #cad8cf}
+.gokul-branch-tabs a{display:flex;min-height:4rem;align-items:center;flex:none;padding:.2rem .4rem;color:#435d58;font-weight:600}
+.gokul-branch-tabs a[aria-current="page"]{border-bottom:3px solid #c76752;color:#a83232}
+.editorial-storefront .gokul-editorial-menu>header{border:0!important;box-shadow:none!important;background:transparent!important;padding:1rem 0!important}
+.editorial-storefront .gokul-editorial-menu>header h1{font:500 clamp(2.2rem,4vw,3.5rem)/1.08 Georgia,serif;letter-spacing:-.04em;color:#173a37!important}
+.editorial-storefront .gokul-editorial-menu>header [class*="bg-[#fffaf3]"]{background:#f1f6f2!important;border-color:#cbd8d0!important}
+.editorial-storefront .gokul-editorial-menu [class~="bg-white"]{background:#fff!important;border-color:#d6dfd8!important;box-shadow:0 8px 28px #143b2a0d!important}
+.editorial-storefront .gokul-editorial-menu [class*="text-[#241715]"]{color:#173a37!important}
+.editorial-storefront .gokul-editorial-menu [class*="text-[#756763]"]{color:#435d58!important}
+.editorial-storefront .gokul-editorial-menu [class*="text-[#c88a20]"],.editorial-storefront .gokul-editorial-menu [class*="text-[#7a1625]"]{color:#a83232!important}
+.editorial-storefront .gokul-editorial-menu :is(button,a)[class*="bg-[#7a1625]"]{background:#c76752!important;color:#fff!important;box-shadow:none!important}
+.editorial-storefront .gokul-editorial-menu :is(input,select){background:#fff!important;color:#173a37!important}
+.editorial-storefront .gokul-editorial-menu :is(a,button,input,select):focus-visible{outline:3px solid #168b9d;outline-offset:3px}
+@media(max-width:700px){.editorial-storefront .gokul-editorial-menu{padding:1rem .85rem}.gokul-gallery-photos{grid-template-rows:repeat(2,110px)}.gokul-gallery-fallback{min-height:215px}.gokul-branch-intro h1{font-size:2.8rem}}
+
+/* SCRUM-95: editorial pickup selection with authoritative live availability. */
+.editorial-storefront .checkout-experience-v2{max-width:1320px;margin:1.5rem auto 3rem;border:1px solid #d1ded6;border-radius:1.2rem;background:#fff!important;color:#173a37;box-shadow:0 16px 45px #12392c15}
+.editorial-storefront .checkout-experience-v2:before{display:none}
+.editorial-storefront .checkout-experience-head{background:#f5f8f6;border-color:#d1ded6;color:#173a37}
+.editorial-storefront .checkout-experience-mark{background:#173a37;border-color:#173a37;color:#fff;box-shadow:none}
+.editorial-storefront .checkout-experience-brand{color:#173a37}.editorial-storefront .checkout-experience-brand small{color:#a83232}
+.editorial-storefront .checkout-experience-branch{background:#fff;border-color:#d1ded6;color:#173a37}.editorial-storefront .checkout-experience-branch-copy small,.editorial-storefront .checkout-experience-location{color:#a83232}
+.editorial-storefront .checkout-experience-branch button{color:#173a37}
+.editorial-storefront .checkout-experience-progress{background:#fff;border-color:#d1ded6}.editorial-storefront .checkout-experience-progress span{color:#435d58}
+.editorial-storefront .checkout-experience-progress .current{background:#c76752;color:#fff;box-shadow:none}
+.editorial-storefront .checkout-experience-content{padding:clamp(1rem,3vw,3rem);color:#173a37}
+.editorial-storefront .checkout-experience-content section{color:#173a37}
+.editorial-storefront .checkout-experience-content section [class~="bg-white"]{background:#fff!important;border-color:#d1ded6!important;box-shadow:0 6px 22px #12392c0c}
+.editorial-storefront .checkout-experience-content section [class*="text-[#241715]"],.editorial-storefront .checkout-experience-content section [class*="text-[#7a1625]"]{color:#173a37!important}
+.editorial-storefront .checkout-experience-content section [class*="text-[#756763]"]{color:#435d58!important}
+.editorial-storefront .checkout-experience-content section button[class*="bg-[#7a1625]"],.editorial-storefront .checkout-experience-content section a[class*="bg-[#7a1625]"]{background:#c76752!important;color:#fff!important;border-color:#c76752!important;box-shadow:none}
+.editorial-storefront .checkout-experience-content section button[class*="bg-[#7a1625]"]:disabled{background:#bac5bf!important;color:#173a37!important}
+.editorial-storefront .checkout-experience-content h1{font:500 clamp(2.3rem,4vw,3.6rem)/1.08 Georgia,serif;letter-spacing:-.04em;color:#173a37!important}
+.gokul-pickup-overline{margin-top:.75rem;text-transform:uppercase;letter-spacing:.15em;color:#a83232;font-size:.8rem;font-weight:700}
+.gokul-pickup-times{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:.8rem}
+.gokul-pickup-time{display:flex;min-height:5.5rem;flex-direction:column;align-items:flex-start;justify-content:center;gap:.3rem;border:1px solid #cad8cf;border-radius:.8rem;padding:.85rem 1rem;background:#fff;color:#173a37;text-align:left}
+.gokul-pickup-time strong{font-size:1.15rem}.gokul-pickup-time span{font-size:.85rem;color:#435d58}
+.gokul-pickup-time[aria-pressed="true"]{border:2px solid #a83232;background:#fff4ed}.gokul-pickup-time:disabled{opacity:.6}
+.editorial-storefront .gokul-pickup-time:focus-visible{outline:3px solid #168b9d;outline-offset:3px}
+@media(max-width:600px){.editorial-storefront .checkout-experience-v2{margin:.5rem .6rem 2rem}.gokul-pickup-times{grid-template-columns:repeat(2,minmax(0,1fr))}.gokul-pickup-time{padding:.7rem;min-height:5.8rem}.gokul-pickup-time strong{font-size:.95rem}}
+.gokul-pickup-layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;align-items:start;gap:1.5rem}
+.gokul-pickup-options{min-width:0;display:grid;gap:1.5rem}
+.gokul-pickup-summary{position:sticky;top:6rem;border:1px solid #d1ded6;border-radius:1rem;padding:1.25rem;background:#f8faf7;color:#173a37}
+.gokul-pickup-summary h2{font:500 1.5rem Georgia,serif;margin:0 0 1rem}
+.gokul-pickup-summary p{font-size:.88rem;line-height:1.5;color:#435d58}
+.gokul-pickup-summary ul{padding:1rem 0;margin:1rem 0;border-block:1px solid #d1ded6;list-style:none;max-height:270px;overflow-y:auto}
+.gokul-pickup-summary li{display:flex;justify-content:space-between;gap:.5rem;padding:.35rem 0;font-size:.9rem}
+.gokul-pickup-summary a{display:inline-flex;min-height:2.75rem;align-items:center;margin-top:1rem;color:#a83232;font-weight:700;text-decoration:underline}
+@media(max-width:850px){.gokul-pickup-layout{grid-template-columns:1fr}.gokul-pickup-summary{position:static;grid-row:1}}

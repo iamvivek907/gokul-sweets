@@ -112,7 +112,7 @@ export default function SmartPickupSelection({features, onFallback}: {
         } finally {setContinuing(false);}
     }
 
-    return <AppShell showSocialPopup={false}>
+    return <AppShell editorial={features.checkoutExperienceV2 === true} showSocialPopup={false}>
         <CheckoutExperienceFrame enabled={features.checkoutExperienceV2 === true} stage="pickup" allowBranchChange>
         {proposedDate && branch && <CartSwitchDialog branchId={branch.id} branchName={branch.name}
             date={proposedDate} items={cart.items} onKeep={() => setProposedDate(null)}
@@ -124,7 +124,8 @@ export default function SmartPickupSelection({features, onFallback}: {
         <nav aria-label="Order progress" className="mb-5 text-sm text-[#756763]">
             <Link href="/menu">Branch & menu</Link> / <Link href="/cart">Your cart</Link> / <strong>Pickup time</strong> / Review
         </nav>
-        <h1 className="text-3xl font-bold text-[#7a1625]">When would you like to collect?</h1>
+        <p className="gokul-pickup-overline">Pickup at {branch?.name ?? "your branch"}</p>
+        <h1 className="text-3xl font-bold text-[#7a1625]">Choose when to collect</h1>
         <p className="mt-2 text-sm text-[#756763]">Times are checked for your whole cart at {branch?.name ?? "your branch"}. Your order is reserved at checkout.</p>
         {!cart.items.length ? <Link className="mt-5 block underline" href="/menu">Add items from the menu first</Link>
             : !validBranch ? <p role="alert" className="mt-5">Your cart belongs to a different branch. <Link href="/cart" className="underline">Review your cart</Link> before continuing.</p>
@@ -136,7 +137,8 @@ export default function SmartPickupSelection({features, onFallback}: {
                     <p className="text-xs">Your cart is preserved. Checkout will still validate availability.</p>
                 </div>}
                 {!data && !error && <p role="status" className="mt-5">Checking dates and times for your cart...</p>}
-                {data && <div className="mt-6 space-y-6">
+                {data && <div className={features.checkoutExperienceV2 ? "gokul-pickup-layout mt-6" : "mt-6 space-y-6"}>
+                    <div className={features.checkoutExperienceV2 ? "gokul-pickup-options" : "space-y-6"}>
                     {next && !available && <button className="min-h-12 rounded-xl bg-[#fff0dc] px-4 py-3 text-left font-semibold"
                         onClick={() => {
                             if (features.cartSwitchPreview) chooseDate(next.day.date);
@@ -169,16 +171,26 @@ export default function SmartPickupSelection({features, onFallback}: {
                             </p>)}
                             <Link href="/cart" className="inline-flex min-h-11 items-center underline">Edit quantities or remove items in your cart</Link>
                         </div>}
-                        <label htmlFor="smart-pickup-time" className="mb-2 block text-sm font-semibold">Pickup time</label>
-                        <select id="smart-pickup-time" aria-describedby="pickup-time-help"
-                            disabled={continuing || !selectable.length}
+                        <h3 className="mb-2 text-sm font-semibold">Available pickup times</h3>
+                        {features.checkoutExperienceV2 ? selectable.length ? <div className="gokul-pickup-times" role="group" aria-describedby="pickup-time-help" aria-label="Choose a pickup time">
+                            {selectable.flatMap(value => (["NORMAL", "PRIORITY"] as const).flatMap(type => {
+                                if (!(type === "NORMAL" ? value.normalAvailable : value.priorityAvailable && value.slot.priorityEnabled)) return [];
+                                const picked = available && selection?.id === value.slot.id && selection.type === type;
+                                return <button key={`${value.slot.id}:${type}`} type="button" disabled={continuing} aria-pressed={!!picked}
+                                    onClick={() => {setSelection({id: value.slot.id, type}); setMessage("");}}
+                                    className="gokul-pickup-time">
+                                    <strong>{value.slot.startTime.slice(0, 5)}–{value.slot.endTime.slice(0, 5)}</strong>
+                                    <span>{type === "NORMAL" ? "Normal pickup" : `Priority · + INR ${value.slot.priorityCharge}`}</span>
+                                </button>;
+                            }))}
+                        </div> : <p role="status" className="rounded-xl border p-4">No matching times on this date. Try another date above.</p>
+                        : <select aria-label="Pickup time" aria-describedby="pickup-time-help" disabled={continuing || !selectable.length}
                             value={available && selection ? `${selection.id}:${selection.type}` : ""}
                             onChange={event => {
                                 const [id, type] = event.target.value.split(":");
                                 setSelection(id && (type === "NORMAL" || type === "PRIORITY") ? {id: Number(id), type} : null);
                                 setMessage("");
-                            }}
-                            className="min-h-12 w-full rounded-xl border border-[#eadfd6] bg-white px-3 text-base sm:max-w-lg">
+                            }} className="min-h-12 w-full rounded-xl border border-[#eadfd6] bg-white px-3 text-base sm:max-w-lg">
                             <option value="">{selectable.length ? "Choose an available time" : "No matching times on this date"}</option>
                             {selectable.flatMap(value => (["NORMAL", "PRIORITY"] as const).flatMap(type => {
                                 if (!(type === "NORMAL" ? value.normalAvailable : value.priorityAvailable && value.slot.priorityEnabled)) return [];
@@ -187,7 +199,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                                     {type === "NORMAL" ? " · Normal pickup" : ` · Priority + INR ${value.slot.priorityCharge}`}
                                 </option>;
                             }))}
-                        </select>
+                        </select>}
                         <p id="pickup-time-help" className="mt-2 text-xs text-[#756763]">Only times that fit every item in your cart are selectable. All times are India time.</p>
                         {unavailable.length > 0 && <details className="mt-4 rounded-xl border border-[#eadfd6] p-3">
                             <summary className="min-h-11 cursor-pointer py-2 text-sm">Why are {unavailable.length} other times not available?</summary>
@@ -197,6 +209,16 @@ export default function SmartPickupSelection({features, onFallback}: {
                             </li>)}</ul>
                         </details>}
                     </section>
+                    </div>
+                    {features.checkoutExperienceV2 && <aside className="gokul-pickup-summary" aria-label="Your pickup order">
+                        <h2>Your pickup order</h2>
+                        <p>Collect from <strong>{branch?.name}</strong></p>
+                        <ul>{cart.items.map(item => <li key={item.product.id}>
+                            <span>{item.product.name}</span><strong>{item.product.saleMode === "WEIGHT" ? `${item.weightGrams ?? 0} g` : `× ${item.quantity}`}</strong>
+                        </li>)}</ul>
+                        <p>{cart.itemCount} {cart.itemCount === 1 ? "item" : "items"} · INR {cart.subtotal.toFixed(2)} before tax</p>
+                        <Link href="/cart">Review cart</Link>
+                    </aside>}
                 </div>}
                 {message && <p role="alert" className="mt-4 text-red-700">{message}</p>}
                 <div className="mt-6 mb-24 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd6] bg-white p-4">
