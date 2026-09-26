@@ -1,4 +1,6 @@
 export const MIN_MANUAL_PAYMENT_CHECK_MS = 10_000;
+// Limit automatic provider checks after consecutive failures; the customer can still check manually.
+export const MAX_AUTOMATIC_PAYMENT_FAILURES = 3;
 
 export function isTemporaryPaymentFailure(status: number): boolean {
     return status === 0 || status === 429 || status >= 500;

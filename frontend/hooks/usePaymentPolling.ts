@@ -1,16 +1,18 @@
 "use client";
 
 import {useEffect, useRef} from "react";
-import {nextPaymentPollDelayMs} from "@/lib/paymentPolling";
+import {MAX_AUTOMATIC_PAYMENT_FAILURES, nextPaymentPollDelayMs} from "@/lib/paymentPolling";
 
 export type PaymentPollResult = {success: boolean; retryAfterMs?: number | null; permanent?: boolean} | undefined;
 
 /** One timer for one pending payment. Resets only when payment identity or lifecycle changes. */
 export function usePaymentPolling(enabled: boolean, paymentId: number | undefined, status: string,
                                   deadlineMs: number, openingPayment: boolean,
-                                  refresh: () => Promise<PaymentPollResult>) {
+                                  refresh: () => Promise<PaymentPollResult>, onPaused?: () => void) {
     const refreshRef = useRef(refresh);
     useEffect(() => {refreshRef.current = refresh;}, [refresh]);
+    const onPausedRef = useRef(onPaused);
+    useEffect(() => {onPausedRef.current = onPaused;}, [onPaused]);
 
     useEffect(() => {
         if (!enabled || !paymentId || status !== "PENDING" || openingPayment) return;
@@ -30,7 +32,13 @@ export function usePaymentPolling(enabled: boolean, paymentId: number | undefine
             const result = await refreshRef.current();
             if (stopped || result?.permanent) return;
             if (result?.success) {successes++; failures = 0;}
-            else failures++;
+            else {
+                failures++;
+                if (failures >= MAX_AUTOMATIC_PAYMENT_FAILURES) {
+                    onPausedRef.current?.();
+                    return;
+                }
+            }
             if (Date.now() >= deadlineMs) return;
             schedule(Math.max(nextPaymentPollDelayMs(successes, failures, Math.random()), result?.retryAfterMs ?? 0));
         }
