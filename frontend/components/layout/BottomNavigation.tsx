@@ -104,7 +104,7 @@ export default function BottomNavigation() {
     return (
         <nav
             aria-label="Primary navigation"
-            className="
+            className="customer-bottom-navigation
                 fixed
                 inset-x-0
                 bottom-0
