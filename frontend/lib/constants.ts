@@ -44,3 +44,7 @@ export const IST_TIME_FIX_ENABLED =
 
 /** Business-facing dates and times for the current India-only storefront. */
 export const BUSINESS_TIME_ZONE = "Asia/Kolkata";
+
+/** Browser-scoped MSG91 widget settings; never put the server Authkey here. */
+export const MSG91_WIDGET_ID = process.env.NEXT_PUBLIC_MSG91_WIDGET_ID;
+export const MSG91_WIDGET_TOKEN = process.env.NEXT_PUBLIC_MSG91_WIDGET_TOKEN;

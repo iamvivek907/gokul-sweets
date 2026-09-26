@@ -20,6 +20,7 @@ import CheckoutStateCard
 
 import CustomerDetailsForm
     from "@/components/checkout/CustomerDetailsForm";
+import CustomerIdentityPanel from "@/components/customer/CustomerIdentityPanel";
 import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
@@ -499,6 +500,8 @@ export default function CustomerPage() {
 
                         </div>
 
+
+                        <CustomerIdentityPanel />
 
                         <CustomerDetailsForm
                             initialValue={
