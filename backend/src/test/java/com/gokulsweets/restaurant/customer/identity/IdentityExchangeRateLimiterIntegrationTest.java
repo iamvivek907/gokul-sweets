@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.TimeZone;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -39,5 +40,23 @@ class IdentityExchangeRateLimiterIntegrationTest {
         assertThatThrownBy(() -> limiter.checkVerifiedPhone(ConsentEnvironment.DEV, "+919876543210", now))
                 .isInstanceOf(IdentityExchangeRateLimiter.Limited.class);
         limiter.checkVerifiedPhone(ConsentEnvironment.DEV, "+919876543210", now.plusSeconds(3601));
+    }
+
+    @Test
+    void sourceWindowDoesNotResetAtIstMidnightOnNonIndianServer() {
+        var originalZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
+            var beforeMidnightIst = Instant.parse("2026-09-26T18:29:30Z");
+            for (int attempt = 0; attempt < 5; attempt++) {
+                limiter.checkSource(ConsentEnvironment.DEV, "192.0.2.93", beforeMidnightIst);
+            }
+            assertThatThrownBy(() -> limiter.checkSource(ConsentEnvironment.DEV,
+                    "192.0.2.93", beforeMidnightIst.plusSeconds(60)))
+                    .isInstanceOf(IdentityExchangeRateLimiter.Limited.class);
+            limiter.checkSource(ConsentEnvironment.DEV, "192.0.2.93", beforeMidnightIst.plusSeconds(901));
+        } finally {
+            TimeZone.setDefault(originalZone);
+        }
     }
 }

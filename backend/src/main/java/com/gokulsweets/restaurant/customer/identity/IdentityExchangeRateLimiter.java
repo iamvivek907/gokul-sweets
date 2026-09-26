@@ -76,7 +76,7 @@ public class IdentityExchangeRateLimiter {
         }
     }
 
-    @Scheduled(cron = "0 0 * * * *")
+    @Scheduled(cron = "0 0 * * * *", zone = "UTC")
     public void removeExpiredWindows() {
         jdbc.update("DELETE FROM identity_exchange_limits WHERE window_start < ?",
                 Timestamp.from(Instant.now().minus(Duration.ofHours(2))));

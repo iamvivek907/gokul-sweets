@@ -9,11 +9,10 @@ The internal `OtpChallengePolicy` remains unused until a provider integration
 needs locally generated codes. MSG91's provider-managed OTP flow must not be
 combined with a second independent code verification without a clear protocol.
 
-V56 and `VerifiedCustomerSessionStore` add only a dormant, hashed, expiring,
-revocable bearer token scoped to DEV or PROD. There is no issuance endpoint:
-`issue` is for a future service that validates MSG91 proof server-side and
-binds a stable verified customer subject. Deliver the token in a Secure,
-HttpOnly, SameSite cookie, not a URL or browser local storage. Keep the feature
+V56 and `VerifiedCustomerSessionStore` add a hashed, expiring, revocable bearer
+token scoped to DEV or PROD. Issuance occurs only after server-side MSG91 proof
+verification. Deliver the token in a Secure, HttpOnly, SameSite cookie, not a
+URL or browser local storage. Keep the feature
 flag OFF until SMS transport, verified session middleware, order ownership,
 phone reassignment protection, per-phone/IP/device rate limits, resend/expiry,
 provider outage recovery and user-facing checkout/account controls are tested.
@@ -28,8 +27,8 @@ flag is OFF or the server authkey is missing, and rejects responses without an
 explicit successful result and a verified Indian mobile in the provider data.
 MSG91's exact live response shape must be checked with a DEV account before
 activation; an unrecognised response fails closed. The widget token intended
-for the browser and the server authkey are different credentials. No browser
-widget, login endpoint or bearer session cookie is exposed by this checkpoint.
+for the browser and the server authkey are different credentials. The browser
+widget is still pending.
 
 V57 adds an environment-scoped verified phone registry. The internal
 `VerifiedCustomerSubjectStore` atomically creates or retrieves the subject after
@@ -42,8 +41,7 @@ V58 and the internal `VerifiedIdentityExchange` verify MSG91 proof before a
 database transaction that claims its digest, records the verified subject and
 issues a session atomically. The digest is globally unique, including across
 DEV and PROD. A repeated proof fails even if two instances race. Failed
-issuance rolls back the claim. No public exchange endpoint or cookie exists;
-activation still requires phone reassignment controls and a tested MSG91 DEV
+issuance rolls back the claim. Activation still requires phone reassignment controls and a tested MSG91 DEV
 response contract. Do not expose the issuance service directly to untrusted
 callers: only the exchange calls it with a server-verified phone.
 
@@ -64,3 +62,11 @@ limits. The response sets a Secure, HttpOnly, SameSite=Strict host-only cookie,
 with no bearer in JSON, and does not attach orders or historic consent. Verify
 trusted proxy TLS forwarding and browser credentials in DEV before turning
 on this flag. The service remains OFF by default.
+
+Identity expiry, proof claims and rate-limit windows use UTC `Instant` values
+and PostgreSQL `TIMESTAMP WITH TIME ZONE`; no server-local date is used for
+authorization. A seven-day session remains valid across IST midnight and
+expires at its exact instant even when the JVM uses a US timezone. Rate-limit
+windows likewise do not reset at IST midnight. Hourly retention cleanup runs
+in UTC. Display dates in Asia/Kolkata at the customer UI boundary; do not
+change the server timezone to control identity expiry.
