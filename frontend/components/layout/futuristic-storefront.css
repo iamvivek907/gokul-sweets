@@ -30,6 +30,7 @@ body:has(.future-storefront){background:#151722}
 .future-storefront .customer-bottom-navigation a:focus-visible{outline:3px solid #91d4f3;outline-offset:-2px}
 .future-storefront .customer-bottom-navigation [class*="bg-[#7a1625]"]{background:#f4c78b!important;color:#321c2a!important}
 .future-storefront .customer-site-footer{background:#171722!important;border-color:#af83917a!important}
+.future-storefront:has(.checkout-experience-v2) .customer-site-footer{padding-bottom:2rem}
 .future-storefront .customer-site-footer p{color:#eddae0!important}
 .future-storefront .page-content [class~="bg-white"],.future-storefront .page-content [class~="bg-white/95"],.future-storefront .page-content [class~="bg-white/70"]{background:linear-gradient(145deg,#ffffff18,#ffffff08)!important;border-color:#c79fa37d!important;box-shadow:inset 0 1px #ffffff22,0 12px 28px #100b1938}
 .future-storefront .page-content [class*="bg-[#fffaf3]"]{background:#312536!important}
