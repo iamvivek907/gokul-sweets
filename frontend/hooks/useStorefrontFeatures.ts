@@ -9,6 +9,7 @@ export interface StorefrontFeatures {
     inventoryAutomationV2: boolean;
     customerHomeV2: boolean;
     homepageCampaigns: boolean;
+    preHomeIntentGateway: boolean;
     persistentPickupContext: boolean;
     cartSwitchPreview: boolean;
     inPlaceBranchSwitch: boolean;

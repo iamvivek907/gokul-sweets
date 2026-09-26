@@ -19,7 +19,7 @@ class RuntimeConfigurationTest {
             properties.load(stream);
         }
         for (var feature : List.of("smart-availability", "smart-pickup-selection",
-                "inventory-automation-v2", "customer-home-v2", "homepage-campaigns",
+                "inventory-automation-v2", "customer-home-v2", "homepage-campaigns", "pre-home-intent-gateway",
                 "persistent-pickup-context", "cart-switch-preview", "authoritative-pickup-commitment",
                 "accepted-checkout-quote", "payment-reconciliation-v2", "payment-polling-v2", "truthful-order-tracking")) {
             assertThat(properties.getProperty("gokul.features." + feature)).endsWith(":false}");
@@ -49,6 +49,7 @@ class RuntimeConfigurationTest {
             assertThat(features.isCartSwitchPreview()).isFalse();
             assertThat(features.isAuthoritativePickupCommitment()).isFalse();
             assertThat(features.isAcceptedCheckoutQuote()).isFalse();
+            assertThat(features.isPreHomeIntentGateway()).isFalse();
             assertThat(features.isPaymentReconciliationV2()).isFalse();
             assertThat(features.isTruthfulOrderTracking()).isFalse();
             features.setFutureOrderingDays(0);
