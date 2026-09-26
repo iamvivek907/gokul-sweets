@@ -86,7 +86,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
                 <nav aria-label="Welcome navigation">
                     <a href="#gokul-branches">Branches</a>
                     <button type="button" onClick={onExplore}>Explore home</button>
-                    <Link href="/menu">Order for pickup ↗</Link>
+                    <Link href="/menu" onClick={onExplore}>Order for pickup ↗</Link>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
@@ -94,7 +94,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
                 <h1 id="gokul-arrival-title">Good moments<br />begin at <em>Gokul.</em></h1>
                 <span>Sweet celebrations, everyday cravings and the food you come back for. Made fresh in your neighbourhood.</span>
                 <div className={styles.actions}>
-                    <Link href="/menu">Explore the menu ↗</Link>
+                    <Link href="/menu" onClick={onExplore}>Explore the menu ↗</Link>
                     <button type="button" onClick={onExplore}>See what’s new</button>
                 </div>
                 <small>Order online · Pick up at your chosen branch</small>
@@ -128,7 +128,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
         <section className={styles.closing}>
             <div><span>03 / THE LITTLE THINGS</span><h2>Handmade taste.<br /><em>Everyday joy.</em></h2>
                 <p>Browse the menu, choose a pickup time, and review the full order before payment.</p>
-                <Link href="/menu">See the menu ↗</Link></div>
+                <Link href="/menu" onClick={onExplore}>See the menu ↗</Link></div>
         </section>
     </div>;
 }
