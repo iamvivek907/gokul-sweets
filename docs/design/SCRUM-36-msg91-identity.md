@@ -21,3 +21,12 @@ provider outage recovery and user-facing checkout/account controls are tested.
 Guest pickup remains available. Do not attach old orders or consent to a newly
 verified phone without an explicit account recovery policy. No location or
 marketing processing is enabled by these checkpoints.
+
+`Msg91WidgetProofVerifier` now prepares the server-side access-token exchange
+with a fixed MSG91 HTTPS origin. It refuses to call MSG91 while the identity
+flag is OFF or the server authkey is missing, and rejects responses without an
+explicit successful result and a verified Indian mobile in the provider data.
+MSG91's exact live response shape must be checked with a DEV account before
+activation; an unrecognised response fails closed. The widget token intended
+for the browser and the server authkey are different credentials. No browser
+widget, login endpoint or bearer session cookie is exposed by this checkpoint.
