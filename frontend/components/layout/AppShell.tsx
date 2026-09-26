@@ -30,7 +30,8 @@ export default function AppShell({
     children,
     showSocialPopup = true
 }: AppShellProps) {
-    const futuristic = useStorefrontFeatures()?.futuristicStorefrontV2 === true;
+    const features = useStorefrontFeatures();
+    const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
 
     return (
         <div
