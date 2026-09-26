@@ -960,6 +960,7 @@ export default function MenuScreen() {
                 className={`
                     mx-auto
                     max-w-295
+                    future-menu-width
 
                     ${
                         itemCount > 0
