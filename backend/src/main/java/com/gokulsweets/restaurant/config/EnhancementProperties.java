@@ -49,6 +49,8 @@ public class EnhancementProperties {
     private boolean truthfulOrderTracking;
     /** Remove only the matching pending checkout cart when server payment is PAID. */
     private boolean paidCartRecovery;
+    /** SCRUM-36: requires a verified SMS provider and customer session implementation before activation. */
+    private boolean customerOtpIdentity;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;
