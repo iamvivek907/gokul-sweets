@@ -82,53 +82,43 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
             /></div>}
             <div className={styles.scrim} aria-hidden="true" />
             <div className={styles.topbar}>
-                <Link href="/" className={styles.logo}>G <span>GOKUL SWEETS</span></Link>
+                <Link href="/" className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></Link>
                 <nav aria-label="Welcome navigation">
-                    <a href="#gokul-branches">Branches</a>
-                    <button type="button" onClick={onExplore}>Explore home</button>
-                    <Link href="/menu" onClick={onExplore}>Order for pickup ↗</Link>
+                    <button type="button" onClick={onExplore}>Home</button>
+                    <Link href="/about">Our story</Link>
+                    <a href="#gokul-branches">Our branches</a>
+                    <Link href="/menu" onClick={onExplore}>Order food ↗</Link>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
-                <p>FRESHLY MADE, BEAUTIFULLY SHARED</p>
-                <h1 id="gokul-arrival-title">Good moments<br />begin at <em>Gokul.</em></h1>
-                <span>Sweet celebrations, everyday cravings and the food you come back for. Made fresh in your neighbourhood.</span>
+                <p>GOKUL SWEETS &amp; RESTAURANTS</p>
+                <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
+                <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
-                    <Link href="/menu" onClick={onExplore}>Explore the menu ↗</Link>
-                    <button type="button" onClick={onExplore}>See what’s new</button>
+                    <Link href="/menu" onClick={onExplore}>Order food ↗</Link>
+                    <Link href="/about#our-branches">Plan an occasion</Link>
                 </div>
-                <small>Order online · Pick up at your chosen branch</small>
             </div>
             <a className={styles.scrollCue} href="#gokul-branches">Scroll to explore <span aria-hidden="true">⌄</span></a>
         </section>
-        <section className={styles.intro}>
-            <span>01 / DISCOVER GOKUL</span>
-            <h2>More than a sweet shop.<br /><em>A place for your moments.</em></h2>
-            <p>From familiar sweets to a meal worth stopping for, discover what your Gokul branch has ready for pickup.</p>
-        </section>
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
-                <span>02 / OUR PLACES</span><h2>Find your Gokul.</h2>
-                <p>Each branch has its own menu and pickup choices. Select yours to see what is available.</p>
+                <span>OUR BRANCHES</span><h2>Your next visit starts here.</h2>
+                <p>Choose a Gokul branch near you to see its live menu and pickup choices.</p>
             </div>
             <div className={styles.branchGrid}>
                 {branches.map(item => <article className={styles.branchCard} key={item.id}>
                     {branchPhotos[item.id] && <Image src={branchPhotos[item.id]} alt={item.name}
                         fill sizes="(max-width: 700px) 100vw, 50vw" className={styles.branchPhoto} />}
                     <div className={styles.branchCopy}>
-                        <span>PICKUP BRANCH</span><h3>{item.name}</h3>
+                        <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
                         <p>{item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
-                        <button type="button" popoverTarget="branch-selector-popover">Choose pickup branch ↗</button>
+                        <button type="button" popoverTarget="branch-selector-popover">Select branch ↗</button>
                     </div>
                 </article>)}
             </div>
             <div className={styles.selectBranch}><BranchSelector /></div>
             {!branches.length && <p className={styles.branchFallback}>Branch details will appear here when available. You can still explore the menu.</p>}
-        </section>
-        <section className={styles.closing}>
-            <div><span>03 / THE LITTLE THINGS</span><h2>Handmade taste.<br /><em>Everyday joy.</em></h2>
-                <p>Browse the menu, choose a pickup time, and review the full order before payment.</p>
-                <Link href="/menu" onClick={onExplore}>See the menu ↗</Link></div>
         </section>
     </div>;
 }

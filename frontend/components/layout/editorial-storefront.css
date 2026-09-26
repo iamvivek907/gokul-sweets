@@ -33,3 +33,12 @@
 .editorial-storefront .gokul-editorial-home [class*="text-[#c88a20]"],.editorial-storefront .gokul-editorial-home [class*="text-[#7a1625]"]{color:#aa5c37!important}
 .editorial-storefront .gokul-editorial-home [class~="bg-white"]{background:#fffaf4!important;border-color:#e4d6c5!important;box-shadow:none}
 @media(max-width:700px){.editorial-storefront .gokul-footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.gokul-footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.gokul-footer-grid>div:first-child{grid-column:1/-1}.gokul-footer-bottom{display:grid}.editorial-storefront .gokul-editorial-home{padding:1rem .85rem 2rem}.editorial-storefront .customer-site-footer{padding-bottom:7rem}}
+
+/* Footer matches the airy editorial canvas and retains real customer links. */
+.editorial-storefront .customer-site-footer{background:#f7f7f2!important;color:#173a37!important;border-color:#d6ded7!important}
+.editorial-storefront .customer-site-footer p,.editorial-storefront .customer-site-footer a,.editorial-storefront .customer-site-footer span,.editorial-storefront .customer-site-footer h2,.editorial-storefront .customer-site-footer h3{color:#173a37!important}
+.editorial-storefront .gokul-footer-grid{grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:clamp(1.5rem,4vw,4rem)}
+.editorial-storefront .gokul-footer-grid h2{font-size:2.8rem;color:#0d413b!important}
+.editorial-storefront .gokul-footer-bottom{border-color:#baccc2}
+.editorial-storefront .customer-site-footer a:hover{text-decoration:underline}
+@media(max-width:700px){.editorial-storefront .gokul-footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

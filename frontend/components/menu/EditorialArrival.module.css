@@ -16,3 +16,30 @@
 .closing{display:flex;align-items:center;min-height:370px;background:linear-gradient(100deg,#fffaf2,#e9d8bf);padding:4rem clamp(1.25rem,7vw,7rem);color:#29251f}.closing>div{max-width:650px}.closing h2{margin:1rem 0}.closing a{display:inline-block;margin-top:1.2rem;border-radius:999px;background:#2d3b2d;color:#fff9ed;padding:.85rem 1.25rem;font-weight:700}
 @media(max-width:700px){.hero{min-height:100dvh}.topbar{padding:1.1rem}.logo{font-size:1.8rem}.logo span{font-size:.55rem}.topbar nav{gap:0}.topbar nav a:not(:last-child),.topbar nav button{display:none}.topbar nav a:last-child{padding:.55rem;font-size:.65rem}.heroCopy{padding:7rem 1.2rem 5rem}.heroCopy h1{font-size:clamp(3rem,12vw,4.2rem)}.heroCopy>span{font-size:.9rem}.actions{flex-direction:column}.intro{grid-template-columns:1fr;padding:3rem 1.3rem;gap:1rem}.branches{padding:3.2rem 1.1rem}.branchGrid{grid-template-columns:1fr}.branchCard{min-height:300px}.branchCopy{padding:1.5rem}.closing{padding:3rem 1.3rem}}
 @media(prefers-reduced-motion:reduce){.arrival *{scroll-behavior:auto}}
+
+/* Owner-reviewed editorial concept: teal food hero, left copy, white branch gallery. */
+.hero{display:flex;align-items:center;justify-content:flex-start;min-height:min(800px,100svh);background:#143936 url('/arrival-mithai.webp') center center/cover no-repeat;text-align:left}
+.scrim{background:linear-gradient(90deg,#092725df 0%,#0d302cb0 39%,#0d302b20 76%),linear-gradient(0deg,#0b252374,transparent 35%)}
+.topbar{padding:1.8rem clamp(1.5rem,5vw,5.5rem)}
+.logo{font:500 2.55rem Georgia,serif;display:grid;gap:.05rem;text-shadow:0 2px 12px #001f1d88}
+.logo span{font:700 .55rem Arial,sans-serif;letter-spacing:.27em}
+.topbar nav{gap:1.7rem}.topbar nav a:last-child{background:#be6553;border:0;border-radius:999px;padding:.85rem 1.25rem}
+.heroCopy{width:min(860px,70%);max-width:none;margin:4rem 0 2rem;padding:6rem clamp(1.5rem,5vw,5.5rem);text-align:left}
+.heroCopy>p{font-size:.8rem;letter-spacing:.2em}.heroCopy h1{font-size:clamp(3.8rem,6.5vw,7.2rem);line-height:.98;margin:1.2rem 0 1.4rem}
+.heroCopy>span{margin:0;max-width:520px;font-size:1.15rem;line-height:1.55;color:#f5efea}
+.actions{justify-content:flex-start;gap:.8rem;margin:2rem 0}.actions a{background:#c76752;color:#fff;border-radius:999px;padding:1rem 1.6rem;font-size:.95rem}
+.actions a:last-child{background:transparent;border:1px solid #fff;color:#fff}
+.scrollCue{font-size:.8rem;text-transform:none;letter-spacing:.04em}
+.branches{background:#fff;color:#172e2c;padding:5rem clamp(1.5rem,5vw,5rem)}
+.sectionHead{max-width:760px;margin:0 auto 2.8rem}.sectionHead>span{color:#a83232}.sectionHead h2{font-size:clamp(2.5rem,4.5vw,4.2rem);margin:.6rem 0}.sectionHead p{font-size:1rem;color:#4e605c}
+.branchGrid{grid-template-columns:repeat(3,minmax(0,1fr));max-width:1320px;margin:auto;gap:1.25rem}
+.branchCard{min-height:370px;border-radius:1rem;background:#e8f0eb;color:#173a37;box-shadow:0 14px 30px #163d3020}
+.branchCard:before{background:linear-gradient(0deg,#092d2cde 0%,transparent 70%)}
+.branchCard:has(.branchPhoto){color:#fff}.branchCard:not(:has(.branchPhoto)):before{display:none}
+.branchCopy{padding:1.5rem}.branchCard:has(.branchPhoto) .branchCopy>span,.branchCard:has(.branchPhoto) .branchCopy button{color:#fff}
+.branchCopy>span,.branchCopy button{color:#a83232}.branchCopy h3{font-size:1.8rem}.branchCopy p{font-size:.9rem;line-height:1.5}
+.branchCard:not(:has(.branchPhoto)) .branchCopy{width:100%}
+.branchCard:not(:has(.branchPhoto)) .branchCopy:before{content:'Gokul Sweets';display:block;font:italic 2.1rem Georgia,serif;color:#54746a;margin:0 0 5rem}
+.arrival :is(a,button):focus-visible{outline:3px solid #94dfed;outline-offset:4px}
+@media(max-width:900px){.branchGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.heroCopy{width:78%}}
+@media(max-width:700px){.hero{min-height:100dvh;background-position:64% center}.scrim{background:linear-gradient(0deg,#092725eb,#0d302c9c 77%,#0d302b6b)}.topbar{padding:1.2rem}.logo{font-size:2rem}.topbar nav{gap:0}.topbar nav a:last-child{padding:.65rem;font-size:.75rem}.heroCopy{width:100%;margin:4rem 0 0;padding:7rem 1.4rem 6rem}.heroCopy h1{font-size:clamp(3.2rem,12vw,5rem)}.heroCopy>span{font-size:1rem}.actions{flex-direction:row;flex-wrap:wrap}.actions a{padding:.85rem 1.15rem}.branchGrid{grid-template-columns:1fr}.branchCard{min-height:310px}.branches{padding:3.5rem 1.2rem}}
