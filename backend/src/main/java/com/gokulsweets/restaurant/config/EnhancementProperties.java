@@ -23,6 +23,8 @@ public class EnhancementProperties {
     private boolean preHomeIntentGateway;
     /** SCRUM-26: clarify branch menu, product units, availability and cart estimates. */
     private boolean contextualStorefrontV2;
+    /** SCRUM-27: stage campaign edits and serve atomic, reversible published snapshots. */
+    private boolean controlledCampaignPublishing;
     /** Show the selected pickup branch and slot across the customer ordering journey. */
     private boolean persistentPickupContext;
     /** Require a server-backed cart preview before changing a pickup branch or date. */

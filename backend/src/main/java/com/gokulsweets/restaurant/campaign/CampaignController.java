@@ -18,8 +18,20 @@ public class CampaignController {
     private final StaffAuthorizationService authorization;
 
     @GetMapping("/api/storefront/campaigns")
-    public List<HomepageCampaign> active() {
-        return features.isHomepageCampaigns() ? service.active() : List.of();
+    public List<HomepageCampaign> active(@RequestParam(required = false) Long branchId) {
+        return features.isHomepageCampaigns() ? service.active(branchId) : List.of();
+    }
+
+    @GetMapping("/api/admin/homepage-campaigns/{id}/publications")
+    public List<CampaignPublication> history(@PathVariable Long id) {
+        authorization.requirePermission(PermissionName.MENU_MANAGE);
+        return service.history(id);
+    }
+
+    @PostMapping("/api/admin/homepage-campaigns/{id}/publications/{revision}/restore")
+    public HomepageCampaign restore(@PathVariable Long id, @PathVariable Long revision) {
+        authorization.requirePermission(PermissionName.MENU_MANAGE);
+        return service.rollback(id, revision);
     }
 
     @GetMapping("/api/admin/homepage-campaigns")
@@ -47,6 +59,19 @@ public class CampaignController {
                                    @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
         return service.upload(id, file, fallback, requestId);
+    }
+
+    @PostMapping(value = "/api/admin/homepage-campaigns/{id}/mobile-media", consumes = "multipart/form-data")
+    public HomepageCampaign uploadMobile(@PathVariable Long id, @RequestParam MultipartFile file,
+                @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId) {
+        authorization.requirePermission(PermissionName.MENU_MANAGE);
+        return service.uploadMobile(id, file, requestId);
+    }
+
+    @DeleteMapping("/api/admin/homepage-campaigns/{id}/mobile-media")
+    public HomepageCampaign removeMobile(@PathVariable Long id) {
+        authorization.requirePermission(PermissionName.MENU_MANAGE);
+        return service.removeMobile(id);
     }
 
     @DeleteMapping("/api/admin/homepage-campaigns/{id}/media")

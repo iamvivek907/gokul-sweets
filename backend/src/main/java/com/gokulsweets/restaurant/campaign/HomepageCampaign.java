@@ -26,6 +26,13 @@ public class HomepageCampaign {
     private String mediaType;
     @Column(length = 1000)
     private String fallbackMediaUrl;
+    @Column(length = 180)
+    private String altText;
+    private Long branchId;
+    @Column(length = 1000)
+    private String mobileMediaUrl;
+    @JsonIgnore private UUID mobileRequestId;
+    private Long publishedRevision;
     @Column(length = 60)
     private String ctaLabel;
     @Column(length = 240)

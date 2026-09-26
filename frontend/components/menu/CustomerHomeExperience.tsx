@@ -30,6 +30,7 @@ export default function CustomerHomeExperience({fallback}: {fallback: ReactNode}
 
 function Storefront({features}: {features: StorefrontFeatures}) {
     const {branch} = useSelectedBranch();
+    const campaignBranchId = branch?.id;
     const cart = useCart();
     const [menu, setMenu] = useState<{branchId: number; categories: MenuCategory[]} | null>(null);
     const [highlights, setHighlights] = useState<{branchId: number; data: Highlights} | null>(null);
@@ -42,7 +43,8 @@ function Storefront({features}: {features: StorefrontFeatures}) {
     const categories = menu?.branchId === branch?.id ? menu?.categories ?? [] : [];
     const products = categories.flatMap(category => category.products).filter(product => product.available);
     const ranked = highlights?.branchId === branch?.id ? highlights?.data : null;
-    const candidates = features.homepageCampaigns ? visibleCampaigns(campaigns, now)
+    const candidates = features.homepageCampaigns ? visibleCampaigns(campaigns, now,
+        features.controlledCampaignPublishing ? branch?.id ?? -1 : undefined)
         .filter(campaign => !failedMedia.includes(`${campaign.id}:${campaign.updatedAt}`)) : [];
     const hero = candidates.find(campaign => campaign.type === "HERO");
     const special = candidates.find(campaign => campaign.type === "FEATURE");
@@ -70,7 +72,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
         const controller = new AbortController();
         async function load() {
             try {
-                const data = await apiClient<HomepageCampaign[]>("/api/storefront/campaigns", {
+                const data = await apiClient<HomepageCampaign[]>(`/api/storefront/campaigns${features.controlledCampaignPublishing && campaignBranchId ? `?branchId=${campaignBranchId}` : ""}`, {
                     signal: AbortSignal.any([controller.signal, AbortSignal.timeout(5000)])
                 });
                 if (!controller.signal.aborted) {setCampaigns(data); setNow(Date.now());}
@@ -85,7 +87,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
         const fetchTimer = window.setInterval(load, 30_000);
         const clockTimer = window.setInterval(() => setNow(Date.now()), 1000);
         return () => {controller.abort(); window.clearInterval(fetchTimer); window.clearInterval(clockTimer);};
-    }, [features.homepageCampaigns]);
+    }, [features.homepageCampaigns, features.controlledCampaignPublishing, campaignBranchId]);
 
 
     function mediaFailure(campaign: HomepageCampaign) {

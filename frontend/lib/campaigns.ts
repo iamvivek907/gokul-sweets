@@ -1,7 +1,8 @@
 import type {HomepageCampaign} from "../types/campaign";
 
-export function visibleCampaigns(campaigns: HomepageCampaign[], now: number) {
+export function visibleCampaigns(campaigns: HomepageCampaign[], now: number, branchId?: number) {
     return campaigns.filter(campaign => campaign.active && campaign.mediaUrl
+        && (branchId === undefined || !campaign.branchId || campaign.branchId === branchId)
         && (!campaign.startAt || Date.parse(campaign.startAt) <= now)
         && (!campaign.endAt || now < Date.parse(campaign.endAt)))
         .sort((a, b) => a.displayOrder - b.displayOrder || a.id - b.id);

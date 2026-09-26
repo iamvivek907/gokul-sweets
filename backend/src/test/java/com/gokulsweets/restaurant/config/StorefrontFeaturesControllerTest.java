@@ -39,6 +39,7 @@ class StorefrontFeaturesControllerTest {
         properties.setPaymentPollingV2(true);
         properties.setPreHomeIntentGateway(true);
         properties.setContextualStorefrontV2(true);
+        properties.setControlledCampaignPublishing(true);
         properties.setInPlaceBranchSwitch(true);
         var previewEnabled = new StorefrontFeaturesController(properties, clock).features();
         assertThat(previewEnabled.cartSwitchPreview()).isTrue();
@@ -46,6 +47,7 @@ class StorefrontFeaturesControllerTest {
         assertThat(previewEnabled.paymentPollingV2()).isTrue();
         assertThat(previewEnabled.preHomeIntentGateway()).isTrue();
         assertThat(previewEnabled.contextualStorefrontV2()).isTrue();
+        assertThat(previewEnabled.controlledCampaignPublishing()).isTrue();
         assertThat(previewEnabled.inPlaceBranchSwitch()).isTrue();
         assertThat(previewEnabled.smartAvailability()).isFalse();
         properties.setAuthoritativePickupCommitment(true);
