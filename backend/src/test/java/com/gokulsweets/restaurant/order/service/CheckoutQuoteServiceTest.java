@@ -53,6 +53,8 @@ class CheckoutQuoteServiceTest {
                 PickupType.NORMAL, request.items());
         assertThatThrownBy(() -> service.accept(differentSlot, null, amounts, quote.token()))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("changed");
+        assertThatThrownBy(() -> service.accept(request, "stale-pending-order", amounts, quote.token()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("changed");
     }
 
     @Test
