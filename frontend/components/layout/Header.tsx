@@ -2,13 +2,19 @@
 
 import MobileMenu
     from "@/components/layout/MobileMenu";
+import BranchSelector from "@/components/branch/BranchSelector";
+import {useSelectedBranch} from "@/hooks/useSelectedBranch";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 
 export default function Header() {
+    const futuristic = useStorefrontFeatures()?.futuristicStorefrontV2 === true;
+    const {branch} = useSelectedBranch();
 
     return (
         <header
-            className="
+            className="customer-site-header
+
                 sticky
                 top-0
                 z-40
@@ -37,7 +43,10 @@ export default function Header() {
                 "
             >
 
-                <div
+                {futuristic ? <div className="future-brand" aria-label="Gokul Sweets">
+                    <span className="future-brand-mark" aria-hidden="true">G</span>
+                    <span>Gokul Sweets<small>FRESH FOR YOUR MOMENTS</small></span>
+                </div> : <div
                     className="
                         min-w-0
                     "
@@ -69,8 +78,14 @@ export default function Header() {
                         Gokul Sweets
                     </h1>
 
-                </div>
+                </div>}
 
+
+                {futuristic && <div className="future-branch-control">
+                    <span aria-hidden="true" className="future-location-icon">⌖</span>
+                    <span className="future-branch-name"><small>PICKUP FROM</small><strong>{branch?.name ?? "Choose a shop"}</strong></span>
+                    <BranchSelector compact />
+                </div>}
 
                 <MobileMenu />
 
