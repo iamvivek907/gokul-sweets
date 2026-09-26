@@ -17,6 +17,8 @@ import AppShell
     from "@/components/layout/AppShell";
 import ConfirmedPickupContext from "@/components/order/ConfirmedPickupContext";
 import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {reconcilePaidCart} from "@/lib/paidCartRecovery";
 
 import {
     useCart
@@ -247,6 +249,7 @@ const paymentInitializationPromises =
  */
 
 export default function PaymentPage() {
+    const paidCartRecovery = useStorefrontFeatures()?.paidCartRecovery;
 
     const router =
         useRouter();
@@ -488,11 +491,14 @@ export default function PaymentPage() {
                 response: PaymentResponse
             ) => {
 
-                clearPendingPayment();
+                if (paidCartRecovery !== false) {
+                    reconcilePaidCart(response.orderNumber);
+                } else {
+                    clearPendingPayment();
 
-                clearPendingOrder();
+                    clearPendingOrder();
 
-                clearCart();
+                    clearCart();
 
 
                 if (
@@ -508,6 +514,7 @@ export default function PaymentPage() {
                         "gokul-customer-details"
                     );
                 }
+                }
 
 
                 router.replace(
@@ -518,6 +525,7 @@ export default function PaymentPage() {
             },
             [
                 clearCart,
+                paidCartRecovery,
                 router
             ]
         );
@@ -787,11 +795,14 @@ export default function PaymentPage() {
                                     "PAID"
                             ) {
 
-                                clearPendingPayment();
+                                if (paidCartRecovery !== false) {
+                                    reconcilePaidCart(orderNumber);
+                                } else {
+                                    clearPendingPayment();
 
-                                clearPendingOrder();
+                                    clearPendingOrder();
 
-                                clearCart();
+                                    clearCart();
 
 
                                 if (
@@ -806,6 +817,7 @@ export default function PaymentPage() {
                                     window.localStorage.removeItem(
                                         "gokul-customer-details"
                                     );
+                                }
                                 }
 
 
@@ -1007,6 +1019,7 @@ export default function PaymentPage() {
         [
             applyPaymentResult,
             clearCart,
+            paidCartRecovery,
             currentCartFingerprint,
             orderNumber,
             pendingOrder,
