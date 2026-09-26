@@ -4,6 +4,7 @@ import AppShell from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
 import CustomerHomeExperience from "@/components/menu/CustomerHomeExperience";
+import HomeEntry from "@/components/menu/HomeEntry";
 
 
 const MENU_HIGHLIGHTS = [
@@ -71,7 +72,7 @@ const PICKUP_STEPS = [
 
 
 export default function Home() {
-    return <CustomerHomeExperience fallback={<LegacyHome />} />;
+    return <HomeEntry><CustomerHomeExperience fallback={<LegacyHome />} /></HomeEntry>;
 }
 
 function LegacyHome() {
