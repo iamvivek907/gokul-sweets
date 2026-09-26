@@ -66,3 +66,39 @@ test('a final provider response stops the active payment timer immediately', asy
     assert.equal(checks, 1);
     assert.equal(timers.size, 0);
 });
+
+test('three consecutive provider errors pause automatic checks without declaring payment failed', async () => {
+    const hookSource = fs.readFileSync(path.join(__dirname, '../hooks/usePaymentPolling.ts'), 'utf8');
+    const hookCode = ts.transpileModule(hookSource, {
+        compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}
+    }).outputText;
+    const effects = [];
+    const timers = new Map();
+    let nextId = 0;
+    const hookExports = {};
+    vm.runInNewContext(hookCode, {
+        exports: hookExports,
+        require: name => name === 'react'
+            ? {useRef: value => ({current: value}), useEffect: callback => {effects.push(callback);}}
+            : {MAX_AUTOMATIC_PAYMENT_FAILURES: 3, nextPaymentPollDelayMs: () => 30_000},
+        window: {setTimeout: callback => {const id = ++nextId; timers.set(id, callback); return id;},
+            clearTimeout: id => timers.delete(id), addEventListener() {}, removeEventListener() {}},
+        document: {hidden: false, addEventListener() {}, removeEventListener() {}},
+        navigator: {onLine: true}, Date, Math
+    });
+    let checks = 0;
+    let paused = 0;
+    hookExports.usePaymentPolling(true, 42, 'PENDING', Date.now() + 300_000, false,
+        async () => {checks++; return {success: false, retryAfterMs: 30_000};}, () => {paused++;});
+    effects.forEach(effect => effect());
+    for (let i = 0; i < 3; i++) {
+        assert.equal(timers.size, 1);
+        const [id, callback] = timers.entries().next().value;
+        timers.delete(id);
+        callback();
+        await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(checks, 3);
+    assert.equal(paused, 1);
+    assert.equal(timers.size, 0);
+});
