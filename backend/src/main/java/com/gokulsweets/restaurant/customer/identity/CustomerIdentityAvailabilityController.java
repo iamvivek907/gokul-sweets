@@ -26,6 +26,7 @@ public class CustomerIdentityAvailabilityController {
                     || "PROD".equals(settings.getProperty("gokul.environment-isolation.environment")))
                 && !settings.getProperty("gokul.msg91.server-authkey", "").isBlank()
                 && settings.getProperty("gokul.identity.rate-limit-key", "").length() >= 32;
+        enabled = enabled && settings.getProperty("gokul.identity.provider-abuse-controls-verified", Boolean.class, false);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(Map.of("enabled", enabled));
     }

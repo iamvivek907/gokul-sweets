@@ -34,8 +34,10 @@ import {
 } from "@/lib/orderTracking";
 
 import {
-    getCustomerOrderHistory
+    getCustomerOrderHistory,
+    getVerifiedCustomerOrders
 } from "@/services/orderApi";
+import {apiClient} from "@/services/apiClient";
 
 import type {
     OrderHistoryFilter
@@ -100,6 +102,12 @@ export default function OrdersPage() {
     const [reloadVersion, setReloadVersion] =
         useState(0);
 
+    useEffect(() => {
+        const refresh = () => setReloadVersion(value => value + 1);
+        window.addEventListener("gokul-customer-identity-changed", refresh);
+        return () => window.removeEventListener("gokul-customer-identity-changed", refresh);
+    }, []);
+
     const requestKey =
         useMemo(
             () =>
@@ -121,21 +129,34 @@ export default function OrdersPage() {
 
     useEffect(() => {
 
-        if (orderNumbers.length === 0) {
-            return;
-        }
-
         const controller = new AbortController();
         const activeRequestKey = requestKey;
 
         async function loadHistory(): Promise<void> {
 
             try {
-                const orders =
-                    await getCustomerOrderHistory(
-                        orderNumbers,
-                        controller.signal
-                    );
+                const localOrders = orderNumbers.length > 0
+                    ? await getCustomerOrderHistory(orderNumbers, controller.signal)
+                    : [];
+                let verifiedOrders: CustomerOrderSummaryResponse[] = [];
+                try {
+                    const availability = await apiClient<{enabled: boolean}>("/api/storefront/customer-identity", {
+                        signal: controller.signal
+                    });
+                    if (availability.enabled) {
+                        const session = await apiClient<{authenticated: boolean}>("/api/customer/identity/me", {
+                            credentials: "include", signal: controller.signal
+                        });
+                        if (session.authenticated) verifiedOrders = await getVerifiedCustomerOrders(controller.signal);
+                    }
+                } catch (identityError) {
+                    if (controller.signal.aborted) return;
+                    console.error("Unable to recover verified orders:", identityError);
+                }
+
+                const orders = Array.from(new Map([...localOrders, ...verifiedOrders]
+                    .map(order => [order.orderNumber, order])).values())
+                    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 
                 if (controller.signal.aborted) {
                     return;
@@ -182,10 +203,8 @@ export default function OrdersPage() {
             ? loadedHistory
             : null;
 
-    const loading =
-        orderNumbers.length > 0
-        &&
-        currentHistory === null;
+    const loading = currentHistory === null;
+    const hasOrders = (currentHistory?.orders.length ?? 0) > 0;
 
     const normalizedQuery =
         query.trim().toLowerCase();
@@ -275,7 +294,7 @@ export default function OrdersPage() {
                         </p>
                     </div>
 
-                    {orderNumbers.length > 0 && (
+                    {hasOrders && (
                         <button
                             type="button"
                             disabled={loading}
@@ -293,7 +312,7 @@ export default function OrdersPage() {
                     </div>
                 )}
 
-                {orderNumbers.length > 0 && (
+                {hasOrders && (
                     <div className="mt-6 rounded-2xl border border-[#eadfd6] bg-white p-4 shadow-sm">
                         <label htmlFor="order-search" className="text-xs font-bold uppercase tracking-wide text-[#756763]">
                             Find an order
@@ -349,12 +368,16 @@ export default function OrdersPage() {
                     </div>
                 )}
 
-                {!loading && orderNumbers.length === 0 && (
+                {!loading && !hasOrders && !currentHistory?.error && (
                     <div className="mt-8 rounded-3xl border border-[#eadfd6] bg-white px-6 py-16 text-center">
                         <h2 className="text-xl font-bold text-[#241715]">No orders yet</h2>
                         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#756763]">
-                            Orders created from this browser will appear here.
+                            Orders from this browser and your current verified session will appear here.
                         </p>
+                        <button type="button" onClick={() => router.push("/profile")}
+                            className="mt-5 min-h-11 rounded-xl border border-[#eadfd6] px-5 text-sm font-bold text-[#7a1625]">
+                            Verify your phone
+                        </button>
                         <button
                             type="button"
                             onClick={() => router.push("/menu")}
@@ -365,7 +388,7 @@ export default function OrdersPage() {
                     </div>
                 )}
 
-                {!loading && currentHistory && !currentHistory.error && filteredOrders.length === 0 && orderNumbers.length > 0 && (
+                {!loading && currentHistory && !currentHistory.error && filteredOrders.length === 0 && hasOrders && (
                     <div className="mt-8 rounded-3xl border border-[#eadfd6] bg-white px-6 py-14 text-center">
                         <h2 className="text-lg font-bold text-[#241715]">No matching orders</h2>
                         <p className="mt-2 text-sm text-[#756763]">Try another status or search term.</p>

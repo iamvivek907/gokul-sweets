@@ -70,4 +70,48 @@ class VerifiedIdentityIssuanceIntegrationTest {
                 WHERE environment = 'DEV' AND prior_subject_id = ? AND new_subject_id = ?
                 """, Integer.class, oldSubject, newSubject)).isEqualTo(1);
     }
+
+    @Test
+    void oldSessionAndNewOtpCarryOrdersButPhoneOnlyCannot() {
+        var now = Instant.now();
+        var phone = "+919876543210";
+        var first = issuance.issue(ConsentEnvironment.DEV, "first-" + java.util.UUID.randomUUID(), phone, now);
+        var oldSubject = sessions.subject(ConsentEnvironment.DEV, first.token(), now).orElseThrow();
+        var marker = java.util.UUID.randomUUID().toString().substring(0, 8);
+        var branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Test branch') RETURNING id",
+                Long.class, "IDENTITY-" + marker);
+        var slot = jdbc.queryForObject("""
+                INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity)
+                VALUES (?, CURRENT_DATE, '10:00', '10:30', 2) RETURNING id
+                """, Long.class, branch);
+        var orderNumber = "GKS-IDENTITY-" + marker;
+        var order = jdbc.queryForObject("""
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name,
+                    customer_phone, pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Test Customer', '9876543210', 'NORMAL', 'PENDING_PAYMENT', CURRENT_TIMESTAMP)
+                RETURNING id
+                """, Long.class, orderNumber, branch, slot);
+        jdbc.update("""
+                INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id)
+                VALUES (?, 'DEV', ?)
+                """, order, oldSubject);
+
+        var continued = issuance.issue(ConsentEnvironment.DEV, "continued-" + java.util.UUID.randomUUID(),
+                phone, first.token(), now.plusSeconds(1));
+        var continuedSubject = sessions.subject(ConsentEnvironment.DEV, continued.token(), now.plusSeconds(1))
+                .orElseThrow();
+        assertThat(continuedSubject).isNotEqualTo(oldSubject);
+        assertThat(jdbc.queryForObject("""
+                SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
+                """, java.util.UUID.class, order)).isEqualTo(continuedSubject);
+
+        var newHolder = issuance.issue(ConsentEnvironment.DEV, "new-holder-" + java.util.UUID.randomUUID(),
+                phone, now.plusSeconds(2));
+        var newSubject = sessions.subject(ConsentEnvironment.DEV, newHolder.token(), now.plusSeconds(2))
+                .orElseThrow();
+        assertThat(newSubject).isNotEqualTo(continuedSubject);
+        assertThat(jdbc.queryForObject("""
+                SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
+                """, java.util.UUID.class, order)).isEqualTo(continuedSubject);
+    }
 }

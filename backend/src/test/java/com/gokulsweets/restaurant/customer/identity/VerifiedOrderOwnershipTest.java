@@ -35,4 +35,16 @@ class VerifiedOrderOwnershipTest {
         assertThat(sql.getValue()).contains("s.revoked_at IS NULL", "s.expires_at > ?",
                 "v.verified_phone = ?", "FOR SHARE OF s, v");
     }
+
+    @Test
+    void lookupIsScopedToExactEnvironmentAndSubjectNotPhone() {
+        var first = java.util.UUID.randomUUID();
+        var second = java.util.UUID.randomUUID();
+        when(jdbc.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class),
+                eq("DEV"), eq(first))).thenReturn(java.util.List.of("GKS-FIRST"));
+        assertThat(ownership.orderNumbers("DEV", first)).containsExactly("GKS-FIRST");
+        assertThat(ownership.orderNumbers("PROD", second)).isEmpty();
+        verify(jdbc).query(contains("ownership.verified_subject_id = ?"),
+                any(org.springframework.jdbc.core.RowMapper.class), eq("DEV"), eq(first));
+    }
 }

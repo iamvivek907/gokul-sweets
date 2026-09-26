@@ -19,6 +19,8 @@ class CustomerIdentityAvailabilityControllerTest {
         var controller = new CustomerIdentityAvailabilityController(features, settings);
         assertThat(controller.availability().getBody()).containsEntry("enabled", false);
         features.setCustomerOtpIdentity(true);
+        assertThat(controller.availability().getBody()).containsEntry("enabled", false);
+        settings.setProperty("gokul.identity.provider-abuse-controls-verified", "true");
         assertThat(controller.availability().getBody()).containsEntry("enabled", true);
         settings.setProperty("gokul.msg91.server-authkey", "");
         assertThat(controller.availability().getBody()).containsEntry("enabled", false);
