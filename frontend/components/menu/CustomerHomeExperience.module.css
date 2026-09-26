@@ -79,3 +79,20 @@
     .later h2 { font-size: 32px; }
     .later .primary { margin-top: 20px; }
 }
+
+/* Optional shared visual direction; product media and live availability remain unchanged. */
+.future{--wine:#f4c78b;--ink:#fff5e9;color:var(--ink)}
+.future .hero{background:radial-gradient(circle at 76% 18%,#a655735b,transparent 38%),linear-gradient(145deg,#3b263d,#231c30 70%);border:1px solid #d4a38483;box-shadow:0 22px 50px #110b1d6e}
+.future .intro,.future .pickupNote,.future .later p:last-child{color:#ead5d9}
+.future .primary{background:linear-gradient(110deg,#f6d69b,#eaa979);color:#321b2a;box-shadow:0 12px 28px #e7a77646}
+.future .secondary{border-color:#e4b98c;color:#ffe0ae}
+.future .foodPhoto{background:#574057}
+.future .insetPhoto{border-color:#37263b}
+.future .wordmark{background:linear-gradient(145deg,#efc78d,#b46b77);color:#341d2b}
+.future .steps{border-color:#b98f9c72;color:#f3e2e1}.future .steps b{color:#f4c78b}
+.future .sectionHeading > a,.future .hero h1 em,.future .later em{color:#f8d29a}
+.future .categoryPhoto{background:#75526a}.future .category:nth-child(even) .categoryPhoto{background:#635473}
+.future .categoryPhoto > span{color:#ffe0b2}
+.future .highlight{background:linear-gradient(145deg,#ffffff1b,#ffffff08);border-color:#d8ad9885}
+.future .later{background:linear-gradient(135deg,#54405a99,#312838);border-color:#d6aa967c}
+.future .home a:focus-visible{outline-color:#91d4f3}
