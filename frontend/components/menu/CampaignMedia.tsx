@@ -3,6 +3,7 @@
 import Image from "next/image";
 import {useEffect, useRef, useState, useSyncExternalStore} from "react";
 import type {HomepageCampaign} from "@/types/campaign";
+import {useStaticCampaignMedia} from "@/lib/mediaRecovery";
 
 function subscribe(callback: () => void) {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -10,12 +11,22 @@ function subscribe(callback: () => void) {
     return () => query.removeEventListener("change", callback);
 }
 
-export default function CampaignMedia({campaign, hero = false, onUnavailable}: {
-    campaign: HomepageCampaign; hero?: boolean; onUnavailable: () => void;
+type DataConnection = {saveData?: boolean; addEventListener?: (name: string, fn: () => void) => void;
+    removeEventListener?: (name: string, fn: () => void) => void};
+const connection = () => (navigator as Navigator & {connection?: DataConnection}).connection;
+function subscribeSaveData(callback: () => void) {
+    const active = connection();
+    active?.addEventListener?.("change", callback);
+    return () => active?.removeEventListener?.("change", callback);
+}
+
+export default function CampaignMedia({campaign, hero = false, accessible = false, onUnavailable}: {
+    campaign: HomepageCampaign; hero?: boolean; accessible?: boolean; onUnavailable: () => void;
 }) {
     const reduced = useSyncExternalStore(subscribe,
         () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => true);
     const [failed, setFailed] = useState(false);
+    const saveData = useSyncExternalStore(subscribeSaveData, () => connection()?.saveData === true, () => true);
     const [visible, setVisible] = useState(hero);
     const frame = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -26,8 +37,8 @@ export default function CampaignMedia({campaign, hero = false, onUnavailable}: {
         observer.observe(frame.current);
         return () => observer.disconnect();
     }, [hero]);
-    const animated = campaign.mediaType === "image/gif" || campaign.mediaType?.startsWith("video/");
-    const useFallback = animated && (reduced || failed || !visible);
+    const animated = campaign.mediaType === "image/gif" || campaign.mediaType?.startsWith("video/") === true;
+    const useFallback = useStaticCampaignMedia(animated, reduced, accessible && saveData, failed, visible);
     const source = useFallback ? campaign.fallbackMediaUrl : campaign.mediaUrl;
     if (!source) return null;
     const fail = () => {

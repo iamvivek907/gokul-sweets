@@ -1,6 +1,7 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {getCartSnapshot} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
@@ -19,10 +20,44 @@ interface Props {
 const money = (amount: number) => new Intl.NumberFormat("en-IN", {style: "currency", currency: "INR"}).format(amount);
 
 export default function CartSwitchDialog({branchId, branchName, date, items, onKeep, onSwitch}: Props) {
+    const accessible = useStorefrontFeatures()?.accessibleOrderingV2 === true;
+    const dialogRef = useRef<HTMLDivElement>(null);
+    const onKeepRef = useRef(onKeep);
     const [preview, setPreview] = useState<CartSwitchPreview | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const busyRef = useRef(false);
     const [snapshots, setSnapshots] = useState<{cart: string; branch: string; pickup: string} | null>(null);
+
+    useEffect(() => {onKeepRef.current = onKeep;}, [onKeep]);
+    useEffect(() => {busyRef.current = busy;}, [busy]);
+
+    useEffect(() => {
+        if (!accessible) return;
+        const previous = document.activeElement;
+        const dialog = dialogRef.current;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+            'button:not(:disabled), a[href], input:not(:disabled), [tabindex="0"]'
+        ) ?? []).filter(element => element.getClientRects().length > 0);
+        focusable()[0]?.focus();
+        function onKeyDown(event: KeyboardEvent) {
+            if (event.key === "Escape") {event.preventDefault(); if (!busyRef.current) onKeepRef.current(); return;}
+            if (event.key !== "Tab") return;
+            const targets = focusable();
+            if (!targets.length) {event.preventDefault(); return;}
+            const first = targets[0]; const last = targets[targets.length - 1];
+            if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last.focus();}
+            else if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first.focus();}
+        }
+        dialog?.addEventListener("keydown", onKeyDown);
+        return () => {
+            dialog?.removeEventListener("keydown", onKeyDown);
+            document.body.style.overflow = previousOverflow;
+            if (previous instanceof HTMLElement && previous.isConnected) previous.focus();
+        };
+    }, [accessible]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -55,7 +90,7 @@ export default function CartSwitchDialog({branchId, branchName, date, items, onK
         } finally {setBusy(false);}
     }
 
-    return <div role="dialog" aria-modal="true" aria-label="Review cart before switching" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
+    return <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Review cart before switching" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
         <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
             <h2 className="text-xl font-bold">Review your cart for {branchName}</h2>
             <p className="mt-2 text-sm text-[#756763]">Pickup date: {date} (India time). Nothing changes until you confirm.</p>
@@ -77,7 +112,7 @@ export default function CartSwitchDialog({branchId, branchName, date, items, onK
             </>}
             {error && <p role="alert" className="mt-3 text-sm text-[#7a1625]">{error}</p>}
             <div className="mt-5 flex flex-wrap gap-3">
-                <button type="button" onClick={onKeep} className="min-h-11 rounded-xl border px-4 font-semibold">Keep current selection</button>
+                <button type="button" disabled={accessible && busy} onClick={onKeep} className="min-h-11 rounded-xl border px-4 font-semibold">Keep current selection</button>
                 <button type="button" disabled={!preview || busy} onClick={() => void confirm()}
                     className="min-h-11 rounded-xl bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-50">{busy ? "Rechecking..." : "Accept and switch"}</button>
                 {error && <button type="button" onClick={onKeep} className="min-h-11 px-2 underline">Close and retry</button>}

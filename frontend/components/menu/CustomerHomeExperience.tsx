@@ -111,7 +111,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
                     ? `Browsing ${branch?.name ?? "your chosen branch"} · Branch prices and pickup choices confirmed before payment`
                     : `Pickup at ${branch?.name ?? "your chosen branch"} · Order now or plan ahead`}</p>
             </div>
-            {hero ? <div className={styles.heroMedia}><CampaignMedia key={`${hero.id}:${hero.updatedAt}`} campaign={hero} hero onUnavailable={() => mediaFailure(hero)} /></div>
+            {hero ? <div className={styles.heroMedia}><CampaignMedia key={`${hero.id}:${hero.updatedAt}`} campaign={hero} hero accessible={features.accessibleOrderingV2} onUnavailable={() => mediaFailure(hero)} /></div>
                 : heroProduct?.imageUrl ? <div className={styles.heroMedia}>
                     <div className={styles.foodPhoto}>
                         <Image src={heroProduct.imageUrl} alt={heroProduct.name} fill sizes="(max-width: 768px) 100vw, 50vw" loading="eager" className="object-cover"
@@ -160,7 +160,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
             <Link href={cart.isEmpty ? "/menu" : "/checkout/pickup"} className={styles.primary}>Order for later <span aria-hidden="true">&rarr;</span></Link>
         </section>
         {special && <section className="mb-8 grid items-center gap-5 rounded-3xl border border-[#eadfd6] bg-white p-5 md:grid-cols-2">
-            <CampaignMedia key={`${special.id}:${special.updatedAt}`} campaign={special} onUnavailable={() => mediaFailure(special)} />
+            <CampaignMedia key={`${special.id}:${special.updatedAt}`} campaign={special} accessible={features.accessibleOrderingV2} onUnavailable={() => mediaFailure(special)} />
             <div><p className="text-xs font-bold uppercase text-[#c88a20]">Gokul specials</p><h2 className="mt-2 text-2xl font-bold">{special.title}</h2>
                 {special.subtitle && <p className="mt-2 text-sm text-[#756763]">{special.subtitle}</p>}
                 {special.ctaTarget && <Link href={special.ctaTarget} className="mt-4 inline-flex min-h-12 items-center rounded-xl bg-[#7a1625] px-5 font-bold text-white!">{special.ctaLabel}</Link>}

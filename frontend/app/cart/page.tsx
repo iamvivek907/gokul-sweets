@@ -36,6 +36,7 @@ import {
     useSelectedBranch
 } from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useOnlineStatus} from "@/hooks/useOnlineStatus";
 
 import type {
     CartItem as CartItemType
@@ -45,6 +46,7 @@ import type {
 export default function CartPage() {
     const pickupCheck = useDateAvailability();
     const features = useStorefrontFeatures();
+    const online = useOnlineStatus();
     const inPlaceBranchSwitch = features?.inPlaceBranchSwitch === true;
 
     const router =
@@ -135,6 +137,8 @@ export default function CartPage() {
 
 
     function handleContinue() {
+
+        if (features?.accessibleOrderingV2 && !online) return;
 
         if (
             !cartMatchesSelectedBranch
@@ -492,9 +496,7 @@ export default function CartPage() {
                                         subtotal={
                                             subtotal
                                         }
-                                        canContinue={
-                                            cartMatchesSelectedBranch
-                                        }
+                                        canContinue={cartMatchesSelectedBranch && (features?.accessibleOrderingV2 !== true || online)}
                                         onContinue={
                                             handleContinue
                                         }
@@ -508,6 +510,16 @@ export default function CartPage() {
                     )}
 
             </section>
+
+            {features?.accessibleOrderingV2 === true && !online && !isEmpty && <p role="alert" className="mx-auto max-w-[1180px] px-4 pb-3 text-sm text-[#7a1625]">Your cart is saved. Reconnect before choosing a pickup time.</p>}
+
+            {features?.accessibleOrderingV2 === true && !isEmpty && <div className="fixed inset-x-0 bottom-[env(safe-area-inset-bottom)] z-40 border-t border-[#eadfd6] bg-white p-3 shadow-[0_-6px_20px_rgba(60,30,20,0.12)] lg:hidden">
+                <div className="mx-auto flex max-w-lg items-center gap-3">
+                    <p className="min-w-0 flex-1 text-sm font-semibold text-[#241715]">{!online ? "Reconnect to continue" : !cartMatchesSelectedBranch ? "Choose your cart’s shop" : `${itemCount} items · ${new Intl.NumberFormat("en-IN", {style: "currency", currency: "INR", maximumFractionDigits: 2}).format(subtotal)} estimate`}</p>
+                    <button type="button" disabled={!cartMatchesSelectedBranch || !online} onClick={handleContinue}
+                        className="min-h-12 rounded-xl bg-[#7a1625] px-4 font-bold text-white disabled:opacity-50">Choose pickup</button>
+                </div>
+            </div>}
 
 
             {weightItem
