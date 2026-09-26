@@ -7,6 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.ZoneId;
+import java.util.TimeZone;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,5 +35,28 @@ class VerifiedCustomerSessionStoreIntegrationTest {
 
         sessions.revoke(ConsentEnvironment.DEV, issued.token(), now);
         assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), now)).isEmpty();
+    }
+
+    @Test
+    void sessionExpiresAtSameInstantAcrossIstMidnightOnNonIndianServer() {
+        var originalZone = TimeZone.getDefault();
+        try {
+            TimeZone.setDefault(TimeZone.getTimeZone("America/Los_Angeles"));
+            var issuedAt = Instant.parse("2026-09-26T18:29:59Z"); // 23:59:59 IST
+            var afterIstMidnight = issuedAt.plusSeconds(2);
+            assertThat(issuedAt.atZone(ZoneId.of("Asia/Kolkata")).toLocalDate())
+                    .isNotEqualTo(afterIstMidnight.atZone(ZoneId.of("Asia/Kolkata")).toLocalDate());
+            var subject = UUID.randomUUID();
+            var issued = sessions.issue(ConsentEnvironment.DEV, subject, issuedAt);
+            assertThat(issued.expiresAt()).isEqualTo(issuedAt.plusSeconds(7 * 24 * 60 * 60));
+            assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), afterIstMidnight))
+                    .contains(subject);
+            assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), issued.expiresAt().minusSeconds(1)))
+                    .contains(subject);
+            assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), issued.expiresAt()))
+                    .isEmpty();
+        } finally {
+            TimeZone.setDefault(originalZone);
+        }
     }
 }
