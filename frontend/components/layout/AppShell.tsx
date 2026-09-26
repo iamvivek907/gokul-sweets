@@ -1,3 +1,5 @@
+"use client";
+
 import type {
     ReactNode
 } from "react";
@@ -13,6 +15,8 @@ import SocialFollowPopup
 import CustomerFooter
     from "./CustomerFooter";
 import PickupJourneyContext from "./PickupJourneyContext";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import "./futuristic-storefront.css";
 
 
 interface AppShellProps {
@@ -26,11 +30,14 @@ export default function AppShell({
     children,
     showSocialPopup = true
 }: AppShellProps) {
+    const features = useStorefrontFeatures();
+    const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
 
     return (
         <div
-            className="
+            className={`
                 app-container
+                ${futuristic ? "future-storefront" : ""}
                 flex
                 flex-col
                 min-h-dvh
@@ -40,7 +47,7 @@ export default function AppShell({
                 overflow-x-clip
                 bg-[#fffaf3]
                 text-[#241715]
-            "
+            `}
         >
 
             <Header />

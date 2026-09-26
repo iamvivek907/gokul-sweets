@@ -20,7 +20,13 @@ public class StorefrontFeaturesController {
                 properties.isInventoryAutomationV2(), properties.isCustomerHomeV2(),
                 properties.isHomepageCampaigns(), properties.isPreHomeIntentGateway(),
                 properties.isContextualStorefrontV2(), properties.isControlledCampaignPublishing(),
-                properties.isAccessibleOrderingV2(), properties.isPersistentPickupContext(),
+                properties.isAccessibleOrderingV2(), properties.isFuturisticStorefrontV2(),
+                properties.isCheckoutExperienceV2() && properties.isSmartAvailability()
+                        && properties.isSmartPickupSelection() && properties.isAuthoritativePickupCommitment()
+                        && properties.isPersistentPickupContext() && properties.isCartSwitchPreview()
+                        && properties.isInPlaceBranchSwitch() && properties.isAcceptedCheckoutQuote()
+                        && properties.isAccessibleOrderingV2() && properties.isPaymentPollingV2(),
+                properties.isPersistentPickupContext(),
                 properties.isCartSwitchPreview(),
                 properties.isPersistentPickupContext() && properties.isCartSwitchPreview() && properties.isInPlaceBranchSwitch(),
                 properties.isSmartAvailability() && properties.isAuthoritativePickupCommitment(),
@@ -35,7 +41,7 @@ public class StorefrontFeaturesController {
                            boolean inventoryAutomationV2, boolean customerHomeV2,
                            boolean homepageCampaigns, boolean preHomeIntentGateway, boolean contextualStorefrontV2,
                            boolean controlledCampaignPublishing, boolean accessibleOrderingV2,
-                           boolean persistentPickupContext, boolean cartSwitchPreview,
+                           boolean futuristicStorefrontV2, boolean checkoutExperienceV2, boolean persistentPickupContext, boolean cartSwitchPreview,
                            boolean inPlaceBranchSwitch,
                            boolean authoritativePickupCommitment,
                            boolean acceptedCheckoutQuote,

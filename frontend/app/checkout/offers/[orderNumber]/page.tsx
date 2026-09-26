@@ -14,6 +14,8 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import {
     useCart
@@ -112,6 +114,7 @@ function padSeconds(
 
 
 export default function OffersPage() {
+    const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
     const router =
         useRouter();
@@ -1688,6 +1691,7 @@ export default function OffersPage() {
     return (
 
         <AppShell>
+            <CheckoutExperienceFrame enabled={checkoutExperienceV2} stage="offers">
 
             <section
                 className="
@@ -3074,6 +3078,7 @@ export default function OffersPage() {
 
             </section>
 
+        </CheckoutExperienceFrame>
         </AppShell>
     );
 }

@@ -18,6 +18,7 @@ import AppShell
     from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
 import ReviewPickupRecovery from "@/components/checkout/ReviewPickupRecovery";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
 import {parseBusinessTimestamp} from "@/lib/businessTime";
 import {pendingCheckoutAction} from "@/lib/checkoutQuoteContext";
 
@@ -624,6 +625,7 @@ export default function ReviewPage() {
     const quoteExpired = acceptedQuote !== null && quoteClock > 0 &&
         Date.parse(acceptedQuote.quote.expiresAt) <= quoteClock;
     const [pickupRecovery, setPickupRecovery] = useState(false);
+    const [editingPickup, setEditingPickup] = useState(false);
 
     const router =
         useRouter();
@@ -1664,6 +1666,7 @@ try {
 
     return (
         <AppShell>
+            <CheckoutExperienceFrame enabled={storefrontFeatures?.checkoutExperienceV2 === true} stage="review" allowBranchChange>
 
             <section
                 className="
@@ -1957,23 +1960,17 @@ try {
 
 
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                            {inPlaceBranchSwitch && <BranchSelector compact />}
-                        <Link
-                            href="/checkout/pickup"
-                            className="
-                                shrink-0
-                                rounded-lg
-                                px-2
-                                py-1
-                                text-sm
-                                font-semibold
-                                text-[#7a1625]
-                                transition
-                                hover:bg-[#fff0dc]
-                            "
-                        >
-                            {inPlaceBranchSwitch ? "Change time" : "Change"}
-                        </Link>
+                            {inPlaceBranchSwitch && !storefrontFeatures?.checkoutExperienceV2 && <BranchSelector compact />}
+                        {storefrontFeatures?.checkoutExperienceV2
+                            ? <button type="button" onClick={() => setEditingPickup(value => !value)}
+                                aria-expanded={editingPickup}
+                                className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-[#7a1625] hover:bg-[#fff0dc]">
+                                {editingPickup ? "Keep this time" : "Change time"}
+                            </button>
+                            : <Link href="/checkout/pickup"
+                                className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-[#7a1625] transition hover:bg-[#fff0dc]">
+                                {inPlaceBranchSwitch ? "Change time" : "Change"}
+                            </Link>}
                         </div>
 
                     </div>
@@ -2410,11 +2407,11 @@ try {
                     )
                 }
 
-                {pickupRecovery && branch && pickupSelection && storefrontFeatures &&
-                    <ReviewPickupRecovery branchId={branch.id} items={items} today={storefrontFeatures.today}
+                {(pickupRecovery || editingPickup) && branch && pickupSelection && storefrontFeatures &&
+                    <ReviewPickupRecovery mode={editingPickup ? "all" : "later"} branchId={branch.id} items={items} today={storefrontFeatures.today}
                         days={storefrontFeatures.futureOrderingDays} rejectedSlotId={pickupSelection.slot.id}
                         rejectedDate={pickupSelection.date} rejectedTime={pickupSelection.slot.startTime}
-                        onSelected={() => {setOrderError(null); setPickupRecovery(false); setAcceptedQuote(null);
+                        onSelected={() => {setOrderError(null); setPickupRecovery(false); setEditingPickup(false); setAcceptedQuote(null);
                             idempotencyKeyRef.current = null;}} />}
 
 
@@ -2590,6 +2587,7 @@ try {
 
             </section>
 
+            </CheckoutExperienceFrame>
         </AppShell>
     );
 }

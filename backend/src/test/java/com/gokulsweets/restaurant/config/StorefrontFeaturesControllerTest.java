@@ -26,6 +26,43 @@ class StorefrontFeaturesControllerTest {
     }
 
     @Test
+    void futuristicStorefrontIsOffByDefaultAndIndependentOfCheckout() {
+        var properties = new EnhancementProperties();
+        var controller = new StorefrontFeaturesController(properties, clock);
+        assertThat(controller.features().futuristicStorefrontV2()).isFalse();
+        properties.setFuturisticStorefrontV2(true);
+        assertThat(controller.features().futuristicStorefrontV2()).isTrue();
+        assertThat(controller.features().checkoutExperienceV2()).isFalse();
+        properties.setFuturisticStorefrontV2(false);
+        assertThat(controller.features().futuristicStorefrontV2()).isFalse();
+    }
+
+    @Test
+    void checkoutExperienceRequiresAllCommitmentAndPaymentSafeguards() {
+        var properties = new EnhancementProperties();
+        properties.setCheckoutExperienceV2(true);
+        var controller = new StorefrontFeaturesController(properties, clock);
+        assertThat(controller.features().checkoutExperienceV2()).isFalse();
+
+        properties.setSmartAvailability(true);
+        properties.setSmartPickupSelection(true);
+        properties.setAuthoritativePickupCommitment(true);
+        properties.setPersistentPickupContext(true);
+        properties.setCartSwitchPreview(true);
+        properties.setInPlaceBranchSwitch(true);
+        properties.setAcceptedCheckoutQuote(true);
+        properties.setAccessibleOrderingV2(true);
+        properties.setPaymentPollingV2(true);
+        assertThat(controller.features().checkoutExperienceV2()).isTrue();
+
+        properties.setAcceptedCheckoutQuote(false);
+        assertThat(controller.features().checkoutExperienceV2()).isFalse();
+        properties.setAcceptedCheckoutQuote(true);
+        properties.setCheckoutExperienceV2(false);
+        assertThat(controller.features().checkoutExperienceV2()).isFalse();
+    }
+
+    @Test
     void contextDisplayCanBeEnabledWithoutAvailabilityOrChangingExistingFlags() {
         var properties = new EnhancementProperties();
         properties.setPersistentPickupContext(true);

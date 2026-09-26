@@ -1,0 +1,50 @@
+/* Customer storefront visual system. Scope to AppShell only; admin and flag-OFF UI are untouched. */
+body:has(.future-storefront){background:#151722}
+.future-storefront{--future-ink:#fff7ee;--future-muted:#dbc7d0;--future-gold:#f3c78b;--future-border:#c699aa70;background:radial-gradient(circle at 8% 5%,#70385155,transparent 30%),radial-gradient(circle at 90% 48%,#4d3b6655,transparent 40%),linear-gradient(155deg,#241926,#151722 68%)!important;color:var(--future-ink)!important}
+.future-storefront .page-content{position:relative;padding-top:1.3rem}
+.future-storefront .customer-site-header{background:#1e1824e8!important;border-color:#d3a38e70!important;box-shadow:0 12px 32px #100a1d55;backdrop-filter:blur(22px)}
+.future-brand{display:flex;align-items:center;gap:.65rem;min-width:0;color:#fff1dc;font:500 1.35rem Georgia,"Times New Roman",serif;white-space:nowrap}
+.future-brand small{display:block;margin-top:.22rem;color:var(--future-gold);font:700 .55rem Arial,sans-serif;letter-spacing:.16em}
+.future-brand-mark{display:grid;place-items:center;flex:none;width:2.4rem;height:2.4rem;border:1px solid #f5d39f91;border-radius:.78rem;background:linear-gradient(140deg,#f1cb8f,#a04d6b);color:#341b2a;font:700 1.5rem Georgia,serif;box-shadow:0 0 20px #e4ab7d5e}
+.future-branch-control{display:flex;align-items:center;gap:.55rem;min-height:3rem;padding:.3rem .65rem;border:1px solid #eec7998a;border-radius:1rem;background:linear-gradient(110deg,#ffffff10,#dba47c20);box-shadow:inset 0 1px #ffffff22}
+.future-location-icon{color:var(--future-gold);font-size:1.45rem}
+.future-branch-name{display:grid;gap:.12rem}.future-branch-name small{color:var(--future-gold);font-size:.53rem;letter-spacing:.17em;font-weight:800}.future-branch-name strong{color:#fff4e5;font-size:.78rem;max-width:13rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.future-branch-control button{min-height:2.75rem;padding:.3rem .5rem;border-radius:.65rem;color:#ffe0a5;text-decoration:none}.future-branch-review{display:inline-flex;align-items:center;min-height:2.75rem;padding:.3rem .5rem;border-radius:.65rem;color:#ffe0a5;font-size:.8rem;font-weight:700}.future-branch-review:hover{background:#f4c88d20;text-decoration:underline}
+.future-branch-control button:hover{background:#f4c88d20;text-decoration:underline}
+.future-storefront .customer-menu-trigger{background:#f4c88d1c!important;border-color:#f4c88d88!important;color:#fff4e8;box-shadow:inset 0 1px #ffffff2a,0 0 20px #e4ad7940}
+.future-storefront .customer-menu-trigger span span{background:#ffe0ad}
+.future-storefront .customer-mobile-drawer{background:radial-gradient(circle at 0 0,#79445c66,transparent 38%),linear-gradient(165deg,#302235,#171a26)!important;border-color:#e0b29477!important;color:#fff7ee}
+.future-storefront .customer-mobile-drawer > div:first-child,.future-storefront .customer-mobile-drawer > div:last-child{background:#241d2dcf!important;border-color:#e0b2945c!important}
+.future-storefront .customer-mobile-drawer nav [class~="bg-white"],.future-storefront .customer-mobile-drawer nav [class~="bg-white/70"],.future-storefront .customer-mobile-drawer nav [class*="bg-[#fff2d2]"]{background:linear-gradient(135deg,#ffffff1e,#ffffff09)!important;border-color:#d4a99578!important}
+.future-storefront .customer-mobile-drawer nav a[aria-current="page"]{background:#f2c98b22!important;border-color:#f2c98b!important;box-shadow:inset 3px 0 #f2c98b}
+.future-storefront .customer-mobile-drawer [class*="text-[#241715]"]{color:#fff3e5!important}
+.future-storefront .customer-mobile-drawer [class*="text-[#756763]"]{color:#dac4cb!important}
+.future-storefront .customer-mobile-drawer [class*="text-[#7a1625]"],.future-storefront .customer-mobile-drawer [class*="text-[#c88a20]"]{color:#f8d29a!important}
+.future-storefront .customer-mobile-drawer nav a:focus-visible{outline:3px solid #91d4f3;outline-offset:2px}
+.future-storefront .customer-bottom-navigation{left:50%;right:auto;bottom:.65rem;width:min(calc(100% - 1rem),600px);border:1px solid #e1b88c85!important;border-radius:1.35rem;background:#281f30e8!important;box-shadow:0 18px 40px #10091a99,inset 0 1px #ffffff23;transform:translateX(-50%);backdrop-filter:blur(22px)}
+.future-storefront .customer-bottom-navigation a{color:#d8c6cd!important;border-radius:1rem}
+.future-storefront .customer-bottom-navigation a[aria-current="page"]{color:#f8d59e!important;background:#f4c78b1b}
+.future-storefront .customer-bottom-navigation a[aria-current="page"] > span:first-child{background:linear-gradient(135deg,#f7d89f,#eaaa7b)!important;box-shadow:0 0 18px #f1bc806e}
+.future-storefront .customer-bottom-navigation a[aria-current="page"] svg{stroke:#392235!important}
+.future-storefront .customer-bottom-navigation a:not([aria-current="page"]) svg{stroke:#e2ced2!important}
+.future-storefront .customer-bottom-navigation a:focus-visible{outline:3px solid #91d4f3;outline-offset:-2px}
+.future-storefront .customer-bottom-navigation [class*="bg-[#7a1625]"]{background:#f4c78b!important;color:#321c2a!important}
+.future-storefront .customer-site-footer{background:#171722!important;border-color:#af83917a!important}
+.future-storefront:has(.checkout-experience-v2) .customer-site-footer{padding-bottom:2rem}
+.future-storefront .customer-site-footer p{color:#eddae0!important}
+.future-storefront .page-content [class~="bg-white"],.future-storefront .page-content [class~="bg-white/95"],.future-storefront .page-content [class~="bg-white/70"]{background:linear-gradient(145deg,#ffffff18,#ffffff08)!important;border-color:#c79fa37d!important;box-shadow:inset 0 1px #ffffff22,0 12px 28px #100b1938}
+.future-storefront .page-content [class*="bg-[#fffaf3]"]{background:#312536!important}
+.future-storefront .page-content [class*="border-[#eadfd6]"]{border-color:#c49ba184!important}
+.future-storefront .page-content [class*="text-[#241715]"]{color:#fff5ea!important}
+.future-storefront .page-content [class*="text-[#756763]"]{color:#dfcbd0!important}
+.future-storefront .page-content [class*="text-[#7a1625]"],.future-storefront .page-content [class*="text-[#c88a20]"]{color:#f6ce94!important}
+.future-storefront .page-content :is(button,a)[class*="bg-[#7a1625]"]{background:linear-gradient(110deg,#f7d69a,#e9aa7c)!important;color:#321e2b!important;box-shadow:0 8px 20px #e5a37235}
+.future-storefront .page-content :is(button,a)[class*="bg-[#7a1625]"]:disabled{background:#847780!important;color:#f9edf0!important;box-shadow:none}
+.future-storefront .page-content :is(input,textarea,select){background:#fff9f1;color:#291e27}
+.future-storefront .page-content [class~="bg-amber-50"],.future-storefront .page-content [class~="bg-red-50"]{color:#3b2427}
+.future-storefront .page-content [class~="bg-amber-50"] [class*="text-[#241715]"],.future-storefront .page-content [class~="bg-red-50"] [class*="text-[#241715]"]{color:#3b2427!important}
+.future-storefront :is(a,button,input,textarea,select):focus-visible{outline:3px solid #91d4f3;outline-offset:3px}
+@media(max-width:600px){.future-storefront .customer-site-header > div{gap:.4rem;padding:.65rem .75rem}.future-brand{gap:.3rem;font-size:.92rem}.future-brand-mark{width:1.9rem;height:1.9rem;border-radius:.58rem;font-size:1.15rem}.future-brand small{font-size:.44rem;letter-spacing:.08em}.future-branch-control{gap:.2rem;padding:.2rem .35rem;min-height:2.8rem}.future-location-icon{display:none}.future-branch-name small{font-size:.43rem}.future-branch-name strong{max-width:5.4rem;font-size:.62rem}.future-branch-control button{font-size:.62rem;padding:.2rem;min-height:2.75rem}.future-storefront .customer-bottom-navigation{bottom:.35rem}.future-storefront .page-content{padding-bottom:7.5rem}}
+@media(prefers-reduced-motion:reduce){.future-storefront *{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+@media(max-width:400px){.future-storefront .future-branch-control button{font-size:0;width:2.75rem;flex:none}.future-storefront .future-branch-review{font-size:.58rem;max-width:3.2rem;line-height:1.15;text-align:center}.future-storefront .future-branch-control button:after{content:"↗";font-size:1.2rem}.future-storefront .future-brand{font-size:.82rem}.future-storefront .future-branch-name strong{max-width:5rem}}

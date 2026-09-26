@@ -32,6 +32,7 @@ export default function PickupJourneyContext() {
         ? savedSelection : null;
 
     // Committed orders must use their own server-confirmed branch and pickup time.
+    if (features?.checkoutExperienceV2 && pathname.startsWith("/checkout/")) return null;
     if (!features?.persistentPickupContext || !branch ||
         !(pathname === "/menu" || pathname === "/cart" ||
           pathname === "/checkout/pickup" || pathname === "/checkout/customer" ||
