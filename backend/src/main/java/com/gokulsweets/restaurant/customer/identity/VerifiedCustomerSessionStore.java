@@ -61,7 +61,7 @@ public class VerifiedCustomerSessionStore {
                 """, java.sql.Timestamp.from(now), environment.name(), digest(token));
     }
 
-    private static byte[] digest(String token) {
+    static byte[] digest(String token) {
         try {
             return MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.US_ASCII));
         } catch (java.security.NoSuchAlgorithmException e) {
