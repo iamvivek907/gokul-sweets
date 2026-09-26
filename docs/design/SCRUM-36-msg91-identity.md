@@ -37,3 +37,12 @@ server-side proof verification and rejects malformed phones. The registry does
 not grant access to older orders or consent: recycled numbers require an
 explicit recovery and reassignment policy before any customer-facing identity
 flow is enabled. Protect the registry as personal data under retention rules.
+
+V58 and the internal `VerifiedIdentityExchange` verify MSG91 proof before a
+database transaction that claims its digest, records the verified subject and
+issues a session atomically. The digest is globally unique, including across
+DEV and PROD. A repeated proof fails even if two instances race. Failed
+issuance rolls back the claim. No public exchange endpoint or cookie exists;
+activation still requires phone reassignment controls and a tested MSG91 DEV
+response contract. Do not expose the issuance service directly to untrusted
+callers: only the exchange calls it with a server-verified phone.
