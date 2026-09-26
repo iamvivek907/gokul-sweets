@@ -2,6 +2,7 @@
 
 import {
     useEffect,
+    useId,
     useState
 } from "react";
 
@@ -25,7 +26,9 @@ import type {
 } from "@/types/branch";
 
 
-export default function BranchSelector() {
+export default function BranchSelector({compact = false}: {compact?: boolean}) {
+    const uniqueId = useId();
+    const popoverId = compact ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
 
     const {
         branch,
@@ -178,7 +181,7 @@ export default function BranchSelector() {
 
         const popover =
             document.getElementById(
-                "branch-selector-popover"
+                popoverId
             );
 
 
@@ -241,8 +244,8 @@ export default function BranchSelector() {
 
             <button
                 type="button"
-                popoverTarget="branch-selector-popover"
-                className="
+                popoverTarget={popoverId}
+                className={compact ? "min-h-11 font-semibold text-[#7a1625] underline" : `
                     w-full
                     rounded-2xl
                     border
@@ -253,8 +256,10 @@ export default function BranchSelector() {
                     shadow-sm
                     transition
                     active:scale-[0.99]
-                "
+                `}
             >
+
+                {compact ? "Change branch" : <>
 
                 <div
                     className="
@@ -327,11 +332,12 @@ export default function BranchSelector() {
 
                 </div>
 
+                </>}
             </button>
 
 
             <div
-                id="branch-selector-popover"
+                id={popoverId}
                 popover="auto"
                 className="
                     fixed

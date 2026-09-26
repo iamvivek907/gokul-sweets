@@ -17,6 +17,7 @@ import AppShell
 
 import CartItem
     from "@/components/cart/CartItem";
+import BranchConflictReview from "@/components/cart/BranchConflictReview";
 
 import CartSummary
     from "@/components/cart/CartSummary";
@@ -34,6 +35,7 @@ import {
 import {
     useSelectedBranch
 } from "@/hooks/useSelectedBranch";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import type {
     CartItem as CartItemType
@@ -42,6 +44,7 @@ import type {
 
 export default function CartPage() {
     const pickupCheck = useDateAvailability();
+    const inPlaceBranchSwitch = useStorefrontFeatures()?.inPlaceBranchSwitch === true;
 
     const router =
         useRouter();
@@ -266,6 +269,9 @@ export default function CartPage() {
                     )
                     : (
                         <>
+
+                            {inPlaceBranchSwitch && branch && !cartMatchesSelectedBranch &&
+                                <BranchConflictReview branchId={branch.id} items={items} removeItem={handleRemoveItem} clearCart={clearCart} />}
 
                             <div
                                 className={`
