@@ -96,7 +96,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
     }
 
     return <AppShell showSocialPopup={false}>
-        <div className={`${styles.home} ${features.futuristicStorefrontV2 ? styles.future : ""}`}>
+        <div className={`${styles.home} ${features.futuristicStorefrontV2 || features.checkoutExperienceV2 ? styles.future : ""}`}>
         <div className={styles.location}><span className={styles.eyebrow}>Good taste starts here</span><BranchSelector /></div>
         <section className={styles.hero}>
             <div className={styles.heroCopy}>
