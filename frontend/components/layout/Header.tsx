@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {usePathname} from "next/navigation";
 import MobileMenu
     from "@/components/layout/MobileMenu";
 import BranchSelector from "@/components/branch/BranchSelector";
@@ -14,6 +15,7 @@ export default function Header() {
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
     const {branch} = useSelectedBranch();
     const cart = useCart();
+    const pathname = usePathname();
 
     return (
         <header
@@ -85,7 +87,7 @@ export default function Header() {
                 </div>}
 
 
-                {futuristic && <div className="future-branch-control">
+                {futuristic && !pathname.startsWith("/checkout/") && <div className="future-branch-control">
                     <span aria-hidden="true" className="future-location-icon">⌖</span>
                     <span className="future-branch-name"><small>PICKUP FROM</small><strong>{branch?.name ?? "Choose a shop"}</strong></span>
                     {features?.cartSwitchPreview || cart.isEmpty
