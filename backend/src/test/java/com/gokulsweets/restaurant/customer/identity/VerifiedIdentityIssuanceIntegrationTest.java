@@ -1,6 +1,8 @@
 package com.gokulsweets.restaurant.customer.identity;
 
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
+import com.gokulsweets.restaurant.customer.consent.ConsentLedger;
+import com.gokulsweets.restaurant.customer.consent.ConsentPurpose;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,6 +20,7 @@ class VerifiedIdentityIssuanceIntegrationTest {
     @Autowired VerifiedIdentityIssuance issuance;
     @Autowired VerifiedCustomerSessionStore sessions;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ConsentLedger consent;
 
     @Test
     void oneProofIssuesOneSessionAndCannotBeReplayedAcrossEnvironments() {
@@ -45,5 +48,26 @@ class VerifiedIdentityIssuanceIntegrationTest {
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM verified_identity_proof_claims", Integer.class))
                 .isZero();
+    }
+
+    @Test
+    void reverifiedPhoneGetsFreshSubjectAndCannotInheritSessionsOrConsent() {
+        var now = Instant.parse("2026-09-26T18:29:59Z"); // just before IST midnight
+        var phone = "+919876543210";
+        var first = issuance.issue(ConsentEnvironment.DEV, "first-" + java.util.UUID.randomUUID(), phone, now);
+        var oldSubject = sessions.subject(ConsentEnvironment.DEV, first.token(), now).orElseThrow();
+        consent.record(ConsentEnvironment.DEV, oldSubject, ConsentPurpose.MARKETING, "2026-09", true);
+
+        var second = issuance.issue(ConsentEnvironment.DEV, "second-" + java.util.UUID.randomUUID(),
+                phone, now.plusSeconds(2));
+        var newSubject = sessions.subject(ConsentEnvironment.DEV, second.token(), now.plusSeconds(2)).orElseThrow();
+        assertThat(newSubject).isNotEqualTo(oldSubject);
+        assertThat(sessions.subject(ConsentEnvironment.DEV, first.token(), now.plusSeconds(2))).isEmpty();
+        assertThat(consent.current(ConsentEnvironment.DEV, newSubject, ConsentPurpose.MARKETING).granted())
+                .isFalse();
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM verified_subject_rotations
+                WHERE environment = 'DEV' AND prior_subject_id = ? AND new_subject_id = ?
+                """, Integer.class, oldSubject, newSubject)).isEqualTo(1);
     }
 }

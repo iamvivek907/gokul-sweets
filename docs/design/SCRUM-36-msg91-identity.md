@@ -31,11 +31,20 @@ for the browser and the server authkey are different credentials. The browser
 widget is still pending.
 
 V57 adds an environment-scoped verified phone registry. The internal
-`VerifiedCustomerSubjectStore` atomically creates or retrieves the subject after
+`VerifiedCustomerSubjectStore` creates a subject after
 server-side proof verification and rejects malformed phones. The registry does
 not grant access to older orders or consent: recycled numbers require an
 explicit recovery and reassignment policy before any customer-facing identity
 flow is enabled. Protect the registry as personal data under retention rules.
+
+V60 changes subsequent verification of the same phone to rotate the subject
+under a database transaction lock and revoke its previous sessions. Consent
+and any future orders attached to the old subject are never inherited merely
+because the number received another OTP. A restricted old-to-new audit trail
+supports a later, separately verified account recovery process; it is not
+queried by the customer login API. Re-verification signs out other devices,
+including those owned by the same customer. Complete an explicit recovery
+policy before enabling historical order access.
 
 V58 and the internal `VerifiedIdentityExchange` verify MSG91 proof before a
 database transaction that claims its digest, records the verified subject and
