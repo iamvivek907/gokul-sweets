@@ -5,7 +5,7 @@ import SmartPickupSelection from "@/components/checkout/SmartPickupSelection";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
 import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
-import {parseBusinessTimestamp} from "@/lib/businessTime";
+import {formatBusinessTime, parseBusinessTimestamp} from "@/lib/businessTime";
 
 import {
     useEffect,
@@ -232,34 +232,7 @@ function formatDisplayDate(
 function formatTime(
     value: string
 ): string {
-
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 

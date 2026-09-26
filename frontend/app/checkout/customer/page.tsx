@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {formatBusinessTime} from "@/lib/businessTime";
 
 import {
     useMemo,
@@ -67,35 +68,7 @@ function formatCurrency(
 function formatTime(
     value: string
 ): string {
-
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 

@@ -19,7 +19,7 @@ import AppShell
 import BranchSelector from "@/components/branch/BranchSelector";
 import ReviewPickupRecovery from "@/components/checkout/ReviewPickupRecovery";
 import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
-import {parseBusinessTimestamp} from "@/lib/businessTime";
+import {formatBusinessTime, parseBusinessTimestamp} from "@/lib/businessTime";
 import {pendingCheckoutAction} from "@/lib/checkoutQuoteContext";
 
 
@@ -166,35 +166,7 @@ function cartItemSelection(
 function formatTime(
     value: string
 ): string {
-
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 

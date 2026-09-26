@@ -70,3 +70,7 @@ expires at its exact instant even when the JVM uses a US timezone. Rate-limit
 windows likewise do not reset at IST midnight. Hourly retention cleanup runs
 in UTC. Display dates in Asia/Kolkata at the customer UI boundary; do not
 change the server timezone to control identity expiry.
+
+For business dates and legacy local timestamps across the app, see
+`business-time-hosting.md`. They follow Asia/Kolkata even when the host OS
+uses another timezone.

@@ -16,7 +16,7 @@ vm.runInNewContext(compiled, {
     require: () => ({BUSINESS_TIME_ZONE: 'Asia/Kolkata', IST_TIME_FIX_ENABLED: true}),
     Date, Intl, Number
 });
-const {formatBusinessTime, parseBusinessTimestamp, parseBusinessDate} = exportsObject;
+const {formatBusinessTime, parseBusinessTimestamp, parseBusinessDate, businessDateOffset} = exportsObject;
 
 test('India date and offset survive UTC year rollover without shifting on a foreign browser', () => {
     assert.equal(parseBusinessTimestamp('2027-01-01T00:00:00').toISOString(), '2026-12-31T18:30:00.000Z');
@@ -28,4 +28,11 @@ test('pickup wall-time formatting is independent of device day and daylight-savi
     assert.equal(formatBusinessTime('00:05'), '12:05 am');
     assert.equal(formatBusinessTime('23:55:00'), '11:55 pm');
     assert.equal(formatBusinessTime('25:05'), '25:05');
+});
+
+test('India date offsets remain on the India calendar across midnight on a foreign host', () => {
+    const instant = new Date('2026-09-26T18:31:00Z'); // 27 September in India
+    assert.equal(businessDateOffset(0, instant), '2026-09-27');
+    assert.equal(businessDateOffset(13, instant), '2026-10-10');
+    assert.equal(businessDateOffset(-1, instant), '2026-09-26');
 });
