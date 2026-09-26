@@ -10,6 +10,7 @@ import {
 import {
     useCart
 } from "@/hooks/useCart";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 
 interface NavigationItem {
@@ -75,6 +76,7 @@ export default function BottomNavigation() {
 
     const pathname =
         usePathname();
+    const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
 
     const {
@@ -100,6 +102,8 @@ export default function BottomNavigation() {
         );
     }
 
+
+    if (checkoutExperienceV2 && pathname.startsWith("/checkout/")) return null;
 
     return (
         <nav
