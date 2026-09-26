@@ -115,76 +115,39 @@ export default function ProductGrid({
 
     return (
         <div className={dateAware ? styles.products : undefined}>
-        <div
-            className="
-                grid
-                grid-cols-1
-                gap-3
-
-                sm:grid-cols-2
-                sm:gap-4
-
-                lg:grid-cols-3
-            "
-        >
-
-            {products.map(
-                product => (
-
-                    <div key={product.id}>
-                    {dateAware && <p role="status" className={`mb-2 rounded-xl px-3 py-2 text-xs ${pickupItems?.find(item => item.productId === product.id)?.available ? "bg-green-50 text-green-900" : "bg-[#fff0dc] text-[#754321]"}`}>
-                        {refined
-                            ? describePickupAvailability(pickupItems?.find(item => item.productId === product.id), !!pickupChecking)
-                            : (() => {
-                            const item = pickupItems?.find(value => value.productId === product.id);
-                            if (!item) return pickupChecking ? "Pickup check pending - not confirmed" : "Choose pickup to check availability";
-                            if (!item.available) return `${item.reason}${item.code === "QUANTITY_TOO_LARGE" ? ` Up to ${item.availableQuantity} ${item.unit === "GRAM" ? "g" : "pieces"} remain.` : ""}`;
-                            return `Pickup options available${item.availableQuantity == null ? "" : ` - up to ${item.availableQuantity} ${item.unit === "GRAM" ? "g" : "pieces"} now`}. Final cart checked at checkout.`;
-                        })()}
-                    </p>}
-                    <ProductCard
-                        refined={refined}
-                        unavailableForPickup={refined && dateAware && pickupItems?.some(item => item.productId === product.id && !item.available) === true}
-                        product={
-                            product
-                        }
-                        ratingSummary={
-                            ratingSummaries[
-                                product.id
-                            ]
-                            ?? null
-                        }
-                        ratingLoading={
-                            ratingsLoading
-                        }
-                        quantity={
-                            quantities[
-                                product.id
-                            ]
-                            ?? 0
-                        }
-                        weightGrams={
-                            weights[
-                                product.id
-                            ]
-                            ?? null
-                        }
-                        onIncrease={
-                            onIncrease
-                        }
-                        onDecrease={
-                            onDecrease
-                        }
-                        onAdd={
-                            onAdd
-                        }
-                    />
-                    </div>
-
-                )
-            )}
-
-        </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                {products.map(product => {
+                    const pickup = pickupItems?.find(item => item.productId === product.id);
+                    const unavailable = dateAware && pickup?.available === false;
+                    return (
+                        <div key={product.id} className="relative min-w-0">
+                            {dateAware && (pickup || pickupChecking) && (
+                                <span className={`menu-availability-chip ${unavailable ? "menu-availability-chip--unavailable" : pickupChecking && !pickup ? "menu-availability-chip--checking" : ""}`}>
+                                    <span aria-hidden="true">{unavailable ? "!" : pickupChecking && !pickup ? "◌" : "✓"}</span>
+                                    {unavailable ? "Date unavailable" : pickupChecking && !pickup ? "Checking date" : "Date preview"}
+                                </span>
+                            )}
+                            <ProductCard
+                                refined={refined}
+                                unavailableForPickup={refined && unavailable}
+                                product={product}
+                                ratingSummary={ratingSummaries[product.id] ?? null}
+                                ratingLoading={ratingsLoading}
+                                quantity={quantities[product.id] ?? 0}
+                                weightGrams={weights[product.id] ?? null}
+                                onIncrease={onIncrease}
+                                onDecrease={onDecrease}
+                                onAdd={onAdd}
+                            />
+                            {unavailable && (
+                                <p role="status" className="menu-availability-note">
+                                    {describePickupAvailability(pickup, false)}
+                                </p>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }
