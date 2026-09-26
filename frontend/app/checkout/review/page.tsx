@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import {
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -18,6 +19,7 @@ import AppShell
 import BranchSelector from "@/components/branch/BranchSelector";
 import ReviewPickupRecovery from "@/components/checkout/ReviewPickupRecovery";
 import {parseBusinessTimestamp} from "@/lib/businessTime";
+import {pendingCheckoutAction} from "@/lib/checkoutQuoteContext";
 
 
 import CheckoutOffersPanel
@@ -608,6 +610,16 @@ export default function ReviewPage() {
     const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
     const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
     const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
+    const [quoteNotice, setQuoteNotice] = useState<{oldTotal: string; newTotal: string} | null>(null);
+    const [quoteClock, setQuoteClock] = useState(0);
+    useEffect(() => {
+        if (!acceptedQuote) return;
+        const immediate = window.setTimeout(() => setQuoteClock(Date.now()), 0);
+        const timer = window.setInterval(() => setQuoteClock(Date.now()), 15_000);
+        return () => {window.clearTimeout(immediate); window.clearInterval(timer);};
+    }, [acceptedQuote]);
+    const quoteExpired = acceptedQuote !== null && quoteClock > 0 &&
+        Date.parse(acceptedQuote.quote.expiresAt) <= quoteClock;
     const [pickupRecovery, setPickupRecovery] = useState(false);
 
     const router =
@@ -908,16 +920,41 @@ export default function ReviewPage() {
             pickupType: pickupSelection.pickupType,
             items: requestItems
         };
-        const quoteOrderNumber = localPendingOrderCandidate ? pendingOrder?.orderNumber : undefined;
-        const quoteKey = JSON.stringify([quoteRequest, quoteOrderNumber]);
-
-
+        let quoteOrderNumber: string | undefined;
         setSubmitting(true);
 setOrderError(null);
 setInventoryIssue(null);
 setPickupRecovery(false);
 
 try {
+
+    // Resolve the browser's pending-order hint before binding a signed quote.
+    // An expired order must never supply a quote token for a new order.
+    let reusablePendingOrder = false;
+    if (localPendingOrderCandidate && pendingOrder) {
+        const serverOrder = await getCustomerOrder(pendingOrder.orderNumber);
+        const expiresAt = parseBusinessTimestamp(serverOrder.reservationExpiresAt).getTime();
+        const action = pendingCheckoutAction(serverOrder, expiresAt, Date.now());
+        reusablePendingOrder = action === "reuse";
+        if (!reusablePendingOrder) {
+            if (quoteEnabled && action === "payment") {
+                router.push(`/checkout/payment/${encodeURIComponent(pendingOrder.orderNumber)}`);
+                return;
+            }
+            if (quoteEnabled && action === "paid") {
+                if (pendingOrder.cartFingerprint === currentCartFingerprint) {
+                    router.push(`/orders/${encodeURIComponent(pendingOrder.orderNumber)}`);
+                    return;
+                }
+            }
+            clearPendingOrder();
+            setAcceptedQuote(null);
+            idempotencyKeyRef.current = null;
+        }
+    }
+
+    quoteOrderNumber = reusablePendingOrder ? pendingOrder?.orderNumber : undefined;
+    const quoteKey = JSON.stringify([quoteRequest, quoteOrderNumber]);
 
     const inventory =
         await checkInventory(
@@ -948,7 +985,10 @@ try {
     if (quoteEnabled) {
         if (!acceptedQuote || acceptedQuote.key !== quoteKey ||
             Date.parse(acceptedQuote.quote.expiresAt) <= Date.now()) {
-            setAcceptedQuote({key: quoteKey, quote: await previewCheckoutQuote(quoteRequest, quoteOrderNumber)});
+            const refreshed = await previewCheckoutQuote(quoteRequest, quoteOrderNumber);
+            setAcceptedQuote({key: quoteKey, quote: refreshed});
+            setQuoteNotice(acceptedQuote?.key === quoteKey
+                ? {oldTotal: acceptedQuote.quote.totalAmount, newTotal: refreshed.totalAmount} : null);
             return;
         }
     }
@@ -970,56 +1010,7 @@ try {
              * the newly selected pickup time and recalculates
              * prices, tax, priority charge and rebate eligibility.
              */
-            if (
-                localPendingOrderCandidate
-                &&
-                pendingOrder
-            ) {
-
-                /*
-                 * localStorage is only a client-side hint.
-                 *
-                 * The backend may already have expired or
-                 * completed this order since the browser last
-                 * saved it.
-                 *
-                 * Always ask the backend before deciding that
-                 * the existing checkout can be edited.
-                 */
-                const serverOrder =
-                    await getCustomerOrder(
-                        pendingOrder.orderNumber
-                    );
-
-
-                const reservationExpiresAtMs =
-                    parseBusinessTimestamp(
-                        serverOrder.reservationExpiresAt
-                    ).getTime();
-
-
-                const reservationStillActive =
-                    Number.isFinite(
-                        reservationExpiresAtMs
-                    )
-                    &&
-                    reservationExpiresAtMs >
-                        Date.now();
-
-
-                const backendOrderReusable =
-                    serverOrder.orderStatus ===
-                        "PENDING_PAYMENT"
-                    &&
-                    serverOrder.paymentStatus ===
-                        null
-                    &&
-                    reservationStillActive;
-
-
-                if (
-                    backendOrderReusable
-                ) {
+            if (reusablePendingOrder && pendingOrder) {
 
                     const updateRequest:
                         UpdatePendingOrderRequest =
@@ -1090,32 +1081,6 @@ try {
 
 
                     return;
-                }
-
-
-                /*
-                 * The browser still remembered an old pending
-                 * checkout, but the backend says it is no
-                 * longer editable.
-                 *
-                 * Clear ONLY the pending-order pointer.
-                 *
-                 * Keep:
-                 * - cart
-                 * - branch
-                 * - pickup selection
-                 * - customer details
-                 *
-                 * The normal create-order path below will
-                 * create a new reservation using the current
-                 * checkout data.
-                 */
-                clearPendingOrder();
-
-                setAcceptedQuote(null);
-
-                idempotencyKeyRef.current =
-                    null;
             }
 
 
@@ -1230,6 +1195,45 @@ try {
         } catch (exception) {
 
             setAcceptedQuote(null);
+            const quoteChanged = quoteEnabled && exception instanceof Error &&
+                /quote expired|price quote expired|price or pickup details changed|review the current price/i.test(exception.message);
+            if (quoteChanged) {
+                try {
+                    let refreshOrderNumber = quoteOrderNumber;
+                    if (refreshOrderNumber) {
+                        const latest = await getCustomerOrder(refreshOrderNumber);
+                        const expiry = parseBusinessTimestamp(latest.reservationExpiresAt).getTime();
+                        const action = pendingCheckoutAction(latest, expiry, Date.now());
+                        if (action === "payment") {
+                            router.push(`/checkout/payment/${encodeURIComponent(refreshOrderNumber)}`);
+                            return;
+                        }
+                        if (action === "paid") {
+                            if (pendingOrder?.cartFingerprint === currentCartFingerprint) {
+                                router.push(`/orders/${encodeURIComponent(refreshOrderNumber)}`);
+                                return;
+                            }
+                        }
+                        if (action === "replace" || action === "paid") {
+                            clearPendingOrder();
+                            refreshOrderNumber = undefined;
+                            idempotencyKeyRef.current = null;
+                        }
+                    }
+                    const refreshed = await previewCheckoutQuote(quoteRequest, refreshOrderNumber);
+                    const refreshedKey = JSON.stringify([quoteRequest, refreshOrderNumber]);
+                    setAcceptedQuote({key: refreshedKey, quote: refreshed});
+                    setQuoteNotice(acceptedQuote?.key === refreshedKey
+                        ? {oldTotal: acceptedQuote.quote.totalAmount, newTotal: refreshed.totalAmount} : null);
+                    setOrderError(null);
+                    return;
+                } catch (refreshError) {
+                    console.warn("Unable to refresh checkout quote:", refreshError);
+                    setOrderError("We couldn't refresh your total. Your cart is saved; please try again.");
+                    return;
+                }
+            }
+            setQuoteNotice(null);
             // A slot can cease to fit the cart between the initial preview and reservation.
             // Offer newly checked times here, while keeping all checkout fields intact.
             if (exception instanceof Error && /preparation time|ready later|later pickup|pickup time is no longer available/i.test(exception.message)) {
@@ -2422,6 +2426,14 @@ try {
                 {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
                     <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-white p-4" role="status">
                         <p className="font-bold">Your price, before offers</p>
+                        {quoteExpired && <p className="mt-2 rounded-xl bg-[#fff4e5] p-3 text-sm" role="status">
+                            This price needs refreshing. Your cart and pickup details are saved.
+                        </p>}
+                        {quoteNotice && <p className="mt-2 rounded-xl bg-[#fff4e5] p-3 text-sm" role="alert">
+                            {quoteNotice.oldTotal === quoteNotice.newTotal
+                                ? "Your price has been refreshed. Please review it once more before continuing."
+                                : `Your total changed from ${formatCurrency(Number(quoteNotice.oldTotal))} to ${formatCurrency(Number(quoteNotice.newTotal))}. Please review the new amount before continuing.`}
+                        </p>}
                         {acceptedQuote.quote.items.map((line, index) => (
                             <p className="mt-2 text-sm" key={`${line.name}-${index}`}>
                                 {line.name}: ₹{line.total} (unit ₹{line.unitPrice}, tax {line.taxRate}%)
@@ -2429,7 +2441,7 @@ try {
                         ))}
                         <p className="mt-3 text-sm">Items ₹{acceptedQuote.quote.subtotal} · Tax ₹{acceptedQuote.quote.taxAmount} · Pickup charge ₹{acceptedQuote.quote.priorityCharge}</p>
                         <p className="mt-2 font-bold">Total before optional offers ₹{acceptedQuote.quote.totalAmount}</p>
-                        <p className="mt-2 text-xs">This price is available until {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy">See the cancellation policy</Link> before paying.</p>
+                        {!quoteExpired && <p className="mt-2 text-xs">This price is available until {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy">See the cancellation policy</Link> before paying.</p>}
                     </div>
                 )}
 
@@ -2523,6 +2535,8 @@ try {
                                     {
                                         submitting
                                             ? "Preparing your order..."
+                                            : quoteExpired
+                                                ? "Refresh your total"
                                             : quoteEnabled && acceptedQuote
                                                 ? "Accept price and reserve pickup"
                                                 : "Check Final Price & Offers"
