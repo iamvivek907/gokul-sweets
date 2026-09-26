@@ -6,8 +6,8 @@ Open [the connected prototype](../../frontend/public/design/scrum-95-checkout-pr
 
 | Decision | Proposed treatment |
 | --- | --- |
-| Brand | Carry forward the SCRUM-24 proposed cream, wine and gold direction, pending owner approval and real brand assets. |
-| Pickup | Show shop, IST day and available time in one selector; offer **Change** in checkout without sending the customer home. Changing a shop with unavailable items requires an explicit decision. |
+| Brand | Explore a futuristic, luminous wine and gold direction with layered depth, restrained glow and strong contrast. This is an owner-review variant pending SCRUM-24 approval and real brand assets. |
+| Pickup | Use a compact, prominent branch selector in the header showing the active shop, plus the same shop in the pickup context; show IST day and available time in one selector; offer **Change** in checkout without sending the customer home. Changing a shop with unavailable items requires an explicit decision. |
 | Conflict | Keep cart and contact details; show fresh alternatives in the same context. Choosing one refreshes the amount. |
 | Pricing | One line per item with piece/weight and unit price, followed by item subtotal, GST, pickup charge, savings, and one payable amount. Values come from a fresh backend response in the implementation. |
 | Offers | Place eligible offers within the review step, with the payable amount updated before explicit payment. |
@@ -38,3 +38,7 @@ This story asks for owner review **before implementation**. SCRUM-24 visual dire
 ## Owner review gate
 
 Please review the prototype on the PR preview at `/design/scrum-95-checkout-prototype.html` and record approval or corrections for: shop and pickup change, conflict recovery, order/tax hierarchy, offer placement, cancellation wording, and ambiguous payment return. The example date is 26 Sep 2026 IST; no live availability, stock, reservation, quote, order, payment, or customer data is used. The prototype includes a demonstration of a conflict and payment return, but the sold-out, expired quote, offline, saved pending order, and real provider cases require implementation and DEV QA after approval. SCRUM-24 brand approval is still pending.
+
+## Visual feedback revision · 26 Sep 2026
+
+The owner found the first draft too similar to a conventional website and the header shop change dated. The current prototype explores a darker, more distinctive editorial treatment: a luminous brand mark, layered wine surfaces, warm gold actions and selection states, and a compact header control that names the active pickup shop. The pickup panel echoes that shop without creating a second selection state. The visual direction remains a prototype, not final brand approval; test its legibility and contrast on the actual phone before implementation. Avoid glow on dense item totals, warnings or form copy.
