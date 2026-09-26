@@ -31,6 +31,25 @@ export function parseBusinessDate(value: string): Date {
     return new Date(`${value}T12:00:00+05:30`);
 }
 
+/** Calendar arithmetic starts from India's date, independent of browser/server zone. */
+export function businessDateOffset(offsetDays: number, now = new Date()): string {
+    const parts = new Intl.DateTimeFormat("en-GB", {
+        timeZone: BUSINESS_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(now);
+    const read = (part: string) => parts.find(value => value.type === part)?.value;
+    const year = read("year");
+    const month = read("month");
+    const day = read("day");
+    if (!year || !month || !day) throw new Error("India business date unavailable");
+    const date = parseBusinessDate(`${year}-${month}-${day}`);
+    date.setUTCDate(date.getUTCDate() + offsetDays);
+    const shifted = new Intl.DateTimeFormat("en-GB", {
+        timeZone: BUSINESS_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit"
+    }).formatToParts(date);
+    const value = (part: string) => shifted.find(item => item.type === part)?.value;
+    return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
 /** Pickup LocalTime is an India wall-clock value, never the device's zone. */
 export function formatBusinessTime(value: string): string {
     if (!IST_TIME_FIX_ENABLED) {

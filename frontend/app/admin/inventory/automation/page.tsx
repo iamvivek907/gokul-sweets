@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {businessDateOffset} from "@/lib/businessTime";
 import {adminManagementApi} from "@/services/adminManagementApi";
 import {
     useEffect,
@@ -56,11 +57,7 @@ const dayOptions = [
 ];
 
 function indiaDate(offsetDays = 0): string {
-    const date = new Date();
-    date.setDate(date.getDate() + offsetDays);
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit"
-    }).format(date);
+    return businessDateOffset(offsetDays);
 }
 
 function modeLabel(mode: InventoryAutomationMode): string {

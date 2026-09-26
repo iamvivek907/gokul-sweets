@@ -6,6 +6,7 @@ import {useEffect, useState, type ReactNode} from "react";
 import AppShell from "@/components/layout/AppShell";
 import {getActiveBranches} from "@/services/branchApi";
 import type {Branch} from "@/types/branch";
+import {formatBusinessTime} from "@/lib/businessTime";
 
 const INSTAGRAM_URL = "https://www.instagram.com/_gokulsweets";
 const FACEBOOK_URL = "https://www.facebook.com/visitgokulsweets";
@@ -19,15 +20,7 @@ const POLICY_LINKS = [
 ] as const;
 
 function formatTime(value: string | null): string | null {
-    if (!value) return null;
-    const [hour, minute] = value.split(":").map(Number);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
-    const date = new Date();
-    date.setHours(hour, minute, 0, 0);
-    return new Intl.DateTimeFormat("en-IN", {
-        hour: "numeric",
-        minute: "2-digit"
-    }).format(date);
+    return value ? formatBusinessTime(value) : null;
 }
 
 function formatAddress(branch: Branch): string {
