@@ -16,6 +16,7 @@ import {
 import AppShell
     from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
+import ReviewPickupRecovery from "@/components/checkout/ReviewPickupRecovery";
 import {parseBusinessTimestamp} from "@/lib/businessTime";
 
 
@@ -607,6 +608,7 @@ export default function ReviewPage() {
     const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
     const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
     const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
+    const [pickupRecovery, setPickupRecovery] = useState(false);
 
     const router =
         useRouter();
@@ -913,6 +915,7 @@ export default function ReviewPage() {
         setSubmitting(true);
 setOrderError(null);
 setInventoryIssue(null);
+setPickupRecovery(false);
 
 try {
 
@@ -1227,6 +1230,11 @@ try {
         } catch (exception) {
 
             setAcceptedQuote(null);
+            // A slot can cease to fit the cart between the initial preview and reservation.
+            // Offer newly checked times here, while keeping all checkout fields intact.
+            if (exception instanceof Error && /preparation time|ready later|later pickup|pickup time is no longer available/i.test(exception.message)) {
+                setPickupRecovery(true);
+            }
 
             console.error(
                 "Unable to prepare order:",
@@ -2324,7 +2332,7 @@ try {
                                     text-[#241715]
                                 "
                             >
-                                Final amount is verified before payment
+                                No surprises at payment
                             </p>
 
 
@@ -2336,9 +2344,8 @@ try {
                                     text-[#756763]
                                 "
                             >
-                                Product prices, 5% GST, pickup charges and
-                                eligible offers are recalculated by Gokul Sweets.
-                                You&apos;ll see the payable amount before paying.
+                                See item prices, GST, any pickup charge and
+                                your savings together before you pay.
                             </p>
 
                         </div>
@@ -2372,7 +2379,7 @@ try {
                                     text-red-700
                                 "
                             >
-                                Unable to continue
+                                {pickupRecovery ? "Let’s find a better pickup time" : "We couldn’t continue"}
                             </p>
 
 
@@ -2383,13 +2390,20 @@ try {
                                     text-red-600
                                 "
                             >
-                                {orderError}
+                                {pickupRecovery ? "That time no longer gives us enough time to prepare every item. Choose another available time below." : orderError}
                             </p>
 
                         </div>
 
                     )
                 }
+
+                {pickupRecovery && branch && pickupSelection && storefrontFeatures &&
+                    <ReviewPickupRecovery branchId={branch.id} items={items} today={storefrontFeatures.today}
+                        days={storefrontFeatures.futureOrderingDays} rejectedSlotId={pickupSelection.slot.id}
+                        rejectedDate={pickupSelection.date} rejectedTime={pickupSelection.slot.startTime}
+                        onSelected={() => {setOrderError(null); setPickupRecovery(false); setAcceptedQuote(null);
+                            idempotencyKeyRef.current = null;}} />}
 
 
                 {
@@ -2407,7 +2421,7 @@ try {
 
                 {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
                     <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-white p-4" role="status">
-                        <p className="font-bold">Review your server confirmed price</p>
+                        <p className="font-bold">Your price, before offers</p>
                         {acceptedQuote.quote.items.map((line, index) => (
                             <p className="mt-2 text-sm" key={`${line.name}-${index}`}>
                                 {line.name}: ₹{line.total} (unit ₹{line.unitPrice}, tax {line.taxRate}%)
@@ -2415,7 +2429,7 @@ try {
                         ))}
                         <p className="mt-3 text-sm">Items ₹{acceptedQuote.quote.subtotal} · Tax ₹{acceptedQuote.quote.taxAmount} · Pickup charge ₹{acceptedQuote.quote.priorityCharge}</p>
                         <p className="mt-2 font-bold">Total before optional offers ₹{acceptedQuote.quote.totalAmount}</p>
-                        <p className="mt-2 text-xs">This quote expires at {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. After confirmation, the payment page shows your reservation deadline. <Link className="underline" href="/about#cancellation-policy">Review the cancellation policy</Link> before paying.</p>
+                        <p className="mt-2 text-xs">This price is available until {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy">See the cancellation policy</Link> before paying.</p>
                     </div>
                 )}
 
@@ -2466,9 +2480,8 @@ try {
                                             text-[#756763]
                                         "
                                     >
-                                        We&apos;ll reserve your pickup time and confirm
-                                        the latest price. You can find offers or use
-                                        a private code without leaving this page.
+                                        Review your total, then explore any available
+                                        offers before paying.
                                     </p>
 
                                 </div>
@@ -2477,7 +2490,7 @@ try {
                                 <button
                                     type="button"
                                     disabled={
-                                        submitting
+                                        submitting || pickupRecovery
                                     }
                                     onClick={
                                         handlePlaceOrder
