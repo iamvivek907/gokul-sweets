@@ -28,7 +28,7 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.web.environment-cors-enabled", "true")
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(
-            exchange, sessions, features, settings, new WebCorsProperties());
+            exchange, sessions, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings));
 
     @Test
     void disabledFeatureNeverConsultsProviderOrSessions() {

@@ -31,16 +31,17 @@ public class CustomerIdentityController {
     private final EnhancementProperties features;
     private final Environment settings;
     private final WebCorsProperties cors;
+    private final IdentityClientConnection clientConnection;
 
     @PostMapping(value = "/exchange", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> exchange(@RequestBody ExchangeRequest payload,
                                                            HttpServletRequest request) {
         var environment = enabledEnvironment();
-        requireTrustedMutation(request);
+        var sourceAddress = requireTrustedMutation(request);
         if (payload == null || payload.accessToken() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identity proof required");
         }
-        var issued = exchange.exchange(environment, request.getRemoteAddr(), payload.accessToken(), Instant.now());
+        var issued = exchange.exchange(environment, sourceAddress, payload.accessToken(), Instant.now());
         var cookie = ResponseCookie.from(COOKIE, issued.token())
                 .httpOnly(true).secure(true).sameSite("Strict").path("/")
                 .maxAge(Duration.between(Instant.now(), issued.expiresAt())).build();
@@ -83,11 +84,13 @@ public class CustomerIdentityController {
         };
     }
 
-    private void requireTrustedMutation(HttpServletRequest request) {
-        if (!request.isSecure() || !cors.effectiveAllowedOrigins(settings)
+    private String requireTrustedMutation(HttpServletRequest request) {
+        var connection = clientConnection.resolve(request);
+        if (!connection.secure() || !cors.effectiveAllowedOrigins(settings)
                 .contains(request.getHeader(HttpHeaders.ORIGIN))) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
         }
+        return connection.sourceAddress();
     }
 
     private static String cookie(HttpServletRequest request) {

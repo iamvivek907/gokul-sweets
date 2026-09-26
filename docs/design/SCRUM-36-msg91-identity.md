@@ -72,6 +72,19 @@ with no bearer in JSON, and does not attach orders or historic consent. Verify
 trusted proxy TLS forwarding and browser credentials in DEV before turning
 on this flag. The service remains OFF by default.
 
+Behind a reverse proxy, set `GOKUL_IDENTITY_TRUSTED_PROXY_CIDRS` to the narrow
+numeric CIDRs of the proxies directly connected to the API (comma separated).
+The proxy must overwrite incoming `X-Forwarded-For` and `X-Forwarded-Proto`
+and append its observed client IP and transport protocol; block direct access
+to the API except through those proxies. The API walks the address chain from
+the nearest trusted proxy to the first untrusted address for exchange limits,
+and accepts HTTPS only when the nearest trusted proxy reports `https`. Missing
+or invalid forwarding information fails closed. The default empty setting
+ignores forwarding headers entirely and requires direct HTTPS at the API.
+Do not trust a public CIDR or a wildcard range. Verify the exact proxy behavior
+and address ranges in DEV before enabling identity; this configuration alone
+does not complete the pending MSG91 callback and send-limit checks.
+
 The optional profile and checkout entry point loads MSG91's Web SDK only after
 the customer selects SMS verification. It requires the server readiness endpoint
 and build-time `NEXT_PUBLIC_MSG91_WIDGET_ID` plus the browser-scoped
