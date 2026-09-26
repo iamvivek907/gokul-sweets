@@ -96,6 +96,12 @@ function getPaymentStatus(
 }
 
 async function refreshKnownPayment(known: PaymentResponse, resilient: boolean): Promise<PaymentResponse> {
+    // A settled payment has no active checkout to poll. Read the current database
+    // state on a new visit; a late provider callback can still update that state.
+    if (known.paymentStatus !== "PENDING") {
+        const lookup = await getPaymentForOrder(known.orderNumber);
+        return lookup.payment ?? known;
+    }
     if (resilient && known.paymentStatus === "PENDING" &&
         !hasOpenedPaymentGateway(known.orderNumber, known.paymentId)) return known;
     try {
@@ -397,6 +403,7 @@ export default function PaymentPage() {
         );
     const [pollingNotice, setPollingNotice] = useState<string | null>(null);
     const [gatewayOpened, setGatewayOpened] = useState(false);
+    const initializedPaymentRef = useRef<{orderNumber: string; paymentId: number} | null>(null);
     const refreshInFlightRef = useRef(false);
     // A settled response stops any timer callback already queued before React
     // has committed the corresponding status update.
@@ -454,6 +461,9 @@ export default function PaymentPage() {
             (
                 response: PaymentResponse
             ) => {
+                // Storage notifies subscribers synchronously. Mark this payment
+                // before writing so initialization cannot restart on that update.
+                initializedPaymentRef.current = {orderNumber: response.orderNumber, paymentId: response.paymentId};
 
                 const fingerprint =
                     pendingOrder
@@ -667,6 +677,7 @@ export default function PaymentPage() {
             // Wait for the rollout setting before recovering a payment. An initial
             // null must never start the legacy five-second provider polling.
             if (!features && !configurationError) return;
+            if (initializedPaymentRef.current?.orderNumber === orderNumber) return;
 
             let cancelled =
                 false;
