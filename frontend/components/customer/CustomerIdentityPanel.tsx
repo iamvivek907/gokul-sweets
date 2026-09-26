@@ -68,6 +68,9 @@ export default function CustomerIdentityPanel() {
         setBusy(true);
         setError(null);
         try {
+            await apiClient<void>("/api/customer/identity/start", {
+                method: "POST", credentials: "include"
+            });
             const sdk = await loadWidget();
             sdk.initSendOTP?.({
                 widgetId,
@@ -85,7 +88,10 @@ export default function CustomerIdentityPanel() {
                             await apiClient<{authenticated: boolean}>("/api/customer/identity/exchange", {
                                 method: "POST", credentials: "include", body: JSON.stringify({accessToken})
                             });
-                            if (alive.current) setVerified(true);
+                            if (alive.current) {
+                                setVerified(true);
+                                window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+                            }
                         } catch {
                             if (alive.current) setError("Verification could not be completed. Please try again.");
                         } finally {
@@ -107,7 +113,10 @@ export default function CustomerIdentityPanel() {
         setError(null);
         try {
             await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
-            if (alive.current) setVerified(false);
+            if (alive.current) {
+                setVerified(false);
+                window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+            }
         } catch {
             if (alive.current) setError("Could not sign out. Please try again.");
         } finally {

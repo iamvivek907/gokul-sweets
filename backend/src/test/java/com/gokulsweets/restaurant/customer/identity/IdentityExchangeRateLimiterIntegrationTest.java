@@ -59,4 +59,20 @@ class IdentityExchangeRateLimiterIntegrationTest {
             TimeZone.setDefault(originalZone);
         }
     }
+
+    @Test
+    void deviceAndWidgetStartHaveIndependentSharedLimits() {
+        var now = Instant.parse("2026-09-26T18:29:59Z");
+        for (int attempt = 0; attempt < 5; attempt++) {
+            limiter.checkStartSource(ConsentEnvironment.DEV, "192.0.2.99", now);
+            limiter.checkStartDevice(ConsentEnvironment.DEV, "a".repeat(64), now);
+            limiter.checkDevice(ConsentEnvironment.DEV, "a".repeat(64), now);
+        }
+        assertThatThrownBy(() -> limiter.checkStartSource(ConsentEnvironment.DEV, "192.0.2.99", now))
+                .isInstanceOf(IdentityExchangeRateLimiter.Limited.class);
+        assertThatThrownBy(() -> limiter.checkStartDevice(ConsentEnvironment.DEV, "a".repeat(64), now))
+                .isInstanceOf(IdentityExchangeRateLimiter.Limited.class);
+        assertThatThrownBy(() -> limiter.checkDevice(ConsentEnvironment.DEV, "a".repeat(64), now))
+                .isInstanceOf(IdentityExchangeRateLimiter.Limited.class);
+    }
 }

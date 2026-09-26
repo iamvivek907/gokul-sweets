@@ -3,6 +3,9 @@ package com.gokulsweets.restaurant.customer.identity;
 import com.gokulsweets.restaurant.common.security.WebCorsProperties;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
+import com.gokulsweets.restaurant.order.dto.CustomerOrderResponse;
+import com.gokulsweets.restaurant.order.dto.CustomerOrderSummaryResponse;
+import com.gokulsweets.restaurant.order.service.OrderQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.env.Environment;
@@ -19,6 +22,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.List;
+import java.util.UUID;
 
 /** Identity only: no order or historical consent ownership is granted here. */
 @RestController
@@ -26,12 +31,35 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CustomerIdentityController {
     private static final String COOKIE = "__Host-gokul-customer";
+    private static final String DEVICE_COOKIE = "__Host-gokul-device";
     private final VerifiedIdentityExchange exchange;
     private final VerifiedCustomerSessionStore sessions;
     private final EnhancementProperties features;
     private final Environment settings;
     private final WebCorsProperties cors;
     private final IdentityClientConnection clientConnection;
+    private final VerifiedOrderOwnership ownership;
+    private final OrderQueryService orders;
+    private final IdentityExchangeRateLimiter rateLimiter;
+    private final IdentityDeviceRegistry devices;
+
+    /** Called before opening the widget. Source and device limits are shared across instances. */
+    @PostMapping("/start")
+    public ResponseEntity<Void> start(HttpServletRequest request) {
+        var environment = enabledEnvironment();
+        var source = requireTrustedMutation(request);
+        var now = Instant.now();
+        rateLimiter.checkStartSource(environment, source, now);
+        var device = cookie(request, DEVICE_COOKIE);
+        boolean newDevice = !devices.recognized(environment, device, now);
+        if (newDevice) device = devices.issue(environment, now);
+        rateLimiter.checkStartDevice(environment, device, now);
+        var response = ResponseEntity.noContent().cacheControl(CacheControl.noStore());
+        if (newDevice) response.header(HttpHeaders.SET_COOKIE, ResponseCookie.from(DEVICE_COOKIE, device)
+                .httpOnly(true).secure(true).sameSite("Strict").path("/")
+                .maxAge(Duration.ofDays(30)).build().toString());
+        return response.build();
+    }
 
     @PostMapping(value = "/exchange", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> exchange(@RequestBody ExchangeRequest payload,
@@ -41,7 +69,12 @@ public class CustomerIdentityController {
         if (payload == null || payload.accessToken() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Identity proof required");
         }
-        var issued = exchange.exchange(environment, sourceAddress, payload.accessToken(), Instant.now());
+        var device = cookie(request, DEVICE_COOKIE);
+        if (!devices.recognized(environment, device, Instant.now())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        var issued = exchange.exchange(environment, sourceAddress, device,
+                payload.accessToken(), cookie(request), Instant.now());
         var cookie = ResponseCookie.from(COOKIE, issued.token())
                 .httpOnly(true).secure(true).sameSite("Strict").path("/")
                 .maxAge(Duration.between(Instant.now(), issued.expiresAt())).build();
@@ -59,6 +92,36 @@ public class CustomerIdentityController {
                 .body(Map.of("authenticated", authenticated));
     }
 
+    @GetMapping("/orders")
+    public ResponseEntity<List<CustomerOrderSummaryResponse>> orders(HttpServletRequest request) {
+        var environment = enabledEnvironment();
+        var subject = requiredSubject(request, environment);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(orders.getCustomerOrderHistory(ownership.orderNumbers(environment.name(), subject)));
+    }
+
+    @GetMapping("/orders/{orderNumber}")
+    public ResponseEntity<CustomerOrderResponse> order(@PathVariable String orderNumber,
+                                                         HttpServletRequest request) {
+        var environment = enabledEnvironment();
+        var subject = requiredSubject(request, environment);
+        if (!ownership.owns(environment.name(), subject, orderNumber)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(orders.getCustomerOrder(orderNumber));
+    }
+
+    private UUID requiredSubject(HttpServletRequest request, ConsentEnvironment environment) {
+        // An allowed browser Origin prevents unrelated sites reading authenticated data.
+        if (!clientConnection.resolve(request).secure()
+                || !cors.effectiveAllowedOrigins(settings).contains(request.getHeader(HttpHeaders.ORIGIN))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        return sessions.subject(environment, cookie(request), Instant.now())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
         var environment = enabledEnvironment();
@@ -74,7 +137,8 @@ public class CustomerIdentityController {
     private ConsentEnvironment enabledEnvironment() {
         if (!features.isCustomerOtpIdentity()
                 || !settings.getProperty("gokul.environment-isolation.enabled", Boolean.class, false)
-                || !settings.getProperty("gokul.web.environment-cors-enabled", Boolean.class, false)) {
+                || !settings.getProperty("gokul.web.environment-cors-enabled", Boolean.class, false)
+                || !settings.getProperty("gokul.identity.provider-abuse-controls-verified", Boolean.class, false)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }
         return switch (settings.getProperty("gokul.environment-isolation.environment", "")) {
@@ -94,9 +158,13 @@ public class CustomerIdentityController {
     }
 
     private static String cookie(HttpServletRequest request) {
+        return cookie(request, COOKIE);
+    }
+
+    private static String cookie(HttpServletRequest request, String name) {
         if (request.getCookies() == null) return null;
         return Arrays.stream(request.getCookies())
-                .filter(value -> COOKIE.equals(value.getName()))
+                .filter(value -> name.equals(value.getName()))
                 .map(jakarta.servlet.http.Cookie::getValue).findFirst().orElse(null);
     }
 

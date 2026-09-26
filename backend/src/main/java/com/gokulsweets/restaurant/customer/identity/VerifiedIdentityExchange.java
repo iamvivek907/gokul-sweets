@@ -16,13 +16,21 @@ public class VerifiedIdentityExchange {
     private final IdentityExchangeRateLimiter rateLimiter;
 
     public VerifiedCustomerSessionStore.IssuedSession exchange(
-            ConsentEnvironment environment, String sourceAddress, String accessToken, Instant now) {
+            ConsentEnvironment environment, String sourceAddress, String deviceToken,
+            String accessToken, Instant now) {
+        return exchange(environment, sourceAddress, deviceToken, accessToken, null, now);
+    }
+
+    public VerifiedCustomerSessionStore.IssuedSession exchange(
+            ConsentEnvironment environment, String sourceAddress, String deviceToken,
+            String accessToken, String previousSessionToken, Instant now) {
         Objects.requireNonNull(environment);
         Objects.requireNonNull(now);
         rateLimiter.checkSource(environment, sourceAddress, now);
+        rateLimiter.checkDevice(environment, deviceToken, now);
         // Network verification precedes the short database transaction.
         String verifiedPhone = verifier.verifiedPhone(accessToken);
         rateLimiter.checkVerifiedPhone(environment, verifiedPhone, now);
-        return issuance.issue(environment, accessToken, verifiedPhone, now);
+        return issuance.issue(environment, accessToken, verifiedPhone, previousSessionToken, now);
     }
 }

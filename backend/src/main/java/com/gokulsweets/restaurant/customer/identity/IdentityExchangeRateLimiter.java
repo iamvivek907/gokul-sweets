@@ -38,6 +38,27 @@ public class IdentityExchangeRateLimiter {
         check(environment, "PHONE", phone, now, Duration.ofHours(1), 5);
     }
 
+    public void checkStartSource(ConsentEnvironment environment, String sourceAddress, Instant now) {
+        if (sourceAddress == null || !sourceAddress.matches("[0-9a-fA-F:.]{3,45}")) {
+            throw new IllegalArgumentException("A server-observed IP address is required");
+        }
+        check(environment, "START_SOURCE", sourceAddress, now, Duration.ofMinutes(15), 5);
+    }
+
+    public void checkDevice(ConsentEnvironment environment, String deviceToken, Instant now) {
+        if (deviceToken == null || !deviceToken.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("A server-issued device cookie is required");
+        }
+        check(environment, "DEVICE", deviceToken, now, Duration.ofHours(1), 5);
+    }
+
+    public void checkStartDevice(ConsentEnvironment environment, String deviceToken, Instant now) {
+        if (deviceToken == null || !deviceToken.matches("[0-9a-f]{64}")) {
+            throw new IllegalArgumentException("A server-issued device cookie is required");
+        }
+        check(environment, "START_DEVICE", deviceToken, now, Duration.ofHours(1), 5);
+    }
+
     private void check(ConsentEnvironment environment, String scope, String value,
                        Instant now, Duration window, int maximum) {
         Objects.requireNonNull(environment);

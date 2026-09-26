@@ -16,7 +16,7 @@ class VerifiedIdentityExchangeTest {
         var limiter = mock(IdentityExchangeRateLimiter.class);
         when(verifier.verifiedPhone("bad-proof")).thenThrow(new IllegalStateException("provider rejected"));
         var exchange = new VerifiedIdentityExchange(verifier, issuance, limiter);
-        assertThatThrownBy(() -> exchange.exchange(ConsentEnvironment.DEV, "127.0.0.1", "bad-proof", Instant.now()))
+        assertThatThrownBy(() -> exchange.exchange(ConsentEnvironment.DEV, "127.0.0.1", "a".repeat(64), "bad-proof", Instant.now()))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(issuance);
     }
@@ -30,7 +30,7 @@ class VerifiedIdentityExchangeTest {
         doThrow(new IllegalStateException("limited")).when(limiter)
                 .checkSource(ConsentEnvironment.DEV, "127.0.0.1", now);
         var exchange = new VerifiedIdentityExchange(verifier, issuance, limiter);
-        assertThatThrownBy(() -> exchange.exchange(ConsentEnvironment.DEV, "127.0.0.1", "proof", now))
+        assertThatThrownBy(() -> exchange.exchange(ConsentEnvironment.DEV, "127.0.0.1", "a".repeat(64), "proof", now))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(verifier, issuance);
     }

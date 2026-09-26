@@ -34,9 +34,17 @@ export async function createOrder(
                     idempotencyKey
             },
             body: JSON.stringify(request),
+            credentials: "include",
             signal
         }
     );
+}
+
+/** Only the currently verified subject's orders; excludes phone-matched guest history. */
+export function getVerifiedCustomerOrders(signal?: AbortSignal): Promise<CustomerOrderSummaryResponse[]> {
+    return apiClient<CustomerOrderSummaryResponse[]>("/api/customer/identity/orders", {
+        credentials: "include", signal
+    });
 }
 
 

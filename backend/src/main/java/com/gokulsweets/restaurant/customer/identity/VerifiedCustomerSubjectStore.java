@@ -19,6 +19,12 @@ public class VerifiedCustomerSubjectStore {
 
     @Transactional
     public UUID recordVerifiedPhone(ConsentEnvironment environment, String verifiedPhone, Instant now) {
+        return recordVerifiedPhone(environment, verifiedPhone, now, null);
+    }
+
+    @Transactional
+    public UUID recordVerifiedPhone(ConsentEnvironment environment, String verifiedPhone,
+                                    Instant now, UUID previousSessionSubject) {
         Objects.requireNonNull(environment);
         Objects.requireNonNull(now);
         if (verifiedPhone == null || !verifiedPhone.matches("\\+91[6-9][0-9]{9}")) {
@@ -55,6 +61,14 @@ public class VerifiedCustomerSubjectStore {
                         (environment, prior_subject_id, new_subject_id, rotated_at, reason)
                     VALUES (?, ?, ?, ?, 'PHONE_REVERIFICATION')
                     """, environment.name(), prior, current, Timestamp.from(now));
+            // Only possession of both the still-live old session and the newly
+            // verified phone proves continuity. Never carry consent across.
+            if (prior.equals(previousSessionSubject)) {
+                jdbc.update("""
+                        UPDATE verified_order_ownership SET verified_subject_id = ?
+                        WHERE environment = ? AND verified_subject_id = ?
+                        """, current, environment.name(), prior);
+            }
         }
         return current;
     }

@@ -25,6 +25,13 @@ public class VerifiedIdentityIssuance {
     @Transactional
     public VerifiedCustomerSessionStore.IssuedSession issue(
             ConsentEnvironment environment, String accessToken, String verifiedPhone, Instant now) {
+        return issue(environment, accessToken, verifiedPhone, null, now);
+    }
+
+    @Transactional
+    public VerifiedCustomerSessionStore.IssuedSession issue(
+            ConsentEnvironment environment, String accessToken, String verifiedPhone,
+            String previousSessionToken, Instant now) {
         Objects.requireNonNull(environment);
         Objects.requireNonNull(now);
         if (accessToken == null || accessToken.isBlank() || accessToken.length() > 4096) {
@@ -51,7 +58,8 @@ public class VerifiedIdentityIssuance {
         } catch (EmptyResultDataAccessException e) {
             throw new IllegalStateException("Identity proof already used", e);
         }
-        var subject = subjects.recordVerifiedPhone(environment, verifiedPhone, now);
+        var previousSubject = sessions.subject(environment, previousSessionToken, now).orElse(null);
+        var subject = subjects.recordVerifiedPhone(environment, verifiedPhone, now, previousSubject);
         return sessions.issue(environment, subject, now);
     }
 }
