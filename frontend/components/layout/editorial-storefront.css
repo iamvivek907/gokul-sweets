@@ -1,0 +1,35 @@
+/* Warm editorial layer for the arrival and enhanced home only. Ordering and checkout keep their established guards. */
+.editorial-storefront{background:#fffaf4!important;color:#28241f!important}
+.editorial-storefront .page-content{padding:0!important}
+.editorial-storefront:has(.gokul-arrival) .customer-site-header,
+.editorial-storefront:has(.gokul-arrival) .customer-bottom-navigation{display:none}
+.editorial-storefront .customer-site-header{background:#fffaf4f2!important;border-color:#e3d8ca!important;box-shadow:0 8px 25px #4a342111}
+.editorial-storefront .future-brand{color:#703c2a}.editorial-storefront .future-brand small{color:#a55332}
+.editorial-storefront .future-brand-mark{background:linear-gradient(135deg,#cf8b55,#8c503b);color:#fff8ee;border-color:#d29b77;box-shadow:none}
+.editorial-storefront .future-branch-control{background:#fff7ec;border-color:#d8c3ac;box-shadow:none}
+.editorial-storefront .future-branch-name small,.editorial-storefront .future-location-icon{color:#a55332}
+.editorial-storefront .future-branch-name strong{color:#322a23}
+.editorial-storefront .future-branch-control button,.editorial-storefront .future-branch-review{color:#873f2e}
+.editorial-storefront .customer-menu-trigger{background:#f6eadb!important;border-color:#d8c3ac!important;color:#4c332b;box-shadow:none}
+.editorial-storefront .customer-menu-trigger span span{background:#4c332b}
+.editorial-storefront .customer-bottom-navigation{background:#fffaf4f2!important;border-color:#d8c3ac!important;box-shadow:0 10px 32px #3a30241f}
+.editorial-storefront .customer-bottom-navigation a:not([aria-current="page"]) > span:last-child{color:#65594e!important}
+.editorial-storefront .customer-bottom-navigation a[aria-current="page"] > span:last-child{color:#8b432e!important}
+.editorial-storefront .customer-bottom-navigation a:not([aria-current="page"]) svg{stroke:#65594e!important}
+.editorial-storefront .customer-bottom-navigation a[aria-current="page"] svg{stroke:#2d291e!important}
+.editorial-storefront .customer-bottom-navigation a[aria-current="page"] > span:first-child{background:#f4c78b!important;box-shadow:none}
+.editorial-storefront .customer-site-footer{background:#252d25!important;border-color:#252d25!important;color:#f5f1e7;padding:3.5rem clamp(1.25rem,6vw,6rem) 7rem}
+.editorial-storefront .customer-site-footer p{color:#d7d7c9!important}
+.editorial-storefront .gokul-footer-grid{max-width:none;display:grid;grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:2rem;text-align:left}
+.gokul-footer-grid{display:grid;grid-template-columns:2fr repeat(3,minmax(0,1fr));gap:2rem;max-width:1180px;margin:auto;text-align:left}
+.gokul-footer-grid h2{font:500 2rem Georgia,serif;margin:0 0 .7rem}
+.gokul-footer-grid h3{font-size:.7rem;letter-spacing:.18em;margin:0 0 1rem}
+.gokul-footer-grid a,.gokul-footer-grid span{display:block;margin:.75rem 0;font-size:.84rem;line-height:1.5}
+.gokul-footer-bottom{max-width:1180px;margin:2.5rem auto 0;border-top:1px solid #bcb9ac66;padding-top:1.25rem;display:flex;justify-content:space-between;gap:1rem;font-size:.75rem}
+.editorial-storefront .gokul-footer-bottom{max-width:none}
+.editorial-storefront .gokul-editorial-home{max-width:none;padding:1.5rem clamp(1.25rem,4vw,4rem) 3rem;color:#28241f}
+.editorial-storefront .gokul-editorial-home [class*="text-[#241715]"]{color:#28241f!important}
+.editorial-storefront .gokul-editorial-home [class*="text-[#756763]"]{color:#675b51!important}
+.editorial-storefront .gokul-editorial-home [class*="text-[#c88a20]"],.editorial-storefront .gokul-editorial-home [class*="text-[#7a1625]"]{color:#aa5c37!important}
+.editorial-storefront .gokul-editorial-home [class~="bg-white"]{background:#fffaf4!important;border-color:#e4d6c5!important;box-shadow:none}
+@media(max-width:700px){.editorial-storefront .gokul-footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.gokul-footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.gokul-footer-grid>div:first-child{grid-column:1/-1}.gokul-footer-bottom{display:grid}.editorial-storefront .gokul-editorial-home{padding:1rem .85rem 2rem}.editorial-storefront .customer-site-footer{padding-bottom:7rem}}
