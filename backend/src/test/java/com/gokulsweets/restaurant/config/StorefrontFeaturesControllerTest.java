@@ -38,12 +38,14 @@ class StorefrontFeaturesControllerTest {
         properties.setPaidCartRecovery(true);
         properties.setPaymentPollingV2(true);
         properties.setPreHomeIntentGateway(true);
+        properties.setContextualStorefrontV2(true);
         properties.setInPlaceBranchSwitch(true);
         var previewEnabled = new StorefrontFeaturesController(properties, clock).features();
         assertThat(previewEnabled.cartSwitchPreview()).isTrue();
         assertThat(previewEnabled.paidCartRecovery()).isTrue();
         assertThat(previewEnabled.paymentPollingV2()).isTrue();
         assertThat(previewEnabled.preHomeIntentGateway()).isTrue();
+        assertThat(previewEnabled.contextualStorefrontV2()).isTrue();
         assertThat(previewEnabled.inPlaceBranchSwitch()).isTrue();
         assertThat(previewEnabled.smartAvailability()).isFalse();
         properties.setAuthoritativePickupCommitment(true);

@@ -21,6 +21,8 @@ public class EnhancementProperties {
     private boolean homepageCampaigns;
     /** SCRUM-25: show a quick first-visit choice before home; returning visitors continue to home. */
     private boolean preHomeIntentGateway;
+    /** SCRUM-26: clarify branch menu, product units, availability and cart estimates. */
+    private boolean contextualStorefrontV2;
     /** Show the selected pickup branch and slot across the customer ordering journey. */
     private boolean persistentPickupContext;
     /** Require a server-backed cart preview before changing a pickup branch or date. */

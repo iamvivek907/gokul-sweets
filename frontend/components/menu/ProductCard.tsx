@@ -1,12 +1,15 @@
 "use client";
 
 import Image from "next/image";
+import {useState} from "react";
 
 import type { MenuProduct } from "@/types/menu";
 import type { ProductRatingSummary } from "@/types/review";
 
 
 interface ProductCardProps {
+    refined?: boolean;
+    unavailableForPickup?: boolean;
     product: MenuProduct;
     ratingSummary: ProductRatingSummary | null;
     ratingLoading: boolean;
@@ -18,14 +21,14 @@ interface ProductCardProps {
 }
 
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number, exact = false): string {
 
     return new Intl.NumberFormat(
         "en-IN",
         {
             style: "currency",
             currency: "INR",
-            maximumFractionDigits: 0
+            maximumFractionDigits: exact ? 2 : 0
         }
     ).format(amount);
 }
@@ -55,6 +58,8 @@ function formatWeight(
 
 
 export default function ProductCard({
+    refined = false,
+    unavailableForPickup = false,
     product,
     ratingSummary,
     ratingLoading,
@@ -64,6 +69,7 @@ export default function ProductCard({
     onDecrease,
     onAdd
 }: ProductCardProps) {
+    const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
     const isAvailable =
         product.available !== false;
@@ -88,7 +94,7 @@ export default function ProductCard({
 
     return (
         <article
-            className="
+            className={`
                 group
                 flex
                 min-h-32
@@ -104,7 +110,8 @@ export default function ProductCard({
                 hover:shadow-[0_10px_26px_rgba(60,30,20,0.11)]
 
                 sm:flex-col
-            "
+                ${refined ? "sm:rounded-3xl sm:shadow-[0_10px_30px_rgba(60,30,20,0.08)]" : ""}
+            `}
         >
 
             {/* ============================================================ */}
@@ -127,7 +134,7 @@ export default function ProductCard({
             >
 
                 {
-                    product.imageUrl
+                    product.imageUrl && (!refined || failedImageUrl !== product.imageUrl)
                         ? (
                             <Image
                                 src={
@@ -150,6 +157,7 @@ export default function ProductCard({
                                     group-hover:scale-105
                                 "
                                 draggable={false}
+                                onError={refined ? () => setFailedImageUrl(product.imageUrl) : undefined}
                             />
                         )
                         : (
@@ -168,7 +176,7 @@ export default function ProductCard({
 
 
                 {
-                    !isAvailable
+                    (!isAvailable || (refined && unavailableForPickup))
                     && (
                         <div className="
                             absolute
@@ -190,7 +198,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                Unavailable
+                                {isAvailable ? "Try another pickup date" : "Unavailable"}
                             </span>
                         </div>
                     )
@@ -356,7 +364,7 @@ export default function ProductCard({
 
                 {/* Price + Add */}
 
-                <div className="
+                <div className={`
                     product-card-purchase
                     mt-auto
                     flex
@@ -364,7 +372,8 @@ export default function ProductCard({
                     justify-between
                     gap-2
                     pt-2.5
-                ">
+                    ${refined ? "flex-wrap" : ""}
+                `}>
 
                     <span className="
                         text-sm
@@ -375,7 +384,7 @@ export default function ProductCard({
                     ">
                         {
                             formatCurrency(
-                                product.price
+                                product.price, refined
                             )
                         }
 
@@ -395,6 +404,10 @@ export default function ProductCard({
                             )
                         }
                     </span>
+
+                    {refined && isWeighted && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
+                        From {formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} for {formatWeight(product.minimumWeightGrams ?? 250)}
+                    </span>}
 
 
                     <div
@@ -417,7 +430,7 @@ export default function ProductCard({
 
                         <button
                             type="button"
-                            disabled={!isAvailable}
+                            disabled={!isAvailable || unavailableForPickup}
                             tabIndex={
                                 isInCart
                                     ? -1
@@ -538,6 +551,7 @@ export default function ProductCard({
                                                 selectionLabel
                                             }
                                             type="button"
+                                            disabled={unavailableForPickup}
                                             tabIndex={
                                                 isInCart
                                                     ? 0
@@ -609,7 +623,7 @@ export default function ProductCard({
                             <button
                                 type="button"
                                 disabled={
-                                    !isAvailable
+                                    !isAvailable || unavailableForPickup
                                 }
                                 tabIndex={
                                     isInCart

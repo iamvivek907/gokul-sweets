@@ -9,6 +9,7 @@ import type {
 
 
 interface CartItemProps {
+    refined?: boolean;
 
     item:
         CartItemType;
@@ -28,7 +29,7 @@ interface CartItemProps {
 
 
 function formatCurrency(
-    amount: number
+    amount: number, exact = false
 ) {
 
     return new Intl.NumberFormat(
@@ -39,7 +40,7 @@ function formatCurrency(
             currency:
                 "INR",
             maximumFractionDigits:
-                0
+                exact ? 2 : 0
         }
     ).format(
         amount
@@ -73,6 +74,7 @@ function formatWeight(
 
 
 export default function CartItem({
+    refined = false,
     item,
     onIncrease,
     onDecrease,
@@ -264,7 +266,7 @@ export default function CartItem({
                             text-[#756763]
                         "
                     >
-                        {formatCurrency(product.price)} {isWeighted ? "per kg" : "each"}
+                        {formatCurrency(product.price, refined)} {isWeighted ? "per kg" : "each"}
                     </p>
 
                 </div>
@@ -470,7 +472,7 @@ export default function CartItem({
                             text-[#241715]
                         "
                     >
-                        {formatCurrency(itemTotal)}
+                        {formatCurrency(itemTotal, refined)}
                     </p>
 
                 </div>

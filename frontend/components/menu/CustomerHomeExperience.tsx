@@ -105,7 +105,9 @@ function Storefront({features}: {features: StorefrontFeatures}) {
                     <Link href="/menu" className={styles.primary}>Order Now <span aria-hidden="true">&rarr;</span></Link>
                     <Link href={hero?.ctaTarget ?? "/menu"} className={styles.secondary}>{hero?.ctaLabel ?? "Explore Menu"}</Link>
                 </div>
-                <p className={styles.pickupNote}><span aria-hidden="true" /> Pickup at {branch?.name ?? "your chosen branch"} · Order now or plan ahead</p>
+                <p className={styles.pickupNote}><span aria-hidden="true" /> {features.contextualStorefrontV2
+                    ? `Browsing ${branch?.name ?? "your chosen branch"} · Branch prices and pickup choices confirmed before payment`
+                    : `Pickup at ${branch?.name ?? "your chosen branch"} · Order now or plan ahead`}</p>
             </div>
             {hero ? <div className={styles.heroMedia}><CampaignMedia key={`${hero.id}:${hero.updatedAt}`} campaign={hero} hero onUnavailable={() => mediaFailure(hero)} /></div>
                 : heroProduct?.imageUrl ? <div className={styles.heroMedia}>

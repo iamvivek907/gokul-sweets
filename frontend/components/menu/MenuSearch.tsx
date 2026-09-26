@@ -2,6 +2,7 @@
 
 
 interface MenuSearchProps {
+    refined?: boolean;
 
     value: string;
 
@@ -11,6 +12,7 @@ interface MenuSearchProps {
 
 
 export default function MenuSearch({
+    refined = false,
     value,
     onChange
 }: MenuSearchProps) {
@@ -38,7 +40,10 @@ export default function MenuSearch({
             </div>
 
 
+            {refined && <label htmlFor="gokul-menu-search" className="mb-2 block text-sm font-semibold text-[#241715]">Find a favourite</label>}
             <input
+                id={refined ? "gokul-menu-search" : undefined}
+                aria-label={refined ? undefined : "Search the menu"}
                 type="search"
                 value={value}
                 onChange={

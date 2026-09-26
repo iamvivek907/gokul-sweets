@@ -1031,7 +1031,9 @@ export default function MenuScreen() {
                                     text-[#756763]
                                 "
                             >
-                                {pickupCheck.features?.smartAvailability
+                                {pickupCheck.features?.contextualStorefrontV2
+                                    ? `Browsing ${branch.name}. Prices are shown per piece or per kg. Choose a pickup date to preview availability; we confirm the final quote before payment.`
+                                    : pickupCheck.features?.smartAvailability
                                     ? "Choose a pickup date to see what fits, or browse first and decide later."
                                     : "Choose your favourites now. You'll select a convenient pickup time during checkout."}
                             </p>
@@ -1156,6 +1158,7 @@ export default function MenuScreen() {
                 >
 
                     <MenuSearch
+                        refined={pickupCheck.features?.contextualStorefrontV2 === true}
                         value={
                             search
                         }
@@ -1325,6 +1328,7 @@ export default function MenuScreen() {
 
 
                                 <ProductGrid
+                                    refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
                                     pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
                                     dateAware={!!pickupCheck.features?.smartAvailability}
