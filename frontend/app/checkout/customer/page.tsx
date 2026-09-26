@@ -19,6 +19,8 @@ import CheckoutStateCard
 
 import CustomerDetailsForm
     from "@/components/checkout/CustomerDetailsForm";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import {
     useCart
@@ -98,6 +100,7 @@ function formatTime(
 
 
 export default function CustomerPage() {
+    const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
     const router =
         useRouter();
@@ -336,6 +339,7 @@ export default function CustomerPage() {
      */
     return (
         <AppShell>
+            <CheckoutExperienceFrame enabled={checkoutExperienceV2} stage="details" allowBranchChange>
 
             <section
                 className="
@@ -934,6 +938,7 @@ export default function CustomerPage() {
 
             </section>
 
+            </CheckoutExperienceFrame>
         </AppShell>
     );
 }
