@@ -49,11 +49,11 @@ export default function CampaignMedia({campaign, hero = false, accessible = fals
         {!useFallback && campaign.mediaType?.startsWith("video/") ? <video
             src={source} poster={campaign.fallbackMediaUrl ?? undefined} muted loop playsInline autoPlay controls
             preload={hero ? "metadata" : "none"} aria-label={campaign.altText || campaign.title}
-            className={campaign.mobileMediaUrl ? "hidden h-full w-full object-cover md:block" : "h-full w-full object-cover"} onError={fail} />
+            className="h-full w-full object-cover" onError={fail} />
             : <Image src={source} alt={campaign.altText || campaign.title} fill sizes="(max-width: 768px) 100vw, 50vw"
                 loading={hero ? "eager" : "lazy"} unoptimized={campaign.mediaType === "image/gif" && !useFallback}
                 className={campaign.mobileMediaUrl && !useFallback ? "hidden object-cover md:block" : "object-cover"} onError={fail} />}
-        {campaign.mobileMediaUrl && !useFallback && <Image
+        {campaign.mobileMediaUrl && !useFallback && !campaign.mediaType?.startsWith("video/") && <Image
             src={campaign.mobileMediaUrl} alt={campaign.altText || campaign.title} fill sizes="100vw"
             className="object-cover md:hidden" onError={fail} />}
     </div>;

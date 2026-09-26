@@ -12,3 +12,7 @@ The approved Sprint 2 customer visual direction lives in the shared customer she
 - A deliberate rebrand should change this contract and shared components in one reviewed PR. Do not restyle a single story into a separate visual system.
 
 The `frontend/tests/customerThemeContract.test.cjs` regression runs in GitHub Actions. It checks that the shell still owns both navigations, loads the scoped stylesheet, and uses the server's effective feature flags. Visual review is still necessary for new pages; a static check cannot prove every layout is consistent.
+
+## Customer entrance
+
+When the backend enables `preHomeIntentGateway`, `/` opens the editorial entrance on every visit to that route, including for a customer with a saved branch. Direct links to menu, checkout and order status remain direct. The Explore action reveals the storefront for the current mount only. The entrance loads the published HERO campaign, with autoplay only when the browser permits muted inline playback and the customer has not requested reduced motion or data saving. Missing media falls back to the branded background. Branch names and addresses come from the public branch endpoint; ordering still uses the selected branch and its live menu.

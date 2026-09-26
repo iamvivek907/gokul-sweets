@@ -83,3 +83,8 @@ body:has(.future-storefront){background:#151722}
 .menu-availability-chip--checking{border-color:#ac8c80}
 .menu-availability-note{margin-top:.5rem;padding:.7rem .85rem;border-left:3px solid #a55345;border-radius:.7rem;background:#fff2e9;color:#512b2b;font-size:.8rem;line-height:1.45}
 .future-storefront .future-menu-width{max-width:none;width:100%}
+
+/* Editorial entry and footer have their own light surface within the customer shell. */
+.future-storefront .customer-site-footer{background:#f5f8f6!important;border-color:#cbd8d2!important}
+.future-storefront .customer-site-footer p,.future-storefront .customer-site-footer a,.future-storefront .customer-site-footer span,.future-storefront .customer-site-footer h2{color:#173a37!important}
+.future-storefront .customer-site-footer a:hover{text-decoration:underline}
