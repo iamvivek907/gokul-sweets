@@ -16,6 +16,7 @@ export interface StorefrontFeatures {
     acceptedCheckoutQuote: boolean;
     truthfulOrderTracking: boolean;
     paidCartRecovery: boolean;
+    paymentPollingV2: boolean;
     futureOrderingDays: number;
     today: string;
 }

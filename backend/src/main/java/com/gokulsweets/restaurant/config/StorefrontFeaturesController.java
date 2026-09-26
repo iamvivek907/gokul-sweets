@@ -25,6 +25,7 @@ public class StorefrontFeaturesController {
                 properties.isAcceptedCheckoutQuote(),
                 properties.isTruthfulOrderTracking(),
                 properties.isPaidCartRecovery(),
+                properties.isPaymentPollingV2(),
                 properties.getFutureOrderingDays(), LocalDate.now(inventoryClock));
     }
 
@@ -36,5 +37,6 @@ public class StorefrontFeaturesController {
                            boolean acceptedCheckoutQuote,
                            boolean truthfulOrderTracking,
                            boolean paidCartRecovery,
+                           boolean paymentPollingV2,
                            int futureOrderingDays, LocalDate today) {}
 }

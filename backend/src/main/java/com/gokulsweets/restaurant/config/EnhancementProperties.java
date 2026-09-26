@@ -31,6 +31,8 @@ public class EnhancementProperties {
     private boolean acceptedCheckoutQuote;
     /** Reconcile late provider success against the payment and reservation deadlines before fulfilment. */
     private boolean paymentReconciliationV2;
+    /** Bound storefront payment-status polling and pause on provider throttling. */
+    private boolean paymentPollingV2;
     /** Allow authorized branch staff to publish an honest revised readiness estimate. */
     private boolean truthfulOrderTracking;
     /** Remove only the matching pending checkout cart when server payment is PAID. */

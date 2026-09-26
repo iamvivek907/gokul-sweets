@@ -4,6 +4,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState,
     useSyncExternalStore
 } from "react";
@@ -18,6 +19,9 @@ import AppShell
 import ConfirmedPickupContext from "@/components/order/ConfirmedPickupContext";
 import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {usePaymentPolling, type PaymentPollResult} from "@/hooks/usePaymentPolling";
+import {MIN_MANUAL_PAYMENT_CHECK_MS, isTemporaryPaymentFailure} from "@/lib/paymentPolling";
+import {ApiError} from "@/services/apiClient";
 import {reconcilePaidCart} from "@/lib/paidCartRecovery";
 
 import {
@@ -88,6 +92,17 @@ function getPaymentStatus(
     return payment
         ? String(payment.paymentStatus)
         : "";
+}
+
+async function refreshKnownPayment(known: PaymentResponse, resilient: boolean): Promise<PaymentResponse> {
+    try {
+        return mergePaymentResponse(await refreshPayment(known.paymentId), known);
+    } catch (error) {
+        // A temporary provider outage cannot turn a known pending payment into a new attempt.
+        if (resilient && known.paymentStatus === "PENDING" && error instanceof ApiError &&
+            isTemporaryPaymentFailure(error.status)) return known;
+        throw error;
+    }
 }
 
 
@@ -249,7 +264,9 @@ const paymentInitializationPromises =
  */
 
 export default function PaymentPage() {
-    const paidCartRecovery = useStorefrontFeatures()?.paidCartRecovery;
+    const features = useStorefrontFeatures();
+    const paidCartRecovery = features?.paidCartRecovery;
+    const paymentPollingV2 = features?.paymentPollingV2 === true;
 
     const router =
         useRouter();
@@ -375,6 +392,18 @@ export default function PaymentPage() {
         useState<string | null>(
             null
         );
+    const [pollingNotice, setPollingNotice] = useState<string | null>(null);
+    const refreshInFlightRef = useRef(false);
+    const nextAllowedCheckRef = useRef(0);
+    const [paymentClock, setPaymentClock] = useState(0);
+    const activePaymentId = payment?.paymentId;
+    useEffect(() => {
+        if (!paymentPollingV2 || !activePaymentId) return;
+        const tick = () => setPaymentClock(Date.now());
+        tick();
+        const timer = window.setInterval(tick, 15_000);
+        return () => window.clearInterval(timer);
+    }, [paymentPollingV2, activePaymentId]);
 
 
     /*
@@ -658,16 +687,7 @@ export default function PaymentPage() {
                                     orderNumber
                             ) {
 
-                                const refreshed =
-                                    await refreshPayment(
-                                        storedPayment.paymentId
-                                    );
-
-
-                                return mergePaymentResponse(
-                                    refreshed,
-                                    storedPayment
-                                );
+                                return refreshKnownPayment(storedPayment, paymentPollingV2);
                             }
 
 
@@ -716,16 +736,7 @@ export default function PaymentPage() {
                                  * Ask the provider for the current state.
                                  */
 
-                                const refreshed =
-                                    await refreshPayment(
-                                        backendPayment.paymentId
-                                    );
-
-
-                                return mergePaymentResponse(
-                                    refreshed,
-                                    backendPayment
-                                );
+                                return refreshKnownPayment(backendPayment, paymentPollingV2);
                             }
 
 
@@ -1020,6 +1031,7 @@ export default function PaymentPage() {
             applyPaymentResult,
             clearCart,
             paidCartRecovery,
+            paymentPollingV2,
             currentCartFingerprint,
             orderNumber,
             pendingOrder,
@@ -1037,16 +1049,22 @@ export default function PaymentPage() {
 
     const refreshCurrentPayment =
         useCallback(
-            async () => {
+            async (automatic = false): Promise<PaymentPollResult> => {
 
                 if (
-                    refreshing
+                    (paymentPollingV2 ? refreshInFlightRef.current : refreshing)
                     ||
                     !payment
                 ) {
-
-                    return;
+                    return undefined;
                 }
+
+                if (paymentPollingV2 && Date.now() < nextAllowedCheckRef.current) {
+                    if (!automatic) setPollingNotice("We checked recently. Please wait a moment before checking again.");
+                    return {success: false, retryAfterMs: nextAllowedCheckRef.current - Date.now()};
+                }
+
+                refreshInFlightRef.current = true;
 
 
                 setRefreshing(
@@ -1054,9 +1072,7 @@ export default function PaymentPage() {
                 );
 
 
-                setError(
-                    null
-                );
+                if (!automatic || !paymentPollingV2) setError(null);
 
 
                 try {
@@ -1077,6 +1093,11 @@ export default function PaymentPage() {
                     applyPaymentResult(
                         response
                     );
+                    if (paymentPollingV2) {
+                        nextAllowedCheckRef.current = Date.now() + MIN_MANUAL_PAYMENT_CHECK_MS;
+                        setPollingNotice(null);
+                    }
+                    return {success: true};
 
                 } catch (
                     exception
@@ -1088,22 +1109,28 @@ export default function PaymentPage() {
                     );
 
 
-                    setError(
-                        exception instanceof Error
-                            ? exception.message
-                            : "Unable to check payment status."
-                    );
+                    if (paymentPollingV2 && exception instanceof ApiError && isTemporaryPaymentFailure(exception.status)) {
+                        const delay = Math.max(30_000, exception.retryAfterMs ?? 0);
+                        nextAllowedCheckRef.current = Date.now() + delay;
+                        setPollingNotice("We couldn't confirm the latest payment status yet. Your payment may still be processing. We'll check again shortly.");
+                        setError(null);
+                        return {success: false, retryAfterMs: delay};
+                    }
+                    setError(exception instanceof Error ? exception.message : "Unable to check payment status.");
+                    return {success: false, permanent: paymentPollingV2};
 
                 } finally {
 
                     setRefreshing(
                         false
                     );
+                    refreshInFlightRef.current = false;
                 }
             },
             [
                 applyPaymentResult,
                 payment,
+                paymentPollingV2,
                 refreshing
             ]
         );
@@ -1120,6 +1147,11 @@ export default function PaymentPage() {
             payment
         );
 
+    const paymentDeadlineMs = payment ? parseBusinessTimestamp(payment.expiresAt).getTime() : 0;
+    usePaymentPolling(paymentPollingV2, payment?.paymentId, paymentStatus,
+        Number.isFinite(paymentDeadlineMs) ? paymentDeadlineMs : 0,
+        openingPayment, () => refreshCurrentPayment(true));
+
 
     /*
      * =========================================================
@@ -1130,6 +1162,7 @@ export default function PaymentPage() {
     useEffect(
         () => {
 
+            if (paymentPollingV2) return;
             if (
                 paymentStatus !==
                     "PENDING"
@@ -1165,6 +1198,7 @@ export default function PaymentPage() {
         [
             openingPayment,
             payment,
+            paymentPollingV2,
             paymentStatus,
             refreshCurrentPayment
         ]
@@ -1180,6 +1214,7 @@ export default function PaymentPage() {
     useEffect(
         () => {
 
+            if (paymentPollingV2) return;
             if (
                 paymentStatus !==
                     "REFUND_PENDING"
@@ -1209,6 +1244,7 @@ export default function PaymentPage() {
 
         },
         [
+            paymentPollingV2,
             paymentStatus,
             refreshCurrentPayment
         ]
@@ -1636,6 +1672,9 @@ export default function PaymentPage() {
     const isPending =
         status ===
         "PENDING";
+
+    const paymentDeadlineReached = paymentPollingV2 && isPending && paymentClock > 0 &&
+        Number.isFinite(paymentDeadlineMs) && paymentClock >= paymentDeadlineMs;
 
 
     const isFailed =
@@ -2520,8 +2559,8 @@ export default function PaymentPage() {
                                 >
                                     {
                                         phonePeStatusOnly
-                                            ? "We found the payment on the backend and will not create a duplicate payment. The status is checked automatically."
-                                            : "We always verify the payment through the backend. A pending attempt remains active until the provider reports a final result or the backend payment deadline is reached."
+                                            ? "This payment is still being checked. You can safely leave and return to this order."
+                                            : "You can safely leave this page and return later. We'll show your order once the payment is confirmed."
                                     }
                                 </p>
 
@@ -2545,6 +2584,8 @@ export default function PaymentPage() {
                                     refreshing
                                     ||
                                     cartChanged
+                                    ||
+                                    paymentDeadlineReached
                                 }
                                 onClick={
                                     () =>
@@ -2579,6 +2620,17 @@ export default function PaymentPage() {
 
                         )
                     }
+
+                    {paymentPollingV2 && isPending && paymentDeadlineReached &&
+                        <p role="status" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            This payment window has closed. Please check its status before starting a new checkout.
+                            If you paid, it may take a little longer to confirm.
+                        </p>}
+
+                    {paymentPollingV2 && pollingNotice && isPending &&
+                        <p role="status" className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                            {pollingNotice}
+                        </p>}
 
 
                     {
