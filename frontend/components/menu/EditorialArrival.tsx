@@ -74,7 +74,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
     const hero = visibleCampaigns(campaigns, now, branch?.id ?? -1)
         .find(value => value.type === "HERO" && !failed.includes(value.id));
 
-    return <div className={styles.arrival}>
+    return <div className={`gokul-arrival ${styles.arrival}`}>
         <section className={styles.hero} aria-labelledby="gokul-arrival-title">
             {hero && <div className={styles.media}><CampaignMedia
                 campaign={hero} hero immersive accessible={accessible}
