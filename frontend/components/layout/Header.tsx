@@ -1,9 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import MobileMenu
     from "@/components/layout/MobileMenu";
 import BranchSelector from "@/components/branch/BranchSelector";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
+import {useCart} from "@/hooks/useCart";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 
@@ -11,6 +13,7 @@ export default function Header() {
     const features = useStorefrontFeatures();
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
     const {branch} = useSelectedBranch();
+    const cart = useCart();
 
     return (
         <header
@@ -85,7 +88,9 @@ export default function Header() {
                 {futuristic && <div className="future-branch-control">
                     <span aria-hidden="true" className="future-location-icon">⌖</span>
                     <span className="future-branch-name"><small>PICKUP FROM</small><strong>{branch?.name ?? "Choose a shop"}</strong></span>
-                    <BranchSelector compact />
+                    {features?.cartSwitchPreview || cart.isEmpty
+                        ? <BranchSelector compact />
+                        : <Link href="/cart" className="future-branch-review">Review branch</Link>}
                 </div>}
 
                 <MobileMenu />
