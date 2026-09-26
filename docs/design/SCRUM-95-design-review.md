@@ -1,6 +1,6 @@
 # SCRUM-95 · Pickup and checkout owner review
 
-Open [the connected prototype](./scrum-95-checkout-prototype.html). Switch between a 400 px phone and desktop; use the regular, slot conflict and payment return scenarios. This is an interactive design example, not a checkout connected to the backend or PhonePe. Item prices and GST shown in it are illustrative.
+Open [the connected prototype](../../frontend/public/design/scrum-95-checkout-prototype.html). On the PR preview deployment, open `/design/scrum-95-checkout-prototype.html` for an interactive walkthrough. Switch between a 400 px phone and desktop; use the regular, slot conflict and payment return scenarios. This is an interactive design example, not a checkout connected to the backend or PhonePe. Item prices and GST shown in it are illustrative.
 
 ## Decisions to approve or correct
 
@@ -34,3 +34,7 @@ These are *design targets*. The acceptance test should count actual taps from th
 4. Verify DEV in both flag states on phone, desktop, 200% zoom and keyboard, including expired slot, branch inventory conflict, stale quote, slow/offline request, closed browser and payment return.
 
 This story asks for owner review **before implementation**. SCRUM-24 visual direction still awaits owner approval; do not treat this prototype as approval or mark SCRUM-95 Done.
+
+## Owner review gate
+
+Please review the prototype on the PR preview at `/design/scrum-95-checkout-prototype.html` and record approval or corrections for: shop and pickup change, conflict recovery, order/tax hierarchy, offer placement, cancellation wording, and ambiguous payment return. The example date is 26 Sep 2026 IST; no live availability, stock, reservation, quote, order, payment, or customer data is used. The prototype includes a demonstration of a conflict and payment return, but the sold-out, expired quote, offline, saved pending order, and real provider cases require implementation and DEV QA after approval. SCRUM-24 brand approval is still pending.
