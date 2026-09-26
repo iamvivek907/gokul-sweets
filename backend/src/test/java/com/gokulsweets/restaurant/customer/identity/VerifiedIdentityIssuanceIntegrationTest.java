@@ -14,7 +14,7 @@ import java.time.Instant;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-@SpringBootTest
+@SpringBootTest(properties = "gokul.identity.phone-only-order-recovery=true")
 @Transactional
 class VerifiedIdentityIssuanceIntegrationTest {
     @Autowired VerifiedIdentityIssuance issuance;
@@ -72,7 +72,7 @@ class VerifiedIdentityIssuanceIntegrationTest {
     }
 
     @Test
-    void oldSessionAndNewOtpCarryOrdersButPhoneOnlyCannot() {
+    void phoneOtpAloneRecoversVerifiedOrdersAcrossDevicesAndAuditsEachTransfer() {
         var now = Instant.now();
         var phone = "+919876543210";
         var first = issuance.issue(ConsentEnvironment.DEV, "first-" + java.util.UUID.randomUUID(), phone, now);
@@ -95,15 +95,22 @@ class VerifiedIdentityIssuanceIntegrationTest {
                 INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id)
                 VALUES (?, 'DEV', ?)
                 """, order, oldSubject);
+        var guestOrder = jdbc.queryForObject("""
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name,
+                    customer_phone, pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Guest Customer', '9876543210', 'NORMAL', 'PENDING_PAYMENT', CURRENT_TIMESTAMP)
+                RETURNING id
+                """, Long.class, orderNumber + "-GUEST", branch, slot);
 
         var continued = issuance.issue(ConsentEnvironment.DEV, "continued-" + java.util.UUID.randomUUID(),
-                phone, first.token(), now.plusSeconds(1));
+                phone, now.plusSeconds(1));
         var continuedSubject = sessions.subject(ConsentEnvironment.DEV, continued.token(), now.plusSeconds(1))
                 .orElseThrow();
         assertThat(continuedSubject).isNotEqualTo(oldSubject);
         assertThat(jdbc.queryForObject("""
                 SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
                 """, java.util.UUID.class, order)).isEqualTo(continuedSubject);
+        assertThat(sessions.subject(ConsentEnvironment.DEV, first.token(), now.plusSeconds(1))).isEmpty();
 
         var newHolder = issuance.issue(ConsentEnvironment.DEV, "new-holder-" + java.util.UUID.randomUUID(),
                 phone, now.plusSeconds(2));
@@ -112,6 +119,17 @@ class VerifiedIdentityIssuanceIntegrationTest {
         assertThat(newSubject).isNotEqualTo(continuedSubject);
         assertThat(jdbc.queryForObject("""
                 SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
-                """, java.util.UUID.class, order)).isEqualTo(continuedSubject);
+                """, java.util.UUID.class, order)).isEqualTo(newSubject);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM verified_order_transfer_audit
+                WHERE environment = 'DEV' AND order_id = ?
+                """, Integer.class, order)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM verified_order_ownership WHERE order_id = ?
+                """, Integer.class, guestOrder)).isZero();
+        assertThat(jdbc.queryForObject("""
+                SELECT sum(transferred_order_count) FROM verified_subject_rotations
+                WHERE environment = 'DEV' AND new_subject_id IN (?, ?)
+                """, Long.class, continuedSubject, newSubject)).isEqualTo(2L);
     }
 }

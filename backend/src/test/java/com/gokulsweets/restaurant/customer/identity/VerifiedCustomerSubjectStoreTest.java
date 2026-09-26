@@ -10,7 +10,8 @@ import static org.mockito.Mockito.*;
 
 class VerifiedCustomerSubjectStoreTest {
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final VerifiedCustomerSubjectStore store = new VerifiedCustomerSubjectStore(jdbc);
+    private final VerifiedCustomerSubjectStore store = new VerifiedCustomerSubjectStore(jdbc,
+            new org.springframework.mock.env.MockEnvironment());
 
     @Test
     void rejectsUnverifiedPhoneShapesWithoutDatabaseWrites() {
