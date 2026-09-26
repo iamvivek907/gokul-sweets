@@ -26,6 +26,18 @@ class StorefrontFeaturesControllerTest {
     }
 
     @Test
+    void futuristicStorefrontIsOffByDefaultAndIndependentOfCheckout() {
+        var properties = new EnhancementProperties();
+        var controller = new StorefrontFeaturesController(properties, clock);
+        assertThat(controller.features().futuristicStorefrontV2()).isFalse();
+        properties.setFuturisticStorefrontV2(true);
+        assertThat(controller.features().futuristicStorefrontV2()).isTrue();
+        assertThat(controller.features().checkoutExperienceV2()).isFalse();
+        properties.setFuturisticStorefrontV2(false);
+        assertThat(controller.features().futuristicStorefrontV2()).isFalse();
+    }
+
+    @Test
     void checkoutExperienceRequiresAllCommitmentAndPaymentSafeguards() {
         var properties = new EnhancementProperties();
         properties.setCheckoutExperienceV2(true);
