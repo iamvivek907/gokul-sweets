@@ -30,3 +30,10 @@ MSG91's exact live response shape must be checked with a DEV account before
 activation; an unrecognised response fails closed. The widget token intended
 for the browser and the server authkey are different credentials. No browser
 widget, login endpoint or bearer session cookie is exposed by this checkpoint.
+
+V57 adds an environment-scoped verified phone registry. The internal
+`VerifiedCustomerSubjectStore` atomically creates or retrieves the subject after
+server-side proof verification and rejects malformed phones. The registry does
+not grant access to older orders or consent: recycled numbers require an
+explicit recovery and reassignment policy before any customer-facing identity
+flow is enabled. Protect the registry as personal data under retention rules.
