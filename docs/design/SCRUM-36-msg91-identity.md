@@ -63,6 +63,16 @@ with no bearer in JSON, and does not attach orders or historic consent. Verify
 trusted proxy TLS forwarding and browser credentials in DEV before turning
 on this flag. The service remains OFF by default.
 
+The optional profile and checkout entry point loads MSG91's Web SDK only after
+the customer selects SMS verification. It requires the server readiness endpoint
+and build-time `NEXT_PUBLIC_MSG91_WIDGET_ID` plus the browser-scoped
+`NEXT_PUBLIC_MSG91_WIDGET_TOKEN`; never place `GOKUL_MSG91_SERVER_AUTHKEY` in
+the frontend. The widget proof is sent with credentials to the backend exchange
+and is never persisted in browser storage. Guest pickup remains available.
+Verify the widget callback's exact proof shape and mobile behavior against a
+DEV MSG91 account before enabling this flow. Provider send/resend limits and
+phone reassignment controls remain mandatory for release.
+
 Identity expiry, proof claims and rate-limit windows use UTC `Instant` values
 and PostgreSQL `TIMESTAMP WITH TIME ZONE`; no server-local date is used for
 authorization. A seven-day session remains valid across IST midnight and

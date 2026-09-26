@@ -3,6 +3,7 @@ import AppShell
 
 import InstallAppBanner
     from "@/components/pwa/InstallAppBanner";
+import CustomerIdentityPanel from "@/components/customer/CustomerIdentityPanel";
 
 export default function ProfilePage() {
 
@@ -39,6 +40,7 @@ export default function ProfilePage() {
                 </h1>
 
                 <InstallAppBanner />
+                <CustomerIdentityPanel />
 
             </div>
 
