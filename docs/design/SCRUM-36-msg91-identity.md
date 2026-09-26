@@ -55,3 +55,12 @@ keep IP and phone values out of this table. Set a dedicated 32+ character
 configuration fails closed. Expired windows are purged hourly. A future HTTP
 controller must pass a trusted server-derived source address, never a raw
 browser header, and add device and provider-send limits before activation.
+
+The customer identity controller now offers exchange, session status and
+logout only when the OTP flag, environment isolation and strict environment
+CORS switches are all ON. Mutating requests require HTTPS and the exact
+configured storefront Origin; it uses the server-observed remote address for
+limits. The response sets a Secure, HttpOnly, SameSite=Strict host-only cookie,
+with no bearer in JSON, and does not attach orders or historic consent. Verify
+trusted proxy TLS forwarding and browser credentials in DEV before turning
+on this flag. The service remains OFF by default.
