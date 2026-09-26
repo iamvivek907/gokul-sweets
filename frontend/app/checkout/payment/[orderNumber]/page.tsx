@@ -1173,7 +1173,8 @@ export default function PaymentPage() {
     const paymentDeadlineMs = payment ? parseBusinessTimestamp(payment.expiresAt).getTime() : 0;
     usePaymentPolling(paymentPollingV2 && gatewayOpened, payment?.paymentId, paymentStatus,
         Number.isFinite(paymentDeadlineMs) ? paymentDeadlineMs : 0,
-        openingPayment, () => refreshCurrentPayment(true));
+        openingPayment, () => refreshCurrentPayment(true),
+        () => setPollingNotice("Automatic status checks are paused after repeated connection errors. You can check again using the button below."));
 
 
     /*
