@@ -75,3 +75,11 @@ body:has(.future-storefront){background:#151722}
 .future-storefront .menu-availability-chip--checking{border-color:#d5b8c5;color:#fff5eb}
 .future-storefront .menu-availability-note{margin-top:.5rem;padding:.7rem .85rem;border-left:3px solid #f6b4a8;border-radius:.7rem;background:#4c2e3d;color:#fff2e8;font-size:.8rem;line-height:1.45}
 @media(max-width:600px){.future-storefront .page-content{padding-inline:.75rem}.future-storefront .customer-site-header > div{padding-inline:.75rem}.future-storefront .menu-availability-chip{top:.55rem;right:.55rem}}
+
+/* The legacy flag-OFF menu keeps a readable availability treatment too. */
+.menu-availability-chip{position:absolute;z-index:2;top:.75rem;right:.75rem;display:inline-flex;align-items:center;gap:.4rem;max-width:calc(100% - 1.5rem);padding:.45rem .7rem;border:1px solid #9a603f;border-radius:999px;background:#fff8edee;color:#4a2932;font-size:.72rem;font-weight:700;line-height:1.2;box-shadow:0 5px 18px #24171533;pointer-events:none}
+.menu-availability-chip > span{display:grid;place-items:center;width:1rem;height:1rem;flex:none;border-radius:50%;background:#6b3944;color:white;font-size:.65rem}
+.menu-availability-chip--unavailable{border-color:#9d4a40;background:#fff1e9f2;color:#6b2526}
+.menu-availability-chip--checking{border-color:#ac8c80}
+.menu-availability-note{margin-top:.5rem;padding:.7rem .85rem;border-left:3px solid #a55345;border-radius:.7rem;background:#fff2e9;color:#512b2b;font-size:.8rem;line-height:1.45}
+.future-storefront .future-menu-width{max-width:none;width:100%}
