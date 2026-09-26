@@ -29,9 +29,10 @@ public class CampaignController {
     }
 
     @PostMapping("/api/admin/homepage-campaigns/{id}/publications/{revision}/restore")
-    public HomepageCampaign restore(@PathVariable Long id, @PathVariable Long revision) {
+    public HomepageCampaign restore(@PathVariable Long id, @PathVariable Long revision,
+            @RequestHeader(value = "If-Match", required = false) Long expectedVersion) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.rollback(id, revision);
+        return service.rollback(id, revision, expectedVersion);
     }
 
     @GetMapping("/api/admin/homepage-campaigns")
@@ -48,35 +49,40 @@ public class CampaignController {
     }
 
     @PutMapping("/api/admin/homepage-campaigns/{id}")
-    public HomepageCampaign update(@PathVariable Long id, @Valid @RequestBody CampaignRequest request) {
+    public HomepageCampaign update(@PathVariable Long id, @Valid @RequestBody CampaignRequest request,
+            @RequestHeader(value = "If-Match", required = false) Long expectedVersion) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.save(id, request);
+        return service.save(id, request, expectedVersion);
     }
 
     @PostMapping(value = "/api/admin/homepage-campaigns/{id}/media", consumes = "multipart/form-data")
     public HomepageCampaign upload(@PathVariable Long id, @RequestParam MultipartFile file,
                                    @RequestParam(defaultValue = "false") boolean fallback,
-                                   @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId) {
+                                   @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId,
+                                   @RequestHeader(value = "If-Match", required = false) Long expectedVersion) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.upload(id, file, fallback, requestId);
+        return service.upload(id, file, fallback, requestId, expectedVersion);
     }
 
     @PostMapping(value = "/api/admin/homepage-campaigns/{id}/mobile-media", consumes = "multipart/form-data")
     public HomepageCampaign uploadMobile(@PathVariable Long id, @RequestParam MultipartFile file,
-                @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId) {
+                @RequestHeader(value = "Idempotency-Key", required = false) java.util.UUID requestId,
+                @RequestHeader(value = "If-Match", required = false) Long expectedVersion) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.uploadMobile(id, file, requestId);
+        return service.uploadMobile(id, file, requestId, expectedVersion);
     }
 
     @DeleteMapping("/api/admin/homepage-campaigns/{id}/mobile-media")
-    public HomepageCampaign removeMobile(@PathVariable Long id) {
+    public HomepageCampaign removeMobile(@PathVariable Long id,
+            @RequestHeader(value = "If-Match", required = false) Long expectedVersion) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.removeMobile(id);
+        return service.removeMobile(id, expectedVersion);
     }
 
     @DeleteMapping("/api/admin/homepage-campaigns/{id}/media")
-    public HomepageCampaign remove(@PathVariable Long id, @RequestParam(defaultValue = "false") boolean fallback) {
+    public HomepageCampaign remove(@PathVariable Long id, @RequestParam(defaultValue = "false") boolean fallback,
+            @RequestHeader(value = "If-Match", required = false) Long expectedVersion) {
         authorization.requirePermission(PermissionName.MENU_MANAGE);
-        return service.removeMedia(id, fallback);
+        return service.removeMedia(id, fallback, expectedVersion);
     }
 }

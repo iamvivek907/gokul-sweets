@@ -10,6 +10,7 @@ export interface HomepageCampaign {
     altText?: string | null;
     branchId?: number | null;
     publishedRevision?: number | null;
+    editVersion?: number;
     ctaLabel: string | null;
     ctaTarget: string | null;
     startAt: string | null;

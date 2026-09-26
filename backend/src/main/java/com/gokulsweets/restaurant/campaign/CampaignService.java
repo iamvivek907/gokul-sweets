@@ -9,6 +9,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
@@ -88,9 +90,23 @@ public class CampaignService {
             campaign = repository.saveAndFlush(campaign);
             var publication = publications.saveAndFlush(CampaignPublication.from(campaign, inventoryClock.instant()));
             campaign.setPublishedRevision(publication.getId());
-            return repository.save(campaign);
+            return repository.saveAndFlush(campaign);
         }
-        return repository.save(campaign);
+        return features.isControlledCampaignPublishing() ? repository.saveAndFlush(campaign) : repository.save(campaign);
+    }
+
+    @Transactional
+    public HomepageCampaign save(Long id, CampaignRequest request, Long expectedVersion) {
+        if (features.isControlledCampaignPublishing()) checkVersion(id, expectedVersion);
+        return save(id, request);
+    }
+
+    private void checkVersion(Long id, Long expected) {
+        var current = require(id);
+        if (expected == null || expected != current.getEditVersion()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Campaign changed in another editor. Reload the draft before saving.");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -107,7 +123,13 @@ public class CampaignService {
         var previous = publications.findById(revision).orElseThrow(() -> new IllegalArgumentException("Revision not found."));
         if (!previous.getCampaignId().equals(id)) throw new IllegalArgumentException("Revision belongs to another campaign.");
         campaign.setPublishedRevision(revision);
-        return repository.save(campaign);
+        return repository.saveAndFlush(campaign);
+    }
+
+    @Transactional
+    public HomepageCampaign rollback(Long id, Long revision, Long expectedVersion) {
+        if (features.isControlledCampaignPublishing()) checkVersion(id, expectedVersion);
+        return rollback(id, revision);
     }
 
     @Transactional
@@ -148,7 +170,13 @@ public class CampaignService {
         }
         validateActiveMedia(campaign);
         if (requestId != null) repository.recordMediaRequest(id, fallback, requestId, requestHash);
-        return repository.save(campaign);
+        return features.isControlledCampaignPublishing() ? repository.saveAndFlush(campaign) : repository.save(campaign);
+    }
+
+    @Transactional
+    public HomepageCampaign upload(Long id, MultipartFile file, boolean fallback, UUID requestId, Long expectedVersion) {
+        if (features.isControlledCampaignPublishing()) checkVersion(id, expectedVersion);
+        return upload(id, file, fallback, requestId);
     }
 
     @Transactional
@@ -166,7 +194,13 @@ public class CampaignService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCommit() { if (!features.isControlledCampaignPublishing() && campaign.getPublishedRevision() == null) cleanup(oldUrl); }
         });
-        return repository.save(campaign);
+        return features.isControlledCampaignPublishing() ? repository.saveAndFlush(campaign) : repository.save(campaign);
+    }
+
+    @Transactional
+    public HomepageCampaign removeMedia(Long id, boolean fallback, Long expectedVersion) {
+        if (features.isControlledCampaignPublishing()) checkVersion(id, expectedVersion);
+        return removeMedia(id, fallback);
     }
 
     @Transactional
@@ -198,7 +232,13 @@ public class CampaignService {
         });
         campaign.setMobileMediaUrl(media.url()); campaign.setMobileRequestId(requestId);
         if (requestId != null) repository.recordMobileRequest(id, requestId, requestHash);
-        return repository.save(campaign);
+        return repository.saveAndFlush(campaign);
+    }
+
+    @Transactional
+    public HomepageCampaign uploadMobile(Long id, MultipartFile file, UUID requestId, Long expectedVersion) {
+        checkVersion(id, expectedVersion);
+        return uploadMobile(id, file, requestId);
     }
 
     @Transactional
@@ -212,7 +252,13 @@ public class CampaignService {
                 @Override public void afterCommit() { cleanup(oldUrl); }
             });
         }
-        return repository.save(campaign);
+        return repository.saveAndFlush(campaign);
+    }
+
+    @Transactional
+    public HomepageCampaign removeMobile(Long id, Long expectedVersion) {
+        checkVersion(id, expectedVersion);
+        return removeMobile(id);
     }
 
     private void cleanup(String url) {

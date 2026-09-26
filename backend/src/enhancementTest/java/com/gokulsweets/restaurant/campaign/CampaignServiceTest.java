@@ -152,6 +152,21 @@ class CampaignServiceTest {
         assertThat(draft.getPublishedRevision()).isEqualTo(41L);
     }
 
+    @Test void staleEditorCannotOverwriteDraftOrRestorePublication() {
+        flags.setControlledCampaignPublishing(true);
+        var draft = campaign(); draft.setEditVersion(8);
+        when(repository.findForUpdate(1L)).thenReturn(Optional.of(draft));
+        var newDraft = new CampaignRequest("HERO", "Stale", null, null, null, null, null, false, 0, "Sweets", null);
+        assertThatThrownBy(() -> service.save(1L, newDraft, 7L))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                .hasMessageContaining("409 CONFLICT");
+        assertThatThrownBy(() -> service.rollback(1L, 42L, null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
+        verifyNoInteractions(publications);
+    }
+
     private HomepageCampaign campaign() {
         var c = new HomepageCampaign(); c.setId(1L); c.setTitle("Test"); c.setActive(true); c.setMediaUrl("old"); c.setMediaType("image/png");
         return c;

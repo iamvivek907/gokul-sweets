@@ -3,6 +3,7 @@ ALTER TABLE homepage_campaigns ADD COLUMN branch_id BIGINT REFERENCES branches(i
 ALTER TABLE homepage_campaigns ADD COLUMN mobile_media_url VARCHAR(1000);
 ALTER TABLE homepage_campaigns ADD COLUMN mobile_request_id UUID;
 ALTER TABLE homepage_campaigns ADD COLUMN published_revision BIGINT;
+ALTER TABLE homepage_campaigns ADD COLUMN edit_version BIGINT NOT NULL DEFAULT 0;
 
 -- Publication snapshots make a multi-step draft upload invisible until publish.
 -- Historical R2 URLs are kept so a previous publication can be restored.

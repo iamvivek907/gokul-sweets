@@ -33,6 +33,7 @@ public class HomepageCampaign {
     private String mobileMediaUrl;
     @JsonIgnore private UUID mobileRequestId;
     private Long publishedRevision;
+    @Version private long editVersion;
     @Column(length = 60)
     private String ctaLabel;
     @Column(length = 240)

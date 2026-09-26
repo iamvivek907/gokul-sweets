@@ -44,6 +44,7 @@ export default function HomepageCampaignsPage() {
     const uploadKeys = useRef(new WeakMap<File, string>());
     const uploaded = useRef<{main: File | null; fallback: File | null; mobile: File | null}>({main: null, fallback: null, mobile: null});
     const selected = campaigns.find(campaign => campaign.id === editing);
+    const versionHeaders = (): Record<string, string> => controlled ? {"If-Match": String(persisted.current?.editVersion ?? 0)} : {};
 
     useEffect(() => {
         if (!authorization || !allowed) return;
@@ -108,7 +109,8 @@ export default function HomepageCampaignsPage() {
             const id = persisted.current?.id;
             creationKey.current ??= crypto.randomUUID();
             retain(await adminManagementApi<HomepageCampaign>(id ? `${path}/${id}` : path, authorization, {
-                method: id ? "PUT" : "POST", headers: {"Content-Type": "application/json", "Idempotency-Key": creationKey.current}, body: JSON.stringify(metadata)
+                method: id ? "PUT" : "POST", headers: {"Content-Type": "application/json", "Idempotency-Key": creationKey.current,
+                    ...(id ? versionHeaders() : {})}, body: JSON.stringify(metadata)
             }));
             // A successful step is retained immediately: retrying publication must not upload it again.
             for (const fallback of [true, false]) {
@@ -119,7 +121,7 @@ export default function HomepageCampaignsPage() {
                 const body = new FormData(); body.append("file", file);
                 if (!uploadKeys.current.has(file)) uploadKeys.current.set(file, crypto.randomUUID());
                 retain(await adminManagementApi<HomepageCampaign>(`${path}/${persisted.current!.id}/media?fallback=${fallback}`,
-                    authorization, {method: "POST", body, headers: {"Idempotency-Key": uploadKeys.current.get(file)!}}));
+                    authorization, {method: "POST", body, headers: {"Idempotency-Key": uploadKeys.current.get(file)!, ...versionHeaders()}}));
                 uploaded.current[key] = file;
             }
             if (controlled && mobileFile && uploaded.current.mobile !== mobileFile) {
@@ -127,13 +129,13 @@ export default function HomepageCampaignsPage() {
                 const body = new FormData(); body.append("file", mobileFile);
                 if (!uploadKeys.current.has(mobileFile)) uploadKeys.current.set(mobileFile, crypto.randomUUID());
                 retain(await adminManagementApi<HomepageCampaign>(`${path}/${persisted.current!.id}/mobile-media`, authorization,
-                    {method: "POST", body, headers: {"Idempotency-Key": uploadKeys.current.get(mobileFile)!}}));
+                    {method: "POST", body, headers: {"Idempotency-Key": uploadKeys.current.get(mobileFile)!, ...versionHeaders()}}));
                 uploaded.current.mobile = mobileFile;
             }
             if (publish) {
                 setMessage("Publishing campaign...");
                 retain(await adminManagementApi<HomepageCampaign>(`${path}/${persisted.current!.id}`, authorization, {
-                    method: "PUT", headers: {"Content-Type": "application/json"}, body: JSON.stringify({...metadata, active: true})
+                    method: "PUT", headers: {"Content-Type": "application/json", ...versionHeaders()}, body: JSON.stringify({...metadata, active: true})
                 }));
             }
             setForm(current => ({...current, active: publish}));
@@ -151,7 +153,7 @@ export default function HomepageCampaignsPage() {
         inFlight.current = true; setBusy(true); setError(""); setMessage("");
         try {
             const campaign = await adminManagementApi<HomepageCampaign>(`${path}/${editing}/publications/${revision}/restore`,
-                authorization, {method: "POST"});
+                authorization, {method: "POST", headers: versionHeaders()});
             accept(campaign); persisted.current = campaign;
             setMessage("Earlier publication restored. Your current draft remains available for editing.");
         } catch (error) {setError(error instanceof Error ? error.message : "Could not restore this publication.");}
@@ -162,7 +164,7 @@ export default function HomepageCampaignsPage() {
         if (!controlled || !authorization || !editing || inFlight.current) return;
         inFlight.current = true; setBusy(true); setError("");
         try {
-            const campaign = await adminManagementApi<HomepageCampaign>(`${path}/${editing}/mobile-media`, authorization, {method: "DELETE"});
+            const campaign = await adminManagementApi<HomepageCampaign>(`${path}/${editing}/mobile-media`, authorization, {method: "DELETE", headers: versionHeaders()});
             accept(campaign); persisted.current = campaign; setMobileFile(null); uploaded.current.mobile = null;
             setMessage("Mobile draft image removed. Any published version stays available until you publish again.");
         } catch (error) {setError(error instanceof Error ? error.message : "Could not remove the mobile image.");}
@@ -180,11 +182,11 @@ export default function HomepageCampaignsPage() {
             const body = new FormData();
             if (file) body.append("file", file);
             const campaign = await adminManagementApi<HomepageCampaign>(`${path}/${editing}/media?fallback=${fallback}`, authorization,
-                remove ? {method: "DELETE"} : {method: "POST", body});
+                remove ? {method: "DELETE", headers: versionHeaders()} : {method: "POST", body, headers: versionHeaders()});
             accept(campaign); persisted.current = campaign; setForm(current => ({...current, active: campaign.active}));
             if (fallback) {setFallbackFile(null); uploaded.current.fallback = null;}
             else {setMainFile(null); uploaded.current.main = null;}
-            setMessage(remove ? "Media removed. A campaign without required media is deactivated." : "Media uploaded. Save any other form changes separately.");
+            setMessage(remove ? (controlled ? "Draft media removed. The last published version stays live." : "Media removed. A campaign without required media is deactivated.") : "Media uploaded. Save any other form changes separately.");
         } catch (error) {setError(error instanceof Error ? error.message : "Unable to update campaign media.");}
         finally {inFlight.current = false; setBusy(false);}
     }
