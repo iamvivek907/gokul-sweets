@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
 import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import type {StorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -112,6 +113,7 @@ export default function SmartPickupSelection({features, onFallback}: {
     }
 
     return <AppShell showSocialPopup={false}>
+        <CheckoutExperienceFrame enabled={features.checkoutExperienceV2 === true} stage="pickup" allowBranchChange>
         {proposedDate && branch && <CartSwitchDialog branchId={branch.id} branchName={branch.name}
             date={proposedDate} items={cart.items} onKeep={() => setProposedDate(null)}
             onSwitch={(preview: CartSwitchPreview) => {
@@ -206,5 +208,6 @@ export default function SmartPickupSelection({features, onFallback}: {
                     </button>
                 </div>
             </>}
+        </CheckoutExperienceFrame>
     </AppShell>;
 }
