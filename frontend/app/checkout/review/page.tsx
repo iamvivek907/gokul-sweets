@@ -18,6 +18,7 @@ import AppShell
     from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
 import ReviewPickupRecovery from "@/components/checkout/ReviewPickupRecovery";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
 import {parseBusinessTimestamp} from "@/lib/businessTime";
 import {pendingCheckoutAction} from "@/lib/checkoutQuoteContext";
 
@@ -1664,6 +1665,7 @@ try {
 
     return (
         <AppShell>
+            <CheckoutExperienceFrame enabled={storefrontFeatures?.checkoutExperienceV2 === true} stage="review" allowBranchChange>
 
             <section
                 className="
@@ -1957,7 +1959,7 @@ try {
 
 
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                            {inPlaceBranchSwitch && <BranchSelector compact />}
+                            {inPlaceBranchSwitch && !storefrontFeatures?.checkoutExperienceV2 && <BranchSelector compact />}
                         <Link
                             href="/checkout/pickup"
                             className="
@@ -2590,6 +2592,7 @@ try {
 
             </section>
 
+            </CheckoutExperienceFrame>
         </AppShell>
     );
 }
