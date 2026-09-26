@@ -71,6 +71,7 @@ import type {
     UpdatePendingOrderRequest
 } from "@/types/order";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useOnlineStatus} from "@/hooks/useOnlineStatus";
 
 import {
     addOrderToHistory
@@ -607,6 +608,8 @@ function ReviewInventoryIssue({
 export default function ReviewPage() {
 
     const storefrontFeatures = useStorefrontFeatures();
+    const accessible = storefrontFeatures?.accessibleOrderingV2 === true;
+    const online = useOnlineStatus();
     const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
     const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
     const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
@@ -795,6 +798,11 @@ export default function ReviewPage() {
      */
 
     async function handlePlaceOrder() {
+
+        if (accessible && !online) {
+            setOrderError("You're offline. Your cart and pickup details are saved. Reconnect, then check your final price again.");
+            return;
+        }
 
         if (submitting) {
             return;
@@ -2410,6 +2418,10 @@ try {
                             idempotencyKeyRef.current = null;}} />}
 
 
+                {accessible && !online && <div role="alert" className="mt-4 rounded-xl border border-[#c88a20] bg-[#fff4e5] p-4 text-sm">
+                    You&apos;re offline. Your cart is saved. Reconnect and check your final price again before continuing.
+                </div>}
+
                 {
                     inventoryIssue
                     && (
@@ -2456,7 +2468,7 @@ try {
                         )
                         : (
                             <div
-                                className="
+                                className={`${accessible ? "max-sm:sticky max-sm:bottom-[env(safe-area-inset-bottom)] max-sm:z-30" : ""}
                                     mt-5
                                     rounded-3xl
                                     border
@@ -2464,7 +2476,7 @@ try {
                                     bg-white
                                     p-4
                                     shadow-[0_6px_24px_rgba(60,30,20,0.06)]
-                                "
+                                `}
                             >
 
                                 <div
@@ -2502,7 +2514,7 @@ try {
                                 <button
                                     type="button"
                                     disabled={
-                                        submitting || pickupRecovery
+                                        submitting || pickupRecovery || (accessible && !online)
                                     }
                                     onClick={
                                         handlePlaceOrder

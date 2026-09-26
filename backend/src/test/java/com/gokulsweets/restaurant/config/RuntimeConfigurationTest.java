@@ -21,6 +21,7 @@ class RuntimeConfigurationTest {
         for (var feature : List.of("smart-availability", "smart-pickup-selection",
                 "inventory-automation-v2", "customer-home-v2", "homepage-campaigns", "pre-home-intent-gateway", "contextual-storefront-v2",
                 "controlled-campaign-publishing",
+                "accessible-ordering-v2",
                 "persistent-pickup-context", "cart-switch-preview", "authoritative-pickup-commitment",
                 "accepted-checkout-quote", "payment-reconciliation-v2", "payment-polling-v2", "truthful-order-tracking")) {
             assertThat(properties.getProperty("gokul.features." + feature)).endsWith(":false}");

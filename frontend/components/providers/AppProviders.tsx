@@ -9,6 +9,8 @@ import ServiceWorkerRegistration
 
 import OfflineBanner
     from "@/components/common/OfflineBanner";
+import StorefrontVitals from "@/components/common/StorefrontVitals";
+import AccessibleOrderingRuntime from "@/components/common/AccessibleOrderingRuntime";
 
 
 interface AppProvidersProps {
@@ -25,6 +27,8 @@ export default function AppProviders({
             <ServiceWorkerRegistration />
 
             <OfflineBanner />
+            <StorefrontVitals />
+            <AccessibleOrderingRuntime />
 
             {children}
         </>
