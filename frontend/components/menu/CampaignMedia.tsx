@@ -20,8 +20,8 @@ function subscribeSaveData(callback: () => void) {
     return () => active?.removeEventListener?.("change", callback);
 }
 
-export default function CampaignMedia({campaign, hero = false, accessible = false, onUnavailable}: {
-    campaign: HomepageCampaign; hero?: boolean; accessible?: boolean; onUnavailable: () => void;
+export default function CampaignMedia({campaign, hero = false, immersive = false, accessible = false, onUnavailable}: {
+    campaign: HomepageCampaign; hero?: boolean; immersive?: boolean; accessible?: boolean; onUnavailable: () => void;
 }) {
     const reduced = useSyncExternalStore(subscribe,
         () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => true);
@@ -45,15 +45,15 @@ export default function CampaignMedia({campaign, hero = false, accessible = fals
         if (animated && !useFallback && campaign.fallbackMediaUrl) setFailed(true);
         else onUnavailable();
     };
-    return <div ref={frame} className="relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-[#fff0dc]">
+    return <div ref={frame} className={immersive ? "entry-campaign-media" : "relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-[#fff0dc]"}>
         {!useFallback && campaign.mediaType?.startsWith("video/") ? <video
             src={source} poster={campaign.fallbackMediaUrl ?? undefined} muted loop playsInline autoPlay controls
             preload={hero ? "metadata" : "none"} aria-label={campaign.altText || campaign.title}
-            className={campaign.mobileMediaUrl ? "hidden h-full w-full object-cover md:block" : "h-full w-full object-cover"} onError={fail} />
+            className={immersive ? "h-full w-full object-cover" : campaign.mobileMediaUrl ? "hidden h-full w-full object-cover md:block" : "h-full w-full object-cover"} onError={fail} />
             : <Image src={source} alt={campaign.altText || campaign.title} fill sizes="(max-width: 768px) 100vw, 50vw"
                 loading={hero ? "eager" : "lazy"} unoptimized={campaign.mediaType === "image/gif" && !useFallback}
-                className={campaign.mobileMediaUrl && !useFallback ? "hidden object-cover md:block" : "object-cover"} onError={fail} />}
-        {campaign.mobileMediaUrl && !useFallback && <Image
+                className={immersive ? "object-cover" : campaign.mobileMediaUrl && !useFallback ? "hidden object-cover md:block" : "object-cover"} onError={fail} />}
+        {campaign.mobileMediaUrl && !useFallback && !immersive && <Image
             src={campaign.mobileMediaUrl} alt={campaign.altText || campaign.title} fill sizes="100vw"
             className="object-cover md:hidden" onError={fail} />}
     </div>;

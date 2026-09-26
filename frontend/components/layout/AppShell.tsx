@@ -17,18 +17,21 @@ import CustomerFooter
 import PickupJourneyContext from "./PickupJourneyContext";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import "./futuristic-storefront.css";
+import "./editorial-storefront.css";
 
 
 interface AppShellProps {
 
     children: ReactNode;
     showSocialPopup?: boolean;
+    editorial?: boolean;
 }
 
 
 export default function AppShell({
     children,
-    showSocialPopup = true
+    showSocialPopup = true,
+    editorial = false
 }: AppShellProps) {
     const features = useStorefrontFeatures();
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
@@ -38,6 +41,7 @@ export default function AppShell({
             className={`
                 app-container
                 ${futuristic ? "future-storefront" : ""}
+                ${futuristic && editorial ? "editorial-storefront" : ""}
                 flex
                 flex-col
                 min-h-dvh
