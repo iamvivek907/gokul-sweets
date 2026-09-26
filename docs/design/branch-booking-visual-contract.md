@@ -21,7 +21,7 @@ Owner direction, 26 September 2026. This carries the approved editorial directio
 ## Interaction and content rules
 
 - Show branch, IST date/time, guest count or item quantity, and next action at the point of decision. Use one clear primary action. Avoid repeated entry of unchanged details.
-- Cover loading, missing media, empty inventory, sold out, changed capacity, expired hold/quote, pending payment, confirmation, cancellation and interrupted-session recovery. Never fabricate ratings, venue prices, availability, interiors or booking status.
+- Keep the loading screen and skeletons in the same palette and typography, with reduced motion and immediate access to recovery. Cover missing media, empty inventory, sold out, changed capacity, expired hold/quote, pending payment, confirmation, cancellation and interrupted-session recovery. Never fabricate ratings, venue prices, availability, interiors or booking status.
 - Check keyboard operation, reduced-motion poster, readable contrast, 400px phone and large text. On mobile, surface the current step and order/booking summary without hiding branch context.
 - Business-controlled images, video, descriptions and policies should flow through authorized admin publishing with preview and fallback. A control must not appear before the public capability it manages exists.
 - QA includes connected desktop/mobile prototypes, owner review, real DEV content, flag ON/OFF, and a happy path plus sold-out/conflict/recovery path. Do not infer live functionality from concept art.
