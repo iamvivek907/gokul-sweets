@@ -398,6 +398,9 @@ export default function PaymentPage() {
     const [pollingNotice, setPollingNotice] = useState<string | null>(null);
     const [gatewayOpened, setGatewayOpened] = useState(false);
     const refreshInFlightRef = useRef(false);
+    // A settled response stops any timer callback already queued before React
+    // has committed the corresponding status update.
+    const settledPaymentIdRef = useRef<number | null>(null);
     const nextAllowedCheckRef = useRef(0);
     const [paymentClock, setPaymentClock] = useState(0);
     const activePaymentId = payment?.paymentId;
@@ -575,6 +578,8 @@ export default function PaymentPage() {
             (
                 response: PaymentResponse
             ) => {
+                settledPaymentIdRef.current = response.paymentStatus === "PENDING"
+                    ? null : response.paymentId;
 
                 persistPayment(
                     response
@@ -1063,6 +1068,11 @@ export default function PaymentPage() {
         useCallback(
             async (automatic = false): Promise<PaymentPollResult> => {
 
+                if (automatic && payment && (payment.paymentStatus !== "PENDING" ||
+                    settledPaymentIdRef.current === payment.paymentId)) {
+                    return {success: true, permanent: true};
+                }
+
                 if (
                     (paymentPollingV2 ? refreshInFlightRef.current : refreshing)
                     ||
@@ -1105,11 +1115,12 @@ export default function PaymentPage() {
                     applyPaymentResult(
                         response
                     );
+                    const terminal = response.paymentStatus !== "PENDING";
                     if (paymentPollingV2) {
                         nextAllowedCheckRef.current = Date.now() + MIN_MANUAL_PAYMENT_CHECK_MS;
                         setPollingNotice(null);
                     }
-                    return {success: true};
+                    return {success: true, permanent: terminal};
 
                 } catch (
                     exception
@@ -1192,7 +1203,7 @@ export default function PaymentPage() {
                 window.setInterval(
                     () => {
 
-                        void refreshCurrentPayment();
+                        void refreshCurrentPayment(true);
 
                     },
                     5000
@@ -1240,6 +1251,8 @@ export default function PaymentPage() {
                 window.setInterval(
                     () => {
 
+                        // Refund settlement has its own lifecycle; a payment
+                        // failure guard must not suppress refund reconciliation.
                         void refreshCurrentPayment();
 
                     },
