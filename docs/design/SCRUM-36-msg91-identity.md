@@ -72,6 +72,16 @@ with no bearer in JSON, and does not attach orders or historic consent. Verify
 trusted proxy TLS forwarding and browser credentials in DEV before turning
 on this flag. The service remains OFF by default.
 
+New pickup orders can receive an internal ownership record only when an
+active verified cookie comes from an allowed HTTPS storefront Origin and its
+current DEV/PROD subject has the same verified mobile as the checkout phone.
+The insert happens during first order creation; an idempotency retry cannot
+claim an existing guest order. A missing, expired or revoked cookie and a
+different phone leave the order as a guest order. The record keeps its original
+subject UUID when a phone is reverified, so a new holder cannot automatically
+see the old holder's orders. Historical and guest orders are never adopted by
+phone alone. Verified order listing and controlled recovery remain separate.
+
 Behind a reverse proxy, set `GOKUL_IDENTITY_TRUSTED_PROXY_CIDRS` to the narrow
 numeric CIDRs of the proxies directly connected to the API (comma separated).
 The proxy must overwrite incoming `X-Forwarded-For` and `X-Forwarded-Proto`

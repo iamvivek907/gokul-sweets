@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.order.service;
 
 import com.gokulsweets.restaurant.customer.CustomerContact;
 import com.gokulsweets.restaurant.customer.CustomerContactService;
+import com.gokulsweets.restaurant.customer.identity.VerifiedOrderOwnership;
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
 import com.gokulsweets.restaurant.order.dto.CreateOrderRequest;
 import com.gokulsweets.restaurant.order.dto.OrderItemResponse;
@@ -64,6 +65,7 @@ public class OrderService {
 
     private final PickupCommitmentCheck pickupCommitmentCheck;
     private final CheckoutQuoteService checkoutQuoteService;
+    private final VerifiedOrderOwnership verifiedOrderOwnership;
 
     @Value(
             "${checkout.reservation-expiry-minutes:15}"
@@ -78,6 +80,15 @@ public class OrderService {
     public OrderResponse createOrder(
             CreateOrderRequest request,
             String idempotencyKey
+    ) {
+        return createOrder(request, idempotencyKey, null);
+    }
+
+    @Transactional
+    public OrderResponse createOrder(
+            CreateOrderRequest request,
+            String idempotencyKey,
+            String identityToken
     ) {
 
         String requestHash =
@@ -166,6 +177,8 @@ public class OrderService {
                         .saveAndFlush(
                                 order
                         );
+
+        verifiedOrderOwnership.bindNewOrder(savedOrder.getId(), request.customerPhone(), identityToken);
 
         /*
          * Reserve the complete order inventory after the order
