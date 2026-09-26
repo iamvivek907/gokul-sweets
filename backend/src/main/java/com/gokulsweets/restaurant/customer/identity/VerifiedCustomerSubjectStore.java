@@ -24,17 +24,38 @@ public class VerifiedCustomerSubjectStore {
         if (verifiedPhone == null || !verifiedPhone.matches("\\+91[6-9][0-9]{9}")) {
             throw new IllegalArgumentException("A provider-verified Indian mobile is required");
         }
-        // One statement handles competing verifications and preserves the existing subject.
-        // Do not infer ownership of historic orders or consent from this association.
-        return jdbc.queryForObject("""
-                INSERT INTO verified_customer_subjects
-                    (id, environment, verified_phone, created_at, last_verified_at)
-                VALUES (?, ?, ?, ?, ?)
-                ON CONFLICT (environment, verified_phone)
-                DO UPDATE SET last_verified_at = GREATEST(
-                    verified_customer_subjects.last_verified_at, EXCLUDED.last_verified_at)
-                RETURNING id
-                """, UUID.class, UUID.randomUUID(), environment.name(), verifiedPhone,
-                Timestamp.from(now), Timestamp.from(now));
+        // Serialize first verification and repeat verification across app instances.
+        // A reused phone must never inherit a prior holder's sessions or consent.
+        jdbc.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
+                rs -> { rs.next(); return null; }, environment.name() + ":" + verifiedPhone);
+        UUID prior = jdbc.query("""
+                SELECT id FROM verified_customer_subjects
+                WHERE environment = ? AND verified_phone = ?
+                """, rs -> rs.next() ? (UUID) rs.getObject(1) : null,
+                environment.name(), verifiedPhone);
+        UUID current = UUID.randomUUID();
+        if (prior == null) {
+            jdbc.update("""
+                    INSERT INTO verified_customer_subjects
+                        (id, environment, verified_phone, created_at, last_verified_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """, current, environment.name(), verifiedPhone,
+                    Timestamp.from(now), Timestamp.from(now));
+        } else {
+            jdbc.update("""
+                    UPDATE verified_customer_sessions SET revoked_at = ?
+                    WHERE environment = ? AND verified_subject_id = ? AND revoked_at IS NULL
+                    """, Timestamp.from(now), environment.name(), prior);
+            jdbc.update("""
+                    UPDATE verified_customer_subjects SET id = ?, last_verified_at = GREATEST(last_verified_at, ?)
+                    WHERE environment = ? AND verified_phone = ?
+                    """, current, Timestamp.from(now), environment.name(), verifiedPhone);
+            jdbc.update("""
+                    INSERT INTO verified_subject_rotations
+                        (environment, prior_subject_id, new_subject_id, rotated_at, reason)
+                    VALUES (?, ?, ?, ?, 'PHONE_REVERIFICATION')
+                    """, environment.name(), prior, current, Timestamp.from(now));
+        }
+        return current;
     }
 }
