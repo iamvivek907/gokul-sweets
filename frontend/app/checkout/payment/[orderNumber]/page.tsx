@@ -18,8 +18,9 @@ import AppShell
     from "@/components/layout/AppShell";
 import ConfirmedPickupContext from "@/components/order/ConfirmedPickupContext";
 import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
-import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
 import {usePaymentPolling, type PaymentPollResult} from "@/hooks/usePaymentPolling";
+import {hasOpenedPaymentGateway, markPaymentGatewayOpened, clearPaymentGatewayVisit} from "@/lib/paymentGatewayVisit";
 import {MIN_MANUAL_PAYMENT_CHECK_MS, isTemporaryPaymentFailure} from "@/lib/paymentPolling";
 import {ApiError} from "@/services/apiClient";
 import {reconcilePaidCart} from "@/lib/paidCartRecovery";
@@ -95,6 +96,8 @@ function getPaymentStatus(
 }
 
 async function refreshKnownPayment(known: PaymentResponse, resilient: boolean): Promise<PaymentResponse> {
+    if (resilient && known.paymentStatus === "PENDING" &&
+        !hasOpenedPaymentGateway(known.orderNumber, known.paymentId)) return known;
     try {
         return mergePaymentResponse(await refreshPayment(known.paymentId), known);
     } catch (error) {
@@ -264,7 +267,7 @@ const paymentInitializationPromises =
  */
 
 export default function PaymentPage() {
-    const features = useStorefrontFeatures();
+    const {features, error: configurationError} = useStorefrontConfiguration();
     const paidCartRecovery = features?.paidCartRecovery;
     const paymentPollingV2 = features?.paymentPollingV2 === true;
 
@@ -393,6 +396,7 @@ export default function PaymentPage() {
             null
         );
     const [pollingNotice, setPollingNotice] = useState<string | null>(null);
+    const [gatewayOpened, setGatewayOpened] = useState(false);
     const refreshInFlightRef = useRef(false);
     const nextAllowedCheckRef = useRef(0);
     const [paymentClock, setPaymentClock] = useState(0);
@@ -587,6 +591,7 @@ export default function PaymentPage() {
                     status ===
                     "PAID"
                 ) {
+                    clearPaymentGatewayVisit(response.orderNumber);
 
                     completePaidPayment(
                         response
@@ -620,6 +625,7 @@ export default function PaymentPage() {
                     status ===
                         "REFUND_FAILED"
                 ) {
+                    clearPaymentGatewayVisit(response.orderNumber);
 
                     clearPendingOrder();
                 }
@@ -653,6 +659,9 @@ export default function PaymentPage() {
 
     useEffect(
         () => {
+            // Wait for the rollout setting before recovering a payment. An initial
+            // null must never start the legacy five-second provider polling.
+            if (!features && !configurationError) return;
 
             let cancelled =
                 false;
@@ -973,6 +982,7 @@ export default function PaymentPage() {
                     applyPaymentResult(
                         response
                     );
+                    setGatewayOpened(hasOpenedPaymentGateway(response.orderNumber, response.paymentId));
 
                 } catch (
                     exception
@@ -1031,6 +1041,8 @@ export default function PaymentPage() {
             applyPaymentResult,
             clearCart,
             paidCartRecovery,
+            features,
+            configurationError,
             paymentPollingV2,
             currentCartFingerprint,
             orderNumber,
@@ -1148,7 +1160,7 @@ export default function PaymentPage() {
         );
 
     const paymentDeadlineMs = payment ? parseBusinessTimestamp(payment.expiresAt).getTime() : 0;
-    usePaymentPolling(paymentPollingV2, payment?.paymentId, paymentStatus,
+    usePaymentPolling(paymentPollingV2 && gatewayOpened, payment?.paymentId, paymentStatus,
         Number.isFinite(paymentDeadlineMs) ? paymentDeadlineMs : 0,
         openingPayment, () => refreshCurrentPayment(true));
 
@@ -1326,6 +1338,10 @@ export default function PaymentPage() {
         setOpeningPayment(
             true
         );
+        if (paymentPollingV2) {
+            markPaymentGatewayOpened(payment.orderNumber, payment.paymentId);
+            setGatewayOpened(true);
+        }
 
 
         setError(
@@ -1354,12 +1370,16 @@ export default function PaymentPage() {
                 outcome.kind ===
                 "failed"
             ) {
+                if (paymentPollingV2) {
+                    clearPaymentGatewayVisit(payment.orderNumber);
+                    setGatewayOpened(false);
+                }
 
                 setError(
                     outcome.message
                 );
 
-                await refreshCurrentPayment();
+                if (!paymentPollingV2) await refreshCurrentPayment();
 
             } else {
 
@@ -1374,6 +1394,10 @@ export default function PaymentPage() {
         } catch (
             exception
         ) {
+            if (paymentPollingV2) {
+                clearPaymentGatewayVisit(payment.orderNumber);
+                setGatewayOpened(false);
+            }
 
             console.error(
                 "Unable to open payment checkout:",
@@ -2559,8 +2583,12 @@ export default function PaymentPage() {
                                 >
                                     {
                                         phonePeStatusOnly
-                                            ? "This payment is still being checked. You can safely leave and return to this order."
-                                            : "You can safely leave this page and return later. We'll show your order once the payment is confirmed."
+                                            ? (paymentPollingV2 && !gatewayOpened
+                                                ? "A payment attempt already exists. If you paid on another device, choose Check Payment Status below."
+                                                : "This payment is still being checked. You can safely leave and return to this order.")
+                                            : (paymentPollingV2 && !gatewayOpened
+                                                ? "Ready when you are. Tap Pay to open secure checkout."
+                                                : "You can safely leave this page and return later. We'll show your order once the payment is confirmed.")
                                     }
                                 </p>
 
