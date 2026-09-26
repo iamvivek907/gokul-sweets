@@ -51,6 +51,7 @@ export function createPayment(
         {
             method: "POST",
             body: JSON.stringify(request),
+            credentials: "include",
             signal
         }
     );
@@ -101,6 +102,7 @@ export function getPaymentForOrder(
         `/api/payments/order/${encodeURIComponent(orderNumber)}`,
         {
             method: "GET",
+            credentials: "include",
             signal
         }
     );
@@ -122,6 +124,7 @@ export function refreshPayment(
         `/api/payments/${paymentId}/refresh`,
         {
             method: "POST",
+            credentials: "include",
             signal
         }
     );
@@ -145,6 +148,7 @@ export function verifyRazorpayPayment(
         {
             method: "POST",
             body: JSON.stringify(request),
+            credentials: "include",
             signal
         }
     );

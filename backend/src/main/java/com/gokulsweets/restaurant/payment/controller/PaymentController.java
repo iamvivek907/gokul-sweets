@@ -1,10 +1,12 @@
 package com.gokulsweets.restaurant.payment.controller;
 
+import com.gokulsweets.restaurant.customer.identity.VerifiedOrderAccess;
 import com.gokulsweets.restaurant.payment.dto.*;
 import com.gokulsweets.restaurant.payment.provider.PaymentProviderRegistry;
 import com.gokulsweets.restaurant.payment.service.PaymentCheckoutService;
 import com.gokulsweets.restaurant.payment.service.RazorpayVerificationService;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,6 +25,7 @@ public class PaymentController {
     private final PaymentCheckoutService paymentCheckoutService;
     private final RazorpayVerificationService razorpayVerificationService;
     private final PaymentProviderRegistry providerRegistry;
+    private final VerifiedOrderAccess orderAccess;
 
 
     @GetMapping("/providers")
@@ -39,8 +42,11 @@ public class PaymentController {
 
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(
-            @Valid @RequestBody CreatePaymentRequest request
+            @Valid @RequestBody CreatePaymentRequest request,
+            HttpServletRequest servletRequest
     ) {
+
+        orderAccess.requireOrder(request.orderNumber().trim().toUpperCase(), servletRequest);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
@@ -62,8 +68,10 @@ public class PaymentController {
      */
     @GetMapping("/order/{orderNumber}")
     public ResponseEntity<PaymentLookupResponse> getPaymentForOrder(
-            @PathVariable String orderNumber
+            @PathVariable String orderNumber,
+            HttpServletRequest servletRequest
     ) {
+        orderAccess.requireOrder(orderNumber.trim().toUpperCase(), servletRequest);
         PaymentResponse payment =
                 paymentCheckoutService.findLatestPaymentForOrder(
                         orderNumber.trim().toUpperCase()
@@ -77,8 +85,11 @@ public class PaymentController {
 
     @PostMapping("/{paymentId}/refresh")
     public ResponseEntity<PaymentResponse> refreshPayment(
-            @PathVariable Long paymentId
+            @PathVariable Long paymentId,
+            HttpServletRequest servletRequest
     ) {
+
+        orderAccess.requirePayment(paymentId, servletRequest);
 
         return ResponseEntity.ok(
                 paymentCheckoutService.refreshPayment(
@@ -91,8 +102,11 @@ public class PaymentController {
     @PostMapping("/{paymentId}/razorpay/verify")
     public ResponseEntity<PaymentResponse> verifyRazorpayPayment(
             @PathVariable Long paymentId,
-            @Valid @RequestBody RazorpayPaymentVerificationRequest request
+            @Valid @RequestBody RazorpayPaymentVerificationRequest request,
+            HttpServletRequest servletRequest
     ) {
+
+        orderAccess.requirePayment(paymentId, servletRequest);
 
         return ResponseEntity.ok(
                 razorpayVerificationService.verify(

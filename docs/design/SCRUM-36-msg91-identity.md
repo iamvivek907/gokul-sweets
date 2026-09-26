@@ -105,6 +105,17 @@ flag is accidentally enabled. Secure cookies must reach the API; when frontend
 and API use different sites, a SameSite=Strict cookie will not be sent. Use a
 same-site API origin and confirm browser credential behavior before enabling.
 
+`GOKUL_IDENTITY_PROTECT_LEGACY_ROUTES` is a separate default-OFF rollout guard.
+When both identity and this guard are enabled, order-number lookups, history,
+pending checkout updates, payment initiation, payment lookup and payment-ID
+refresh/verification require the current verified subject for orders already
+bound to a subject. A missing or wrong session receives 404, while orders that
+were placed as guests retain the order-number capability flow. Checkout sends
+the secure cookie with these requests. Validate PhonePe and Razorpay return
+flows in DEV before enabling this guard: an external payment return in a new
+browser context may not have the original session. Additional order-bound
+offers/rebates and guest capability routes need a separate authorization audit.
+
 Behind a reverse proxy, set `GOKUL_IDENTITY_TRUSTED_PROXY_CIDRS` to the narrow
 numeric CIDRs of the proxies directly connected to the API (comma separated).
 The proxy must overwrite incoming `X-Forwarded-For` and `X-Forwarded-Proto`

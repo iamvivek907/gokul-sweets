@@ -15,7 +15,7 @@ export async function previewCheckoutQuote(request: CreateOrderRequest, pendingO
     const path = pendingOrderNumber
         ? `/api/orders/${encodeURIComponent(pendingOrderNumber)}/quote`
         : "/api/orders/quote";
-    return apiClient<CheckoutQuote>(path, {method: "POST", body: JSON.stringify(request)});
+    return apiClient<CheckoutQuote>(path, {method: "POST", body: JSON.stringify(request), credentials: "include"});
 }
 
 
@@ -59,6 +59,7 @@ export async function updatePendingCheckout(
         {
             method: "PUT",
             body: JSON.stringify(request),
+            credentials: "include",
             signal
         }
     );
@@ -74,6 +75,7 @@ export async function getCustomerOrder(
         `/api/orders/${encodeURIComponent(orderNumber)}`,
         {
             method: "GET",
+            credentials: "include",
             signal
         }
     );
@@ -92,6 +94,7 @@ export async function getCustomerOrderHistory(
             body: JSON.stringify({
                 orderNumbers
             }),
+            credentials: "include",
             signal
         }
     );
