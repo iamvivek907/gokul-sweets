@@ -218,7 +218,7 @@ export default function MobileMenu() {
                 onClick={
                     toggleMenu
                 }
-                className="
+                className="customer-menu-trigger
                     relative
                     flex
                     h-11
@@ -381,7 +381,7 @@ export default function MobileMenu() {
                 aria-hidden={
                     !open
                 }
-                className={`
+                className={`customer-mobile-drawer
                     fixed
                     right-0
                     top-0
