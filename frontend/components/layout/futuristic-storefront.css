@@ -48,3 +48,30 @@ body:has(.future-storefront){background:#151722}
 @media(prefers-reduced-motion:reduce){.future-storefront *{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 
 @media(max-width:400px){.future-storefront .future-branch-control button{font-size:0;width:2.75rem;flex:none}.future-storefront .future-branch-review{font-size:.58rem;max-width:3.2rem;line-height:1.15;text-align:center}.future-storefront .future-branch-control button:after{content:"↗";font-size:1.2rem}.future-storefront .future-brand{font-size:.82rem}.future-storefront .future-branch-name strong{max-width:5rem}}
+
+/* Full-width customer canvas while keeping readable gutters on large monitors. */
+.future-storefront{max-width:none}
+.future-storefront .customer-site-header > div,
+.future-storefront .customer-site-footer > div{max-width:none}
+.future-storefront .customer-site-header > div{padding-inline:clamp(1rem,2.5vw,3rem)}
+.future-storefront .page-content{padding-inline:clamp(1rem,2.5vw,3rem)}
+.future-storefront .customer-site-footer > div{padding-inline:clamp(0rem,2vw,2rem)}
+
+/* Keep controls and light promotional surfaces legible inside the dark shell. */
+.future-storefront .page-content :is(input,textarea,select){background:#fff9f1!important;color:#291e27!important}
+.future-storefront .page-content :is(input,textarea)::placeholder{color:#67565b;opacity:1}
+.future-storefront .page-content [class*="bg-[#fff4e5]"],
+.future-storefront .page-content [class*="bg-[#fff2d2]"]{background:#f5dcaf!important;color:#362532!important}
+.future-storefront .page-content [class*="bg-[#fff4e5]"] [class*="text-[#7a1625]"],
+.future-storefront .page-content [class*="bg-[#fff2d2]"] [class*="text-[#756763]"]{color:#49313a!important}
+.future-storefront .customer-bottom-navigation a[aria-current="page"] > span:last-child{color:#ffdda3!important}
+.future-storefront .customer-bottom-navigation a:not([aria-current="page"]) > span:last-child{color:#e7d5dc!important}
+
+/* Availability belongs to the item card; the pickup context explains the caveat once. */
+.future-storefront .menu-availability-chip{position:absolute;z-index:2;top:.75rem;right:.75rem;display:inline-flex;align-items:center;gap:.4rem;max-width:calc(100% - 1.5rem);padding:.45rem .7rem;border:1px solid #f2d49c;border-radius:999px;background:#302332ed;color:#ffe2aa;font-size:.72rem;font-weight:700;line-height:1.2;box-shadow:0 5px 18px #140d1c88;backdrop-filter:blur(12px);pointer-events:none}
+.future-storefront .menu-availability-chip > span{display:grid;place-items:center;width:1rem;height:1rem;flex:none;border-radius:50%;background:#f4ce92;color:#372237;font-size:.65rem}
+.future-storefront .menu-availability-chip--unavailable{border-color:#f6b4a8;background:#522a38f2;color:#fff1e8}
+.future-storefront .menu-availability-chip--unavailable > span{background:#f6b4a8}
+.future-storefront .menu-availability-chip--checking{border-color:#d5b8c5;color:#fff5eb}
+.future-storefront .menu-availability-note{margin-top:.5rem;padding:.7rem .85rem;border-left:3px solid #f6b4a8;border-radius:.7rem;background:#4c2e3d;color:#fff2e8;font-size:.8rem;line-height:1.45}
+@media(max-width:600px){.future-storefront .page-content{padding-inline:.75rem}.future-storefront .customer-site-header > div{padding-inline:.75rem}.future-storefront .menu-availability-chip{top:.55rem;right:.55rem}}
