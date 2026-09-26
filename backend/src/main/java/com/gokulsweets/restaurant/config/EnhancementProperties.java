@@ -27,6 +27,8 @@ public class EnhancementProperties {
     private boolean controlledCampaignPublishing;
     /** SCRUM-28: accessible dialogs, mobile actions, motion and network recovery. */
     private boolean accessibleOrderingV2;
+    /** SCRUM-95: approved checkout presentation; effective only with pickup, quote and payment safeguards. */
+    private boolean checkoutExperienceV2;
     /** Show the selected pickup branch and slot across the customer ordering journey. */
     private boolean persistentPickupContext;
     /** Require a server-backed cart preview before changing a pickup branch or date. */
