@@ -55,3 +55,14 @@ record to an unverified phone number, browser storage key or staff account.
 
 The owner will manually deploy after Sprint 3. Keep SCRUM-49 and SCRUM-29 open
 until code, CI, DEV flag ON/OFF evidence and owner QA are complete.
+
+## Ledger checkpoint
+
+V55 creates an append-only optional consent ledger keyed by a verified subject
+UUID and explicit DEV/PROD environment. `ConsentLedger` defaults to denied,
+serializes decisions for the same subject and purpose, and preserves withdrawal
+history. There is intentionally no customer API or frontend opt-in yet: the
+existing guest checkout has no verified customer session. SCRUM-36 must provide
+verified ownership before a caller may record or read this ledger. This
+checkpoint adds no permission prompt, analytics, marketing send or change to
+pickup behaviour. It is not completion of SCRUM-49.
