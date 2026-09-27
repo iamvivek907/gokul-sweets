@@ -82,6 +82,22 @@ Retention/export/deletion and legal/privacy wording still need review; do not
 enable the flag until the reviewed policy is available. No device coordinates
 are requested or stored by these controls.
 
+## Privacy request intake checkpoint
+
+V64 stores verified, environment-scoped export and deletion-review requests.
+The account page submits and shows received requests through the same secure,
+allowed-Origin session checks as consent. Repeated submissions of the same
+kind for a subject are idempotent, including retries after network failures.
+The request row contains a subject UUID, environment, kind and server timestamp;
+it contains no coordinates, marketing choice, phone or order data. The action
+does not delete records or produce an export, and its UI says only "received".
+
+The privacy owner must define a staffed triage and audited fulfillment process,
+identity re-verification and subject-rotation handling, financial-record
+retention basis, response period, and reviewed wording before enabling this
+flag. A request from a rotated subject may need manual linkage via the existing
+subject-rotation audit. Do not infer a retention duration or automate erasure.
+
 ## Ledger checkpoint
 
 V55 creates an append-only optional consent ledger keyed by a verified subject

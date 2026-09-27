@@ -6,6 +6,8 @@ import {apiClient} from "@/services/apiClient";
 type Purpose = "MARKETING" | "OCCASION_REMINDERS" | "COARSE_AREA_ANALYTICS";
 type Decision = {granted: boolean; policyVersion: string; recordedAt: string | null};
 type Choices = Record<Purpose, Decision>;
+type PrivacyKind = "EXPORT" | "DELETION_REVIEW";
+type PrivacyRequest = {id: number; kind: PrivacyKind; receivedAt: string};
 
 const purposes: {id: Purpose; title: string; detail: string}[] = [
     {id: "MARKETING", title: "Offers and news", detail: "Optional promotional messages. Order updates are separate."},
@@ -17,14 +19,19 @@ export default function ConsentPreferences() {
     const [choices, setChoices] = useState<Choices | null>(null);
     const [pending, setPending] = useState<Purpose | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [requests, setRequests] = useState<PrivacyRequest[] | null>(null);
+    const [requesting, setRequesting] = useState<PrivacyKind | null>(null);
 
     const refresh = useCallback(async () => {
         try {
             const next = await apiClient<Choices>("/api/customer/identity/consents", {credentials: "include"});
             setChoices(next);
+            const existing = await apiClient<PrivacyRequest[]>("/api/customer/identity/privacy-requests", {credentials: "include"});
+            setRequests(existing);
             setError(null);
         } catch {
             setChoices(null);
+            setRequests(null);
         }
     }, []);
 
@@ -52,6 +59,22 @@ export default function ConsentPreferences() {
         }
     }
 
+    async function requestPrivacyReview(kind: PrivacyKind) {
+        if (requesting) return;
+        setRequesting(kind);
+        setError(null);
+        try {
+            const entry = await apiClient<PrivacyRequest>(`/api/customer/identity/privacy-requests/${kind}`, {
+                method: "POST", credentials: "include"
+            });
+            setRequests(current => current && current.some(item => item.id === entry.id) ? current : [...(current ?? []), entry]);
+        } catch {
+            setError("Your request could not be recorded. Please try again.");
+        } finally {
+            setRequesting(null);
+        }
+    }
+
     if (!choices) return null;
     return <section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Privacy choices">
         <h2 className="text-xl font-semibold text-[#241715]">Privacy choices</h2>
@@ -67,6 +90,21 @@ export default function ConsentPreferences() {
                 </label>
             </div>)}
         </div>
+        {requests && <div className="mt-6 border-t border-[#eadfd6] pt-5">
+            <h3 className="font-semibold text-[#241715]">Your data requests</h3>
+            <p className="mt-1 text-sm text-[#756763]">Submit a request for manual review. Submitting a deletion review does not immediately erase financial order records.</p>
+            <div className="mt-3 flex flex-wrap gap-3">
+                {(["EXPORT", "DELETION_REVIEW"] as const).map(kind => {
+                    const existing = requests.find(item => item.kind === kind);
+                    return <button key={kind} type="button" disabled={Boolean(existing) || requesting !== null}
+                        onClick={() => {void requestPrivacyReview(kind);}}
+                        className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-60">
+                        {existing ? `${kind === "EXPORT" ? "Export" : "Deletion review"} request received`
+                            : requesting === kind ? "Submitting…" : kind === "EXPORT" ? "Request data export" : "Request deletion review"}
+                    </button>;
+                })}
+            </div>
+        </div>}
         {error && <p role="alert" className="mt-4 text-sm text-[#9e2732]">{error}</p>}
     </section>;
 }

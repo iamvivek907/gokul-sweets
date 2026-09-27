@@ -6,6 +6,8 @@ import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
 import com.gokulsweets.restaurant.customer.consent.ConsentDecision;
 import com.gokulsweets.restaurant.customer.consent.ConsentLedger;
 import com.gokulsweets.restaurant.customer.consent.ConsentPurpose;
+import com.gokulsweets.restaurant.customer.consent.CustomerPrivacyRequests;
+import com.gokulsweets.restaurant.customer.consent.PrivacyRequestKind;
 import com.gokulsweets.restaurant.order.dto.CustomerOrderResponse;
 import com.gokulsweets.restaurant.order.dto.CustomerOrderSummaryResponse;
 import com.gokulsweets.restaurant.order.service.OrderQueryService;
@@ -46,6 +48,7 @@ public class CustomerIdentityController {
     private final IdentityExchangeRateLimiter rateLimiter;
     private final IdentityDeviceRegistry devices;
     private final ConsentLedger consents;
+    private final CustomerPrivacyRequests privacyRequests;
 
     /** Called before opening the widget. Source and device limits are shared across instances. */
     @PostMapping("/start")
@@ -146,6 +149,22 @@ public class CustomerIdentityController {
     }
 
     public record ConsentChoice(Boolean granted) { }
+
+    @GetMapping("/privacy-requests")
+    public ResponseEntity<List<CustomerPrivacyRequests.Request>> privacyRequests(HttpServletRequest request) {
+        var environment = consentEnvironment();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(privacyRequests.forSubject(environment, requiredSubject(request, environment)));
+    }
+
+    @PostMapping("/privacy-requests/{kind}")
+    public ResponseEntity<CustomerPrivacyRequests.Request> submitPrivacyRequest(
+            @PathVariable PrivacyRequestKind kind, HttpServletRequest request) {
+        var environment = consentEnvironment();
+        requireTrustedMutation(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(privacyRequests.submit(environment, requiredSubject(request, environment), kind));
+    }
 
     private ConsentEnvironment consentEnvironment() {
         var environment = enabledEnvironment();
