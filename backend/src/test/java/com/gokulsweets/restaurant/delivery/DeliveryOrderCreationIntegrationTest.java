@@ -8,6 +8,9 @@ import com.gokulsweets.restaurant.customer.identity.VerifiedOrderOwnership;
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
 import com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
+import com.gokulsweets.restaurant.order.service.PreparationEligibilityService;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.order.service.OrderCalculationService;
 import com.gokulsweets.restaurant.order.service.OrderIdempotencyService;
@@ -45,6 +48,7 @@ class DeliveryOrderCreationIntegrationTest {
     @Autowired OrderRepository orders;
     @Autowired OrderIdempotencyService idempotency;
     @Autowired OrderNumberGenerator numbers;
+    @Autowired PreparationEligibilityService preparationEligibility;
 
     @Test
     void retryReturnsSameOrderWithOneRiderAndInventoryReservation() {
@@ -131,5 +135,15 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(saved.getItems()).hasSize(1);
         verify(inventory, times(1)).synchronizePendingDeliveryOrder(eq(saved), any());
         verify(preparation, times(2)).prepare(quote, windowId);
+
+        // The paid-order transition uses the selected IST rider window rather than a pickup slot.
+        saved.setOrderStatus(OrderStatus.CONFIRMED);
+        orders.saveAndFlush(saved);
+        assertThat(preparationEligibility.evaluate(saved, date.atTime(9, 59)).status())
+                .isEqualTo(PreparationEligibilityStatus.SCHEDULED);
+        assertThat(preparationEligibility.evaluate(saved, date.atTime(10, 0)).status())
+                .isEqualTo(PreparationEligibilityStatus.ELIGIBLE);
+        assertThat(preparationEligibility.evaluate(saved, date.atTime(11, 0)).status())
+                .isEqualTo(PreparationEligibilityStatus.OVERDUE);
     }
 }

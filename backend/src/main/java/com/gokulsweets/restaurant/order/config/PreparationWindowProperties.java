@@ -36,4 +36,7 @@ public class PreparationWindowProperties {
      */
     private int adminOverrideLeadMinutes =
             60;
+
+    /** Minutes before a selected IST rider window when delivery preparation may begin. */
+    private int deliveryLeadMinutes = 60;
 }

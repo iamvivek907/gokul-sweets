@@ -6,6 +6,7 @@ import com.gokulsweets.restaurant.order.dto.admin.AdminOrderDetailResponse;
 import com.gokulsweets.restaurant.order.dto.admin.UpdateOrderDelayRequest;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import com.gokulsweets.restaurant.staff.PermissionName;
@@ -37,6 +38,8 @@ public class OrderDelayService {
                 .orElseThrow(() -> new IllegalArgumentException("Order does not exist."));
         authorization.requireBranchAccess(order.getBranch().getId());
         authorization.requirePermission(PermissionName.ORDER_MARK_READY);
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY)
+            throw new IllegalStateException("Delivery readiness updates require a revised rider window.");
         if (!REPORTABLE.contains(order.getOrderStatus())) {
             throw new IllegalStateException("Only confirmed or preparing orders can report a revised ready time.");
         }
