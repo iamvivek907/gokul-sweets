@@ -48,6 +48,8 @@ class AdminPrivacyRequestQueueIntegrationTest {
         doThrow(new AccessDeniedException("denied"))
                 .when(staff).requirePermission(PermissionName.PRIVACY_REQUEST_VIEW);
         assertThatThrownBy(() -> queue.view(0)).isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> queue.triage(1, PrivacyReviewState.IN_REVIEW))
+                .isInstanceOf(AccessDeniedException.class);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM customer_privacy_queue_access_audit WHERE staff_user_id = ?", Long.class, actorId))
                 .isZero();
 
@@ -56,11 +58,29 @@ class AdminPrivacyRequestQueueIntegrationTest {
         assertThat(entries).singleElement().satisfies(entry -> {
             assertThat(entry.subjectId()).isEqualTo(subject);
             assertThat(entry.kind()).isEqualTo(PrivacyRequestKind.EXPORT);
+            assertThat(entry.state()).isEqualTo(PrivacyReviewState.RECEIVED);
         });
-        verify(staff, times(2)).requirePermission(PermissionName.PRIVACY_REQUEST_VIEW);
+        verify(staff, times(3)).requirePermission(PermissionName.PRIVACY_REQUEST_VIEW);
         assertThat(jdbc.queryForObject("""
                 SELECT returned_count FROM customer_privacy_queue_access_audit
                 WHERE staff_user_id = ? AND environment = 'DEV'
                 """, Integer.class, actorId)).isEqualTo(1);
+
+        var item = entries.getFirst();
+        assertThatThrownBy(() -> queue.triage(item.id(), PrivacyReviewState.RECEIVED))
+                .isInstanceOf(ResponseStatusException.class);
+        var changed = queue.triage(item.id(), PrivacyReviewState.IN_REVIEW);
+        assertThat(changed.state()).isEqualTo(PrivacyReviewState.IN_REVIEW);
+        queue.triage(item.id(), PrivacyReviewState.IN_REVIEW); // idempotent retry
+        assertThat(jdbc.queryForObject("""
+                SELECT count(*) FROM customer_privacy_triage_events
+                WHERE request_id = ? AND staff_user_id = ? AND from_state = 'RECEIVED'
+                    AND to_state = 'IN_REVIEW'
+                """, Long.class, item.id(), actorId)).isEqualTo(1);
+        var foreign = requests.submit(ConsentEnvironment.PROD, UUID.randomUUID(), PrivacyRequestKind.EXPORT);
+        assertThatThrownBy(() -> queue.triage(foreign.id(), PrivacyReviewState.NEEDS_REVERIFICATION))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(jdbc.queryForObject("SELECT review_state FROM customer_privacy_requests WHERE id = ?",
+                String.class, foreign.id())).isEqualTo("RECEIVED");
     }
 }

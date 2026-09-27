@@ -113,6 +113,18 @@ not claim completion from a received request. Before flag activation, the
 privacy owner and legal reviewer still need an approved processing runbook,
 recipient re-verification, rotation handling, retention schedule and wording.
 
+## Triage checkpoint
+
+V66 lets an authorized owner mark a request **In review** or **Needs
+re-verification** from `/admin/privacy-requests`. Each state change is recorded
+with the acting staff ID and prior/new state in an append-only event; concurrent
+updates lock the request row. An idempotent retry does not duplicate an event.
+The list remains environment-scoped and audited on read. The page shows
+received timestamps in IST and exposes no completion or erase action. The
+`PRIVACY_REQUEST_VIEW` permission is still owner-only. Triage does not contact
+the customer or itself prove identity: the staffed re-verification and
+fulfillment runbook still requires privacy/legal approval before release.
+
 ## Ledger checkpoint
 
 V55 creates an append-only optional consent ledger keyed by a verified subject
