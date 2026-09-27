@@ -120,7 +120,7 @@ export default function ProductGrid({
                     const pickup = pickupItems?.find(item => item.productId === product.id);
                     const unavailable = dateAware && pickup?.available === false;
                     return (
-                        <div key={product.id} className="relative min-w-0">
+                        <div key={product.id} id={`gokul-product-${product.id}`} className="relative min-w-0 scroll-mt-24">
                             {dateAware && (pickup || pickupChecking) && (
                                 <span className={`menu-availability-chip ${unavailable ? "menu-availability-chip--unavailable" : pickupChecking && !pickup ? "menu-availability-chip--checking" : ""}`}>
                                     <span aria-hidden="true">{unavailable ? "!" : pickupChecking && !pickup ? "◌" : "✓"}</span>

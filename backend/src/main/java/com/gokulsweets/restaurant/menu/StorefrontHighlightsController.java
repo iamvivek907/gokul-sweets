@@ -33,7 +33,8 @@ public class StorefrontHighlightsController {
 
     @GetMapping("/api/branches/{branchId}/storefront-highlights")
     public Highlights highlights(@PathVariable Long branchId) {
-        if (!features.isCustomerHomeV2()) return new Highlights(List.of(), List.of());
+        if (!features.isCustomerHomeV2() && !features.isContextualStorefrontV2())
+            return new Highlights(List.of(), List.of());
         LocalDate today = LocalDate.now(inventoryClock);
         CacheKey key = new CacheKey(branchId, today, features.getFutureOrderingDays());
         CacheEntry entry;
