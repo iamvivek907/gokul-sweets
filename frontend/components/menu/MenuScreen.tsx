@@ -988,7 +988,7 @@ export default function MenuScreen() {
                     "
                 >
 
-                    <div
+                    {!pickupCheck.features?.contextualStorefrontV2 && <div
                         className="
                             flex
                             flex-col
@@ -1100,10 +1100,17 @@ export default function MenuScreen() {
 
                         </div>}
 
-                    </div>
+                    </div>}
 
+                {pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
+                    <NewBranchItems branch={branch} products={allProducts} onSelect={product => {
+                        setSearch("");
+                        setSelectedCategoryId(product.categoryId);
+                        requestAnimationFrame(() =>
+                            document.getElementById(`gokul-product-${product.id}`)?.scrollIntoView({behavior: "smooth", block: "center"}));
+                    }} />}
 
-                    {!isLoading
+                    {!pickupCheck.features?.contextualStorefrontV2 && !isLoading
                         &&
                         !error
                         && (
@@ -1147,14 +1154,6 @@ export default function MenuScreen() {
                         )}
 
                 </header>
-
-                {pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
-                    <NewBranchItems branch={branch} products={allProducts} onSelect={product => {
-                        setSearch("");
-                        setSelectedCategoryId(product.categoryId);
-                        requestAnimationFrame(() =>
-                            document.getElementById(`gokul-product-${product.id}`)?.scrollIntoView({behavior: "smooth", block: "center"}));
-                    }} />}
 
                 <PickupContext check={pickupCheck} />
 

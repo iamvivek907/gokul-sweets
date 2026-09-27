@@ -78,7 +78,8 @@ public class StorefrontHighlightsController {
         Map<Long, Boolean> checked = new HashMap<>();
         return new Highlights(availableIds(branchId, today, trending, products, checked),
                 availableIds(branchId, today, recent, products, checked),
-                availableIds(branchId, today, latest, products, checked));
+                // The latest-items display is a catalog preview; pickup suitability is checked for the chosen date.
+                latest.stream().filter(products::containsKey).limit(8).toList());
     }
 
     private List<Long> availableIds(Long branchId, LocalDate today, List<Long> ids,
