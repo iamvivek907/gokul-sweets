@@ -6,6 +6,8 @@ import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
 import com.gokulsweets.restaurant.customer.consent.ConsentLedger;
 import com.gokulsweets.restaurant.customer.consent.ConsentPurpose;
 import com.gokulsweets.restaurant.customer.consent.ConsentDecision;
+import com.gokulsweets.restaurant.customer.consent.CustomerPrivacyRequests;
+import com.gokulsweets.restaurant.customer.consent.PrivacyRequestKind;
 import com.gokulsweets.restaurant.order.service.OrderQueryService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -31,6 +33,7 @@ class CustomerIdentityControllerTest {
     private final IdentityExchangeRateLimiter rateLimiter = mock(IdentityExchangeRateLimiter.class);
     private final IdentityDeviceRegistry devices = mock(IdentityDeviceRegistry.class);
     private final ConsentLedger consents = mock(ConsentLedger.class);
+    private final CustomerPrivacyRequests privacyRequests = mock(CustomerPrivacyRequests.class);
     private final EnhancementProperties features = new EnhancementProperties();
     private final MockEnvironment settings = new MockEnvironment()
             .withProperty("gokul.environment-isolation.enabled", "true")
@@ -39,7 +42,34 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(
             exchange, sessions, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
-            ownership, orders, rateLimiter, devices, consents);
+            ownership, orders, rateLimiter, devices, consents, privacyRequests);
+
+    @Test
+    void privacyRequestsRequireVerifiedSubjectAndTrustedMutation() {
+        features.setCustomerOtpIdentity(true);
+        assertThatThrownBy(() -> controller.submitPrivacyRequest(PrivacyRequestKind.EXPORT, request()))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(privacyRequests);
+
+        features.setCustomerConsentControls(true);
+        settings.withProperty("gokul.consent.policy-version", "2026-09");
+        assertThatThrownBy(() -> controller.submitPrivacyRequest(PrivacyRequestKind.EXPORT, request()))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(privacyRequests);
+
+        var subject = UUID.randomUUID();
+        var valid = request();
+        valid.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
+        when(sessions.subject(eq(ConsentEnvironment.DEV), eq("current-session"), any()))
+                .thenReturn(Optional.of(subject));
+        controller.submitPrivacyRequest(PrivacyRequestKind.DELETION_REVIEW, valid);
+        verify(privacyRequests).submit(ConsentEnvironment.DEV, subject, PrivacyRequestKind.DELETION_REVIEW);
+
+        valid.setSecure(false);
+        assertThatThrownBy(() -> controller.submitPrivacyRequest(PrivacyRequestKind.EXPORT, valid))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(privacyRequests, never()).submit(ConsentEnvironment.DEV, subject, PrivacyRequestKind.EXPORT);
+    }
 
     @Test
     void consentDefaultsOffAndRequiresVerifiedOwnerAndApprovedPolicy() {
