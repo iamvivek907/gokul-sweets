@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.List;
 
@@ -41,7 +42,9 @@ class DeliveryAcceptedQuoteServiceTest {
                 LocalDate.of(2026, 9, 28), List.of(new CreateOrderItemRequest(42L, 1, null)), 26.85, 80.94);
         var draft = new DeliveryOrderCreationService.CreateRequest(quote, 2L,
                 "Customer", "9999999999", "12 Main Road", null);
-        when(preparation.prepare(quote, 2L)).thenReturn(new DeliveryOrderPreparationService.Prepared(null, price, null));
+        var window = new DeliveryCapacityService.Window(2L, 1L, quote.serviceDate(),
+                LocalTime.of(11, 0), LocalTime.NOON, 1, 0, false);
+        when(preparation.prepare(quote, 2L)).thenReturn(new DeliveryOrderPreparationService.Prepared(null, price, window));
         String token = service.preview(draft).token();
         var accepted = new DeliveryOrderCreationService.CreateRequest(quote, 2L,
                 "Customer", "9999999999", "12 Main Road", token);
