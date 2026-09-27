@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.delivery;
 
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.customer.identity.TrustedCheckoutIdentity;
+import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 
@@ -33,8 +34,9 @@ class DeliveryOrderControllerTest {
         flags.setDeliveryLocalityCheck(true);
         flags.setCustomerConsentControls(true);
         flags.setCustomerOtpIdentity(true);
-        var created = new DeliveryOrderCreationService.Created("GKS-ORDER", BigDecimal.ONE,
-                LocalDateTime.of(2026, 9, 27, 20, 0));
+        var created = new DeliveryOrderCreationService.Created(1L, "GKS-ORDER", 2L, 3L,
+                OrderStatus.PENDING_PAYMENT, BigDecimal.ONE,
+                LocalDateTime.of(2026, 9, 27, 20, 0), LocalDateTime.of(2026, 9, 27, 19, 45));
         when(identity.token(servletRequest)).thenReturn("trusted-token");
         when(service.create(null, "key", "trusted-token")).thenReturn(created);
         var response = controller.create("key", null, servletRequest);

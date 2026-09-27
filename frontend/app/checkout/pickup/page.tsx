@@ -358,10 +358,10 @@ function LegacyPickupPage({
 
     const pendingOrder =
         useMemo(
-            () =>
-                parsePendingOrder(
-                    pendingOrderSnapshot
-                ),
+            () => {
+                const order = parsePendingOrder(pendingOrderSnapshot);
+                return order?.fulfillmentType === "DELIVERY" ? null : order;
+            },
             [
                 pendingOrderSnapshot
             ]

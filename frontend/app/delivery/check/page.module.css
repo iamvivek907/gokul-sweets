@@ -22,5 +22,18 @@
 .card .result { padding: 14px; border-radius: 9px; background: #edf6f2; color: #174e48; }
 .notice { margin-top: 36px; padding: 22px; border-left: 3px solid #af7541; background: #f7f1e8; }
 .notice p { margin: 8px 0 0; }
+.checkout { grid-column: 1 / -1; }
+.windows { border: 0; padding: 0; margin: 12px 0; display: grid; gap: 8px; }
+.windows legend { font-weight: 700; font-size: 14px; margin-bottom: 12px; }
+.card .window { margin: 0; display: flex; align-items: center; gap: 14px; padding: 12px 16px;
+    border: 1px solid #c9d7cf; border-radius: 12px; cursor: pointer; }
+.card .window:has(input:checked) { border-color: #165c5b; background: #edf6f2; }
+.card .window input { width: 20px; height: 20px; min-height: 20px; padding: 0; accent-color: #165c5b; }
+.price { margin-top: 24px; border-radius: 16px; padding: 22px; background: #eef4f0; }
+.price .step { margin: 0 0 14px; }
+.price ul { list-style: none; margin: 0; padding: 0; }
+.price li,.total { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; }
+.total { border-top: 1px solid #bed2c7; font-size: 20px; }
+.price .action { width: 100%; text-align: left; }
 :global(.future-storefront) .page { background: #eef3ee; }
 @media (max-width: 760px) { .page { padding: 20px 16px 80px; } .grid { grid-template-columns: 1fr; gap: 16px; } .intro { font-size: 16px; } }

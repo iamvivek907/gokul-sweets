@@ -160,11 +160,15 @@ public class DeliveryOrderCreationService {
     }
 
     private static Created response(Order order) {
-        return new Created(order.getOrderNumber(), order.getTotalAmount(), order.getReservationExpiresAt());
+        return new Created(order.getId(), order.getOrderNumber(), order.getBranch().getId(),
+                order.getDeliveryWindowId(), order.getOrderStatus(), order.getTotalAmount(),
+                order.getReservationExpiresAt(), order.getCreatedAt());
     }
 
     public record CreateRequest(DeliveryCapacityService.QuoteRequest quote, long windowId,
                                 String customerName, String customerPhone, String addressLine,
                                 String acceptedQuoteToken) {}
-    public record Created(String orderNumber, java.math.BigDecimal totalAmount, LocalDateTime reservationExpiresAt) {}
+    public record Created(Long id, String orderNumber, Long branchId, Long windowId,
+                          OrderStatus orderStatus, java.math.BigDecimal totalAmount,
+                          LocalDateTime reservationExpiresAt, LocalDateTime createdAt) {}
 }

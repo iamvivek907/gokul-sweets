@@ -326,6 +326,9 @@ export default function PaymentPage() {
             ]
         );
 
+    const deliveryOrder = pendingOrder?.orderNumber === orderNumber &&
+        pendingOrder.fulfillmentType === "DELIVERY";
+
 
     /*
      * =========================================================
@@ -643,7 +646,7 @@ export default function PaymentPage() {
                 ) {
                     clearPaymentGatewayVisit(response.orderNumber);
 
-                    clearPendingOrder();
+                    if (!deliveryOrder) clearPendingOrder();
                 }
 
 
@@ -653,6 +656,7 @@ export default function PaymentPage() {
             },
             [
                 completePaidPayment,
+                deliveryOrder,
                 persistPayment
             ]
         );
@@ -918,11 +922,13 @@ export default function PaymentPage() {
                                     null
                             ) {
 
-                                clearPendingOrder();
+                                if (!deliveryOrder) clearPendingOrder();
 
 
                                 throw new Error(
-                                    "Your pickup reservation has expired. Your cart is still available, so please choose a pickup slot again."
+                                    deliveryOrder
+                                        ? "Your delivery reservation has expired. Your cart is still available, so please choose another rider window."
+                                        : "Your pickup reservation has expired. Your cart is still available, so please choose a pickup slot again."
                                 );
                             }
 
@@ -938,7 +944,7 @@ export default function PaymentPage() {
                                 "PENDING_PAYMENT"
                             ) {
 
-                                clearPendingOrder();
+                                if (!deliveryOrder) clearPendingOrder();
 
 
                                 throw new Error(
@@ -1062,6 +1068,7 @@ export default function PaymentPage() {
             configurationError,
             paymentPollingV2,
             currentCartFingerprint,
+            deliveryOrder,
             orderNumber,
             pendingOrder,
             router,
@@ -1468,9 +1475,7 @@ export default function PaymentPage() {
         }
 
 
-        router.push(
-            "/checkout/pickup"
-        );
+        router.push(deliveryOrder ? "/delivery/check" : "/checkout/pickup");
     }
 
 
@@ -1786,7 +1791,7 @@ export default function PaymentPage() {
                 "
             >
 
-                <ConfirmedPickupContext orderNumber={orderNumber} />
+                {!deliveryOrder && <ConfirmedPickupContext orderNumber={orderNumber} />}
 
                 <div
                     className="
@@ -2004,7 +2009,7 @@ export default function PaymentPage() {
                                         payment after this order had
                                         already become terminal. We
                                         did not restore the cancelled
-                                        pickup reservation. A full
+                                        {deliveryOrder ? "delivery reservation" : "pickup reservation"}. A full
                                         refund for{" "}
                                         <strong>
                                             {
@@ -2094,7 +2099,7 @@ export default function PaymentPage() {
                                     }
                                 </strong>
                                 . The old order remains cancelled or
-                                failed, and its pickup slot stays
+                                failed, and its {deliveryOrder ? "rider window" : "pickup slot"} stays
                                 released.
                             </p>
 
@@ -2151,7 +2156,7 @@ export default function PaymentPage() {
                                 The automatic refund did not reach
                                 a successful final state. Your old
                                 order has not been restored and no
-                                pickup slot has been re-reserved.
+                                {deliveryOrder ? "rider window" : "pickup slot"} has been re-reserved.
                             </p>
 
 
@@ -2218,7 +2223,7 @@ export default function PaymentPage() {
                                 "
                             >
                                 The order is no longer holding its
-                                pickup reservation. Your cart is
+                                {deliveryOrder ? "delivery reservation" : "pickup reservation"}. Your cart is
                                 still available.
                             </p>
 
@@ -2287,9 +2292,9 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The old pickup reservation has been
+                                The old {deliveryOrder ? "delivery" : "pickup"} reservation has been
                                 released. Your cart is still safe,
-                                so you can choose a new pickup slot.
+                                so you can choose a new {deliveryOrder ? "rider window" : "pickup slot"}.
                             </p>
 
 
@@ -2771,7 +2776,7 @@ export default function PaymentPage() {
                                     hover:bg-[#5d0f1b]
                                 "
                             >
-                                Choose New Pickup Slot
+                                {deliveryOrder ? "Choose New Delivery Window" : "Choose New Pickup Slot"}
                             </button>
 
                         )
