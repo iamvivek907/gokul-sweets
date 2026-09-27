@@ -91,3 +91,5 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 .future-storefront .gokul-branch-switch{position:absolute;top:1.25rem;right:1.5rem;z-index:2;display:inline-flex;align-items:center;min-height:44px;padding:.4rem .8rem;border:1px solid #ffffff91;border-radius:999px;color:white!important;font-size:.8rem;font-weight:800;text-decoration:none;background:#0927258c}
 .future-storefront .gokul-branch-switch:hover{background:#092725}
 @media(max-width:700px){.future-storefront .gokul-branch-switch{position:static;width:max-content;max-width:100%;margin:0 0 1.25rem}}
+/* Keep vertical page scrolling and contained horizontal carousels, without pinch scaling the customer shell. */
+.app-container{touch-action:pan-x pan-y}
