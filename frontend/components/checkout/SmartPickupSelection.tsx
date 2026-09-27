@@ -137,7 +137,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                     <p className="text-xs">Your cart is preserved. Checkout will still validate availability.</p>
                 </div>}
                 {!data && !error && <p role="status" className="mt-5">Checking dates and times for your cart...</p>}
-                {data && <div className={features.checkoutExperienceV2 ? "gokul-pickup-layout mt-6" : "mt-6 space-y-6"}>
+                {data && <div className="mt-6 space-y-6">
                     <div className={features.checkoutExperienceV2 ? "gokul-pickup-options" : "space-y-6"}>
                     {next && !available && <button className="min-h-12 rounded-xl bg-[#fff0dc] px-4 py-3 text-left font-semibold"
                         onClick={() => {
@@ -210,15 +210,6 @@ export default function SmartPickupSelection({features, onFallback}: {
                         </details>}
                     </section>
                     </div>
-                    {features.checkoutExperienceV2 && <aside className="gokul-pickup-summary" aria-label="Your pickup order">
-                        <h2>Your pickup order</h2>
-                        <p>Collect from <strong>{branch?.name}</strong></p>
-                        <ul>{cart.items.map(item => <li key={item.product.id}>
-                            <span>{item.product.name}</span><strong>{item.product.saleMode === "WEIGHT" ? `${item.weightGrams ?? 0} g` : `× ${item.quantity}`}</strong>
-                        </li>)}</ul>
-                        <p>{cart.itemCount} {cart.itemCount === 1 ? "item" : "items"} · INR {cart.subtotal.toFixed(2)} before tax</p>
-                        <Link href="/cart">Review cart</Link>
-                    </aside>}
                 </div>}
                 {message && <p role="alert" className="mt-4 text-red-700">{message}</p>}
                 <div className="mt-6 mb-24 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd6] bg-white p-4">

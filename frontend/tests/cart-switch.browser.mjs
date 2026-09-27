@@ -27,49 +27,38 @@ await page.route("**/api/storefront/features", route => route.fulfill({json: {
     inventoryAutomationV2: false, futureOrderingDays: 30, today: "2026-09-26"
 }}));
 await page.route("**/api/branches", route => route.fulfill({json: [original, nextBranch]}));
-await page.route(`**/api/menu?branchId=${nextBranch.id}`, route => route.fulfill({json: [
-    {...menu[0], products: [{...product, price: product.price + 10}]}
-]}));
-await page.route(`**/api/branches/${nextBranch.id}/pickup-slots?*`, route => route.fulfill({json: [
-    {id: 9999999, branchId: nextBranch.id, active: true, remainingCapacity: 10,
-        priorityEnabled: false, priorityRemainingCapacity: 0, priorityCharge: 0,
-        startTime: "12:00:00", endTime: "12:30:00"}
-]}));
-await page.route(`**/api/branches/${nextBranch.id}/inventory/check`, route => route.fulfill({json: {
-    enforcementEnabled: true, requestedDate: "2026-09-26", orderable: true,
-    items: [{productId: product.id, productName: product.name, orderable: true, availableQuantity: 5000}]
-}}));
+await page.route(`**/api/menu?branchId=${nextBranch.id}`, route => route.fulfill({json: menu}));
 const snapshot = () => page.evaluate(() => ({branch: localStorage.getItem("gokul-selected-branch"),
     cart: localStorage.getItem("gokul-cart")}));
-const openPreview = async () => {
+const openReview = async () => {
     await page.locator('button[popovertarget="branch-selector-popover"]').click();
     await page.getByRole("button", {name: /Synthetic second branch/}).click();
-    await page.getByRole("dialog", {name: "Review cart before switching"}).getByText("Item subtotal:").waitFor();
+    await page.getByRole("dialog", {name: /Start at Synthetic second branch/}).waitFor();
 };
 try {
     await page.goto(base);
     const before = await snapshot();
-    await openPreview();
-    await page.getByRole("button", {name: "Keep current selection"}).click();
+    await openReview();
+    await page.getByRole("button", {name: "Keep my cart"}).click();
     assert.deepEqual(await snapshot(), before, "Cancel preserves branch and cart byte-for-byte.");
 
-    await page.route(`**/api/branches/${nextBranch.id}/inventory/check`, route => route.fulfill({status: 503}));
-    await page.locator('button[popovertarget="branch-selector-popover"]').click();
-    await page.getByRole("button", {name: /Synthetic second branch/}).click();
-    await page.getByText("We couldn't verify this switch.").waitFor();
-    assert.deepEqual(await snapshot(), before, "Network failure cannot switch or lose cart.");
-    await page.getByRole("button", {name: "Keep current selection"}).click();
-    await page.unroute(`**/api/branches/${nextBranch.id}/inventory/check`);
-
-    await openPreview();
+    await openReview();
     await page.evaluate(() => {
         const value = JSON.parse(localStorage.getItem("gokul-cart"));
         value.items[0].quantity += 1;
         localStorage.setItem("gokul-cart", JSON.stringify(value));
         window.dispatchEvent(new Event("gokul-cart-change"));
     });
-    await page.getByRole("button", {name: "Accept and switch"}).click();
-    await page.getByText("Your cart or pickup changed.").waitFor();
-    assert.equal((await snapshot()).branch, before.branch, "Stale preview cannot change branch.");
-    console.log("PASS: cancel, API failure and concurrent cart edit preserve customer state.");
+    await page.getByRole("button", {name: "Clear cart and switch"}).click();
+    await page.getByText("Your cart changed.").waitFor();
+    assert.equal((await snapshot()).branch, before.branch, "Stale review cannot change branch.");
+    await page.getByRole("button", {name: "Keep my cart"}).click();
+
+    await openReview();
+    await page.getByRole("button", {name: "Clear cart and switch"}).click();
+    await page.waitForURL("**/menu");
+    const after = await snapshot();
+    assert.equal(JSON.parse(after.branch).id, nextBranch.id);
+    assert.equal(after.cart, null, "The new branch opens with an empty cart.");
+    console.log("PASS: cancellation and stale cart preserve state; confirmed switch opens new menu with empty cart.");
 } finally {await browser.close();}

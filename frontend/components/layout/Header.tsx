@@ -87,14 +87,12 @@ export default function Header() {
                 </div>}
 
 
-                {futuristic && !pathname.startsWith("/checkout/") && <div className="future-branch-control">
+                {futuristic && pathname !== "/menu" && pathname !== "/branches" && !pathname.startsWith("/checkout/") && <div className="future-branch-control">
                     <span aria-hidden="true" className="future-location-icon">⌖</span>
                     <span className="future-branch-name"><small>PICKUP FROM</small><strong>{branch?.name ?? "Choose a shop"}</strong></span>
-                    {pathname === "/menu" && branch
-                        ? <Link href="/#gokul-branches" className="future-branch-review">Switch branch</Link>
-                        : features?.cartSwitchPreview || cart.isEmpty
-                            ? <BranchSelector compact />
-                            : <Link href="/cart" className="future-branch-review">Review branch</Link>}
+                    {features?.cartSwitchPreview || cart.isEmpty
+                        ? <BranchSelector compact />
+                        : <Link href="/cart" className="future-branch-review">Review branch</Link>}
                 </div>}
 
                 <MobileMenu />

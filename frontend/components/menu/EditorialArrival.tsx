@@ -13,8 +13,8 @@ import type {Branch} from "@/types/branch";
 import type {HomepageCampaign} from "@/types/campaign";
 import styles from "./EditorialArrival.module.css";
 
-export default function EditorialArrival({campaignsEnabled, accessible, onExplore}: {
-    campaignsEnabled: boolean; accessible: boolean; onExplore: () => void;
+export default function EditorialArrival({campaignsEnabled, accessible, onExplore, branchesOnly = false}: {
+    campaignsEnabled: boolean; accessible: boolean; onExplore: () => void; branchesOnly?: boolean;
 }) {
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -75,7 +75,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
         .find(value => value.type === "HERO" && !failed.includes(value.id));
 
     return <div className={`gokul-arrival ${styles.arrival}`}>
-        <section className={styles.hero} aria-labelledby="gokul-arrival-title">
+        {!branchesOnly && <section className={styles.hero} aria-labelledby="gokul-arrival-title">
             {hero && <div className={styles.media}><CampaignMedia
                 campaign={hero} hero immersive accessible={accessible}
                 onUnavailable={() => setFailed(current => [...current, hero.id])}
@@ -100,7 +100,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
                 </div>
             </div>
             <a className={styles.scrollCue} href="#gokul-branches">Scroll to explore <span aria-hidden="true">⌄</span></a>
-        </section>
+        </section>}
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
                 <span>OUR BRANCHES</span><h2>Your next visit starts here.</h2>

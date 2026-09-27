@@ -95,12 +95,4 @@
 .gokul-pickup-time[aria-pressed="true"]{border:2px solid #a83232;background:#fff4ed}.gokul-pickup-time:disabled{opacity:.6}
 .editorial-storefront .gokul-pickup-time:focus-visible{outline:3px solid #168b9d;outline-offset:3px}
 @media(max-width:600px){.editorial-storefront .checkout-experience-v2{margin:.5rem .6rem 2rem}.gokul-pickup-times{grid-template-columns:repeat(2,minmax(0,1fr))}.gokul-pickup-time{padding:.7rem;min-height:5.8rem}.gokul-pickup-time strong{font-size:.95rem}}
-.gokul-pickup-layout{display:grid;grid-template-columns:minmax(0,1fr) 260px;align-items:start;gap:1.5rem}
 .gokul-pickup-options{min-width:0;display:grid;gap:1.5rem}
-.gokul-pickup-summary{position:sticky;top:6rem;border:1px solid #d1ded6;border-radius:1rem;padding:1.25rem;background:#f8faf7;color:#173a37}
-.gokul-pickup-summary h2{font:500 1.5rem Georgia,serif;margin:0 0 1rem}
-.gokul-pickup-summary p{font-size:.88rem;line-height:1.5;color:#435d58}
-.gokul-pickup-summary ul{padding:1rem 0;margin:1rem 0;border-block:1px solid #d1ded6;list-style:none;max-height:270px;overflow-y:auto}
-.gokul-pickup-summary li{display:flex;justify-content:space-between;gap:.5rem;padding:.35rem 0;font-size:.9rem}
-.gokul-pickup-summary a{display:inline-flex;min-height:2.75rem;align-items:center;margin-top:1rem;color:#a83232;font-weight:700;text-decoration:underline}
-@media(max-width:850px){.gokul-pickup-layout{grid-template-columns:1fr}.gokul-pickup-summary{position:static;grid-row:1}}
