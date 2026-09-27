@@ -357,7 +357,7 @@ export default function CartPage() {
                                     </div>
 
 
-                                    <Link
+                                    {!cartMatchesSelectedBranch && <Link
                                         href="/"
                                         className="
                                             shrink-0
@@ -368,7 +368,7 @@ export default function CartPage() {
                                         "
                                     >
                                         Change
-                                    </Link>
+                                    </Link>}
 
                                 </div>
 

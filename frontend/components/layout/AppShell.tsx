@@ -18,6 +18,7 @@ import PickupJourneyContext from "./PickupJourneyContext";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import "./futuristic-storefront.css";
 import "./editorial-storefront.css";
+import "./customer-journey.css";
 
 
 interface AppShellProps {

@@ -115,7 +115,7 @@ export default function ProductGrid({
 
     return (
         <div className={dateAware ? styles.products : undefined}>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
                 {products.map(product => {
                     const pickup = pickupItems?.find(item => item.productId === product.id);
                     const unavailable = dateAware && pickup?.available === false;

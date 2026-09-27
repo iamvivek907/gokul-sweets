@@ -49,7 +49,7 @@ export default function FloatingCartButton({
     return (
         <div
             className="
-                fixed
+                gokul-floating-cart fixed
                 bottom-[calc(5.5rem+env(safe-area-inset-bottom))]
                 left-1/2
                 z-60

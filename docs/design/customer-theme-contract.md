@@ -1,5 +1,9 @@
 # Customer theme contract
 
+## SCRUM-107 owner-approved arrival palette
+
+The arrival screen and approved eight-item menu demo define the shared customer appearance when the effective customer visual flag is on: deep teal `#092725`, hero teal `#143936`, cream `#fffaf2`, coral action `#c76752`, readable ink `#172e2c`, and light bordered surfaces. `frontend/components/layout/customer-journey.css` applies these tokens within `.future-storefront` across menu, cart, checkout, orders, navigation and overlays. The server's effective flags still control the visual shell; the flag-OFF experience is unchanged. Branch cards open the selected live menu, and the shared branch-switch review protects an existing cart. A real paid `CONFIRMED` order alone receives the prominent confirmation tick.
+
 The approved Sprint 2 customer visual direction lives in the shared customer shell. New customer stories inherit it automatically when they render inside `AppShell`; staff and admin screens keep their own design.
 
 ## Implementation rules

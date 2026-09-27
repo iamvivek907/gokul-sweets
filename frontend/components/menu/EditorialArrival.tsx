@@ -87,7 +87,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
                     <button type="button" onClick={onExplore}>Home</button>
                     <Link href="/about">Our story</Link>
                     <a href="#gokul-branches">Our branches</a>
-                    <Link href="/menu" onClick={onExplore}>Order food ↗</Link>
+                    <a href="#gokul-branches">Order food ↗</a>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
@@ -95,8 +95,8 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
                 <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
                 <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
-                    <Link href="/menu" onClick={onExplore}>Order food ↗</Link>
-                    <Link href="/about#our-branches">Plan an occasion</Link>
+                    <a href="#gokul-branches">Order food ↗</a>
+                    <a href="#gokul-branches">Plan an occasion</a>
                 </div>
             </div>
             <a className={styles.scrollCue} href="#gokul-branches">Scroll to explore <span aria-hidden="true">⌄</span></a>
@@ -113,11 +113,11 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
                     <div className={styles.branchCopy}>
                         <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
                         <p>{item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
-                        <button type="button" popoverTarget="branch-selector-popover">Select branch ↗</button>
+                        <span className={styles.cardPrompt}>Explore this branch ↗</span>
                     </div>
+                    <BranchSelector cardBranch={item} />
                 </article>)}
             </div>
-            <div className={styles.selectBranch}><BranchSelector /></div>
             {!branches.length && <p className={styles.branchFallback}>Branch details will appear here when available. You can still explore the menu.</p>}
         </section>
     </div>;
