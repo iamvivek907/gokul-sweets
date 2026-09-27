@@ -39,7 +39,8 @@ export async function getAvailableRebates(
     >(
         `/api/orders/${encodeURIComponent(
             orderNumber
-        )}/available-rebates`
+        )}/available-rebates`,
+        {credentials: "include"}
     );
 }
 
@@ -88,6 +89,7 @@ export async function applyRebate(
         {
             method:
                 "POST",
+            credentials: "include",
 
             body:
                 JSON.stringify(
@@ -122,7 +124,8 @@ export async function removeRebate(
         )}/rebate`,
         {
             method:
-                "DELETE"
+                "DELETE",
+            credentials: "include"
         }
     );
 }
