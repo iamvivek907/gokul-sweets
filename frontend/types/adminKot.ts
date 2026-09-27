@@ -52,13 +52,17 @@ export interface AdminKot {
 
     branchAddress: string;
 
-    pickupDate: string;
+    pickupDate: string | null;
 
-    pickupStartTime: string;
+    pickupStartTime: string | null;
 
-    pickupEndTime: string;
+    pickupEndTime: string | null;
 
-    pickupType: KotPickupType;
+    pickupType: KotPickupType | null;
+    fulfillmentType: "PICKUP" | "DELIVERY";
+    deliveryDate: string | null;
+    deliveryStartTime: string | null;
+    deliveryEndTime: string | null;
 
     startedByStaffId: number;
 

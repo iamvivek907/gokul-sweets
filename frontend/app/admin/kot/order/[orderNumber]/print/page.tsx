@@ -1013,10 +1013,10 @@ export default function AdminKotPrintPage() {
 
 
                         <TicketRow
-                            label="Pickup"
+                            label={kot.fulfillmentType === "DELIVERY" ? "Delivery window" : "Pickup"}
                             value={
                                 formatPickupDate(
-                                    kot.pickupDate
+                                    (kot.fulfillmentType === "DELIVERY" ? kot.deliveryDate : kot.pickupDate) ?? ""
                                 )
                             }
                         />
@@ -1026,9 +1026,9 @@ export default function AdminKotPrintPage() {
                             label="Time"
                             value={
                                 `${formatTime(
-                                    kot.pickupStartTime
+                                    (kot.fulfillmentType === "DELIVERY" ? kot.deliveryStartTime : kot.pickupStartTime) ?? ""
                                 )} - ${formatTime(
-                                    kot.pickupEndTime
+                                    (kot.fulfillmentType === "DELIVERY" ? kot.deliveryEndTime : kot.pickupEndTime) ?? ""
                                 )}`
                             }
                         />
@@ -1037,7 +1037,7 @@ export default function AdminKotPrintPage() {
 
 
                     {
-                        kot.pickupType
+                        kot.fulfillmentType === "PICKUP" && kot.pickupType && kot.pickupType
                         !== "NORMAL"
                         && (
 

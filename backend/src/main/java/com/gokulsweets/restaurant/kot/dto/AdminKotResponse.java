@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.kot.dto;
 
 import com.gokulsweets.restaurant.order.enums.PickupType;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -41,7 +42,11 @@ public record AdminKotResponse(
 
         Integer printCount,
 
-        List<AdminKotItemResponse> items
+        List<AdminKotItemResponse> items,
+        FulfillmentType fulfillmentType,
+        LocalDate deliveryDate,
+        LocalTime deliveryStartTime,
+        LocalTime deliveryEndTime
 
 ) {
 }

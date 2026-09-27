@@ -72,7 +72,11 @@ public record PrintAgentClaimResponse(
 
             LocalDateTime createdAt,
 
-            List<Item> items
+            List<Item> items,
+            com.gokulsweets.restaurant.order.enums.FulfillmentType fulfillmentType,
+            LocalDate deliveryDate,
+            LocalTime deliveryStartTime,
+            LocalTime deliveryEndTime
     ) {
     }
 
