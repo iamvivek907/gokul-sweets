@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.order.dto;
 
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
 
@@ -53,6 +54,13 @@ public record CustomerOrderResponse(
         String branchPhone,
         LocalDateTime estimatedReadyAt,
         String delayReason,
-        LocalDateTime delayReportedAt
+        LocalDateTime delayReportedAt,
+        FulfillmentType fulfillmentType,
+        LocalDate deliveryDate,
+        LocalTime deliveryStartTime,
+        LocalTime deliveryEndTime,
+        String deliveryAddressLine,
+        String deliveryLocality,
+        String deliveryPostalCode
 ) {
 }

@@ -290,7 +290,7 @@ export default function OrdersPage() {
                             My Orders
                         </h1>
                         <p className="mt-2 max-w-xl text-sm leading-6 text-[#756763]">
-                            Track active pickups and find older completed, cancelled or failed orders.
+                            Track active orders and find older completed, cancelled or failed orders.
                         </p>
                     </div>
 
@@ -406,7 +406,7 @@ export default function OrdersPage() {
 
                         <div className="mt-3 grid gap-4 md:grid-cols-2">
                             {monthOrders.map(order => {
-                                const status = getOrderStatusPresentation(order.orderStatus);
+                                const status = getOrderStatusPresentation(order.orderStatus, order.fulfillmentType);
 
                                 return (
                                     <article
@@ -424,7 +424,7 @@ export default function OrdersPage() {
                                         </div>
 
                                         <p className="mt-3 text-xs leading-5 text-[#756763]">{status.message}</p>
-                                        {trackingEnabled && order.estimatedReadyAt && order.delayReportedAt && (
+                                        {trackingEnabled && order.fulfillmentType === "PICKUP" && order.estimatedReadyAt && order.delayReportedAt && (
                                             <p className="mt-2 rounded-xl bg-amber-50 p-3 text-xs text-[#6b3900]">
                                                 Revised ready estimate {formatBusinessTimestamp(order.estimatedReadyAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. Updated {formatBusinessTimestamp(order.delayReportedAt, {hour: "numeric", minute: "2-digit"})} IST. Open this order for help.
                                             </p>
@@ -432,10 +432,12 @@ export default function OrdersPage() {
 
                                         <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl bg-[#fffaf3] p-4 text-sm">
                                             <div>
-                                                <p className="text-xs text-[#756763]">Pickup</p>
-                                                <p className="mt-1 font-semibold text-[#241715]">{formatOrderDate(order.pickupDate)}</p>
+                                                <p className="text-xs text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}</p>
+                                                <p className="mt-1 font-semibold text-[#241715]">{order.fulfillmentType === "DELIVERY" ? order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending" : order.pickupDate ? formatOrderDate(order.pickupDate) : "Time pending"}</p>
                                                 <p className="mt-1 text-xs text-[#756763]">
-                                                    {formatOrderTime(order.pickupStartTime)} – {formatOrderTime(order.pickupEndTime)}
+                                                    {order.fulfillmentType === "DELIVERY"
+                                                        ? order.deliveryStartTime && order.deliveryEndTime ? `${formatOrderTime(order.deliveryStartTime)} – ${formatOrderTime(order.deliveryEndTime)} IST` : ""
+                                                        : order.pickupStartTime && order.pickupEndTime ? `${formatOrderTime(order.pickupStartTime)} – ${formatOrderTime(order.pickupEndTime)}` : ""}
                                                 </p>
                                             </div>
                                             <div>

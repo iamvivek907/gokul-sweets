@@ -260,7 +260,7 @@ export default function OrderDetailPage() {
         useMemo(
             () =>
                 order
-                    ? getOrderStatusPresentation(order.orderStatus)
+                    ? getOrderStatusPresentation(order.orderStatus, order.fulfillmentType)
                     : null,
             [order]
         );
@@ -310,7 +310,7 @@ export default function OrderDetailPage() {
         );
     }
 
-    const showOperationalTimeline =
+    const showOperationalTimeline = order.fulfillmentType === "PICKUP" &&
         [
             "CONFIRMED",
             "PREPARING",
@@ -319,7 +319,8 @@ export default function OrderDetailPage() {
         ].includes(order.orderStatus);
 
     const pendingPreparation = order.orderStatus === "CONFIRMED" || order.orderStatus === "PREPARING";
-    const pastPickupWindow = pendingPreparation &&
+    const pastPickupWindow = order.fulfillmentType === "PICKUP" && pendingPreparation &&
+        !!order.pickupDate && !!order.pickupEndTime &&
         parseBusinessTimestamp(`${order.pickupDate}T${order.pickupEndTime}`).getTime() <= currentOrder.checkedAt;
 
     return (
@@ -356,7 +357,7 @@ export default function OrderDetailPage() {
                         <p className="mt-1 text-sm leading-6">{status.message}</p>
                     </div>
 
-                    {trackingEnabled && order.estimatedReadyAt && order.delayReportedAt && (
+                    {trackingEnabled && order.fulfillmentType === "PICKUP" && order.estimatedReadyAt && order.delayReportedAt && (
                         <div role="status" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-[#241715]">
                             <p className="font-bold">{pendingPreparation ? "Revised ready estimate" : "Previous ready time update"}</p>
                             <p className="mt-1">{formatUpdatedAt(order.estimatedReadyAt)} IST</p>
@@ -415,7 +416,7 @@ export default function OrderDetailPage() {
 
                     <div className="mt-7 grid gap-4 border-t border-[#eadfd6] pt-6 sm:grid-cols-2">
                         <div className="rounded-2xl bg-[#fffaf3] p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">Pickup from</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Preparing at" : "Pickup from"}</p>
                             <p className="mt-2 font-bold text-[#241715]">{order.branchName}</p>
                             <p className="mt-1 text-sm leading-6 text-[#756763]">{order.branchAddress}</p>
                             {trackingEnabled && order.branchPhone && (
@@ -428,14 +429,16 @@ export default function OrderDetailPage() {
                             )}
                         </div>
                         <div className="rounded-2xl bg-[#fffaf3] p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">Pickup time</p>
-                            <p className="mt-2 font-bold text-[#241715]">{formatOrderDate(order.pickupDate)}</p>
-                            <p className="mt-1 text-sm text-[#756763]">
-                                {formatOrderTime(order.pickupStartTime)} – {formatOrderTime(order.pickupEndTime)}
-                            </p>
-                            <p className="mt-2 text-xs font-semibold text-[#7a1625]">
-                                {order.pickupType === "PRIORITY" ? "Priority pickup" : "Normal pickup"}
-                            </p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Delivery window" : "Pickup time"}</p>
+                            {order.fulfillmentType === "DELIVERY" ? <>
+                                <p className="mt-2 font-bold text-[#241715]">{order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Confirming window"}</p>
+                                <p className="mt-1 text-sm text-[#756763]">{order.deliveryStartTime && order.deliveryEndTime ? `${formatOrderTime(order.deliveryStartTime)} – ${formatOrderTime(order.deliveryEndTime)} IST` : "Window pending"}</p>
+                                <p className="mt-2 text-xs text-[#756763]">{order.deliveryAddressLine}, {order.deliveryLocality} {order.deliveryPostalCode}</p>
+                            </> : <>
+                                <p className="mt-2 font-bold text-[#241715]">{order.pickupDate ? formatOrderDate(order.pickupDate) : "Pickup time pending"}</p>
+                                <p className="mt-1 text-sm text-[#756763]">{order.pickupStartTime && order.pickupEndTime ? `${formatOrderTime(order.pickupStartTime)} – ${formatOrderTime(order.pickupEndTime)}` : "Time pending"}</p>
+                                <p className="mt-2 text-xs font-semibold text-[#7a1625]">{order.pickupType === "PRIORITY" ? "Priority pickup" : "Normal pickup"}</p>
+                            </>}
                         </div>
                     </div>
 

@@ -5,17 +5,23 @@ import com.gokulsweets.restaurant.order.dto.CustomerOrderSummaryResponse;
 import com.gokulsweets.restaurant.order.dto.OrderItemResponse;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.entity.OrderItem;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.payment.entity.Payment;
 import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Collections;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Service
 @RequiredArgsConstructor
@@ -26,6 +32,7 @@ public class OrderQueryService {
 
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
+    private final JdbcTemplate jdbc;
 
     @Transactional(readOnly = true)
     public CustomerOrderResponse getCustomerOrder(
@@ -58,15 +65,18 @@ public class OrderQueryService {
                 .map(this::toItemResponse)
                 .toList();
 
+        var window = deliveryWindow(order);
+        var slot = order.getPickupSlot();
+
         return new CustomerOrderResponse(
                 order.getOrderNumber(),
                 order.getOrderStatus(),
                 paymentStatus,
                 order.getBranch().getName(),
                 order.getBranch().getAddress(),
-                order.getPickupSlot().getSlotDate(),
-                order.getPickupSlot().getStartTime(),
-                order.getPickupSlot().getEndTime(),
+                slot == null ? null : slot.getSlotDate(),
+                slot == null ? null : slot.getStartTime(),
+                slot == null ? null : slot.getEndTime(),
                 order.getPickupType(),
                 order.getCustomerName(),
                 maskPhone(order.getCustomerPhone()),
@@ -81,7 +91,14 @@ public class OrderQueryService {
                 order.getBranch().getPhone(),
                 order.getEstimatedReadyAt(),
                 order.getDelayReason(),
-                order.getDelayReportedAt()
+                order.getDelayReportedAt(),
+                order.getFulfillmentType(),
+                window == null ? null : window.date(),
+                window == null ? null : window.start(),
+                window == null ? null : window.end(),
+                order.getDeliveryAddressLine(),
+                order.getDeliveryLocality(),
+                order.getDeliveryPostalCode()
         );
     }
 
@@ -124,27 +141,61 @@ public class OrderQueryService {
                 orders.size()
         );
 
+        List<Long> deliveryWindowIds = orders.stream()
+                .filter(order -> order.getFulfillmentType() == FulfillmentType.DELIVERY)
+                .map(Order::getDeliveryWindowId).distinct().toList();
+        Map<Long, DeliveryWindow> windows = deliveryWindowIds.isEmpty() ? Map.of() : jdbc.query("""
+                SELECT id, service_date, starts_at, ends_at FROM delivery_capacity_windows
+                WHERE id IN (%s)
+                """.formatted(String.join(",", Collections.nCopies(deliveryWindowIds.size(), "?"))),
+                rs -> {
+                    var result = new java.util.HashMap<Long, DeliveryWindow>();
+                    while (rs.next()) result.put(rs.getLong(1), new DeliveryWindow(rs.getDate(2).toLocalDate(),
+                            rs.getTime(3).toLocalTime(), rs.getTime(4).toLocalTime()));
+                    return result;
+                }, deliveryWindowIds.toArray());
         return orders.stream()
-                .map(this::toSummaryResponse)
+                .map(order -> toSummaryResponse(order, windows))
                 .toList();
     }
 
-    private CustomerOrderSummaryResponse toSummaryResponse(Order order) {
+    private CustomerOrderSummaryResponse toSummaryResponse(Order order, Map<Long, DeliveryWindow> windows) {
+        var window = order.getFulfillmentType() == FulfillmentType.DELIVERY
+                ? windows.get(order.getDeliveryWindowId()) : null;
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY && window == null)
+            throw new IllegalStateException("Delivery order is missing its rider window.");
+        var slot = order.getPickupSlot();
         return new CustomerOrderSummaryResponse(
                 order.getOrderNumber(),
                 order.getOrderStatus(),
                 order.getBranch().getName(),
-                order.getPickupSlot().getSlotDate(),
-                order.getPickupSlot().getStartTime(),
-                order.getPickupSlot().getEndTime(),
+                slot == null ? null : slot.getSlotDate(),
+                slot == null ? null : slot.getStartTime(),
+                slot == null ? null : slot.getEndTime(),
                 order.getPickupType(),
                 order.getTotalAmount(),
                 order.getCreatedAt(),
                 order.getUpdatedAt(),
                 order.getEstimatedReadyAt(),
-                order.getDelayReportedAt()
+                order.getDelayReportedAt(),
+                order.getFulfillmentType(),
+                window == null ? null : window.date(),
+                window == null ? null : window.start(),
+                window == null ? null : window.end()
         );
     }
+
+    private DeliveryWindow deliveryWindow(Order order) {
+        if (order.getFulfillmentType() != FulfillmentType.DELIVERY) return null;
+        return jdbc.query("""
+                SELECT service_date, starts_at, ends_at FROM delivery_capacity_windows WHERE id = ?
+                """, (rs, row) -> new DeliveryWindow(rs.getDate(1).toLocalDate(),
+                rs.getTime(2).toLocalTime(), rs.getTime(3).toLocalTime()),
+                order.getDeliveryWindowId()).stream().findFirst()
+                .orElseThrow(() -> new IllegalStateException("Delivery order is missing its rider window."));
+    }
+
+    private record DeliveryWindow(LocalDate date, LocalTime start, LocalTime end) {}
 
     private OrderItemResponse toItemResponse(OrderItem item) {
         return new OrderItemResponse(

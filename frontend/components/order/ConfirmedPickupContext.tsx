@@ -25,11 +25,14 @@ export default function ConfirmedPickupContext({orderNumber, order: providedOrde
 
     if (!features?.persistentPickupContext) return null;
     const order = providedOrder ?? (loaded?.number === orderNumber ? loaded.order : null);
-    return <aside aria-label="Order pickup plan" className="mb-5 rounded-2xl border border-[#eadfd6] bg-white p-4 text-sm">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#756763]">Pickup for this order</p>
+    return <aside aria-label="Order fulfillment plan" className="mb-5 rounded-2xl border border-[#eadfd6] bg-white p-4 text-sm">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#756763]">{order?.fulfillmentType === "DELIVERY" ? "Delivery for this order" : "Pickup for this order"}</p>
         {order ? <><p className="mt-1 font-bold">{order.branchName}</p>
-            <p className="mt-1">{pickupDateLabel(order.pickupDate)} · {formatBusinessTime(order.pickupStartTime)}–{formatBusinessTime(order.pickupEndTime)} IST</p>
-            <p className="mt-1 text-xs text-[#756763]">{order.pickupType === "PRIORITY" ? "Priority" : "Normal"} pickup · Confirm changes with the shop</p></>
+            {order.fulfillmentType === "DELIVERY"
+                ? <><p className="mt-1">{order.deliveryDate && order.deliveryStartTime && order.deliveryEndTime ? `${pickupDateLabel(order.deliveryDate)} · ${formatBusinessTime(order.deliveryStartTime)}–${formatBusinessTime(order.deliveryEndTime)} IST` : "Window pending"}</p>
+                    <p className="mt-1 text-xs text-[#756763]">{order.deliveryAddressLine}, {order.deliveryLocality} {order.deliveryPostalCode}</p></>
+                : <><p className="mt-1">{order.pickupDate && order.pickupStartTime && order.pickupEndTime ? `${pickupDateLabel(order.pickupDate)} · ${formatBusinessTime(order.pickupStartTime)}–${formatBusinessTime(order.pickupEndTime)} IST` : "Pickup time pending"}</p>
+                    <p className="mt-1 text-xs text-[#756763]">{order.pickupType === "PRIORITY" ? "Priority" : "Normal"} pickup · Confirm changes with the shop</p></>}</>
             : <p role="status" className="mt-1 text-[#756763]">{error ? "Pickup details unavailable. Check the order page before collecting." : "Checking confirmed pickup details..."}</p>}
     </aside>;
 }

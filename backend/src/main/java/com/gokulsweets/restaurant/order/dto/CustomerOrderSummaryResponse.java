@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.order.dto;
 
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 
 import java.math.BigDecimal;
@@ -20,6 +21,10 @@ public record CustomerOrderSummaryResponse(
         LocalDateTime createdAt,
         LocalDateTime updatedAt,
         LocalDateTime estimatedReadyAt,
-        LocalDateTime delayReportedAt
+        LocalDateTime delayReportedAt,
+        FulfillmentType fulfillmentType,
+        LocalDate deliveryDate,
+        LocalTime deliveryStartTime,
+        LocalTime deliveryEndTime
 ) {
 }
