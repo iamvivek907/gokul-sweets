@@ -2,6 +2,7 @@
 
 import Image
     from "next/image";
+import {useRef, useState} from "react";
 
 import type {
     CartItem as CartItemType
@@ -98,6 +99,8 @@ export default function CartItem({
         isWeighted
             ? product.price * (weightGrams ?? 0) / 1000
             : product.price * quantity;
+    const [revealed, setRevealed] = useState(false);
+    const touchStart = useRef<{x: number; y: number} | null>(null);
 
 
     return (
@@ -110,10 +113,21 @@ export default function CartItem({
                 border
                 border-[#eadfd6]
                 bg-white
-                p-4
+                relative
                 shadow-[0_4px_16px_rgba(60,30,20,0.06)]
             "
         >
+            <button type="button" className="gokul-cart-swipe-delete" aria-label={`Delete ${product.name} from cart`}
+                onClick={() => onRemove(product.id)}>Delete</button>
+            <div className={`gokul-cart-swipe-content ${revealed ? "is-revealed" : ""}`} onTouchStart={event => {
+                touchStart.current = {x: event.touches[0].clientX, y: event.touches[0].clientY};
+            }} onTouchEnd={event => {
+                if (!touchStart.current) return;
+                const deltaX = event.changedTouches[0].clientX - touchStart.current.x;
+                const deltaY = event.changedTouches[0].clientY - touchStart.current.y;
+                if (Math.abs(deltaX) > 55 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5) setRevealed(deltaX < 0);
+                touchStart.current = null;
+            }}>
 
             <div
                 className="
@@ -253,7 +267,8 @@ export default function CartItem({
                                 active:scale-[0.96]
                             "
                         >
-                            Remove
+                            <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>
+                            <span className="sr-only">Remove</span>
                         </button>
 
                     </div>
@@ -479,6 +494,7 @@ export default function CartItem({
 
             </div>
 
+            </div>
         </article>
     );
 }

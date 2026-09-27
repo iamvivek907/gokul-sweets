@@ -34,7 +34,7 @@ public class StorefrontHighlightsController {
     @GetMapping("/api/branches/{branchId}/storefront-highlights")
     public Highlights highlights(@PathVariable Long branchId) {
         if (!features.isCustomerHomeV2() && !features.isContextualStorefrontV2())
-            return new Highlights(List.of(), List.of());
+            return new Highlights(List.of(), List.of(), List.of());
         LocalDate today = LocalDate.now(inventoryClock);
         CacheKey key = new CacheKey(branchId, today, features.getFutureOrderingDays());
         CacheEntry entry;
@@ -70,9 +70,15 @@ public class StorefrontHighlightsController {
                   AND p.created_at >= ?
                 ORDER BY p.created_at DESC, p.id DESC LIMIT 12
                 """, Long.class, branchId, Date.valueOf(today.minusDays(30)));
+        List<Long> latest = jdbc.queryForList("""
+                SELECT p.id FROM products p JOIN branch_products bp ON bp.product_id = p.id
+                WHERE bp.branch_id = ? AND p.active = true AND bp.available = true
+                ORDER BY p.created_at DESC, p.id DESC LIMIT 20
+                """, Long.class, branchId);
         Map<Long, Boolean> checked = new HashMap<>();
         return new Highlights(availableIds(branchId, today, trending, products, checked),
-                availableIds(branchId, today, recent, products, checked));
+                availableIds(branchId, today, recent, products, checked),
+                availableIds(branchId, today, latest, products, checked));
     }
 
     private List<Long> availableIds(Long branchId, LocalDate today, List<Long> ids,
@@ -88,7 +94,7 @@ public class StorefrontHighlightsController {
                 log.warn("Omitting unorderable storefront highlight: branchId={}, productId={}, reason={}", branchId, id, exception.getMessage());
                 return false;
             }
-        })).limit(4).toList();
+        })).limit(8).toList();
     }
 
     private record CacheKey(Long branchId, LocalDate date, int futureOrderingDays) {}
@@ -97,5 +103,5 @@ public class StorefrontHighlightsController {
         private Instant expiresAt;
     }
 
-    public record Highlights(List<Long> trendingProductIds, List<Long> newProductIds) {}
+    public record Highlights(List<Long> trendingProductIds, List<Long> newProductIds, List<Long> latestProductIds) {}
 }

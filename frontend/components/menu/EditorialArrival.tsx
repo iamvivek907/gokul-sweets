@@ -87,7 +87,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
                     <a href="#gokul-arrival-title" aria-current="page">Home</a>
                     <Link href="/about">Our story</Link>
                     <a href="#gokul-branches">Our branches</a>
-                    <a href="#gokul-branches" className={styles.orderFood}>Order food <span aria-hidden="true" className={styles.orderArrow}>↗</span></a>
+                    <a href="#gokul-branches" className={styles.orderFood}>Order food</a>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
@@ -95,11 +95,11 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
                 <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
                 <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
-                    <a href="#gokul-branches" className={styles.orderFood}>Order food <span aria-hidden="true" className={styles.orderArrow}>↗</span></a>
+                    <a href="#gokul-branches" className={styles.orderFood}>Order food</a>
                     <a href="#gokul-branches">Plan an occasion</a>
                 </div>
             </div>
-            <a className={styles.scrollCue} href="#gokul-branches">Scroll to explore <span aria-hidden="true">⌄</span></a>
+            <a className={styles.scrollCue} href="#gokul-branches">Scroll to explore</a>
         </section>}
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
@@ -113,7 +113,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
                     <div className={styles.branchCopy}>
                         <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
                         <p>{item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
-                        <span className={styles.cardPrompt}>Explore this branch ↗</span>
+                        <span className={styles.cardPrompt}>Explore this branch</span>
                     </div>
                     <BranchSelector cardBranch={item} />
                 </article>)}
