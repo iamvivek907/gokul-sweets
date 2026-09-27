@@ -87,7 +87,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
                     <a href="#gokul-arrival-title" aria-current="page">Home</a>
                     <Link href="/about">Our story</Link>
                     <a href="#gokul-branches">Our branches</a>
-                    <a href="#gokul-branches">Order food ↗</a>
+                    <a href="#gokul-branches" className={styles.orderFood}>Order food <span aria-hidden="true" className={styles.orderArrow}>↗</span></a>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
@@ -95,7 +95,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
                 <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
                 <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
-                    <a href="#gokul-branches">Order food ↗</a>
+                    <a href="#gokul-branches" className={styles.orderFood}>Order food <span aria-hidden="true" className={styles.orderArrow}>↗</span></a>
                     <a href="#gokul-branches">Plan an occasion</a>
                 </div>
             </div>
