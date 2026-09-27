@@ -278,7 +278,9 @@ export default function OrderDetailPage() {
                 order
                     ? order.orderStatus === "CONFIRMED" && order.paymentStatus !== "PAID"
                         ? {label: "Payment verification pending", message: "We cannot confirm payment yet. Check again shortly or contact the branch if you were charged.", tone: "amber" as const}
-                        : getOrderStatusPresentation(order.orderStatus, order.fulfillmentType)
+                        : order.orderStatus === "CONFIRMED" && order.paymentStatus === "PAID"
+                            ? {...getOrderStatusPresentation(order.orderStatus, order.fulfillmentType), tone: "green" as const}
+                            : getOrderStatusPresentation(order.orderStatus, order.fulfillmentType)
                     : null,
             [order]
         );
@@ -420,7 +422,9 @@ export default function OrderDetailPage() {
                                                 completed
                                                     ? "border-green-600 bg-green-600 text-white!"
                                                     : current
-                                                        ? "border-[#7a1625] bg-[#fff4e5] text-[#7a1625]"
+                                                        ? order.orderStatus === "CONFIRMED" && order.paymentStatus === "PAID"
+                                                            ? "border-green-600 bg-green-50 text-green-800"
+                                                            : "border-[#7a1625] bg-[#fff4e5] text-[#7a1625]"
                                                         : "border-[#d8cbc3] bg-white text-[#9b8b84]"
                                             }`}>
                                                 {completed ? "✓" : index + 1}

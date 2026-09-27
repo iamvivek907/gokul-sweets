@@ -6,19 +6,28 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 export default function AccessibleOrderingRuntime() {
     const enabled = useStorefrontFeatures()?.accessibleOrderingV2 === true;
     useEffect(() => {
+        const preventCustomerPinch = (event: Event) => {
+            const target = event.target;
+            if (target instanceof Element && target.closest(".app-container")) event.preventDefault();
+        };
+        const preventMultiTouch = (event: TouchEvent) => {
+            if (event.touches.length > 1) preventCustomerPinch(event);
+        };
+        document.addEventListener("gesturestart", preventCustomerPinch, {passive: false});
+        document.addEventListener("gesturechange", preventCustomerPinch, {passive: false});
+        document.addEventListener("touchmove", preventMultiTouch, {passive: false});
+        return () => {
+            document.removeEventListener("gesturestart", preventCustomerPinch);
+            document.removeEventListener("gesturechange", preventCustomerPinch);
+            document.removeEventListener("touchmove", preventMultiTouch);
+        };
+    }, []);
+    useEffect(() => {
         if (!enabled) return;
         const root = document.documentElement;
         root.dataset.accessibleOrdering = "true";
-        // Next owns the viewport tag; change its content only while the feature is enabled.
-        // iOS browsers otherwise refuse pinch zoom because the legacy layout caps scale at 1.
-        const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-        const previous = viewport?.content;
-        if (viewport) viewport.content = (previous ?? "width=device-width, initial-scale=1")
-            .replace(/,?\s*maximum-scale\s*=\s*[^,]+/gi, "")
-            .replace(/,?\s*user-scalable\s*=\s*no/gi, "");
         return () => {
             delete root.dataset.accessibleOrdering;
-            if (viewport && previous !== undefined) viewport.content = previous;
         };
     }, [enabled]);
     return null;
