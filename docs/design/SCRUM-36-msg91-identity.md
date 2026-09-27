@@ -113,8 +113,10 @@ bound to a subject. A missing or wrong session receives 404, while orders that
 were placed as guests retain the order-number capability flow. Checkout sends
 the secure cookie with these requests. Validate PhonePe and Razorpay return
 flows in DEV before enabling this guard: an external payment return in a new
-browser context may not have the original session. Additional order-bound
-offers/rebates and guest capability routes need a separate authorization audit.
+browser context may not have the original session. Available rebate lookup,
+apply and removal use the same verified-order guard and send credentials.
+Guest order-number capability routes still require a separate authorization
+audit before treating an order number as sufficient proof of ownership.
 
 Behind a reverse proxy, set `GOKUL_IDENTITY_TRUSTED_PROXY_CIDRS` to the narrow
 numeric CIDRs of the proxies directly connected to the API (comma separated).
