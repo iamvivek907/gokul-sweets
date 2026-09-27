@@ -39,7 +39,7 @@ class DeliveryCustomerOrderViewIntegrationTest {
                 INSERT INTO delivery_rider_holds(hold_key, window_id, request_fingerprint, state, expires_at)
                 VALUES (?, ?, ?, 'COMMITTED', CURRENT_TIMESTAMP + INTERVAL '1 hour')
                 """, hold, window, "a".repeat(64));
-        String orderNumber = "DCV-" + key;
+        String orderNumber = ("DCV-" + key).toUpperCase(java.util.Locale.ROOT);
         jdbc.update("""
                 INSERT INTO orders(order_number, branch_id, customer_name, customer_phone, order_status,
                                    reservation_expires_at, fulfillment_type, delivery_window_id, delivery_hold_key,
