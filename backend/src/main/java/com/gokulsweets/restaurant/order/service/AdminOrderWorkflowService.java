@@ -5,6 +5,7 @@ import com.gokulsweets.restaurant.kot.service.KotService;
 import com.gokulsweets.restaurant.order.dto.admin.AdminOrderDetailResponse;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PreparationBatchResult;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
@@ -91,6 +92,9 @@ public class AdminOrderWorkflowService {
                         order.getBranch()
                                 .getId()
                 );
+
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY)
+            throw new IllegalStateException("Delivery status workflow is not configured yet.");
 
 
         OrderStatus currentStatus =
