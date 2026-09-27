@@ -78,6 +78,12 @@ underscores or hyphens). Without these dependencies, requests return 404 and
 the profile shows no controls. Order contact and guest pickup remain separate.
 This checkpoint does not activate marketing, occasion sends or area analytics;
 those send/event paths must read the current ledger choice before operating.
+`OptionalProcessingGate` provides that server-side check: it fails closed when
+flags/dependencies are OFF, the subject or environment changes, the policy
+version changes, or a withdrawal is recorded. Future optional send/event
+implementations must call it immediately before processing; the storefront
+choice and a previously queued message are not evidence of current consent.
+No optional send or analytics path is enabled by this checkpoint.
 Retention/export/deletion and legal/privacy wording still need review; do not
 enable the flag until the reviewed policy is available. No device coordinates
 are requested or stored by these controls.
