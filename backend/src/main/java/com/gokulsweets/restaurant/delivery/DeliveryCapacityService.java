@@ -1,6 +1,8 @@
 package com.gokulsweets.restaurant.delivery;
 
 import com.gokulsweets.restaurant.config.EnhancementProperties;
+import com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,7 @@ public class DeliveryCapacityService {
     private final DeliveryZoneService zones;
     private final JdbcTemplate jdbc;
     private final Clock inventoryClock;
+    private final DeliveryStockCheck stock;
 
     public boolean enabled() { return flags.isDeliveryCapacity() && zones.enabled(); }
 
@@ -76,13 +79,15 @@ public class DeliveryCapacityService {
     @Transactional(readOnly = true)
     public Quote quote(QuoteRequest request) {
         requireEnabled();
-        if (request.productIds() == null || request.productIds().isEmpty())
+        if (request.items() == null || request.items().isEmpty() || request.items().size() > 50)
             return unavailable("Add products before checking delivery capability.");
+        if (request.items().stream().anyMatch(item -> item == null || item.productId() == null
+                || item.productId() <= 0)) return unavailable("Review the items in your cart.");
         LocalDate today = LocalDate.now(inventoryClock);
         if (request.serviceDate().isBefore(today) || request.serviceDate().isAfter(today.plusDays(30)))
             return unavailable("Choose a date within the next 30 IST business days.");
-        List<Long> productIds = request.productIds().stream().distinct().toList();
-        if (productIds.size() != request.productIds().size()) return unavailable("Choose each item only once.");
+        List<Long> productIds = request.items().stream().map(CreateOrderItemRequest::productId).distinct().toList();
+        if (productIds.size() != request.items().size()) return unavailable("Choose each item only once.");
         // Only exact zone, branch and active catalog matches qualify. No inferred radius or pickup slot reuse.
         var zoneIds = jdbc.queryForList("""
                 SELECT z.id FROM delivery_zones z JOIN branches b ON b.id = z.branch_id
@@ -101,6 +106,8 @@ public class DeliveryCapacityService {
                 Long.class, params(request.branchId(), zoneId, productIds));
         if (eligibleProducts == null || eligibleProducts != productIds.size())
             return unavailable("One or more products are not offered for delivery in this area.");
+        var dailyStock = stock.check(request.branchId(), request.serviceDate(), request.items());
+        if (!dailyStock.available()) return unavailable(dailyStock.reason());
         var windows = jdbc.query("""
                 SELECT w.id, w.zone_id, w.service_date, w.starts_at, w.ends_at,
                        w.rider_capacity, w.reserved_count, w.paused
@@ -143,6 +150,6 @@ public class DeliveryCapacityService {
     public record QuoteRequest(@Positive long branchId, @NotBlank @Size(min = 2, max = 120) String locality,
                                @NotBlank @Pattern(regexp = "[0-9]{6}") String postalCode,
                                @NotNull LocalDate serviceDate,
-                               @NotEmpty @Size(max = 50) List<@NotNull @Positive Long> productIds) {}
+                               @NotEmpty @Size(max = 50) List<@NotNull @Valid CreateOrderItemRequest> items) {}
     public record Quote(List<Window> provisionalWindows, boolean orderable, String notice) {}
 }
