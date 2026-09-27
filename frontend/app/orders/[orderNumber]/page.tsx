@@ -361,7 +361,7 @@ export default function OrderDetailPage() {
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                             <p className="text-xs font-bold uppercase tracking-wide text-[#c88a20]">Order tracking</p>
-                            <h1 className="mt-2 break-all text-xl font-bold text-[#241715] sm:text-2xl">
+                            <h1 data-copyable className="mt-2 break-all text-xl font-bold text-[#241715] sm:text-2xl">
                                 {order.orderNumber}
                             </h1>
                             <p className="mt-2 text-xs text-[#756763]">

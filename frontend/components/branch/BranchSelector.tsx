@@ -3,6 +3,7 @@
 import {
     useEffect,
     useId,
+    useRef,
     useState
 } from "react";
 
@@ -14,18 +15,37 @@ import {
     useSelectedBranch
 } from "@/hooks/useSelectedBranch";
 import {useCart} from "@/hooks/useCart";
-import {usePickupIntent, savePickupIntent} from "@/hooks/usePickupIntent";
-import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useRouter} from "next/navigation";
 import {createPortal} from "react-dom";
-import {saveCart} from "@/lib/cartStorage";
+import {clearStoredCart, getCartSnapshot} from "@/lib/cartStorage";
 import {clearPickupSlot} from "@/lib/checkoutStorage";
-import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
-import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 
 import type {
     Branch
 } from "@/types/branch";
+
+function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
+    branchName: string; itemCount: number; onKeep: () => void; onConfirm: () => void;
+}) {
+    const dialogId = useId();
+    const originalCart = useRef<string | null>(null);
+    const [changed, setChanged] = useState(false);
+    useEffect(() => {
+        const dialog = document.getElementById(dialogId) as HTMLDialogElement | null;
+        originalCart.current = getCartSnapshot();
+        dialog?.showModal();
+        return () => dialog?.close();
+    }, [dialogId]);
+    return <dialog id={dialogId} aria-labelledby={`${dialogId}-title`} onCancel={onKeep} className="m-auto w-[calc(100vw-2rem)] max-w-md rounded-2xl border border-[#d9e5df] bg-white p-5 text-[#172e2c] shadow-xl backdrop:bg-black/60">
+        <h2 id={`${dialogId}-title`} className="text-xl font-bold">Start at {branchName}?</h2>
+        <p className="mt-3 text-sm leading-6">Your current cart has {itemCount} {itemCount === 1 ? "item" : "items"} from another branch. Switching will clear that cart and open {branchName} with an empty cart. Your placed orders are unaffected.</p>
+        {changed && <p role="alert" className="mt-3 text-sm text-red-700">Your cart changed. Close this review and choose the branch again.</p>}
+        <div className="mt-5 flex flex-wrap gap-3">
+            <button type="button" onClick={onKeep} className="min-h-11 rounded-xl border px-4 font-semibold">Keep my cart</button>
+            <button type="button" disabled={changed} onClick={() => originalCart.current === getCartSnapshot() ? onConfirm() : setChanged(true)} className="min-h-11 rounded-xl bg-[#143936] px-4 font-semibold text-white disabled:opacity-50">Clear cart and switch</button>
+        </div>
+    </dialog>;
+}
 
 
 export default function BranchSelector({compact = false, cardBranch}: {compact?: boolean; cardBranch?: Branch}) {
@@ -39,8 +59,6 @@ export default function BranchSelector({compact = false, cardBranch}: {compact?:
     } =
         useSelectedBranch();
     const cart = useCart();
-    const features = useStorefrontFeatures();
-    const pickup = usePickupIntent(branch?.id);
     const [proposedBranch, setProposedBranch] = useState<Branch | null>(null);
 
 
@@ -166,7 +184,7 @@ export default function BranchSelector({compact = false, cardBranch}: {compact?:
         selectedBranch: Branch
     ) {
 
-        if (features?.cartSwitchPreview && branch?.id !== selectedBranch.id && !cart.isEmpty) {
+        if (!cart.isEmpty && cart.branchId !== selectedBranch.id) {
             setProposedBranch(selectedBranch);
             closePopover();
             return;
@@ -177,7 +195,7 @@ export default function BranchSelector({compact = false, cardBranch}: {compact?:
         );
 
         closePopover();
-        if (cardBranch) router.push("/menu");
+        router.push("/menu");
     }
 
     function closePopover() {
@@ -203,21 +221,14 @@ export default function BranchSelector({compact = false, cardBranch}: {compact?:
         }
     }
 
-    function confirmSwitch(preview: CartSwitchPreview) {
+    function confirmSwitch() {
         if (!proposedBranch) return;
-        if (!preview.conflicts) {
-            // Replace prices only with the verified destination menu; preserve quantities and weights.
-            saveCart({branchId: proposedBranch.id, items: preview.lines.map(line => ({
-                ...line.item, product: line.proposed!
-            }))});
-        }
-        // A conflicted cart remains attached to its original branch and cannot be silently checked out.
+        clearStoredCart();
         clearPickupSlot();
-        savePickupIntent(proposedBranch.id, preview.date);
         selectBranch(proposedBranch);
         setProposedBranch(null);
         closePopover();
-        if (cardBranch) router.push("/menu");
+        router.push("/menu");
     }
 
 
@@ -243,9 +254,8 @@ export default function BranchSelector({compact = false, cardBranch}: {compact?:
     return (
         <div>
 
-            {proposedBranch && createPortal(<CartSwitchDialog branchId={proposedBranch.id} branchName={proposedBranch.name}
-                date={pickup.date ?? features?.today ?? ""} items={cart.items}
-                onKeep={() => setProposedBranch(null)} onSwitch={confirmSwitch} />, document.body)}
+            {proposedBranch && createPortal(<StartFreshDialog branchName={proposedBranch.name} itemCount={cart.itemCount}
+                onKeep={() => setProposedBranch(null)} onConfirm={confirmSwitch} />, document.body)}
 
             {cardBranch ? <button type="button" className="gokul-branch-card-action"
                 aria-label={`Explore ${cardBranch.name} menu and pickup choices`}

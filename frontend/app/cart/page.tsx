@@ -358,7 +358,7 @@ export default function CartPage() {
 
 
                                     {!cartMatchesSelectedBranch && <Link
-                                        href="/"
+                                        href="/branches"
                                         className="
                                             shrink-0
                                             text-sm

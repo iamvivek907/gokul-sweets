@@ -376,7 +376,7 @@ export default function ProductCard({
                     ${refined ? "flex-wrap" : ""}
                 `}>
 
-                    <span className="
+                    <span data-copyable className="
                         text-sm
                         font-bold
                         text-[#241715]
