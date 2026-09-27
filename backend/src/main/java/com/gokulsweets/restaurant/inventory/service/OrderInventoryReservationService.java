@@ -14,18 +14,21 @@ import com.gokulsweets.restaurant.inventory.repository.BranchInventoryPolicyRepo
 import com.gokulsweets.restaurant.inventory.repository.InventoryDailyAllocationRepository;
 import com.gokulsweets.restaurant.inventory.repository.InventoryReservationRepository;
 import com.gokulsweets.restaurant.order.entity.Order;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.service.model.ValidatedOrderData;
 import com.gokulsweets.restaurant.order.service.model.ValidatedOrderItem;
 import com.gokulsweets.restaurant.product.ProductSaleMode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.*;
 
 @Service
@@ -43,6 +46,7 @@ public class OrderInventoryReservationService {
     private final Clock inventoryClock;
     private final com.gokulsweets.restaurant.config.EnhancementProperties features;
     private final com.gokulsweets.restaurant.order.service.SmartOrderingRules smartOrderingRules;
+    private final JdbcTemplate jdbc;
 
     /*
      * Synchronizes the complete pending order, not one item at a time.
@@ -68,10 +72,44 @@ public class OrderInventoryReservationService {
             return;
         }
 
-        validatePendingOrder(order, validatedOrder);
+        validatePendingOrder(order, validatedOrder, FulfillmentType.PICKUP);
 
         LocalDate serviceDate =
                 validatedOrder.pickupSlot().getSlotDate();
+
+        synchronizePendingInventory(order, validatedOrder, serviceDate,
+                validatedOrder.pickupSlot().getStartTime(), pickupChanged);
+    }
+
+    /** Only a held window belonging to this order's branch can supply the inventory service date. */
+    @Transactional
+    public void synchronizePendingDeliveryOrder(Order order, ValidatedOrderData validatedOrder) {
+        if (!properties.isEnforcementEnabled() || !features.isDeliveryRiderHolds())
+            throw new IllegalStateException("Delivery inventory reservation is disabled.");
+        validatePendingOrder(order, validatedOrder, FulfillmentType.DELIVERY);
+        if (order.getDeliveryWindowId() == null || order.getDeliveryHoldKey() == null)
+            throw new IllegalArgumentException("Delivery window and hold are required.");
+        var windows = jdbc.query("""
+                SELECT w.service_date, w.starts_at FROM delivery_capacity_windows w
+                JOIN delivery_zones z ON z.id = w.zone_id
+                JOIN delivery_rider_holds h ON h.window_id = w.id
+                WHERE w.id = ? AND h.hold_key = ? AND z.branch_id = ?
+                  AND h.state = 'HELD' AND h.expires_at > ? AND h.expires_at >= ?
+                FOR UPDATE OF h
+                """, (rs, row) -> new WindowStart(rs.getDate(1).toLocalDate(), rs.getTime(2).toLocalTime()),
+                order.getDeliveryWindowId(), order.getDeliveryHoldKey(), order.getBranch().getId(),
+                java.sql.Timestamp.from(inventoryClock.instant()),
+                java.sql.Timestamp.from(order.getReservationExpiresAt()
+                        .atZone(java.time.ZoneId.of("Asia/Kolkata")).toInstant()));
+        if (windows.isEmpty()) throw new InventoryConflictException("DELIVERY_HOLD_UNAVAILABLE",
+                "The selected delivery window is no longer reserved for this order.");
+        WindowStart window = windows.getFirst();
+        synchronizePendingInventory(order, validatedOrder, window.date(), window.start(), false);
+    }
+
+    private void synchronizePendingInventory(Order order, ValidatedOrderData validatedOrder,
+                                             LocalDate serviceDate, LocalTime serviceStart, boolean pickupChanged) {
+        LocalDateTime serviceAt = LocalDateTime.of(serviceDate, serviceStart);
 
         Map<Long, RequestedHold> requested =
                 buildRequestedHolds(
@@ -100,7 +138,8 @@ public class OrderInventoryReservationService {
                 // Same-date holds can be reused, but moving to an earlier slot must still meet preparation promises.
                 var locked = lockAllRequiredAllocations(existing, requested);
                 for (RequestedHold hold : requested.values()) {
-                    validatePolicyForOrder(order, requireLockedAllocation(locked, hold.key()), requirePolicy(hold.branchProductId()));
+                    validatePolicyForOrder(order, requireLockedAllocation(locked, hold.key()),
+                            requirePolicy(hold.branchProductId()), serviceAt);
                 }
             }
             return;
@@ -131,7 +170,8 @@ public class OrderInventoryReservationService {
             validatePolicyForOrder(
                     order,
                     allocation,
-                    policy
+                    policy,
+                    serviceAt
             );
 
             BigDecimal quantity =
@@ -224,7 +264,7 @@ public class OrderInventoryReservationService {
         }
 
         log.info(
-                "Pending-order inventory synchronized: orderNumber={}, pickupDate={}, itemCount={}, expiresAt={}",
+                "Pending-order inventory synchronized: orderNumber={}, serviceDate={}, itemCount={}, expiresAt={}",
                 order.getOrderNumber(),
                 serviceDate,
                 requested.size(),
@@ -539,20 +579,20 @@ public class OrderInventoryReservationService {
     private void validatePolicyForOrder(
             Order order,
             InventoryDailyAllocation allocation,
-            BranchInventoryPolicy policy
+            BranchInventoryPolicy policy,
+            LocalDateTime serviceAt
     ) {
-        if (features.isSmartAvailability()) {
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY && !policy.isOnlineEnabled())
+            throw new InventoryConflictException("DELIVERY_INVENTORY_OFFLINE",
+                    "One or more products are not available for delivery online.");
+        if (features.isSmartAvailability() && order.getFulfillmentType() == FulfillmentType.PICKUP) {
             String reason = smartOrderingRules.preparationReason(order.getPickupSlot(), policy, allocation);
             if (reason != null) throw new InventoryConflictException("PICKUP_NOT_READY", reason);
         }
         LocalDateTime now = LocalDateTime.now(inventoryClock);
-        LocalDate pickupDate = order.getPickupSlot().getSlotDate();
-        LocalDateTime pickupAt = LocalDateTime.of(
-                pickupDate,
-                order.getPickupSlot().getStartTime()
-        );
+        LocalDate serviceDate = serviceAt.toLocalDate();
 
-        if (pickupDate.isAfter(
+        if (serviceDate.isAfter(
                 now.toLocalDate().plusDays(policy.getBookingHorizonDays())
         )) {
             throw new InventoryConflictException(
@@ -563,14 +603,14 @@ public class OrderInventoryReservationService {
             );
         }
 
-        if (pickupAt.isBefore(
+        if (serviceAt.isBefore(
                 now.plusMinutes(policy.getProductionLeadMinutes())
         )) {
             throw new InventoryConflictException(
                     "PRODUCTION_LEAD_TIME_NOT_MET",
                     "This product needs at least "
                             + policy.getProductionLeadMinutes()
-                            + " minutes of preparation time. Please choose a later pickup slot."
+                            + " minutes of preparation time. Please choose a later service window."
             );
         }
 
@@ -609,7 +649,8 @@ public class OrderInventoryReservationService {
 
     private void validatePendingOrder(
             Order order,
-            ValidatedOrderData validatedOrder
+            ValidatedOrderData validatedOrder,
+            FulfillmentType expectedType
     ) {
         if (
                 order == null
@@ -617,7 +658,11 @@ public class OrderInventoryReservationService {
                         || order.getOrderNumber().isBlank()
                         || order.getReservationExpiresAt() == null
                         || validatedOrder == null
-                        || validatedOrder.pickupSlot() == null
+                        || order.getFulfillmentType() != expectedType
+                        || (expectedType == FulfillmentType.PICKUP && validatedOrder.pickupSlot() == null)
+                        || (expectedType == FulfillmentType.DELIVERY &&
+                            (validatedOrder.pickupSlot() != null || validatedOrder.pickupType() != null
+                                    || order.getPickupSlot() != null || order.getPickupType() != null))
                         || validatedOrder.items() == null
                         || validatedOrder.items().isEmpty()
         ) {
@@ -723,6 +768,8 @@ public class OrderInventoryReservationService {
         }
         return reason.trim();
     }
+
+    private record WindowStart(LocalDate date, LocalTime start) {}
 
     private record RequestedHold(
             Long branchProductId,
