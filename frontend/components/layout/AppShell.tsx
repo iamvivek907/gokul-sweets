@@ -15,6 +15,7 @@ import SocialFollowPopup
 import CustomerFooter
     from "./CustomerFooter";
 import PickupJourneyContext from "./PickupJourneyContext";
+import CustomerBreadcrumbs from "./CustomerBreadcrumbs";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import "./futuristic-storefront.css";
 import "./editorial-storefront.css";
@@ -70,6 +71,7 @@ export default function AppShell({
                     overflow-x-clip
                 "
             >
+                {futuristic && <CustomerBreadcrumbs />}
                 {children}
             </main>
 

@@ -13,7 +13,6 @@ export default function BranchMenuGallery({branch, products}: {branch: Branch; p
 
     return <div className="gokul-branch-gallery">
         <div className="gokul-branch-intro">
-            <Link href="/branches" className="gokul-branch-switch">Switch branch ↗</Link>
             <p className="gokul-overline">Gokul Sweets &amp; Restaurants / Pickup menu</p>
             <h1>{branch.name}</h1>
             <p>Fresh sweets, snacks and meals from your chosen branch. Browse the live menu and choose a pickup time at checkout.</p>

@@ -1047,7 +1047,7 @@ export default function MenuScreen() {
                         </div>
 
 
-                        <div
+                        {!pickupCheck.features?.contextualStorefrontV2 && <div
                             className="
                                 rounded-2xl
                                 border
@@ -1098,7 +1098,7 @@ export default function MenuScreen() {
                                 Change branch
                             </Link>
 
-                        </div>
+                        </div>}
 
                     </div>
 

@@ -48,10 +48,10 @@ function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
 }
 
 
-export default function BranchSelector({compact = false, cardBranch}: {compact?: boolean; cardBranch?: Branch}) {
+export default function BranchSelector({compact = false, locationControl = false, cardBranch}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch}) {
     const router = useRouter();
     const uniqueId = useId();
-    const popoverId = compact || cardBranch ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
+    const popoverId = compact || locationControl || cardBranch ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
 
     const {
         branch,
@@ -264,7 +264,7 @@ export default function BranchSelector({compact = false, cardBranch}: {compact?:
             </button> : <button
                 type="button"
                 popoverTarget={popoverId}
-                className={compact ? "min-h-11 font-semibold text-[#7a1625] underline" : `
+                className={locationControl ? "gokul-location-control" : compact ? "min-h-11 font-semibold text-[#7a1625] underline" : `
                     w-full
                     rounded-2xl
                     border
@@ -278,7 +278,11 @@ export default function BranchSelector({compact = false, cardBranch}: {compact?:
                 `}
             >
 
-                {compact ? "Change branch" : <>
+                {locationControl ? <>
+                    <span className="gokul-location-pin" aria-hidden="true">●</span>
+                    <span className="gokul-location-name"><small>PICKUP BRANCH</small><strong>{branch?.name ?? "Choose branch"}</strong></span>
+                    <span className="gokul-location-chevron" aria-hidden="true">⌄</span>
+                </> : compact ? "Change branch" : <>
 
                 <div
                     className="
