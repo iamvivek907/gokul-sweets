@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.order.repository;
 
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
@@ -96,6 +97,10 @@ public interface OrderRepository
     long countByBranchIdAndOrderStatus(
             Long branchId,
             OrderStatus orderStatus
+    );
+
+    long countByBranchIdAndOrderStatusAndFulfillmentType(
+            Long branchId, OrderStatus orderStatus, FulfillmentType fulfillmentType
     );
 
 

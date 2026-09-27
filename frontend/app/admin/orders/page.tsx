@@ -2386,7 +2386,10 @@ export default function AdminOrdersPage() {
                                     ?? "",
                                 order.pickupDate,
                                 order.pickupStartTime,
-                                order.pickupEndTime
+                                order.pickupEndTime,
+                                order.deliveryDate,
+                                order.deliveryStartTime,
+                                order.deliveryEndTime
                             ]
                                 .join(
                                     " "
@@ -4377,9 +4380,7 @@ function PreparationQueueCard({
                                     Type:
                                 </strong>{" "}
                                 {
-                                    formatPickupType(
-                                        order.pickupType
-                                    )
+                                    formatPickupType(order.pickupType)
                                 }
                             </span>
 
@@ -4604,17 +4605,19 @@ function OrderCard({
                     >
 
                         <InfoItem
-                            label="Pickup date"
+                            label={order.fulfillmentType === "DELIVERY" ? "Delivery date" : "Pickup date"}
                             value={
-                                order.pickupDate
+                                (order.fulfillmentType === "DELIVERY" ? order.deliveryDate : order.pickupDate) ?? "—"
                             }
                         />
 
 
                         <InfoItem
-                            label="Pickup time"
+                            label={order.fulfillmentType === "DELIVERY" ? "Delivery window (IST)" : "Pickup time"}
                             value={
-                                `${order.pickupStartTime} - ${order.pickupEndTime}`
+                                order.fulfillmentType === "DELIVERY"
+                                    ? `${order.deliveryStartTime ?? "—"} - ${order.deliveryEndTime ?? "—"}`
+                                    : `${order.pickupStartTime ?? "—"} - ${order.pickupEndTime ?? "—"}`
                             }
                         />
 
@@ -4622,9 +4625,7 @@ function OrderCard({
                         <InfoItem
                             label="Pickup type"
                             value={
-                                formatPickupType(
-                                    order.pickupType
-                                )
+                                order.fulfillmentType === "DELIVERY" ? "Delivery" : formatPickupType(order.pickupType ?? "NORMAL")
                             }
                         />
 
@@ -4795,7 +4796,7 @@ function OrderDetailDrawer({
     useRouter();
 
     const nextStatus =
-        order
+        order?.fulfillmentType === "PICKUP"
             ? getNextOrderStatus(
                 order.orderStatus
             )
@@ -5616,7 +5617,7 @@ function OrderDetailDrawer({
                                     }
 
 
-                                    {trackingEnabled && order && (
+                                    {trackingEnabled && order?.fulfillmentType === "PICKUP" && (
                                         <section className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm" aria-label="Order delay">
                                             <h3 className="font-bold">Customer ready time update · {order.orderNumber}</h3>
                                             {order.estimatedReadyAt && order.delayReportedAt && (
@@ -5872,7 +5873,7 @@ function OrderDetailDrawer({
                                 {/* PICKUP */}
 
                                 <DetailSection
-                                    title="Pickup"
+                                    title={order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
                                 >
 
                                     <div
@@ -5899,19 +5900,26 @@ function OrderDetailDrawer({
                                             }
                                         />
 
+                                        {order.fulfillmentType === "DELIVERY" && <DetailValue
+                                            label="Deliver to"
+                                            value={`${order.deliveryAddressLine ?? ""}, ${order.deliveryLocality ?? ""} ${order.deliveryPostalCode ?? ""}`}
+                                        />}
+
 
                                         <DetailValue
-                                            label="Pickup date"
+                                            label={order.fulfillmentType === "DELIVERY" ? "Delivery date" : "Pickup date"}
                                             value={
-                                                order.pickupDate
+                                                (order.fulfillmentType === "DELIVERY" ? order.deliveryDate : order.pickupDate) ?? "—"
                                             }
                                         />
 
 
                                         <DetailValue
-                                            label="Pickup time"
+                                            label={order.fulfillmentType === "DELIVERY" ? "Delivery window (IST)" : "Pickup time"}
                                             value={
-                                                `${order.pickupStartTime} - ${order.pickupEndTime}`
+                                                order.fulfillmentType === "DELIVERY"
+                                                    ? `${order.deliveryStartTime ?? "—"} - ${order.deliveryEndTime ?? "—"}`
+                                                    : `${order.pickupStartTime ?? "—"} - ${order.pickupEndTime ?? "—"}`
                                             }
                                         />
 
@@ -5919,9 +5927,7 @@ function OrderDetailDrawer({
                                         <DetailValue
                                             label="Pickup type"
                                             value={
-                                                formatPickupType(
-                                                    order.pickupType
-                                                )
+                                                order.fulfillmentType === "DELIVERY" ? "Delivery" : formatPickupType(order.pickupType ?? "NORMAL")
                                             }
                                         />
 

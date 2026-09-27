@@ -12,6 +12,7 @@ import com.gokulsweets.restaurant.order.dto.admin.AdminOrderSummaryResponse;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.entity.OrderItem;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.payment.entity.Payment;
@@ -21,6 +22,7 @@ import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -28,6 +30,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -70,6 +74,7 @@ public class AdminOrderQueryService {
             preparationWindowProperties;
 
     private final ApplicationClock  applicationClock;
+    private final JdbcTemplate jdbc;
 
 
     /*
@@ -148,6 +153,8 @@ public class AdminOrderQueryService {
                         orders.getContent()
                 );
 
+        Map<Long, DeliveryWindow> windows = loadDeliveryWindows(orders.getContent());
+
 
         List<AdminOrderSummaryResponse> responses =
                 orders.getContent()
@@ -156,9 +163,9 @@ public class AdminOrderQueryService {
                                 order ->
                                         toSummaryResponse(
                                                 order,
-                                                paymentStatuses.get(
-                                                        order.getId()
-                                                )
+                                                paymentStatuses.get(order.getId()),
+                                                order.getFulfillmentType() == FulfillmentType.DELIVERY
+                                                        ? windows.get(order.getDeliveryWindowId()) : null
                                         )
                         )
                         .toList();
@@ -360,9 +367,10 @@ public class AdminOrderQueryService {
 
         long confirmedTotal =
                 orderRepository
-                        .countByBranchIdAndOrderStatus(
+                        .countByBranchIdAndOrderStatusAndFulfillmentType(
                                 branchId,
-                                OrderStatus.CONFIRMED
+                                OrderStatus.CONFIRMED,
+                                FulfillmentType.PICKUP
                         );
 
 
@@ -434,17 +442,19 @@ public class AdminOrderQueryService {
 
         long preparing =
                 orderRepository
-                        .countByBranchIdAndOrderStatus(
+                        .countByBranchIdAndOrderStatusAndFulfillmentType(
                                 branchId,
-                                OrderStatus.PREPARING
+                                OrderStatus.PREPARING,
+                                FulfillmentType.PICKUP
                         );
 
 
         long ready =
                 orderRepository
-                        .countByBranchIdAndOrderStatus(
+                        .countByBranchIdAndOrderStatusAndFulfillmentType(
                                 branchId,
-                                OrderStatus.READY_FOR_PICKUP
+                                OrderStatus.READY_FOR_PICKUP,
+                                FulfillmentType.PICKUP
                         );
 
 
@@ -527,6 +537,10 @@ public class AdminOrderQueryService {
                         )
                         .toList();
 
+        DeliveryWindow window = order.getFulfillmentType() == FulfillmentType.DELIVERY
+                ? loadDeliveryWindows(List.of(order)).get(order.getDeliveryWindowId()) : null;
+        var slot = order.getPickupSlot();
+
 
         return new AdminOrderDetailResponse(
                 order.getOrderNumber(),
@@ -544,14 +558,11 @@ public class AdminOrderQueryService {
 
                 order.getCustomerPhone(),
 
-                order.getPickupSlot()
-                        .getSlotDate(),
+                slot == null ? null : slot.getSlotDate(),
 
-                order.getPickupSlot()
-                        .getStartTime(),
+                slot == null ? null : slot.getStartTime(),
 
-                order.getPickupSlot()
-                        .getEndTime(),
+                slot == null ? null : slot.getEndTime(),
 
                 order.getPickupType(),
 
@@ -578,7 +589,14 @@ public class AdminOrderQueryService {
                 order.getUpdatedAt(),
                 order.getEstimatedReadyAt(),
                 order.getDelayReason(),
-                order.getDelayReportedAt()
+                order.getDelayReportedAt(),
+                order.getFulfillmentType(),
+                window == null ? null : window.date(),
+                window == null ? null : window.start(),
+                window == null ? null : window.end(),
+                order.getDeliveryAddressLine(),
+                order.getDeliveryLocality(),
+                order.getDeliveryPostalCode()
         );
     }
 
@@ -686,8 +704,13 @@ public class AdminOrderQueryService {
 
     private AdminOrderSummaryResponse toSummaryResponse(
             Order order,
-            PaymentStatus paymentStatus
+            PaymentStatus paymentStatus,
+            DeliveryWindow window
     ) {
+
+        var slot = order.getPickupSlot();
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY && window == null)
+            throw new IllegalStateException("Delivery order is missing its rider window.");
 
         return new AdminOrderSummaryResponse(
                 order.getOrderNumber(),
@@ -704,14 +727,11 @@ public class AdminOrderQueryService {
                         order.getCustomerPhone()
                 ),
 
-                order.getPickupSlot()
-                        .getSlotDate(),
+                slot == null ? null : slot.getSlotDate(),
 
-                order.getPickupSlot()
-                        .getStartTime(),
+                slot == null ? null : slot.getStartTime(),
 
-                order.getPickupSlot()
-                        .getEndTime(),
+                slot == null ? null : slot.getEndTime(),
 
                 order.getPickupType(),
 
@@ -723,9 +743,31 @@ public class AdminOrderQueryService {
 
                 order.getCreatedAt(),
                 order.getEstimatedReadyAt(),
-                order.getDelayReportedAt()
+                order.getDelayReportedAt(),
+                order.getFulfillmentType(),
+                window == null ? null : window.date(),
+                window == null ? null : window.start(),
+                window == null ? null : window.end()
         );
     }
+
+    private Map<Long, DeliveryWindow> loadDeliveryWindows(List<Order> orders) {
+        List<Long> ids = orders.stream().filter(o -> o.getFulfillmentType() == FulfillmentType.DELIVERY)
+                .map(Order::getDeliveryWindowId).distinct().toList();
+        if (ids.isEmpty()) return Map.of();
+        Map<Long, DeliveryWindow> windows = jdbc.query("""
+                SELECT id, service_date, starts_at, ends_at FROM delivery_capacity_windows WHERE id IN (%s)
+                """.formatted(String.join(",", Collections.nCopies(ids.size(), "?"))), rs -> {
+                    var result = new java.util.HashMap<Long, DeliveryWindow>();
+                    while (rs.next()) result.put(rs.getLong(1), new DeliveryWindow(rs.getDate(2).toLocalDate(),
+                            rs.getTime(3).toLocalTime(), rs.getTime(4).toLocalTime()));
+                    return result;
+                }, ids.toArray());
+        if (windows.size() != ids.size()) throw new IllegalStateException("Delivery order is missing its rider window.");
+        return windows;
+    }
+
+    private record DeliveryWindow(LocalDate date, LocalTime start, LocalTime end) {}
 
 
     /*

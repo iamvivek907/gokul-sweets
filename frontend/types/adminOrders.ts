@@ -61,13 +61,17 @@ export interface AdminOrderSummary {
 
     maskedCustomerPhone: string | null;
 
-    pickupDate: string;
+    pickupDate: string | null;
 
-    pickupStartTime: string;
+    pickupStartTime: string | null;
 
-    pickupEndTime: string;
+    pickupEndTime: string | null;
 
-    pickupType: PickupType;
+    pickupType: PickupType | null;
+    fulfillmentType: "PICKUP" | "DELIVERY";
+    deliveryDate: string | null;
+    deliveryStartTime: string | null;
+    deliveryEndTime: string | null;
 
     totalAmount: number;
 
@@ -275,13 +279,20 @@ export interface AdminOrderDetail {
 
     customerPhone: string;
 
-    pickupDate: string;
+    pickupDate: string | null;
 
-    pickupStartTime: string;
+    pickupStartTime: string | null;
 
-    pickupEndTime: string;
+    pickupEndTime: string | null;
 
-    pickupType: PickupType;
+    pickupType: PickupType | null;
+    fulfillmentType: "PICKUP" | "DELIVERY";
+    deliveryDate: string | null;
+    deliveryStartTime: string | null;
+    deliveryEndTime: string | null;
+    deliveryAddressLine: string | null;
+    deliveryLocality: string | null;
+    deliveryPostalCode: string | null;
 
     orderStatus: OrderStatus;
 

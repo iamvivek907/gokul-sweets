@@ -1,10 +1,12 @@
 package com.gokulsweets.restaurant.order.lifecycle.service;
 
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryLifecycleService;
+import com.gokulsweets.restaurant.delivery.DeliveryRiderHoldService;
 import com.gokulsweets.restaurant.inventory.exception.InventoryConflictException;
 import com.gokulsweets.restaurant.order.dto.admin.AdminOrderDetailResponse;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.order.service.AdminOrderQueryService;
 import com.gokulsweets.restaurant.order.service.AdminOrderWorkflowService;
@@ -41,6 +43,7 @@ public class AdminOrderLifecycleCoordinator {
     private final AdminOrderQueryService queryService;
     private final StaffAuthorizationService authorizationService;
     private final PickupSlotReservationService pickupSlotReservationService;
+    private final DeliveryRiderHoldService deliveryRiderHolds;
     private final OrderInventoryLifecycleService inventoryLifecycleService;
 
     @Transactional
@@ -96,7 +99,7 @@ public class AdminOrderLifecycleCoordinator {
         }
 
         OrderStatus previousStatus = order.getOrderStatus();
-        releasePickupCapacity(order);
+        releaseCapacity(order);
         inventoryLifecycleService.cancelOrderInventory(
                 orderNumber,
                 reason,
@@ -143,7 +146,12 @@ public class AdminOrderLifecycleCoordinator {
         return queryService.getOrder(orderNumber);
     }
 
-    private void releasePickupCapacity(Order order) {
+    private void releaseCapacity(Order order) {
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY) {
+            if (!deliveryRiderHolds.release(order.getDeliveryHoldKey()))
+                throw new IllegalStateException("Delivery rider reservation is missing during cancellation.");
+            return;
+        }
         Long slotId = order.getPickupSlot().getId();
         switch (order.getPickupType()) {
             case NORMAL -> pickupSlotReservationService.releaseNormalCapacity(slotId);
