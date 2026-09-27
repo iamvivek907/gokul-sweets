@@ -48,8 +48,15 @@ const ISSUE_STATUSES:
 
 
 export function getOrderStatusPresentation(
-    status: OrderStatus
+    status: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ): OrderStatusPresentation {
+
+    if (fulfillmentType === "DELIVERY") {
+        if (status === "PENDING_PAYMENT") return {label: "Awaiting Payment", message: "Your delivery window is held while checkout is completed.", tone: "amber"};
+        if (status === "READY_FOR_PICKUP" || status === "PICKED_UP" || status === "NO_SHOW" || status === "PICKUP_WINDOW_EXPIRED")
+            return {label: "Order Update", message: "Contact the branch for the latest delivery status.", tone: "blue"};
+    }
 
     switch (status) {
 

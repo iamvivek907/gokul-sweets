@@ -514,6 +514,11 @@ function LegacyPickupPage({
         &&
         loadedCurrentReservation?.lookupKey ===
             currentReservationLookupKey
+            && loadedCurrentReservation.order
+            && loadedCurrentReservation.order.fulfillmentType === "PICKUP"
+            && loadedCurrentReservation.order.pickupDate
+            && loadedCurrentReservation.order.pickupStartTime
+            && loadedCurrentReservation.order.pickupEndTime
             ? loadedCurrentReservation.order
             : null;
 
@@ -1264,7 +1269,7 @@ function LegacyPickupPage({
                             >
                                 {
                                     formatDisplayDate(
-                                        currentReservation.pickupDate
+                                        currentReservation.pickupDate ?? ""
                                     )
                                 }
 
@@ -1272,7 +1277,7 @@ function LegacyPickupPage({
 
                                 {
                                     formatTime(
-                                        currentReservation.pickupStartTime
+                                        currentReservation.pickupStartTime ?? ""
                                     )
                                 }
 
@@ -1280,7 +1285,7 @@ function LegacyPickupPage({
 
                                 {
                                     formatTime(
-                                        currentReservation.pickupEndTime
+                                        currentReservation.pickupEndTime ?? ""
                                     )
                                 }
                             </p>
