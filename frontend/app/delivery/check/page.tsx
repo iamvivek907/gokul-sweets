@@ -23,6 +23,7 @@ export default function DeliveryCheckPage() {
     const [quote, setQuote] = useState<Quote | null>(null);
     const [message, setMessage] = useState("");
     const [locationState, setLocationState] = useState<LocationState>("idle");
+    const [devicePoint, setDevicePoint] = useState<{latitude: number; longitude: number} | null>(null);
     const cart = useCart();
 
     async function submit(event: FormEvent<HTMLFormElement>) {
@@ -36,12 +37,28 @@ export default function DeliveryCheckPage() {
             setMessage(`${area} is ready to check. Delivery availability is not confirmed yet.`);
             return;
         }
+        let point = devicePoint;
+        if (features.deliveryAddressBoundaries) {
+            if (pin.trim()) {
+                const parts = pin.trim().split(",").map(value => Number(value.trim()));
+                if (parts.length !== 2 || pin.trim().split(",").some(value => !value.trim())
+                        || parts.some(value => !Number.isFinite(value))) {
+                    setMessage("Enter a map pin as latitude, longitude, or use your device location."); return;
+                }
+                point = {latitude: parts[0], longitude: parts[1]};
+            }
+            if (!point || Math.abs(point.latitude) > 90 || Math.abs(point.longitude) > 180) {
+                setMessage("A valid map pin is needed to check a reviewed delivery boundary. Pickup remains available."); return;
+            }
+        }
         setPending(true); setMessage(""); setQuote(null);
         try {
             if (features.deliveryCapacity && cart.branchId && cart.items.length && serviceDate) {
                 const result = await apiClient<Quote>("/api/storefront/delivery/quote", {
                     method: "POST", body: JSON.stringify({branchId: cart.branchId, locality: area,
-                        postalCode, serviceDate, items: cart.items.map(item => ({productId: item.product.id,
+                        postalCode, serviceDate, latitude: features.deliveryAddressBoundaries ? point?.latitude : null,
+                        longitude: features.deliveryAddressBoundaries ? point?.longitude : null,
+                        items: cart.items.map(item => ({productId: item.product.id,
                             quantity: item.product.saleMode === "WEIGHT" ? null : item.quantity,
                             weightGrams: item.product.saleMode === "WEIGHT" ? item.weightGrams : null}))}),
                     signal: AbortSignal.timeout(8000)
@@ -56,7 +73,7 @@ export default function DeliveryCheckPage() {
                     : result.notice);
             }
         } catch {setMessage("We could not check your area right now. Pickup is still available; try again later.");}
-        finally {setPending(false);}
+        finally {setPending(false); setDevicePoint(null);}
     }
 
     function useLocation() {
@@ -66,9 +83,11 @@ export default function DeliveryCheckPage() {
         }
         setLocationState("locating");
         navigator.geolocation.getCurrentPosition(
-            () => {
-                // The coordinates are intentionally discarded: there is no approved
-                // delivery-zone endpoint yet, and no purpose for retaining them.
+            position => {
+                // Keep coordinates only in this page's memory until the next explicit
+                // boundary check; never persist them in a cart, URL or analytics.
+                if (features?.deliveryAddressBoundaries) setDevicePoint({
+                    latitude: position.coords.latitude, longitude: position.coords.longitude});
                 setLocationState("received");
             },
             () => setLocationState("unavailable"),
@@ -108,10 +127,13 @@ export default function DeliveryCheckPage() {
                                 <input id="delivery-service-date" name="serviceDate" type="date" value={serviceDate}
                                        onChange={event => {setServiceDate(event.target.value); setQuote(null);}} />
                                 <p className={styles.hint}>Checking {cart.items.length} item(s) from your current branch. A result does not reserve a rider.</p></>}
-                            <label htmlFor="delivery-pin">Map pin or landmark (optional)</label>
+                            <label htmlFor="delivery-pin">{features.deliveryAddressBoundaries ? "Map pin coordinates (latitude, longitude)" : "Map pin or landmark (optional)"}</label>
                             <input id="delivery-pin" name="pin" value={pin} maxLength={160}
-                                   onChange={event => setPin(event.target.value)} placeholder="Paste a map link or enter a landmark" />
-                            <p className={styles.hint}>The optional map pin or landmark stays on this page. When available, locality and PIN go to the server for a provisional check.</p>
+                                   onChange={event => {setPin(event.target.value); setQuote(null);}}
+                                   placeholder={features.deliveryAddressBoundaries ? "e.g. 26.85, 80.94" : "Paste a map link or enter a landmark"} />
+                            <p className={styles.hint}>{features.deliveryAddressBoundaries
+                                ? "Your pin is sent once to check a reviewed boundary, without saving it. You may use device location instead."
+                                : "The optional map pin or landmark stays on this page. When available, locality and PIN go to the server for a provisional check."}</p>
                             <button type="submit" disabled={pending} className={styles.action}>{pending ? "Checking area..." : "Check area"} <span aria-hidden="true">&rarr;</span></button>
                         </form>
                         {message && <p role="status" className={styles.result}>{message}</p>}
@@ -130,7 +152,9 @@ export default function DeliveryCheckPage() {
                         <button type="button" className={styles.outline} disabled={locationState === "locating"} onClick={useLocation}>
                             {locationState === "locating" ? "Finding location..." : "Use my location"}
                         </button>
-                        {locationState === "received" && <p role="status" className={styles.result}>Location received for this one-time check. Enter your locality above while delivery zones are being prepared.</p>}
+                        {locationState === "received" && <p role="status" className={styles.result}>{features.deliveryAddressBoundaries
+                            ? "Location ready in this page for one boundary check. Enter your locality and PIN above, then check your area."
+                            : "Location received for this one-time check. Enter your locality above while delivery zones are being prepared."}</p>}
                         {locationState === "unavailable" && <p role="status" className={styles.result}>Location is unavailable or permission was declined. Enter your locality above instead.</p>}
                         <div className={styles.notice}><strong>Delivery is not confirmed yet.</strong><p>We&apos;ll confirm supported areas and a fulfilment branch when delivery opens. Pickup ordering is unaffected.</p></div>
                     </aside>

@@ -59,6 +59,8 @@ public class EnhancementProperties {
     private boolean deliveryZones;
     /** SCRUM-30: explicit rider capacity preview; never enables delivery checkout by itself. */
     private boolean deliveryCapacity;
+    /** SCRUM-30: exact reviewed polygon/pin check; requires delivery-capacity preview. */
+    private boolean deliveryAddressBoundaries;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

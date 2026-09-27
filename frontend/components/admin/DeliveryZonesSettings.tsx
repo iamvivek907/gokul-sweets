@@ -6,12 +6,14 @@ import {listDeliveryZones, saveDeliveryZone, type DeliveryZone, type ZoneConfigu
 import type {AdminBranchProduct} from "@/types/adminMenu";
 import {DeliveryCapacitySettings} from "@/components/admin/DeliveryCapacitySettings";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {DeliveryBoundarySettings} from "@/components/admin/DeliveryBoundarySettings";
 
 const empty: ZoneConfiguration = {locality: "", postalCode: "", opensAt: "10:00", closesAt: "20:00",
     active: false, riderPaused: true, productIds: []};
 
 export function DeliveryZonesSettings({branchId, authorization}: {branchId: number; authorization: string}) {
     const capacityEnabled = useStorefrontFeatures()?.deliveryCapacity === true;
+    const boundariesEnabled = useStorefrontFeatures()?.deliveryAddressBoundaries === true;
     const [zones, setZones] = useState<DeliveryZone[]>([]);
     const [products, setProducts] = useState<AdminBranchProduct[]>([]);
     const [form, setForm] = useState<ZoneConfiguration>(empty);
@@ -83,6 +85,8 @@ export function DeliveryZonesSettings({branchId, authorization}: {branchId: numb
                 <button type="button" className="min-h-11 rounded-lg border px-4" onClick={() => {setForm(empty); setNotice("");}}>New zone</button></div>
         </form>
         {capacityEnabled && selectedZone && <DeliveryCapacitySettings key={selectedZone.id}
+            branchId={branchId} zoneId={selectedZone.id} authorization={authorization} />}
+        {boundariesEnabled && selectedZone && <DeliveryBoundarySettings key={`boundary-${selectedZone.id}`}
             branchId={branchId} zoneId={selectedZone.id} authorization={authorization} />}
     </section>;
 }

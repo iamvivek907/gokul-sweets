@@ -27,6 +27,7 @@ public class DeliveryCapacityService {
     private final JdbcTemplate jdbc;
     private final Clock inventoryClock;
     private final DeliveryStockCheck stock;
+    private final DeliveryBoundaryService boundaries;
 
     public boolean enabled() { return flags.isDeliveryCapacity() && zones.enabled(); }
 
@@ -96,6 +97,8 @@ public class DeliveryCapacityService {
                 """, Long.class, request.branchId(), request.postalCode(), DeliveryZoneService.canonical(request.locality()));
         if (zoneIds.isEmpty()) return unavailable("Delivery coverage has not been confirmed for this area.");
         Long zoneId = zoneIds.getFirst();
+        if (flags.isDeliveryAddressBoundaries() && !boundaries.contains(zoneId, request.latitude(), request.longitude()))
+            return unavailable("A pin inside a reviewed delivery boundary is required. Confirm your pin or choose pickup.");
         Long eligibleProducts = jdbc.queryForObject("""
                 SELECT count(*) FROM delivery_zone_products zp
                 JOIN branch_products bp ON bp.branch_id = ? AND bp.product_id = zp.product_id
@@ -150,6 +153,12 @@ public class DeliveryCapacityService {
     public record QuoteRequest(@Positive long branchId, @NotBlank @Size(min = 2, max = 120) String locality,
                                @NotBlank @Pattern(regexp = "[0-9]{6}") String postalCode,
                                @NotNull LocalDate serviceDate,
-                               @NotEmpty @Size(max = 50) List<@NotNull @Valid CreateOrderItemRequest> items) {}
+                               @NotEmpty @Size(max = 50) List<@NotNull @Valid CreateOrderItemRequest> items,
+                               Double latitude, Double longitude) {
+        public QuoteRequest(long branchId, String locality, String postalCode, LocalDate serviceDate,
+                            List<CreateOrderItemRequest> items) {
+            this(branchId, locality, postalCode, serviceDate, items, null, null);
+        }
+    }
     public record Quote(List<Window> provisionalWindows, boolean orderable, String notice) {}
 }
