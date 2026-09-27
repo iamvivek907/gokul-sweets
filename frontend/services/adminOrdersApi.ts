@@ -850,8 +850,19 @@ export async function updateAdminOrderStatus(
  */
 
 export function getNextOrderStatus(
-    currentStatus: OrderStatus
+    currentStatus: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ): OrderStatus | null {
+
+    if (fulfillmentType === "DELIVERY") {
+        switch (currentStatus) {
+            case "CONFIRMED": return "PREPARING";
+            case "PREPARING": return "READY_FOR_DELIVERY";
+            case "READY_FOR_DELIVERY": return "OUT_FOR_DELIVERY";
+            case "OUT_FOR_DELIVERY": return "DELIVERED";
+            default: return null;
+        }
+    }
 
     switch (
         currentStatus
@@ -873,8 +884,19 @@ export function getNextOrderStatus(
 
 
 export function getRequiredPermissionForTransition(
-    currentStatus: OrderStatus
+    currentStatus: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ): string | null {
+
+    if (fulfillmentType === "DELIVERY") {
+        switch (currentStatus) {
+            case "CONFIRMED": return "ORDER_START_PREPARATION";
+            case "PREPARING": return "ORDER_MARK_READY";
+            case "READY_FOR_DELIVERY": return "ORDER_DISPATCH_DELIVERY";
+            case "OUT_FOR_DELIVERY": return "ORDER_CONFIRM_DELIVERY";
+            default: return null;
+        }
+    }
 
     switch (
         currentStatus

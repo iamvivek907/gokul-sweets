@@ -34,6 +34,7 @@ public class AdminOrderLifecycleCoordinator {
                     OrderStatus.CONFIRMED,
                     OrderStatus.PREPARING,
                     OrderStatus.READY_FOR_PICKUP,
+                    OrderStatus.READY_FOR_DELIVERY,
                     OrderStatus.PICKUP_WINDOW_EXPIRED
             );
 
@@ -56,7 +57,7 @@ public class AdminOrderLifecycleCoordinator {
                 targetStatus
         );
 
-        if (targetStatus == OrderStatus.PICKED_UP) {
+        if (targetStatus == OrderStatus.PICKED_UP || targetStatus == OrderStatus.DELIVERED) {
             inventoryLifecycleService.fulfilOrderInventory(
                     orderNumber,
                     currentActor()
@@ -125,6 +126,10 @@ public class AdminOrderLifecycleCoordinator {
 
         authorizationService.requireBranchAccess(order.getBranch().getId());
         authorizationService.requirePermission(PermissionName.ORDER_MARK_PICKED_UP);
+
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY) {
+            throw new IllegalStateException("Late collection is only available for pickup orders.");
+        }
 
         if (order.getOrderStatus() == OrderStatus.PICKED_UP) {
             inventoryLifecycleService.fulfilOrderInventory(orderNumber, currentActor());

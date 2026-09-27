@@ -12,6 +12,12 @@ public enum OrderStatus {
 
     PICKED_UP,
 
+    READY_FOR_DELIVERY,
+
+    OUT_FOR_DELIVERY,
+
+    DELIVERED,
+
     PAYMENT_FAILED,
 
     CANCELLED,

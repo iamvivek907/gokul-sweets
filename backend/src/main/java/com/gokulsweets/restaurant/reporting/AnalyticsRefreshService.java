@@ -146,7 +146,7 @@ public class AnalyticsRefreshService {
                 CURRENT_TIMESTAMP
             FROM (
                 SELECT
-                    ps.slot_date AS business_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     COUNT(*) AS completed_orders,
                     COUNT(DISTINCT o.customer_contact_id) AS unique_customers,
                     COALESCE(SUM(o.subtotal), 0) AS subtotal_amount,
@@ -155,24 +155,28 @@ public class AnalyticsRefreshService {
                     COALESCE(SUM(o.rebate_discount_amount), 0) AS rebate_discount_amount,
                     COALESCE(SUM(o.total_amount), 0) AS net_revenue
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
-                WHERE o.order_status = 'PICKED_UP'
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
+                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                 GROUP BY
-                    ps.slot_date
+                    COALESCE(ps.slot_date, dw.service_date)
             ) order_rollup
             LEFT JOIN (
                 SELECT
-                    ps.slot_date AS business_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     COALESCE(SUM(oi.quantity), 0) AS units_sold
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
                 JOIN order_items oi
                     ON oi.order_id = o.id
-                WHERE o.order_status = 'PICKED_UP'
+                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                 GROUP BY
-                    ps.slot_date
+                    COALESCE(ps.slot_date, dw.service_date)
             ) item_rollup
                 ON item_rollup.business_date = order_rollup.business_date
             """;
@@ -210,7 +214,7 @@ public class AnalyticsRefreshService {
                 CURRENT_TIMESTAMP
             FROM (
                 SELECT
-                    ps.slot_date AS business_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     o.branch_id,
                     COUNT(*) AS completed_orders,
                     COUNT(DISTINCT o.customer_contact_id) AS unique_customers,
@@ -220,26 +224,30 @@ public class AnalyticsRefreshService {
                     COALESCE(SUM(o.rebate_discount_amount), 0) AS rebate_discount_amount,
                     COALESCE(SUM(o.total_amount), 0) AS net_revenue
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
-                WHERE o.order_status = 'PICKED_UP'
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
+                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                 GROUP BY
-                    ps.slot_date,
+                    COALESCE(ps.slot_date, dw.service_date),
                     o.branch_id
             ) order_rollup
             LEFT JOIN (
                 SELECT
-                    ps.slot_date AS business_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     o.branch_id,
                     COALESCE(SUM(oi.quantity), 0) AS units_sold
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
                 JOIN order_items oi
                     ON oi.order_id = o.id
-                WHERE o.order_status = 'PICKED_UP'
+                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                 GROUP BY
-                    ps.slot_date,
+                    COALESCE(ps.slot_date, dw.service_date),
                     o.branch_id
             ) item_rollup
                 ON item_rollup.business_date = order_rollup.business_date
@@ -269,37 +277,41 @@ public class AnalyticsRefreshService {
                 CURRENT_TIMESTAMP
             FROM (
                 SELECT
-                    ps.slot_date AS business_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     o.branch_id,
-                    EXTRACT(HOUR FROM ps.start_time)::SMALLINT AS pickup_hour,
+                    EXTRACT(HOUR FROM COALESCE(ps.start_time, dw.starts_at))::SMALLINT AS pickup_hour,
                     COUNT(*) AS completed_orders,
                     COUNT(DISTINCT o.customer_contact_id) AS unique_customers,
                     COALESCE(SUM(o.total_amount), 0) AS net_revenue
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
-                WHERE o.order_status = 'PICKED_UP'
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
+                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                 GROUP BY
-                    ps.slot_date,
+                    COALESCE(ps.slot_date, dw.service_date),
                     o.branch_id,
-                    EXTRACT(HOUR FROM ps.start_time)
+                    EXTRACT(HOUR FROM COALESCE(ps.start_time, dw.starts_at))
             ) order_rollup
             LEFT JOIN (
                 SELECT
-                    ps.slot_date AS business_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     o.branch_id,
-                    EXTRACT(HOUR FROM ps.start_time)::SMALLINT AS pickup_hour,
+                    EXTRACT(HOUR FROM COALESCE(ps.start_time, dw.starts_at))::SMALLINT AS pickup_hour,
                     COALESCE(SUM(oi.quantity), 0) AS units_sold
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
                 JOIN order_items oi
                     ON oi.order_id = o.id
-                WHERE o.order_status = 'PICKED_UP'
+                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                 GROUP BY
-                    ps.slot_date,
+                    COALESCE(ps.slot_date, dw.service_date),
                     o.branch_id,
-                    EXTRACT(HOUR FROM ps.start_time)
+                    EXTRACT(HOUR FROM COALESCE(ps.start_time, dw.starts_at))
             ) item_rollup
                 ON item_rollup.business_date = order_rollup.business_date
                AND item_rollup.branch_id = order_rollup.branch_id
@@ -320,7 +332,7 @@ public class AnalyticsRefreshService {
                 refreshed_at
             )
             SELECT
-                ps.slot_date,
+                COALESCE(ps.slot_date, dw.service_date),
                 o.branch_id,
                 oi.product_id,
                 p.category_id,
@@ -330,15 +342,17 @@ public class AnalyticsRefreshService {
                 COUNT(DISTINCT o.customer_contact_id),
                 CURRENT_TIMESTAMP
             FROM orders o
-            JOIN pickup_slots ps
+            LEFT JOIN pickup_slots ps
                 ON ps.id = o.pickup_slot_id
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
             JOIN order_items oi
                 ON oi.order_id = o.id
             JOIN products p
                 ON p.id = oi.product_id
-            WHERE o.order_status = 'PICKED_UP'
+            WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
             GROUP BY
-                ps.slot_date,
+                COALESCE(ps.slot_date, dw.service_date),
                 o.branch_id,
                 oi.product_id,
                 p.category_id
@@ -348,16 +362,18 @@ public class AnalyticsRefreshService {
     private static final String PRODUCT_PAIR_DAILY_SQL = """
             WITH order_products AS (
                 SELECT DISTINCT
-                    ps.slot_date AS business_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     o.branch_id,
                     o.id AS order_id,
                     oi.product_id
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
                 JOIN order_items oi
                     ON oi.order_id = o.id
-                WHERE o.order_status = 'PICKED_UP'
+                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
             )
             INSERT INTO analytics_product_pair_daily (
                 business_date,
@@ -397,13 +413,13 @@ public class AnalyticsRefreshService {
                     o.id AS order_id,
                     o.total_amount,
                     o.updated_at,
-                    ps.slot_date AS purchase_date,
+                    COALESCE(ps.slot_date, dw.service_date) AS purchase_date,
 
-                    LAG(ps.slot_date)
+                    LAG(COALESCE(ps.slot_date, dw.service_date))
                         OVER (
                             PARTITION BY o.customer_contact_id
                             ORDER BY
-                                ps.slot_date ASC,
+                                COALESCE(ps.slot_date, dw.service_date) ASC,
                                 o.id ASC
                         ) AS previous_purchase_date,
 
@@ -411,15 +427,17 @@ public class AnalyticsRefreshService {
                         OVER (
                             PARTITION BY o.customer_contact_id
                             ORDER BY
-                                ps.slot_date DESC,
+                                COALESCE(ps.slot_date, dw.service_date) DESC,
                                 o.id DESC
                         ) AS reverse_purchase_number
 
                 FROM orders o
-                JOIN pickup_slots ps
+                LEFT JOIN pickup_slots ps
                     ON ps.id = o.pickup_slot_id
+                LEFT JOIN delivery_capacity_windows dw
+                    ON dw.id = o.delivery_window_id
                 WHERE
-                    o.order_status = 'PICKED_UP'
+                    o.order_status IN ('PICKED_UP', 'DELIVERED')
                     AND o.customer_contact_id IS NOT NULL
             ),
             purchase_gaps AS (

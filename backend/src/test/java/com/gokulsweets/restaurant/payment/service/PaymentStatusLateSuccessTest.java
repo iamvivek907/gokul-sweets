@@ -142,6 +142,27 @@ class PaymentStatusLateSuccessTest {
         verify(inventory).releasePendingOrderHolds("GKS-DELIVERY-FAILED", "Payment failed.");
     }
 
+    @Test
+    void lateFailureAfterDeliveryDoesNotReleaseCommittedRiderOrInventory() {
+        var payments = mock(PaymentRepository.class);
+        var pickup = mock(PickupSlotReservationService.class);
+        var inventory = mock(OrderInventoryReservationService.class);
+        var riders = mock(DeliveryRiderHoldService.class);
+        var order = new Order();
+        order.setOrderNumber("GKS-DELIVERED");
+        order.setOrderStatus(OrderStatus.DELIVERED);
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        when(payments.findById(27L)).thenReturn(Optional.of(payment(order, PaymentStatus.PAID)));
+        var service = new PaymentStatusService(payments, mock(OrderRepository.class), pickup,
+                mock(RebateRedemptionService.class), mock(OrderInventoryCommitmentService.class), inventory,
+                new PaymentReconciliationPolicy(new EnhancementProperties()), riders);
+
+        service.markFailed(27L, "Late provider failure");
+
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.DELIVERED);
+        verifyNoInteractions(pickup, riders, inventory);
+    }
+
     private static Payment payment(Order order, PaymentStatus status) {
         Payment payment = new Payment();
         payment.setId(21L);

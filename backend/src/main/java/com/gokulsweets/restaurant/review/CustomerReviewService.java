@@ -37,7 +37,8 @@ public class CustomerReviewService {
                 .map(this::toResponse)
                 .orElse(null);
 
-        boolean eligible = order.getOrderStatus() == OrderStatus.PICKED_UP;
+        boolean eligible = order.getOrderStatus() == OrderStatus.PICKED_UP
+                || order.getOrderStatus() == OrderStatus.DELIVERED;
 
         return new ReviewContextResponse(
                 eligible,
@@ -56,7 +57,8 @@ public class CustomerReviewService {
 
         entityManager.lock(order, LockModeType.PESSIMISTIC_WRITE);
 
-        if (order.getOrderStatus() != OrderStatus.PICKED_UP) {
+        if (order.getOrderStatus() != OrderStatus.PICKED_UP
+                && order.getOrderStatus() != OrderStatus.DELIVERED) {
             throw new IllegalStateException(eligibilityMessage(order.getOrderStatus()));
         }
 
@@ -174,11 +176,12 @@ public class CustomerReviewService {
 
     private String eligibilityMessage(OrderStatus status) {
         return switch (status) {
-            case PENDING_PAYMENT, CONFIRMED, PREPARING, READY_FOR_PICKUP ->
-                    "You can review this order after it has been picked up.";
+            case PENDING_PAYMENT, CONFIRMED, PREPARING, READY_FOR_PICKUP,
+                    READY_FOR_DELIVERY, OUT_FOR_DELIVERY ->
+                    "You can review this order once it has been picked up or delivered.";
             case PAYMENT_FAILED, CANCELLED, NO_SHOW, PICKUP_WINDOW_EXPIRED ->
                     "This order is not eligible for a review.";
-            case PICKED_UP -> null;
+            case PICKED_UP, DELIVERED -> null;
         };
     }
 

@@ -513,7 +513,7 @@ export default function AdminCustomerDetailPage({
 
 
                                             <p className="mt-1 text-xs text-[#756763]">
-                                                All checkout attempts are shown here. Purchase metrics above count PICKED_UP orders only.
+                                                All checkout attempts are shown here. Purchase metrics above count picked up and delivered orders.
                                             </p>
 
                                         </div>
