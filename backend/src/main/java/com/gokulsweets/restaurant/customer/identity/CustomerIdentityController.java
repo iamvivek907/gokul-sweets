@@ -3,6 +3,9 @@ package com.gokulsweets.restaurant.customer.identity;
 import com.gokulsweets.restaurant.common.security.WebCorsProperties;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
+import com.gokulsweets.restaurant.customer.consent.ConsentDecision;
+import com.gokulsweets.restaurant.customer.consent.ConsentLedger;
+import com.gokulsweets.restaurant.customer.consent.ConsentPurpose;
 import com.gokulsweets.restaurant.order.dto.CustomerOrderResponse;
 import com.gokulsweets.restaurant.order.dto.CustomerOrderSummaryResponse;
 import com.gokulsweets.restaurant.order.service.OrderQueryService;
@@ -42,6 +45,7 @@ public class CustomerIdentityController {
     private final OrderQueryService orders;
     private final IdentityExchangeRateLimiter rateLimiter;
     private final IdentityDeviceRegistry devices;
+    private final ConsentLedger consents;
 
     /** Called before opening the widget. Source and device limits are shared across instances. */
     @PostMapping("/start")
@@ -110,6 +114,46 @@ public class CustomerIdentityController {
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(orders.getCustomerOrder(orderNumber));
+    }
+
+    @GetMapping("/consents")
+    public ResponseEntity<Map<ConsentPurpose, ConsentDecision>> consents(HttpServletRequest request) {
+        var environment = consentEnvironment();
+        var subject = requiredSubject(request, environment);
+        var policy = settings.getRequiredProperty("gokul.consent.policy-version");
+        var decisions = new java.util.EnumMap<ConsentPurpose, ConsentDecision>(ConsentPurpose.class);
+        for (var purpose : ConsentPurpose.values()) {
+            var decision = consents.current(environment, subject, purpose);
+            decisions.put(purpose, decision.granted() && !policy.equals(decision.policyVersion())
+                    ? new ConsentDecision(false, decision.policyVersion(), decision.recordedAt()) : decision);
+        }
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(decisions);
+    }
+
+    @PutMapping("/consents/{purpose}")
+    public ResponseEntity<ConsentDecision> updateConsent(@PathVariable ConsentPurpose purpose,
+                                                           @RequestBody ConsentChoice choice,
+                                                           HttpServletRequest request) {
+        var environment = consentEnvironment();
+        requireTrustedMutation(request);
+        var subject = requiredSubject(request, environment);
+        if (choice == null || choice.granted() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Consent choice required");
+        }
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(consents.record(environment, subject, purpose,
+                        settings.getRequiredProperty("gokul.consent.policy-version"), choice.granted()));
+    }
+
+    public record ConsentChoice(Boolean granted) { }
+
+    private ConsentEnvironment consentEnvironment() {
+        var environment = enabledEnvironment();
+        var policy = settings.getProperty("gokul.consent.policy-version", "");
+        if (!features.isCustomerConsentControls() || !policy.matches("[A-Za-z0-9._-]{1,40}")) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
+        return environment;
     }
 
     private UUID requiredSubject(HttpServletRequest request, ConsentEnvironment environment) {

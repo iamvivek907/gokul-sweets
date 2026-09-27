@@ -56,6 +56,32 @@ record to an unverified phone number, browser storage key or staff account.
 The owner will manually deploy after Sprint 3. Keep SCRUM-49 and SCRUM-29 open
 until code, CI, DEV flag ON/OFF evidence and owner QA are complete.
 
+## Verified customer controls checkpoint
+
+The profile offers separate optional choices only after a verified session.
+`GET /api/customer/identity/consents` reads the effective ledger decisions and
+shows older-policy grants as OFF until the customer explicitly grants the
+current reviewed version. Any future sender must also require a current-policy
+grant directly from the ledger at send time; the profile response is not an
+authorization cache.
+`PUT /api/customer/identity/consents/{purpose}` records a grant or withdrawal.
+The backend resolves the subject from the secure session cookie; callers cannot
+submit a phone or subject ID. Reads require a secure connection and allowed
+Origin; mutations also require the trusted mutation check. Responses disable
+caching. The current ledger is read again on account focus across devices.
+
+Owner privacy: `GOKUL_FEATURES_CUSTOMER_CONSENT_CONTROLS=false` keeps these
+controls inaccessible. ON requires `GOKUL_FEATURES_CUSTOMER_OTP_IDENTITY=true`,
+the existing identity environment/CORS and provider abuse gates, and a
+legally reviewed `GOKUL_CONSENT_POLICY_VERSION` (1–40 letters, digits, dots,
+underscores or hyphens). Without these dependencies, requests return 404 and
+the profile shows no controls. Order contact and guest pickup remain separate.
+This checkpoint does not activate marketing, occasion sends or area analytics;
+those send/event paths must read the current ledger choice before operating.
+Retention/export/deletion and legal/privacy wording still need review; do not
+enable the flag until the reviewed policy is available. No device coordinates
+are requested or stored by these controls.
+
 ## Ledger checkpoint
 
 V55 creates an append-only optional consent ledger keyed by a verified subject
