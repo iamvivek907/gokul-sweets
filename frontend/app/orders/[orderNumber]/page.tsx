@@ -276,7 +276,9 @@ export default function OrderDetailPage() {
         useMemo(
             () =>
                 order
-                    ? getOrderStatusPresentation(order.orderStatus, order.fulfillmentType)
+                    ? order.orderStatus === "CONFIRMED" && order.paymentStatus !== "PAID"
+                        ? {label: "Payment verification pending", message: "We cannot confirm payment yet. Check again shortly or contact the branch if you were charged.", tone: "amber" as const}
+                        : getOrderStatusPresentation(order.orderStatus, order.fulfillmentType)
                     : null,
             [order]
         );
@@ -327,6 +329,7 @@ export default function OrderDetailPage() {
     }
 
     const showOperationalTimeline =
+        order.paymentStatus === "PAID" &&
         [
             "CONFIRMED",
             "PREPARING",
@@ -372,6 +375,8 @@ export default function OrderDetailPage() {
                     </div>
 
                     <div className={`mt-5 rounded-2xl border p-4 ${getStatusClasses(status.tone)}`}>
+                        {order.orderStatus === "CONFIRMED" && order.paymentStatus === "PAID" &&
+                            <p className="mb-2 flex items-center gap-3 text-xl font-bold text-green-800"><span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-green-700 text-white">✓</span> Confirmed</p>}
                         <p className="font-bold">{status.label}</p>
                         <p className="mt-1 text-sm leading-6">{status.message}</p>
                     </div>

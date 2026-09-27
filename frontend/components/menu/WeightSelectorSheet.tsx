@@ -478,7 +478,7 @@ function WeightSelectorDialog({
     return (
         <div
             role="presentation"
-            className="fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5"
+            className="gokul-weight-overlay fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5"
             onMouseDown={
                 event => {
 

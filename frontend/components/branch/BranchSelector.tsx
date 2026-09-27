@@ -16,6 +16,8 @@ import {
 import {useCart} from "@/hooks/useCart";
 import {usePickupIntent, savePickupIntent} from "@/hooks/usePickupIntent";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useRouter} from "next/navigation";
+import {createPortal} from "react-dom";
 import {saveCart} from "@/lib/cartStorage";
 import {clearPickupSlot} from "@/lib/checkoutStorage";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
@@ -26,9 +28,10 @@ import type {
 } from "@/types/branch";
 
 
-export default function BranchSelector({compact = false}: {compact?: boolean}) {
+export default function BranchSelector({compact = false, cardBranch}: {compact?: boolean; cardBranch?: Branch}) {
+    const router = useRouter();
     const uniqueId = useId();
-    const popoverId = compact ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
+    const popoverId = compact || cardBranch ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
 
     const {
         branch,
@@ -174,6 +177,7 @@ export default function BranchSelector({compact = false}: {compact?: boolean}) {
         );
 
         closePopover();
+        if (cardBranch) router.push("/menu");
     }
 
     function closePopover() {
@@ -213,6 +217,7 @@ export default function BranchSelector({compact = false}: {compact?: boolean}) {
         selectBranch(proposedBranch);
         setProposedBranch(null);
         closePopover();
+        if (cardBranch) router.push("/menu");
     }
 
 
@@ -238,11 +243,15 @@ export default function BranchSelector({compact = false}: {compact?: boolean}) {
     return (
         <div>
 
-            {proposedBranch && <CartSwitchDialog branchId={proposedBranch.id} branchName={proposedBranch.name}
+            {proposedBranch && createPortal(<CartSwitchDialog branchId={proposedBranch.id} branchName={proposedBranch.name}
                 date={pickup.date ?? features?.today ?? ""} items={cart.items}
-                onKeep={() => setProposedBranch(null)} onSwitch={confirmSwitch} />}
+                onKeep={() => setProposedBranch(null)} onSwitch={confirmSwitch} />, document.body)}
 
-            <button
+            {cardBranch ? <button type="button" className="gokul-branch-card-action"
+                aria-label={`Explore ${cardBranch.name} menu and pickup choices`}
+                onClick={() => handleSelectBranch(cardBranch)}>
+                <span className="gokul-branch-card-action-label">Explore this branch <span aria-hidden="true">↗</span></span>
+            </button> : <button
                 type="button"
                 popoverTarget={popoverId}
                 className={compact ? "min-h-11 font-semibold text-[#7a1625] underline" : `
@@ -333,7 +342,7 @@ export default function BranchSelector({compact = false}: {compact?: boolean}) {
                 </div>
 
                 </>}
-            </button>
+            </button>}
 
 
             <div

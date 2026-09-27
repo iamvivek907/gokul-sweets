@@ -96,6 +96,7 @@ export default function ProductCard({
         <article
             className={`
                 group
+                ${refined ? "gokul-menu-product-card" : ""}
                 flex
                 min-h-32
                 overflow-hidden
