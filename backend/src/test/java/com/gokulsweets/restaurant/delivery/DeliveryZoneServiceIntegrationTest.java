@@ -28,9 +28,10 @@ class DeliveryZoneServiceIntegrationTest {
         var unique = UUID.randomUUID().toString().substring(0, 8);
         Long branch = jdbc.queryForObject("INSERT INTO branches (code, name) VALUES (?, ?) RETURNING id",
                 Long.class, "DEL-" + unique, "Delivery Test " + unique);
-        Long category = jdbc.queryForObject("INSERT INTO categories (name) VALUES (?) RETURNING id", Long.class, "Test " + unique);
-        Long product = jdbc.queryForObject("INSERT INTO products (category_id, name, base_price) VALUES (?, ?, 100) RETURNING id",
-                Long.class, category, "Test product " + unique);
+        Long category = jdbc.queryForObject("INSERT INTO categories (code, name) VALUES (?, ?) RETURNING id",
+                Long.class, "CATEGORY_DEL_" + unique, "Test " + unique);
+        Long product = jdbc.queryForObject("INSERT INTO products (code, category_id, name, base_price) VALUES (?, ?, ?, 100) RETURNING id",
+                Long.class, "PRODUCT_DEL_" + unique, category, "Test product " + unique);
         jdbc.update("INSERT INTO branch_products (branch_id, product_id) VALUES (?, ?)", branch, product);
         var request = new DeliveryZoneService.Configuration(" Hazratganj ", "226001",
                 LocalTime.of(10, 0), LocalTime.of(20, 0), true, false, List.of(product));
