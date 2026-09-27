@@ -114,7 +114,9 @@ were placed as guests retain the order-number capability flow. Checkout sends
 the secure cookie with these requests. Validate PhonePe and Razorpay return
 flows in DEV before enabling this guard: an external payment return in a new
 browser context may not have the original session. Available rebate lookup,
-apply and removal use the same verified-order guard and send credentials.
+apply and removal, and customer review context and submission, use the same
+verified-order guard and send credentials. Public product rating summaries
+remain available for menu browsing.
 Guest order-number capability routes still require a separate authorization
 audit before treating an order number as sufficient proof of ownership.
 
