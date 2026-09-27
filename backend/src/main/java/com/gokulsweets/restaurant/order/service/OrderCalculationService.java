@@ -35,11 +35,22 @@ public class OrderCalculationService {
                 validatedOrder.items().size()
         );
 
+        return calculateItems(validatedOrder.items(), determinePriorityCharge(validatedOrder));
+    }
+
+    /** Delivery uses the same accepted branch prices, weights and taxes, with no pickup priority charge. */
+    public OrderCalculationResult calculateDelivery(List<ValidatedOrderItem> items) {
+        if (items == null || items.isEmpty() || items.size() > 50)
+            throw new IllegalArgumentException("Select between 1 and 50 delivery items.");
+        return calculateItems(items, money(BigDecimal.ZERO));
+    }
+
+    private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
         List<CalculatedOrderItem> calculatedItems = new ArrayList<>();
 
-        for (ValidatedOrderItem validatedItem : validatedOrder.items()) {
+        for (ValidatedOrderItem validatedItem : items) {
             CalculatedOrderItem item = calculateItem(validatedItem);
             calculatedItems.add(item);
             subtotal = subtotal.add(lineSubtotal(item));
@@ -48,7 +59,6 @@ public class OrderCalculationService {
 
         subtotal = money(subtotal);
         totalTax = money(totalTax);
-        BigDecimal priorityCharge = determinePriorityCharge(validatedOrder);
         BigDecimal totalAmount = money(
                 subtotal.add(totalTax).add(priorityCharge)
         );
