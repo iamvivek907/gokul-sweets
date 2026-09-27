@@ -116,6 +116,11 @@ class DeliveryOrderCreationIntegrationTest {
 
         assertThat(retry.orderNumber()).isEqualTo(first.orderNumber());
         assertThat(first.totalAmount()).isEqualByComparingTo(new BigDecimal("100.00"));
+        assertThat(first.id()).isPositive();
+        assertThat(first.branchId()).isEqualTo(branchId);
+        assertThat(first.windowId()).isEqualTo(windowId);
+        assertThat(first.orderStatus()).isEqualTo(com.gokulsweets.restaurant.order.enums.OrderStatus.PENDING_PAYMENT);
+        assertThat(first.createdAt()).isNotNull();
         assertThat(jdbc.queryForObject("SELECT reserved_count FROM delivery_capacity_windows WHERE id = ?",
                 Integer.class, windowId)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM orders WHERE order_number = ?",

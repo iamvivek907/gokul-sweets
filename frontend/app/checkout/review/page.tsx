@@ -888,6 +888,8 @@ export default function ReviewPage() {
         const localPendingOrderCandidate =
             pendingOrder !== null
             &&
+            pendingOrder.fulfillmentType !== "DELIVERY"
+            &&
             pendingOrder.orderStatus ===
                 "PENDING_PAYMENT"
             &&
@@ -1614,6 +1616,8 @@ try {
 
     const preparedOrderNumber =
         pendingOrder
+        &&
+        pendingOrder.fulfillmentType !== "DELIVERY"
         &&
         pendingOrder.orderStatus ===
             "PENDING_PAYMENT"

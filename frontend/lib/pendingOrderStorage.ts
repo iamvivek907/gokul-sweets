@@ -125,7 +125,8 @@ export function parsePendingOrder(
             ||
             typeof parsed.branchId !== "number"
             ||
-            typeof parsed.pickupSlotId !== "number"
+            (typeof parsed.pickupSlotId !== "number" &&
+                !(parsed.fulfillmentType === "DELIVERY" && parsed.pickupSlotId === null))
             ||
             typeof parsed.totalAmount !== "number"
             ||
@@ -155,6 +156,7 @@ export function parsePendingOrder(
 
             pickupSlotId:
                 parsed.pickupSlotId,
+            fulfillmentType: parsed.fulfillmentType === "DELIVERY" ? "DELIVERY" : "PICKUP",
 
             totalAmount:
                 parsed.totalAmount,
