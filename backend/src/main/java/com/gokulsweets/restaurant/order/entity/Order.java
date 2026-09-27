@@ -4,6 +4,7 @@ import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.customer.CustomerContact;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
 import com.gokulsweets.restaurant.rebate.Rebate;
@@ -81,12 +82,32 @@ public class Order {
     )
     private Branch branch;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(
             name = "pickup_slot_id",
-            nullable = false
+            nullable = true
     )
     private PickupSlot pickupSlot;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "fulfillment_type", nullable = false, length = 12)
+    private FulfillmentType fulfillmentType = FulfillmentType.PICKUP;
+
+    // A delivery order owns a rider hold. The pickup path never sets these fields.
+    @Column(name = "delivery_window_id")
+    private Long deliveryWindowId;
+
+    @Column(name = "delivery_hold_key", length = 100)
+    private String deliveryHoldKey;
+
+    @Column(name = "delivery_address_line", length = 300)
+    private String deliveryAddressLine;
+
+    @Column(name = "delivery_locality", length = 120)
+    private String deliveryLocality;
+
+    @Column(name = "delivery_postal_code", length = 6)
+    private String deliveryPostalCode;
 
     /*
      * Permanent order snapshot.
@@ -151,7 +172,7 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(
             name = "pickup_type",
-            nullable = false,
+            nullable = true,
             length = 30
     )
     private PickupType pickupType;
