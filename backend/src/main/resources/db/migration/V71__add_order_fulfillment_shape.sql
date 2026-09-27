@@ -5,7 +5,7 @@ ALTER TABLE orders ADD COLUMN delivery_window_id BIGINT REFERENCES delivery_capa
 ALTER TABLE orders ADD COLUMN delivery_hold_key VARCHAR(100) UNIQUE REFERENCES delivery_rider_holds(hold_key);
 ALTER TABLE orders ADD COLUMN delivery_address_line VARCHAR(300);
 ALTER TABLE orders ADD COLUMN delivery_locality VARCHAR(120);
-ALTER TABLE orders ADD COLUMN delivery_postal_code CHAR(6);
+ALTER TABLE orders ADD COLUMN delivery_postal_code VARCHAR(6);
 ALTER TABLE delivery_rider_holds ADD CONSTRAINT uk_delivery_hold_key_window UNIQUE (hold_key, window_id);
 ALTER TABLE orders ADD CONSTRAINT fk_orders_delivery_hold_window FOREIGN KEY (delivery_hold_key, delivery_window_id)
     REFERENCES delivery_rider_holds (hold_key, window_id);
