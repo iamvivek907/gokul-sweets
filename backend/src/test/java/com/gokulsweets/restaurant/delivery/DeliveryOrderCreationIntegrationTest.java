@@ -91,6 +91,12 @@ class DeliveryOrderCreationIntegrationTest {
         flags.setDeliveryRiderHolds(true);
         flags.setDeliveryAddressBoundaries(true);
         flags.setDeliveryAcceptedQuote(true);
+        flags.setDeliveryCheckout(true);
+        flags.setDeliveryCapacity(true);
+        flags.setDeliveryZones(true);
+        flags.setDeliveryLocalityCheck(true);
+        flags.setCustomerConsentControls(true);
+        flags.setCustomerOtpIdentity(true);
         var rider = new DeliveryRiderHoldService(flags, capacity, jdbc, ist);
         var inventory = mock(OrderInventoryReservationService.class);
         var contacts = mock(CustomerContactService.class);

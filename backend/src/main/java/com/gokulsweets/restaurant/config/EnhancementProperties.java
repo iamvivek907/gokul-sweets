@@ -65,6 +65,14 @@ public class EnhancementProperties {
     private boolean deliveryRiderHolds;
     /** SCRUM-30: require a fresh signed delivery price before internal order creation. */
     private boolean deliveryAcceptedQuote;
+    /** SCRUM-30: customer delivery order creation; requires signed quote and rider/inventory lifecycle. */
+    private boolean deliveryCheckout;
+
+    public boolean deliveryCheckoutReady() {
+        return deliveryCheckout && deliveryAcceptedQuote && deliveryRiderHolds
+                && deliveryAddressBoundaries && deliveryCapacity && deliveryZones
+                && deliveryLocalityCheck && customerConsentControls && customerOtpIdentity;
+    }
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;
