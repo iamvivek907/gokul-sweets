@@ -114,16 +114,8 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 @media(max-width:700px){.future-storefront .gokul-location-control{max-width:42vw;min-height:2.8rem;padding:.35rem .55rem;gap:.35rem}.future-storefront .gokul-location-pin{width:1.1rem;height:1.1rem;font-size:.45rem}.future-storefront .gokul-location-name small{font-size:.43rem}.future-storefront .gokul-location-name strong{font-size:.65rem}.future-storefront .gokul-location-chevron{font-size:1rem}.future-storefront .gokul-customer-breadcrumbs{margin:.25rem 0 .6rem;font-size:.7rem}}
 @media(max-width:700px){.future-storefront .future-brand small{display:none}.future-storefront .future-brand{font-size:.82rem}.future-storefront .future-branch-control{flex:0 1 auto}}
 .future-storefront .gokul-editorial-menu{max-width:1760px!important;padding-inline:clamp(.75rem,2vw,1.5rem)}
-.future-storefront .gokul-branch-hero-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(225px,260px);align-items:stretch;gap:1rem;margin:0 auto 1.1rem}
-.future-storefront .gokul-branch-hero-layout .gokul-branch-gallery{margin-bottom:0}
-.future-storefront .gokul-branch-side-card{display:flex;flex-direction:column;align-items:flex-start;gap:.8rem;padding:1.6rem;border:1px solid var(--journey-line);border-radius:1.25rem;background:#edf5ef;color:var(--journey-ink)}
-.future-storefront .gokul-branch-side-card p{margin:0;font-size:.7rem;font-weight:800;letter-spacing:.15em;color:var(--journey-muted)}
-.future-storefront .gokul-branch-side-card h2{margin:0;font:500 1.8rem/1.12 Georgia,serif;overflow-wrap:anywhere}
-.future-storefront .gokul-branch-side-card>span{font-size:.9rem;line-height:1.55;color:var(--journey-muted)}
-.future-storefront .gokul-branch-side-facts{width:100%;padding:1rem 0;border-top:1px solid #cbded3;border-bottom:1px solid #cbded3;color:var(--journey-muted);font-size:.85rem;line-height:2}.future-storefront .gokul-branch-side-facts strong{color:var(--journey-teal);font-size:1.05rem}
-.future-storefront .gokul-branch-side-card button{margin-top:auto;min-height:44px;padding:.55rem .85rem;border-radius:999px;background:var(--journey-teal);color:white!important;text-decoration:none;cursor:pointer}
+.future-storefront .gokul-branch-gallery{margin-bottom:1.1rem}
 .future-storefront .gokul-customer-breadcrumbs{margin-bottom:.35rem}
-@media(max-width:1100px){.future-storefront .gokul-branch-hero-layout{grid-template-columns:1fr}.future-storefront .gokul-branch-side-card{display:none}}
 
 .gokul-cart-swipe-content{position:relative;padding:1rem;background:#fff;transition:transform .22s cubic-bezier(.2,.8,.2,1);touch-action:pan-y}
 .gokul-cart-swipe-delete{display:none}

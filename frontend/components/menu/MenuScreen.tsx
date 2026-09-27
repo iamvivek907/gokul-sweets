@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import BranchMenuGallery from "@/components/menu/BranchMenuGallery";
-import BranchSelector from "@/components/branch/BranchSelector";
 import NewBranchItems from "@/components/menu/NewBranchItems";
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
@@ -974,16 +973,7 @@ export default function MenuScreen() {
                 `}
             >
 
-                {pickupCheck.features?.contextualStorefrontV2 && <div className="gokul-branch-hero-layout">
-                    <BranchMenuGallery branch={branch} products={allProducts} />
-                    <aside className="gokul-branch-side-card" aria-label="Selected pickup branch">
-                        <p>PICKUP BRANCH</p>
-                        <h2>{branch.name}</h2>
-                        <span>{[branch.address, branch.city].filter(Boolean).join(", ") || "Collect your order at this branch."}</span>
-                        <div className="gokul-branch-side-facts"><strong>{allProducts.length}</strong> menu items<br /><strong>{categories.length}</strong> categories</div>
-                        <BranchSelector compact />
-                    </aside>
-                </div>}
+                {pickupCheck.features?.contextualStorefrontV2 && <BranchMenuGallery branch={branch} products={allProducts} />}
 
                 <header
                     className="
