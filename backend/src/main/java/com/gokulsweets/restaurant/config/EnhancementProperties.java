@@ -55,6 +55,8 @@ public class EnhancementProperties {
     private boolean customerConsentControls;
     /** SCRUM-29: delivery locality intake; effective only alongside reviewed privacy controls. */
     private boolean deliveryLocalityCheck;
+    /** SCRUM-30: manage delivery zones and return provisional coverage only. */
+    private boolean deliveryZones;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

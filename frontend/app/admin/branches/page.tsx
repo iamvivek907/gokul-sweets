@@ -21,6 +21,8 @@ import {
 import {
     BranchOperationalSettings
 } from "@/components/admin/BranchOperationalSettings";
+import {DeliveryZonesSettings} from "@/components/admin/DeliveryZonesSettings";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import type {
     AdminBranch,
@@ -245,6 +247,8 @@ function formatDateTime(
 
 
 export default function AdminBranchesPage() {
+
+    const deliveryZonesEnabled = useStorefrontFeatures()?.deliveryZones === true;
 
     const {
         profile,
@@ -2190,8 +2194,7 @@ export default function AdminBranchesPage() {
                             selectedBranch
                             &&
                             authorization
-                            && (
-
+                            && (<>
                                 <BranchOperationalSettings
                                     key={
                                         selectedBranch.id
@@ -2207,7 +2210,13 @@ export default function AdminBranchesPage() {
                                     }
                                 />
 
-                            )
+                                {deliveryZonesEnabled && <DeliveryZonesSettings
+                                    key={`delivery-${selectedBranch.id}`}
+                                    branchId={selectedBranch.id}
+                                    authorization={authorization}
+                                />}
+
+                            </>)
                         }
 
                     </section>
