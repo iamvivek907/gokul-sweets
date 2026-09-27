@@ -13,6 +13,21 @@ class StorefrontFeaturesControllerTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-25T18:31:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @Test
+    void deliveryLocationCheckRequiresPrivacyAndIdentityGates() {
+        var properties = new EnhancementProperties();
+        var controller = new StorefrontFeaturesController(properties, clock);
+        assertThat(controller.features().deliveryLocalityCheck()).isFalse();
+        properties.setDeliveryLocalityCheck(true);
+        assertThat(controller.features().deliveryLocalityCheck()).isFalse();
+        properties.setCustomerConsentControls(true);
+        assertThat(controller.features().deliveryLocalityCheck()).isFalse();
+        properties.setCustomerOtpIdentity(true);
+        assertThat(controller.features().deliveryLocalityCheck()).isTrue();
+        properties.setCustomerConsentControls(false);
+        assertThat(controller.features().deliveryLocalityCheck()).isFalse();
+    }
+
+    @Test
     void contextDisplayDefaultsOffAndUsesIndiaBusinessDate() {
         var properties = new EnhancementProperties();
         var result = new StorefrontFeaturesController(properties, clock).features();

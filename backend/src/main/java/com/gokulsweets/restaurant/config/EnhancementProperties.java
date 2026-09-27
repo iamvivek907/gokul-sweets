@@ -53,6 +53,8 @@ public class EnhancementProperties {
     private boolean customerOtpIdentity;
     /** SCRUM-49: verified customer optional-purpose controls; requires an approved policy version. */
     private boolean customerConsentControls;
+    /** SCRUM-29: delivery locality intake; effective only alongside reviewed privacy controls. */
+    private boolean deliveryLocalityCheck;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

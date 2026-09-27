@@ -23,6 +23,7 @@ export interface StorefrontFeatures {
     truthfulOrderTracking: boolean;
     paidCartRecovery: boolean;
     paymentPollingV2: boolean;
+    deliveryLocalityCheck: boolean;
     futureOrderingDays: number;
     today: string;
 }

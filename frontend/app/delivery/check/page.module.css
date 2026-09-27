@@ -1,0 +1,26 @@
+.page { padding: 42px 20px 90px; background: #f8f4ed; color: #173c3d; min-height: 70vh; }
+.frame { max-width: 1130px; margin: 0 auto; }
+.back { display: inline-flex; min-height: 44px; align-items: center; font-weight: 650; color: #176a68; }
+.eyebrow,.step { display: block; margin: 38px 0 12px; font-size: 12px; font-weight: 750; letter-spacing: .15em; text-transform: uppercase; color: #a36937; }
+.step { margin: 0 0 14px; }
+.page h1 { max-width: 800px; font-family: Georgia, serif; font-size: clamp(44px, 6vw, 78px); line-height: 1.08; letter-spacing: -.045em; }
+.page h1 em { color: #aa713d; font-weight: 400; }
+.intro { max-width: 660px; margin: 20px 0 40px; font-size: 18px; line-height: 1.7; color: #536b67; }
+.grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 24px; align-items: start; }
+.card { padding: clamp(24px, 4vw, 44px); border: 1px solid #d7ded8; border-radius: 22px; background: #fffdfa; box-shadow: 0 14px 45px #143a3810; }
+.card h2 { font-family: Georgia, serif; font-size: clamp(27px, 3vw, 38px); line-height: 1.16; }
+.card p { margin: 16px 0 24px; line-height: 1.65; color: #526662; }
+.card form { display: grid; gap: 11px; }
+.card label { margin-top: 12px; font-weight: 700; font-size: 14px; }
+.card input { width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #9cafa8; border-radius: 10px; color: #173c3d; background: #fff; }
+.card input:focus-visible,.card button:focus-visible,.back:focus-visible,.card a:focus-visible { outline: 3px solid #cb9a49; outline-offset: 3px; }
+.card .hint { margin: 0; font-size: 13px; }
+.card button { min-height: 48px; padding: 11px 20px; border-radius: 10px; font-weight: 700; }
+.card .action { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-top: 10px; color: #fff; background: #165c5b; }
+.card .outline { border: 1px solid #165c5b; color: #165c5b; }
+.card button:disabled { opacity: .6; }
+.card .result { padding: 14px; border-radius: 9px; background: #edf6f2; color: #174e48; }
+.notice { margin-top: 36px; padding: 22px; border-left: 3px solid #af7541; background: #f7f1e8; }
+.notice p { margin: 8px 0 0; }
+:global(.future-storefront) .page { background: #eef3ee; }
+@media (max-width: 760px) { .page { padding: 20px 16px 80px; } .grid { grid-template-columns: 1fr; gap: 16px; } .intro { font-size: 16px; } }
