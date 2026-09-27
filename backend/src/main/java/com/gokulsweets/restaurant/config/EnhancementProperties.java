@@ -57,6 +57,8 @@ public class EnhancementProperties {
     private boolean deliveryLocalityCheck;
     /** SCRUM-30: manage delivery zones and return provisional coverage only. */
     private boolean deliveryZones;
+    /** SCRUM-30: explicit rider capacity preview; never enables delivery checkout by itself. */
+    private boolean deliveryCapacity;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;

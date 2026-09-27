@@ -4,11 +4,14 @@ import {useEffect, useState, type FormEvent} from "react";
 import {getAdminBranchMenu} from "@/services/adminMenuApi";
 import {listDeliveryZones, saveDeliveryZone, type DeliveryZone, type ZoneConfiguration} from "@/services/adminDeliveryZonesApi";
 import type {AdminBranchProduct} from "@/types/adminMenu";
+import {DeliveryCapacitySettings} from "@/components/admin/DeliveryCapacitySettings";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 const empty: ZoneConfiguration = {locality: "", postalCode: "", opensAt: "10:00", closesAt: "20:00",
     active: false, riderPaused: true, productIds: []};
 
 export function DeliveryZonesSettings({branchId, authorization}: {branchId: number; authorization: string}) {
+    const capacityEnabled = useStorefrontFeatures()?.deliveryCapacity === true;
     const [zones, setZones] = useState<DeliveryZone[]>([]);
     const [products, setProducts] = useState<AdminBranchProduct[]>([]);
     const [form, setForm] = useState<ZoneConfiguration>(empty);
@@ -40,6 +43,8 @@ export function DeliveryZonesSettings({branchId, authorization}: {branchId: numb
 
     const field = "mt-1 min-h-11 w-full rounded-lg border border-[#d8c9bd] bg-white p-2 text-[#241715]";
     const choices = products.filter(product => product.available && product.productActive && product.categoryActive);
+    const selectedZone = zones.find(zone => zone.locality === form.locality.trim().toLowerCase()
+        && zone.postalCode === form.postalCode);
 
     return <section className="mt-8 rounded-2xl border border-[#eadfd6] bg-white p-5">
         <p className="text-xs font-bold uppercase tracking-widest text-[#a56e2e]">Delivery configuration</p>
@@ -77,5 +82,7 @@ export function DeliveryZonesSettings({branchId, authorization}: {branchId: numb
                 className="min-h-11 rounded-lg bg-[#7a1625] px-5 font-semibold text-white disabled:opacity-50">{busy ? "Saving..." : "Save zone"}</button>
                 <button type="button" className="min-h-11 rounded-lg border px-4" onClick={() => {setForm(empty); setNotice("");}}>New zone</button></div>
         </form>
+        {capacityEnabled && selectedZone && <DeliveryCapacitySettings key={selectedZone.id}
+            branchId={branchId} zoneId={selectedZone.id} authorization={authorization} />}
     </section>;
 }

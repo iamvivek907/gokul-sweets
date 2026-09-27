@@ -4,27 +4,57 @@ import Link from "next/link";
 import {useState, type FormEvent} from "react";
 import AppShell from "@/components/layout/AppShell";
 import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
+import {useCart} from "@/hooks/useCart";
+import {apiClient} from "@/services/apiClient";
 import styles from "./page.module.css";
 
 type LocationState = "idle" | "locating" | "received" | "unavailable";
+type Coverage = {configuredAreas: {branchId: number; branchName: string}[]; orderable: boolean; notice: string};
+type Quote = {provisionalWindows: {id: number; serviceDate: string; startsAt: string; endsAt: string}[];
+    orderable: boolean; notice: string};
 
 export default function DeliveryCheckPage() {
     const {features, error, retry} = useStorefrontConfiguration();
     const [locality, setLocality] = useState("");
     const [pin, setPin] = useState("");
+    const [postalCode, setPostalCode] = useState("");
+    const [serviceDate, setServiceDate] = useState("");
+    const [pending, setPending] = useState(false);
+    const [quote, setQuote] = useState<Quote | null>(null);
     const [message, setMessage] = useState("");
     const [locationState, setLocationState] = useState<LocationState>("idle");
+    const cart = useCart();
 
-    function submit(event: FormEvent<HTMLFormElement>) {
+    async function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
         const area = locality.trim();
         if (area.length < 2 || area.length > 120) {
             setMessage("Enter a locality between 2 and 120 characters.");
             return;
         }
-        // SCRUM-30 will send this input to its authoritative eligibility API.
-        // Until then, the browser does not save, transmit or classify the area.
-        setMessage(`${area} is ready to check. Delivery availability is not confirmed yet.`);
+        if (!features?.deliveryZones) {
+            setMessage(`${area} is ready to check. Delivery availability is not confirmed yet.`);
+            return;
+        }
+        setPending(true); setMessage(""); setQuote(null);
+        try {
+            if (features.deliveryCapacity && cart.branchId && cart.items.length && serviceDate) {
+                const result = await apiClient<Quote>("/api/storefront/delivery/quote", {
+                    method: "POST", body: JSON.stringify({branchId: cart.branchId, locality: area,
+                        postalCode, serviceDate, productIds: cart.items.map(item => item.product.id)}),
+                    signal: AbortSignal.timeout(8000)
+                });
+                setQuote(result);
+                setMessage(result.notice);
+            } else {
+                const result = await apiClient<Coverage>(`/api/storefront/delivery/coverage?locality=${encodeURIComponent(area)}&postalCode=${encodeURIComponent(postalCode)}`,
+                    {signal: AbortSignal.timeout(8000)});
+                setMessage(result.configuredAreas.length
+                    ? "This area has a configured branch. Add items and choose an IST date to preview rider windows. Delivery is not confirmed."
+                    : result.notice);
+            }
+        } catch {setMessage("We could not check your area right now. Pickup is still available; try again later.");}
+        finally {setPending(false);}
     }
 
     function useLocation() {
@@ -66,15 +96,30 @@ export default function DeliveryCheckPage() {
                         <form onSubmit={submit}>
                             <label htmlFor="delivery-locality">Locality or neighbourhood</label>
                             <input id="delivery-locality" name="locality" autoComplete="address-level3" value={locality}
-                                   onChange={event => {setLocality(event.target.value); setMessage("");}}
+                                   onChange={event => {setLocality(event.target.value); setMessage(""); setQuote(null);}}
                                    minLength={2} maxLength={120} required placeholder="e.g. Hazratganj" />
+                            {features.deliveryZones && <><label htmlFor="delivery-postal-code">Six-digit PIN code</label>
+                                <input id="delivery-postal-code" name="postalCode" inputMode="numeric" autoComplete="postal-code"
+                                       value={postalCode} onChange={event => {setPostalCode(event.target.value); setQuote(null);}}
+                                       pattern="[0-9]{6}" required placeholder="e.g. 226001" /></>}
+                            {features.deliveryCapacity && cart.items.length > 0 && <><label htmlFor="delivery-service-date">Delivery date (IST)</label>
+                                <input id="delivery-service-date" name="serviceDate" type="date" value={serviceDate}
+                                       onChange={event => {setServiceDate(event.target.value); setQuote(null);}} />
+                                <p className={styles.hint}>Checking {cart.items.length} item(s) from your current branch. A result does not reserve a rider.</p></>}
                             <label htmlFor="delivery-pin">Map pin or landmark (optional)</label>
                             <input id="delivery-pin" name="pin" value={pin} maxLength={160}
                                    onChange={event => setPin(event.target.value)} placeholder="Paste a map link or enter a landmark" />
-                            <p className={styles.hint}>The pin stays on this page for now. No address or pin is submitted.</p>
-                            <button type="submit" className={styles.action}>Prepare area check <span aria-hidden="true">&rarr;</span></button>
+                            <p className={styles.hint}>The optional map pin or landmark stays on this page. When available, locality and PIN go to the server for a provisional check.</p>
+                            <button type="submit" disabled={pending} className={styles.action}>{pending ? "Checking area..." : "Check area"} <span aria-hidden="true">&rarr;</span></button>
                         </form>
                         {message && <p role="status" className={styles.result}>{message}</p>}
+                        {quote && quote.provisionalWindows.length > 0 && <div className={styles.result}>
+                            <strong>Configured rider windows (IST)</strong>
+                            <ul>{quote.provisionalWindows.map(window => <li key={window.id}>
+                                {window.serviceDate} · {window.startsAt.slice(0, 5)}–{window.endsAt.slice(0, 5)}
+                            </li>)}</ul>
+                            <p>These times are provisional. Delivery checkout is not open yet.</p>
+                        </div>}
                     </section>
                     <aside className={styles.card} aria-labelledby="device-location">
                         <span className={styles.step}>02 / OPTIONAL</span>

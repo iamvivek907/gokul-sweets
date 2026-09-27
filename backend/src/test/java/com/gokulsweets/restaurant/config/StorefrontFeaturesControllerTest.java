@@ -43,6 +43,21 @@ class StorefrontFeaturesControllerTest {
     }
 
     @Test
+    void deliveryCapacityRequiresZoneAndPrivacyPrerequisites() {
+        var properties = new EnhancementProperties();
+        properties.setDeliveryCapacity(true);
+        var controller = new StorefrontFeaturesController(properties, clock);
+        assertThat(controller.features().deliveryCapacity()).isFalse();
+        properties.setDeliveryZones(true);
+        properties.setDeliveryLocalityCheck(true);
+        properties.setCustomerConsentControls(true);
+        properties.setCustomerOtpIdentity(true);
+        assertThat(controller.features().deliveryCapacity()).isTrue();
+        properties.setDeliveryZones(false);
+        assertThat(controller.features().deliveryCapacity()).isFalse();
+    }
+
+    @Test
     void contextDisplayDefaultsOffAndUsesIndiaBusinessDate() {
         var properties = new EnhancementProperties();
         var result = new StorefrontFeaturesController(properties, clock).features();
