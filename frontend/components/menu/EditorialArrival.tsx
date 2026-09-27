@@ -82,7 +82,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
             /></div>}
             <div className={styles.scrim} aria-hidden="true" />
             <div className={styles.topbar}>
-                <Link href="/" className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></Link>
+                <div className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></div>
                 <nav aria-label="Welcome navigation">
                     <button type="button" onClick={onExplore}>Home</button>
                     <Link href="/about">Our story</Link>

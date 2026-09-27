@@ -79,11 +79,14 @@ body:has(.future-storefront){background:#fffaf2}
 .future-storefront .menu-availability-chip>span{background:white;color:var(--journey-teal)}
 .future-storefront .menu-availability-chip--unavailable{background:#a52d2d;color:white;border-color:#a52d2d}
 .future-storefront .menu-availability-note{background:#fff2e7;color:var(--journey-ink);border-color:var(--journey-coral)}
-html:has(.future-storefront),body:has(.future-storefront){max-width:100%;overflow-x:clip}
-.future-storefront :is(p,h1,h2,h3,span,strong,small,li,time,code,input,textarea){-webkit-user-select:text;user-select:text}
-.future-storefront :is(button,button *,a[role="button"],.gokul-branch-card-action-label){-webkit-user-select:none;user-select:none}
+html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
+.future-storefront :is(input,textarea,select,code,time,.selectable-text,[data-copyable]){-webkit-user-select:text;user-select:text}
+.future-storefront :is(button,button *,a,.gokul-branch-card-action-label){-webkit-user-select:none;user-select:none}
 .future-storefront :is(img,video){-webkit-user-drag:none}
 .future-storefront :is(button,a){touch-action:manipulation}
+.future-storefront :is(.gokul-pickup-options,.gokul-pickup-times,.gokul-branch-gallery,.gokul-editorial-menu,.checkout-experience-v2){min-width:0;max-width:100%}
+.future-storefront .gokul-pickup-time{min-width:0;overflow-wrap:anywhere}
+.future-storefront .gokul-pickup-options>section{min-width:0;max-width:100%}
 .future-storefront .gokul-branch-gallery{position:relative}
 .future-storefront .gokul-branch-switch{position:absolute;top:1.25rem;right:1.5rem;z-index:2;display:inline-flex;align-items:center;min-height:44px;padding:.4rem .8rem;border:1px solid #ffffff91;border-radius:999px;color:white!important;font-size:.8rem;font-weight:800;text-decoration:none;background:#0927258c}
 .future-storefront .gokul-branch-switch:hover{background:#092725}

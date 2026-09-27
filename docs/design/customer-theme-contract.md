@@ -4,6 +4,8 @@
 
 The arrival screen and approved eight-item menu demo define the shared customer appearance when the effective customer visual flag is on: deep teal `#092725`, hero teal `#143936`, cream `#fffaf2`, coral action `#c76752`, readable ink `#172e2c`, and light bordered surfaces. `frontend/components/layout/customer-journey.css` applies these tokens within `.future-storefront` across menu, cart, checkout, orders, navigation and overlays. The server's effective flags still control the visual shell; the flag-OFF appearance is unchanged. Branch cards open the selected live menu. A cross-branch switch explicitly reviews the current cart and, only after confirmation, clears it, resets the selected pickup slot and opens the new branch menu. Placed orders are unaffected. A real paid `CONFIRMED` order alone receives the prominent confirmation tick.
 
+Across customer pages, decorative text and action labels resist accidental selection; inputs, prices and order numbers remain copyable. The viewport fits narrow screens without page-wide horizontal movement, while intended carousels retain contained scrolling. Buttons use touch manipulation to avoid accidental double-tap zoom. Do not suppress browser pinch or accessibility zoom: the viewport must remain usable at 200% zoom and larger text.
+
 The approved Sprint 2 customer visual direction lives in the shared customer shell. New customer stories inherit it automatically when they render inside `AppShell`; staff and admin screens keep their own design.
 
 ## Implementation rules
