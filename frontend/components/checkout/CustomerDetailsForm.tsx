@@ -29,10 +29,16 @@ function normalizePhone(
     value: string
 ): string {
 
-    return value.replace(
+    const digits = value.replace(
         /\D/g,
         ""
     );
+
+    // Contact autofill can provide the international prefix even though +91
+    // is already displayed beside this field. Strip it before limiting input.
+    if (digits.length > 10 && digits.startsWith("0091")) return digits.slice(4);
+    if (digits.length > 10 && digits.startsWith("91")) return digits.slice(2);
+    return digits;
 }
 
 
@@ -66,7 +72,7 @@ export default function CustomerDetailsForm({
         setPhone
     ] =
         useState(
-            initialValue?.phone
+            normalizePhone(initialValue?.phone ?? "")
             ?? ""
         );
 

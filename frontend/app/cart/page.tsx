@@ -160,8 +160,6 @@ export default function CartPage() {
 
     return (
         <AppShell>
-            <PickupContext check={pickupCheck} cart />
-
             <section
                 className="
                     mx-auto
@@ -278,9 +276,12 @@ export default function CartPage() {
                             {inPlaceBranchSwitch && branch && !cartMatchesSelectedBranch &&
                                 <BranchConflictReview branchId={branch.id} items={items} removeItem={handleRemoveItem} clearCart={clearCart} />}
 
+                            {(pickupCheck.selectionUnavailable || pickupCheck.items?.some(item => !item.available)) &&
+                                <PickupContext check={pickupCheck} cart />}
+
                             <div
                                 className={`
-                                    mt-6
+                                    mt-4
                                     rounded-2xl
                                     border
                                     p-4

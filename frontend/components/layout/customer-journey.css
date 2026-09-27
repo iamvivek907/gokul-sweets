@@ -44,11 +44,11 @@
 .future-storefront .gokul-menu-product-grid{gap:1rem;grid-template-columns:repeat(4,minmax(0,1fr))}
 .future-storefront .gokul-menu-product-card{flex-direction:column;min-width:0;border-radius:18px}
 .future-storefront .gokul-menu-product-card>div:first-of-type{height:auto;width:100%;aspect-ratio:4/3;background:linear-gradient(135deg,#f1e6d0,#c5d6c9)}
-.future-storefront .gokul-menu-product-card .product-card-purchase{align-items:flex-start}
-.future-storefront .gokul-menu-product-card .product-card-controls{height:44px}
+.future-storefront .gokul-menu-product-card .product-card-purchase{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-end;flex-wrap:nowrap;gap:.3rem;min-height:104px}
+.future-storefront .gokul-menu-product-card .product-card-controls{height:44px;width:100%;margin-top:auto}
 .future-storefront .gokul-menu-product-card .product-card-controls button{min-height:40px}
 @media(max-width:1100px){.future-storefront .gokul-menu-product-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@media(max-width:750px){.future-storefront .gokul-menu-product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}.future-storefront .gokul-menu-product-card .product-card-purchase{display:block}.future-storefront .gokul-menu-product-card .product-card-controls{width:100%;margin-top:.55rem}.future-storefront .gokul-menu-product-card>div:first-of-type{aspect-ratio:4/3}}
+@media(max-width:750px){.future-storefront .gokul-menu-product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.65rem}.future-storefront .gokul-menu-product-card>div:first-of-type{aspect-ratio:4/3}}
 @media(max-width:350px){.future-storefront .gokul-menu-product-grid{grid-template-columns:1fr}}
 body:has(.future-storefront){background:#fffaf2}
 .future-storefront .page-content [class~="bg-white"],.future-storefront .page-content [class~="bg-white/95"],.future-storefront .page-content [class~="bg-white/70"]{background:white!important;border-color:var(--journey-line)!important;box-shadow:0 8px 25px #0927250e!important}

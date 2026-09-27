@@ -34,8 +34,7 @@ export default function PickupJourneyContext() {
     // Committed orders must use their own server-confirmed branch and pickup time.
     if (features?.checkoutExperienceV2 && pathname.startsWith("/checkout/")) return null;
     if (!features?.persistentPickupContext || !branch ||
-        !(pathname === "/cart" ||
-          pathname === "/checkout/pickup" || pathname === "/checkout/customer" ||
+        !(pathname === "/checkout/pickup" || pathname === "/checkout/customer" ||
           pathname === "/checkout/review")) return null;
 
     const mismatchedCart = !cart.isEmpty && cart.branchId !== branch.id;

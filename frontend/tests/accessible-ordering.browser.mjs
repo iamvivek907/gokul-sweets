@@ -16,10 +16,10 @@ try {
     await page.goto(process.env.BROWSER_BASE ?? "http://127.0.0.1:3309");
     await page.locator('html[data-accessible-ordering="true"]').waitFor();
     const viewport = await page.locator('meta[name="viewport"]').getAttribute("content");
-    assert.ok(!viewport.includes("maximum-scale=1"), "Customers must be able to pinch zoom.");
+    assert.ok(viewport.includes("maximum-scale=1"), "The customer viewport keeps its fixed device scale.");
     assert.ok(await page.getByRole("link", {name: /Order Now/}).isVisible(), "Ordering remains available at narrow width.");
     await context.setOffline(true);
     await page.getByText("You're offline", {exact: true}).waitFor();
     assert.ok(await page.getByRole("link", {name: /Order Now/}).isVisible(), "Offline state keeps the navigation visible.");
-    console.log("PASS: mobile zoom, reduced-motion style, and offline navigation recovery.");
+    console.log("PASS: fixed mobile viewport, reduced-motion style, and offline navigation recovery.");
 } finally {await browser.close();}

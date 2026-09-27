@@ -51,11 +51,6 @@ html {
     scroll-behavior: smooth;
 }
 
-html[data-accessible-ordering="true"] body {
-    -webkit-user-select: text;
-    user-select: text;
-}
-
 html[data-accessible-ordering="true"] :is(a, button, input, select, textarea):focus-visible {
     outline: 3px solid #9a5116;
     outline-offset: 3px;
