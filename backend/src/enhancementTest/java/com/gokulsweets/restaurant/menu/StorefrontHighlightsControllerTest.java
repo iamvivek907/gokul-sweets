@@ -62,14 +62,14 @@ class StorefrontHighlightsControllerTest {
         verifyNoMoreInteractions(menu, jdbc, availability);
     }
 
-    @Test void refreshesAtExpiryAndCachesEmptyResults() {
+    @Test void refreshesAtExpiryAndKeepsLatestCatalogWhenPickupIsUnavailable() {
         controller.highlights(1L);
         when(clock.instant()).thenReturn(now.plusSeconds(30));
         when(availability.check(anyLong(), any(LocalDate.class), anyInt(), anyList())).thenReturn(result(false));
         var refreshed = controller.highlights(1L);
         assertThat(refreshed.trendingProductIds()).isEmpty();
         assertThat(refreshed.newProductIds()).isEmpty();
-        assertThat(refreshed.latestProductIds()).isEmpty();
+        assertThat(refreshed.latestProductIds()).containsExactly(11L);
         assertThat(controller.highlights(1L)).isSameAs(refreshed);
         verify(menu, times(2)).getMenu(1L);
         verify(availability, times(2)).check(eq(1L), any(LocalDate.class), eq(31), anyList());
