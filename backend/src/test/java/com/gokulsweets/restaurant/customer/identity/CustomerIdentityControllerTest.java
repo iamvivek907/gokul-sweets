@@ -3,6 +3,9 @@ package com.gokulsweets.restaurant.customer.identity;
 import com.gokulsweets.restaurant.common.security.WebCorsProperties;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
+import com.gokulsweets.restaurant.customer.consent.ConsentLedger;
+import com.gokulsweets.restaurant.customer.consent.ConsentPurpose;
+import com.gokulsweets.restaurant.customer.consent.ConsentDecision;
 import com.gokulsweets.restaurant.order.service.OrderQueryService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
@@ -27,6 +30,7 @@ class CustomerIdentityControllerTest {
     private final OrderQueryService orders = mock(OrderQueryService.class);
     private final IdentityExchangeRateLimiter rateLimiter = mock(IdentityExchangeRateLimiter.class);
     private final IdentityDeviceRegistry devices = mock(IdentityDeviceRegistry.class);
+    private final ConsentLedger consents = mock(ConsentLedger.class);
     private final EnhancementProperties features = new EnhancementProperties();
     private final MockEnvironment settings = new MockEnvironment()
             .withProperty("gokul.environment-isolation.enabled", "true")
@@ -35,7 +39,46 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(
             exchange, sessions, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
-            ownership, orders, rateLimiter, devices);
+            ownership, orders, rateLimiter, devices, consents);
+
+    @Test
+    void consentDefaultsOffAndRequiresVerifiedOwnerAndApprovedPolicy() {
+        features.setCustomerOtpIdentity(true);
+        assertThatThrownBy(() -> controller.consents(request()))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(consents);
+
+        features.setCustomerConsentControls(true);
+        settings.withProperty("gokul.consent.policy-version", "2026-09");
+        assertThatThrownBy(() -> controller.consents(request()))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(consents);
+
+        var subject = UUID.randomUUID();
+        var authenticated = request();
+        authenticated.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
+        when(sessions.subject(eq(ConsentEnvironment.DEV), eq("current-session"), any()))
+                .thenReturn(Optional.of(subject));
+        when(consents.current(eq(ConsentEnvironment.DEV), eq(subject), any()))
+                .thenReturn(new ConsentDecision(false, "", null));
+        assertThat(controller.consents(authenticated).getBody().get(ConsentPurpose.MARKETING).granted())
+                .isFalse();
+        when(consents.current(ConsentEnvironment.DEV, subject, ConsentPurpose.MARKETING))
+                .thenReturn(new ConsentDecision(true, "old-policy", Instant.now()));
+        assertThat(controller.consents(authenticated).getBody().get(ConsentPurpose.MARKETING).granted())
+                .isFalse();
+
+        var choice = new CustomerIdentityController.ConsentChoice(true);
+        controller.updateConsent(ConsentPurpose.MARKETING, choice, authenticated);
+        verify(consents).record(ConsentEnvironment.DEV, subject, ConsentPurpose.MARKETING, "2026-09", true);
+        var wrongOrigin = request();
+        wrongOrigin.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
+        wrongOrigin.removeHeader(HttpHeaders.ORIGIN);
+        wrongOrigin.addHeader(HttpHeaders.ORIGIN, "https://attacker.example");
+        assertThatThrownBy(() -> controller.updateConsent(ConsentPurpose.MARKETING, choice, wrongOrigin))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(consents, times(1)).record(any(), any(), any(), any(), anyBoolean());
+    }
 
     @Test
     void recoveredOrdersRequireCurrentSessionAndExactOwner() {

@@ -4,6 +4,7 @@ import {useEffect, useRef, useState} from "react";
 import {apiClient} from "@/services/apiClient";
 import {proofFromWidget} from "@/lib/msg91Proof";
 import {MSG91_WIDGET_ID, MSG91_WIDGET_TOKEN} from "@/lib/constants";
+import ConsentPreferences from "@/components/customer/ConsentPreferences";
 
 const widgetId = MSG91_WIDGET_ID;
 const widgetToken = MSG91_WIDGET_TOKEN;
@@ -124,7 +125,7 @@ export default function CustomerIdentityPanel() {
         }
     }
 
-    return <section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Phone verification">
+    return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Phone verification">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">Your account</p>
         <h2 className="mt-2 text-xl font-semibold text-[#241715]">{verified ? "Phone verified" : "Verify your phone"}</h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
@@ -136,5 +137,5 @@ export default function CustomerIdentityPanel() {
             {busy ? "Please wait…" : verified ? "Sign out" : "Verify with SMS"}
         </button>
         {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
-    </section>;
+    </section>{verified && <ConsentPreferences />}</>;
 }

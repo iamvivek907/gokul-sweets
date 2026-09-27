@@ -51,6 +51,8 @@ public class EnhancementProperties {
     private boolean paidCartRecovery;
     /** SCRUM-36: requires a verified SMS provider and customer session implementation before activation. */
     private boolean customerOtpIdentity;
+    /** SCRUM-49: verified customer optional-purpose controls; requires an approved policy version. */
+    private boolean customerConsentControls;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;
