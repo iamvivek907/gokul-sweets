@@ -98,6 +98,21 @@ retention basis, response period, and reviewed wording before enabling this
 flag. A request from a rotated subject may need manual linkage via the existing
 subject-rotation audit. Do not infer a retention duration or automate erasure.
 
+## Owner review queue checkpoint
+
+V65 adds `PRIVACY_REQUEST_VIEW` to the owner role only. The bounded
+`GET /api/admin/privacy-requests?page=0` returns request metadata from the
+configured environment and records the staff ID, environment, page and row
+count in an audit event in the same transaction. A failed permission check
+does not read or audit the queue. Neither phone numbers nor order contents are
+included. The queue remains hidden when consent controls are OFF.
+
+This is triage visibility, not a fulfillment action. No status change, actual
+export, deletion, or financial-record retention rule is provided. Staff must
+not claim completion from a received request. Before flag activation, the
+privacy owner and legal reviewer still need an approved processing runbook,
+recipient re-verification, rotation handling, retention schedule and wording.
+
 ## Ledger checkpoint
 
 V55 creates an append-only optional consent ledger keyed by a verified subject
