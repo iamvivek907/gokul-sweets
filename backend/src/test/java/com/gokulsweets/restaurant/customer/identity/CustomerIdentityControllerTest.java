@@ -59,7 +59,7 @@ class CustomerIdentityControllerTest {
         authenticated.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
         when(sessions.subject(eq(ConsentEnvironment.DEV), eq("current-session"), any()))
                 .thenReturn(Optional.of(subject));
-        when(consents.current(ConsentEnvironment.DEV, subject, ConsentPurpose.MARKETING))
+        when(consents.current(eq(ConsentEnvironment.DEV), eq(subject), any()))
                 .thenReturn(new ConsentDecision(false, "", null));
         assertThat(controller.consents(authenticated).getBody().get(ConsentPurpose.MARKETING).granted())
                 .isFalse();
