@@ -8,7 +8,7 @@ import type {MenuProduct} from "@/types/menu";
 import styles from "./NewBranchItems.module.css";
 
 interface Highlights {
-    newProductIds: number[];
+    latestProductIds: number[];
 }
 
 export default function NewBranchItems({branch, products, onSelect}: {
@@ -25,7 +25,7 @@ export default function NewBranchItems({branch, products, onSelect}: {
         apiClient<Highlights>(`/api/branches/${branch.id}/storefront-highlights`, {
             signal: controller.signal
         }).then(data => {
-            if (!controller.signal.aborted) setHighlights({branchId: branch.id, ids: data.newProductIds ?? []});
+            if (!controller.signal.aborted) setHighlights({branchId: branch.id, ids: data.latestProductIds ?? []});
         }).catch(error => {
             if (!controller.signal.aborted) console.warn("New branch items unavailable.", error);
         });
@@ -44,7 +44,7 @@ export default function NewBranchItems({branch, products, onSelect}: {
         <div className={styles.heading}>
             <div>
                 <p className={styles.eyebrow}>Fresh from {branch.name}</p>
-                <h2 id="new-branch-items-title">New on the menu</h2>
+        <h2 id="new-branch-items-title">Latest on the menu</h2>
             </div>
             <div className={styles.controls} aria-label="Browse new items">
                 <button type="button" aria-label="Previous new items" onClick={() => move(-1)}>‹</button>

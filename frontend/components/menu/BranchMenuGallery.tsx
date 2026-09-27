@@ -17,7 +17,7 @@ export default function BranchMenuGallery({branch, products}: {branch: Branch; p
             <h1>{branch.name}</h1>
             <p>Fresh sweets, snacks and meals from your chosen branch. Browse the live menu and choose a pickup time at checkout.</p>
             <div className="gokul-branch-meta"><span>{[branch.address, branch.city].filter(Boolean).join(", ") || "Your selected pickup branch"}</span>
-                <a href="#gokul-menu-items" className="gokul-branch-menu-cta">Browse menu ↓</a></div>
+                <a href="#gokul-menu-items" className="gokul-branch-menu-cta">Browse menu</a></div>
         </div>
         {photos.length ? <div className="gokul-gallery-photos" aria-label="Food from this branch's menu">
             {photos.map((product, index) => <div key={product.id} className={`gokul-gallery-tile gokul-gallery-tile-${index}`}>

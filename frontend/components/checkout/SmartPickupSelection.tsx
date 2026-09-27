@@ -35,6 +35,7 @@ export default function SmartPickupSelection({features, onFallback}: {
     const [failure, setFailure] = useState<{key: string; message: string} | null>(null);
     const [continuing, setContinuing] = useState(false);
     const [message, setMessage] = useState("");
+    const [showAllTimes, setShowAllTimes] = useState(false);
     const stateVersion = useRef(0);
     const date = selectedDate ?? (intent.date && intent.date >= features.today ? intent.date : features.today);
     const itemsJson = JSON.stringify(availabilityItems(cart.items));
@@ -46,6 +47,7 @@ export default function SmartPickupSelection({features, onFallback}: {
     const chosen = currentDate?.slots.find(value => value.slot.id === selection?.id);
     const available = selection?.type === "PRIORITY" ? chosen?.priorityAvailable : chosen?.normalAvailable;
     const selectable = currentDate?.slots.filter(value => value.normalAvailable || value.priorityAvailable) ?? [];
+    const timeChoiceCount = selectable.reduce((count, value) => count + Number(value.normalAvailable) + Number(value.priorityAvailable && value.slot.priorityEnabled), 0);
     const unavailable = currentDate?.slots.filter(value => !value.normalAvailable && !value.priorityAvailable) ?? [];
     const next = data?.dates.flatMap(day => day.slots.filter(slot => slot.normalAvailable || slot.priorityAvailable)
         .map(slot => ({day, slot})))[0];
@@ -62,6 +64,7 @@ export default function SmartPickupSelection({features, onFallback}: {
         setSelectedDate(nextDate);
         if (branch) savePickupIntent(branch.id, nextDate);
         setSelection(null);
+        setShowAllTimes(false);
         setMessage("");
     }
 
@@ -172,7 +175,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                             <Link href="/cart" className="inline-flex min-h-11 items-center underline">Edit quantities or remove items in your cart</Link>
                         </div>}
                         <h3 className="mb-2 text-sm font-semibold">Available pickup times</h3>
-                        {features.checkoutExperienceV2 ? selectable.length ? <div className="gokul-pickup-times" role="group" aria-describedby="pickup-time-help" aria-label="Choose a pickup time">
+                        {features.checkoutExperienceV2 ? selectable.length ? <div className={`gokul-pickup-times ${showAllTimes ? "" : "gokul-pickup-times--compact"}`} role="group" aria-describedby="pickup-time-help" aria-label="Choose a pickup time">
                             {selectable.flatMap(value => (["NORMAL", "PRIORITY"] as const).flatMap(type => {
                                 if (!(type === "NORMAL" ? value.normalAvailable : value.priorityAvailable && value.slot.priorityEnabled)) return [];
                                 const picked = available && selection?.id === value.slot.id && selection.type === type;
@@ -200,6 +203,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                                 </option>;
                             }))}
                         </select>}
+                        {features.checkoutExperienceV2 && timeChoiceCount > 8 && <button type="button" className="gokul-pickup-show-times" onClick={() => setShowAllTimes(value => !value)}>{showAllTimes ? "Show fewer times" : `Show all ${timeChoiceCount} times`}</button>}
                         <p id="pickup-time-help" className="mt-2 text-xs text-[#756763]">Only times that fit every item in your cart are selectable. All times are India time.</p>
                         {unavailable.length > 0 && <details className="mt-4 rounded-xl border border-[#eadfd6] p-3">
                             <summary className="min-h-11 cursor-pointer py-2 text-sm">Why are {unavailable.length} other times not available?</summary>
@@ -212,7 +216,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                     </div>
                 </div>}
                 {message && <p role="alert" className="mt-4 text-red-700">{message}</p>}
-                <div className="mt-6 mb-24 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd6] bg-white p-4">
+                <div className="gokul-pickup-desktop-continue mt-6 mb-24 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd6] bg-white p-4">
                     <Link href="/cart" className="min-h-11 py-3 text-sm underline">{cart.itemCount} items · INR {cart.subtotal.toFixed(2)} before tax</Link>
                     {chosen && <p className="text-sm font-semibold">{dateLabel(date)} at {chosen.slot.startTime.slice(0, 5)}{selection?.type === "PRIORITY" ? ` + INR ${chosen.slot.priorityCharge} priority` : ""}</p>}
                     <button disabled={!available || continuing || !data} onClick={continueCheckout}
@@ -222,5 +226,9 @@ export default function SmartPickupSelection({features, onFallback}: {
                 </div>
             </>}
         </CheckoutExperienceFrame>
+        {features.checkoutExperienceV2 && !!cart.items.length && !!validBranch && <div className="gokul-pickup-mobile-continue">
+            <span>{available && chosen ? `${dateLabel(date)} · ${chosen.slot.startTime.slice(0, 5)}` : "Choose a pickup time"}</span>
+            <button type="button" disabled={!available || continuing || !data} onClick={continueCheckout}>{continuing ? "Checking..." : "Continue"}</button>
+        </div>}
     </AppShell>;
 }

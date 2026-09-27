@@ -5,7 +5,7 @@
 .future-storefront .future-brand-mark{background:var(--journey-teal)!important;border-color:var(--journey-teal)!important;color:white!important;box-shadow:none!important}
 .future-storefront .future-brand small,.future-storefront .future-branch-name small{color:var(--journey-muted)!important}
 .future-storefront .future-branch-control{background:white!important;border-color:var(--journey-line)!important;box-shadow:none!important}
-.future-storefront .future-branch-review,.future-storefront .future-branch-control button{color:var(--journey-teal)!important}
+.future-storefront .future-branch-review,.future-storefront .future-branch-control > div > button{color:var(--journey-teal)!important}
 .future-storefront .customer-bottom-navigation{background:#fffaf2f5!important;border-color:var(--journey-line)!important}
 .future-storefront .customer-site-footer{background:var(--journey-deep)!important;color:white!important;border-color:var(--journey-deep)!important}
 .future-storefront .customer-site-footer :is(h2,h3,p,a,span){color:#e5f0e9!important}
@@ -113,3 +113,35 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 .future-storefront .checkout-experience-brand{text-decoration:none}.future-storefront .checkout-experience-brand:hover{opacity:.9}
 @media(max-width:700px){.future-storefront .gokul-location-control{max-width:42vw;min-height:2.8rem;padding:.35rem .55rem;gap:.35rem}.future-storefront .gokul-location-pin{width:1.1rem;height:1.1rem;font-size:.45rem}.future-storefront .gokul-location-name small{font-size:.43rem}.future-storefront .gokul-location-name strong{font-size:.65rem}.future-storefront .gokul-location-chevron{font-size:1rem}.future-storefront .gokul-customer-breadcrumbs{margin:.25rem 0 .6rem;font-size:.7rem}}
 @media(max-width:700px){.future-storefront .future-brand small{display:none}.future-storefront .future-brand{font-size:.82rem}.future-storefront .future-branch-control{flex:0 1 auto}}
+.future-storefront .gokul-editorial-menu{max-width:1760px!important;padding-inline:clamp(.75rem,2vw,1.5rem)}
+.future-storefront .gokul-branch-hero-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(225px,260px);align-items:stretch;gap:1rem;margin:0 auto 1.1rem}
+.future-storefront .gokul-branch-hero-layout .gokul-branch-gallery{margin-bottom:0}
+.future-storefront .gokul-branch-side-card{display:flex;flex-direction:column;align-items:flex-start;gap:.8rem;padding:1.6rem;border:1px solid var(--journey-line);border-radius:1.25rem;background:#edf5ef;color:var(--journey-ink)}
+.future-storefront .gokul-branch-side-card p{margin:0;font-size:.7rem;font-weight:800;letter-spacing:.15em;color:var(--journey-muted)}
+.future-storefront .gokul-branch-side-card h2{margin:0;font:500 1.8rem/1.12 Georgia,serif;overflow-wrap:anywhere}
+.future-storefront .gokul-branch-side-card>span{font-size:.9rem;line-height:1.55;color:var(--journey-muted)}
+.future-storefront .gokul-branch-side-facts{width:100%;padding:1rem 0;border-top:1px solid #cbded3;border-bottom:1px solid #cbded3;color:var(--journey-muted);font-size:.85rem;line-height:2}.future-storefront .gokul-branch-side-facts strong{color:var(--journey-teal);font-size:1.05rem}
+.future-storefront .gokul-branch-side-card button{margin-top:auto;min-height:44px;padding:.55rem .85rem;border-radius:999px;background:var(--journey-teal);color:white!important;text-decoration:none;cursor:pointer}
+.future-storefront .gokul-customer-breadcrumbs{margin-bottom:.35rem}
+@media(max-width:1100px){.future-storefront .gokul-branch-hero-layout{grid-template-columns:1fr}.future-storefront .gokul-branch-side-card{display:none}}
+
+.gokul-cart-swipe-content{position:relative;padding:1rem;background:#fff;transition:transform .22s cubic-bezier(.2,.8,.2,1);touch-action:pan-y}
+.gokul-cart-swipe-delete{display:none}
+.gokul-pickup-show-times,.gokul-pickup-mobile-continue{display:none}
+@media(max-width:700px){
+ .future-storefront .gokul-location-control{width:clamp(7rem,36vw,10rem);max-width:36vw;min-width:0;flex:none;overflow:hidden}
+ .future-storefront .gokul-location-name{min-width:0;flex:1}
+ .future-storefront .gokul-location-name strong{display:block;max-width:100%;font-size:.7rem}
+ .future-storefront .gokul-location-chevron{margin-left:0}
+ .future-storefront .future-branch-control [popover]{width:calc(100vw - 2rem);max-width:28rem;min-width:0;padding:1.25rem}
+ .future-storefront .future-branch-control [popover] button{font-size:inherit;width:auto;min-width:0;white-space:normal;text-align:left}
+ .gokul-cart-swipe-content.is-revealed{transform:translateX(-5.5rem)}
+ .gokul-cart-swipe-delete{display:grid;position:absolute;inset:0 0 0 auto;width:5.5rem;place-items:center;background:#9b1730;color:#fff;font-weight:700}
+ .gokul-pickup-times--compact .gokul-pickup-time:nth-child(n+9):not([aria-pressed="true"]){display:none}
+ .gokul-pickup-show-times{display:block;width:100%;min-height:3rem;margin-top:.75rem;border:1px solid #cad8cf;border-radius:.75rem;background:#fff;color:#143936;font-weight:700}
+ .gokul-pickup-desktop-continue{display:none}
+ .gokul-pickup-mobile-continue{position:fixed;z-index:45;inset:auto 0 0;display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.75rem max(1rem,env(safe-area-inset-right)) calc(.75rem + env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left));border-top:1px solid #cad8cf;background:#fff;box-shadow:0 -8px 22px #0927251b;color:#143936;font-size:.85rem;font-weight:700}
+ .gokul-pickup-mobile-continue button{min-height:2.9rem;padding:0 1.25rem;border-radius:.8rem;background:#143936;color:#fff;white-space:nowrap}
+ .gokul-pickup-mobile-continue button:disabled{opacity:.5}
+ .future-storefront .checkout-experience-v2{padding-bottom:6rem}
+}

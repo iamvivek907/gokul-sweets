@@ -260,7 +260,7 @@ export default function BranchSelector({compact = false, locationControl = false
             {cardBranch ? <button type="button" className="gokul-branch-card-action"
                 aria-label={`Explore ${cardBranch.name} menu and pickup choices`}
                 onClick={() => handleSelectBranch(cardBranch)}>
-                <span className="gokul-branch-card-action-label">Explore this branch <span aria-hidden="true">↗</span></span>
+                <span className="gokul-branch-card-action-label">Explore this branch</span>
             </button> : <button
                 type="button"
                 popoverTarget={popoverId}

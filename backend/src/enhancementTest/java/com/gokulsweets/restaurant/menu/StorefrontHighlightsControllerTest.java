@@ -42,6 +42,8 @@ class StorefrontHighlightsControllerTest {
                 .thenReturn(List.of(11L));
         when(jdbc.queryForList(anyString(), eq(Long.class), anyLong(), any(Date.class)))
                 .thenReturn(List.of(11L));
+        when(jdbc.queryForList(anyString(), eq(Long.class), anyLong()))
+                .thenReturn(List.of(11L));
         when(availability.check(anyLong(), any(LocalDate.class), anyInt(), anyList())).thenReturn(result(true));
     }
 
@@ -51,10 +53,12 @@ class StorefrontHighlightsControllerTest {
         assertThat(controller.highlights(1L)).isSameAs(first);
         assertThat(first.trendingProductIds()).containsExactly(11L);
         assertThat(first.newProductIds()).containsExactly(11L);
+        assertThat(first.latestProductIds()).containsExactly(11L);
         verify(menu).getMenu(1L);
         verify(availability).check(1L, LocalDate.now(clock), 31, List.of(new CreateOrderItemRequest(11L, null, 250)));
         verify(jdbc).queryForList(anyString(), eq(Long.class), eq(1L), any(Date.class), any(Date.class));
         verify(jdbc).queryForList(anyString(), eq(Long.class), eq(1L), any(Date.class));
+        verify(jdbc).queryForList(anyString(), eq(Long.class), eq(1L));
         verifyNoMoreInteractions(menu, jdbc, availability);
     }
 
@@ -65,9 +69,18 @@ class StorefrontHighlightsControllerTest {
         var refreshed = controller.highlights(1L);
         assertThat(refreshed.trendingProductIds()).isEmpty();
         assertThat(refreshed.newProductIds()).isEmpty();
+        assertThat(refreshed.latestProductIds()).isEmpty();
         assertThat(controller.highlights(1L)).isSameAs(refreshed);
         verify(menu, times(2)).getMenu(1L);
         verify(availability, times(2)).check(eq(1L), any(LocalDate.class), eq(31), anyList());
+    }
+
+    @Test void showsLatestBranchProductsEvenWhenNoneAreNewThisMonth() {
+        when(jdbc.queryForList(anyString(), eq(Long.class), anyLong(), any(Date.class)))
+                .thenReturn(List.of());
+        var result = controller.highlights(1L);
+        assertThat(result.newProductIds()).isEmpty();
+        assertThat(result.latestProductIds()).containsExactly(11L);
     }
 
     @Test void isolatesBranchesAndBypassesCachedResultsWhenDisabled() {

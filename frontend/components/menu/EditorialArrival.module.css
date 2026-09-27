@@ -50,12 +50,9 @@
 .branchCopy{padding-bottom:3.3rem;pointer-events:none}.cardPrompt{font-size:.86rem;font-weight:800;text-decoration:underline;text-underline-offset:5px}
 .arrival :is(a,button):focus-visible{outline:3px solid #94dfed;outline-offset:4px}
 .arrival .orderFood{display:inline-flex;align-items:center;justify-content:center;gap:.7rem;min-height:48px;transition:transform .32s cubic-bezier(.2,1.4,.4,1),box-shadow .32s ease,background-color .25s ease;touch-action:manipulation}
-.arrival .orderArrow{display:grid;place-items:center;width:1.65rem;height:1.65rem;flex:none;border-radius:50%;background:#ffffff2e;color:#fff;font:700 1.05rem/1 Arial,sans-serif;transition:transform .32s cubic-bezier(.2,1.4,.4,1),background-color .25s ease}
 .arrival .orderFood:hover{transform:translateY(-3px);box-shadow:0 12px 28px #051d1a70;background:#d27661}
-.arrival .orderFood:hover .orderArrow{transform:translate(2px,-2px) rotate(8deg);background:#ffffff45}
 .arrival .orderFood:active{transform:scale(.96);box-shadow:0 3px 10px #051d1a55}
-.arrival .orderFood:active .orderArrow{transform:scale(.88)}
-@media(prefers-reduced-motion:reduce){.arrival .orderFood,.arrival .orderArrow{transition:none}.arrival .orderFood:hover,.arrival .orderFood:active,.arrival .orderFood:hover .orderArrow,.arrival .orderFood:active .orderArrow{transform:none}}
+@media(prefers-reduced-motion:reduce){.arrival .orderFood{transition:none}.arrival .orderFood:hover,.arrival .orderFood:active{transform:none}}
 @media(max-width:900px){.branchGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.heroCopy{width:78%}}
 @media(max-width:700px){.hero{min-height:100dvh;background-position:64% center}.scrim{background:linear-gradient(0deg,#092725eb,#0d302c9c 77%,#0d302b6b)}.topbar{padding:1.2rem}.logo{font-size:2rem}.topbar nav{gap:0}.topbar nav a:last-child{padding:.65rem;font-size:.75rem}.heroCopy{width:100%;margin:4rem 0 0;padding:7rem 1.4rem 6rem}.heroCopy h1{font-size:clamp(3.2rem,12vw,5rem)}.heroCopy>span{font-size:1rem}.actions{flex-direction:row;flex-wrap:wrap}.actions a{padding:.85rem 1.15rem}.branchGrid{grid-template-columns:1fr}.branchCard{min-height:310px}.branches{padding:3.5rem 1.2rem}}
 @media(max-width:700px){.branchGrid:has(.branchCard:nth-child(2):last-child){grid-template-columns:1fr}}
