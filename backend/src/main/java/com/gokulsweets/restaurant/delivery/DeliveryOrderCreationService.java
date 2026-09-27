@@ -29,6 +29,7 @@ import java.util.HexFormat;
 public class DeliveryOrderCreationService {
     private final EnhancementProperties flags;
     private final DeliveryOrderPreparationService preparation;
+    private final DeliveryAcceptedQuoteService acceptedQuotes;
     private final DeliveryRiderHoldService riders;
     private final OrderInventoryReservationService inventory;
     private final OrderIdempotencyService idempotency;
@@ -40,7 +41,8 @@ public class DeliveryOrderCreationService {
 
     @Transactional
     public Created create(CreateRequest request, String idempotencyKey, String identityToken) {
-        if (!flags.isDeliveryRiderHolds() || !flags.isDeliveryAddressBoundaries())
+        if (!flags.isDeliveryRiderHolds() || !flags.isDeliveryAddressBoundaries()
+                || !flags.isDeliveryAcceptedQuote())
             throw new IllegalStateException("Delivery order creation is disabled.");
         validate(request);
         String fingerprint = fingerprint(request);
@@ -53,6 +55,7 @@ public class DeliveryOrderCreationService {
         }
 
         var prepared = preparation.prepare(request.quote(), request.windowId());
+        acceptedQuotes.accept(request, prepared.price());
         String holdKey = "delivery-" + digest(idempotencyKey);
         // The 14-minute checkout deadline fits inside the server's 15-minute rider hold.
         LocalDateTime expiresAt = LocalDateTime.now(inventoryClock).plusMinutes(14);
@@ -99,7 +102,7 @@ public class DeliveryOrderCreationService {
         return response(saved);
     }
 
-    private static void validate(CreateRequest request) {
+    static void validate(CreateRequest request) {
         if (request == null || request.quote() == null || request.windowId() <= 0
                 || request.quote().branchId() <= 0 || request.quote().serviceDate() == null
                 || request.quote().locality() == null || request.quote().postalCode() == null
@@ -162,6 +165,7 @@ public class DeliveryOrderCreationService {
     }
 
     public record CreateRequest(DeliveryCapacityService.QuoteRequest quote, long windowId,
-                                String customerName, String customerPhone, String addressLine) {}
+                                String customerName, String customerPhone, String addressLine,
+                                String acceptedQuoteToken) {}
     public record Created(String orderNumber, java.math.BigDecimal totalAmount, LocalDateTime reservationExpiresAt) {}
 }
