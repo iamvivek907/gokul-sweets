@@ -61,6 +61,8 @@ public class EnhancementProperties {
     private boolean deliveryCapacity;
     /** SCRUM-30: exact reviewed polygon/pin check; requires delivery-capacity preview. */
     private boolean deliveryAddressBoundaries;
+    /** SCRUM-30: internal idempotent rider holds; not exposed to checkout until order lifecycle is ready. */
+    private boolean deliveryRiderHolds;
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;
