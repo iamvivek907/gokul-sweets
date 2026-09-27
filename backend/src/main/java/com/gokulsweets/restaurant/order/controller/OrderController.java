@@ -1,7 +1,6 @@
 package com.gokulsweets.restaurant.order.controller;
 
-import com.gokulsweets.restaurant.common.security.WebCorsProperties;
-import com.gokulsweets.restaurant.customer.identity.IdentityClientConnection;
+import com.gokulsweets.restaurant.customer.identity.TrustedCheckoutIdentity;
 import com.gokulsweets.restaurant.customer.identity.VerifiedOrderAccess;
 import com.gokulsweets.restaurant.order.dto.CreateOrderRequest;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,8 +15,6 @@ import com.gokulsweets.restaurant.order.service.CheckoutQuoteService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.core.env.Environment;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -41,9 +38,7 @@ public class OrderController {
 
     private final OrderQueryService orderQueryService;
     private final CheckoutQuoteService checkoutQuoteService;
-    private final IdentityClientConnection clientConnection;
-    private final WebCorsProperties cors;
-    private final Environment settings;
+    private final TrustedCheckoutIdentity checkoutIdentity;
     private final VerifiedOrderAccess orderAccess;
 
     @PostMapping("/quote")
@@ -85,22 +80,9 @@ public class OrderController {
                         orderService.createOrder(
                                 request,
                                 idempotencyKey,
-                                trustedIdentityCookie(servletRequest)
+                                checkoutIdentity.token(servletRequest)
                         )
                 );
-    }
-
-    private String trustedIdentityCookie(HttpServletRequest request) {
-        if (request.getCookies() == null || !cors.effectiveAllowedOrigins(settings)
-                .contains(request.getHeader(HttpHeaders.ORIGIN))) return null;
-        try {
-            if (!clientConnection.resolve(request).secure()) return null;
-        } catch (IllegalStateException invalidProxy) {
-            return null;
-        }
-        return java.util.Arrays.stream(request.getCookies())
-                .filter(cookie -> "__Host-gokul-customer".equals(cookie.getName()))
-                .map(jakarta.servlet.http.Cookie::getValue).findFirst().orElse(null);
     }
 
     @PutMapping("/{orderNumber}/checkout")

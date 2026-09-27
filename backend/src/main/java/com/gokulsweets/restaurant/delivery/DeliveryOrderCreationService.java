@@ -23,7 +23,7 @@ import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.HexFormat;
 
-/** Internal transaction boundary. No controller invokes this until delivery checkout is launched. */
+/** Atomic delivery order transaction. Customer entry remains OFF until the delivery checkout flag is enabled. */
 @Service
 @RequiredArgsConstructor
 public class DeliveryOrderCreationService {
@@ -41,8 +41,7 @@ public class DeliveryOrderCreationService {
 
     @Transactional
     public Created create(CreateRequest request, String idempotencyKey, String identityToken) {
-        if (!flags.isDeliveryRiderHolds() || !flags.isDeliveryAddressBoundaries()
-                || !flags.isDeliveryAcceptedQuote())
+        if (!flags.deliveryCheckoutReady())
             throw new IllegalStateException("Delivery order creation is disabled.");
         validate(request);
         String fingerprint = fingerprint(request);

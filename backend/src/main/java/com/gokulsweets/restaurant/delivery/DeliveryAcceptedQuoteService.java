@@ -16,7 +16,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 
-/** Internal signed delivery price. Public preview wiring remains gated until delivery checkout launches. */
+/** Signed delivery price shared by gated storefront preview and order creation. */
 @Service
 public class DeliveryAcceptedQuoteService {
     private final EnhancementProperties flags;
