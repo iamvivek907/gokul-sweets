@@ -110,6 +110,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
                 <p className={styles.pickupNote}><span aria-hidden="true" /> {features.contextualStorefrontV2
                     ? `Browsing ${branch?.name ?? "your chosen branch"} · Branch prices and pickup choices confirmed before payment`
                     : `Pickup at ${branch?.name ?? "your chosen branch"} · Order now or plan ahead`}</p>
+                {features.deliveryLocalityCheck && <Link href="/delivery/check" className={styles.secondary}>Explore delivery by area &rarr;</Link>}
             </div>
             {hero ? <div className={styles.heroMedia}><CampaignMedia key={`${hero.id}:${hero.updatedAt}`} campaign={hero} hero accessible={features.accessibleOrderingV2} onUnavailable={() => mediaFailure(hero)} /></div>
                 : heroProduct?.imageUrl ? <div className={styles.heroMedia}>

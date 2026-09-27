@@ -1,0 +1,7 @@
+# SCRUM-29 delivery location foundation
+
+The `/delivery/check` preview is an optional area-intake surface within the approved customer shell. `GOKUL_FEATURES_DELIVERY_LOCALITY_CHECK=false` is the default. The effective storefront flag also requires both customer consent controls and customer OTP identity ON. Do not enable any of these flags before SCRUM-49 legal review and DEV QA. The preview has no checkout route, delivery promise, zone result or fulfilment branch assignment.
+
+The visitor may type a locality and optionally a landmark or map link. Neither is submitted or persisted in this story. The browser prompts for one-time device location only on an explicit click in a secure context, uses low accuracy and an eight-second timeout, and discards the coordinates immediately. Denial, browser failure and HTTP provide the same manual-locality fallback; pickup never depends on location. There is no location analytics event. A future coarse-area analytics event must have a stated purpose and its own consent decision before implementation.
+
+SCRUM-30 will add authoritative server-side zone and branch matching. It should validate manual input and coordinates, apply an approved retention schedule, and show eligibility only from the server response. Do not interpret the current preview's “ready to check” message as coverage confirmation. Recheck flag OFF, denied/revoked location, poor connectivity, manual fallback, narrow screens, keyboard access, pickup ordering and privacy policy in DEV after manual deployment.
