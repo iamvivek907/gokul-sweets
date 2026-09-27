@@ -19,8 +19,10 @@ test('the enabled entrance appears for each new home opening and advances after 
     assert.equal(entry.shouldShowIntentGateway(true, false), true);
 });
 
-test('the home route does not bypass the entrance for a saved branch or tab storage', () => {
+test('the home route keeps the entrance when the gateway is enabled', () => {
     const home = fs.readFileSync(path.join(__dirname, '../components/menu/HomeEntry.tsx'), 'utf8');
-    assert.match(home, /shouldShowIntentGateway\(features\.preHomeIntentGateway, entered\)/);
+    assert.match(home, /shouldShowIntentGateway\(features\.preHomeIntentGateway, false\)/);
     assert.doesNotMatch(home, /hasChosenEntryIntent|sessionStorage|Boolean\(branch\)/);
+    const arrival = fs.readFileSync(path.join(__dirname, '../components/menu/EditorialArrival.tsx'), 'utf8');
+    assert.match(arrival, /href="#gokul-arrival-title" aria-current="page">Home<\/a>/);
 });

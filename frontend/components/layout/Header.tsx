@@ -49,10 +49,10 @@ export default function Header() {
                 "
             >
 
-                {futuristic ? <div className="future-brand" aria-label="Gokul Sweets">
+                {futuristic ? <Link href="/" className="future-brand" aria-label="Gokul Sweets · Home">
                     <span className="future-brand-mark" aria-hidden="true">G</span>
                     <span>Gokul Sweets<small>FRESH FOR YOUR MOMENTS</small></span>
-                </div> : <div
+                </Link> : <Link href="/" aria-label="Gokul Sweets · Home"
                     className="
                         min-w-0
                     "
@@ -84,15 +84,17 @@ export default function Header() {
                         Gokul Sweets
                     </h1>
 
-                </div>}
+                </Link>}
 
 
-                {futuristic && pathname !== "/menu" && pathname !== "/branches" && !pathname.startsWith("/checkout/") && <div className="future-branch-control">
-                    <span aria-hidden="true" className="future-location-icon">⌖</span>
-                    <span className="future-branch-name"><small>PICKUP FROM</small><strong>{branch?.name ?? "Choose a shop"}</strong></span>
+                {futuristic && pathname !== "/branches" && !pathname.startsWith("/checkout/") && <div className="future-branch-control">
                     {features?.cartSwitchPreview || cart.isEmpty
-                        ? <BranchSelector compact />
-                        : <Link href="/cart" className="future-branch-review">Review branch</Link>}
+                        ? <BranchSelector locationControl />
+                        : <Link href="/cart" className="gokul-location-control future-branch-review" aria-label="Review cart before changing branch">
+                            <span className="gokul-location-pin" aria-hidden="true">●</span>
+                            <span className="gokul-location-name"><small>PICKUP BRANCH</small><strong>{branch?.name ?? "Choose branch"}</strong></span>
+                            <span className="gokul-location-chevron" aria-hidden="true">⌄</span>
+                        </Link>}
                 </div>}
 
                 <MobileMenu />

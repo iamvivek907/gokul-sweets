@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import BranchMenuGallery from "@/components/menu/BranchMenuGallery";
+import NewBranchItems from "@/components/menu/NewBranchItems";
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
@@ -1046,7 +1047,7 @@ export default function MenuScreen() {
                         </div>
 
 
-                        <div
+                        {!pickupCheck.features?.contextualStorefrontV2 && <div
                             className="
                                 rounded-2xl
                                 border
@@ -1097,7 +1098,7 @@ export default function MenuScreen() {
                                 Change branch
                             </Link>
 
-                        </div>
+                        </div>}
 
                     </div>
 
@@ -1146,6 +1147,14 @@ export default function MenuScreen() {
                         )}
 
                 </header>
+
+                {pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
+                    <NewBranchItems branch={branch} products={allProducts} onSelect={product => {
+                        setSearch("");
+                        setSelectedCategoryId(product.categoryId);
+                        requestAnimationFrame(() =>
+                            document.getElementById(`gokul-product-${product.id}`)?.scrollIntoView({behavior: "smooth", block: "center"}));
+                    }} />}
 
                 <PickupContext check={pickupCheck} />
 

@@ -13,8 +13,8 @@ import type {Branch} from "@/types/branch";
 import type {HomepageCampaign} from "@/types/campaign";
 import styles from "./EditorialArrival.module.css";
 
-export default function EditorialArrival({campaignsEnabled, accessible, onExplore, branchesOnly = false}: {
-    campaignsEnabled: boolean; accessible: boolean; onExplore: () => void; branchesOnly?: boolean;
+export default function EditorialArrival({campaignsEnabled, accessible, branchesOnly = false}: {
+    campaignsEnabled: boolean; accessible: boolean; branchesOnly?: boolean;
 }) {
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -84,10 +84,10 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
             <div className={styles.topbar}>
                 <div className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></div>
                 <nav aria-label="Welcome navigation">
-                    <button type="button" onClick={onExplore}>Home</button>
+                    <a href="#gokul-arrival-title" aria-current="page">Home</a>
                     <Link href="/about">Our story</Link>
                     <a href="#gokul-branches">Our branches</a>
-                    <a href="#gokul-branches">Order food ↗</a>
+                    <a href="#gokul-branches" className={styles.orderFood}>Order food <span aria-hidden="true" className={styles.orderArrow}>↗</span></a>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
@@ -95,7 +95,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
                 <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
                 <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
-                    <a href="#gokul-branches">Order food ↗</a>
+                    <a href="#gokul-branches" className={styles.orderFood}>Order food <span aria-hidden="true" className={styles.orderArrow}>↗</span></a>
                     <a href="#gokul-branches">Plan an occasion</a>
                 </div>
             </div>
