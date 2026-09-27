@@ -1,6 +1,8 @@
 package com.gokulsweets.restaurant.review;
 
+import com.gokulsweets.restaurant.customer.identity.VerifiedOrderAccess;
 import com.gokulsweets.restaurant.review.ReviewDtos.*;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,19 +15,24 @@ import java.util.List;
 public class ReviewController {
 
     private final CustomerReviewService customerReviewService;
+    private final VerifiedOrderAccess orderAccess;
 
     @GetMapping("/api/orders/{orderNumber}/review")
     public ResponseEntity<ReviewContextResponse> getReviewContext(
-            @PathVariable String orderNumber
+            @PathVariable String orderNumber,
+            HttpServletRequest servletRequest
     ) {
+        orderAccess.requireOrder(orderNumber, servletRequest);
         return ResponseEntity.ok(customerReviewService.getContext(orderNumber));
     }
 
     @PutMapping("/api/orders/{orderNumber}/review")
     public ResponseEntity<CustomerReviewResponse> upsertReview(
             @PathVariable String orderNumber,
-            @Valid @RequestBody UpsertReviewRequest request
+            @Valid @RequestBody UpsertReviewRequest request,
+            HttpServletRequest servletRequest
     ) {
+        orderAccess.requireOrder(orderNumber, servletRequest);
         return ResponseEntity.ok(customerReviewService.upsert(orderNumber, request));
     }
 
