@@ -13,8 +13,8 @@ import type {Branch} from "@/types/branch";
 import type {HomepageCampaign} from "@/types/campaign";
 import styles from "./EditorialArrival.module.css";
 
-export default function EditorialArrival({campaignsEnabled, accessible, onExplore, branchesOnly = false}: {
-    campaignsEnabled: boolean; accessible: boolean; onExplore: () => void; branchesOnly?: boolean;
+export default function EditorialArrival({campaignsEnabled, accessible, branchesOnly = false}: {
+    campaignsEnabled: boolean; accessible: boolean; branchesOnly?: boolean;
 }) {
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -84,7 +84,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, onExplor
             <div className={styles.topbar}>
                 <div className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></div>
                 <nav aria-label="Welcome navigation">
-                    <button type="button" onClick={onExplore}>Home</button>
+                    <a href="#gokul-arrival-title" aria-current="page">Home</a>
                     <Link href="/about">Our story</Link>
                     <a href="#gokul-branches">Our branches</a>
                     <a href="#gokul-branches">Order food ↗</a>
