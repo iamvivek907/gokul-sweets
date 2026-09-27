@@ -14,6 +14,7 @@ import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 
 /** Internal signed delivery price. Public preview wiring remains gated until delivery checkout launches. */
 @Service
@@ -32,7 +33,11 @@ public class DeliveryAcceptedQuoteService {
         this.clock = inventoryClock;
     }
 
-    public record Quote(String totalAmount, String currency, String expiresAt, String token) {}
+    public record Line(String productName, String unitPrice, String taxRate, String taxAmount,
+                       String totalAmount) {}
+    public record Quote(long windowId, String serviceDate, String startsAt, String endsAt,
+                        List<Line> items, String subtotal, String taxAmount, String priorityCharge,
+                        String totalAmount, String currency, String expiresAt, String token) {}
 
     @Transactional(readOnly = true)
     public Quote preview(DeliveryOrderCreationService.CreateRequest request) {
@@ -41,8 +46,15 @@ public class DeliveryAcceptedQuoteService {
         var prepared = preparation.prepare(request.quote(), request.windowId());
         long expiry = Instant.now(clock).plusSeconds(300).getEpochSecond();
         String token = expiry + "." + sign(expiry + ":" + payload(request, prepared.price()));
-        return new Quote(prepared.price().totalAmount().toPlainString(), "INR",
-                Instant.ofEpochSecond(expiry).toString(), token);
+        var window = prepared.window();
+        var price = prepared.price();
+        return new Quote(window.id(), window.serviceDate().toString(), window.startsAt().toString(),
+                window.endsAt().toString(), price.items().stream().map(item -> new Line(
+                        item.product().getName(), item.unitPrice().toPlainString(),
+                        item.taxRate().toPlainString(), item.taxAmount().toPlainString(),
+                        item.lineTotal().toPlainString())).toList(), price.subtotal().toPlainString(),
+                price.taxAmount().toPlainString(), price.priorityCharge().toPlainString(),
+                price.totalAmount().toPlainString(), "INR", Instant.ofEpochSecond(expiry).toString(), token);
     }
 
     public void accept(DeliveryOrderCreationService.CreateRequest request, OrderCalculationResult price) {
