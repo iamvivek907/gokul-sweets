@@ -2084,6 +2084,10 @@ export default function AdminOrdersPage() {
         const currentStatus =
             selectedOrder.orderStatus;
 
+        if (selectedOrder.fulfillmentType === "DELIVERY" && currentStatus !== "CONFIRMED") {
+            return;
+        }
+
 
         const targetStatus =
             getNextOrderStatus(
@@ -4796,7 +4800,7 @@ function OrderDetailDrawer({
     useRouter();
 
     const nextStatus =
-        order?.fulfillmentType === "PICKUP"
+        order && (order.fulfillmentType === "PICKUP" || order.orderStatus === "CONFIRMED")
             ? getNextOrderStatus(
                 order.orderStatus
             )

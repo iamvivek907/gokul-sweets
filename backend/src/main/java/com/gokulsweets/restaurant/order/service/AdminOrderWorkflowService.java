@@ -93,12 +93,19 @@ public class AdminOrderWorkflowService {
                                 .getId()
                 );
 
-        if (order.getFulfillmentType() == FulfillmentType.DELIVERY)
-            throw new IllegalStateException("Delivery status workflow is not configured yet.");
-
-
         OrderStatus currentStatus =
                 order.getOrderStatus();
+
+        // Delivery can enter the kitchen through the same eligibility and KOT path.
+        // Later delivery transitions need their own handoff workflow; never label
+        // a delivery order READY_FOR_PICKUP or PICKED_UP.
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY
+                && !(currentStatus == OrderStatus.CONFIRMED
+                && targetStatus == OrderStatus.PREPARING)
+                && !(currentStatus == OrderStatus.PREPARING
+                && targetStatus == OrderStatus.PREPARING)) {
+            throw new IllegalStateException("Delivery handoff workflow is not configured yet.");
+        }
 
 
         /*
