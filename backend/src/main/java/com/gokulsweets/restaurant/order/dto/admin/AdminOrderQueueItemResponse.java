@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.order.dto.admin;
 
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
 import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
 
@@ -44,7 +45,15 @@ public record AdminOrderQueueItemResponse(
 
         LocalDateTime pickupAt,
 
-        long minutesUntilPickup
+        long minutesUntilPickup,
+
+        FulfillmentType fulfillmentType,
+
+        LocalDate deliveryDate,
+
+        LocalTime deliveryStartTime,
+
+        LocalTime deliveryEndTime
 
 ) {
 }

@@ -52,6 +52,7 @@ class DeliveryOrderCreationIntegrationTest {
     @Autowired OrderNumberGenerator numbers;
     @Autowired PreparationEligibilityService preparationEligibility;
     @Autowired DeliveryOrderWindowLookup deliveryWindows;
+    @Autowired DeliveryPreparationQueue deliveryQueue;
 
     @Test
     void retryReturnsSameOrderWithOneRiderAndInventoryReservation() {
@@ -158,5 +159,14 @@ class DeliveryOrderCreationIntegrationTest {
                 .isEqualTo(PreparationEligibilityStatus.ELIGIBLE);
         assertThat(preparationEligibility.evaluate(saved, date.atTime(11, 0)).status())
                 .isEqualTo(PreparationEligibilityStatus.OVERDUE);
+        assertThat(deliveryQueue.confirmed(branchId)).isEqualTo(1);
+        assertThat(deliveryQueue.eligible(branchId, date.atTime(9, 59), 10)).isEmpty();
+        assertThat(deliveryQueue.eligibleCount(branchId, date.atTime(9, 59))).isZero();
+        assertThat(deliveryQueue.eligible(branchId, date.atTime(10, 0), 10))
+                .extracting(Order::getId).containsExactly(saved.getId());
+        assertThat(deliveryQueue.eligibleCount(branchId, date.atTime(10, 0))).isEqualTo(1);
+        assertThat(deliveryQueue.overdueCount(branchId, date.atTime(10, 0))).isZero();
+        assertThat(deliveryQueue.overdueCount(branchId, date.atTime(11, 0))).isEqualTo(1);
+        assertThat(deliveryQueue.eligible(branchId + 999, date.atTime(11, 0), 10)).isEmpty();
     }
 }

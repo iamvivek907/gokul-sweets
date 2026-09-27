@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.order;
 
 import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.config.ApplicationClock;
+import com.gokulsweets.restaurant.delivery.DeliveryPreparationQueue;
 import com.gokulsweets.restaurant.order.config.PreparationWindowProperties;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
@@ -71,7 +72,7 @@ class AdminDeliveryOrderViewIntegrationTest {
         when(repo.findByBranchId(eq(branchId), any())).thenReturn(new PageImpl<>(List.of(order)));
         var service = new AdminOrderQueryService(repo, mock(PaymentRepository.class),
                 mock(StaffAuthorizationService.class), mock(PreparationEligibilityService.class),
-                new PreparationWindowProperties(), clock, jdbc);
+                new PreparationWindowProperties(), clock, jdbc, mock(DeliveryPreparationQueue.class));
 
         var detail = service.getOrder(order.getOrderNumber());
         assertThat(detail.pickupDate()).isNull();
@@ -103,7 +104,7 @@ class AdminDeliveryOrderViewIntegrationTest {
         when(repo.findByBranchId(eq(10L), any())).thenReturn(new PageImpl<>(List.of(order)));
         var service = new AdminOrderQueryService(repo, mock(PaymentRepository.class),
                 mock(StaffAuthorizationService.class), mock(PreparationEligibilityService.class),
-                new PreparationWindowProperties(), clock, jdbc);
+                new PreparationWindowProperties(), clock, jdbc, mock(DeliveryPreparationQueue.class));
 
         assertThat(service.getOrder("ADV-PICKUP").pickupDate()).isEqualTo(LocalDate.of(2026, 10, 1));
         assertThat(service.getOrders(10L, null, 0, 10).orders().getFirst().deliveryDate()).isNull();
