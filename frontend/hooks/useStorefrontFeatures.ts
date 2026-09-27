@@ -26,6 +26,7 @@ export interface StorefrontFeatures {
     deliveryLocalityCheck: boolean;
     deliveryZones: boolean;
     deliveryCapacity: boolean;
+    deliveryAddressBoundaries: boolean;
     futureOrderingDays: number;
     today: string;
 }

@@ -39,7 +39,8 @@ class DeliveryCapacityServiceIntegrationTest {
         var zones = new DeliveryZoneService(flags, jdbc, branches);
         var stock = mock(DeliveryStockCheck.class);
         when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(true, null));
-        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, stock);
+        var boundaries = mock(DeliveryBoundaryService.class);
+        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, stock, boundaries);
         var key = UUID.randomUUID().toString().substring(0, 8);
         Long branch = jdbc.queryForObject("INSERT INTO branches (code, name) VALUES (?, ?) RETURNING id",
                 Long.class, "DWC-" + key, "Delivery " + key);
@@ -59,6 +60,13 @@ class DeliveryCapacityServiceIntegrationTest {
         assertThat(service.quote(quote).provisionalWindows()).singleElement()
                 .extracting(DeliveryCapacityService.Window::id).isEqualTo(window.id());
         assertThat(service.quote(quote).orderable()).isFalse();
+        flags.setDeliveryAddressBoundaries(true);
+        assertThat(service.quote(quote).provisionalWindows()).isEmpty();
+        when(boundaries.contains(zone.id(), 26.85, 80.94)).thenReturn(true);
+        var pinned = new DeliveryCapacityService.QuoteRequest(branch, "HAZRATGANJ", "226001", TODAY,
+                items, 26.85, 80.94);
+        assertThat(service.quote(pinned).provisionalWindows()).hasSize(1);
+        flags.setDeliveryAddressBoundaries(false);
         when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(false, "Insufficient stock."));
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
         when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(true, null));
@@ -83,7 +91,8 @@ class DeliveryCapacityServiceIntegrationTest {
     void missingFlagsAndIstBoundaryFailClosed() {
         var flags = flags();
         var zones = new DeliveryZoneService(flags, jdbc, branches);
-        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, mock(DeliveryStockCheck.class));
+        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, mock(DeliveryStockCheck.class),
+                mock(DeliveryBoundaryService.class));
         var request = new DeliveryCapacityService.QuoteRequest(1, "Hazratganj", "226001", TODAY.minusDays(1),
                 List.of(new CreateOrderItemRequest(1L, 1, null)));
         assertThat(service.quote(request).provisionalWindows()).isEmpty();
