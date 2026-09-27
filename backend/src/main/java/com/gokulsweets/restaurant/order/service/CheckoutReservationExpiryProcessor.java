@@ -1,8 +1,10 @@
 package com.gokulsweets.restaurant.order.service;
 
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
+import com.gokulsweets.restaurant.delivery.DeliveryRiderHoldService;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
@@ -34,11 +36,12 @@ public class CheckoutReservationExpiryProcessor {
 
     private final OrderInventoryReservationService
             orderInventoryReservationService;
+    private final DeliveryRiderHoldService deliveryRiderHolds;
 
     /*
      * Processes one order in its own transaction.
      *
-     * Pickup capacity, inventory holds and order status are
+     * Rider or pickup capacity, inventory holds and order status are
      * released together. A failure in any step rolls back all
      * three effects.
      */
@@ -89,12 +92,12 @@ public class CheckoutReservationExpiryProcessor {
             return false;
         }
 
-        Long slotId = order.getPickupSlot().getId();
-
-        releasePickupCapacity(
-                order.getPickupType(),
-                slotId
-        );
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY) {
+            if (!deliveryRiderHolds.release(order.getDeliveryHoldKey()))
+                throw new IllegalStateException("Delivery rider reservation is missing during expiry.");
+        } else {
+            releasePickupCapacity(order.getPickupType(), order.getPickupSlot().getId());
+        }
 
         orderInventoryReservationService
                 .releasePendingOrderHolds(
@@ -107,11 +110,10 @@ public class CheckoutReservationExpiryProcessor {
         orderRepository.saveAndFlush(order);
 
         log.info(
-                "Checkout reservation expired: orderId={}, orderNumber={}, pickupSlotId={}, pickupType={}, reservationExpiresAt={}",
+                "Checkout reservation expired: orderId={}, orderNumber={}, fulfillmentType={}, reservationExpiresAt={}",
                 order.getId(),
                 order.getOrderNumber(),
-                slotId,
-                order.getPickupType(),
+                order.getFulfillmentType(),
                 expiresAt
         );
 
