@@ -4,10 +4,12 @@ import com.gokulsweets.restaurant.order.config.PreparationWindowProperties;
 import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -19,6 +21,7 @@ public class PreparationEligibilityService {
 
     private final PreparationWindowProperties
             preparationWindowProperties;
+    private final JdbcTemplate jdbc;
 
 
     /*
@@ -87,6 +90,22 @@ public class PreparationEligibilityService {
         }
 
 
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY) {
+            if (order.getDeliveryWindowId() == null || order.getBranch() == null)
+                throw new IllegalStateException("Delivery window is unavailable for the confirmed order.");
+            var starts = jdbc.query("""
+                    SELECT w.service_date, w.starts_at FROM delivery_capacity_windows w
+                    JOIN delivery_zones z ON z.id = w.zone_id
+                    WHERE w.id = ? AND z.branch_id = ?
+                    """, (rs, row) -> LocalDateTime.of(rs.getDate(1).toLocalDate(),
+                    rs.getTime(2).toLocalTime()), order.getDeliveryWindowId(), order.getBranch().getId());
+            if (starts.isEmpty())
+                throw new IllegalStateException("Delivery window is unavailable for the confirmed order.");
+            int leadMinutes = preparationWindowProperties.getDeliveryLeadMinutes();
+            if (leadMinutes < 0) throw new IllegalStateException("Delivery preparation lead minutes cannot be negative.");
+            return eligibility(starts.getFirst(), leadMinutes, now);
+        }
+
         PickupSlot pickupSlot =
                 order.getPickupSlot();
 
@@ -140,6 +159,10 @@ public class PreparationEligibilityService {
                 );
 
 
+        return eligibility(pickupAt, leadMinutes, now);
+    }
+
+    private PreparationEligibility eligibility(LocalDateTime pickupAt, int leadMinutes, LocalDateTime now) {
         LocalDateTime eligibleAt =
                 pickupAt.minusMinutes(
                         leadMinutes

@@ -5,7 +5,11 @@ import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,10 +18,13 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 class PreparationEligibilityServiceTest {
 
     private PreparationEligibilityService service;
+    private JdbcTemplate jdbc;
 
 
     @BeforeEach
@@ -42,10 +49,45 @@ class PreparationEligibilityServiceTest {
         );
 
 
+        jdbc = mock(JdbcTemplate.class);
         service =
                 new PreparationEligibilityService(
-                        properties
+                        properties, jdbc
                 );
+    }
+
+    @Test
+    void deliveryUsesSelectedIstWindowAtItsExactPreparationBoundary() {
+        var order = new Order();
+        order.setOrderStatus(OrderStatus.CONFIRMED);
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        order.setDeliveryWindowId(91L);
+        var branch = new Branch();
+        branch.setId(7L);
+        order.setBranch(branch);
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
+                eq(91L), eq(7L))).thenReturn(java.util.List.of(LocalDateTime.of(2026, 9, 27, 19, 30)));
+        assertEquals(PreparationEligibilityStatus.SCHEDULED,
+                service.evaluate(order, LocalDateTime.of(2026, 9, 27, 18, 29)).status());
+        assertEquals(PreparationEligibilityStatus.ELIGIBLE,
+                service.evaluate(order, LocalDateTime.of(2026, 9, 27, 18, 30)).status());
+        assertEquals(PreparationEligibilityStatus.OVERDUE,
+                service.evaluate(order, LocalDateTime.of(2026, 9, 27, 19, 30)).status());
+        verify(jdbc, times(3)).query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
+                eq(91L), eq(7L));
+    }
+
+    @Test
+    void deliveryWithMissingWindowFailsClosed() {
+        var order = new Order();
+        order.setOrderStatus(OrderStatus.CONFIRMED);
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        order.setDeliveryWindowId(91L);
+        var branch = new Branch(); branch.setId(7L); order.setBranch(branch);
+        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
+                eq(91L), eq(7L))).thenReturn(java.util.List.of());
+        assertThrows(IllegalStateException.class,
+                () -> service.evaluate(order, LocalDateTime.of(2026, 9, 27, 18, 30)));
     }
 
 
