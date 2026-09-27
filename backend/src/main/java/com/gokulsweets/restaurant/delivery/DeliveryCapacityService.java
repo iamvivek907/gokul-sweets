@@ -30,6 +30,8 @@ public class DeliveryCapacityService {
     @Transactional
     public Window configure(long branchId, long zoneId, WindowConfiguration input) {
         requireEnabled();
+        if (input.riderCapacity() < 1 || input.riderCapacity() > 1000)
+            throw new IllegalArgumentException("Rider capacity must be between 1 and 1000.");
         LocalDate today = LocalDate.now(inventoryClock);
         if (input.serviceDate().isBefore(today) || input.serviceDate().isAfter(today.plusDays(30)))
             throw new IllegalArgumentException("Select a date within the next 30 IST business days.");

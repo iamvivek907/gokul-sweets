@@ -44,7 +44,7 @@ class DeliveryCapacityServiceIntegrationTest {
                 LocalTime.of(20, 0), true, false, List.of(product));
         var zone = zones.configure(branch, zoneRequest);
         var window = service.configure(branch, zone.id(), new DeliveryCapacityService.WindowConfiguration(
-                TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 1, false));
+                TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 2, false));
         var quote = new DeliveryCapacityService.QuoteRequest(branch, " HAZRATGANJ ", "226001", TODAY, List.of(product));
 
         assertThat(service.quote(quote).provisionalWindows()).singleElement()
@@ -58,7 +58,7 @@ class DeliveryCapacityServiceIntegrationTest {
         jdbc.update("UPDATE delivery_capacity_windows SET reserved_count = rider_capacity WHERE id = ?", window.id());
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
         assertThatThrownBy(() -> service.configure(branch, zone.id(), new DeliveryCapacityService.WindowConfiguration(
-                TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 0, false))).isInstanceOf(IllegalArgumentException.class);
+                TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 1, false))).isInstanceOf(IllegalArgumentException.class);
         jdbc.update("UPDATE delivery_capacity_windows SET reserved_count = 0, paused = true WHERE id = ?", window.id());
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
         jdbc.update("UPDATE delivery_capacity_windows SET paused = false WHERE id = ?", window.id());
