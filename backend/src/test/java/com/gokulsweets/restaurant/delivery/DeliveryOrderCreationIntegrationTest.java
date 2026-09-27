@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -89,14 +90,19 @@ class DeliveryOrderCreationIntegrationTest {
         var flags = new EnhancementProperties();
         flags.setDeliveryRiderHolds(true);
         flags.setDeliveryAddressBoundaries(true);
+        flags.setDeliveryAcceptedQuote(true);
         var rider = new DeliveryRiderHoldService(flags, capacity, jdbc, ist);
         var inventory = mock(OrderInventoryReservationService.class);
         var contacts = mock(CustomerContactService.class);
         var ownership = mock(VerifiedOrderOwnership.class);
-        var service = new DeliveryOrderCreationService(flags, preparation, rider, inventory,
+        var accepted = new DeliveryAcceptedQuoteService(flags, preparation, ist);
+        ReflectionTestUtils.setField(accepted, "signingKey", "delivery-quote-test-signing-key-at-least-32-characters");
+        var service = new DeliveryOrderCreationService(flags, preparation, accepted, rider, inventory,
                 idempotency, orders, numbers, contacts, ownership, ist);
+        var draft = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
+                "Customer", "9999999999", "12 Main Road", null);
         var request = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
-                "Customer", "9999999999", "12 Main Road");
+                "Customer", "9999999999", "12 Main Road", accepted.preview(draft).token());
         String idempotencyKey = "delivery-create-" + key;
 
         var first = service.create(request, idempotencyKey, null);
@@ -113,6 +119,6 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(saved.getPickupSlot()).isNull();
         assertThat(saved.getItems()).hasSize(1);
         verify(inventory, times(1)).synchronizePendingDeliveryOrder(eq(saved), any());
-        verify(preparation, times(1)).prepare(quote, windowId);
+        verify(preparation, times(2)).prepare(quote, windowId);
     }
 }
