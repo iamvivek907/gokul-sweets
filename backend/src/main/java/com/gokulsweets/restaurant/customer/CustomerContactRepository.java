@@ -91,20 +91,20 @@ public interface CustomerContactRepository
 
                         COUNT(o.id)
                             FILTER (
-                                WHERE o.order_status = 'PICKED_UP'
+                                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                             ) AS completedPurchaseCount,
 
                         COALESCE(
                             SUM(o.total_amount)
                                 FILTER (
-                                    WHERE o.order_status = 'PICKED_UP'
+                                    WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                                 ),
                             0
                         ) AS lifetimeSpend,
 
                         MAX(o.updated_at)
                             FILTER (
-                                WHERE o.order_status = 'PICKED_UP'
+                                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                             ) AS lastPurchaseAt
 
                     FROM customer_contacts cc
@@ -194,20 +194,20 @@ public interface CustomerContactRepository
 
                         COUNT(o.id)
                             FILTER (
-                                WHERE o.order_status = 'PICKED_UP'
+                                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                             ) AS completedPurchaseCount,
 
                         COALESCE(
                             SUM(o.total_amount)
                                 FILTER (
-                                    WHERE o.order_status = 'PICKED_UP'
+                                    WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                                 ),
                             0
                         ) AS lifetimeSpend,
 
                         MAX(o.updated_at)
                             FILTER (
-                                WHERE o.order_status = 'PICKED_UP'
+                                WHERE o.order_status IN ('PICKED_UP', 'DELIVERED')
                             ) AS lastPurchaseAt
 
                     FROM customer_contacts cc

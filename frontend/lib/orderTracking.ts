@@ -33,7 +33,9 @@ const ACTIVE_STATUSES:
         "PENDING_PAYMENT",
         "CONFIRMED",
         "PREPARING",
-        "READY_FOR_PICKUP"
+        "READY_FOR_PICKUP",
+        "READY_FOR_DELIVERY",
+        "OUT_FOR_DELIVERY"
     ]);
 
 
@@ -54,6 +56,9 @@ export function getOrderStatusPresentation(
 
     if (fulfillmentType === "DELIVERY") {
         if (status === "PENDING_PAYMENT") return {label: "Awaiting Payment", message: "Your delivery window is held while checkout is completed.", tone: "amber"};
+        if (status === "READY_FOR_DELIVERY") return {label: "Ready for Delivery", message: "Your order is prepared and waiting for a rider handoff at the branch.", tone: "green"};
+        if (status === "OUT_FOR_DELIVERY") return {label: "Out for Delivery", message: "Your order has left the branch for delivery.", tone: "blue"};
+        if (status === "DELIVERED") return {label: "Delivered", message: "The branch has confirmed delivery of your order.", tone: "green"};
         if (status === "READY_FOR_PICKUP" || status === "PICKED_UP" || status === "NO_SHOW" || status === "PICKUP_WINDOW_EXPIRED")
             return {label: "Order Update", message: "Contact the branch for the latest delivery status.", tone: "blue"};
     }
@@ -94,6 +99,11 @@ export function getOrderStatusPresentation(
                 message: "This order has been collected successfully.",
                 tone: "green"
             };
+
+        case "READY_FOR_DELIVERY":
+        case "OUT_FOR_DELIVERY":
+        case "DELIVERED":
+            return {label: "Order Update", message: "Contact the branch for the latest order status.", tone: "blue"};
 
         case "PAYMENT_FAILED":
             return {
@@ -168,7 +178,7 @@ export function matchesOrderFilter(
         case "ACTIVE":
             return isActiveOrderStatus(order.orderStatus);
         case "COMPLETED":
-            return order.orderStatus === "PICKED_UP";
+            return order.orderStatus === "PICKED_UP" || order.orderStatus === "DELIVERED";
         case "ISSUES":
             return isIssueOrderStatus(order.orderStatus);
         case "ALL":

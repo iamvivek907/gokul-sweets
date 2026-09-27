@@ -113,6 +113,9 @@ const STATUS_TABS: {
         value: "PICKED_UP",
         label: "Picked Up"
     },
+    {value: "READY_FOR_DELIVERY", label: "Ready for Delivery"},
+    {value: "OUT_FOR_DELIVERY", label: "Out for Delivery"},
+    {value: "DELIVERED", label: "Delivered"},
     {
         value: "PENDING_PAYMENT",
         label: "Pending Payment"
@@ -198,6 +201,15 @@ function formatStatus(
 
         case "PICKED_UP":
             return "Picked Up";
+
+        case "READY_FOR_DELIVERY":
+            return "Ready for Delivery";
+
+        case "OUT_FOR_DELIVERY":
+            return "Out for Delivery";
+
+        case "DELIVERED":
+            return "Delivered";
 
         case "PAYMENT_FAILED":
             return "Payment Failed";
@@ -307,6 +319,15 @@ function statusClasses(
             return "bg-green-50 text-green-800 border-green-200";
 
         case "PICKED_UP":
+            return "bg-emerald-50 text-emerald-800 border-emerald-200";
+
+        case "READY_FOR_DELIVERY":
+            return "bg-green-50 text-green-800 border-green-200";
+
+        case "OUT_FOR_DELIVERY":
+            return "bg-blue-50 text-blue-800 border-blue-200";
+
+        case "DELIVERED":
             return "bg-emerald-50 text-emerald-800 border-emerald-200";
 
         case "PENDING_PAYMENT":
@@ -452,8 +473,19 @@ function getBatchSummaryMessage(
 
 
 function getTransitionLabel(
-    currentStatus: OrderStatus
+    currentStatus: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ) {
+
+    if (fulfillmentType === "DELIVERY") {
+        switch (currentStatus) {
+            case "CONFIRMED": return "Start Preparation";
+            case "PREPARING": return "Mark Ready for Delivery";
+            case "READY_FOR_DELIVERY": return "Record Rider Handoff";
+            case "OUT_FOR_DELIVERY": return "Confirm Delivered";
+            default: return null;
+        }
+    }
 
     switch (
         currentStatus
@@ -2086,14 +2118,11 @@ export default function AdminOrdersPage() {
         const currentStatus =
             selectedOrder.orderStatus;
 
-        if (selectedOrder.fulfillmentType === "DELIVERY" && currentStatus !== "CONFIRMED") {
-            return;
-        }
-
 
         const targetStatus =
             getNextOrderStatus(
-                currentStatus
+                currentStatus,
+                selectedOrder.fulfillmentType
             );
 
 
@@ -2108,12 +2137,14 @@ export default function AdminOrdersPage() {
 
         if (
             targetStatus
-            === "PICKED_UP"
+            === "PICKED_UP" || targetStatus === "DELIVERED"
         ) {
 
             const confirmed =
                 window.confirm(
-                    `Mark order ${selectedOrder.orderNumber} as picked up?`
+                    targetStatus === "DELIVERED"
+                        ? `Confirm that order ${selectedOrder.orderNumber} has reached the customer?`
+                        : `Mark order ${selectedOrder.orderNumber} as picked up?`
                 );
 
 
@@ -2163,13 +2194,12 @@ export default function AdminOrdersPage() {
 
 
             setOrderActionSuccess(
-                targetStatus
-                === "PREPARING"
-                    ? "Order preparation started successfully."
-                    : targetStatus
-                    === "READY_FOR_PICKUP"
-                        ? "Order marked ready for pickup."
-                        : "Order marked picked up successfully."
+                targetStatus === "PREPARING" ? "Order preparation started successfully."
+                    : targetStatus === "READY_FOR_PICKUP" ? "Order marked ready for pickup."
+                    : targetStatus === "READY_FOR_DELIVERY" ? "Order marked ready for delivery."
+                    : targetStatus === "OUT_FOR_DELIVERY" ? "Rider handoff recorded."
+                    : targetStatus === "DELIVERED" ? "Delivery confirmed."
+                    : "Order marked picked up successfully."
             );
 
 
@@ -4803,9 +4833,10 @@ function OrderDetailDrawer({
     useRouter();
 
     const nextStatus =
-        order && (order.fulfillmentType === "PICKUP" || order.orderStatus === "CONFIRMED")
+        order
             ? getNextOrderStatus(
-                order.orderStatus
+                order.orderStatus,
+                order.fulfillmentType
             )
             : null;
 
@@ -4813,7 +4844,8 @@ function OrderDetailDrawer({
     const requiredPermission =
         order
             ? getRequiredPermissionForTransition(
-                order.orderStatus
+                order.orderStatus,
+                order.fulfillmentType
             )
             : null;
 
@@ -4821,7 +4853,8 @@ function OrderDetailDrawer({
     const actionLabel =
         order
             ? getTransitionLabel(
-                order.orderStatus
+                order.orderStatus,
+                order.fulfillmentType
             )
             : null;
 
@@ -4846,6 +4879,9 @@ function OrderDetailDrawer({
         ||
         order.orderStatus
         === "PICKED_UP"
+        || order.orderStatus === "READY_FOR_DELIVERY"
+        || order.orderStatus === "OUT_FOR_DELIVERY"
+        || order.orderStatus === "DELIVERED"
     );
 
 

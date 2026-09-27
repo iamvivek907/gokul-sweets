@@ -36,6 +36,13 @@ public class AdminOrderWorkflowService {
                     OrderStatus.PICKED_UP
             );
 
+    private static final Map<OrderStatus, OrderStatus> DELIVERY_TRANSITIONS = Map.of(
+            OrderStatus.CONFIRMED, OrderStatus.PREPARING,
+            OrderStatus.PREPARING, OrderStatus.READY_FOR_DELIVERY,
+            OrderStatus.READY_FOR_DELIVERY, OrderStatus.OUT_FOR_DELIVERY,
+            OrderStatus.OUT_FOR_DELIVERY, OrderStatus.DELIVERED
+    );
+
 
     private final OrderRepository
             orderRepository;
@@ -96,17 +103,6 @@ public class AdminOrderWorkflowService {
         OrderStatus currentStatus =
                 order.getOrderStatus();
 
-        // Delivery can enter the kitchen through the same eligibility and KOT path.
-        // Later delivery transitions need their own handoff workflow; never label
-        // a delivery order READY_FOR_PICKUP or PICKED_UP.
-        if (order.getFulfillmentType() == FulfillmentType.DELIVERY
-                && !(currentStatus == OrderStatus.CONFIRMED
-                && targetStatus == OrderStatus.PREPARING)
-                && !(currentStatus == OrderStatus.PREPARING
-                && targetStatus == OrderStatus.PREPARING)) {
-            throw new IllegalStateException("Delivery handoff workflow is not configured yet.");
-        }
-
 
         /*
          * =====================================================
@@ -141,7 +137,8 @@ public class AdminOrderWorkflowService {
          */
 
         OrderStatus allowedTarget =
-                ALLOWED_TRANSITIONS.get(
+                (order.getFulfillmentType() == FulfillmentType.DELIVERY
+                        ? DELIVERY_TRANSITIONS : ALLOWED_TRANSITIONS).get(
                         currentStatus
                 );
 
@@ -181,6 +178,7 @@ public class AdminOrderWorkflowService {
          */
 
         requirePermissionForTransition(
+                order.getFulfillmentType(),
                 currentStatus,
                 targetStatus
         );
@@ -631,6 +629,7 @@ public class AdminOrderWorkflowService {
      */
 
     private void requirePermissionForTransition(
+            FulfillmentType fulfillmentType,
             OrderStatus currentStatus,
             OrderStatus targetStatus
     ) {
@@ -659,9 +658,8 @@ public class AdminOrderWorkflowService {
                         ==
                         OrderStatus.PREPARING
                         &&
-                        targetStatus
-                                ==
-                                OrderStatus.READY_FOR_PICKUP
+                        (targetStatus == OrderStatus.READY_FOR_PICKUP
+                                || targetStatus == OrderStatus.READY_FOR_DELIVERY)
         ) {
 
             staffAuthorizationService
@@ -669,6 +667,20 @@ public class AdminOrderWorkflowService {
                             PermissionName.ORDER_MARK_READY
                     );
 
+            return;
+        }
+
+        if (fulfillmentType == FulfillmentType.DELIVERY
+                && currentStatus == OrderStatus.READY_FOR_DELIVERY
+                && targetStatus == OrderStatus.OUT_FOR_DELIVERY) {
+            staffAuthorizationService.requirePermission(PermissionName.ORDER_DISPATCH_DELIVERY);
+            return;
+        }
+
+        if (fulfillmentType == FulfillmentType.DELIVERY
+                && currentStatus == OrderStatus.OUT_FOR_DELIVERY
+                && targetStatus == OrderStatus.DELIVERED) {
+            staffAuthorizationService.requirePermission(PermissionName.ORDER_CONFIRM_DELIVERY);
             return;
         }
 

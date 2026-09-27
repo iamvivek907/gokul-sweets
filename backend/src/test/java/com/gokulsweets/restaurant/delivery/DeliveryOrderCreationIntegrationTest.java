@@ -20,6 +20,7 @@ import com.gokulsweets.restaurant.order.service.model.ValidatedOrderData;
 import com.gokulsweets.restaurant.order.service.model.ValidatedOrderItem;
 import com.gokulsweets.restaurant.product.Product;
 import com.gokulsweets.restaurant.product.ProductSaleMode;
+import com.gokulsweets.restaurant.printing.dto.PrintAgentClaimResponse;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +54,7 @@ class DeliveryOrderCreationIntegrationTest {
     @Autowired PreparationEligibilityService preparationEligibility;
     @Autowired DeliveryOrderWindowLookup deliveryWindows;
     @Autowired DeliveryPreparationQueue deliveryQueue;
+    @Autowired tools.jackson.databind.ObjectMapper json;
 
     @Test
     void retryReturnsSameOrderWithOneRiderAndInventoryReservation() {
@@ -168,5 +170,15 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(deliveryQueue.overdueCount(branchId, date.atTime(10, 0))).isZero();
         assertThat(deliveryQueue.overdueCount(branchId, date.atTime(11, 0))).isEqualTo(1);
         assertThat(deliveryQueue.eligible(branchId + 999, date.atTime(11, 0), 10)).isEmpty();
+
+        // External printer-agent contract: delivery has its own IST window; never invent a pickup slot.
+        var printPayload = new PrintAgentClaimResponse.KotPayload(1L, "KOT-1", saved.getOrderNumber(),
+                branch.getName(), branch.getAddress(), null, null, null, null, "Kitchen", date.atTime(10, 0),
+                List.of(new PrintAgentClaimResponse.Item("Sweet", 1, 0)), FulfillmentType.DELIVERY,
+                kitchenWindow.date(), kitchenWindow.start(), kitchenWindow.end());
+        String printJson = json.writeValueAsString(printPayload);
+        assertThat(printJson).contains("\"fulfillmentType\":\"DELIVERY\"")
+                .contains("\"deliveryDate\":\"" + date + "\"")
+                .doesNotContain("\"pickupDate\":\"" + date + "\"");
     }
 }

@@ -107,7 +107,7 @@ public class OrderInventoryLifecycleService {
                     reservation.getQuantity().negate(),
                     orderNumber,
                     reservation.getReservationKey(),
-                    "Customer collected the order.",
+                    "Order fulfilled for pickup or delivery.",
                     actor
             );
         }

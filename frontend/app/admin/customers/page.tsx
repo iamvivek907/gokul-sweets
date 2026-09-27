@@ -523,7 +523,7 @@ export default function AdminCustomersPage() {
                                 text-[#756763]
                             "
                         >
-                            Purchase metrics count PICKED_UP orders only.
+                            Purchase metrics count picked up and delivered orders.
                         </p>
 
                     </div>

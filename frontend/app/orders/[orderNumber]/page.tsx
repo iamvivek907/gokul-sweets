@@ -79,6 +79,14 @@ const TIMELINE_STEPS: TimelineStep[] = [
     }
 ];
 
+const DELIVERY_TIMELINE_STEPS: TimelineStep[] = [
+    {status: "CONFIRMED", label: "Confirmed", description: "The branch has received your order."},
+    {status: "PREPARING", label: "Preparing", description: "Your order is being prepared."},
+    {status: "READY_FOR_DELIVERY", label: "Ready for delivery", description: "Your order is waiting for rider handoff."},
+    {status: "OUT_FOR_DELIVERY", label: "Out for delivery", description: "Your order has left the branch."},
+    {status: "DELIVERED", label: "Delivered", description: "The branch has confirmed delivery."}
+];
+
 
 const TIMELINE_INDEX:
     Partial<Record<OrderStatus, number>> = {
@@ -87,6 +95,14 @@ const TIMELINE_INDEX:
         READY_FOR_PICKUP: 2,
         PICKED_UP: 3
     };
+
+const DELIVERY_TIMELINE_INDEX: Partial<Record<OrderStatus, number>> = {
+    CONFIRMED: 0,
+    PREPARING: 1,
+    READY_FOR_DELIVERY: 2,
+    OUT_FOR_DELIVERY: 3,
+    DELIVERED: 4
+};
 
 
 function formatUpdatedAt(value: string): string {
@@ -253,7 +269,7 @@ export default function OrderDetailPage() {
 
     const currentTimelineIndex =
         order
-            ? TIMELINE_INDEX[order.orderStatus] ?? -1
+            ? (order.fulfillmentType === "DELIVERY" ? DELIVERY_TIMELINE_INDEX : TIMELINE_INDEX)[order.orderStatus] ?? -1
             : -1;
 
     const status =
@@ -310,13 +326,16 @@ export default function OrderDetailPage() {
         );
     }
 
-    const showOperationalTimeline = order.fulfillmentType === "PICKUP" &&
+    const showOperationalTimeline =
         [
             "CONFIRMED",
             "PREPARING",
-            "READY_FOR_PICKUP",
-            "PICKED_UP"
+            ...(order.fulfillmentType === "DELIVERY"
+                ? ["READY_FOR_DELIVERY", "OUT_FOR_DELIVERY", "DELIVERED"]
+                : ["READY_FOR_PICKUP", "PICKED_UP"])
         ].includes(order.orderStatus);
+    const timelineSteps = order.fulfillmentType === "DELIVERY" ? DELIVERY_TIMELINE_STEPS : TIMELINE_STEPS;
+    const terminalStatus = order.fulfillmentType === "DELIVERY" ? "DELIVERED" : "PICKED_UP";
 
     const pendingPreparation = order.orderStatus === "CONFIRMED" || order.orderStatus === "PREPARING";
     const pastPickupWindow = order.fulfillmentType === "PICKUP" && pendingPreparation &&
@@ -383,13 +402,13 @@ export default function OrderDetailPage() {
                         <div className="mt-7">
                             <h2 className="text-lg font-bold text-[#241715]">Order progress</h2>
                             <div className="mt-5 space-y-0">
-                                {TIMELINE_STEPS.map((step, index) => {
-                                    const completed = index < currentTimelineIndex || order.orderStatus === "PICKED_UP";
-                                    const current = index === currentTimelineIndex && order.orderStatus !== "PICKED_UP";
+                                {timelineSteps.map((step, index) => {
+                                    const completed = index < currentTimelineIndex || order.orderStatus === terminalStatus;
+                                    const current = index === currentTimelineIndex && order.orderStatus !== terminalStatus;
 
                                     return (
                                         <div key={step.status} className="relative flex gap-4 pb-7 last:pb-0">
-                                            {index < TIMELINE_STEPS.length - 1 && (
+                                            {index < timelineSteps.length - 1 && (
                                                 <div className={`absolute left-[15px] top-8 h-[calc(100%-1rem)] w-0.5 ${index < currentTimelineIndex ? "bg-green-500" : "bg-[#eadfd6]"}`} />
                                             )}
                                             <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
@@ -484,7 +503,7 @@ export default function OrderDetailPage() {
                         </div>
                     </div>
 
-                    {order.orderStatus === "PICKED_UP" && (
+                    {order.orderStatus === terminalStatus && (
                         <OrderReviewCard
                             orderNumber={order.orderNumber}
                         />
