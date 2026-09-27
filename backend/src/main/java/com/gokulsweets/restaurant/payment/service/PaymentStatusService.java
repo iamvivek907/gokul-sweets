@@ -2,8 +2,10 @@ package com.gokulsweets.restaurant.payment.service;
 
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryCommitmentService;
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
+import com.gokulsweets.restaurant.delivery.DeliveryRiderHoldService;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.payment.entity.Payment;
@@ -45,6 +47,7 @@ public class PaymentStatusService {
     private final OrderInventoryReservationService
             orderInventoryReservationService;
     private final PaymentReconciliationPolicy reconciliationPolicy;
+    private final DeliveryRiderHoldService deliveryRiderHolds;
 
     // =========================================================
     // MARK PAID
@@ -112,6 +115,8 @@ public class PaymentStatusService {
                     .confirmPendingOrderHolds(
                             order.getOrderNumber()
                     );
+
+            commitDeliveryCapacity(order);
 
             rebateRedemptionService
                     .recordRedemptionIfApplicable(
@@ -230,6 +235,8 @@ public class PaymentStatusService {
                                 order.getOrderNumber()
                         );
 
+                commitDeliveryCapacity(order);
+
                 rebateRedemptionService
                         .recordRedemptionIfApplicable(
                                 order
@@ -344,6 +351,8 @@ public class PaymentStatusService {
                 .confirmPendingOrderHolds(
                         order.getOrderNumber()
                 );
+
+        commitDeliveryCapacity(order);
 
         rebateRedemptionService
                 .recordRedemptionIfApplicable(
@@ -849,7 +858,7 @@ public class PaymentStatusService {
                     OrderStatus.PAYMENT_FAILED
             );
 
-            releasePickupCapacity(
+            releaseOrderCapacity(
                     order
             );
 
@@ -859,7 +868,7 @@ public class PaymentStatusService {
             );
 
             log.info(
-                    "Payment initialization failed; order marked PAYMENT_FAILED and pickup capacity released: paymentId={}, orderId={}, orderNumber={}",
+                    "Payment initialization failed; order marked PAYMENT_FAILED and capacity released: paymentId={}, orderId={}, orderNumber={}",
                     paymentId,
                     order.getId(),
                     order.getOrderNumber()
@@ -960,7 +969,7 @@ public class PaymentStatusService {
                     OrderStatus.PAYMENT_FAILED
             );
 
-            releasePickupCapacity(
+            releaseOrderCapacity(
                     order
             );
 
@@ -970,7 +979,7 @@ public class PaymentStatusService {
             );
 
             log.info(
-                    "Payment failed and pickup capacity released: paymentId={}, orderId={}",
+                    "Payment failed and capacity released: paymentId={}, orderId={}",
                     paymentId,
                     order.getId()
             );
@@ -1045,7 +1054,7 @@ public class PaymentStatusService {
                     OrderStatus.CANCELLED
             );
 
-            releasePickupCapacity(
+            releaseOrderCapacity(
                     order
             );
 
@@ -1059,7 +1068,7 @@ public class PaymentStatusService {
             );
 
             log.info(
-                    "Payment expired and pickup capacity released: paymentId={}, orderId={}",
+                    "Payment expired and capacity released: paymentId={}, orderId={}",
                     paymentId,
                     order.getId()
             );
@@ -1096,12 +1105,18 @@ public class PaymentStatusService {
     }
 
     // =========================================================
-    // RELEASE PICKUP CAPACITY
+    // RELEASE ORDER CAPACITY
     // =========================================================
 
-    private void releasePickupCapacity(
+    private void releaseOrderCapacity(
             Order order
     ) {
+
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY) {
+            if (!deliveryRiderHolds.release(order.getDeliveryHoldKey()))
+                throw new IllegalStateException("Delivery rider reservation is missing during release.");
+            return;
+        }
 
         Long slotId =
                 order.getPickupSlot()
@@ -1127,6 +1142,12 @@ public class PaymentStatusService {
                             slotId
                     );
         }
+    }
+
+    private void commitDeliveryCapacity(Order order) {
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY
+                && !deliveryRiderHolds.commit(order.getDeliveryHoldKey()))
+            throw new IllegalStateException("Delivery rider reservation expired before payment confirmation.");
     }
 
     // =========================================================

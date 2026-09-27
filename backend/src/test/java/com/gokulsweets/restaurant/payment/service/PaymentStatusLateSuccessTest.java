@@ -1,10 +1,12 @@
 package com.gokulsweets.restaurant.payment.service;
 
 import com.gokulsweets.restaurant.config.EnhancementProperties;
+import com.gokulsweets.restaurant.delivery.DeliveryRiderHoldService;
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryCommitmentService;
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.payment.entity.Payment;
@@ -33,7 +35,7 @@ class PaymentStatusLateSuccessTest {
         var holds = mock(OrderInventoryReservationService.class);
         var service = new PaymentStatusService(repository, mock(OrderRepository.class), slots,
                 mock(RebateRedemptionService.class), commitments, holds,
-                new PaymentReconciliationPolicy(new EnhancementProperties()));
+                new PaymentReconciliationPolicy(new EnhancementProperties()), mock(DeliveryRiderHoldService.class));
         var order = new Order();
         order.setOrderStatus(OrderStatus.CANCELLED);
         Payment queued = payment(order, PaymentStatus.REFUND_PENDING);
@@ -55,7 +57,7 @@ class PaymentStatusLateSuccessTest {
         var features = new EnhancementProperties();
         features.setPaymentReconciliationV2(true);
         var service = new PaymentStatusService(repository, orders, slots, redemptions,
-                commitments, holds, new PaymentReconciliationPolicy(features));
+                commitments, holds, new PaymentReconciliationPolicy(features), mock(DeliveryRiderHoldService.class));
 
         var order = new Order();
         order.setId(11L);
@@ -84,6 +86,60 @@ class PaymentStatusLateSuccessTest {
         verify(slots, times(1)).releaseNormalCapacity(42L);
         verify(holds, times(1)).releasePendingOrderHolds(eq("GKS-TEST"), any());
         verifyNoInteractions(commitments, redemptions);
+    }
+
+    @Test
+    void duplicatePaidDeliveryConfirmationCommitsRiderHoldWithoutPickupCapacity() {
+        var payments = mock(PaymentRepository.class);
+        var orders = mock(OrderRepository.class);
+        var slots = mock(PickupSlotReservationService.class);
+        var inventory = mock(OrderInventoryCommitmentService.class);
+        var riders = mock(DeliveryRiderHoldService.class);
+        when(riders.commit("server-issued-hold")).thenReturn(true);
+        var service = new PaymentStatusService(payments, orders, slots,
+                mock(RebateRedemptionService.class), inventory, mock(OrderInventoryReservationService.class),
+                new PaymentReconciliationPolicy(new EnhancementProperties()), riders);
+        var order = new Order();
+        order.setId(12L);
+        order.setOrderNumber("GKS-DELIVERY");
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        order.setDeliveryHoldKey("server-issued-hold");
+        order.setOrderStatus(OrderStatus.PENDING_PAYMENT);
+        when(payments.findById(25L)).thenReturn(Optional.of(payment(order, PaymentStatus.PAID)));
+
+        service.markPaid(25L, "provider-transaction");
+
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(riders).commit("server-issued-hold");
+        verifyNoInteractions(slots);
+        verify(inventory).confirmPendingOrderHolds("GKS-DELIVERY");
+    }
+
+    @Test
+    void failedDeliveryPaymentReleasesRiderWithoutTouchingPickupSlot() {
+        var payments = mock(PaymentRepository.class);
+        var pickup = mock(PickupSlotReservationService.class);
+        var inventory = mock(OrderInventoryReservationService.class);
+        var riders = mock(DeliveryRiderHoldService.class);
+        var order = new Order();
+        order.setId(15L);
+        order.setOrderNumber("GKS-DELIVERY-FAILED");
+        order.setOrderStatus(OrderStatus.PENDING_PAYMENT);
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        order.setDeliveryHoldKey("server-issued-hold");
+        when(payments.findById(26L)).thenReturn(Optional.of(payment(order, PaymentStatus.PENDING)));
+        when(payments.transitionStatus(26L, PaymentStatus.PENDING, PaymentStatus.FAILED)).thenReturn(1);
+        when(riders.release("server-issued-hold")).thenReturn(true);
+        var service = new PaymentStatusService(payments, mock(OrderRepository.class), pickup,
+                mock(RebateRedemptionService.class), mock(OrderInventoryCommitmentService.class), inventory,
+                new PaymentReconciliationPolicy(new EnhancementProperties()), riders);
+
+        service.markFailed(26L, "Provider declined");
+
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+        verify(riders).release("server-issued-hold");
+        verifyNoInteractions(pickup);
+        verify(inventory).releasePendingOrderHolds("GKS-DELIVERY-FAILED", "Payment failed.");
     }
 
     private static Payment payment(Order order, PaymentStatus status) {
