@@ -358,8 +358,10 @@ function paymentStatusClasses(
 
 
 function formatMinutesUntilPickup(
-    minutesUntilPickup: number
+    minutesUntilPickup: number,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ) {
+    const destination = fulfillmentType === "DELIVERY" ? "delivery window" : "pickup";
 
     if (minutesUntilPickup < 0) {
 
@@ -377,12 +379,12 @@ function formatMinutesUntilPickup(
 
 
     if (minutesUntilPickup === 0) {
-        return "Pickup time now";
+        return fulfillmentType === "DELIVERY" ? "Delivery window now" : "Pickup time now";
     }
 
 
     if (minutesUntilPickup < 60) {
-        return `${minutesUntilPickup} min until pickup`;
+        return `${minutesUntilPickup} min until ${destination}`;
     }
 
 
@@ -397,11 +399,11 @@ function formatMinutesUntilPickup(
 
 
     if (minutes === 0) {
-        return `${hours} hr until pickup`;
+        return `${hours} hr until ${destination}`;
     }
 
 
-    return `${hours} hr ${minutes} min until pickup`;
+    return `${hours} hr ${minutes} min until ${destination}`;
 }
 
 
@@ -2551,7 +2553,7 @@ export default function AdminOrdersPage() {
                                     text-[#756763]
                                 "
                             >
-                                Monitor customer pickup orders and move them through preparation and pickup.
+                                Monitor customer pickup and delivery orders as they move through preparation.
                             </p>
 
                         </div>
@@ -2939,7 +2941,7 @@ export default function AdminOrdersPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Only confirmed orders whose preparation window is open appear here. Orders are ordered by pickup urgency.
+                                        Only confirmed orders whose preparation window is open appear here. Orders are ordered by booked pickup or delivery window.
                                     </p>
 
                                 </div>
@@ -4294,7 +4296,8 @@ function PreparationQueueCard({
                             >
                                 {
                                     formatMinutesUntilPickup(
-                                        order.minutesUntilPickup
+                                        order.minutesUntilPickup,
+                                        order.fulfillmentType
                                     )
                                 }
                             </span>
@@ -4360,17 +4363,17 @@ function PreparationQueueCard({
                                         text-[#241715]
                                     "
                                 >
-                                    Pickup:
+                                    {order.fulfillmentType === "DELIVERY" ? "Delivery window (IST):" : "Pickup:"}
                                 </strong>{" "}
                                 {
-                                    order.pickupDate
+                                    (order.fulfillmentType === "DELIVERY" ? order.deliveryDate : order.pickupDate) ?? "—"
                                 }{","}{" "}
                                 {
-                                    order.pickupStartTime
+                                    (order.fulfillmentType === "DELIVERY" ? order.deliveryStartTime : order.pickupStartTime) ?? "—"
                                 }
                                 {" - "}
                                 {
-                                    order.pickupEndTime
+                                    (order.fulfillmentType === "DELIVERY" ? order.deliveryEndTime : order.pickupEndTime) ?? "—"
                                 }
                             </span>
 
@@ -4384,7 +4387,7 @@ function PreparationQueueCard({
                                     Type:
                                 </strong>{" "}
                                 {
-                                    formatPickupType(order.pickupType)
+                                    order.fulfillmentType === "DELIVERY" ? "Delivery" : formatPickupType(order.pickupType ?? "NORMAL")
                                 }
                             </span>
 

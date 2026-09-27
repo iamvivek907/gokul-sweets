@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.order.service;
 
 import com.gokulsweets.restaurant.config.ApplicationClock;
+import com.gokulsweets.restaurant.delivery.DeliveryPreparationQueue;
 import com.gokulsweets.restaurant.order.config.PreparationWindowProperties;
 import com.gokulsweets.restaurant.order.dto.OrderItemResponse;
 import com.gokulsweets.restaurant.order.dto.admin.AdminOrderDetailResponse;
@@ -33,6 +34,7 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -75,6 +77,7 @@ public class AdminOrderQueryService {
 
     private final ApplicationClock  applicationClock;
     private final JdbcTemplate jdbc;
+    private final DeliveryPreparationQueue deliveryPreparationQueue;
 
 
     /*
@@ -245,7 +248,7 @@ public class AdminOrderQueryService {
                 );
 
 
-        List<Order> candidates =
+        List<Order> pickupCandidates =
                 orderRepository
                         .findPreparationQueueCandidates(
                                 branchId,
@@ -271,6 +274,18 @@ public class AdminOrderQueryService {
 
                                 queuePage
                         );
+
+        List<Order> deliveryCandidates = deliveryPreparationQueue.eligible(branchId, now, databaseLimit);
+        List<Order> candidates = new java.util.ArrayList<>(pickupCandidates);
+        candidates.addAll(deliveryCandidates);
+        Map<Long, DeliveryWindow> windows = loadDeliveryWindows(deliveryCandidates);
+        candidates.sort(Comparator.comparing((Order order) ->
+                        order.getFulfillmentType() == FulfillmentType.DELIVERY
+                                ? LocalDateTime.of(windows.get(order.getDeliveryWindowId()).date(),
+                                        windows.get(order.getDeliveryWindowId()).start())
+                                : LocalDateTime.of(order.getPickupSlot().getSlotDate(),
+                                        order.getPickupSlot().getStartTime()))
+                .thenComparing(Order::getCreatedAt).thenComparing(Order::getId));
 
 
         boolean hasMore =
@@ -304,7 +319,9 @@ public class AdminOrderQueryService {
                                                 paymentStatuses.get(
                                                         order.getId()
                                                 ),
-                                                now
+                                                now,
+                                                order.getFulfillmentType() == FulfillmentType.DELIVERY
+                                                        ? windows.get(order.getDeliveryWindowId()) : null
                                         )
                         )
                         .toList();
@@ -371,7 +388,7 @@ public class AdminOrderQueryService {
                                 branchId,
                                 OrderStatus.CONFIRMED,
                                 FulfillmentType.PICKUP
-                        );
+                        ) + deliveryPreparationQueue.confirmed(branchId);
 
 
         long actionableTotal =
@@ -397,7 +414,7 @@ public class AdminOrderQueryService {
                                         .toLocalDate(),
                                 cutoffs.adminOverride()
                                         .toLocalTime()
-                        );
+                        ) + deliveryPreparationQueue.eligibleCount(branchId, now);
 
 
         long overdue =
@@ -407,7 +424,7 @@ public class AdminOrderQueryService {
                                 OrderStatus.CONFIRMED,
                                 now.toLocalDate(),
                                 now.toLocalTime()
-                        );
+                        ) + deliveryPreparationQueue.overdueCount(branchId, now);
 
 
         /*
@@ -446,7 +463,8 @@ public class AdminOrderQueryService {
                                 branchId,
                                 OrderStatus.PREPARING,
                                 FulfillmentType.PICKUP
-                        );
+                        ) + orderRepository.countByBranchIdAndOrderStatusAndFulfillmentType(
+                                branchId, OrderStatus.PREPARING, FulfillmentType.DELIVERY);
 
 
         long ready =
@@ -779,7 +797,8 @@ public class AdminOrderQueryService {
     private AdminOrderQueueItemResponse toQueueResponse(
             Order order,
             PaymentStatus paymentStatus,
-            LocalDateTime now
+            LocalDateTime now,
+            DeliveryWindow deliveryWindow
     ) {
 
         PreparationEligibility eligibility =
@@ -816,14 +835,11 @@ public class AdminOrderQueryService {
                         order.getCustomerPhone()
                 ),
 
-                order.getPickupSlot()
-                        .getSlotDate(),
+                deliveryWindow == null ? order.getPickupSlot().getSlotDate() : null,
 
-                order.getPickupSlot()
-                        .getStartTime(),
+                deliveryWindow == null ? order.getPickupSlot().getStartTime() : null,
 
-                order.getPickupSlot()
-                        .getEndTime(),
+                deliveryWindow == null ? order.getPickupSlot().getEndTime() : null,
 
                 order.getPickupType(),
 
@@ -841,7 +857,11 @@ public class AdminOrderQueryService {
 
                 eligibility.pickupAt(),
 
-                eligibility.minutesUntilPickup()
+                eligibility.minutesUntilPickup(),
+                order.getFulfillmentType(),
+                deliveryWindow == null ? null : deliveryWindow.date(),
+                deliveryWindow == null ? null : deliveryWindow.start(),
+                deliveryWindow == null ? null : deliveryWindow.end()
         );
     }
 
