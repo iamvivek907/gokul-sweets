@@ -41,7 +41,9 @@ export default function DeliveryCheckPage() {
             if (features.deliveryCapacity && cart.branchId && cart.items.length && serviceDate) {
                 const result = await apiClient<Quote>("/api/storefront/delivery/quote", {
                     method: "POST", body: JSON.stringify({branchId: cart.branchId, locality: area,
-                        postalCode, serviceDate, productIds: cart.items.map(item => item.product.id)}),
+                        postalCode, serviceDate, items: cart.items.map(item => ({productId: item.product.id,
+                            quantity: item.product.saleMode === "WEIGHT" ? null : item.quantity,
+                            weightGrams: item.product.saleMode === "WEIGHT" ? item.weightGrams : null}))}),
                     signal: AbortSignal.timeout(8000)
                 });
                 setQuote(result);

@@ -1,0 +1,5 @@
+# SCRUM-30 inventory-aware provisional quote
+
+Base dev HEAD: `36fc073` (PR #71). The OFF-by-default delivery capacity flag continues to gate the quote. The customer now sends the current cart's product IDs and requested quantities or grams for a chosen IST date. The server validates the branch menu and cart, permitted zone products, current inventory policies and daily allocation, online status and booking horizon, and the available quantity using the existing inventory calculator. A missing or disabled inventory policy, allocation or enforcement fails closed with no windows. No new inventory writes or holds happen on quote.
+
+The rider windows remain provisional and `orderable=false` even when stock and capacity currently appear available. Preview results can race later sales or pauses. No delivery checkout exists; accepted order creation must recheck the full address, cart, inventory, current zone/rider status and capacity atomically, acquire stock and rider reservations, and release them on expiry, cancellation and failed payment. Do not enable the flags or move SCRUM-30 to QA until that lifecycle, address-boundary checks and DEV manual testing are complete.

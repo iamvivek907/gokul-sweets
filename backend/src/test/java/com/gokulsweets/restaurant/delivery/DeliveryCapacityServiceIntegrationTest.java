@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.delivery;
 
 import com.gokulsweets.restaurant.branch.BranchRepository;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
+import com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,6 +19,11 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest
 @Transactional
@@ -31,7 +37,9 @@ class DeliveryCapacityServiceIntegrationTest {
     void exactAreaProductPauseAndCapacityDetermineProvisionalWindowsOnly() {
         var flags = flags();
         var zones = new DeliveryZoneService(flags, jdbc, branches);
-        var service = new DeliveryCapacityService(flags, zones, jdbc, IST);
+        var stock = mock(DeliveryStockCheck.class);
+        when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(true, null));
+        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, stock);
         var key = UUID.randomUUID().toString().substring(0, 8);
         Long branch = jdbc.queryForObject("INSERT INTO branches (code, name) VALUES (?, ?) RETURNING id",
                 Long.class, "DWC-" + key, "Delivery " + key);
@@ -45,15 +53,19 @@ class DeliveryCapacityServiceIntegrationTest {
         var zone = zones.configure(branch, zoneRequest);
         var window = service.configure(branch, zone.id(), new DeliveryCapacityService.WindowConfiguration(
                 TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 2, false));
-        var quote = new DeliveryCapacityService.QuoteRequest(branch, " HAZRATGANJ ", "226001", TODAY, List.of(product));
+        var items = List.of(new CreateOrderItemRequest(product, 1, null));
+        var quote = new DeliveryCapacityService.QuoteRequest(branch, " HAZRATGANJ ", "226001", TODAY, items);
 
         assertThat(service.quote(quote).provisionalWindows()).singleElement()
                 .extracting(DeliveryCapacityService.Window::id).isEqualTo(window.id());
         assertThat(service.quote(quote).orderable()).isFalse();
+        when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(false, "Insufficient stock."));
+        assertThat(service.quote(quote).provisionalWindows()).isEmpty();
+        when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(true, null));
         assertThat(service.quote(new DeliveryCapacityService.QuoteRequest(branch, "Hazratganj", "226002", TODAY,
-                List.of(product))).provisionalWindows()).isEmpty();
+                items)).provisionalWindows()).isEmpty();
         assertThat(service.quote(new DeliveryCapacityService.QuoteRequest(branch, "Nearby hamlet", "226001", TODAY,
-                List.of(product))).provisionalWindows()).isEmpty();
+                items)).provisionalWindows()).isEmpty();
 
         jdbc.update("UPDATE delivery_capacity_windows SET reserved_count = rider_capacity WHERE id = ?", window.id());
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
@@ -71,8 +83,9 @@ class DeliveryCapacityServiceIntegrationTest {
     void missingFlagsAndIstBoundaryFailClosed() {
         var flags = flags();
         var zones = new DeliveryZoneService(flags, jdbc, branches);
-        var service = new DeliveryCapacityService(flags, zones, jdbc, IST);
-        var request = new DeliveryCapacityService.QuoteRequest(1, "Hazratganj", "226001", TODAY.minusDays(1), List.of(1L));
+        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, mock(DeliveryStockCheck.class));
+        var request = new DeliveryCapacityService.QuoteRequest(1, "Hazratganj", "226001", TODAY.minusDays(1),
+                List.of(new CreateOrderItemRequest(1L, 1, null)));
         assertThat(service.quote(request).provisionalWindows()).isEmpty();
         flags.setDeliveryCapacity(false);
         assertThatThrownBy(() -> service.quote(request)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
