@@ -9,6 +9,7 @@ import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationSer
 import com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
 import com.gokulsweets.restaurant.order.service.PreparationEligibilityService;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
@@ -36,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -49,6 +51,7 @@ class DeliveryOrderCreationIntegrationTest {
     @Autowired OrderIdempotencyService idempotency;
     @Autowired OrderNumberGenerator numbers;
     @Autowired PreparationEligibilityService preparationEligibility;
+    @Autowired DeliveryOrderWindowLookup deliveryWindows;
 
     @Test
     void retryReturnsSameOrderWithOneRiderAndInventoryReservation() {
@@ -133,6 +136,16 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(saved.getFulfillmentType()).isEqualTo(FulfillmentType.DELIVERY);
         assertThat(saved.getPickupSlot()).isNull();
         assertThat(saved.getItems()).hasSize(1);
+        var kitchenWindow = deliveryWindows.require(saved);
+        assertThat(kitchenWindow.date()).isEqualTo(date);
+        assertThat(kitchenWindow.start()).isEqualTo(LocalTime.of(11, 0));
+        assertThat(kitchenWindow.end()).isEqualTo(LocalTime.of(12, 0));
+        var foreignBranch = new Branch(); foreignBranch.setId(branchId + 999);
+        var wrongBranchOrder = new Order(); wrongBranchOrder.setBranch(foreignBranch);
+        wrongBranchOrder.setFulfillmentType(FulfillmentType.DELIVERY);
+        wrongBranchOrder.setDeliveryWindowId(windowId);
+        assertThatThrownBy(() -> deliveryWindows.require(wrongBranchOrder))
+                .isInstanceOf(IllegalStateException.class);
         verify(inventory, times(1)).synchronizePendingDeliveryOrder(eq(saved), any());
         verify(preparation, times(2)).prepare(quote, windowId);
 

@@ -1,6 +1,8 @@
 package com.gokulsweets.restaurant.printing.service;
 
 import com.gokulsweets.restaurant.kot.entity.Kot;
+import com.gokulsweets.restaurant.delivery.DeliveryOrderWindowLookup;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.kot.entity.KotItem;
 import com.gokulsweets.restaurant.kot.repository.KotRepository;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
@@ -60,6 +62,7 @@ public class PrintAgentService {
 
     private final KotRepository
             kotRepository;
+    private final DeliveryOrderWindowLookup deliveryWindows;
 
 
     /*
@@ -560,11 +563,9 @@ public class PrintAgentService {
                         .getPickupSlot();
 
 
-        if (
-                pickupSlot
-                        ==
-                        null
-        ) {
+        var deliveryWindow = kot.getOrder().getFulfillmentType() == FulfillmentType.DELIVERY
+                ? deliveryWindows.require(kot.getOrder()) : null;
+        if (pickupSlot == null && deliveryWindow == null) {
 
             throw new IllegalStateException(
                     "Pickup slot is unavailable for the KOT print job."
@@ -605,14 +606,18 @@ public class PrintAgentService {
                                 .getName(),
                         kot.getBranch()
                                 .getAddress(),
-                        pickupSlot.getSlotDate(),
-                        pickupSlot.getStartTime(),
-                        pickupSlot.getEndTime(),
+                        pickupSlot == null ? null : pickupSlot.getSlotDate(),
+                        pickupSlot == null ? null : pickupSlot.getStartTime(),
+                        pickupSlot == null ? null : pickupSlot.getEndTime(),
                         kot.getOrder()
                                 .getPickupType(),
                         kot.getStartedByStaffName(),
                         kot.getCreatedAt(),
-                        items
+                        items,
+                        kot.getOrder().getFulfillmentType(),
+                        deliveryWindow == null ? null : deliveryWindow.date(),
+                        deliveryWindow == null ? null : deliveryWindow.start(),
+                        deliveryWindow == null ? null : deliveryWindow.end()
                 );
 
 

@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.kot.service;
 
 import com.gokulsweets.restaurant.kot.dto.AdminKotItemResponse;
+import com.gokulsweets.restaurant.delivery.DeliveryOrderWindowLookup;
 import com.gokulsweets.restaurant.kot.dto.AdminKotResponse;
 import com.gokulsweets.restaurant.kot.entity.Kot;
 import com.gokulsweets.restaurant.kot.entity.KotItem;
@@ -8,6 +9,7 @@ import com.gokulsweets.restaurant.kot.repository.KotRepository;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.entity.OrderItem;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
 import com.gokulsweets.restaurant.printing.service.PrintJobService;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
@@ -35,6 +37,7 @@ public class KotService {
 
     private final PrintJobService
             printJobService;
+    private final DeliveryOrderWindowLookup deliveryWindows;
 
 
     /*
@@ -472,7 +475,9 @@ public class KotService {
                 order.getPickupSlot();
 
 
-        if (pickupSlot == null) {
+        var deliveryWindow = order.getFulfillmentType() == FulfillmentType.DELIVERY
+                ? deliveryWindows.require(order) : null;
+        if (pickupSlot == null && deliveryWindow == null) {
 
             throw new IllegalStateException(
                     "Pickup slot is unavailable for this KOT."
@@ -511,9 +516,9 @@ public class KotService {
                 kot.getBranch()
                         .getAddress(),
 
-                pickupSlot.getSlotDate(),
-                pickupSlot.getStartTime(),
-                pickupSlot.getEndTime(),
+                pickupSlot == null ? null : pickupSlot.getSlotDate(),
+                pickupSlot == null ? null : pickupSlot.getStartTime(),
+                pickupSlot == null ? null : pickupSlot.getEndTime(),
 
                 order.getPickupType(),
 
@@ -525,7 +530,11 @@ public class KotService {
                 kot.getLastPrintedAt(),
                 kot.getPrintCount(),
 
-                items
+                items,
+                order.getFulfillmentType(),
+                deliveryWindow == null ? null : deliveryWindow.date(),
+                deliveryWindow == null ? null : deliveryWindow.start(),
+                deliveryWindow == null ? null : deliveryWindow.end()
         );
     }
 
