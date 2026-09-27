@@ -38,6 +38,8 @@ public class StorefrontFeaturesController {
                         && properties.isCustomerOtpIdentity(),
                 properties.isDeliveryZones() && properties.isDeliveryLocalityCheck()
                         && properties.isCustomerConsentControls() && properties.isCustomerOtpIdentity(),
+                properties.isDeliveryCapacity() && properties.isDeliveryZones() && properties.isDeliveryLocalityCheck()
+                        && properties.isCustomerConsentControls() && properties.isCustomerOtpIdentity(),
                 properties.getFutureOrderingDays(), LocalDate.now(inventoryClock));
     }
 
@@ -52,5 +54,6 @@ public class StorefrontFeaturesController {
                            boolean truthfulOrderTracking,
                            boolean paidCartRecovery,
                            boolean paymentPollingV2, boolean deliveryLocalityCheck, boolean deliveryZones,
+                           boolean deliveryCapacity,
                            int futureOrderingDays, LocalDate today) {}
 }

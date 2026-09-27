@@ -25,6 +25,7 @@ export interface StorefrontFeatures {
     paymentPollingV2: boolean;
     deliveryLocalityCheck: boolean;
     deliveryZones: boolean;
+    deliveryCapacity: boolean;
     futureOrderingDays: number;
     today: string;
 }
