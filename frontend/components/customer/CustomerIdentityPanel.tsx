@@ -2,6 +2,7 @@
 
 import {useEffect, useRef, useState} from "react";
 import {apiClient} from "@/services/apiClient";
+import {ApiError} from "@/services/apiClient";
 import {proofFromWidget} from "@/lib/msg91Proof";
 import {MSG91_WIDGET_ID, MSG91_WIDGET_TOKEN} from "@/lib/constants";
 import ConsentPreferences from "@/components/customer/ConsentPreferences";
@@ -115,8 +116,10 @@ export default function CustomerIdentityPanel() {
                                 setNameDraft(signedIn.name ?? "");
                                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
                             }
-                        } catch {
-                            if (alive.current) setError("The OTP was accepted, but sign-in could not be completed. Please try again.");
+                        } catch (failure) {
+                            if (alive.current) setError(failure instanceof ApiError && failure.status === 429
+                                ? "Too many sign-in attempts. Please wait up to an hour before trying a new OTP."
+                                : "The OTP was accepted, but sign-in could not be completed. Please try again.");
                         } finally {
                             exchanging.current = false;
                             if (alive.current) setBusy(false);
@@ -125,8 +128,10 @@ export default function CustomerIdentityPanel() {
                 },
                 failure: () => {if (alive.current && !exchanging.current) {setError("Verification was cancelled or failed."); setBusy(false);}}
             });
-        } catch {
-            setError("Verification is unavailable right now. You can continue as a guest.");
+        } catch (failure) {
+            setError(failure instanceof ApiError && failure.status === 429
+                ? "Too many verification attempts. Please wait up to an hour before trying again."
+                : "Verification is unavailable right now. You can continue as a guest.");
             setBusy(false);
         }
     }
