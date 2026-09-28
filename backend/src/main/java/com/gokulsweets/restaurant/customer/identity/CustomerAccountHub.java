@@ -93,10 +93,7 @@ public class CustomerAccountHub {
 
     @Transactional
     public Address addAddress(String environment, UUID subject, AddressInput input) {
-        if (input == null || !valid(input.label(), 40) || !valid(input.addressLine(), 180)
-                || !valid(input.locality(), 100) || input.postalCode() == null
-                || !input.postalCode().matches("[0-9]{6}"))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid address and six-digit postal code");
+        validateAddress(input);
         lockSubject(environment, subject);
         if (Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT COUNT(*) >= 5 FROM verified_customer_addresses WHERE environment = ? AND subject_id = ?
@@ -111,6 +108,22 @@ public class CustomerAccountHub {
     }
 
     @Transactional
+    public Address updateAddress(String environment, UUID subject, long addressId, AddressInput input) {
+        validateAddress(input);
+        lockSubject(environment, subject);
+        var updated = jdbc.query("""
+                UPDATE verified_customer_addresses
+                SET label = ?, address_line = ?, locality = ?, postal_code = ?
+                WHERE id = ? AND environment = ? AND subject_id = ?
+                RETURNING id, label, address_line, locality, postal_code
+                """, (rs, row) -> new Address(rs.getLong(1), rs.getString(2), rs.getString(3),
+                rs.getString(4), rs.getString(5)), input.label().trim(), input.addressLine().trim(),
+                input.locality().trim(), input.postalCode(), addressId, environment, subject);
+        if (updated.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return updated.getFirst();
+    }
+
+    @Transactional
     public void deleteAddress(String environment, UUID subject, long addressId) {
         lockSubject(environment, subject);
         if (jdbc.update("""
@@ -120,6 +133,13 @@ public class CustomerAccountHub {
 
     private boolean valid(String text, int max) {
         return text != null && !text.isBlank() && text.trim().length() <= max;
+    }
+
+    private void validateAddress(AddressInput input) {
+        if (input == null || !valid(input.label(), 40) || !valid(input.addressLine(), 180)
+                || !valid(input.locality(), 100) || input.postalCode() == null
+                || !input.postalCode().matches("[0-9]{6}"))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a valid address and six-digit postal code");
     }
 
     private void lockSubject(String environment, UUID subject) {
