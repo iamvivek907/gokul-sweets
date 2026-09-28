@@ -41,6 +41,12 @@ export default function ProfilePage() {
 
                 <InstallAppBanner />
                 <CustomerIdentityPanel />
+                <section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Rewards">
+                    <h2 className="text-xl font-semibold text-[#241715]">Rewards</h2>
+                    <p className="mt-2 text-sm leading-6 text-[#756763]">
+                        Earned points are not available yet. A balance will appear here when the rewards programme is launched.
+                    </p>
+                </section>
 
             </div>
 
