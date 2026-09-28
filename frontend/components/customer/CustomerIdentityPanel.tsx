@@ -5,7 +5,7 @@ import {apiClient} from "@/services/apiClient";
 import {ApiError} from "@/services/apiClient";
 import {proofFromWidget} from "@/lib/msg91Proof";
 import {MSG91_WIDGET_ID, MSG91_WIDGET_TOKEN} from "@/lib/constants";
-import ConsentPreferences from "@/components/customer/ConsentPreferences";
+import Link from "next/link";
 
 const widgetId = MSG91_WIDGET_ID;
 const widgetToken = MSG91_WIDGET_TOKEN;
@@ -18,7 +18,7 @@ type Msg91Window = Window & {initSendOTP?: (configuration: {
     failure: () => void;
 }) => void};
 
-type CustomerSession = {authenticated: boolean; phone?: string; name?: string};
+export type CustomerSession = {authenticated: boolean; phone?: string; name?: string};
 
 async function loadWidget(): Promise<Msg91Window> {
     const sdk = window as Msg91Window;
@@ -39,11 +39,16 @@ async function loadWidget(): Promise<Msg91Window> {
     return sdk;
 }
 
-export default function CustomerIdentityPanel() {
+export default function CustomerIdentityPanel({mode = "profile", onSessionChange}: {
+    mode?: "profile" | "checkout";
+    onSessionChange?: (session: CustomerSession) => void;
+}) {
     const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
         widgetId && widgetToken ? "loading" : "disabled");
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [busy, setBusy] = useState(false);
+    const [promptDismissed, setPromptDismissed] = useState(false);
+    const promptButton = useRef<HTMLButtonElement>(null);
     const [error, setError] = useState<string | null>(null);
     const [nameDraft, setNameDraft] = useState("");
     const [nameError, setNameError] = useState<string | null>(null);
@@ -57,20 +62,30 @@ export default function CustomerIdentityPanel() {
             try {
                 const config = await apiClient<{enabled: boolean}>("/api/storefront/customer-identity");
                 if (!alive.current) return;
-                if (!config.enabled) {setAvailability("disabled"); return;}
+                if (!config.enabled) {setAvailability("disabled"); onSessionChange?.({authenticated: false}); return;}
                 setAvailability("ready");
                 const session = await apiClient<CustomerSession>(
                     "/api/customer/identity/me", {credentials: "include"});
-                if (alive.current) {setSession(session); setNameDraft(session.name ?? "");}
+                if (alive.current) {setSession(session); setNameDraft(session.name ?? ""); onSessionChange?.(session);}
             } catch {
-                if (alive.current) setAvailability("error");
+                if (alive.current) {setAvailability("error"); onSessionChange?.({authenticated: false});}
             }
         })();
         return () => {alive.current = false;};
-    }, []);
+    }, [onSessionChange]);
+
+    useEffect(() => {
+        if (mode !== "checkout" || availability !== "ready" || session.authenticated || promptDismissed) return;
+        promptButton.current?.focus();
+        function onEscape(event: KeyboardEvent) {
+            if (event.key === "Escape") setPromptDismissed(true);
+        }
+        window.addEventListener("keydown", onEscape);
+        return () => window.removeEventListener("keydown", onEscape);
+    }, [mode, availability, session.authenticated, promptDismissed]);
 
     if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status">Checking phone verification…</p>;
-    if (availability !== "ready" || !widgetId || !widgetToken) return <section
+    if (availability !== "ready" || !widgetId || !widgetToken) return mode === "checkout" ? null : <section
         className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"
         aria-label="Phone verification">
         <h2 className="text-xl font-semibold text-[#241715]">Phone verification is unavailable</h2>
@@ -113,6 +128,7 @@ export default function CustomerIdentityPanel() {
                             }
                             if (alive.current) {
                                 setSession(signedIn);
+                                onSessionChange?.(signedIn);
                                 setNameDraft(signedIn.name ?? "");
                                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
                             }
@@ -143,6 +159,7 @@ export default function CustomerIdentityPanel() {
             await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
             if (alive.current) {
                 setSession({authenticated: false});
+                onSessionChange?.({authenticated: false});
                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
             }
         } catch {
@@ -166,13 +183,35 @@ export default function CustomerIdentityPanel() {
             });
             const updated = await apiClient<CustomerSession>("/api/customer/identity/me", {credentials: "include"});
             if (!updated.authenticated) throw new Error("Session expired");
-            if (alive.current) {setSession(updated); window.dispatchEvent(new Event("gokul-customer-identity-changed"));}
+            if (alive.current) {setSession(updated); onSessionChange?.(updated); window.dispatchEvent(new Event("gokul-customer-identity-changed"));}
         } catch {
             if (alive.current) setNameError("Could not save your name. Please check it and try again.");
         } finally {
             if (alive.current) setBusy(false);
         }
     }
+
+    if (mode === "checkout") return <>
+        {session.authenticated ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f4faf4] p-4" aria-label="Verified pickup contact">
+            <div><p className="text-sm font-semibold text-[#245b38]">Signed in · phone verified</p>
+                <p className="mt-1 text-xs text-[#465a4a]">Your account details are filled in below.</p></div>
+            <Link href="/profile" className="text-sm font-semibold text-[#7a1625] underline">Account</Link>
+        </div> : <div className="mb-5 rounded-2xl border border-[#eadfd6] p-4">
+            <p className="text-sm font-semibold text-[#241715]">Checking out as a guest?</p>
+            <p className="mt-1 text-xs text-[#756763]">Sign in to fill your verified number automatically.</p>
+            <button type="button" onClick={() => setPromptDismissed(false)} className="mt-2 text-sm font-semibold text-[#7a1625] underline">Sign in with SMS</button>
+        </div>}
+        {!session.authenticated && !promptDismissed && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onMouseDown={event => {if (event.target === event.currentTarget) setPromptDismissed(true);}}>
+            <div role="dialog" aria-modal="true" aria-labelledby="checkout-signin-title" className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+                <h2 id="checkout-signin-title" className="text-2xl font-bold text-[#241715]">Sign in for a faster checkout</h2>
+                <p className="mt-2 text-sm leading-6 text-[#756763]">Verify your number to fill your pickup details. You can also continue as a guest.</p>
+                <button ref={promptButton} type="button" disabled={busy} onClick={() => {void start();}}
+                    className="mt-6 min-h-12 w-full rounded-xl bg-[#7a1625] px-5 font-semibold text-white disabled:opacity-50">{busy ? "Please wait…" : "Verify with SMS"}</button>
+                <button type="button" onClick={() => setPromptDismissed(true)} className="mt-3 min-h-11 w-full rounded-xl border border-[#eadfd6] font-semibold text-[#241715]">Continue as guest</button>
+                {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
+            </div>
+        </div>}
+    </>;
 
     return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Phone verification">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">Your account</p>
@@ -202,5 +241,5 @@ export default function CustomerIdentityPanel() {
             {busy ? "Please wait…" : session.authenticated ? "Sign out" : "Verify with SMS"}
         </button>
         {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
-    </section>{session.authenticated && <ConsentPreferences />}</>;
+    </section>{session.authenticated && <Link href="/profile/privacy" className="mt-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#e8d7c9] bg-white px-5 text-sm font-semibold text-[#7a1625]">Privacy and data choices <span aria-hidden="true">→</span></Link>}</>;
 }
