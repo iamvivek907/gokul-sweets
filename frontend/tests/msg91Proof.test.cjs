@@ -15,8 +15,11 @@ vm.runInNewContext(compiled, {exports: exportsObject});
 test('only a bounded provider proof reaches server-side exchange', () => {
     const {proofFromWidget} = exportsObject;
     assert.equal(proofFromWidget({accessToken: 'provider-token'}), 'provider-token');
+    assert.equal(proofFromWidget({type: 'success', message: 'provider-jwt'}), 'provider-jwt');
+    assert.equal(proofFromWidget({data: {'access-token': 'provider-jwt'}}), 'provider-jwt');
     assert.equal(proofFromWidget('provider-token'), 'provider-token');
     assert.equal(proofFromWidget({phone: '919876543210'}), null);
+    assert.equal(proofFromWidget({type: 'error', message: 'provider-jwt'}), null);
     assert.equal(proofFromWidget({accessToken: ''}), null);
     assert.equal(proofFromWidget({accessToken: 'a'.repeat(4097)}), null);
 });
