@@ -46,6 +46,7 @@ interface BranchFormState {
     pincode: string;
 
     phone: string;
+    fssaiLicenceNumber: string;
 
     latitude: string;
 
@@ -74,6 +75,7 @@ const EMPTY_FORM: BranchFormState = {
     pincode: "",
 
     phone: "",
+    fssaiLicenceNumber: "",
 
     latitude: "",
 
@@ -117,6 +119,7 @@ function toFormState(
         phone:
             branch.phone
             ?? "",
+        fssaiLicenceNumber: branch.fssaiLicenceNumber ?? "",
 
         latitude:
             branch.latitude === null
@@ -639,6 +642,7 @@ export default function AdminBranchesPage() {
                         nullableText(
                             form.phone
                         ),
+                    fssaiLicenceNumber: nullableText(form.fssaiLicenceNumber),
 
                     latitude:
                         nullableNumber(
@@ -729,6 +733,7 @@ export default function AdminBranchesPage() {
                         nullableText(
                             form.phone
                         ),
+                    fssaiLicenceNumber: nullableText(form.fssaiLicenceNumber),
 
                     latitude:
                         nullableNumber(
@@ -1659,6 +1664,19 @@ export default function AdminBranchesPage() {
 
                                             </Field>
 
+
+                                            <Field label="FSSAI licence number">
+                                                <input
+                                                    value={form.fssaiLicenceNumber}
+                                                    disabled={saving}
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]{14}"
+                                                    maxLength={14}
+                                                    placeholder="14-digit licence number"
+                                                    onChange={event => updateField("fssaiLicenceNumber", event.target.value)}
+                                                    className="min-h-11 w-full rounded-xl border border-[#eadfd6] px-4 text-sm text-[#241715]"
+                                                />
+                                            </Field>
 
                                             <Field
                                                 label="Pincode"
