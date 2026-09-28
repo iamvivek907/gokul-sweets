@@ -1,509 +1,62 @@
 "use client";
 
-import {
-    createContext,
-    useCallback,
-    useContext,
-    useMemo,
-    useSyncExternalStore,
-    type ReactNode
-} from "react";
-
-import {
-    authenticateAdmin
-} from "@/services/adminApi";
-
-import type {
-    AdminProfile,
-    AdminSession
-} from "@/types/admin";
-
-
-export const ADMIN_SESSION_STORAGE_KEY =
-    "gokul-admin-session";
-
-const STORAGE_KEY = ADMIN_SESSION_STORAGE_KEY;
-
-
-const SESSION_CHANGE_EVENT =
-    "gokul-admin-session-change";
-
+import {createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode} from "react";
+import {authenticateAdmin, fetchAdminProfile, logoutAdmin} from "@/services/adminApi";
+import type {AdminProfile} from "@/types/admin";
 
 interface AdminAuthContextValue {
-
     profile: AdminProfile | null;
-
     authorization: string | null;
-
     ready: boolean;
-
     isAuthenticated: boolean;
-
-    login: (
-        username: string,
-        password: string
-    ) => Promise<void>;
-
-    logout: () => void;
-
-    hasPermission: (
-        permission: string
-    ) => boolean;
-
-    hasAnyPermission: (
-        permissions: string[]
-    ) => boolean;
+    login: (username: string, password: string, code?: string) => Promise<void>;
+    refresh: () => Promise<void>;
+    logout: () => Promise<void>;
+    hasPermission: (permission: string) => boolean;
+    hasAnyPermission: (permissions: string[]) => boolean;
 }
+const AdminAuthContext = createContext<AdminAuthContextValue | undefined>(undefined);
+const changeEvent = "gokul-admin-session-change";
+function broadcast() {window.dispatchEvent(new Event(changeEvent));
+    try {const channel = new BroadcastChannel(changeEvent); channel.postMessage("changed"); channel.close();} catch { /* PWA private mode */ }}
 
-
-const AdminAuthContext =
-    createContext<
-        AdminAuthContextValue | undefined
-    >(undefined);
-
-
-/*
- * =========================================================
- * SESSION STORAGE HELPERS
- * =========================================================
- */
-
-function getSessionSnapshot():
-    string | null {
-
-    if (
-        typeof window
-        === "undefined"
-    ) {
-
-        return null;
-    }
-
-
-    return sessionStorage
-        .getItem(
-            STORAGE_KEY
-        );
+export function AdminAuthProvider({children}: {children: ReactNode}) {
+    const [profile, setProfile] = useState<AdminProfile | null>(null);
+    useEffect(() => {try {sessionStorage.removeItem("gokul-admin-session");} catch { /* storage disabled */ }}, []);
+    const [ready, setReady] = useState(false);
+    const refresh = useCallback(async () => {
+        try {setProfile(await fetchAdminProfile());}
+        catch {setProfile(null);}
+        finally {setReady(true);}
+    }, []);
+    useEffect(() => {
+        const controller = new AbortController();
+        fetchAdminProfile(controller.signal).then(setProfile).catch(() => setProfile(null)).finally(() => setReady(true));
+        const onExpired = () => {setProfile(null); setReady(true);};
+        const onFocus = () => {void refresh();};
+        let channel: BroadcastChannel | null = null;
+        try {channel = new BroadcastChannel(changeEvent); channel.onmessage = onFocus;} catch { /* PWA private mode */ }
+        window.addEventListener("gokul-admin-expired", onExpired);
+        window.addEventListener("focus", onFocus);
+        return () => {controller.abort(); channel?.close(); window.removeEventListener("gokul-admin-expired", onExpired);
+            window.removeEventListener("focus", onFocus);};
+    }, [refresh]);
+    const login = useCallback(async (username: string, password: string, code?: string) => {
+        setProfile(await authenticateAdmin(username, password, code)); setReady(true); broadcast();
+    }, []);
+    const logout = useCallback(async () => {
+        try {await logoutAdmin();} finally {setProfile(null); setReady(true); broadcast();}
+    }, []);
+    const hasPermission = useCallback((permission: string) => !!profile &&
+        (profile.roleName === "OWNER_ADMIN" || profile.permissions.includes(permission)), [profile]);
+    const hasAnyPermission = useCallback((permissions: string[]) => permissions.some(hasPermission), [hasPermission]);
+    const value = useMemo(() => ({profile, authorization: profile ? "staff-session" : null,
+        ready, isAuthenticated: !!profile, login, refresh, logout, hasPermission, hasAnyPermission}),
+        [profile, ready, login, refresh, logout, hasPermission, hasAnyPermission]);
+    return <AdminAuthContext.Provider value={value}>{children}</AdminAuthContext.Provider>;
 }
-
-
-function getServerSessionSnapshot():
-    string | null {
-
-    return null;
-}
-
-
-function subscribeToSession(
-    callback: () => void
-) {
-
-    function handleStorage(
-        event: StorageEvent
-    ) {
-
-        if (
-            event.storageArea
-            === sessionStorage
-            &&
-            event.key
-            === STORAGE_KEY
-        ) {
-
-            callback();
-        }
-    }
-
-
-    function handleLocalSessionChange() {
-
-        callback();
-    }
-
-
-    window.addEventListener(
-        "storage",
-        handleStorage
-    );
-
-
-    window.addEventListener(
-        SESSION_CHANGE_EVENT,
-        handleLocalSessionChange
-    );
-
-
-    return () => {
-
-        window.removeEventListener(
-            "storage",
-            handleStorage
-        );
-
-
-        window.removeEventListener(
-            SESSION_CHANGE_EVENT,
-            handleLocalSessionChange
-        );
-    };
-}
-
-
-function notifySessionChanged() {
-
-    window.dispatchEvent(
-        new Event(
-            SESSION_CHANGE_EVENT
-        )
-    );
-}
-
-
-/*
- * =========================================================
- * HYDRATION READINESS
- * =========================================================
- *
- * The server must render ready=false.
- *
- * During hydration React initially uses the same server
- * snapshot, preventing a server/client markup mismatch.
- *
- * Once the component is mounted in the browser,
- * getClientReadySnapshot() becomes authoritative and
- * ready becomes true.
- *
- * This avoids:
- *
- * server  -> Loading admin portal
- * client  -> Admin shell immediately
- *
- * which can otherwise produce hydration inconsistencies.
- */
-
-function subscribeToReady() {
-
-    return () => {
-
-        /*
-         * Hydration readiness does not require an external
-         * event subscription.
-         */
-    };
-}
-
-
-function getClientReadySnapshot() {
-
-    return true;
-}
-
-
-function getServerReadySnapshot() {
-
-    return false;
-}
-
-
-/*
- * =========================================================
- * PROVIDER
- * =========================================================
- */
-
-export function AdminAuthProvider({
-    children
-}: {
-    children: ReactNode;
-}) {
-
-    /*
-     * sessionStorage is an external browser store.
-     *
-     * useSyncExternalStore keeps React synchronized with it
-     * without calling setState inside useEffect.
-     */
-    const rawSession =
-        useSyncExternalStore(
-            subscribeToSession,
-            getSessionSnapshot,
-            getServerSessionSnapshot
-        );
-
-
-    /*
-     * Hydration-safe browser readiness.
-     *
-     * Server render:
-     * ready = false
-     *
-     * Initial hydration:
-     * ready = false
-     *
-     * Browser after hydration:
-     * ready = true
-     */
-    const ready =
-        useSyncExternalStore(
-            subscribeToReady,
-            getClientReadySnapshot,
-            getServerReadySnapshot
-        );
-
-
-    /*
-     * Convert the stored JSON into our typed session.
-     */
-    const session =
-        useMemo<
-            AdminSession | null
-        >(
-            () => {
-
-                if (!rawSession) {
-
-                    return null;
-                }
-
-
-                try {
-
-                    const parsed =
-                        JSON.parse(
-                            rawSession
-                        ) as AdminSession;
-
-
-                    if (
-                        !parsed.authorization
-                        ||
-                        !parsed.profile
-                    ) {
-
-                        return null;
-                    }
-
-
-                    return parsed;
-
-                } catch {
-
-                    return null;
-                }
-            },
-            [
-                rawSession
-            ]
-        );
-
-
-    /*
-     * =========================================================
-     * LOGIN
-     * =========================================================
-     */
-
-    const login =
-        useCallback(
-            async (
-                username: string,
-                password: string
-            ) => {
-
-                const authenticated =
-                    await authenticateAdmin(
-                        username,
-                        password
-                    );
-
-
-                const nextSession:
-                    AdminSession = {
-
-                    authorization:
-                        authenticated.authorization,
-
-                    profile:
-                        authenticated.profile
-                };
-
-
-                sessionStorage
-                    .setItem(
-                        STORAGE_KEY,
-                        JSON.stringify(
-                            nextSession
-                        )
-                    );
-
-
-                notifySessionChanged();
-            },
-            []
-        );
-
-
-    /*
-     * =========================================================
-     * LOGOUT
-     * =========================================================
-     */
-
-    const logout =
-        useCallback(
-            () => {
-
-                sessionStorage
-                    .removeItem(
-                        STORAGE_KEY
-                    );
-
-
-                notifySessionChanged();
-            },
-            []
-        );
-
-
-    /*
-     * =========================================================
-     * PERMISSION CHECK
-     * =========================================================
-     */
-
-    const hasPermission =
-        useCallback(
-            (
-                permission: string
-            ) => {
-
-                if (!session) {
-
-                    return false;
-                }
-
-
-                /*
-                 * OWNER_ADMIN currently receives portal-wide
-                 * frontend access.
-                 */
-                if (
-                    session.profile.roleName
-                    === "OWNER_ADMIN"
-                ) {
-
-                    return true;
-                }
-
-
-                return session
-                    .profile
-                    .permissions
-                    .includes(
-                        permission
-                    );
-            },
-            [
-                session
-            ]
-        );
-
-
-    const hasAnyPermission =
-        useCallback(
-            (
-                permissions: string[]
-            ) => {
-
-                return permissions
-                    .some(
-                        permission =>
-                            hasPermission(
-                                permission
-                            )
-                    );
-            },
-            [
-                hasPermission
-            ]
-        );
-
-
-    /*
-     * =========================================================
-     * CONTEXT VALUE
-     * =========================================================
-     */
-
-    const value =
-        useMemo<
-            AdminAuthContextValue
-        >(
-            () => ({
-
-                profile:
-                    session?.profile
-                    ?? null,
-
-                authorization:
-                    session?.authorization
-                    ?? null,
-
-                ready,
-
-                isAuthenticated:
-                    session !== null,
-
-                login,
-
-                logout,
-
-                hasPermission,
-
-                hasAnyPermission
-            }),
-            [
-                session,
-                ready,
-                login,
-                logout,
-                hasPermission,
-                hasAnyPermission
-            ]
-        );
-
-
-    return (
-        <AdminAuthContext.Provider
-            value={value}
-        >
-            {children}
-        </AdminAuthContext.Provider>
-    );
-}
-
-
-/*
- * =========================================================
- * HOOK
- * =========================================================
- */
-
 export function useAdminAuth() {
-
-    const context =
-        useContext(
-            AdminAuthContext
-        );
-
-
-    if (!context) {
-
-        throw new Error(
-            "useAdminAuth must be used inside AdminAuthProvider."
-        );
-    }
-
-
-    return context;
+    const value = useContext(AdminAuthContext);
+    if (!value) throw new Error("useAdminAuth must be used inside AdminAuthProvider.");
+    return value;
 }

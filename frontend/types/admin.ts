@@ -13,11 +13,3 @@ export interface AdminProfile {
 
     branchIds: number[];
 }
-
-
-export interface AdminSession {
-
-    authorization: string;
-
-    profile: AdminProfile;
-}

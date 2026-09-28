@@ -4,10 +4,7 @@ import type {
     AdminPrintJobPageResponse,
     PrintJobStatus
 } from "@/types/adminPrintJobs";
-import {ADMIN_API_BASE_URL} from "@/lib/constants";
-
-
-const API_BASE = ADMIN_API_BASE_URL;
+import {adminFetch} from "@/services/adminApi";
 
 
 async function getErrorMessage(
@@ -107,16 +104,11 @@ export async function getAdminPrintJobs(
 
 
     const response =
-        await fetch(
-            `${API_BASE}/api/admin/print-jobs?${params.toString()}`,
+        await adminFetch(
+            `/api/admin/print-jobs?${params.toString()}`, authorization,
             {
                 method:
                     "GET",
-
-                headers: {
-                    Authorization:
-                        authorization
-                },
 
                 cache:
                     "no-store",
@@ -149,16 +141,11 @@ export async function getAdminPrintJobCounts(
 ): Promise<AdminPrintJobCounts> {
 
     const response =
-        await fetch(
-            `${API_BASE}/api/admin/print-jobs/counts?branchId=${branchId}`,
+        await adminFetch(
+            `/api/admin/print-jobs/counts?branchId=${branchId}`, authorization,
             {
                 method:
                     "GET",
-
-                headers: {
-                    Authorization:
-                        authorization
-                },
 
                 cache:
                     "no-store",
@@ -189,16 +176,11 @@ export async function retryAdminPrintJob(
 ): Promise<AdminPrintJob> {
 
     const response =
-        await fetch(
-            `${API_BASE}/api/admin/print-jobs/${printJobId}/retry`,
+        await adminFetch(
+            `/api/admin/print-jobs/${printJobId}/retry`, authorization,
             {
                 method:
                     "POST",
-
-                headers: {
-                    Authorization:
-                        authorization
-                },
 
                 cache:
                     "no-store"
