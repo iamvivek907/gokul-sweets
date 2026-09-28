@@ -188,6 +188,15 @@ public class CustomerIdentityController {
                 .body(accountHub.addAddress(environment.name(), requiredSubject(request, environment), input));
     }
 
+    @PutMapping("/account/addresses/{addressId}")
+    public ResponseEntity<CustomerAccountHub.Address> updateAddress(@PathVariable long addressId,
+            @RequestBody CustomerAccountHub.AddressInput input, HttpServletRequest request) {
+        var environment = accountEnvironment();
+        requireTrustedMutation(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(accountHub.updateAddress(environment.name(), requiredSubject(request, environment), addressId, input));
+    }
+
     @DeleteMapping("/account/addresses/{addressId}")
     public ResponseEntity<Void> deleteAddress(@PathVariable long addressId, HttpServletRequest request) {
         var environment = accountEnvironment();

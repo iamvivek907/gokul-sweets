@@ -22,15 +22,15 @@ export default function ProfileAccountExperience() {
             <h2 className="text-xl font-semibold text-[#241715]">Rewards</h2><p className="mt-2 text-sm leading-6 text-[#756763]">Earned points are not available yet. A balance will appear here when the rewards programme is launched.</p></section></div>;
 
     return <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
-        {session?.authenticated ? <CustomerAccountHub session={session} /> :
+        {session?.authenticated ? <CustomerAccountHub session={session} onSessionChange={setSession} /> :
             <header className="account-profile-heading rounded-3xl border border-[#eadfd6] bg-white p-7 sm:p-10">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]">Your Gokul profile</p>
                 <h1 className="mt-3 text-3xl font-bold text-[#241715] sm:text-4xl">All your Gokul moments, together.</h1>
                 <p className="mt-3 max-w-xl text-sm text-[#756763]">Sign in to see your earned badges, orders and saved choices.</p>
             </header>}
-        <section id="account-details" className="account-details-section mt-7 max-w-3xl scroll-mt-24">
-            <CustomerIdentityPanel onSessionChange={setSession} />
+        <section className={session?.authenticated ? "hidden" : "account-details-section mt-7 max-w-3xl scroll-mt-24"}>
+            <CustomerIdentityPanel key={session?.authenticated ? "signed-in" : "guest"} onSessionChange={setSession} />
         </section>
-        <div className="mt-8 max-w-3xl"><InstallAppBanner /></div>
+        {!session?.authenticated && <div className="mt-8 max-w-3xl"><InstallAppBanner /></div>}
     </div>;
 }

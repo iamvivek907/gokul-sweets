@@ -33,6 +33,13 @@ class CustomerAccountHubIntegrationTest {
         assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(1);
         assertThat(hub.snapshot("DEV", other).addresses()).isEmpty();
         assertThat(hub.snapshot("PROD", subject).preferences().dietaryNotes()).isNull();
+        assertThatThrownBy(() -> hub.updateAddress("DEV", other, address.id(),
+                new CustomerAccountHub.AddressInput("Office", "Park Road", "Tamkuhi", "274407")))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(hub.updateAddress("DEV", subject, address.id(),
+                new CustomerAccountHub.AddressInput("Office", "Park Road", "Tamkuhi", "274407"))
+                .label()).isEqualTo("Office");
+        assertThat(hub.snapshot("DEV", subject).addresses().getFirst().addressLine()).isEqualTo("Park Road");
         assertThatThrownBy(() -> hub.deleteAddress("DEV", other, address.id()))
                 .isInstanceOf(ResponseStatusException.class);
         hub.deleteAddress("DEV", subject, address.id());
