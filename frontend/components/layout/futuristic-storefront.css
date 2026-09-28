@@ -86,3 +86,8 @@ body:has(.future-storefront){background:#151722}
 .menu-availability-chip--checking{border-color:#ac8c80}
 .menu-availability-note{margin-top:.5rem;padding:.7rem .85rem;border-left:3px solid #a55345;border-radius:.7rem;background:#fff2e9;color:#512b2b;font-size:.8rem;line-height:1.45}
 .future-storefront .future-menu-width{max-width:none;width:100%}
+/* SCRUM-37: account presentation uses the shared customer theme only when enabled. */
+.future-storefront .account-profile-heading{background:radial-gradient(circle at 88% 15%,#f3c78b35,transparent 38%),linear-gradient(125deg,#392837,#1b2630)!important}
+.future-storefront .account-hero{background:linear-gradient(125deg,#4b303c,#252631)!important}
+.future-storefront .account-hero [class*="bg-[#fff8ef]"]{background:#f3c78b25!important}
+.future-storefront .account-hub textarea,.future-storefront .account-hub input{background:#fff9f1;color:#291e27}

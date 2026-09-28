@@ -51,6 +51,8 @@ public class EnhancementProperties {
     private boolean paidCartRecovery;
     /** SCRUM-36: requires a verified SMS provider and customer session implementation before activation. */
     private boolean customerOtpIdentity;
+    /** SCRUM-37: account hub and owner-scoped saved details. Requires verified identity. */
+    private boolean customerAccountHub;
     /** SCRUM-49: verified customer optional-purpose controls; requires an approved policy version. */
     private boolean customerConsentControls;
     /** SCRUM-29: delivery locality intake; effective only alongside reviewed privacy controls. */

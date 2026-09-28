@@ -50,6 +50,7 @@ public class CustomerIdentityController {
     private final IdentityDeviceRegistry devices;
     private final ConsentLedger consents;
     private final CustomerPrivacyRequests privacyRequests;
+    private final CustomerAccountHub accountHub;
 
     /** Called before opening the widget. Source and device limits are shared across instances. */
     @PostMapping("/start")
@@ -144,6 +145,61 @@ public class CustomerIdentityController {
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(orders.getCustomerOrder(orderNumber));
+    }
+
+    @GetMapping("/account")
+    public ResponseEntity<CustomerAccountHub.Snapshot> account(HttpServletRequest request) {
+        var environment = accountEnvironment();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(accountHub.snapshot(environment.name(), requiredSubject(request, environment)));
+    }
+
+    @PutMapping("/account/preferences")
+    public ResponseEntity<Void> preferences(@RequestBody CustomerAccountHub.Preferences preferences,
+                                             HttpServletRequest request) {
+        var environment = accountEnvironment();
+        requireTrustedMutation(request);
+        accountHub.savePreferences(environment.name(), requiredSubject(request, environment), preferences);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    @PutMapping("/account/favourites/{productId}")
+    public ResponseEntity<Void> favourite(@PathVariable long productId, HttpServletRequest request) {
+        var environment = accountEnvironment();
+        requireTrustedMutation(request);
+        accountHub.setFavourite(environment.name(), requiredSubject(request, environment), productId, true);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    @DeleteMapping("/account/favourites/{productId}")
+    public ResponseEntity<Void> removeFavourite(@PathVariable long productId, HttpServletRequest request) {
+        var environment = accountEnvironment();
+        requireTrustedMutation(request);
+        accountHub.setFavourite(environment.name(), requiredSubject(request, environment), productId, false);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    @PostMapping("/account/addresses")
+    public ResponseEntity<CustomerAccountHub.Address> addAddress(@RequestBody CustomerAccountHub.AddressInput input,
+                                                                  HttpServletRequest request) {
+        var environment = accountEnvironment();
+        requireTrustedMutation(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(accountHub.addAddress(environment.name(), requiredSubject(request, environment), input));
+    }
+
+    @DeleteMapping("/account/addresses/{addressId}")
+    public ResponseEntity<Void> deleteAddress(@PathVariable long addressId, HttpServletRequest request) {
+        var environment = accountEnvironment();
+        requireTrustedMutation(request);
+        accountHub.deleteAddress(environment.name(), requiredSubject(request, environment), addressId);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    private ConsentEnvironment accountEnvironment() {
+        var environment = enabledEnvironment();
+        if (!features.isCustomerAccountHub()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return environment;
     }
 
     @GetMapping("/consents")

@@ -35,6 +35,7 @@ class CustomerIdentityControllerTest {
     private final IdentityDeviceRegistry devices = mock(IdentityDeviceRegistry.class);
     private final ConsentLedger consents = mock(ConsentLedger.class);
     private final CustomerPrivacyRequests privacyRequests = mock(CustomerPrivacyRequests.class);
+    private final CustomerAccountHub accountHub = mock(CustomerAccountHub.class);
     private final EnhancementProperties features = new EnhancementProperties();
     private final MockEnvironment settings = new MockEnvironment()
             .withProperty("gokul.environment-isolation.enabled", "true")
@@ -43,7 +44,37 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(
             exchange, sessions, subjects, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
-            ownership, orders, rateLimiter, devices, consents, privacyRequests);
+            ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub);
+
+    @Test
+    void accountHubRequiresFlagTrustedOriginAndExactSessionSubject() {
+        features.setCustomerOtpIdentity(true);
+        var request = request();
+        request.setCookies(new Cookie("__Host-gokul-customer", "session-token"));
+        var subject = UUID.randomUUID();
+        when(sessions.subject(eq(ConsentEnvironment.DEV), eq("session-token"), any()))
+                .thenReturn(Optional.of(subject));
+        assertThatThrownBy(() -> controller.account(request)).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(accountHub);
+
+        features.setCustomerAccountHub(true);
+        var otherOrigin = request();
+        otherOrigin.setCookies(new Cookie("__Host-gokul-customer", "session-token"));
+        otherOrigin.removeHeader(HttpHeaders.ORIGIN);
+        otherOrigin.addHeader(HttpHeaders.ORIGIN, "https://untrusted.example");
+        assertThatThrownBy(() -> controller.account(otherOrigin)).isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(accountHub);
+
+        controller.account(request);
+        verify(accountHub).snapshot("DEV", subject);
+        var revoked = request();
+        revoked.setCookies(new Cookie("__Host-gokul-customer", "revoked"));
+        assertThatThrownBy(() -> controller.deleteAddress(42, revoked)).isInstanceOf(ResponseStatusException.class);
+        verify(accountHub, never()).deleteAddress(anyString(), any(), anyLong());
+
+        controller.deleteAddress(42, request);
+        verify(accountHub).deleteAddress("DEV", subject, 42);
+    }
 
     @Test
     void privacyRequestsRequireVerifiedSubjectAndTrustedMutation() {
