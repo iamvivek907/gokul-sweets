@@ -1,4 +1,5 @@
 "use client";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 import Link from "next/link";
 
 import {
@@ -262,7 +263,7 @@ export default function ImageManagementPage() {
                         try {
                             const saved = JSON.parse(sessionStorage.getItem("gokul-admin-image-context") ?? "null");
                             if (saved) {
-                                setSelectedBranchId(saved.branchId ?? null); setSearch(saved.search ?? "");
+                                setSearch(saved.search ?? "");
                                 setCategoryFilter(saved.category ?? "ALL");
                                 if (["ALL", "WITH_IMAGE", "WITHOUT_IMAGE"].includes(saved.image)) setImageFilter(saved.image);
                                 restoredProduct.current = saved.productId ?? null;
@@ -275,34 +276,8 @@ export default function ImageManagementPage() {
                     );
 
 
-                    setSelectedBranchId(
-                        previousBranchId => {
-
-                            /*
-                             * Keep the current branch if it is still
-                             * available to the current admin.
-                             */
-                            if (
-                                previousBranchId
-                                &&
-                                allowedBranches.some(
-                                    branch =>
-                                        branch.id
-                                        === previousBranchId
-                                )
-                            ) {
-
-                                return previousBranchId;
-
-                            }
-
-
-                            return allowedBranches.length > 0
-                                ? allowedBranches[0].id
-                                : null;
-
-                        }
-                    );
+                    setSelectedBranchId(previousBranchId =>
+                        preferredAdminBranchId(currentProfile.staffId, allowedBranches, previousBranchId));
 
                 } catch (exception) {
 
@@ -537,6 +512,7 @@ export default function ImageManagementPage() {
         setSelectedBranchId(
             branchId
         );
+        if (profile) rememberAdminBranchId(profile.staffId, branchId);
 
 
         setSelectedProduct(
