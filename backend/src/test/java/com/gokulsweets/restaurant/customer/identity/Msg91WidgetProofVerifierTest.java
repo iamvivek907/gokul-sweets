@@ -51,4 +51,26 @@ class Msg91WidgetProofVerifierTest {
         assertThat(Msg91WidgetProofVerifier.looksLikeJwt("OTP verified successfully")).isFalse();
         assertThat(Msg91WidgetProofVerifier.looksLikeJwt("account-authkey")).isFalse();
     }
+    @Test
+    void acceptsProviderSuccessWithExactMobileOutsideData() throws Exception {
+        assertThat(Msg91WidgetProofVerifier.verifiedPhoneFromResponse(mapper.readTree("""
+                {"type":"success","message":"919876543210"}
+                """))).isEqualTo("+919876543210");
+        assertThat(Msg91WidgetProofVerifier.verifiedPhoneFromResponse(mapper.readTree("""
+                {"type":"success","mobile":"919876543210"}
+                """))).isEqualTo("+919876543210");
+    }
+
+    @Test
+    void rejectsUnverifiedOrAmbiguousProviderMessages() throws Exception {
+        for (var json : new String[] {
+                "{\"type\":\"error\",\"message\":\"919876543210\"}",
+                "{\"type\":\"success\",\"message\":\"verified 919876543210\"}",
+                "{\"type\":\"success\",\"message\":\"447700900000\"}"
+        }) {
+            assertThatThrownBy(() -> Msg91WidgetProofVerifier.verifiedPhoneFromResponse(mapper.readTree(json)))
+                    .isInstanceOf(IllegalStateException.class);
+        }
+    }
+
 }
