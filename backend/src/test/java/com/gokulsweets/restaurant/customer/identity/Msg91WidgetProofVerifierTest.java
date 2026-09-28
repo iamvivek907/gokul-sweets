@@ -29,4 +29,20 @@ class Msg91WidgetProofVerifierTest {
                     .isInstanceOf(IllegalStateException.class);
         }
     }
+    @Test
+    void logsOnlyFixedProviderFailureCategories() throws Exception {
+        var invalid = mapper.readTree("""
+                {"type":"error","message":"Invalid access token: secret-123"}
+                """);
+        assertThat(Msg91WidgetProofVerifier.providerType(invalid)).isEqualTo("error");
+        assertThat(Msg91WidgetProofVerifier.providerReason(invalid)).isEqualTo("invalid-token");
+        var auth = mapper.readTree("""
+                {"type":"error","message":"Authentication Failure: key secret-123"}
+                """);
+        assertThat(Msg91WidgetProofVerifier.providerReason(auth)).isEqualTo("authkey");
+        assertThat(Msg91WidgetProofVerifier.providerReason(mapper.readTree("""
+                {"type":"error","message":"personal data secret-123"}
+                """))).isEqualTo("other");
+    }
+
 }
