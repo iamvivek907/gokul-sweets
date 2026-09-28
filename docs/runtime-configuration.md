@@ -49,6 +49,7 @@ be published by `/api/storefront/features` or a `NEXT_PUBLIC_*` variable.
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | Required HTTPS **origin only** in a production build for customer API requests. Development without it uses `http://localhost:8080`. |
 | `NEXT_PUBLIC_API_BASE_URL` | Optional compatibility variable for admin requests; if present, must exactly match `NEXT_PUBLIC_API_URL`. Both paths use one validated origin. |
+| `NEXT_PUBLIC_FSSAI_LICENCE_NUMBER` | Optional public licence number shown in the customer footer. Set to the verified Gokul Sweets FSSAI number for each frontend build; leave unset until confirmed. |
 | `NEXT_PUBLIC_IST_TIME_FIX_ENABLED` | Existing browser interpretation of zone-less legacy timestamps; default ON, use only in coordination with backend time switch. |
 | `NEXT_PUBLIC_MSG91_WIDGET_ID`, `NEXT_PUBLIC_MSG91_WIDGET_TOKEN` | Browser-scoped MSG91 Widget ID and restricted widget token. The optional verification entry point stays hidden if either is absent or the backend readiness endpoint is OFF. Never set these to the server Authkey. Rebuild after changing them. |
 
