@@ -1,4 +1,5 @@
 "use client";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useEffect,
@@ -40,6 +41,14 @@ export default function AdminDemandForecastPage() {
     } =
         useAdminAuth();
 
+
+    function selectReportBranch(value: string) {
+        const id = value ? Number(value) : null;
+        setBranchId(id);
+        if (profile) rememberAdminBranchId(profile.staffId, id);
+    }
+
+    const staffId = profile?.staffId;
 
     const canView =
         hasPermission(
@@ -148,12 +157,7 @@ export default function AdminDemandForecastPage() {
                         );
 
 
-                        setBranchId(
-                            current =>
-                                current
-                                ?? result.branches[0]?.id
-                                ?? null
-                        );
+                        setBranchId(current => current ?? (staffId ? preferredAdminBranchId(staffId, result.branches) : result.branches[0]?.id ?? null));
                     }
                 )
                 .catch(
@@ -186,7 +190,8 @@ export default function AdminDemandForecastPage() {
         },
         [
             authorization,
-            canView
+            canView,
+            staffId
         ]
     );
 
@@ -402,13 +407,7 @@ export default function AdminDemandForecastPage() {
                         }
                         onChange={
                             event =>
-                                setBranchId(
-                                    event.target.value
-                                        ? Number(
-                                            event.target.value
-                                        )
-                                        : null
-                                )
+                                selectReportBranch(event.target.value)
                         }
                         className={INPUT_CLASS}
                     >

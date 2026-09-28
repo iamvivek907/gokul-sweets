@@ -49,6 +49,7 @@ be published by `/api/storefront/features` or a `NEXT_PUBLIC_*` variable.
 | --- | --- |
 | `NEXT_PUBLIC_API_URL` | Required HTTPS **origin only** in a production build for customer API requests. Development without it uses `http://localhost:8080`. |
 | `NEXT_PUBLIC_API_BASE_URL` | Optional compatibility variable for admin requests; if present, must exactly match `NEXT_PUBLIC_API_URL`. Both paths use one validated origin. |
+| Branch FSSAI licence | Set each branch's 14-digit licence number in Admin → Branches. The customer footer reads the currently selected active branch from the backend; no frontend environment variable or rebuild is needed for edits. |
 | `NEXT_PUBLIC_IST_TIME_FIX_ENABLED` | Existing browser interpretation of zone-less legacy timestamps; default ON, use only in coordination with backend time switch. |
 | `NEXT_PUBLIC_MSG91_WIDGET_ID`, `NEXT_PUBLIC_MSG91_WIDGET_TOKEN` | Browser-scoped MSG91 Widget ID and restricted widget token. The optional verification entry point stays hidden if either is absent or the backend readiness endpoint is OFF. Never set these to the server Authkey. Rebuild after changing them. |
 

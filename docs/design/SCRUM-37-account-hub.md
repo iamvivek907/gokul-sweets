@@ -2,7 +2,7 @@
 
 ## Flag and ownership
 
-`gokul.features.customer-account-hub=${GOKUL_FEATURES_CUSTOMER_ACCOUNT_HUB:false}` is OFF by default. Owner: customer identity and storefront. Enable only with verified customer OTP identity, the V77 migration, and DEV owner/reorder tests. Flag OFF retains the original Profile page. `/api/storefront/features` exposes the effective flag; the account API returns 404 when it is OFF. Existing cart availability, signed quote and inventory checks remain in force.
+`gokul.features.customer-account-hub=${GOKUL_FEATURES_CUSTOMER_ACCOUNT_HUB:true}` is ON by default after the owner's DEV rollout request. Owner: customer identity and storefront. Deploy with verified customer OTP identity, the V77 migration, and DEV owner/reorder tests. The environment override can still disable it; flag OFF retains the original Profile page. `/api/storefront/features` exposes the effective flag; the account API returns 404 when it is OFF. Existing cart availability, signed quote and inventory checks remain in force.
 
 Saved preferences, favourites and addresses are keyed by environment and the exact currently verified subject, never looked up by an entered phone number. The account API checks the secure cookie, allowed Origin, trusted mutation and session on every call. Existing order history binds at checkout via verified ownership. These saved choices are not silently transferred across a new subject rotation; address and preference continuity after same-phone reverification needs a separate reviewed ownership migration. The UI explains that saved addresses are not automatic delivery eligibility.
 

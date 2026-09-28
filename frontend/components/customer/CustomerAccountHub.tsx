@@ -135,18 +135,54 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
     }
 
     const earned = currentMilestone(account.paidOrders);
-    return <div className="account-hub mt-7 space-y-7">
-        <section className="account-hero rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]">Your Gokul journey</p>
-            <h2 className="mt-2 text-2xl font-bold text-[#241715]">{earned ? `${earned.title} ✓` : "Your first tick is waiting"}</h2>
-            <p className="mt-2 text-sm text-[#756763]">{account.paidOrders} paid {account.paidOrders === 1 ? "order" : "orders"} on this verified account. Ticks recognise visits; they are not points or discounts.</p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">{accountMilestones.map(milestone => <div key={milestone.orders}
-                className={`rounded-2xl border p-4 ${account.paidOrders >= milestone.orders ? "border-[#c88a20] bg-[#fff8ef]" : "border-[#eadfd6]"}`}>
-                <span aria-label={account.paidOrders >= milestone.orders ? "Unlocked" : "Locked"} className="text-lg">{account.paidOrders >= milestone.orders ? "✓" : "○"}</span>
-                <h3 className="mt-2 font-bold text-[#241715]">{milestone.title}</h3>
-                <p className="mt-1 text-xs text-[#756763]">{milestone.description}</p></div>)}</div>
-        </section>
-        <section className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+    const displayName = session.name?.trim() || "Gokul guest";
+    const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
+    const maskedPhone = session.phone ? `+91 •••••• ${session.phone.replace(/\D/g, "").slice(-4)}` : "Phone verified";
+    return <div className="account-hub mt-6">
+        <header className="account-cover relative overflow-hidden rounded-3xl p-6 sm:p-9">
+            <div className="account-cover-art" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span></div>
+            <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+                <div className="flex min-w-0 items-center gap-4 sm:gap-6">
+                    <div className="account-avatar" aria-hidden="true">{initials}</div>
+                    <div className="min-w-0"><p className="account-cover-kicker">Your Gokul profile</p>
+                        <h1 className="mt-1 truncate text-2xl font-bold sm:text-4xl">{displayName}</h1>
+                        <p className="mt-2 text-sm">{maskedPhone}</p></div>
+                </div>
+                <div className="account-earned" aria-label={earned ? `Earned badge: ${earned.title}` : "No badge earned yet"}>
+                    <span className="account-earned-symbol" aria-hidden="true">{earned ? "✓" : "○"}</span>
+                    <div><span className="account-earned-label">{earned ? "Earned badge" : "Your first badge"}</span>
+                        <strong>{earned?.title ?? "One order away"}</strong></div>
+                </div>
+            </div>
+        </header>
+        <div className="account-layout mt-6">
+            <nav className="account-navigation" aria-label="Profile sections">
+                <a href="#account-milestones">Badges</a>
+                <a href="#account-orders">Order history</a>
+                <a href="#account-favourites">Favourites</a>
+                <a href="#account-addresses">My addresses</a>
+                <a href="#account-preferences">Preferences</a>
+                <a href="#account-details">Profile details</a>
+                <Link href="/profile/privacy">Privacy and data</Link>
+            </nav>
+            <div className="account-panels space-y-6">
+                <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+                    <div className="flex flex-wrap items-end justify-between gap-4">
+                        <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#c88a20]">Gokul journey</p>
+                            <h2 className="mt-2 text-2xl font-bold text-[#241715]">Your badges</h2>
+                            <p className="mt-2 text-sm text-[#756763]">Earned from completed paid orders on your account.</p></div>
+                        <div className="account-order-count"><strong>{account.paidOrders}</strong><span>paid {account.paidOrders === 1 ? "order" : "orders"}</span></div>
+                    </div>
+                    <div className="mt-6 grid gap-3 sm:grid-cols-3">{accountMilestones.map(milestone => {
+                        const unlocked = account.paidOrders >= milestone.orders;
+                        return <div key={milestone.orders} className={`account-badge ${unlocked ? "is-earned" : "is-locked"}`}>
+                            <span className="account-badge-icon" aria-label={unlocked ? "Unlocked" : "Locked"}>{unlocked ? "✓" : "○"}</span>
+                            <strong>{milestone.title}</strong><span>{milestone.description}</span>
+                        </div>;
+                    })}</div>
+                    <p className="mt-4 text-xs text-[#756763]">Badges recognise visits. They are not points or discounts.</p>
+                </section>
+        <section id="account-orders" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]">Your orders</h2>
                 <p className="mt-1 text-sm text-[#756763]">Only orders placed while signed in to this account.</p></div>
                 <Link href="/orders" className="text-sm font-semibold text-[#7a1625] underline">All orders →</Link></div>
@@ -161,7 +197,7 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
                 <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={busy || preview.unavailable.length > 0} onClick={() => {void confirmReorder();}} className="min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50">Add to cart</button>
                     <button type="button" onClick={() => setPreview(null)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm">Cancel</button></div></div>}
         </section>
-        <div className="grid gap-6 md:grid-cols-2"><section className="rounded-3xl border border-[#eadfd6] bg-white p-6"><h2 className="text-xl font-bold text-[#241715]">Your preferences</h2>
+        <div className="grid gap-6 md:grid-cols-2"><section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6"><h2 className="text-xl font-bold text-[#241715]">Your preferences</h2>
             <p className="mt-1 text-sm text-[#756763]">Dietary notes are for your reference; check ingredients with the branch for each order.</p>
             <label htmlFor="dietary-notes" className="mt-5 block text-sm font-semibold">Dietary notes</label>
             <textarea id="dietary-notes" maxLength={300} value={dietary} onChange={event => setDietary(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-[#eadfd6] p-3 text-sm" placeholder="Optional notes" />
@@ -169,18 +205,20 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
                 className="mt-3 min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50">Save preferences</button>
             <p className="mt-5 text-xs text-[#756763]">{account.preferences.preferredBranchId === branch?.id && branch ? `${branch.name} is your saved branch.` : "Choose your branch from the site header when ordering."}</p>
             {branch && account.preferences.preferredBranchId !== branch.id && <button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({dietaryNotes: dietary, preferredBranchId: branch.id})}), "Preferred branch saved.");}} className="mt-3 min-h-11 text-sm font-semibold text-[#7a1625] underline">Save {branch.name} as preferred</button>}</section>
-            <section className="rounded-3xl border border-[#eadfd6] bg-white p-6"><h2 className="text-xl font-bold text-[#241715]">Saved addresses</h2>
+            <section id="account-addresses" className="rounded-3xl border border-[#eadfd6] bg-white p-6"><h2 className="text-xl font-bold text-[#241715]">Saved addresses</h2>
                 <p className="mt-1 text-sm text-[#756763]">Saved for your account. Delivery coverage and final address are checked separately at checkout.</p>
                 {account.addresses.map(saved => <div key={saved.id} className="mt-4 flex justify-between gap-4 border-t border-[#eadfd6] pt-3"><div><strong className="text-sm">{saved.label}</strong><p className="text-sm text-[#756763]">{saved.addressLine}, {saved.locality} {saved.postalCode}</p></div><button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/addresses/${saved.id}`, {method: "DELETE", credentials: "include"}), "Address removed.");}} className="text-sm font-semibold text-[#7a1625]">Remove</button></div>)}
                 <form className="mt-5 grid gap-2" onSubmit={event => {event.preventDefault(); void perform(async () => {await apiClient<Address>(`${base}/addresses`, {method: "POST", credentials: "include", body: JSON.stringify(address)}); setAddress({label: "", addressLine: "", locality: "", postalCode: ""});}, "Address saved.");}}>
                     {(["label", "addressLine", "locality", "postalCode"] as const).map(field => <label key={field} className="text-xs font-semibold capitalize">{field === "addressLine" ? "Address line" : field === "postalCode" ? "Postal code" : field}<input required maxLength={field === "postalCode" ? 6 : field === "label" ? 40 : field === "locality" ? 100 : 180} value={address[field]} onChange={event => setAddress(current => ({...current, [field]: event.target.value}))} className="mt-1 block min-h-11 w-full rounded-xl border border-[#eadfd6] px-3 text-sm" /></label>)}
                     <button type="submit" disabled={busy || account.addresses.length >= 5} className="min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50">Save address</button></form></section></div>
-        <section className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Saved favourites</h2>
+        <section id="account-favourites" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Saved favourites</h2>
             <p className="mt-1 text-sm text-[#756763]">Save an item from the current branch menu. Availability and prices are checked again when ordering.</p>
             {account.favouriteProductIds.length > 0 && <div className="mt-4 space-y-2">{account.favouriteProductIds.map(id => <div key={id} className="flex items-center justify-between gap-3 border-t border-[#eadfd6] pt-2"><span className="text-sm">{menu.find(product => product.id === id)?.name ?? "Saved item (not on this branch menu)"}</span><button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/favourites/${id}`, {method: "DELETE", credentials: "include"}), "Favourites updated.");}} className="min-h-11 text-sm font-semibold text-[#7a1625]">Remove</button></div>)}</div>}
             {branch ? <><button type="button" disabled={busy} onClick={() => {setBusy(true); void getMenu(branch.id).then(categories => setMenu(categories.flatMap(category => category.products))).catch(() => setMessage("Menu unavailable. Please try again.")).finally(() => setBusy(false));}} className="mt-4 min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]">Browse {branch.name} items</button>
                 {menu.length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2">{menu.filter(product => product.available).slice(0, 30).map(product => <div key={product.id} className="flex items-center justify-between gap-3 border-t border-[#eadfd6] py-2"><span className="text-sm">{product.name}</span><button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/favourites/${product.id}`, {method: account.favouriteProductIds.includes(product.id) ? "DELETE" : "PUT", credentials: "include"}), "Favourites updated.");}} className="min-h-11 text-sm font-semibold text-[#7a1625]">{account.favouriteProductIds.includes(product.id) ? "Remove" : "Save"}</button></div>)}</div>}</> : <Link href="/menu" className="mt-4 inline-block text-sm font-semibold text-[#7a1625] underline">Choose a branch →</Link>}
         </section>
         {message && <p role="status" aria-live="polite" className="rounded-xl border border-[#eadfd6] bg-white p-4 text-sm">{message}</p>}
+            </div>
+        </div>
     </div>;
 }

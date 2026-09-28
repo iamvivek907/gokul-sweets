@@ -24,6 +24,8 @@ public record AdminBranchResponse(
 
         String phone,
 
+        String fssaiLicenceNumber,
+
         BigDecimal latitude,
 
         BigDecimal longitude,
@@ -60,6 +62,8 @@ public record AdminBranchResponse(
                 branch.getPincode(),
 
                 branch.getPhone(),
+
+                branch.getFssaiLicenceNumber(),
 
                 branch.getLatitude(),
 

@@ -98,7 +98,7 @@ export default function Header() {
                         </Link>}
                 </div>}
 
-                <CustomerAccountLink />
+                <div className="ml-auto flex shrink-0 items-center sm:order-1"><CustomerAccountLink /></div>
                 <MobileMenu />
 
             </div>

@@ -8,6 +8,7 @@ export interface Branch {
     state: string | null;
     pincode: string | null;
     phone: string | null;
+    fssaiLicenceNumber: string | null;
 
     latitude: number | null;
     longitude: number | null;

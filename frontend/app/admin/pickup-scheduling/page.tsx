@@ -2,6 +2,7 @@
 
 import {useEffect, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 import {SettingField, SettingToggle} from "@/components/admin/BranchOperationalSettings";
 import {getAdminBranches} from "@/services/adminBranchesApi";
 import {adminManagementApi} from "@/services/adminManagementApi";
@@ -20,7 +21,7 @@ const fields = [
 ] as const;
 
 export default function PickupSchedulingPage() {
-    const {authorization, hasPermission} = useAdminAuth();
+    const {profile, authorization, hasPermission} = useAdminAuth();
     const allowed = hasPermission("BRANCH_MANAGE");
     const [branches, setBranches] = useState<AdminBranch[]>([]);
     const [branchId, setBranchId] = useState("");
@@ -35,10 +36,14 @@ export default function PickupSchedulingPage() {
     useEffect(() => {
         if (!authorization || !allowed) return;
         const controller = new AbortController();
-        getAdminBranches(authorization, controller.signal).then(setBranches)
+        getAdminBranches(authorization, controller.signal).then(result => {
+            if (controller.signal.aborted) return;
+            setBranches(result);
+            if (profile) setBranchId(String(preferredAdminBranchId(profile.staffId, result) ?? ""));
+        })
             .catch(error => {if (!controller.signal.aborted) setError(error.message);});
         return () => controller.abort();
-    }, [authorization, allowed]);
+    }, [authorization, allowed, profile]);
 
     async function load(generate: boolean) {
         if (!authorization) return;
@@ -69,7 +74,7 @@ export default function PickupSchedulingPage() {
         <form onSubmit={event => {event.preventDefault(); void load(true);}} className="rounded-2xl border border-[#eadfd6] bg-white p-5">
             <fieldset disabled={busy} className="grid gap-5 sm:grid-cols-2">
                 <SettingField label="Branch" help="Slots and capacity apply only to this branch." htmlFor="branch">
-                    <select id="branch" required value={branchId} onChange={event => {setBranchId(event.target.value); setSlots([]); setViewed(false);}} className="min-h-11 w-full rounded-xl border px-3">
+                    <select id="branch" required value={branchId} onChange={event => {setBranchId(event.target.value); if (profile && event.target.value) rememberAdminBranchId(profile.staffId, Number(event.target.value)); setSlots([]); setViewed(false);}} className="min-h-11 w-full rounded-xl border px-3">
                         <option value="">Choose a branch</option>{branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                     </select>
                 </SettingField>

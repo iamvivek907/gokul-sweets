@@ -25,6 +25,11 @@
 .gokul-footer-grid h2{font:500 2rem Georgia,serif;margin:0 0 .7rem}
 .gokul-footer-grid h3{font-size:.7rem;letter-spacing:.18em;margin:0 0 1rem}
 .gokul-footer-grid a,.gokul-footer-grid span{display:block;margin:.75rem 0;font-size:.84rem;line-height:1.5}
+.gokul-fssai{display:flex;flex-direction:column;align-items:flex-start;gap:.25rem;max-width:1180px;margin:2rem auto 0;color:#696f6b;line-height:1.15}
+.gokul-fssai-business,.gokul-fssai-number{font-size:clamp(.9rem,1.2vw,1.1rem);letter-spacing:.01em}
+.gokul-fssai-mark{display:inline-block;margin:.15rem 0;font:italic 2.6rem Georgia,serif;line-height:1;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:.08em}
+.editorial-storefront .gokul-fssai{max-width:none;color:#687c74}
+.order-fssai{margin:2rem 0 0;color:#919997}
 .gokul-footer-bottom{max-width:1180px;margin:2.5rem auto 0;border-top:1px solid #bcb9ac66;padding-top:1.25rem;display:flex;justify-content:space-between;gap:1rem;font-size:.75rem}
 .editorial-storefront .gokul-footer-bottom{max-width:none}
 .editorial-storefront .gokul-editorial-home{max-width:none;padding:1.5rem clamp(1.25rem,4vw,4rem) 3rem;color:#28241f}

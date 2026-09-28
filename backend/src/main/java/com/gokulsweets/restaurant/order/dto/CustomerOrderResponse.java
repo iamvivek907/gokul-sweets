@@ -61,6 +61,7 @@ public record CustomerOrderResponse(
         LocalTime deliveryEndTime,
         String deliveryAddressLine,
         String deliveryLocality,
-        String deliveryPostalCode
+        String deliveryPostalCode,
+        String branchFssaiLicenceNumber
 ) {
 }

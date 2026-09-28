@@ -4,6 +4,7 @@ import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 type Row = {orderId: number; orderNumber: string; windowId: number; date: string;
     start: string; end: string; orderStatus: string; riderId: number | null; state: string | null;
@@ -19,7 +20,7 @@ export default function DeliveryDispatchPage() {
     const [message, setMessage] = useState("");
     const [newRider, setNewRider] = useState("");
     const [busy, setBusy] = useState(false);
-    const activeBranch = branchId ?? profile?.branchIds[0] ?? null;
+    const activeBranch = branchId ?? (profile ? preferredAdminBranchId(profile.staffId, profile.branchIds.map(id => ({id}))) : null);
     const path = activeBranch ? `/api/admin/branches/${activeBranch}/delivery-dispatch` : "";
     const refresh = useCallback(async (signal?: AbortSignal) => {
         if (!authorization || !path) return;
@@ -52,7 +53,7 @@ export default function DeliveryDispatchPage() {
         <h1 className="text-2xl font-bold">Delivery dispatch</h1>
         <p className="text-sm">Pilot rider assignments are limited to one order per rider and window. Window times are IST.</p>
         <label className="block">Branch <select className="ml-2 rounded border p-2" value={activeBranch ?? ""}
-            onChange={event => setBranchId(Number(event.target.value))}>
+            onChange={event => {const next = Number(event.target.value); setBranchId(next); if (profile) rememberAdminBranchId(profile.staffId, next);}}>
             {profile?.branchIds.map(id => <option key={id} value={id}>{id}</option>)}
         </select></label>
         <button type="button" className="rounded border px-3 py-2" onClick={() => refresh().catch(error => setMessage(String(error)))}>Refresh</button>

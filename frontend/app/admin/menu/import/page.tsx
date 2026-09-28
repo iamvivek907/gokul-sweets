@@ -1,4 +1,5 @@
 "use client";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useEffect,
@@ -219,7 +220,7 @@ export default function AdminMenuImportPage() {
                     ) {
 
                         setSelectedBranchId(
-                            allowedBranches[0].id
+                            preferredAdminBranchId(currentProfile.staffId, allowedBranches)
                         );
                     }
 
@@ -712,6 +713,7 @@ export default function AdminMenuImportPage() {
                                     setSelectedBranchId(
                                         value
                                     );
+                                    if (profile) rememberAdminBranchId(profile.staffId, value);
 
 
                                     setSelectedFile(

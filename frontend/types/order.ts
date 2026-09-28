@@ -108,6 +108,7 @@ export interface CustomerOrderResponse {
     paymentStatus: PaymentStatus | null;
     branchName: string;
     branchAddress: string;
+    branchFssaiLicenceNumber?: string | null;
     branchPhone?: string | null;
     estimatedReadyAt?: string | null;
     delayReason?: string | null;

@@ -23,6 +23,7 @@ import {
 } from "@/components/admin/BranchOperationalSettings";
 import {DeliveryZonesSettings} from "@/components/admin/DeliveryZonesSettings";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import type {
     AdminBranch,
@@ -46,6 +47,7 @@ interface BranchFormState {
     pincode: string;
 
     phone: string;
+    fssaiLicenceNumber: string;
 
     latitude: string;
 
@@ -74,6 +76,7 @@ const EMPTY_FORM: BranchFormState = {
     pincode: "",
 
     phone: "",
+    fssaiLicenceNumber: "",
 
     latitude: "",
 
@@ -117,6 +120,7 @@ function toFormState(
         phone:
             branch.phone
             ?? "",
+        fssaiLicenceNumber: branch.fssaiLicenceNumber ?? "",
 
         latitude:
             branch.latitude === null
@@ -256,6 +260,7 @@ export default function AdminBranchesPage() {
         hasPermission
     } =
         useAdminAuth();
+    const staffId = profile?.staffId;
 
 
     const [
@@ -372,17 +377,10 @@ export default function AdminBranchesPage() {
                     );
 
 
-                const targetBranch =
-                    preferredBranchId !== undefined
-                        ? result.find(
-                            branch =>
-                                branch.id
-                                === preferredBranchId
-                        )
-                        ?? result[0]
-                        ?? null
-                        : result[0]
-                        ?? null;
+                const targetId = staffId
+                    ? preferredAdminBranchId(staffId, result, preferredBranchId)
+                    : result[0]?.id ?? null;
+                const targetBranch = result.find(branch => branch.id === targetId) ?? null;
 
 
                 setBranches(
@@ -409,7 +407,7 @@ export default function AdminBranchesPage() {
                     false
                 );
             },
-            []
+            [staffId]
         );
 
 
@@ -438,9 +436,10 @@ export default function AdminBranchesPage() {
                 .then(
                     result => {
 
-                        const firstBranch =
-                            result[0]
-                            ?? null;
+                        const selectedId = staffId
+                            ? preferredAdminBranchId(staffId, result)
+                            : result[0]?.id ?? null;
+                        const firstBranch = result.find(branch => branch.id === selectedId) ?? null;
 
 
                         setBranches(
@@ -503,7 +502,8 @@ export default function AdminBranchesPage() {
         },
         [
             authorization,
-            canManage
+            canManage,
+            staffId
         ]
     );
 
@@ -639,6 +639,7 @@ export default function AdminBranchesPage() {
                         nullableText(
                             form.phone
                         ),
+                    fssaiLicenceNumber: nullableText(form.fssaiLicenceNumber),
 
                     latitude:
                         nullableNumber(
@@ -729,6 +730,7 @@ export default function AdminBranchesPage() {
                         nullableText(
                             form.phone
                         ),
+                    fssaiLicenceNumber: nullableText(form.fssaiLicenceNumber),
 
                     latitude:
                         nullableNumber(
@@ -1261,6 +1263,7 @@ export default function AdminBranchesPage() {
                                                                     setSelectedBranchId(
                                                                         branch.id
                                                                     );
+                                                                    if (profile) rememberAdminBranchId(profile.staffId, branch.id);
 
 
                                                                     setForm(
@@ -1659,6 +1662,19 @@ export default function AdminBranchesPage() {
 
                                             </Field>
 
+
+                                            <Field label="FSSAI licence number">
+                                                <input
+                                                    value={form.fssaiLicenceNumber}
+                                                    disabled={saving}
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]{14}"
+                                                    maxLength={14}
+                                                    placeholder="14-digit licence number"
+                                                    onChange={event => updateField("fssaiLicenceNumber", event.target.value)}
+                                                    className="min-h-11 w-full rounded-xl border border-[#eadfd6] px-4 text-sm text-[#241715]"
+                                                />
+                                            </Field>
 
                                             <Field
                                                 label="Pincode"

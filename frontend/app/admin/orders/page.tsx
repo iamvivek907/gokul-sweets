@@ -29,6 +29,7 @@ import {
 } from "@/services/adminOrdersApi";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import type {
     AdminBatchPreparationResponse,
@@ -868,7 +869,7 @@ export default function AdminOrdersPage() {
                     ) {
 
                         setSelectedBranchId(
-                            allowedBranches[0].id
+                            preferredAdminBranchId(currentProfile.staffId, allowedBranches)
                         );
                     }
 
@@ -2636,6 +2637,7 @@ export default function AdminOrdersPage() {
                                         setSelectedBranchId(
                                             value
                                         );
+                                        if (profile) rememberAdminBranchId(profile.staffId, value);
 
 
                                         setPage(
