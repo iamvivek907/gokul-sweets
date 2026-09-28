@@ -1,6 +1,8 @@
 /* SCRUM-107: arrival-derived palette, scoped to the server-enabled customer shell. */
 .future-storefront{--journey-deep:#092725;--journey-teal:#143936;--journey-cream:#fffaf2;--journey-coral:#c76752;--journey-ink:#172e2c;--journey-muted:#4e605c;--journey-line:#d9e5df;background:var(--journey-cream)!important;color:var(--journey-ink)!important;overflow-x:clip}
 .future-storefront .customer-site-header{background:#fffaf2f2!important;border-color:var(--journey-line)!important}
+.future-storefront .customer-account-link{border-color:var(--journey-line);background:#fff;color:var(--journey-teal)}
+.future-storefront .customer-account-link:hover{background:#edf5ef}
 .future-storefront .future-brand,.future-storefront .future-branch-name strong{color:var(--journey-teal)!important}
 .future-storefront .future-brand-mark{background:var(--journey-teal)!important;border-color:var(--journey-teal)!important;color:white!important;box-shadow:none!important}
 .future-storefront .future-brand small,.future-storefront .future-branch-name small{color:var(--journey-muted)!important}
