@@ -20,7 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class Msg91WidgetProofVerifier {
-    private static final URI VERIFY_URL = URI.create("https://api.msg91.com/api/v5/widget/verifyAccessToken");
+    private static final URI VERIFY_URL = URI.create("https://control.msg91.com/api/v5/widget/verifyAccessToken");
     private final EnhancementProperties features;
     private final Environment environment;
     private final ObjectMapper mapper;
@@ -48,8 +48,9 @@ public class Msg91WidgetProofVerifier {
                 log.warn("MSG91 verification unavailable: provider HTTP status {}", response.statusCode());
                 throw new IllegalStateException("MSG91 verification failed");
             }
+            var providerResponse = mapper.readTree(response.body());
             try {
-                return verifiedPhoneFromResponse(mapper.readTree(response.body()));
+                return verifiedPhoneFromResponse(providerResponse);
             } catch (IllegalStateException e) {
                 // These are fixed local categories. Never log the provider body, token,
                 // identifier, or a provider-supplied status/message.
@@ -59,7 +60,12 @@ public class Msg91WidgetProofVerifier {
                     case "MSG91 did not return a verified Indian mobile" -> "success without supported mobile format";
                     default -> "unrecognized provider response";
                 };
-                log.warn("MSG91 verification unavailable: {}", category);
+                // Log only fixed field-presence flags. Provider values may contain tokens,
+                // phone numbers, or other personal information.
+                var data = providerResponse.path("data");
+                log.warn("MSG91 verification unavailable: {}; response shape: type={}, dataObject={}, identifier={}, mobile={}",
+                        category, providerResponse.has("type"), data.isObject(),
+                        data.hasNonNull("identifier"), data.hasNonNull("mobile"));
                 throw e;
             }
         } catch (InterruptedException e) {
