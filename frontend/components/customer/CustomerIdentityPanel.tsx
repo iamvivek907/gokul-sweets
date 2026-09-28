@@ -37,7 +37,7 @@ async function loadWidget(): Promise<Msg91Window> {
 }
 
 export default function CustomerIdentityPanel() {
-    const [available, setAvailable] = useState(false);
+    const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">("loading");
     const [verified, setVerified] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,23 +46,37 @@ export default function CustomerIdentityPanel() {
 
     useEffect(() => {
         alive.current = true;
-        if (!widgetId || !widgetToken) return;
+        if (!widgetId || !widgetToken) {
+            setAvailability("disabled");
+            return;
+        }
         void (async () => {
             try {
                 const config = await apiClient<{enabled: boolean}>("/api/storefront/customer-identity");
-                if (!config.enabled || !alive.current) return;
-                setAvailable(true);
+                if (!alive.current) return;
+                if (!config.enabled) {setAvailability("disabled"); return;}
+                setAvailability("ready");
                 const session = await apiClient<{authenticated: boolean}>(
                     "/api/customer/identity/me", {credentials: "include"});
                 if (alive.current) setVerified(session.authenticated);
             } catch {
-                if (alive.current) setAvailable(false);
+                if (alive.current) setAvailability("error");
             }
         })();
         return () => {alive.current = false;};
     }, []);
 
-    if (!available || !widgetId || !widgetToken) return null;
+    if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status">Checking phone verification…</p>;
+    if (availability !== "ready" || !widgetId || !widgetToken) return <section
+        className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"
+        aria-label="Phone verification">
+        <h2 className="text-xl font-semibold text-[#241715]">Phone verification is unavailable</h2>
+        <p className="mt-2 text-sm leading-6 text-[#756763]">
+            {availability === "error"
+                ? "We could not check verification right now. Please try again later. You can still place a pickup order as a guest."
+                : "SMS sign-in is not enabled for this storefront yet. You can still place a pickup order as a guest."}
+        </p>
+    </section>;
 
     async function start() {
         if (busy || !widgetId || !widgetToken) return;
