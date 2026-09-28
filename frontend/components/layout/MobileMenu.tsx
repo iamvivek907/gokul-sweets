@@ -14,6 +14,9 @@ import {
 import {
     useCart
 } from "@/hooks/useCart";
+import {ADMIN_SESSION_STORAGE_KEY} from "@/contexts/AdminAuthContext";
+import {adminFetch} from "@/services/adminApi";
+import type {AdminSession} from "@/types/admin";
 
 
 /*
@@ -96,6 +99,24 @@ export default function MobileMenu() {
         setOpen
     ] =
         useState(false);
+    const [staffAccess, setStaffAccess] = useState(false);
+
+    useEffect(() => {
+        if (!open) return;
+        const controller = new AbortController();
+        try {
+            const stored = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
+            const session = stored ? JSON.parse(stored) as AdminSession : null;
+            if (session?.authorization && session.profile) {
+                void adminFetch("/api/admin/auth/me", session.authorization, {signal: controller.signal})
+                    .then(response => {if (!controller.signal.aborted) setStaffAccess(response.ok);})
+                    .catch(() => {if (!controller.signal.aborted) setStaffAccess(false);});
+            }
+        } catch {
+            // An unavailable or malformed browser session never reveals the staff entry.
+        }
+        return () => controller.abort();
+    }, [open]);
 
 
     /*
@@ -159,6 +180,7 @@ export default function MobileMenu() {
                     setOpen(
                         false
                     );
+                    setStaffAccess(false);
                 }
             }
 
@@ -189,6 +211,7 @@ export default function MobileMenu() {
         setOpen(
             false
         );
+        setStaffAccess(false);
     }
 
 
@@ -198,6 +221,7 @@ export default function MobileMenu() {
             current =>
                 !current
         );
+        setStaffAccess(false);
     }
 
 
@@ -710,6 +734,11 @@ export default function MobileMenu() {
                         }
 
                     </div>
+
+                    {staffAccess && <Link href="/admin" onClick={closeMenu}
+                        className="mt-5 flex min-h-14 items-center justify-between rounded-2xl border border-[#d9e5df] bg-[#edf5ef] px-4 py-3 font-bold text-[#143936]">
+                        <span>Staff dashboard</span><span aria-hidden="true">›</span>
+                    </Link>}
 
 
                     <div

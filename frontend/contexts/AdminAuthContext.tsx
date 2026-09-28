@@ -19,8 +19,10 @@ import type {
 } from "@/types/admin";
 
 
-const STORAGE_KEY =
+export const ADMIN_SESSION_STORAGE_KEY =
     "gokul-admin-session";
+
+const STORAGE_KEY = ADMIN_SESSION_STORAGE_KEY;
 
 
 const SESSION_CHANGE_EVENT =
