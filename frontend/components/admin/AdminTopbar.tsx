@@ -25,9 +25,9 @@ export default function AdminTopbar() {
         useAdminAuth();
 
 
-    function handleLogout() {
+    async function handleLogout() {
 
-        logout();
+        await logout();
 
 
         router.replace(

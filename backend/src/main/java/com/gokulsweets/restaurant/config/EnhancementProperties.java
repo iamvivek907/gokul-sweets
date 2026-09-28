@@ -67,6 +67,8 @@ public class EnhancementProperties {
     private boolean deliveryAcceptedQuote;
     /** SCRUM-30: customer delivery order creation; requires signed quote and rider/inventory lifecycle. */
     private boolean deliveryCheckout;
+    /** SCRUM-108 coordinated staff cookie migration; requires MFA encryption key and frontend release. */
+    private boolean secureStaffSessions;
     /** SCRUM-31: reviewed, versioned delivery costs; OFF until finance approves inputs. */
     private boolean deliveryEconomics;
     /** SCRUM-32: supervised rider assignment and exception board, OFF during migration. */

@@ -1,0 +1,14 @@
+# SCRUM-108 staff session migration
+
+Owner: security and operations. DEV and production use separate databases, API origins and encryption keys. Staff cookies are host-only for the API host, `Secure`, `HttpOnly`, `SameSite=Lax`, scoped to `/api/admin` and limited to eight hours. The frontend `dev.gokulsweets.in` and API `api-dev.gokulsweets.in` share the same site while remaining different origins; CORS accepts only the exact frontend origin and exposes `X-Staff-CSRF`. Non-browser admin clients need a separate review before migration.
+
+## Coordinated manual rollout
+
+1. Merge the staff security PR, deploy the backend migration V75 and configure `STAFF_MFA_ENCRYPTION_KEY` with an independently generated base64 encoded 32-byte secret. Keep this key safely backed up: losing it prevents previously enrolled authenticators from working. Confirm `GOKUL_ALLOWED_ORIGINS` and the frontend API origin are the exact matching DEV pair.
+2. Set `GOKUL_FEATURES_SECURE_STAFF_SESSIONS=true` on the backend and deploy the matching frontend build in the same maintenance window. The client stops storing Basic credentials; stale `gokul-admin-session` entries are ignored and should be cleared by the browser on first load. With the flag OFF, the new client cannot sign in, so do not ship the client alone.
+3. Existing owner/high-privilege accounts sign in with their current password and enroll an authenticator by entering the displayed setup key and confirming its six-digit code. Save the eight one-use recovery codes before continuing. Other staff sign in with their existing password. Verify owner and limited-role staff, refresh, separate tabs, installed PWA, customer menu entry, branch and permission boundaries, logout and expiry.
+4. Run CSRF and foreign Origin tests, forced deactivation/reactivation, MFA replay and recovery, failed login throttling, cross-domain cookie behavior and sensitive-action reauthentication in DEV. No production activation until owner review.
+
+Staff authorization derives current permissions on every request. Passwords, Basic authorization and session tokens do not enter browser storage. Login rotates any previous session; logout revokes it. The staff cookie cannot authenticate as a customer and a customer phone cookie cannot authenticate as staff. State-changing admin actions require exact Origin plus `X-Staff-CSRF`; login and enrollment require exact Origin. High-risk changes to staff, payroll, refunds and approvals require login within the last ten minutes.
+
+Rollback: restore the previous paired frontend/backend release and set the flag OFF together; this temporarily restores legacy Basic authentication and must be time-limited and restricted to authorized operators. Do not drop V75 or remove backed-up MFA encryption material. Plan a new coordinated migration before enabling the new client again.

@@ -47,6 +47,20 @@ public class SecurityConfig {
     }
 
     @Bean
+    public org.springframework.boot.web.servlet.FilterRegistrationBean<com.gokulsweets.restaurant.security.StaffSessionFilter>
+            staffSessionFilterRegistration(com.gokulsweets.restaurant.security.StaffSessionFilter filter) {
+        var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
+        registration.setEnabled(false);
+        return registration;
+    }
+
+    @Bean
+    public org.springframework.security.authentication.AuthenticationManager authenticationManager(
+            AuthenticationProvider provider) {
+        return new org.springframework.security.authentication.ProviderManager(provider);
+    }
+
+    @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
@@ -68,7 +82,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(List.of("*"));
 
         configuration.setExposedHeaders(
-                List.of("Location")
+                List.of("Location", "X-Staff-CSRF")
         );
 
         configuration.setAllowCredentials(true);
@@ -87,13 +101,16 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            AuthenticationProvider authenticationProvider
+            AuthenticationProvider authenticationProvider,
+            com.gokulsweets.restaurant.security.StaffSessionFilter staffSessionFilter
     ) throws Exception {
 
         http
                 .cors(Customizer.withDefaults())
 
                 .csrf(csrf -> csrf.disable())
+
+                .addFilterBefore(staffSessionFilter, org.springframework.security.web.authentication.www.BasicAuthenticationFilter.class)
 
                 .authenticationProvider(authenticationProvider)
 
@@ -107,6 +124,11 @@ public class SecurityConfig {
                         .permitAll()
 
                         .requestMatchers("/api/print-agent/**")
+                        .permitAll()
+
+                        // Credential verification and MFA enrollment precede staff session creation.
+                        .requestMatchers(HttpMethod.POST, "/api/admin/auth/login",
+                                "/api/admin/auth/mfa/setup", "/api/admin/auth/mfa/confirm")
                         .permitAll()
 
                         // Admin APIs require authentication

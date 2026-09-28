@@ -9,9 +9,8 @@ import {
     useRouter
 } from "next/navigation";
 
-import {
-    useAdminAuth
-} from "@/contexts/AdminAuthContext";
+import {useAdminAuth} from "@/contexts/AdminAuthContext";
+import {StaffEnrollmentRequired, setupStaffMfa, confirmStaffMfa} from "@/services/adminApi";
 
 
 export default function AdminLoginForm() {
@@ -21,7 +20,7 @@ export default function AdminLoginForm() {
 
 
     const {
-        login
+        login, refresh
     } =
         useAdminAuth();
 
@@ -56,6 +55,10 @@ export default function AdminLoginForm() {
         );
 
 
+    const [code, setCode] = useState("");
+    const [enrollment, setEnrollment] = useState<{token: string; secret: string; uri: string} | null>(null);
+    const [recovery, setRecovery] = useState<string[]>([]);
+
     async function handleSubmit(
         event: FormEvent<HTMLFormElement>
     ) {
@@ -83,7 +86,7 @@ export default function AdminLoginForm() {
         }
 
 
-        if (!password) {
+        if (!password && !enrollment) {
 
             setError(
                 "Enter your password."
@@ -105,10 +108,15 @@ export default function AdminLoginForm() {
 
         try {
 
-            await login(
-                normalizedUsername,
-                password
-            );
+            if (enrollment) {
+                const result = await confirmStaffMfa(enrollment.token, code);
+                setRecovery(result.recoveryCodes);
+                setEnrollment(null);
+                setPassword("");
+                return;
+            }
+            await login(normalizedUsername, password, code || undefined);
+            setPassword("");
 
 
             router.replace(
@@ -116,7 +124,14 @@ export default function AdminLoginForm() {
             );
 
         } catch (exception) {
-
+            if (exception instanceof StaffEnrollmentRequired) {
+                try {
+                    const setup = await setupStaffMfa(exception.token);
+                    setEnrollment({token: exception.token, ...setup});
+                    setPassword(""); setCode("");
+                } catch (setupError) {setError(setupError instanceof Error ? setupError.message : "Enrollment unavailable.");}
+                return;
+            }
             setError(
                 exception instanceof Error
                     ? exception.message
@@ -213,7 +228,7 @@ export default function AdminLoginForm() {
             </div>
 
 
-            <div>
+            {!enrollment && <div>
 
                 <label
                     htmlFor="admin-password"
@@ -280,9 +295,23 @@ export default function AdminLoginForm() {
                     "
                 />
 
+            </div>}
+
+            {enrollment && <div className="rounded-xl border p-4 text-sm">
+                <p className="font-bold">Set up your authenticator</p>
+                <p>In your authenticator app, add this setup key. Then enter its current six-digit code.</p>
+                <p className="my-2 select-text break-all font-mono" aria-label="Authenticator setup key">{enrollment.secret}</p>
+                <p>Keep the recovery codes shown after confirmation in a safe place.</p>
+            </div>}
+            <div><label htmlFor="admin-mfa" className="mb-2 block text-sm font-semibold">{enrollment ? "Authenticator code" : "Authenticator or recovery code (if required)"}</label>
+                <input id="admin-mfa" autoComplete="one-time-code" inputMode="numeric" value={code}
+                    onChange={event => setCode(event.target.value)} className="min-h-12 w-full rounded-xl border p-3" />
             </div>
-
-
+            {recovery.length > 0 && <div role="status" className="rounded-xl border p-4">
+                <h2 className="font-bold">Save these one-time recovery codes</h2>
+                <ul className="select-text break-all font-mono">{recovery.map(value => <li key={value}>{value}</li>)}</ul>
+                <button type="button" className="mt-3 rounded border px-3 py-2" onClick={() => {void refresh().then(() => router.replace("/admin"));}}>I saved the codes</button>
+            </div>}
             {error && (
 
                 <div
@@ -308,9 +337,7 @@ export default function AdminLoginForm() {
 
             <button
                 type="submit"
-                disabled={
-                    submitting
-                }
+                disabled={submitting || recovery.length > 0}
                 className="
                     flex
                     min-h-12
@@ -338,7 +365,7 @@ export default function AdminLoginForm() {
                 {
                     submitting
                         ? "Signing in..."
-                        : "Sign in to Admin"
+                        : enrollment ? "Confirm authenticator" : "Sign in to Admin"
                 }
 
             </button>

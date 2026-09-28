@@ -15,9 +15,7 @@ import {
 import {
     useCart
 } from "@/hooks/useCart";
-import {ADMIN_SESSION_STORAGE_KEY} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
-import type {AdminSession} from "@/types/admin";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 
@@ -108,17 +106,9 @@ export default function MobileMenu() {
     useEffect(() => {
         if (!open) return;
         const controller = new AbortController();
-        try {
-            const stored = sessionStorage.getItem(ADMIN_SESSION_STORAGE_KEY);
-            const session = stored ? JSON.parse(stored) as AdminSession : null;
-            if (session?.authorization && session.profile) {
-                void adminFetch("/api/admin/auth/me", session.authorization, {signal: controller.signal})
-                    .then(response => {if (!controller.signal.aborted) setStaffAccess(response.ok);})
-                    .catch(() => {if (!controller.signal.aborted) setStaffAccess(false);});
-            }
-        } catch {
-            // An unavailable or malformed browser session never reveals the staff entry.
-        }
+        void adminFetch("/api/admin/auth/me", "staff-session", {signal: controller.signal})
+            .then(response => {if (!controller.signal.aborted) setStaffAccess(response.ok);})
+            .catch(() => {if (!controller.signal.aborted) setStaffAccess(false);});
         return () => controller.abort();
     }, [open]);
 
