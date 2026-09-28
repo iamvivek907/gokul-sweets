@@ -4,7 +4,7 @@ import Link from "next/link";
 import {useEffect, useState} from "react";
 import {apiClient} from "@/services/apiClient";
 
-type CustomerSession = {authenticated: boolean; phone?: string};
+type CustomerSession = {authenticated: boolean; phone?: string; name?: string};
 
 /** Shared header entry point; session changes are announced by the profile panel. */
 export default function CustomerAccountLink() {
@@ -29,8 +29,9 @@ export default function CustomerAccountLink() {
     }, []);
 
     const phone = session.authenticated ? session.phone : undefined;
-    return <Link href="/profile" className="customer-account-link shrink-0 rounded-full border border-[#d8c6ba] px-3 py-2 text-sm font-semibold text-[#173c39]"
-        aria-label={phone ? `Account, verified phone ending ${phone.slice(-4)}` : "Log in to your account"}>
-        {phone ? `•••• ${phone.slice(-4)}` : session.authenticated ? "Account" : "Log in"}
+    const label = session.authenticated ? session.name?.trim() || (phone ? `•••• ${phone.slice(-4)}` : "Account") : "Log in";
+    return <Link href="/profile" className="customer-account-link max-w-[10rem] shrink-0 truncate rounded-full border border-[#d8c6ba] px-3 py-2 text-sm font-semibold text-[#173c39]"
+        aria-label={session.authenticated ? `Open profile for ${label}` : "Log in to your account"}>
+        {label}
     </Link>;
 }
