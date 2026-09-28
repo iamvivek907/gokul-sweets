@@ -39,6 +39,9 @@ public class Branch {
     @Column(length = 20)
     private String phone;
 
+    @Column(length = 14)
+    private String fssaiLicenceNumber;
+
     @Column(precision = 10, scale = 7)
     private BigDecimal latitude;
 
