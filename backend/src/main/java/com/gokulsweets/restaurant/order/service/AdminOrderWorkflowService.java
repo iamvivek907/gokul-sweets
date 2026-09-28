@@ -63,6 +63,8 @@ public class AdminOrderWorkflowService {
     private final PreparationEligibilityService
             preparationEligibilityService;
 
+    private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch;
+
 
     /*
      * =========================================================
@@ -182,6 +184,9 @@ public class AdminOrderWorkflowService {
                 currentStatus,
                 targetStatus
         );
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY
+                && targetStatus == OrderStatus.OUT_FOR_DELIVERY)
+            dispatch.requireAssignment(order.getId());
 
 
         /*
@@ -229,6 +234,10 @@ public class AdminOrderWorkflowService {
          * =====================================================
          */
 
+        if (updatedRows == 1 && order.getFulfillmentType() == FulfillmentType.DELIVERY) {
+            if (targetStatus == OrderStatus.OUT_FOR_DELIVERY) dispatch.recordTransition(order.getId(), "DISPATCHED");
+            if (targetStatus == OrderStatus.DELIVERED) dispatch.recordTransition(order.getId(), "DELIVERED");
+        }
         if (
                 updatedRows
                         ==
@@ -450,6 +459,10 @@ public class AdminOrderWorkflowService {
          * Another terminal may have won between our read and
          * atomic update.
          */
+        if (updatedRows == 1 && order.getFulfillmentType() == FulfillmentType.DELIVERY) {
+            if (targetStatus == OrderStatus.OUT_FOR_DELIVERY) dispatch.recordTransition(order.getId(), "DISPATCHED");
+            if (targetStatus == OrderStatus.DELIVERED) dispatch.recordTransition(order.getId(), "DELIVERED");
+        }
         if (
                 updatedRows
                         ==
