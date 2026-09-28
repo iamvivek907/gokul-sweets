@@ -24,8 +24,10 @@ type Account = {paidOrders: number; favouriteProductIds: number[]; addresses: Ad
     preferences: {dietaryNotes: string | null; preferredBranchId: number | null}};
 type Preview = {orderNumber: string; items: Array<{product: MenuProduct; quantity: number; weightGrams: number | null}>;
     changed: string[]; unavailable: string[]; stock: CartSwitchPreview; cartSnapshot: string; date: string};
+type AccountSection = "badges" | "orders" | "favourites" | "addresses" | "preferences" | "details";
 
-export default function CustomerAccountHub({session}: {session: CustomerSession | null}) {
+export default function CustomerAccountHub({session, onSessionChange}: {session: CustomerSession | null;
+    onSessionChange: (session: CustomerSession) => void}) {
     const features = useStorefrontFeatures();
     const enabled = features?.customerAccountHub === true;
     const {branch} = useSelectedBranch();
@@ -38,8 +40,24 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
     const [message, setMessage] = useState("");
     const [dietary, setDietary] = useState("");
     const [address, setAddress] = useState({label: "", addressLine: "", locality: "", postalCode: ""});
+    const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
     const [preview, setPreview] = useState<Preview | null>(null);
     const [menu, setMenu] = useState<MenuProduct[]>([]);
+    const [activeSection, setActiveSection] = useState<AccountSection>("badges");
+    const [editingDetails, setEditingDetails] = useState(false);
+    const [nameDraft, setNameDraft] = useState(session?.name ?? "");
+
+    useEffect(() => {
+        const fromHash = () => {
+            const selected = ({"#account-milestones": "badges", "#account-orders": "orders",
+                "#account-favourites": "favourites", "#account-addresses": "addresses",
+                "#account-preferences": "preferences", "#account-details": "details"} as Record<string, AccountSection>)[window.location.hash];
+            if (selected) setActiveSection(selected);
+        };
+        fromHash();
+        window.addEventListener("hashchange", fromHash);
+        return () => window.removeEventListener("hashchange", fromHash);
+    }, []);
 
     const reload = useCallback(async () => {
         const [next, history] = await Promise.all([
@@ -134,6 +152,37 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
         finally {setBusy(false);}
     }
 
+    function showSection(section: AccountSection) {
+        setActiveSection(section);
+        setMessage("");
+        window.requestAnimationFrame(() => document.getElementById("account-content")?.scrollIntoView({block: "start", behavior: "smooth"}));
+    }
+
+    async function saveDetails() {
+        const name = nameDraft.trim();
+        if (name.length < 2 || name.length > 80) {setMessage("Enter your name (2 to 80 characters)."); return;}
+        setBusy(true); setMessage("");
+        try {
+            await apiClient<void>("/api/customer/identity/me/name", {method: "PUT", credentials: "include", body: JSON.stringify({name})});
+            const updated = await apiClient<CustomerSession>("/api/customer/identity/me", {credentials: "include"});
+            if (!updated.authenticated) throw new Error("Session expired");
+            onSessionChange(updated);
+            window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+            setEditingDetails(false);
+            setMessage("Your name was updated.");
+        } catch {setMessage("Your name could not be saved. Please try again.");}
+        finally {setBusy(false);}
+    }
+
+    async function signOut() {
+        setBusy(true); setMessage("");
+        try {
+            await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
+            onSessionChange({authenticated: false});
+            window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+        } catch {setMessage("Could not sign out. Please try again."); setBusy(false);}
+    }
+
     const earned = currentMilestone(account.paidOrders);
     const displayName = session.name?.trim() || "Gokul guest";
     const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
@@ -146,7 +195,9 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
                     <div className="account-avatar" aria-hidden="true">{initials}</div>
                     <div className="min-w-0"><p className="account-cover-kicker">Your Gokul profile</p>
                         <h1 className="mt-1 truncate text-2xl font-bold sm:text-4xl">{displayName}</h1>
-                        <p className="mt-2 text-sm">{maskedPhone}</p></div>
+                        <p className="mt-2 text-sm">{maskedPhone}</p>
+                        <button type="button" onClick={() => {setNameDraft(session.name ?? ""); setEditingDetails(true); showSection("details");}}
+                            className="mt-4 rounded-full border border-[#f6dcae] px-4 py-2 text-sm font-semibold text-[#fff9ed] hover:bg-white/15">Edit details</button></div>
                 </div>
                 <div className="account-earned" aria-label={earned ? `Earned badge: ${earned.title}` : "No badge earned yet"}>
                     <span className="account-earned-symbol" aria-hidden="true">{earned ? "✓" : "○"}</span>
@@ -157,16 +208,14 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
         </header>
         <div className="account-layout mt-6">
             <nav className="account-navigation" aria-label="Profile sections">
-                <a href="#account-milestones">Badges</a>
-                <a href="#account-orders">Order history</a>
-                <a href="#account-favourites">Favourites</a>
-                <a href="#account-addresses">My addresses</a>
-                <a href="#account-preferences">Preferences</a>
-                <a href="#account-details">Profile details</a>
+                {([['badges', 'Badges'], ['orders', 'Order history'], ['favourites', 'Favourites'],
+                    ['addresses', 'My addresses'], ['preferences', 'Preferences'], ['details', 'Profile details']] as const)
+                    .map(([section, label]) => <button key={section} type="button" aria-pressed={activeSection === section}
+                        onClick={() => showSection(section)}>{label}</button>)}
                 <Link href="/profile/privacy">Privacy and data</Link>
             </nav>
-            <div className="account-panels space-y-6">
-                <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+            <div id="account-content" className="account-panels min-w-0 scroll-mt-28 space-y-6" aria-live="polite">
+                {activeSection === "badges" && <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#c88a20]">Gokul journey</p>
                             <h2 className="mt-2 text-2xl font-bold text-[#241715]">Your badges</h2>
@@ -181,8 +230,8 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
                         </div>;
                     })}</div>
                     <p className="mt-4 text-xs text-[#756763]">Badges recognise visits. They are not points or discounts.</p>
-                </section>
-        <section id="account-orders" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+                </section>}
+        {activeSection === "orders" && <section id="account-orders" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]">Your orders</h2>
                 <p className="mt-1 text-sm text-[#756763]">Only orders placed while signed in to this account.</p></div>
                 <Link href="/orders" className="text-sm font-semibold text-[#7a1625] underline">All orders →</Link></div>
@@ -196,27 +245,66 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
                 {preview.unavailable.length > 0 && <p className="mt-2 text-sm text-[#9e2732]">Unavailable or changed: {preview.unavailable.join(", ")}. Browse the menu to choose alternatives.</p>}
                 <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={busy || preview.unavailable.length > 0} onClick={() => {void confirmReorder();}} className="min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50">Add to cart</button>
                     <button type="button" onClick={() => setPreview(null)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm">Cancel</button></div></div>}
-        </section>
-        <div className="grid gap-6 md:grid-cols-2"><section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6"><h2 className="text-xl font-bold text-[#241715]">Your preferences</h2>
+        </section>}
+        {activeSection === "preferences" && <section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Your preferences</h2>
             <p className="mt-1 text-sm text-[#756763]">Dietary notes are for your reference; check ingredients with the branch for each order.</p>
             <label htmlFor="dietary-notes" className="mt-5 block text-sm font-semibold">Dietary notes</label>
             <textarea id="dietary-notes" maxLength={300} value={dietary} onChange={event => setDietary(event.target.value)} rows={3} className="mt-2 w-full rounded-xl border border-[#eadfd6] p-3 text-sm" placeholder="Optional notes" />
             <button type="button" disabled={busy || dietary === (account.preferences.dietaryNotes ?? "")} onClick={() => {void perform(() => apiClient<void>(`${base}/preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({...account.preferences, dietaryNotes: dietary})}), "Preferences saved.");}}
                 className="mt-3 min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50">Save preferences</button>
             <p className="mt-5 text-xs text-[#756763]">{account.preferences.preferredBranchId === branch?.id && branch ? `${branch.name} is your saved branch.` : "Choose your branch from the site header when ordering."}</p>
-            {branch && account.preferences.preferredBranchId !== branch.id && <button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({dietaryNotes: dietary, preferredBranchId: branch.id})}), "Preferred branch saved.");}} className="mt-3 min-h-11 text-sm font-semibold text-[#7a1625] underline">Save {branch.name} as preferred</button>}</section>
-            <section id="account-addresses" className="rounded-3xl border border-[#eadfd6] bg-white p-6"><h2 className="text-xl font-bold text-[#241715]">Saved addresses</h2>
+            {branch && account.preferences.preferredBranchId !== branch.id && <button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({dietaryNotes: dietary, preferredBranchId: branch.id})}), "Preferred branch saved.");}} className="mt-3 min-h-11 text-sm font-semibold text-[#7a1625] underline">Save {branch.name} as preferred</button>}</section>}
+            {activeSection === "addresses" && <section id="account-addresses" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Saved addresses</h2>
                 <p className="mt-1 text-sm text-[#756763]">Saved for your account. Delivery coverage and final address are checked separately at checkout.</p>
-                {account.addresses.map(saved => <div key={saved.id} className="mt-4 flex justify-between gap-4 border-t border-[#eadfd6] pt-3"><div><strong className="text-sm">{saved.label}</strong><p className="text-sm text-[#756763]">{saved.addressLine}, {saved.locality} {saved.postalCode}</p></div><button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/addresses/${saved.id}`, {method: "DELETE", credentials: "include"}), "Address removed.");}} className="text-sm font-semibold text-[#7a1625]">Remove</button></div>)}
-                <form className="mt-5 grid gap-2" onSubmit={event => {event.preventDefault(); void perform(async () => {await apiClient<Address>(`${base}/addresses`, {method: "POST", credentials: "include", body: JSON.stringify(address)}); setAddress({label: "", addressLine: "", locality: "", postalCode: ""});}, "Address saved.");}}>
+                {account.addresses.map(saved => <div key={saved.id} className="mt-4 flex flex-wrap items-start justify-between gap-4 border-t border-[#eadfd6] pt-3"><div><strong className="text-sm">{saved.label}</strong><p className="text-sm text-[#756763]">{saved.addressLine}, {saved.locality} {saved.postalCode}</p></div>
+                    <div className="flex gap-3"><button type="button" disabled={busy} onClick={() => {setEditingAddressId(saved.id); setAddress({label: saved.label, addressLine: saved.addressLine, locality: saved.locality, postalCode: saved.postalCode});}} className="text-sm font-semibold text-[#7a1625]">Edit</button>
+                    <button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/addresses/${saved.id}`, {method: "DELETE", credentials: "include"}), "Address removed.");}} className="text-sm font-semibold text-[#7a1625]">Remove</button></div></div>)}
+                <form className="mt-5 grid gap-2" onSubmit={event => {event.preventDefault(); void perform(async () => {await apiClient<Address>(editingAddressId === null ? `${base}/addresses` : `${base}/addresses/${editingAddressId}`, {method: editingAddressId === null ? "POST" : "PUT", credentials: "include", body: JSON.stringify(address)}); setEditingAddressId(null); setAddress({label: "", addressLine: "", locality: "", postalCode: ""});}, editingAddressId === null ? "Address saved." : "Address updated.");}}>
+                    <h3 className="text-sm font-semibold">{editingAddressId === null ? "Add an address" : "Edit address"}</h3>
                     {(["label", "addressLine", "locality", "postalCode"] as const).map(field => <label key={field} className="text-xs font-semibold capitalize">{field === "addressLine" ? "Address line" : field === "postalCode" ? "Postal code" : field}<input required maxLength={field === "postalCode" ? 6 : field === "label" ? 40 : field === "locality" ? 100 : 180} value={address[field]} onChange={event => setAddress(current => ({...current, [field]: event.target.value}))} className="mt-1 block min-h-11 w-full rounded-xl border border-[#eadfd6] px-3 text-sm" /></label>)}
-                    <button type="submit" disabled={busy || account.addresses.length >= 5} className="min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50">Save address</button></form></section></div>
-        <section id="account-favourites" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Saved favourites</h2>
+                    <button type="submit" disabled={busy || editingAddressId === null && account.addresses.length >= 5} className="min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50">{editingAddressId === null ? "Save address" : "Save changes"}</button>
+                    {editingAddressId !== null && <button type="button" onClick={() => {setEditingAddressId(null); setAddress({label: "", addressLine: "", locality: "", postalCode: ""});}} className="min-h-11 text-sm font-semibold text-[#7a1625]">Cancel</button>}</form></section>}
+        {activeSection === "favourites" && <section id="account-favourites" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Saved favourites</h2>
             <p className="mt-1 text-sm text-[#756763]">Save an item from the current branch menu. Availability and prices are checked again when ordering.</p>
             {account.favouriteProductIds.length > 0 && <div className="mt-4 space-y-2">{account.favouriteProductIds.map(id => <div key={id} className="flex items-center justify-between gap-3 border-t border-[#eadfd6] pt-2"><span className="text-sm">{menu.find(product => product.id === id)?.name ?? "Saved item (not on this branch menu)"}</span><button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/favourites/${id}`, {method: "DELETE", credentials: "include"}), "Favourites updated.");}} className="min-h-11 text-sm font-semibold text-[#7a1625]">Remove</button></div>)}</div>}
             {branch ? <><button type="button" disabled={busy} onClick={() => {setBusy(true); void getMenu(branch.id).then(categories => setMenu(categories.flatMap(category => category.products))).catch(() => setMessage("Menu unavailable. Please try again.")).finally(() => setBusy(false));}} className="mt-4 min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]">Browse {branch.name} items</button>
                 {menu.length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2">{menu.filter(product => product.available).slice(0, 30).map(product => <div key={product.id} className="flex items-center justify-between gap-3 border-t border-[#eadfd6] py-2"><span className="text-sm">{product.name}</span><button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/favourites/${product.id}`, {method: account.favouriteProductIds.includes(product.id) ? "DELETE" : "PUT", credentials: "include"}), "Favourites updated.");}} className="min-h-11 text-sm font-semibold text-[#7a1625]">{account.favouriteProductIds.includes(product.id) ? "Remove" : "Save"}</button></div>)}</div>}</> : <Link href="/menu" className="mt-4 inline-block text-sm font-semibold text-[#7a1625] underline">Choose a branch →</Link>}
-        </section>
+        </section>}
+        {activeSection === "details" && <section id="account-details" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div><h2 className="text-xl font-bold text-[#241715]">Profile details</h2>
+                    <p className="mt-1 text-sm text-[#756763]">Your contact and saved choices.</p></div>
+                {!editingDetails && <button type="button" onClick={() => {setNameDraft(session.name ?? ""); setEditingDetails(true);}}
+                    className="rounded-full border border-[#d8c6ba] px-5 py-2 text-sm font-semibold text-[#173c39]">Edit</button>}
+            </div>
+            <dl className="mt-6 grid gap-5 sm:grid-cols-2">
+                <div><dt className="text-xs font-bold uppercase tracking-wide text-[#756763]">Name</dt>
+                    <dd className="mt-2 font-semibold text-[#241715]">{displayName}</dd></div>
+                <div><dt className="text-xs font-bold uppercase tracking-wide text-[#756763]">Verified phone</dt>
+                    <dd className="mt-2 font-semibold text-[#241715]">{maskedPhone}</dd></div>
+                <div><dt className="text-xs font-bold uppercase tracking-wide text-[#756763]">Saved addresses</dt>
+                    <dd className="mt-2 font-semibold text-[#241715]">{account.addresses.length}</dd></div>
+                <div><dt className="text-xs font-bold uppercase tracking-wide text-[#756763]">Preferred branch</dt>
+                    <dd className="mt-2 font-semibold text-[#241715]">{account.preferences.preferredBranchId === branch?.id ? branch?.name : "Manage in Preferences"}</dd></div>
+            </dl>
+            {editingDetails && <form className="mt-7 border-t border-[#eadfd6] pt-6" onSubmit={event => {event.preventDefault(); void saveDetails();}}>
+                <label htmlFor="account-name-edit" className="text-sm font-semibold text-[#241715]">Your name</label>
+                <input id="account-name-edit" autoComplete="name" required minLength={2} maxLength={80} value={nameDraft}
+                    onChange={event => setNameDraft(event.target.value)} className="mt-2 block min-h-11 w-full rounded-xl border border-[#d8c6ba] px-4 text-base" />
+                <p className="mt-3 text-sm text-[#756763]">Your verified phone stays linked to your account. Saved addresses and preferences can be edited in their sections.</p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                    <button type="submit" disabled={busy || nameDraft.trim() === (session.name ?? "")}
+                        className="min-h-11 rounded-xl bg-[#173c39] px-5 text-sm font-semibold text-white disabled:opacity-50">Save name</button>
+                    <button type="button" onClick={() => {setEditingDetails(false); setNameDraft(session.name ?? "");}}
+                        className="min-h-11 rounded-xl border border-[#d8c6ba] px-5 text-sm font-semibold">Cancel</button>
+                </div>
+            </form>}
+            <div className="mt-7 flex flex-wrap gap-4 border-t border-[#eadfd6] pt-5">
+                <button type="button" onClick={() => showSection("addresses")} className="text-sm font-semibold text-[#7a1625] underline">Manage addresses</button>
+                <button type="button" onClick={() => showSection("preferences")} className="text-sm font-semibold text-[#7a1625] underline">Manage preferences</button>
+                <button type="button" disabled={busy} onClick={() => {void signOut();}} className="text-sm font-semibold text-[#7a1625] underline disabled:opacity-50">Sign out</button>
+            </div>
+        </section>}
         {message && <p role="status" aria-live="polite" className="rounded-xl border border-[#eadfd6] bg-white p-4 text-sm">{message}</p>}
             </div>
         </div>
