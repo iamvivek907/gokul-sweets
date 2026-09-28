@@ -19,8 +19,8 @@ export default function DeliveryDispatchPage() {
     const [message, setMessage] = useState("");
     const [newRider, setNewRider] = useState("");
     const [busy, setBusy] = useState(false);
-    const path = branchId ? `/api/admin/branches/${branchId}/delivery-dispatch` : "";
-    useEffect(() => {if (profile && branchId === null && profile.branchIds.length) setBranchId(profile.branchIds[0]);}, [profile, branchId]);
+    const activeBranch = branchId ?? profile?.branchIds[0] ?? null;
+    const path = activeBranch ? `/api/admin/branches/${activeBranch}/delivery-dispatch` : "";
     const refresh = useCallback(async (signal?: AbortSignal) => {
         if (!authorization || !path) return;
         const [ordersResponse, ridersResponse] = await Promise.all([
@@ -32,7 +32,8 @@ export default function DeliveryDispatchPage() {
     }, [authorization, path]);
     useEffect(() => {
         const controller = new AbortController();
-        refresh(controller.signal).catch(error => {if (!controller.signal.aborted) setMessage(String(error));});
+        void Promise.resolve().then(() => refresh(controller.signal))
+            .catch(error => {if (!controller.signal.aborted) setMessage(String(error));});
         return () => controller.abort();
     }, [refresh]);
     async function send(url: string, body: object) {
@@ -50,7 +51,7 @@ export default function DeliveryDispatchPage() {
     return <main className="mx-auto max-w-6xl space-y-5 p-5">
         <h1 className="text-2xl font-bold">Delivery dispatch</h1>
         <p className="text-sm">Pilot rider assignments are limited to one order per rider and window. Window times are IST.</p>
-        <label className="block">Branch <select className="ml-2 rounded border p-2" value={branchId ?? ""}
+        <label className="block">Branch <select className="ml-2 rounded border p-2" value={activeBranch ?? ""}
             onChange={event => setBranchId(Number(event.target.value))}>
             {profile?.branchIds.map(id => <option key={id} value={id}>{id}</option>)}
         </select></label>
@@ -61,7 +62,7 @@ export default function DeliveryDispatchPage() {
             void send(`${path}/riders`, {name: newRider.trim()}).then(() => setNewRider(""));
         }}><input className="rounded border p-2" aria-label="New rider name" placeholder="New pilot rider"
             value={newRider} onChange={event => setNewRider(event.target.value)} />
-            <button disabled={busy || !branchId} className="rounded border px-3 py-2">Add rider</button></form>}
+            <button disabled={busy || !activeBranch} className="rounded border px-3 py-2">Add rider</button></form>}
         {!rows.length && <p>No active deliveries for this branch and the next two days.</p>}
         <div className="grid gap-4">{rows.map(row => <section key={row.orderId} className="rounded-xl border bg-white p-4">
             <div className="flex flex-wrap justify-between gap-2"><strong>{row.orderNumber}</strong>
