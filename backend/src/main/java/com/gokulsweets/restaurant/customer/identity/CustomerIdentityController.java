@@ -39,7 +39,7 @@ public class CustomerIdentityController {
     private static final String DEVICE_COOKIE = "__Host-gokul-device";
     private final VerifiedIdentityExchange exchange;
     private final VerifiedCustomerSessionStore sessions;
-    private final VerifiedCustomerSubjectStore subjects;
+    private final VerifiedCustomerPhoneLookup subjects;
     private final EnhancementProperties features;
     private final Environment settings;
     private final WebCorsProperties cors;
