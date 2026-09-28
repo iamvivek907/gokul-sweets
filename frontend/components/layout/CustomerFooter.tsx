@@ -31,6 +31,11 @@ export default function CustomerFooter() {
             <div><h3>YOUR ORDER</h3><Link href="/orders">Orders</Link><Link href="/profile">Profile</Link><span>Pickup only</span></div>
             <div><h3>GOOD TO KNOW</h3><span>Choose a branch to see its live menu.</span><span>Pickup times and the full price are confirmed before payment.</span></div>
         </div>
-        <div className="gokul-footer-bottom"><span>© Gokul Sweets</span>{fssaiLicenceNumber && <span>FSSAI licence no. {fssaiLicenceNumber} · {branch?.name}</span>}<span>Made with care, ready for pickup.</span></div>
+        {fssaiLicenceNumber && <div className="gokul-fssai" aria-label={`FSSAI licence number for ${branch?.name}: ${fssaiLicenceNumber}`}>
+            <span className="gokul-fssai-business">Gokul Sweets · {branch?.name}</span>
+            <span className="gokul-fssai-mark" aria-hidden="true">fssai</span>
+            <span className="gokul-fssai-number">Lic. No. {fssaiLicenceNumber}</span>
+        </div>}
+        <div className="gokul-footer-bottom"><span>© Gokul Sweets</span><span>Made with care, ready for pickup.</span></div>
     </footer>;
 }
