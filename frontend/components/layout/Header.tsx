@@ -98,8 +98,10 @@ export default function Header() {
                         </Link>}
                 </div>}
 
-                <div className="ml-auto flex shrink-0 items-center sm:order-1"><CustomerAccountLink /></div>
-                <MobileMenu />
+                <div className="customer-header-actions ml-auto flex shrink-0 flex-row-reverse items-center gap-3 sm:flex-row">
+                    <MobileMenu />
+                    <CustomerAccountLink />
+                </div>
 
             </div>
 
