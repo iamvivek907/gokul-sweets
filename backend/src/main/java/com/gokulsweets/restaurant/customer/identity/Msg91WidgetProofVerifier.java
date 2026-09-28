@@ -20,7 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 @Slf4j
 public class Msg91WidgetProofVerifier {
-    private static final URI VERIFY_URL = URI.create("https://api.msg91.com/api/v5/widget/verifyAccessToken");
+    private static final URI VERIFY_URL = URI.create("https://control.msg91.com/api/v5/widget/verifyAccessToken");
     private final EnhancementProperties features;
     private final Environment environment;
     private final ObjectMapper mapper;
