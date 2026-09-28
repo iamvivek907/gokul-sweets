@@ -19,6 +19,7 @@
 .checkout-experience-content section button[class*="bg-[#7a1625]"]:disabled{background:#927e83!important;color:#f7ece9!important;box-shadow:none}
 .checkout-experience-content section :is(input,textarea,select){color:#281c25;background:#fff9f1}
 .checkout-experience-content section :is(a,button,input,select,textarea):focus-visible,.checkout-experience-branch button:focus-visible{outline:3px solid #85d5fa;outline-offset:3px}
+#customer-phone:focus-visible{outline:none}
 .checkout-experience-content section h1,.checkout-experience-content section h2{font-family:Georgia,"Times New Roman",serif;letter-spacing:-.035em}
 .checkout-experience-content section h1{font-size:clamp(2rem,4vw,3.1rem);line-height:1.1}
 .checkout-experience-content section [role="alert"]{border-color:#f4aeb3}

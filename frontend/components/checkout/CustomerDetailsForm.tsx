@@ -310,7 +310,7 @@ export default function CustomerDetailsForm({
                             }
                         }
                         autoComplete="tel"
-                        placeholder="9876543210"
+                        placeholder="Enter 10-digit mobile number"
                         className="
                             min-h-12
                             min-w-0
