@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
@@ -61,7 +62,7 @@ public class StaffSessionService {
                     String token = randomToken();
                     jdbc.update("DELETE FROM staff_mfa_enrollments WHERE staff_id = ?", user.getId());
                     jdbc.update("INSERT INTO staff_mfa_enrollments(token_hash, staff_id, expires_at) VALUES (?, ?, ?)",
-                            hash(token), user.getId(), now.plusSeconds(300));
+                            hash(token), user.getId(), Timestamp.from(now.plusSeconds(300)));
                     jdbc.update("DELETE FROM staff_login_limits WHERE username = ?", limitKey);
                     audit(user.getId(), "MFA_ENROLLMENT_STARTED");
                     return new SignIn(token, null, user, true);
@@ -104,7 +105,7 @@ public class StaffSessionService {
         if (token == null || token.length() != 43) throw new IllegalArgumentException("Enrollment expired.");
         return jdbc.query("""
                 SELECT staff_id FROM staff_mfa_enrollments WHERE token_hash = ? AND expires_at > ?
-                """, (rs, index) -> new Enrollment(token, rs.getLong(1)), hash(token), Instant.now(inventoryClock))
+                """, (rs, index) -> new Enrollment(token, rs.getLong(1)), hash(token), Timestamp.from(Instant.now(inventoryClock)))
                 .stream().findFirst().orElseThrow(() -> new IllegalArgumentException("Enrollment expired."));
     }
 
@@ -112,7 +113,8 @@ public class StaffSessionService {
     public SignIn issue(StaffUser user) {
         String token = randomToken(), csrf = derivedCsrf(token);
         jdbc.update("INSERT INTO staff_sessions(token_hash, staff_id, csrf_hash, staff_updated_at, expires_at) VALUES (?, ?, ?, ?, ?)",
-                hash(token), user.getId(), hash(csrf), user.getUpdatedAt(), Instant.now(inventoryClock).plusSeconds(8 * 3600));
+                hash(token), user.getId(), hash(csrf), user.getUpdatedAt(),
+                Timestamp.from(Instant.now(inventoryClock).plusSeconds(8 * 3600)));
         return new SignIn(token, csrf, user, false);
     }
 
@@ -125,7 +127,7 @@ public class StaffSessionService {
                 WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
                   AND s.staff_updated_at = u.updated_at AND u.active
                 """, (rs, row) -> new Verified(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getTimestamp(4).toInstant()),
-                hash(token), Instant.now(inventoryClock)).stream().findFirst().orElse(null);
+                hash(token), Timestamp.from(Instant.now(inventoryClock))).stream().findFirst().orElse(null);
     }
 
     @Transactional public void revoke(String token) {
