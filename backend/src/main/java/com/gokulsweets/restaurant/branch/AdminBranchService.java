@@ -210,6 +210,7 @@ public class AdminBranchService {
                 request.state(),
                 request.pincode(),
                 request.phone(),
+                request.fssaiLicenceNumber(),
                 request.latitude(),
                 request.longitude(),
                 request.openingTime(),
@@ -294,6 +295,7 @@ public class AdminBranchService {
                 request.state(),
                 request.pincode(),
                 request.phone(),
+                request.fssaiLicenceNumber(),
                 request.latitude(),
                 request.longitude(),
                 request.openingTime(),
@@ -497,6 +499,8 @@ public class AdminBranchService {
 
             String phone,
 
+            String fssaiLicenceNumber,
+
             BigDecimal latitude,
 
             BigDecimal longitude,
@@ -547,6 +551,8 @@ public class AdminBranchService {
                         phone
                 )
         );
+
+        branch.setFssaiLicenceNumber(normalizeNullableText(fssaiLicenceNumber));
 
 
         branch.setLatitude(
