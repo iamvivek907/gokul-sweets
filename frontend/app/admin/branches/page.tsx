@@ -23,6 +23,7 @@ import {
 } from "@/components/admin/BranchOperationalSettings";
 import {DeliveryZonesSettings} from "@/components/admin/DeliveryZonesSettings";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import type {
     AdminBranch,
@@ -259,6 +260,7 @@ export default function AdminBranchesPage() {
         hasPermission
     } =
         useAdminAuth();
+    const staffId = profile?.staffId;
 
 
     const [
@@ -375,17 +377,10 @@ export default function AdminBranchesPage() {
                     );
 
 
-                const targetBranch =
-                    preferredBranchId !== undefined
-                        ? result.find(
-                            branch =>
-                                branch.id
-                                === preferredBranchId
-                        )
-                        ?? result[0]
-                        ?? null
-                        : result[0]
-                        ?? null;
+                const targetId = staffId
+                    ? preferredAdminBranchId(staffId, result, preferredBranchId)
+                    : result[0]?.id ?? null;
+                const targetBranch = result.find(branch => branch.id === targetId) ?? null;
 
 
                 setBranches(
@@ -412,7 +407,7 @@ export default function AdminBranchesPage() {
                     false
                 );
             },
-            []
+            [staffId]
         );
 
 
@@ -441,9 +436,10 @@ export default function AdminBranchesPage() {
                 .then(
                     result => {
 
-                        const firstBranch =
-                            result[0]
-                            ?? null;
+                        const selectedId = staffId
+                            ? preferredAdminBranchId(staffId, result)
+                            : result[0]?.id ?? null;
+                        const firstBranch = result.find(branch => branch.id === selectedId) ?? null;
 
 
                         setBranches(
@@ -506,7 +502,8 @@ export default function AdminBranchesPage() {
         },
         [
             authorization,
-            canManage
+            canManage,
+            staffId
         ]
     );
 
@@ -1266,6 +1263,7 @@ export default function AdminBranchesPage() {
                                                                     setSelectedBranchId(
                                                                         branch.id
                                                                     );
+                                                                    if (profile) rememberAdminBranchId(profile.staffId, branch.id);
 
 
                                                                     setForm(
