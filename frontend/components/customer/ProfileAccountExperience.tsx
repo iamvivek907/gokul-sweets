@@ -1,7 +1,6 @@
 "use client";
 
 import {useState} from "react";
-import Link from "next/link";
 import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import CustomerAccountHub from "@/components/customer/CustomerAccountHub";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
@@ -22,22 +21,16 @@ export default function ProfileAccountExperience() {
         <section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Rewards">
             <h2 className="text-xl font-semibold text-[#241715]">Rewards</h2><p className="mt-2 text-sm leading-6 text-[#756763]">Earned points are not available yet. A balance will appear here when the rewards programme is launched.</p></section></div>;
 
-    return <div className="mx-auto max-w-5xl px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
-        <header className="account-profile-heading relative overflow-hidden rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-10">
-            <p className="text-xs font-semibold uppercase tracking-[0.17em] text-[#c88a20]">Gokul Sweets · Your space</p>
-            <h1 className="mt-3 text-3xl font-bold tracking-tight text-[#241715] sm:text-5xl">{session?.authenticated ? `Welcome${session.name ? `, ${session.name}` : " back"}` : "Welcome to Gokul"}</h1>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-[#756763]">Your orders, favourite sweets and saved choices in one place.</p>
-            {session?.authenticated && <span className="mt-5 inline-flex rounded-full border border-[#c88a20] px-4 py-2 text-xs font-semibold text-[#7a1625]">✓ Verified account</span>}
-        </header>
-        <CustomerAccountHub session={session} />
-        <div className="mt-7 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <section className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Account and privacy</h2>
-                <p className="mt-2 text-sm text-[#756763]">Manage your verified number and name, then choose how your data is used.</p>
-                <Link href="/profile/privacy" className="mt-5 inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">Privacy and data choices →</Link></section>
-            <section className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]">Enjoy Gokul your way</h2>
-                <p className="mt-2 text-sm text-[#756763]">Browse the current branch menu for today&apos;s selection.</p>
-                <Link href="/menu" className="mt-5 inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">Explore the menu →</Link></section>
-        </div>
-        <div className="mx-auto mt-8 max-w-2xl"><CustomerIdentityPanel onSessionChange={setSession} /><InstallAppBanner /></div>
+    return <div className="mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
+        {session?.authenticated ? <CustomerAccountHub session={session} /> :
+            <header className="account-profile-heading rounded-3xl border border-[#eadfd6] bg-white p-7 sm:p-10">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]">Your Gokul profile</p>
+                <h1 className="mt-3 text-3xl font-bold text-[#241715] sm:text-4xl">All your Gokul moments, together.</h1>
+                <p className="mt-3 max-w-xl text-sm text-[#756763]">Sign in to see your earned badges, orders and saved choices.</p>
+            </header>}
+        <section id="account-details" className="account-details-section mt-7 max-w-3xl scroll-mt-24">
+            <CustomerIdentityPanel onSessionChange={setSession} />
+        </section>
+        <div className="mt-8 max-w-3xl"><InstallAppBanner /></div>
     </div>;
 }
