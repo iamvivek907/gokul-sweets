@@ -5,6 +5,7 @@ import {formatBusinessTime} from "@/lib/businessTime";
 
 import {
     useMemo,
+    useState,
     useSyncExternalStore
 } from "react";
 
@@ -20,7 +21,7 @@ import CheckoutStateCard
 
 import CustomerDetailsForm
     from "@/components/checkout/CustomerDetailsForm";
-import CustomerIdentityPanel from "@/components/customer/CustomerIdentityPanel";
+import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
@@ -78,6 +79,8 @@ export default function CustomerPage() {
 
     const router =
         useRouter();
+
+    const [identity, setIdentity] = useState<CustomerSession | null>(null);
 
 
     const {
@@ -151,6 +154,11 @@ export default function CustomerPage() {
             ]
         );
 
+
+    const verifiedPhone = identity?.authenticated ? identity.phone ?? null : null;
+    const checkoutCustomer = identity?.authenticated
+        ? {name: identity.name?.trim() || existingCustomer?.name || "", phone: verifiedPhone ?? ""}
+        : existingCustomer;
 
     /*
      * =========================================================
@@ -494,19 +502,20 @@ export default function CustomerPage() {
                                     text-[#756763]
                                 "
                             >
-                                No account is required. We&apos;ll only use these details
-                                for this checkout and pickup communication.
+                                We&apos;ll use these details for pickup and order updates. Sign in to fill your verified contact, or continue as a guest.
                             </p>
 
                         </div>
 
 
-                        <CustomerIdentityPanel />
+                        <CustomerIdentityPanel mode="checkout" onSessionChange={setIdentity} />
 
                         <CustomerDetailsForm
+                            key={identity?.authenticated ? `verified:${identity.phone}:${identity.name ?? ""}` : "guest"}
                             initialValue={
-                                existingCustomer
+                                checkoutCustomer
                             }
+                            verifiedPhone={verifiedPhone}
                             onSubmit={
                                 handleCustomerSubmit
                             }

@@ -14,6 +14,8 @@ interface CustomerDetailsFormProps {
     initialValue?:
         CustomerDetails | null;
 
+    verifiedPhone?: string | null;
+
     onSubmit:
         (customer: CustomerDetails) => void;
 }
@@ -54,6 +56,7 @@ function validateIndianPhone(
 
 export default function CustomerDetailsForm({
     initialValue,
+    verifiedPhone,
     onSubmit
 }: CustomerDetailsFormProps) {
 
@@ -99,7 +102,7 @@ export default function CustomerDetailsForm({
 
         const normalizedPhone =
             normalizePhone(
-                phone
+                verifiedPhone ?? phone
             );
 
 
@@ -292,6 +295,7 @@ export default function CustomerDetailsForm({
                         value={
                             phone
                         }
+                        readOnly={Boolean(verifiedPhone)}
                         onChange={
                             event => {
 
@@ -354,9 +358,7 @@ export default function CustomerDetailsForm({
                         text-[#756763]
                     "
                 >
-                    We&apos;ll use this number for
-                    order updates and pickup
-                    identification.
+                    {verifiedPhone ? "Your verified number is used for order updates and pickup identification." : "We’ll use this number for order updates and pickup identification."}
                 </p>
 
             </div>

@@ -32,6 +32,7 @@ export default function ConsentPreferences() {
         } catch {
             setChoices(null);
             setRequests(null);
+            setError("We could not load your privacy choices. Please refresh and try again.");
         }
     }, []);
 
@@ -75,11 +76,12 @@ export default function ConsentPreferences() {
         }
     }
 
-    if (!choices) return null;
-    return <section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Privacy choices">
-        <h2 className="text-xl font-semibold text-[#241715]">Privacy choices</h2>
+    if (!choices) return error ? <p role="alert" className="mt-6 rounded-2xl border border-[#eadfd6] bg-white p-5 text-sm text-[#9e2732]">{error}</p> : <p role="status" className="mt-6 text-sm text-[#756763]">Loading choices…</p>;
+    return <section className="mt-8 rounded-3xl border border-[#e8d7c9] bg-white p-6 shadow-sm sm:p-8" aria-label="Privacy choices">
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">01 · Preferences</p>
+        <h2 className="mt-2 text-2xl font-semibold text-[#241715]">Optional communications and insights</h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">These are optional. Pickup and order updates work without them. You can change your choices anytime.</p>
-        <div className="mt-4 space-y-4">
+        <div className="mt-6 space-y-5">
             {purposes.map(({id, title, detail}) => <div key={id} className="flex items-start justify-between gap-4 border-t border-[#eadfd6] pt-4">
                 <div><p className="font-semibold text-[#241715]">{title}</p><p className="mt-1 text-sm text-[#756763]">{detail}</p></div>
                 <label className="flex shrink-0 items-center gap-2 text-sm text-[#241715]">
@@ -90,17 +92,18 @@ export default function ConsentPreferences() {
                 </label>
             </div>)}
         </div>
-        {requests && <div className="mt-6 border-t border-[#eadfd6] pt-5">
-            <h3 className="font-semibold text-[#241715]">Your data requests</h3>
-            <p className="mt-1 text-sm text-[#756763]">Submit a request for manual review. Submitting a deletion review does not immediately erase financial order records.</p>
-            <div className="mt-3 flex flex-wrap gap-3">
+        {requests && <div className="mt-10 border-t border-[#eadfd6] pt-8">
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">02 · Data requests</p>
+            <h3 className="mt-2 text-2xl font-semibold text-[#241715]">Get a copy or ask for a review</h3>
+            <p className="mt-1 text-sm text-[#756763]">Request an export of your account data, or ask us to review deletion of your account data. These requests are handled manually; requesting deletion does not erase your account or financial order records immediately.</p>
+            <div className="mt-5 flex flex-wrap gap-3">
                 {(["EXPORT", "DELETION_REVIEW"] as const).map(kind => {
                     const existing = requests.find(item => item.kind === kind);
                     return <button key={kind} type="button" disabled={Boolean(existing) || requesting !== null}
                         onClick={() => {void requestPrivacyReview(kind);}}
                         className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-60">
                         {existing ? `${kind === "EXPORT" ? "Export" : "Deletion review"} request received`
-                            : requesting === kind ? "Submitting…" : kind === "EXPORT" ? "Request data export" : "Request deletion review"}
+                            : requesting === kind ? "Submitting…" : kind === "EXPORT" ? "Request data export" : "Ask for deletion review"}
                     </button>;
                 })}
             </div>
