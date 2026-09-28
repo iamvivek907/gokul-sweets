@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {createPortal} from "react-dom";
 
 import {
     useEffect,
@@ -17,6 +18,7 @@ import {
 import {ADMIN_SESSION_STORAGE_KEY} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
 import type {AdminSession} from "@/types/admin";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 
 /*
@@ -100,6 +102,8 @@ export default function MobileMenu() {
     ] =
         useState(false);
     const [staffAccess, setStaffAccess] = useState(false);
+    const features = useStorefrontFeatures();
+    const themed = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
 
     useEffect(() => {
         if (!open) return;
@@ -377,6 +381,7 @@ export default function MobileMenu() {
             </button>
 
 
+            {open && createPortal(<div className={themed ? "future-storefront" : undefined}>
             <div
                 aria-hidden="true"
                 onClick={
@@ -505,7 +510,9 @@ export default function MobileMenu() {
                 <nav
                     className="
                         flex-1
+                        min-h-0
                         overflow-y-auto
+                        overscroll-contain
                         px-4
                         py-5
                     "
@@ -869,6 +876,7 @@ export default function MobileMenu() {
                 </div>
 
             </aside>
+            </div>, document.body)}
 
         </>
     );
