@@ -5,11 +5,17 @@ import Link from "next/link";
 import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import CustomerAccountHub from "@/components/customer/CustomerAccountHub";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
-import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
 
 export default function ProfileAccountExperience() {
     const [session, setSession] = useState<CustomerSession | null>(null);
-    const enabled = useStorefrontFeatures()?.customerAccountHub === true;
+    const {features, error, retry} = useStorefrontConfiguration();
+    const enabled = features?.customerAccountHub === true;
+
+    if (!features) return <div className="mx-auto max-w-xl py-8 text-sm text-[#756763]" role="status">
+        {error ?? "Loading your profile…"}
+        {error && <button type="button" onClick={retry} className="ml-3 font-semibold text-[#7a1625] underline">Try again</button>}
+    </div>;
 
     if (!enabled) return <div className="mx-auto max-w-xl"><p className="text-xs font-semibold uppercase tracking-wide text-[#c88a20]">Your account</p>
         <h1 className="mt-1 text-2xl font-bold">Profile</h1><InstallAppBanner /><CustomerIdentityPanel />
