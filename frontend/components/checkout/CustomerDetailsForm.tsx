@@ -1,7 +1,6 @@
 "use client";
 
 import {
-    useEffect,
     useState
 } from "react";
 
@@ -89,14 +88,6 @@ export default function CustomerDetailsForm({
             {}
         );
 
-
-    useEffect(() => {
-        if (!verifiedPhone) return;
-        // The session arrives asynchronously, after the saved guest details.
-        setPhone(normalizePhone(verifiedPhone).slice(0, 10));
-        if (initialValue?.name) setName(initialValue.name);
-        setErrors({});
-    }, [verifiedPhone, initialValue?.name]);
 
     function handleSubmit(
         event: React.FormEvent<HTMLFormElement>
