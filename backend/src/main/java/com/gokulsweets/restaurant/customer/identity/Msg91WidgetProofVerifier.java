@@ -4,6 +4,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -17,6 +18,7 @@ import java.util.Map;
 /** Server-only verification of an MSG91 widget proof; never trust a client phone claim. */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class Msg91WidgetProofVerifier {
     private static final URI VERIFY_URL = URI.create("https://api.msg91.com/api/v5/widget/verifyAccessToken");
     private final EnhancementProperties features;
@@ -30,6 +32,7 @@ public class Msg91WidgetProofVerifier {
         var authkey = environment.getProperty("gokul.msg91.server-authkey", "");
         if (authkey.isBlank() || accessToken == null || accessToken.isBlank()
                 || accessToken.length() > 4096) {
+            log.warn("MSG91 verification unavailable: missing server configuration or invalid proof input");
             throw new IllegalStateException("Customer identity verification is unavailable");
         }
         try {
@@ -42,13 +45,24 @@ public class Msg91WidgetProofVerifier {
             var response = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3))
                     .build().send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
+                log.warn("MSG91 verification unavailable: provider HTTP status {}", response.statusCode());
                 throw new IllegalStateException("MSG91 verification failed");
             }
-            return verifiedPhoneFromResponse(mapper.readTree(response.body()));
+            try {
+                return verifiedPhoneFromResponse(mapper.readTree(response.body()));
+            } catch (IllegalStateException e) {
+                log.warn("MSG91 verification unavailable: unrecognized or unsuccessful provider response");
+                throw e;
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            log.warn("MSG91 verification unavailable: interrupted");
             throw new IllegalStateException("MSG91 verification was interrupted", e);
         } catch (Exception e) {
+            if (!(e instanceof IllegalStateException)) {
+                log.warn("MSG91 verification unavailable: request or response processing ({})",
+                        e.getClass().getSimpleName());
+            }
             throw new IllegalStateException("MSG91 verification failed", e);
         }
     }
