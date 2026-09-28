@@ -126,6 +126,12 @@ public class DeliveryCapacityService {
                 zoneId, Date.valueOf(request.serviceDate())).stream()
                 .filter(window -> request.serviceDate().isAfter(today)
                         || window.startsAt().isAfter(LocalTime.now(inventoryClock)))
+                .filter(window -> !flags.isDeliveryDispatchPilot() ||
+                        jdbc.queryForObject("""
+                            SELECT count(*) FROM delivery_rider_availability a
+                            JOIN delivery_pilot_riders r ON r.id = a.rider_id
+                            WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
+                            """, Integer.class, window.id(), request.branchId()) > window.reservedCount())
                 .toList();
         return new Quote(windows, false, windows.isEmpty()
                 ? "No delivery windows are currently configured with rider capacity."

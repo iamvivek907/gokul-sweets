@@ -69,6 +69,8 @@ public class EnhancementProperties {
     private boolean deliveryCheckout;
     /** SCRUM-31: reviewed, versioned delivery costs; OFF until finance approves inputs. */
     private boolean deliveryEconomics;
+    /** SCRUM-32: supervised rider assignment and exception board, OFF during migration. */
+    private boolean deliveryDispatchPilot;
 
     public boolean deliveryCheckoutReady() {
         return deliveryCheckout && deliveryAcceptedQuote && deliveryRiderHolds

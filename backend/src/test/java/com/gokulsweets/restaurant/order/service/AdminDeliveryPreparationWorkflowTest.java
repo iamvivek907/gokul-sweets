@@ -26,8 +26,9 @@ class AdminDeliveryPreparationWorkflowTest {
     private final StaffAuthorizationService staff = mock(StaffAuthorizationService.class);
     private final KotService kots = mock(KotService.class);
     private final PreparationEligibilityService eligibility = mock(PreparationEligibilityService.class);
+    private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch = mock(com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService.class);
     private final AdminOrderWorkflowService workflow = new AdminOrderWorkflowService(
-            orders, queries, staff, kots, eligibility);
+            orders, queries, staff, kots, eligibility, dispatch);
     private Order order;
 
     @BeforeEach
