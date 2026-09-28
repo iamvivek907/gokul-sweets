@@ -17,6 +17,8 @@ type Msg91Window = Window & {initSendOTP?: (configuration: {
     failure: () => void;
 }) => void};
 
+type CustomerSession = {authenticated: boolean; phone?: string};
+
 async function loadWidget(): Promise<Msg91Window> {
     const sdk = window as Msg91Window;
     if (sdk.initSendOTP) return sdk;
@@ -39,7 +41,7 @@ async function loadWidget(): Promise<Msg91Window> {
 export default function CustomerIdentityPanel() {
     const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
         widgetId && widgetToken ? "loading" : "disabled");
-    const [verified, setVerified] = useState(false);
+    const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const alive = useRef(true);
@@ -54,9 +56,9 @@ export default function CustomerIdentityPanel() {
                 if (!alive.current) return;
                 if (!config.enabled) {setAvailability("disabled"); return;}
                 setAvailability("ready");
-                const session = await apiClient<{authenticated: boolean}>(
+                const session = await apiClient<CustomerSession>(
                     "/api/customer/identity/me", {credentials: "include"});
-                if (alive.current) setVerified(session.authenticated);
+                if (alive.current) setSession(session);
             } catch {
                 if (alive.current) setAvailability("error");
             }
@@ -98,22 +100,27 @@ export default function CustomerIdentityPanel() {
                     exchanging.current = true;
                     void (async () => {
                         try {
-                            await apiClient<{authenticated: boolean}>("/api/customer/identity/exchange", {
+                            await apiClient<CustomerSession>("/api/customer/identity/exchange", {
                                 method: "POST", credentials: "include", body: JSON.stringify({accessToken})
                             });
+                            const signedIn = await apiClient<CustomerSession>(
+                                "/api/customer/identity/me", {credentials: "include"});
+                            if (!signedIn.authenticated || !signedIn.phone) {
+                                throw new Error("Customer session was not established");
+                            }
                             if (alive.current) {
-                                setVerified(true);
+                                setSession(signedIn);
                                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
                             }
                         } catch {
-                            if (alive.current) setError("Verification could not be completed. Please try again.");
+                            if (alive.current) setError("The OTP was accepted, but sign-in could not be completed. Please try again.");
                         } finally {
                             exchanging.current = false;
                             if (alive.current) setBusy(false);
                         }
                     })();
                 },
-                failure: () => {if (alive.current) {setError("Verification was cancelled or failed."); setBusy(false);}}
+                failure: () => {if (alive.current && !exchanging.current) {setError("Verification was cancelled or failed."); setBusy(false);}}
             });
         } catch {
             setError("Verification is unavailable right now. You can continue as a guest.");
@@ -127,7 +134,7 @@ export default function CustomerIdentityPanel() {
         try {
             await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
             if (alive.current) {
-                setVerified(false);
+                setSession({authenticated: false});
                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
             }
         } catch {
@@ -139,15 +146,18 @@ export default function CustomerIdentityPanel() {
 
     return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Phone verification">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">Your account</p>
-        <h2 className="mt-2 text-xl font-semibold text-[#241715]">{verified ? "Phone verified" : "Verify your phone"}</h2>
+        <h2 className="mt-2 text-xl font-semibold text-[#241715]">{session.authenticated ? "Signed in" : "Verify your phone"}</h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
-            {verified ? "Your phone is verified for this session."
+            {session.authenticated ? "Your phone is verified. This device stays signed in for up to 30 days unless you sign out or verify again on another device."
                 : "Optional verification helps secure your account. You can still place a pickup order as a guest."}
         </p>
-        <button type="button" disabled={busy} onClick={() => {void (verified ? logout() : start());}}
+        {session.authenticated && session.phone && <p className="mt-2 text-sm font-semibold text-[#241715]">
+            Verified phone: <span className="select-text">{session.phone}</span>
+        </p>}
+        <button type="button" disabled={busy} onClick={() => {void (session.authenticated ? logout() : start());}}
             className="mt-4 min-h-11 rounded-full bg-[#7a1625] px-6 py-2 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? "Please wait…" : verified ? "Sign out" : "Verify with SMS"}
+            {busy ? "Please wait…" : session.authenticated ? "Sign out" : "Verify with SMS"}
         </button>
         {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
-    </section>{verified && <ConsentPreferences />}</>;
+    </section>{session.authenticated && <ConsentPreferences />}</>;
 }

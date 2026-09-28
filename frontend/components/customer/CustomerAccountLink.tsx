@@ -1,0 +1,36 @@
+"use client";
+
+import Link from "next/link";
+import {useEffect, useState} from "react";
+import {apiClient} from "@/services/apiClient";
+
+type CustomerSession = {authenticated: boolean; phone?: string};
+
+/** Shared header entry point; session changes are announced by the profile panel. */
+export default function CustomerAccountLink() {
+    const [session, setSession] = useState<CustomerSession>({authenticated: false});
+
+    useEffect(() => {
+        let active = true;
+        const refresh = () => {
+            void apiClient<{enabled: boolean}>("/api/storefront/customer-identity")
+                .then(config => config.enabled
+                    ? apiClient<CustomerSession>("/api/customer/identity/me", {credentials: "include"})
+                    : {authenticated: false})
+                .then(current => {if (active) setSession(current);})
+                .catch(() => {if (active) setSession({authenticated: false});});
+        };
+        refresh();
+        window.addEventListener("gokul-customer-identity-changed", refresh);
+        return () => {
+            active = false;
+            window.removeEventListener("gokul-customer-identity-changed", refresh);
+        };
+    }, []);
+
+    const phone = session.authenticated ? session.phone : undefined;
+    return <Link href="/profile" className="customer-account-link shrink-0 rounded-full border border-[#d8c6ba] px-3 py-2 text-sm font-semibold text-[#173c39]"
+        aria-label={phone ? `Account, verified phone ending ${phone.slice(-4)}` : "Log in to your account"}>
+        {phone ? `•••• ${phone.slice(-4)}` : session.authenticated ? "Account" : "Log in"}
+    </Link>;
+}

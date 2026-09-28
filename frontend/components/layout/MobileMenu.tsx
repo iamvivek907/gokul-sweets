@@ -71,8 +71,7 @@ const MENU_ITEMS: MenuItem[] = [
     {
         label: "Profile",
         href: "/profile",
-        description: "Manage your profile",
-        disabled: true
+        description: "Manage your profile"
     },
     {
         label: "About Gokul Sweets",
