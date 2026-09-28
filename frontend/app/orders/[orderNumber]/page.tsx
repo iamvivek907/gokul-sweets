@@ -512,6 +512,12 @@ export default function OrderDetailPage() {
                         </div>
                     </div>
 
+                    {order.branchFssaiLicenceNumber && <div className="gokul-fssai order-fssai" aria-label={`FSSAI licence number for ${order.branchName}: ${order.branchFssaiLicenceNumber}`}>
+                        <span className="gokul-fssai-business">Gokul Sweets · {order.branchName}</span>
+                        <span className="gokul-fssai-mark" aria-hidden="true">fssai</span>
+                        <span className="gokul-fssai-number">Lic. No. {order.branchFssaiLicenceNumber}</span>
+                    </div>}
+
                     {order.orderStatus === terminalStatus && (
                         <OrderReviewCard
                             orderNumber={order.orderNumber}
