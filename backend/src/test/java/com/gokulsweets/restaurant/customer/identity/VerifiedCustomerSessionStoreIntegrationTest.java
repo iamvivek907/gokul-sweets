@@ -48,7 +48,7 @@ class VerifiedCustomerSessionStoreIntegrationTest {
                     .isNotEqualTo(afterIstMidnight.atZone(ZoneId.of("Asia/Kolkata")).toLocalDate());
             var subject = UUID.randomUUID();
             var issued = sessions.issue(ConsentEnvironment.DEV, subject, issuedAt);
-            assertThat(issued.expiresAt()).isEqualTo(issuedAt.plusSeconds(7 * 24 * 60 * 60));
+            assertThat(issued.expiresAt()).isEqualTo(issuedAt.plusSeconds(30L * 24 * 60 * 60));
             assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), afterIstMidnight))
                     .contains(subject);
             assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), issued.expiresAt().minusSeconds(1)))
