@@ -7,20 +7,21 @@ import {getBranch} from "@/services/branchApi";
 
 export default function CustomerFooter() {
     const {branch} = useSelectedBranch();
+    const branchId = branch?.id;
     const [licence, setLicence] = useState<{branchId: number; number: string | null} | null>(null);
 
     useEffect(() => {
-        if (!branch) return;
+        if (!branchId) return;
         const controller = new AbortController();
-        void getBranch(branch.id, controller.signal)
+        void getBranch(branchId, controller.signal)
             .then(current => {
-                if (!controller.signal.aborted) setLicence({branchId: branch.id, number: current.fssaiLicenceNumber});
+                if (!controller.signal.aborted) setLicence({branchId, number: current.fssaiLicenceNumber});
             })
             .catch(() => {
                 if (!controller.signal.aborted) setLicence(null);
             });
         return () => controller.abort();
-    }, [branch?.id]);
+    }, [branchId]);
 
     const fssaiLicenceNumber = branch && licence?.branchId === branch.id ? licence.number : null;
     return <footer aria-label="Customer footer" className="customer-site-footer border-t border-[#eadfd6] bg-white px-4 pt-6 pb-[calc(90px+env(safe-area-inset-bottom))]">
