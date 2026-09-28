@@ -63,10 +63,9 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
                 const config = await apiClient<{enabled: boolean}>("/api/storefront/customer-identity");
                 if (!alive.current) return;
                 if (!config.enabled) {setAvailability("disabled"); onSessionChange?.({authenticated: false}); return;}
-                setAvailability("ready");
                 const session = await apiClient<CustomerSession>(
                     "/api/customer/identity/me", {credentials: "include"});
-                if (alive.current) {setSession(session); setNameDraft(session.name ?? ""); onSessionChange?.(session);}
+                if (alive.current) {setSession(session); setNameDraft(session.name ?? ""); onSessionChange?.(session); setAvailability("ready");}
             } catch {
                 if (alive.current) {setAvailability("error"); onSessionChange?.({authenticated: false});}
             }
