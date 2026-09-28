@@ -36,6 +36,9 @@ public record AdminBranchUpdateRequest(
         )
         String phone,
 
+        @Pattern(regexp = "^$|^[0-9]{14}$", message = "FSSAI licence number must be 14 digits.")
+        String fssaiLicenceNumber,
+
         BigDecimal latitude,
 
         BigDecimal longitude,
