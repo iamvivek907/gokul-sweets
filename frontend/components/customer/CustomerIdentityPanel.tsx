@@ -148,7 +148,7 @@ export default function CustomerIdentityPanel() {
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">Your account</p>
         <h2 className="mt-2 text-xl font-semibold text-[#241715]">{session.authenticated ? "Signed in" : "Verify your phone"}</h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
-            {session.authenticated ? "Your phone is verified and you are signed in."
+            {session.authenticated ? "Your phone is verified. This device stays signed in for up to 30 days unless you sign out or verify again on another device."
                 : "Optional verification helps secure your account. You can still place a pickup order as a guest."}
         </p>
         {session.authenticated && session.phone && <p className="mt-2 text-sm font-semibold text-[#241715]">
