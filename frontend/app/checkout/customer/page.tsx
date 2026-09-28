@@ -511,6 +511,7 @@ export default function CustomerPage() {
                         <CustomerIdentityPanel mode="checkout" onSessionChange={setIdentity} />
 
                         <CustomerDetailsForm
+                            key={identity?.authenticated ? `verified:${identity.phone}:${identity.name ?? ""}` : "guest"}
                             initialValue={
                                 checkoutCustomer
                             }
