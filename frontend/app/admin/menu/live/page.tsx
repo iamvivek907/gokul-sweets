@@ -1,4 +1,5 @@
 "use client";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useCallback,
@@ -236,8 +237,7 @@ export default function AdminLiveMenuPage() {
 
                         setSelectedBranchId(
                             current =>
-                                current
-                                ?? allowedBranches[0].id
+                                preferredAdminBranchId(currentProfile.staffId, allowedBranches, current)
                         );
                     }
 
@@ -783,6 +783,7 @@ export default function AdminLiveMenuPage() {
                                     setSelectedBranchId(
                                         value
                                     );
+                                    if (profile) rememberAdminBranchId(profile.staffId, value);
 
 
                                     setCategoryId(
