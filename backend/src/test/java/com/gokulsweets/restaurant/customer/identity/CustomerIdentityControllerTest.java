@@ -28,6 +28,7 @@ import static org.mockito.Mockito.*;
 class CustomerIdentityControllerTest {
     private final VerifiedIdentityExchange exchange = mock(VerifiedIdentityExchange.class);
     private final VerifiedCustomerSessionStore sessions = mock(VerifiedCustomerSessionStore.class);
+    private final VerifiedCustomerPhoneLookup subjects = mock(VerifiedCustomerPhoneLookup.class);
     private final VerifiedOrderOwnership ownership = mock(VerifiedOrderOwnership.class);
     private final OrderQueryService orders = mock(OrderQueryService.class);
     private final IdentityExchangeRateLimiter rateLimiter = mock(IdentityExchangeRateLimiter.class);
@@ -41,7 +42,7 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.identity.provider-abuse-controls-verified", "true")
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(
-            exchange, sessions, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
+            exchange, sessions, subjects, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
             ownership, orders, rateLimiter, devices, consents, privacyRequests);
 
     @Test
@@ -185,9 +186,17 @@ class CustomerIdentityControllerTest {
         features.setCustomerOtpIdentity(true);
         var request = request();
         request.setCookies(new Cookie("__Host-gokul-customer", "session-token"));
+        var subject = UUID.randomUUID();
         when(sessions.subject(eq(ConsentEnvironment.DEV), eq("session-token"), any()))
-                .thenReturn(Optional.of(UUID.randomUUID()));
-        assertThat(controller.me(request).getBody()).containsEntry("authenticated", true);
+                .thenReturn(Optional.of(subject));
+        when(subjects.verifiedPhone(ConsentEnvironment.DEV, subject)).thenReturn(Optional.of("+919876543210"));
+        assertThat(controller.me(request).getBody())
+                .containsEntry("authenticated", true).containsEntry("phone", "+919876543210");
+        var foreign = request();
+        foreign.setCookies(new Cookie("__Host-gokul-customer", "session-token"));
+        foreign.removeHeader(HttpHeaders.ORIGIN);
+        foreign.addHeader(HttpHeaders.ORIGIN, "https://attacker.example");
+        assertThatThrownBy(() -> controller.me(foreign)).isInstanceOf(ResponseStatusException.class);
         var logout = controller.logout(request);
         verify(sessions).revoke(eq(ConsentEnvironment.DEV), eq("session-token"), any());
         assertThat(logout.getHeaders().getFirst(HttpHeaders.SET_COOKIE)).contains("Max-Age=0", "Path=/");
