@@ -11,7 +11,7 @@ export function proofFromWidget(result: unknown): string | null {
         nested?.["access-token"];
     const message = data?.message;
     const value = explicit ?? (typeof message === "string" &&
-        /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(message)
+        /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(message)
         ? message : null);
     return typeof value === "string" && value.length > 0 && value.length <= 4096
         ? value : null;
