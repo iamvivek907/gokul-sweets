@@ -459,10 +459,6 @@ public class AdminOrderWorkflowService {
          * Another terminal may have won between our read and
          * atomic update.
          */
-        if (updatedRows == 1 && order.getFulfillmentType() == FulfillmentType.DELIVERY) {
-            if (targetStatus == OrderStatus.OUT_FOR_DELIVERY) dispatch.recordTransition(order.getId(), "DISPATCHED");
-            if (targetStatus == OrderStatus.DELIVERED) dispatch.recordTransition(order.getId(), "DELIVERED");
-        }
         if (
                 updatedRows
                         ==
