@@ -51,7 +51,15 @@ public class Msg91WidgetProofVerifier {
             try {
                 return verifiedPhoneFromResponse(mapper.readTree(response.body()));
             } catch (IllegalStateException e) {
-                log.warn("MSG91 verification unavailable: unrecognized or unsuccessful provider response");
+                // These are fixed local categories. Never log the provider body, token,
+                // identifier, or a provider-supplied status/message.
+                var category = switch (e.getMessage()) {
+                    case "MSG91 did not verify the token" -> "provider did not report success";
+                    case "MSG91 did not return a verified mobile" -> "success without mobile field";
+                    case "MSG91 did not return a verified Indian mobile" -> "success without supported mobile format";
+                    default -> "unrecognized provider response";
+                };
+                log.warn("MSG91 verification unavailable: {}", category);
                 throw e;
             }
         } catch (InterruptedException e) {
@@ -76,6 +84,9 @@ public class Msg91WidgetProofVerifier {
         var data = response.path("data");
         var identifier = data.path("identifier").asText("");
         if (identifier.isEmpty()) identifier = data.path("mobile").asText("");
+        if (identifier.isEmpty()) {
+            throw new IllegalStateException("MSG91 did not return a verified mobile");
+        }
         if (!identifier.matches("91[6-9][0-9]{9}")) {
             throw new IllegalStateException("MSG91 did not return a verified Indian mobile");
         }
