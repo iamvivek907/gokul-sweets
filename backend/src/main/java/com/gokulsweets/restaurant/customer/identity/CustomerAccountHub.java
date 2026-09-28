@@ -35,7 +35,6 @@ public class CustomerAccountHub {
                 """, Long.class, environment, subject);
         var favourites = jdbc.query("""
                 SELECT f.product_id FROM verified_customer_favourites f
-                JOIN products p ON p.id = f.product_id AND p.active = TRUE
                 WHERE f.environment = ? AND f.subject_id = ? ORDER BY f.created_at DESC, f.product_id DESC
                 """, (rs, row) -> rs.getLong(1), environment, subject);
         var addresses = jdbc.query("""
