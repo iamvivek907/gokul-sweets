@@ -17,7 +17,7 @@ type Msg91Window = Window & {initSendOTP?: (configuration: {
     failure: () => void;
 }) => void};
 
-type CustomerSession = {authenticated: boolean; phone?: string};
+type CustomerSession = {authenticated: boolean; phone?: string; name?: string};
 
 async function loadWidget(): Promise<Msg91Window> {
     const sdk = window as Msg91Window;
@@ -44,6 +44,8 @@ export default function CustomerIdentityPanel() {
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [nameDraft, setNameDraft] = useState("");
+    const [nameError, setNameError] = useState<string | null>(null);
     const alive = useRef(true);
     const exchanging = useRef(false);
 
@@ -58,7 +60,7 @@ export default function CustomerIdentityPanel() {
                 setAvailability("ready");
                 const session = await apiClient<CustomerSession>(
                     "/api/customer/identity/me", {credentials: "include"});
-                if (alive.current) setSession(session);
+                if (alive.current) {setSession(session); setNameDraft(session.name ?? "");}
             } catch {
                 if (alive.current) setAvailability("error");
             }
@@ -110,6 +112,7 @@ export default function CustomerIdentityPanel() {
                             }
                             if (alive.current) {
                                 setSession(signedIn);
+                                setNameDraft(signedIn.name ?? "");
                                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
                             }
                         } catch {
@@ -144,6 +147,28 @@ export default function CustomerIdentityPanel() {
         }
     }
 
+    async function saveName() {
+        const name = nameDraft.trim();
+        if (!name || name.length < 2 || name.length > 80) {
+            setNameError("Enter your name (2 to 80 characters).");
+            return;
+        }
+        setBusy(true);
+        setNameError(null);
+        try {
+            await apiClient<void>("/api/customer/identity/me/name", {
+                method: "PUT", credentials: "include", body: JSON.stringify({name})
+            });
+            const updated = await apiClient<CustomerSession>("/api/customer/identity/me", {credentials: "include"});
+            if (!updated.authenticated) throw new Error("Session expired");
+            if (alive.current) {setSession(updated); window.dispatchEvent(new Event("gokul-customer-identity-changed"));}
+        } catch {
+            if (alive.current) setNameError("Could not save your name. Please check it and try again.");
+        } finally {
+            if (alive.current) setBusy(false);
+        }
+    }
+
     return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Phone verification">
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">Your account</p>
         <h2 className="mt-2 text-xl font-semibold text-[#241715]">{session.authenticated ? "Signed in" : "Verify your phone"}</h2>
@@ -154,6 +179,19 @@ export default function CustomerIdentityPanel() {
         {session.authenticated && session.phone && <p className="mt-2 text-sm font-semibold text-[#241715]">
             Verified phone: <span className="select-text">{session.phone}</span>
         </p>}
+        {session.authenticated && <div className="mt-4">
+            <label htmlFor="customer-display-name" className="block text-sm font-semibold text-[#241715]">Your name</label>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input id="customer-display-name" type="text" autoComplete="name" maxLength={80} value={nameDraft}
+                    onChange={event => setNameDraft(event.target.value)}
+                    className="min-h-11 min-w-0 flex-1 rounded-xl border border-[#d8c6ba] bg-white px-3 text-base text-[#241715]"
+                    placeholder="Enter your name" />
+                <button type="button" disabled={busy || nameDraft.trim() === (session.name ?? "")}
+                    onClick={() => {void saveName();}}
+                    className="min-h-11 rounded-full border border-[#d8c6ba] px-4 text-sm font-semibold disabled:opacity-50">Save name</button>
+            </div>
+            {nameError && <p role="alert" className="mt-2 text-sm text-[#9e2732]">{nameError}</p>}
+        </div>}
         <button type="button" disabled={busy} onClick={() => {void (session.authenticated ? logout() : start());}}
             className="mt-4 min-h-11 rounded-full bg-[#7a1625] px-6 py-2 text-sm font-semibold text-white disabled:opacity-50">
             {busy ? "Please wait…" : session.authenticated ? "Sign out" : "Verify with SMS"}
