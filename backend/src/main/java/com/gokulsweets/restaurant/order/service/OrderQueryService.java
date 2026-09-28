@@ -98,7 +98,8 @@ public class OrderQueryService {
                 window == null ? null : window.end(),
                 order.getDeliveryAddressLine(),
                 order.getDeliveryLocality(),
-                order.getDeliveryPostalCode()
+                order.getDeliveryPostalCode(),
+                order.getBranch().getFssaiLicenceNumber()
         );
     }
 
