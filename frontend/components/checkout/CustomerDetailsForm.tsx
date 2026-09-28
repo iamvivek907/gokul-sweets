@@ -1,6 +1,7 @@
 "use client";
 
 import {
+    useEffect,
     useState
 } from "react";
 
@@ -13,6 +14,8 @@ interface CustomerDetailsFormProps {
 
     initialValue?:
         CustomerDetails | null;
+
+    verifiedPhone?: string | null;
 
     onSubmit:
         (customer: CustomerDetails) => void;
@@ -54,6 +57,7 @@ function validateIndianPhone(
 
 export default function CustomerDetailsForm({
     initialValue,
+    verifiedPhone,
     onSubmit
 }: CustomerDetailsFormProps) {
 
@@ -86,6 +90,14 @@ export default function CustomerDetailsForm({
         );
 
 
+    useEffect(() => {
+        if (!verifiedPhone) return;
+        // The session arrives asynchronously, after the saved guest details.
+        setPhone(normalizePhone(verifiedPhone).slice(0, 10));
+        if (initialValue?.name) setName(initialValue.name);
+        setErrors({});
+    }, [verifiedPhone, initialValue?.name]);
+
     function handleSubmit(
         event: React.FormEvent<HTMLFormElement>
     ) {
@@ -99,7 +111,7 @@ export default function CustomerDetailsForm({
 
         const normalizedPhone =
             normalizePhone(
-                phone
+                verifiedPhone ?? phone
             );
 
 
@@ -292,6 +304,7 @@ export default function CustomerDetailsForm({
                         value={
                             phone
                         }
+                        readOnly={Boolean(verifiedPhone)}
                         onChange={
                             event => {
 
@@ -354,9 +367,7 @@ export default function CustomerDetailsForm({
                         text-[#756763]
                     "
                 >
-                    We&apos;ll use this number for
-                    order updates and pickup
-                    identification.
+                    {verifiedPhone ? "Your verified number is used for order updates and pickup identification." : "We’ll use this number for order updates and pickup identification."}
                 </p>
 
             </div>
