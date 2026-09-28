@@ -67,6 +67,7 @@ jobs:
       PHONEPE_REDIRECT_URL: https://ci.example.invalid/checkout
       INVENTORY_AUTOMATION_SCHEDULER_ENABLED: 'false'
       GOKUL_ENVIRONMENT_ISOLATION_ENABLED: 'false'
+      GOKUL_ENVIRONMENT_CORS_ENABLED: 'false'
       # Test-only 32-byte key so ON-by-default staff sessions can bootstrap in CI.
       STAFF_MFA_ENCRYPTION_KEY: 'Y2ktb25seS1ub3QtZm9yLXByb2R1Y3Rpb24tc2VjcmU='
     steps:
