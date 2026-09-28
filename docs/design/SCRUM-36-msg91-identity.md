@@ -146,7 +146,7 @@ before release.
 
 Identity expiry, proof claims and rate-limit windows use UTC `Instant` values
 and PostgreSQL `TIMESTAMP WITH TIME ZONE`; no server-local date is used for
-authorization. A seven-day session remains valid across IST midnight and
+authorization. A 30-day remembered session remains valid across IST midnight and
 expires at its exact instant even when the JVM uses a US timezone. Rate-limit
 windows likewise do not reset at IST midnight. Hourly retention cleanup runs
 in UTC. Display dates in Asia/Kolkata at the customer UI boundary; do not
