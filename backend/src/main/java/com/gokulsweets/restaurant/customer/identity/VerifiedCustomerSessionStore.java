@@ -20,7 +20,9 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class VerifiedCustomerSessionStore {
-    private static final Duration LIFETIME = Duration.ofDays(7);
+    // Remember a verified customer across normal return visits, with an
+    // absolute limit so a lost device cannot retain access indefinitely.
+    private static final Duration LIFETIME = Duration.ofDays(30);
     private final JdbcTemplate jdbc;
     private final SecureRandom random = new SecureRandom();
 
