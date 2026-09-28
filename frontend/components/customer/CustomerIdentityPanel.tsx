@@ -37,7 +37,8 @@ async function loadWidget(): Promise<Msg91Window> {
 }
 
 export default function CustomerIdentityPanel() {
-    const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">("loading");
+    const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
+        widgetId && widgetToken ? "loading" : "disabled");
     const [verified, setVerified] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -46,10 +47,7 @@ export default function CustomerIdentityPanel() {
 
     useEffect(() => {
         alive.current = true;
-        if (!widgetId || !widgetToken) {
-            setAvailability("disabled");
-            return;
-        }
+        if (!widgetId || !widgetToken) return;
         void (async () => {
             try {
                 const config = await apiClient<{enabled: boolean}>("/api/storefront/customer-identity");
