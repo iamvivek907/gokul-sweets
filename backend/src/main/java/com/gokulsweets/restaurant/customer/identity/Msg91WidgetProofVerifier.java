@@ -67,6 +67,9 @@ public class Msg91WidgetProofVerifier {
                 log.warn("MSG91 verification unavailable: {}; providerType={}, providerReason={}, dataObject={}, identifier={}, mobile={}",
                         category, providerType(providerResponse), providerReason(providerResponse), data.isObject(),
                         data.hasNonNull("identifier"), data.hasNonNull("mobile"));
+                log.warn("MSG91 verification input shape: proofJwt={}, serverAuthkeyJwt={}, messageText={}, errorText={}",
+                        looksLikeJwt(accessToken), looksLikeJwt(authkey),
+                        providerResponse.path("message").isTextual(), providerResponse.path("error").isTextual());
                 throw e;
             }
         } catch (InterruptedException e) {
@@ -80,6 +83,11 @@ public class Msg91WidgetProofVerifier {
             }
             throw new IllegalStateException("MSG91 verification failed", e);
         }
+    }
+
+    static boolean looksLikeJwt(String value) {
+        if (value == null) return false;
+        return value.matches("[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+");
     }
 
     // Only fixed labels leave this method. Provider messages can contain personal data.
