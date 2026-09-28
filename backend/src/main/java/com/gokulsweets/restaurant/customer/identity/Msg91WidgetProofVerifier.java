@@ -70,6 +70,9 @@ public class Msg91WidgetProofVerifier {
                 log.warn("MSG91 verification input shape: proofJwt={}, serverAuthkeyJwt={}, messageText={}, errorText={}",
                         looksLikeJwt(accessToken), looksLikeJwt(authkey),
                         providerResponse.path("message").isTextual(), providerResponse.path("error").isTextual());
+                log.warn("MSG91 success identity shape: rootIdentifier={}, rootMobile={}, messageMobile={}",
+                        providerResponse.hasNonNull("identifier"), providerResponse.hasNonNull("mobile"),
+                        isIndianMobile(providerResponse.path("message").asText("")));
                 throw e;
             }
         } catch (InterruptedException e) {
@@ -110,6 +113,10 @@ public class Msg91WidgetProofVerifier {
         return response.hasNonNull("message") ? "other" : "absent";
     }
 
+    private static boolean isIndianMobile(String value) {
+        return value != null && value.matches("91[6-9][0-9]{9}");
+    }
+
     static String verifiedPhoneFromResponse(JsonNode response) {
         // Fail closed on unrecognised provider responses until the live contract
         // has been checked with a safe DEV account. Never accept the client phone.
@@ -119,10 +126,17 @@ public class Msg91WidgetProofVerifier {
         var data = response.path("data");
         var identifier = data.path("identifier").asText("");
         if (identifier.isEmpty()) identifier = data.path("mobile").asText("");
+        if (identifier.isEmpty()) identifier = response.path("identifier").asText("");
+        if (identifier.isEmpty()) identifier = response.path("mobile").asText("");
+        // Some widget verification responses put the verified identifier in
+        // message rather than data. Accept it only as the entire mobile string.
+        if (identifier.isEmpty() && isIndianMobile(response.path("message").asText(""))) {
+            identifier = response.path("message").asText("");
+        }
         if (identifier.isEmpty()) {
             throw new IllegalStateException("MSG91 did not return a verified mobile");
         }
-        if (!identifier.matches("91[6-9][0-9]{9}")) {
+        if (!isIndianMobile(identifier)) {
             throw new IllegalStateException("MSG91 did not return a verified Indian mobile");
         }
         return "+" + identifier;
