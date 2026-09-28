@@ -44,30 +44,36 @@ class DeliveryAcceptedQuoteServiceTest {
                 "Customer", "9999999999", "12 Main Road", null);
         var window = new DeliveryCapacityService.Window(2L, 1L, quote.serviceDate(),
                 LocalTime.of(11, 0), LocalTime.NOON, 1, 0, false);
-        when(preparation.prepare(quote, 2L)).thenReturn(new DeliveryOrderPreparationService.Prepared(null, price, window));
+        when(preparation.prepare(quote, 2L)).thenReturn(new DeliveryOrderPreparationService.Prepared(null, price, window, legacy()));
         String token = service.preview(draft).token();
         var accepted = new DeliveryOrderCreationService.CreateRequest(quote, 2L,
                 "Customer", "9999999999", "12 Main Road", token);
-        service.accept(accepted, price);
+        service.accept(accepted, price, legacy());
 
         assertThatThrownBy(() -> service.accept(new DeliveryOrderCreationService.CreateRequest(
-                quote, 3L, "Customer", "9999999999", "12 Main Road", token), price))
+                quote, 3L, "Customer", "9999999999", "12 Main Road", token), price, legacy()))
                 .isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(() -> service.accept(new DeliveryOrderCreationService.CreateRequest(
-                quote, 2L, "Customer", "9999999999", "13 Main Road", token), price))
+                quote, 2L, "Customer", "9999999999", "13 Main Road", token), price, legacy()))
                 .isInstanceOf(IllegalStateException.class);
         var changedCart = new DeliveryCapacityService.QuoteRequest(1L, "Hazratganj", "226001",
                 quote.serviceDate(), List.of(new CreateOrderItemRequest(42L, 2, null)), 26.85, 80.94);
         assertThatThrownBy(() -> service.accept(new DeliveryOrderCreationService.CreateRequest(
-                changedCart, 2L, "Customer", "9999999999", "12 Main Road", token), price))
+                changedCart, 2L, "Customer", "9999999999", "12 Main Road", token), price, legacy()))
                 .isInstanceOf(IllegalStateException.class);
         var increased = new OrderCalculationResult(price.items(), amount, BigDecimal.ZERO,
                 BigDecimal.ZERO, new BigDecimal("101.00"));
-        assertThatThrownBy(() -> service.accept(accepted, increased)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.accept(accepted, increased, legacy())).isInstanceOf(IllegalStateException.class);
         var later = new DeliveryAcceptedQuoteService(flags, preparation,
                 Clock.fixed(Instant.now(now).plusSeconds(301), ZoneOffset.UTC));
         ReflectionTestUtils.setField(later, "signingKey", "delivery-quote-test-signing-key-at-least-32-characters");
-        assertThatThrownBy(() -> later.accept(accepted, price)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> later.accept(accepted, price, legacy())).isInstanceOf(IllegalStateException.class);
+    }
+
+    private static DeliveryEconomicsService.Assessment legacy() {
+        var zero = BigDecimal.ZERO;
+        return new DeliveryEconomicsService.Assessment("legacy", zero, zero, zero, zero,
+                zero, zero, zero, zero, zero, true, null);
     }
 
     @Test
@@ -82,7 +88,7 @@ class DeliveryAcceptedQuoteServiceTest {
         flags.setDeliveryAddressBoundaries(true);
         var amount = new BigDecimal("100.00");
         when(preparation.prepare(quote, 2L)).thenReturn(new DeliveryOrderPreparationService.Prepared(null,
-                new OrderCalculationResult(List.of(), amount, BigDecimal.ZERO, BigDecimal.ZERO, amount), null));
+                new OrderCalculationResult(List.of(), amount, BigDecimal.ZERO, BigDecimal.ZERO, amount), null, legacy()));
         assertThatThrownBy(() -> service.preview(draft)).isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("signing key");
     }

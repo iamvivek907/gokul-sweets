@@ -37,7 +37,7 @@ public class DeliveryAcceptedQuoteService {
                        String totalAmount) {}
     public record Quote(long windowId, String serviceDate, String startsAt, String endsAt,
                         List<Line> items, String subtotal, String taxAmount, String priorityCharge,
-                        String totalAmount, String currency, String expiresAt, String token) {}
+                        String deliveryFee, String totalAmount, String currency, String expiresAt, String token) {}
 
     @Transactional(readOnly = true)
     public Quote preview(DeliveryOrderCreationService.CreateRequest request) {
@@ -45,7 +45,7 @@ public class DeliveryAcceptedQuoteService {
         DeliveryOrderCreationService.validate(request);
         var prepared = preparation.prepare(request.quote(), request.windowId());
         long expiry = Instant.now(clock).plusSeconds(300).getEpochSecond();
-        String token = expiry + "." + sign(expiry + ":" + payload(request, prepared.price()));
+        String token = expiry + "." + sign(expiry + ":" + payload(request, prepared.price(), prepared.economics()));
         var window = prepared.window();
         var price = prepared.price();
         return new Quote(window.id(), window.serviceDate().toString(), window.startsAt().toString(),
@@ -53,11 +53,12 @@ public class DeliveryAcceptedQuoteService {
                         item.product().getName(), item.unitPrice().toPlainString(),
                         item.taxRate().toPlainString(), item.taxAmount().toPlainString(),
                         item.lineTotal().toPlainString())).toList(), price.subtotal().toPlainString(),
-                price.taxAmount().toPlainString(), price.priorityCharge().toPlainString(),
-                price.totalAmount().toPlainString(), "INR", Instant.ofEpochSecond(expiry).toString(), token);
+                price.taxAmount().toPlainString(), price.priorityCharge().toPlainString(), prepared.economics().fee().toPlainString(),
+                price.totalAmount().add(prepared.economics().fee()).toPlainString(), "INR", Instant.ofEpochSecond(expiry).toString(), token);
     }
 
-    public void accept(DeliveryOrderCreationService.CreateRequest request, OrderCalculationResult price) {
+    public void accept(DeliveryOrderCreationService.CreateRequest request, OrderCalculationResult price,
+                       DeliveryEconomicsService.Assessment economics) {
         requireEnabled();
         String token = request.acceptedQuoteToken();
         if (token == null || !token.matches("[0-9]{10,12}\\.[A-Za-z0-9_-]{43}"))
@@ -67,7 +68,7 @@ public class DeliveryAcceptedQuoteService {
         long now = Instant.now(clock).getEpochSecond();
         if (expiry <= now || expiry > now + 300)
             throw new IllegalStateException("This delivery price expired. Review the current price again.");
-        String expected = sign(parts[0] + ":" + payload(request, price));
+        String expected = sign(parts[0] + ":" + payload(request, price, economics));
         if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.US_ASCII),
                 parts[1].getBytes(StandardCharsets.US_ASCII)))
             throw new IllegalStateException("Your delivery details or price changed. Review the updated quote.");
@@ -79,7 +80,8 @@ public class DeliveryAcceptedQuoteService {
             throw new IllegalStateException("Delivery quotes are disabled.");
     }
 
-    private static String payload(DeliveryOrderCreationService.CreateRequest request, OrderCalculationResult price) {
+    private static String payload(DeliveryOrderCreationService.CreateRequest request, OrderCalculationResult price,
+                                  DeliveryEconomicsService.Assessment economics) {
         var quote = request.quote();
         StringBuilder value = new StringBuilder("delivery-price-v1|");
         append(value, Long.toString(quote.branchId()));
@@ -111,6 +113,9 @@ public class DeliveryAcceptedQuoteService {
         append(value, price.taxAmount().toPlainString());
         append(value, price.priorityCharge().toPlainString());
         append(value, price.totalAmount().toPlainString());
+        append(value, economics.version());
+        append(value, economics.fee().toPlainString());
+        append(value, economics.contribution().toPlainString());
         return value.toString();
     }
 

@@ -288,7 +288,10 @@ export default function DeliveryCheckPage() {
                                 <ul>{accepted.quote.items.map((item, index) => <li key={index}>
                                     <span>{item.productName}</span><strong>₹{item.totalAmount}</strong>
                                 </li>)}</ul>
-                                <div className={styles.total}><span>Total including tax</span><strong>₹{accepted.quote.totalAmount}</strong></div>
+                                <div className={styles.total}><span>Food before tax</span><strong>₹{accepted.quote.subtotal}</strong></div>
+                                <div className={styles.total}><span>Food tax</span><strong>₹{accepted.quote.taxAmount}</strong></div>
+                                <div className={styles.total}><span>Delivery fee</span><strong>₹{accepted.quote.deliveryFee}</strong></div>
+                                <div className={styles.total}><span>Total including tax and delivery</span><strong>₹{accepted.quote.totalAmount}</strong></div>
                                 <p>Price valid until {new Intl.DateTimeFormat("en-IN", {timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit"})
                                     .format(new Date(accepted.quote.expiresAt))} IST. The final amount is checked again when you place the order.</p>
                                 <button type="button" className={styles.action} onClick={placeOrder} disabled={checkoutPending}>

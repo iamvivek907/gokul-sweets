@@ -186,6 +186,9 @@ public class Order {
     private BigDecimal priorityCharge =
             BigDecimal.ZERO;
 
+    @Column(name = "delivery_fee", nullable = false, precision = 10, scale = 2)
+    private BigDecimal deliveryFee = BigDecimal.ZERO;
+
     @Column(
             nullable = false,
             precision = 12,

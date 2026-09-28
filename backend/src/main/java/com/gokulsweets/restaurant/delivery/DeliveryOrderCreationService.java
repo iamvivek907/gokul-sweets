@@ -34,6 +34,7 @@ public class DeliveryOrderCreationService {
     private final OrderInventoryReservationService inventory;
     private final OrderIdempotencyService idempotency;
     private final OrderRepository orders;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
     private final OrderNumberGenerator numbers;
     private final CustomerContactService contacts;
     private final VerifiedOrderOwnership ownership;
@@ -54,7 +55,7 @@ public class DeliveryOrderCreationService {
         }
 
         var prepared = preparation.prepare(request.quote(), request.windowId());
-        acceptedQuotes.accept(request, prepared.price());
+        acceptedQuotes.accept(request, prepared.price(), prepared.economics());
         String holdKey = "delivery-" + digest(idempotencyKey);
         // The 14-minute checkout deadline fits inside the server's 15-minute rider hold.
         LocalDateTime expiresAt = LocalDateTime.now(inventoryClock).plusMinutes(14);
@@ -78,7 +79,8 @@ public class DeliveryOrderCreationService {
         order.setSubtotal(prepared.price().subtotal());
         order.setTaxAmount(prepared.price().taxAmount());
         order.setPriorityCharge(prepared.price().priorityCharge());
-        order.setTotalAmount(prepared.price().totalAmount());
+        order.setDeliveryFee(prepared.economics().fee());
+        order.setTotalAmount(prepared.price().totalAmount().add(prepared.economics().fee()));
         order.setOrderStatus(OrderStatus.PENDING_PAYMENT);
         order.setReservationExpiresAt(expiresAt);
         for (var calculated : prepared.price().items()) {
@@ -95,6 +97,15 @@ public class DeliveryOrderCreationService {
             order.addItem(item);
         }
         Order saved = orders.saveAndFlush(order);
+        if (flags.isDeliveryEconomics()) {
+            var e = prepared.economics();
+            jdbc.update("""
+                    INSERT INTO delivery_economics_snapshots (order_id, version, food_cost, packaging_cost,
+                        labour_cost, waste_cost, payment_cost, journey_cost, remedy_cost, delivery_fee, contribution)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, saved.getId(), e.version(), e.foodCost(), e.packagingCost(), e.labourCost(),
+                    e.wasteCost(), e.paymentCost(), e.journeyCost(), e.remedyCost(), e.fee(), e.contribution());
+        }
         ownership.bindNewOrder(saved.getId(), request.customerPhone(), identityToken);
         inventory.synchronizePendingDeliveryOrder(saved, prepared.validated());
         idempotency.linkOrder(idempotencyKey, saved);

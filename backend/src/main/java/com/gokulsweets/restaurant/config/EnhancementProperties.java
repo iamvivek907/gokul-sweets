@@ -67,6 +67,8 @@ public class EnhancementProperties {
     private boolean deliveryAcceptedQuote;
     /** SCRUM-30: customer delivery order creation; requires signed quote and rider/inventory lifecycle. */
     private boolean deliveryCheckout;
+    /** SCRUM-31: reviewed, versioned delivery costs; OFF until finance approves inputs. */
+    private boolean deliveryEconomics;
 
     public boolean deliveryCheckoutReady() {
         return deliveryCheckout && deliveryAcceptedQuote && deliveryRiderHolds

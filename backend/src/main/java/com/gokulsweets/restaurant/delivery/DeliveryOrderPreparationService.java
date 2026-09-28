@@ -21,6 +21,7 @@ public class DeliveryOrderPreparationService {
     private final BranchRepository branches;
     private final OrderValidationService validation;
     private final OrderCalculationService calculation;
+    private final DeliveryEconomicsService economics;
 
     @Transactional(readOnly = true)
     public Prepared prepare(DeliveryCapacityService.QuoteRequest request, long windowId) {
@@ -37,9 +38,12 @@ public class DeliveryOrderPreparationService {
         if (items.size() != request.items().size() || items.stream().anyMatch(Objects::isNull))
             throw new IllegalArgumentException("Review the items in your delivery cart.");
         var validated = new ValidatedOrderData(branch, null, null, items);
-        return new Prepared(validated, calculation.calculateDelivery(items), selected);
+        var price = calculation.calculateDelivery(items);
+        var assessment = economics.assess(price);
+        if (!assessment.viable()) throw new IllegalStateException(assessment.alternative());
+        return new Prepared(validated, price, selected, assessment);
     }
 
     public record Prepared(ValidatedOrderData validated, OrderCalculationResult price,
-                           DeliveryCapacityService.Window window) {}
+                           DeliveryCapacityService.Window window, DeliveryEconomicsService.Assessment economics) {}
 }

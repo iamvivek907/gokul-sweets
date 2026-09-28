@@ -33,7 +33,7 @@ class DeliveryOrderPreparationServiceTest {
         var branches = mock(BranchRepository.class);
         var validation = mock(OrderValidationService.class);
         var calculation = new OrderCalculationService();
-        var service = new DeliveryOrderPreparationService(flags, capacity, branches, validation, calculation);
+        var service = new DeliveryOrderPreparationService(flags, capacity, branches, validation, calculation, new DeliveryEconomicsService(flags, java.time.Clock.system(java.time.ZoneId.of("Asia/Kolkata"))));
         var branch = new Branch();
         branch.setId(7L);
         var product = new Product();

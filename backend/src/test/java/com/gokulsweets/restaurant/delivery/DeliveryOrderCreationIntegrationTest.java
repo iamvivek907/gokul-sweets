@@ -56,6 +56,8 @@ class DeliveryOrderCreationIntegrationTest {
     @Autowired DeliveryPreparationQueue deliveryQueue;
     @Autowired tools.jackson.databind.ObjectMapper json;
 
+    private static EnhancementProperties flagsForEconomics() { return new EnhancementProperties(); }
+
     @Test
     void retryReturnsSameOrderWithOneRiderAndInventoryReservation() {
         Clock ist = Clock.system(ZoneId.of("Asia/Kolkata"));
@@ -91,7 +93,9 @@ class DeliveryOrderCreationIntegrationTest {
         var validated = new ValidatedOrderData(branch, null, null, List.of(new ValidatedOrderItem(
                 product, branchProduct, ProductSaleMode.UNIT, 1, null)));
         var prepared = new DeliveryOrderPreparationService.Prepared(validated,
-                new OrderCalculationService().calculateDelivery(validated.items()), window);
+                new OrderCalculationService().calculateDelivery(validated.items()), window,
+                new DeliveryEconomicsService(flagsForEconomics(), java.time.Clock.system(java.time.ZoneId.of("Asia/Kolkata"))).assess(
+                        new OrderCalculationService().calculateDelivery(validated.items())));
         var preparation = mock(DeliveryOrderPreparationService.class);
         when(preparation.prepare(quote, windowId)).thenReturn(prepared);
         var capacity = mock(DeliveryCapacityService.class);
@@ -114,7 +118,7 @@ class DeliveryOrderCreationIntegrationTest {
         var accepted = new DeliveryAcceptedQuoteService(flags, preparation, ist);
         ReflectionTestUtils.setField(accepted, "signingKey", "delivery-quote-test-signing-key-at-least-32-characters");
         var service = new DeliveryOrderCreationService(flags, preparation, accepted, rider, inventory,
-                idempotency, orders, numbers, contacts, ownership, ist);
+                idempotency, orders, jdbc, numbers, contacts, ownership, ist);
         var draft = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
                 "Customer", "9999999999", "12 Main Road", null);
         var request = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
