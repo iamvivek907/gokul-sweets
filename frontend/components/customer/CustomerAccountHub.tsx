@@ -157,14 +157,11 @@ export default function CustomerAccountHub({session}: {session: CustomerSession 
         </header>
         <div className="account-layout mt-6">
             <nav className="account-navigation" aria-label="Profile sections">
-                <p className="account-navigation-label">Your activity</p>
                 <a href="#account-milestones">Badges</a>
                 <a href="#account-orders">Order history</a>
-                <p className="account-navigation-label">Your choices</p>
                 <a href="#account-favourites">Favourites</a>
                 <a href="#account-addresses">My addresses</a>
                 <a href="#account-preferences">Preferences</a>
-                <p className="account-navigation-label">Your account</p>
                 <a href="#account-details">Profile details</a>
                 <Link href="/profile/privacy">Privacy and data</Link>
             </nav>
