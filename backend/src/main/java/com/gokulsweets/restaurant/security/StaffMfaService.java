@@ -16,6 +16,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
+import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -53,7 +54,7 @@ public class StaffMfaService {
         var allowed = jdbc.query("""
                 SELECT staff_id, secret_ciphertext FROM staff_mfa_enrollments
                 WHERE token_hash = ? AND staff_id = ? AND expires_at > ? FOR UPDATE
-                """, (rs, index) -> rs.getString(2), enrollmentHash, staffId, Instant.now(inventoryClock));
+                """, (rs, index) -> rs.getString(2), enrollmentHash, staffId, Timestamp.from(Instant.now(inventoryClock)));
         if (allowed.isEmpty() || enrolled(staffId)) throw new IllegalStateException("Enrollment expired or already complete.");
         String encoded = allowed.getFirst();
         if (encoded == null) {
@@ -70,7 +71,7 @@ public class StaffMfaService {
         var secrets = jdbc.query("""
                 SELECT secret_ciphertext FROM staff_mfa_enrollments
                 WHERE token_hash = ? AND staff_id = ? AND expires_at > ? FOR UPDATE
-                """, (rs, index) -> rs.getString(1), enrollmentHash, staffId, Instant.now(inventoryClock));
+                """, (rs, index) -> rs.getString(1), enrollmentHash, staffId, Timestamp.from(Instant.now(inventoryClock)));
         if (secrets.isEmpty() || secrets.getFirst() == null || enrolled(staffId))
             throw new IllegalStateException("Enrollment expired or already complete.");
         if (counter(decrypt(secrets.getFirst()), code) < 0)
