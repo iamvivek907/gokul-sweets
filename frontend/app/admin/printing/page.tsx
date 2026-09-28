@@ -1,4 +1,5 @@
 "use client";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useCallback,
@@ -591,7 +592,7 @@ export default function AdminPrintingPage() {
                     ) {
 
                         setSelectedBranchId(
-                            allowed[0].id
+                            preferredAdminBranchId(currentProfile.staffId, allowed)
                         );
                     }
 
@@ -1166,6 +1167,7 @@ export default function AdminPrintingPage() {
                                             event.target.value
                                         )
                                     );
+                                    if (profile) rememberAdminBranchId(profile.staffId, Number(event.target.value));
 
 
                                     setPage(
