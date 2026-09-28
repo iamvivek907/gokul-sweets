@@ -14,6 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Locale;
 
 /** Server-only verification of an MSG91 widget proof; never trust a client phone claim. */
 @Service
@@ -63,8 +64,8 @@ public class Msg91WidgetProofVerifier {
                 // Log only fixed field-presence flags. Provider values may contain tokens,
                 // phone numbers, or other personal information.
                 var data = providerResponse.path("data");
-                log.warn("MSG91 verification unavailable: {}; response shape: type={}, dataObject={}, identifier={}, mobile={}",
-                        category, providerResponse.has("type"), data.isObject(),
+                log.warn("MSG91 verification unavailable: {}; providerType={}, providerReason={}, dataObject={}, identifier={}, mobile={}",
+                        category, providerType(providerResponse), providerReason(providerResponse), data.isObject(),
                         data.hasNonNull("identifier"), data.hasNonNull("mobile"));
                 throw e;
             }
@@ -79,6 +80,26 @@ public class Msg91WidgetProofVerifier {
             }
             throw new IllegalStateException("MSG91 verification failed", e);
         }
+    }
+
+    // Only fixed labels leave this method. Provider messages can contain personal data.
+    static String providerType(JsonNode response) {
+        var type = response.path("type").asText("");
+        if ("success".equalsIgnoreCase(type)) return "success";
+        if ("error".equalsIgnoreCase(type)) return "error";
+        if ("failure".equalsIgnoreCase(type)) return "failure";
+        return "other";
+    }
+
+    static String providerReason(JsonNode response) {
+        var message = response.path("message").asText("").toLowerCase(Locale.ROOT);
+        if (message.contains("authkey") || message.contains("auth key")
+                || message.contains("authentication failure")) return "authkey";
+        if (message.contains("token") && message.contains("expir")) return "expired-token";
+        if (message.contains("token") && (message.contains("invalid")
+                || message.contains("incorrect"))) return "invalid-token";
+        if (message.contains("rate limit") || message.contains("too many")) return "rate-limit";
+        return response.hasNonNull("message") ? "other" : "absent";
     }
 
     static String verifiedPhoneFromResponse(JsonNode response) {

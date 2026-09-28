@@ -15,7 +15,9 @@ vm.runInNewContext(compiled, {exports: exportsObject});
 test('only a bounded provider proof reaches server-side exchange', () => {
     const {proofFromWidget} = exportsObject;
     assert.equal(proofFromWidget({accessToken: 'provider-token'}), 'provider-token');
-    assert.equal(proofFromWidget({type: 'success', message: 'provider-jwt'}), 'provider-jwt');
+    assert.equal(proofFromWidget({type: 'success', message: 'header.payload.signature'}), 'header.payload.signature');
+    assert.equal(proofFromWidget({type: 'success', message: 'OTP verified successfully'}), null);
+    assert.equal(proofFromWidget({type: 'error', accessToken: 'provider-token'}), null);
     assert.equal(proofFromWidget({data: {'access-token': 'provider-jwt'}}), 'provider-jwt');
     assert.equal(proofFromWidget('provider-token'), 'provider-token');
     assert.equal(proofFromWidget({phone: '919876543210'}), null);
