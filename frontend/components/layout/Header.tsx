@@ -8,6 +8,7 @@ import BranchSelector from "@/components/branch/BranchSelector";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useCart} from "@/hooks/useCart";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import CustomerAccountLink from "@/components/customer/CustomerAccountLink";
 
 
 export default function Header() {
@@ -97,6 +98,7 @@ export default function Header() {
                         </Link>}
                 </div>}
 
+                <CustomerAccountLink />
                 <MobileMenu />
 
             </div>
