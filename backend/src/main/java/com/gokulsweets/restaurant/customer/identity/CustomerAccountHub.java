@@ -45,8 +45,9 @@ public class CustomerAccountHub {
         var preferences = jdbc.query("""
                 SELECT dietary_notes, preferred_branch_id FROM verified_customer_account
                 WHERE environment = ? AND subject_id = ?
-                """, (rs, row) -> rs.next() ? new Preferences(rs.getString(1),
-                rs.getObject(2, Long.class)) : new Preferences(null, null), environment, subject);
+                """, (rs, row) -> new Preferences(rs.getString(1),
+                rs.getObject(2, Long.class)), environment, subject)
+                .stream().findFirst().orElse(new Preferences(null, null));
         return new Snapshot(paid == null ? 0 : paid, favourites, addresses, preferences);
     }
 
