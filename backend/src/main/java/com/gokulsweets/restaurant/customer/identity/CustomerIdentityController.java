@@ -106,9 +106,25 @@ public class CustomerIdentityController {
         }
         var phone = subjects.verifiedPhone(environment, subject.get())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        var name = subjects.displayName(environment, subject.get());
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(Map.of("authenticated", true, "phone", phone));
+                .body(name.<Map<String, Object>>map(value -> Map.of("authenticated", true, "phone", phone, "name", value))
+                        .orElseGet(() -> Map.of("authenticated", true, "phone", phone)));
     }
+
+    @PutMapping(value = "/me/name", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<Void> updateName(@RequestBody NameRequest payload, HttpServletRequest request) {
+        var environment = enabledEnvironment();
+        requireTrustedMutation(request);
+        var subject = requiredSubject(request, environment);
+        if (payload == null || payload.name() == null || !payload.name().trim().matches("[\\p{L}][\\p{L}\\p{M} .'-]{1,79}")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Enter a name of 2 to 80 letters");
+        }
+        subjects.updateDisplayName(environment, subject, payload.name());
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    public record NameRequest(String name) { }
 
     @GetMapping("/orders")
     public ResponseEntity<List<CustomerOrderSummaryResponse>> orders(HttpServletRequest request) {

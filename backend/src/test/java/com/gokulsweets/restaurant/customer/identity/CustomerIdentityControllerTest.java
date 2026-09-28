@@ -190,13 +190,22 @@ class CustomerIdentityControllerTest {
         when(sessions.subject(eq(ConsentEnvironment.DEV), eq("session-token"), any()))
                 .thenReturn(Optional.of(subject));
         when(subjects.verifiedPhone(ConsentEnvironment.DEV, subject)).thenReturn(Optional.of("+919876543210"));
+        when(subjects.displayName(ConsentEnvironment.DEV, subject)).thenReturn(Optional.of("Vivek"));
         assertThat(controller.me(request).getBody())
-                .containsEntry("authenticated", true).containsEntry("phone", "+919876543210");
+                .containsEntry("authenticated", true).containsEntry("phone", "+919876543210")
+                .containsEntry("name", "Vivek");
+        controller.updateName(new CustomerIdentityController.NameRequest("Vivek C"), request);
+        verify(subjects).updateDisplayName(ConsentEnvironment.DEV, subject, "Vivek C");
         var foreign = request();
         foreign.setCookies(new Cookie("__Host-gokul-customer", "session-token"));
         foreign.removeHeader(HttpHeaders.ORIGIN);
         foreign.addHeader(HttpHeaders.ORIGIN, "https://attacker.example");
         assertThatThrownBy(() -> controller.me(foreign)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> controller.updateName(new CustomerIdentityController.NameRequest("Other"), foreign))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> controller.updateName(new CustomerIdentityController.NameRequest(" "), request))
+                .isInstanceOf(ResponseStatusException.class);
+        verify(subjects, times(1)).updateDisplayName(any(), any(), any());
         var logout = controller.logout(request);
         verify(sessions).revoke(eq(ConsentEnvironment.DEV), eq("session-token"), any());
         assertThat(logout.getHeaders().getFirst(HttpHeaders.SET_COOKIE)).contains("Max-Age=0", "Path=/");

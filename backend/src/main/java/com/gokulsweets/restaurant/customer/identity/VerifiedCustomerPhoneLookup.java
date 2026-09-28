@@ -26,4 +26,30 @@ public class VerifiedCustomerPhoneLookup {
                 """, rs -> rs.next() ? Optional.of(rs.getString(1)) : Optional.empty(),
                 environment.name(), subjectId);
     }
+
+    @Transactional(readOnly = true)
+    public Optional<String> displayName(ConsentEnvironment environment, UUID subjectId) {
+        Objects.requireNonNull(environment);
+        Objects.requireNonNull(subjectId);
+        return jdbc.query("""
+                SELECT display_name FROM verified_customer_subjects
+                WHERE environment = ? AND id = ?
+                """, rs -> rs.next() ? Optional.ofNullable(rs.getString(1)) : Optional.empty(),
+                environment.name(), subjectId);
+    }
+
+    @Transactional
+    public void updateDisplayName(ConsentEnvironment environment, UUID subjectId, String name) {
+        Objects.requireNonNull(environment);
+        Objects.requireNonNull(subjectId);
+        if (name == null || !name.trim().matches("[\\p{L}][\\p{L}\\p{M} .'-]{1,79}")) {
+            throw new IllegalArgumentException("Enter a name of 2 to 80 letters");
+        }
+        if (jdbc.update("""
+                UPDATE verified_customer_subjects SET display_name = ?
+                WHERE environment = ? AND id = ?
+                """, name.trim(), environment.name(), subjectId) != 1) {
+            throw new IllegalStateException("Verified customer no longer exists");
+        }
+    }
 }
