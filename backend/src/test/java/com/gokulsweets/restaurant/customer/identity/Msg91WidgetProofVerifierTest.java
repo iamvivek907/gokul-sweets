@@ -45,4 +45,10 @@ class Msg91WidgetProofVerifierTest {
                 """))).isEqualTo("other");
     }
 
+    @Test
+    void distinguishesProofAndAuthkeyShapesWithoutTheirValues() {
+        assertThat(Msg91WidgetProofVerifier.looksLikeJwt("header.payload.signature")).isTrue();
+        assertThat(Msg91WidgetProofVerifier.looksLikeJwt("OTP verified successfully")).isFalse();
+        assertThat(Msg91WidgetProofVerifier.looksLikeJwt("account-authkey")).isFalse();
+    }
 }
