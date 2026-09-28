@@ -39,6 +39,7 @@ public class CustomerIdentityController {
     private static final String DEVICE_COOKIE = "__Host-gokul-device";
     private final VerifiedIdentityExchange exchange;
     private final VerifiedCustomerSessionStore sessions;
+    private final VerifiedCustomerSubjectStore subjects;
     private final EnhancementProperties features;
     private final Environment settings;
     private final WebCorsProperties cors;
@@ -91,12 +92,22 @@ public class CustomerIdentityController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<Map<String, Boolean>> me(HttpServletRequest request) {
+    public ResponseEntity<Map<String, Object>> me(HttpServletRequest request) {
         var environment = enabledEnvironment();
         var token = cookie(request);
-        boolean authenticated = sessions.subject(environment, token, Instant.now()).isPresent();
+        var subject = sessions.subject(environment, token, Instant.now());
+        if (subject.isEmpty()) {
+            return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                    .body(Map.of("authenticated", false));
+        }
+        if (!clientConnection.resolve(request).secure()
+                || !cors.effectiveAllowedOrigins(settings).contains(request.getHeader(HttpHeaders.ORIGIN))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        var phone = subjects.verifiedPhone(environment, subject.get())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(Map.of("authenticated", authenticated));
+                .body(Map.of("authenticated", true, "phone", phone));
     }
 
     @GetMapping("/orders")
