@@ -79,7 +79,10 @@ body:has(.future-storefront){background:#fffaf2}
 .future-storefront .menu-availability-chip>span{background:white;color:var(--journey-teal)}
 .future-storefront .menu-availability-chip--unavailable{background:#a52d2d;color:white;border-color:#a52d2d}
 .future-storefront .menu-availability-note{background:#fff2e7;color:var(--journey-ink);border-color:var(--journey-coral)}
-html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;overflow-x:clip;overscroll-behavior-x:none}
+html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;overflow-x:clip;overscroll-behavior:none;background:#fffaf2}
+.app-container{overscroll-behavior-y:none}
+.app-container :is(a,img,video){-webkit-touch-callout:none}
+.app-container img{pointer-events:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
 .future-storefront :is(input,textarea,select,code,time,.selectable-text,[data-copyable]){-webkit-user-select:text;user-select:text}
 .future-storefront :is(button,button *,a,.gokul-branch-card-action-label){-webkit-user-select:none;user-select:none}
 .future-storefront :is(img,video){-webkit-user-drag:none}
