@@ -8,6 +8,7 @@ import com.gokulsweets.restaurant.inventory.model.CreateInventoryHoldCommand;
 import com.gokulsweets.restaurant.inventory.exception.InventoryConflictException;
 import com.gokulsweets.restaurant.inventory.exception.InventoryNotFoundException;
 import com.gokulsweets.restaurant.inventory.repository.BranchInventoryPolicyRepository;
+import com.gokulsweets.restaurant.inventory.repository.InventoryDailyAllocationRepository;
 import com.gokulsweets.restaurant.inventory.service.InventoryReservationService;
 import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeClient;
 import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeProperties;
@@ -34,6 +35,7 @@ public class OccasionCommitmentService {
     private final TransactionTemplate transactions;
     private final InventoryReservationService inventory;
     private final BranchInventoryPolicyRepository policies;
+    private final InventoryDailyAllocationRepository allocations;
     private final PickupSlotReservationService pickupSlots;
     private final InventoryProperties inventoryProperties;
     private final EnhancementProperties features;
@@ -119,6 +121,12 @@ public class OccasionCommitmentService {
                                 .plusDays(policy.getBookingHorizonDays()))
                         || serviceStart.isBefore(clock.instant().plus(Duration.ofMinutes(policy.getProductionLeadMinutes()))))
                     throw conflict("The date or quantity needs a new production review.");
+                // Lock before checking readiness so a staff plan edit cannot race the hold.
+                var allocation = allocations.findForUpdate(branchProductId, enquiry.date())
+                        .orElseThrow(() -> conflict("An item has no approved inventory for this date."));
+                if (allocation.getExpectedReadyAt() != null
+                        && serviceStart.isBefore(allocation.getExpectedReadyAt().atZone(IST).toInstant()))
+                    throw conflict("Your items will be ready later. Choose a later pickup.");
                 String key = "OCC-" + id + "-" + productId;
                 var hold = inventory.createHold(new CreateInventoryHoldCommand(key, null,
                         branchProductId, enquiry.date(), (BigDecimal) item[2]));

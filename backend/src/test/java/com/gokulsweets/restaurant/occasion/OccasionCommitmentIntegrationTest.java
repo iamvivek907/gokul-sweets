@@ -20,6 +20,7 @@ import java.time.ZoneId;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -107,6 +108,63 @@ class OccasionCommitmentIntegrationTest {
                 fixture.enquiry())).isEqualTo("PAID");
         assertThat(jdbc.queryForObject("SELECT paid_amount FROM occasion_enquiries WHERE id = ?",
                 BigDecimal.class, fixture.enquiry())).isEqualByComparingTo("200.00");
+    }
+
+    @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void depositRejectsPickupBeforeReadinessWithoutCapacityOrPaymentSideEffects() {
+        var fixture = paidDeposit();
+        boolean oldEnquiries = features.isOccasionEnquiries(), oldPayments = features.isOccasionPayments();
+        try {
+            features.setOccasionEnquiries(true);
+            features.setOccasionPayments(true);
+            Long slot = jdbc.queryForObject("SELECT pickup_slot_id FROM occasion_enquiries WHERE id = ?",
+                    Long.class, fixture.enquiry());
+            var date = jdbc.queryForObject("SELECT service_date FROM occasion_enquiries WHERE id = ?",
+                    Date.class, fixture.enquiry());
+            jdbc.update("UPDATE occasion_enquiries SET status = 'QUOTED', paid_amount = 0 WHERE id = ?", fixture.enquiry());
+            jdbc.update("DELETE FROM occasion_payment_attempts WHERE enquiry_id = ?", fixture.enquiry());
+            jdbc.update("UPDATE pickup_slots SET booked_count = 0 WHERE id = ?", slot);
+            Long bp = jdbc.queryForObject("INSERT INTO branch_products(branch_id, product_id) VALUES (?, ?) RETURNING id",
+                    Long.class, fixture.branch(), fixture.product());
+            jdbc.update("""
+                    INSERT INTO branch_inventory_policies(branch_product_id, control_mode, inventory_unit,
+                        online_enabled, booking_horizon_days, created_at, updated_at)
+                    VALUES (?, 'DAILY_PRODUCTION', 'PIECE', true, 30, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """, bp);
+            jdbc.update("""
+                    INSERT INTO inventory_daily_allocations(branch_product_id, service_date, status,
+                        inventory_unit, approved_quantity, expected_ready_at, created_at, updated_at)
+                    VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    """, bp, date, Timestamp.valueOf(date.toLocalDate().atTime(12, 1)));
+            assertThatThrownBy(() -> commitments.beginDeposit(ConsentEnvironment.DEV,
+                    fixture.subject(), fixture.enquiry(), slot)).hasMessageContaining("ready later");
+            assertThat(jdbc.queryForObject("SELECT booked_count FROM pickup_slots WHERE id = ?",
+                    Integer.class, slot)).isZero();
+            assertThat(jdbc.queryForObject("SELECT held_quantity FROM inventory_daily_allocations WHERE branch_product_id = ?",
+                    BigDecimal.class, bp)).isEqualByComparingTo(BigDecimal.ZERO);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM occasion_payment_attempts WHERE enquiry_id = ?",
+                    Integer.class, fixture.enquiry())).isZero();
+            verifyNoInteractions(phonePe);
+
+            // Equality is valid: kitchen readiness and pickup start are both interpreted in IST.
+            jdbc.update("UPDATE inventory_daily_allocations SET expected_ready_at = ? WHERE branch_product_id = ?",
+                    Timestamp.valueOf(date.toLocalDate().atTime(12, 0)), bp);
+            when(phonePe.createPayment(anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
+                    .thenAnswer(invocation -> new PhonePeClient.CreatePaymentResponse("deposit-ready",
+                            invocation.getArgument(0), "PENDING", "https://pay.example/checkout", null, null));
+            var checkout = commitments.beginDeposit(ConsentEnvironment.DEV,
+                    fixture.subject(), fixture.enquiry(), slot);
+            assertThat(checkout.status()).isEqualTo("PENDING");
+            assertThat(jdbc.queryForObject("SELECT booked_count FROM pickup_slots WHERE id = ?",
+                    Integer.class, slot)).isEqualTo(1);
+            assertThat(jdbc.queryForObject("SELECT held_quantity FROM inventory_daily_allocations WHERE branch_product_id = ?",
+                    BigDecimal.class, bp)).isEqualByComparingTo("10");
+            verify(phonePe).createPayment(anyString(), any(), anyString(), eq(600));
+        } finally {
+            features.setOccasionEnquiries(oldEnquiries);
+            features.setOccasionPayments(oldPayments);
+        }
     }
 
     private String merchant(UUID attemptId) {
