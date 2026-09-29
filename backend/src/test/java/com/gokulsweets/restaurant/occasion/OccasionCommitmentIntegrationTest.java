@@ -24,7 +24,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest(properties = "phonepe.redirect-url=https://ci.example.invalid/checkout")
+// Legacy fixture scenarios deliberately retain the original stock path; bulk tests enable their gate explicitly.
+@SpringBootTest(properties = {"phonepe.redirect-url=https://ci.example.invalid/checkout",
+        "gokul.features.occasion-bulk-production=false"})
 @Transactional
 class OccasionCommitmentIntegrationTest {
     @Autowired JdbcTemplate jdbc;
