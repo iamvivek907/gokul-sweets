@@ -33,14 +33,14 @@ public class HomepageCampaign {
     private String mobileMediaUrl;
     @Column(length = 40)
     private String mobileMediaType;
-    private int mainX = 50;
-    private int mainY = 50;
-    private int mainZoom = 100;
-    @Column(length = 8) private String mainFit = "COVER";
-    private int mobileX = 50;
-    private int mobileY = 50;
-    private int mobileZoom = 100;
-    @Column(length = 8) private String mobileFit = "COVER";
+    @Column(name = "main_x") private int mainX = 50;
+    @Column(name = "main_y") private int mainY = 50;
+    @Column(name = "main_zoom") private int mainZoom = 100;
+    @Column(name = "main_fit", length = 8) private String mainFit = "COVER";
+    @Column(name = "mobile_x") private int mobileX = 50;
+    @Column(name = "mobile_y") private int mobileY = 50;
+    @Column(name = "mobile_zoom") private int mobileZoom = 100;
+    @Column(name = "mobile_fit", length = 8) private String mobileFit = "COVER";
     @JsonIgnore private UUID mobileRequestId;
     private Long publishedRevision;
     @Version private long editVersion;
