@@ -123,11 +123,12 @@ public class CartAvailabilityService {
             String dateReason = available ? null : slots.isEmpty() ? "No pickup times have been scheduled for this date."
                     : dateItems.stream().filter(i -> !i.available()).map(i -> i.productName() + ": " + i.reason())
                     .findFirst().orElse("No single pickup time can fulfil all items. Try another date.");
+            LocalDate planDate = date;
             boolean plannedProduction = features.isPlannedPickupProduction() && inventoryProperties.isEnforcementEnabled()
                     && date.isAfter(today) && available && !items.isEmpty()
                     && items.stream().allMatch(item -> {
                         var policy = policies.get(item.branchProduct().getId());
-                        var allocation = allocations.get(new StockKey(item.branchProduct().getId(), date));
+                        var allocation = allocations.get(new StockKey(item.branchProduct().getId(), planDate));
                         return policy != null && policy.getControlMode() == InventoryControlMode.DAILY_PRODUCTION
                                 && allocation != null && (allocation.getStatus()
                                 == com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus.APPROVED
