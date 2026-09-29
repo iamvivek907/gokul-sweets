@@ -62,7 +62,8 @@ public class OccasionEnquiryService {
                           Instant createdAt, String nextStep, String customerPhone, String deliveryAddress,
                           String notes, Instant balanceDueAt, Instant holdExpiresAt,
                           Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber,
-                          boolean balancePaymentOpen, List<ProductionLine> productionPlan) {}
+                          boolean balancePaymentOpen, List<ProductionLine> productionPlan, CancellationReview cancellationReview) {}
+    public record CancellationReview(BigDecimal paidAmount, String reason, String state) {}
     public record ProductionLine(long productId, BigDecimal quantity, String unit, LocalDateTime expectedReadyAt, String state, BigDecimal readyQuantity, long readinessRevision) {}
 
     @Transactional
@@ -312,6 +313,7 @@ public class OccasionEnquiryService {
                     && !rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant())
                     ? "The balance deadline passed. Your deposit is recorded, but this booking is not confirmed. Contact the branch before making another payment."
                     : "Your deposit is verified and your items are committed. Pay the remaining balance by its deadline to confirm.";
+            case "CANCELLED" -> "Your booking is cancelled. The amount already paid needs branch finance review; no refund is confirmed yet. Contact the branch.";
             case "CONFIRMED" -> "The required payments are verified and this pickup is confirmed.";
             default -> "The branch will confirm the next step. This is not a confirmed booking.";
         };
@@ -351,7 +353,10 @@ public class OccasionEnquiryService {
                 jdbc.query("SELECT product_id, quantity, unit, expected_ready_at, state, ready_quantity, readiness_revision FROM occasion_production_allocations WHERE enquiry_id = ? ORDER BY product_id",
                         (plan, row) -> new ProductionLine(plan.getLong(1), plan.getBigDecimal(2), plan.getString(3),
                                 plan.getTimestamp(4).toLocalDateTime(), "EXPIRED".equals(currentStatus) && "PLANNED".equals(plan.getString(5))
-                                ? "RELEASED" : plan.getString(5), plan.getBigDecimal(6), plan.getLong(7)), (UUID) rs.getObject("id")));
+                                ? "RELEASED" : plan.getString(5), plan.getBigDecimal(6), plan.getLong(7)), (UUID) rs.getObject("id")),
+                jdbc.query("SELECT paid_amount, reason, state FROM occasion_cancellation_reviews WHERE enquiry_id = ?",
+                        review -> review.next() ? new CancellationReview(review.getBigDecimal(1), review.getString(2), review.getString(3)) : null,
+                        (UUID) rs.getObject("id")));
     }
 
     private static <T> T throwNotFound() { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }

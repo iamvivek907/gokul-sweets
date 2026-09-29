@@ -13,6 +13,7 @@ type Enquiry = {id: string; occasionType: string; serviceDate: string; guestCoun
     quotedAmount: number | null; depositAmount: number | null; paidAmount: number; balanceDueAt: string | null;
     orderNumber: string | null;
     productionPlan?: {productId: number; quantity: number; unit: string; expectedReadyAt: string; state: string; readyQuantity: number; readinessRevision: number}[];
+    cancellationReview?: {paidAmount: number; reason: string; state: string} | null;
     quoteTerms: string | null; nextStep: string};
 
 export default function OccasionEnquiriesPage() {
@@ -23,6 +24,8 @@ export default function OccasionEnquiriesPage() {
     const [lineAmounts, setLineAmounts] = useState<Record<string, Record<number, string>>>({});
     const [deposit, setDeposit] = useState<Record<string, string>>({});
     const [balanceDue, setBalanceDue] = useState<Record<string, string>>({});
+    const [cancelReason, setCancelReason] = useState<Record<string, string>>({});
+    const [cancelReviewed, setCancelReviewed] = useState<Record<string, boolean>>({});
     const [actualReady, setActualReady] = useState<Record<string, string>>({});
     const [readyAt, setReadyAt] = useState<Record<string, string>>({});
     const [terms, setTerms] = useState<Record<string, string>>({});
@@ -100,6 +103,20 @@ export default function OccasionEnquiriesPage() {
         finally {setBusy(false);}
     }
 
+    async function cancelBooking(enquiry: Enquiry) {
+        if (!authorization || !branchId || busy || !cancelReviewed[enquiry.id] || !cancelReason[enquiry.id]?.trim()) return;
+        setBusy(true); setNotice("");
+        try {
+            const response = await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries/${enquiry.id}/cancel`, authorization,
+                {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({reason: cancelReason[enquiry.id]})});
+            if (!response.ok) throw new Error("Could not cancel. Preparation may have started or the payment/booking state changed. Refresh and contact operations or finance.");
+            const updated = await response.json() as Enquiry;
+            setRequests(current => current.map(item => item.id === updated.id ? updated : item));
+            setNotice("Booking cancelled and dedicated production released. Finance must review the amount collected; no refund has been executed.");
+        } catch (error) {setNotice(error instanceof Error ? error.message : "Could not cancel this booking.");}
+        finally {setBusy(false);}
+    }
+
     return <div className="mx-auto max-w-5xl space-y-6 p-6">
         <h1 className="text-3xl font-bold">Occasion food enquiries</h1>
         <p>Review a request before quoting. A quote is not a confirmed booking. When dedicated bulk production is enabled, approving a pickup quote automatically creates its production plan; the deposit commits it. Daily online stock is unchanged.</p>
@@ -138,6 +155,20 @@ export default function OccasionEnquiriesPage() {
                 </div>)}
                 <p>Approval records a plan, not physically ready stock. Review procurement, time remaining and all existing kitchen commitments before approving.</p>
             </div>}
+            {enquiry.cancellationReview && <div className="rounded-xl bg-amber-50 p-3 text-sm">
+                <p className="font-semibold">Cancelled — finance review required</p>
+                <p>Amount collected ₹{enquiry.cancellationReview.paidAmount}. This is not an approved refund amount or a completed refund.</p>
+                <p>Reason: {enquiry.cancellationReview.reason}</p>
+            </div>}
+            {hasPermission("APPROVAL_MANAGE") && ["PAID", "CONFIRMED"].includes(enquiry.status) && !!enquiry.productionPlan?.length && <details className="rounded-xl border border-red-200 p-3">
+                <summary className="cursor-pointer font-semibold">Review cancellation before preparation</summary>
+                <p className="mt-2 text-sm">This releases dedicated production and pickup capacity only if preparation has not started. ₹{enquiry.paidAmount} already collected will require finance review under the agreed terms. It does not send a refund. Pending balance payments may still settle and need separate reconciliation.</p>
+                <label className="mt-3 block">Cancellation reason (customer-visible)
+                    <textarea maxLength={500} value={cancelReason[enquiry.id] ?? ""} onChange={event => setCancelReason(current => ({...current, [enquiry.id]: event.target.value}))} className="mt-1 block w-full rounded-lg border p-2" />
+                </label>
+                <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={cancelReviewed[enquiry.id] ?? false} onChange={event => setCancelReviewed(current => ({...current, [enquiry.id]: event.target.checked}))} />I reviewed the booking terms and understand finance must decide and reconcile any refund.</label>
+                <button type="button" disabled={busy || !cancelReviewed[enquiry.id] || !cancelReason[enquiry.id]?.trim()} onClick={() => void cancelBooking(enquiry)} className="mt-3 min-h-11 rounded-lg border border-red-700 px-4 text-red-800 disabled:opacity-50">Cancel booking and release production</button>
+            </details>}
             {hasPermission("APPROVAL_MANAGE") && ["REQUESTED", "QUOTED"].includes(enquiry.status) && <div className="grid gap-3 sm:grid-cols-3">
                 <div className="sm:col-span-3"><p className="font-semibold">Approved item totals, including configured tax</p>
                     {enquiry.items.map(item => <label key={item.productId} className="mt-2 block">{item.productName} ({item.quantity} {item.unit.toLowerCase()}) ₹

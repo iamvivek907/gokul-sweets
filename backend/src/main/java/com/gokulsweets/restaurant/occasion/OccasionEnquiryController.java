@@ -25,6 +25,7 @@ public class OccasionEnquiryController {
     private final OccasionEnquiryService service;
     private final OccasionCommitmentService commitments;
     private final OccasionProductionReadinessService readiness;
+    private final OccasionCancellationService cancellations;
     private final EnhancementProperties features;
     private final Environment settings;
     private final TrustedCheckoutIdentity identity;
@@ -103,6 +104,15 @@ public class OccasionEnquiryController {
         staff.requireBranchAccess(branchId);
         readiness.record(environment(), branchId, id, productId, input.quantity(), input.revision(),
                 staff.getCurrentStaff().getUsername());
+        return service.staffGet(environment(), branchId, id);
+    }
+
+    @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/cancel")
+    @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
+    public OccasionEnquiryService.Summary cancel(@PathVariable long branchId, @PathVariable UUID id,
+                                                @RequestBody Decline input) {
+        staff.requireBranchAccess(branchId);
+        cancellations.cancel(environment(), branchId, id, staff.getCurrentStaff().getUsername(), input.reason());
         return service.staffGet(environment(), branchId, id);
     }
 
