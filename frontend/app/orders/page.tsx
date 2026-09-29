@@ -15,6 +15,7 @@ import AppShell
     from "@/components/layout/AppShell";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 
 import {
     getOrderHistorySnapshot,
@@ -75,6 +76,7 @@ export default function OrdersPage() {
     const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
 
     const router = useRouter();
+    const {branch} = useSelectedBranch();
 
     const historySnapshot =
         useSyncExternalStore(
@@ -204,7 +206,9 @@ export default function OrdersPage() {
             : null;
 
     const loading = currentHistory === null;
-    const hasOrders = (currentHistory?.orders.length ?? 0) > 0;
+    const branchOrders = useMemo(() => (currentHistory?.orders ?? [])
+        .filter(order => branch !== null && order.branchId === branch.id), [currentHistory, branch]);
+    const hasOrders = branchOrders.length > 0;
 
     const normalizedQuery =
         query.trim().toLowerCase();
@@ -212,7 +216,7 @@ export default function OrdersPage() {
     const filteredOrders =
         useMemo(
             () =>
-                (currentHistory?.orders ?? [])
+                branchOrders
                     .filter(order =>
                         matchesOrderFilter(order, filter)
                     )
@@ -232,7 +236,7 @@ export default function OrdersPage() {
                                 .includes(normalizedQuery)
                         );
                     }),
-            [currentHistory, filter, normalizedQuery]
+            [branchOrders, filter, normalizedQuery]
         );
 
     const totalPages =
@@ -290,7 +294,8 @@ export default function OrdersPage() {
                             My Orders
                         </h1>
                         <p className="mt-2 max-w-xl text-sm leading-6 text-[#756763]">
-                            Track active orders and find older completed, cancelled or failed orders.
+                            {branch ? `Orders from ${branch.name}. Your Profile shows orders from every branch.`
+                                : "Select a branch to see its orders. Your Profile shows orders from every branch."}
                         </p>
                     </div>
 
@@ -308,7 +313,7 @@ export default function OrdersPage() {
 
                 {history.length > MAX_HISTORY_ORDERS && (
                     <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-                        Showing your latest {MAX_HISTORY_ORDERS} orders.
+                        Checking your latest {MAX_HISTORY_ORDERS} orders for this branch.
                     </div>
                 )}
 
@@ -372,11 +377,12 @@ export default function OrdersPage() {
                     <div className="mt-8 rounded-3xl border border-[#eadfd6] bg-white px-6 py-16 text-center">
                         <h2 className="text-xl font-bold text-[#241715]">No orders yet</h2>
                         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#756763]">
-                            Orders from this browser and your current verified session will appear here.
+                            {branch ? `No orders from ${branch.name} yet. Visit Profile to see orders from all branches.`
+                                : "Choose a branch to see its orders. Visit Profile for all branches."}
                         </p>
-                        <button type="button" onClick={() => router.push("/profile")}
+                        <button type="button" onClick={() => router.push("/profile#account-orders")}
                             className="mt-5 min-h-11 rounded-xl border border-[#eadfd6] px-5 text-sm font-bold text-[#7a1625]">
-                            Verify your phone
+                            View all branches in Profile
                         </button>
                         <button
                             type="button"
