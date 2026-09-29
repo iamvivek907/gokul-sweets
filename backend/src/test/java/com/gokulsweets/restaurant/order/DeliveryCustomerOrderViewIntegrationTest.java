@@ -56,6 +56,7 @@ class DeliveryCustomerOrderViewIntegrationTest {
         assertThat(detail.deliveryStartTime()).isEqualTo(LocalTime.of(11, 0));
         assertThat(detail.deliveryAddressLine()).isEqualTo("12 Main Road");
         var summary = orders.getCustomerOrderHistory(List.of(orderNumber)).getFirst();
+        assertThat(summary.branchId()).isEqualTo(branch);
         assertThat(summary.fulfillmentType()).isEqualTo(FulfillmentType.DELIVERY);
         assertThat(summary.deliveryEndTime()).isEqualTo(LocalTime.of(12, 0));
         assertThat(summary.pickupDate()).isNull();
