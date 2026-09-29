@@ -1,6 +1,8 @@
 package com.gokulsweets.restaurant.branch;
 
 import com.gokulsweets.restaurant.branch.dto.BranchResponse;
+import com.gokulsweets.restaurant.config.EnhancementProperties;
+import com.gokulsweets.restaurant.pickup.BranchPickupSettingsRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,19 @@ import java.util.List;
 public class BranchService {
 
     private final BranchRepository branchRepository;
+    private final BranchExperienceService experience;
+    private final BranchPickupSettingsRepository pickupSettings;
+    private final EnhancementProperties features;
+
+    private BranchResponse response(Branch branch) {
+        var published = features.isBranchExperience() ? experience.published(branch.getId()) : null;
+        boolean pickup = pickupSettings.findByBranchId(branch.getId())
+                .map(setting -> setting.isEnabled()).orElse(false);
+        return BranchResponse.from(branch, published == null ? null : published.imageUrl(),
+                published == null ? null : published.mobileUrl(),
+                published == null ? null : published.altText(),
+                published == null ? null : published.description(), pickup);
+    }
 
     @Transactional(readOnly = true)
     public List<BranchResponse> getActiveBranches() {
@@ -22,7 +37,7 @@ public class BranchService {
                 branchRepository
                         .findByActiveTrueOrderByNameAsc()
                         .stream()
-                        .map(BranchResponse::from)
+                        .map(this::response)
                         .toList();
 
         log.debug(
@@ -56,6 +71,6 @@ public class BranchService {
                             );
                         });
 
-        return BranchResponse.from(branch);
+        return response(branch);
     }
 }

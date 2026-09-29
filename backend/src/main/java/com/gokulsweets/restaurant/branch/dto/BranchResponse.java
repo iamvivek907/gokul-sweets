@@ -19,10 +19,16 @@ public record BranchResponse(
         BigDecimal longitude,
         LocalTime openingTime,
         LocalTime closingTime,
-        boolean active
+        boolean active,
+        String coverImageUrl,
+        String mobileCoverImageUrl,
+        String coverAltText,
+        String description,
+        boolean pickupAvailable
 ) {
 
-    public static BranchResponse from(Branch branch) {
+    public static BranchResponse from(Branch branch, String coverImageUrl, String mobileCoverImageUrl,
+                                      String coverAltText, String description, boolean pickupAvailable) {
         return new BranchResponse(
                 branch.getId(),
                 branch.getCode(),
@@ -37,7 +43,7 @@ public record BranchResponse(
                 branch.getLongitude(),
                 branch.getOpeningTime(),
                 branch.getClosingTime(),
-                branch.isActive()
+                branch.isActive(), coverImageUrl, mobileCoverImageUrl, coverAltText, description, pickupAvailable
         );
     }
 }

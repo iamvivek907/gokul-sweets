@@ -16,7 +16,7 @@ export default function HomeEntry({children}: {children: ReactNode}) {
     if (!features || error || !shouldShowIntentGateway(features.preHomeIntentGateway, false)) return <>{children}</>;
 
     return <AppShell editorial showSocialPopup={false}>
-        <EditorialArrival campaignsEnabled={features.homepageCampaigns}
+        <EditorialArrival campaignsEnabled={features.homepageCampaigns} branchExperience={features.branchExperience}
             accessible={features.accessibleOrderingV2} />
     </AppShell>;
 }

@@ -110,3 +110,8 @@ body:has(.future-storefront){background:#151722}
 .future-storefront .account-navigation button{color:#f5e9d9}.future-storefront .account-navigation button:hover,.future-storefront .account-navigation button:focus-visible,.future-storefront .account-navigation button[aria-pressed="true"]{background:#f3c78b35;color:#ffe7ad}
 .account-badge.is-locked{opacity:1}.future-storefront .account-badge,.future-storefront .account-badge.is-locked{background:#f9f5ed;border-color:#d4c7ad;color:#1d3230}.future-storefront .account-badge.is-earned{background:#f8e8c5;border-color:#d1a350}.future-storefront .account-badge strong{color:#1d3230}.future-storefront .account-badge>span:last-child{color:#43554f}.future-storefront .account-badge.is-locked .account-badge-icon{border-color:#697a72;color:#334942}
 @media(max-width:720px){.account-layout{display:block}.account-navigation{position:static;display:flex;gap:.4rem;overflow-x:auto;margin-bottom:1rem;padding:.65rem;white-space:nowrap}.account-navigation-label{display:none}.account-navigation a,.account-navigation button{flex:none;width:auto}.account-avatar{width:4.6rem;height:4.6rem;font-size:1.5rem}.account-cover{min-height:0}}
+
+/* Branch detail action reuses the cart-safe branch switch control. */
+.branch-detail-action .gokul-branch-card-action{position:static;display:inline-flex;min-height:48px;width:auto;align-items:center;border:0;border-radius:999px;background:#c76752;padding:0 1.4rem;color:white;font-weight:700}
+.branch-detail-action .gokul-branch-card-action-label{position:static;opacity:1;color:inherit}
+.branch-detail-action .gokul-branch-card-action:focus-visible{outline:3px solid #54bbc2;outline-offset:3px}

@@ -13,14 +13,15 @@ import type {Branch} from "@/types/branch";
 import type {HomepageCampaign} from "@/types/campaign";
 import styles from "./EditorialArrival.module.css";
 
-export default function EditorialArrival({campaignsEnabled, accessible, branchesOnly = false}: {
-    campaignsEnabled: boolean; accessible: boolean; branchesOnly?: boolean;
+export default function EditorialArrival({campaignsEnabled, accessible, branchExperience = false, branchesOnly = false}: {
+    campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; branchesOnly?: boolean;
 }) {
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [campaigns, setCampaigns] = useState<HomepageCampaign[]>([]);
     const [branchPhotos, setBranchPhotos] = useState<Record<number, string>>({});
     const [failed, setFailed] = useState<number[]>([]);
+    const [failedBranchPhotos, setFailedBranchPhotos] = useState<number[]>([]);
     const [now, setNow] = useState(0);
 
     useEffect(() => {
@@ -29,7 +30,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
             if (controller.signal.aborted) return;
             const active = list.filter(item => item.active !== false);
             setBranches(active);
-            if (!campaignsEnabled) return;
+            if (!campaignsEnabled || branchExperience) return;
             // A branch-specific published poster can illustrate its own card; never imply an unconfigured capability.
             void Promise.all(active.map(async item => {
                 try {
@@ -51,7 +52,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
             if (!controller.signal.aborted) console.warn("Branch discovery unavailable.", error);
         });
         return () => controller.abort();
-    }, [campaignsEnabled]);
+    }, [campaignsEnabled, branchExperience]);
 
     useEffect(() => {
         if (!campaignsEnabled) return;
@@ -108,14 +109,20 @@ export default function EditorialArrival({campaignsEnabled, accessible, branches
             </div>
             <div className={styles.branchGrid}>
                 {branches.map(item => <article className={styles.branchCard} key={item.id}>
-                    {branchPhotos[item.id] && <Image src={branchPhotos[item.id]} alt={item.name}
-                        fill sizes="(max-width: 700px) 100vw, 50vw" className={styles.branchPhoto} />}
+                    {!failedBranchPhotos.includes(item.id) && branchExperience && item.coverImageUrl
+                        ? <picture><source media="(max-width: 700px)" srcSet={item.mobileCoverImageUrl || item.coverImageUrl} />
+                            <img src={item.coverImageUrl} alt={item.coverAltText || item.name}
+                                className={styles.branchPhoto} onError={() => setFailedBranchPhotos(current => [...current, item.id])} /></picture>
+                        : !branchExperience && branchPhotos[item.id] && <Image src={branchPhotos[item.id]} alt={item.name}
+                            fill sizes="(max-width: 700px) 100vw, 50vw" className={styles.branchPhoto} />}
                     <div className={styles.branchCopy}>
                         <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
-                        <p>{item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
+                        <p>{branchExperience ? item.description || item.city || item.address || "Explore this branch" : item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
+                        {branchExperience && <p>{item.pickupAvailable ? "Order for pickup" : "Online pickup unavailable"}</p>}
                         <span className={styles.cardPrompt}>Explore this branch</span>
                     </div>
-                    <BranchSelector cardBranch={item} />
+                    {branchExperience ? <Link className={styles.branchDetailLink} href={`/branches/${item.id}`} aria-label={`Explore ${item.name} details`} />
+                        : <BranchSelector cardBranch={item} />}
                 </article>)}
             </div>
             {!branches.length && <p className={styles.branchFallback}>Branch details will appear here when available. You can still explore the menu.</p>}
