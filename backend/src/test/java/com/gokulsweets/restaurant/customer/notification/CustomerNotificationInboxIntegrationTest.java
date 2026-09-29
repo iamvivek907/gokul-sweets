@@ -32,7 +32,13 @@ import static org.mockito.Mockito.when;
         "gokul.identity.provider-abuse-controls-verified=true",
         "gokul.environment-isolation.environment=DEV",
         "gokul.environment-isolation.enabled=true",
-        "gokul.web.environment-cors-enabled=true"
+        "gokul.web.environment-cors-enabled=true",
+        "gokul.environment-isolation.api-origin=https://api-inbox-ci.example.invalid",
+        "phonepe.redirect-url=https://dev.gokulsweets.in/checkout",
+        "phonepe.webhook-url=https://api-inbox-ci.example.invalid/api/payments/webhooks/phonepe",
+        "phonepe.webhook-checksum-key-id=inbox-test-key",
+        "cloudflare.r2.bucket-name=gokul-inbox-test",
+        "cloudflare.r2.public-url=https://images-inbox-ci.example.invalid"
 })
 @Transactional
 class CustomerNotificationInboxIntegrationTest {
