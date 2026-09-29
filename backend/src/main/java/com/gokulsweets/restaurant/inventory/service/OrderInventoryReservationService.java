@@ -5,6 +5,7 @@ import com.gokulsweets.restaurant.inventory.entity.BranchInventoryPolicy;
 import com.gokulsweets.restaurant.inventory.entity.InventoryDailyAllocation;
 import com.gokulsweets.restaurant.inventory.entity.InventoryReservation;
 import com.gokulsweets.restaurant.inventory.enums.InventoryControlMode;
+import com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus;
 import com.gokulsweets.restaurant.inventory.enums.InventoryReservationStatus;
 import com.gokulsweets.restaurant.inventory.enums.InventoryTransactionType;
 import com.gokulsweets.restaurant.inventory.exception.InventoryConflictException;
@@ -140,8 +141,25 @@ public class OrderInventoryReservationService {
                 // Reused holds still need current preparation and approved production promises.
                 var locked = lockAllRequiredAllocations(existing, requested);
                 for (RequestedHold hold : requested.values()) {
-                    validatePolicyForOrder(order, requireLockedAllocation(locked, hold.key()),
-                            requirePolicy(hold.branchProductId()), serviceAt);
+                    var allocation = requireLockedAllocation(locked, hold.key());
+                    var policy = requirePolicy(hold.branchProductId());
+                    validatePolicyForOrder(order, allocation, policy, serviceAt);
+                    if (order.getFulfillmentType() == FulfillmentType.DELIVERY
+                            && serviceDate.isAfter(LocalDate.now(inventoryClock))) {
+                        // The current hold is already subtracted from available stock. Recheck
+                        // total backing without releasing it or requiring extra unheld stock.
+                        BigDecimal supply = policy.isReadyStockRequired()
+                                ? allocation.getReadyQuantity().min(allocation.getApprovedQuantity())
+                                : allocation.getApprovedQuantity();
+                        BigDecimal promised = allocation.getHeldQuantity()
+                                .add(allocation.getCommittedQuantity())
+                                .add(allocation.getSafetyBufferQuantity())
+                                .add(allocation.getWastedQuantity());
+                        if (supply.compareTo(promised) < 0) {
+                            throw new InventoryConflictException("DELIVERY_PRODUCTION_SHORTFALL",
+                                    "Approved production no longer covers the reserved delivery quantity. Choose another time or pickup.");
+                        }
+                    }
                 }
             }
             return;
@@ -597,6 +615,9 @@ public class OrderInventoryReservationService {
         if (order.getFulfillmentType() == FulfillmentType.DELIVERY && serviceDate.isAfter(now.toLocalDate())) {
             if (!features.isPlannedDeliveryProduction()
                     || policy.getControlMode() != InventoryControlMode.DAILY_PRODUCTION
+                    || (allocation.getStatus() != InventoryAllocationStatus.APPROVED
+                        && allocation.getStatus() != InventoryAllocationStatus.READY)
+                    || (policy.isReadyStockRequired() && allocation.getStatus() != InventoryAllocationStatus.READY)
                     || allocation.getExpectedReadyAt() == null
                     || serviceAt.isBefore(allocation.getExpectedReadyAt())) {
                 throw new InventoryConflictException("DELIVERY_PRODUCTION_NOT_READY",
