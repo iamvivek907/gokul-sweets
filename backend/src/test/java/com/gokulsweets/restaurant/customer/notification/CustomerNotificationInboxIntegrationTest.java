@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +44,7 @@ class CustomerNotificationInboxIntegrationTest {
     @Autowired PlatformTransactionManager transactions;
     @MockitoBean StaffAuthorizationService staff;
     @MockitoBean AdminOrderQueryService queries;
-    @MockitoBean ApplicationClock clock;
+    @MockitoSpyBean ApplicationClock clock;
     private final UUID subject = UUID.randomUUID();
 
     @BeforeEach

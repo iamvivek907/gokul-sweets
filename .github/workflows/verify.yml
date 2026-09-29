@@ -38,6 +38,9 @@ jobs:
         env:
           NEXT_PUBLIC_API_URL: https://api-ci.example.invalid
           NEXT_PUBLIC_API_BASE_URL: https://api-ci.example.invalid
+          # Synthetic browser settings: every identity API is intercepted by the test.
+          NEXT_PUBLIC_MSG91_WIDGET_ID: ci-test-widget
+          NEXT_PUBLIC_MSG91_WIDGET_TOKEN: ci-test-widget-token
 
       - name: Install inbox browser regression runner
         run: |
