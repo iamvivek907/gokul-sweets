@@ -13,8 +13,8 @@ import type {Branch} from "@/types/branch";
 import type {HomepageCampaign} from "@/types/campaign";
 import styles from "./EditorialArrival.module.css";
 
-export default function EditorialArrival({campaignsEnabled, accessible, branchExperience = false}: {
-    campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean;
+export default function EditorialArrival({campaignsEnabled, accessible, branchExperience = false, occasionEnquiries = false}: {
+    campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; occasionEnquiries?: boolean;
 }) {
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -97,7 +97,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
                     <Link href="/branches" className={styles.orderFood}>Order food</Link>
-                    <Link href="/branches">Plan an occasion</Link>
+                    <Link href={occasionEnquiries ? "/occasions" : "/branches"}>Plan an occasion</Link>
                 </div>
             </div>
             <a className={styles.scrollCue} href="#gokul-branches" onClick={event => {

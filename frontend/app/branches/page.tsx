@@ -14,6 +14,7 @@ export default function BranchesPage() {
     return <AppShell editorial showSocialPopup={false}>
         <EditorialArrival campaignsEnabled={features?.homepageCampaigns === true}
             branchExperience={features?.branchExperience === true}
+            occasionEnquiries={features?.occasionEnquiries === true}
             accessible={features?.accessibleOrderingV2 === true} />
     </AppShell>;
 }

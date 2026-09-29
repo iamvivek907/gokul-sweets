@@ -139,6 +139,7 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/api/storefront/**",
                                 "/api/customer/identity/**",
+                                "/api/occasion-enquiries", "/api/occasion-enquiries/**",
 
                                 "/api/branches",
                                 "/api/branches/**",

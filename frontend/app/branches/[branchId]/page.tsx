@@ -9,11 +9,13 @@ import BranchDetails from "@/components/branch/BranchDetails";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {getBranch} from "@/services/branchApi";
 import type {Branch} from "@/types/branch";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 export default function BranchHomePage() {
     const {branchId} = useParams<{branchId: string}>();
     const id = Number(branchId);
     const {branch: selected} = useSelectedBranch();
+    const occasionEnquiries = useStorefrontFeatures()?.occasionEnquiries === true;
     const [branch, setBranch] = useState<Branch | null>(null);
     const [tab, setTab] = useState<"home" | "details">("home");
     const [error, setError] = useState("");
@@ -46,6 +48,7 @@ export default function BranchHomePage() {
                 {tab === "details" ? <BranchDetails branch={branch} /> : <section className="branch-home-welcome">
                     <h2>Made for your next visit.</h2><p>{branch.pickupAvailable ? "Browse what is available here, place an order and choose your pickup time at checkout." : "Explore this branch and contact us for your visit."}</p>
                     <button type="button" onClick={() => setTab("details")}>See branch details →</button>
+                    {occasionEnquiries && selected?.id === branch.id && <Link className="ml-4 inline-flex min-h-11 items-center font-semibold underline" href="/occasions">Plan occasion food →</Link>}
                 </section>}
             </>}
         </article>
