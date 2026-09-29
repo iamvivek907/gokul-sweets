@@ -63,7 +63,7 @@ public class OccasionEnquiryService {
                           String notes, Instant balanceDueAt, Instant holdExpiresAt,
                           Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber,
                           boolean balancePaymentOpen, List<ProductionLine> productionPlan) {}
-    public record ProductionLine(long productId, BigDecimal quantity, String unit, LocalDateTime expectedReadyAt, String state) {}
+    public record ProductionLine(long productId, BigDecimal quantity, String unit, LocalDateTime expectedReadyAt, String state, BigDecimal readyQuantity, long readinessRevision) {}
 
     @Transactional
     public Summary submit(ConsentEnvironment environment, UUID subject, Request input) {
@@ -258,7 +258,7 @@ public class OccasionEnquiryService {
                 """, Boolean.class, Timestamp.from(clock.instant()), id, environment.name(), branchId));
     }
 
-    private Summary staffGet(ConsentEnvironment environment, long branchId, UUID id) {
+    public Summary staffGet(ConsentEnvironment environment, long branchId, UUID id) {
         return jdbc.query("SELECT * FROM occasion_enquiries WHERE id = ? AND environment = ? AND branch_id = ?",
                 rs -> rs.next() ? map(rs) : null, id, environment.name(), branchId);
     }
@@ -348,10 +348,10 @@ public class OccasionEnquiryService {
                         "SELECT order_number FROM orders WHERE id = ?", String.class, rs.getLong("order_id")),
                 "PAID".equals(status) && rs.getTimestamp("balance_due_at") != null
                         && rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant()),
-                jdbc.query("SELECT product_id, quantity, unit, expected_ready_at, state FROM occasion_production_allocations WHERE enquiry_id = ? ORDER BY product_id",
+                jdbc.query("SELECT product_id, quantity, unit, expected_ready_at, state, ready_quantity, readiness_revision FROM occasion_production_allocations WHERE enquiry_id = ? ORDER BY product_id",
                         (plan, row) -> new ProductionLine(plan.getLong(1), plan.getBigDecimal(2), plan.getString(3),
                                 plan.getTimestamp(4).toLocalDateTime(), "EXPIRED".equals(currentStatus) && "PLANNED".equals(plan.getString(5))
-                                ? "RELEASED" : plan.getString(5)), (UUID) rs.getObject("id")));
+                                ? "RELEASED" : plan.getString(5), plan.getBigDecimal(6), plan.getLong(7)), (UUID) rs.getObject("id")));
     }
 
     private static <T> T throwNotFound() { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }

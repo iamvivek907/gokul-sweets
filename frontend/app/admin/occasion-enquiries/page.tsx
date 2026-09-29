@@ -12,7 +12,7 @@ type Enquiry = {id: string; occasionType: string; serviceDate: string; guestCoun
     pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number; taxAmount: number; cgstRate: number; sgstRate: number}[];
     quotedAmount: number | null; depositAmount: number | null; paidAmount: number; balanceDueAt: string | null;
     orderNumber: string | null;
-    productionPlan?: {productId: number; quantity: number; unit: string; expectedReadyAt: string; state: string}[];
+    productionPlan?: {productId: number; quantity: number; unit: string; expectedReadyAt: string; state: string; readyQuantity: number; readinessRevision: number}[];
     quoteTerms: string | null; nextStep: string};
 
 export default function OccasionEnquiriesPage() {
@@ -23,6 +23,7 @@ export default function OccasionEnquiriesPage() {
     const [lineAmounts, setLineAmounts] = useState<Record<string, Record<number, string>>>({});
     const [deposit, setDeposit] = useState<Record<string, string>>({});
     const [balanceDue, setBalanceDue] = useState<Record<string, string>>({});
+    const [actualReady, setActualReady] = useState<Record<string, string>>({});
     const [readyAt, setReadyAt] = useState<Record<string, string>>({});
     const [terms, setTerms] = useState<Record<string, string>>({});
     const [notice, setNotice] = useState("");
@@ -81,6 +82,24 @@ export default function OccasionEnquiriesPage() {
         finally {setBusy(false);}
     }
 
+    async function saveReadiness(enquiry: Enquiry, productId: number, revision: number, unit: string) {
+        if (!authorization || !branchId || busy) return;
+        const input = Number(actualReady[`${enquiry.id}:${productId}`]);
+        if (!Number.isFinite(input) || input < 0 || actualReady[`${enquiry.id}:${productId}`] === undefined) {
+            setNotice("Enter the actual quantity prepared."); return;
+        }
+        setBusy(true); setNotice("");
+        try {
+            const response = await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries/${enquiry.id}/production/${productId}/readiness`, authorization,
+                {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({quantity: unit === "GRAM" ? Math.round(input * 1000) : input, revision})});
+            if (!response.ok) throw new Error("Could not save readiness. The order must be preparing; check the quantity and refresh if another staff member updated it.");
+            const updated = await response.json() as Enquiry;
+            setRequests(current => current.map(item => item.id === updated.id ? updated : item));
+            setNotice("Actual prepared quantity recorded. Mark the order ready for pickup only after every item is fully prepared.");
+        } catch (error) {setNotice(error instanceof Error ? error.message : "Could not save readiness.");}
+        finally {setBusy(false);}
+    }
+
     return <div className="mx-auto max-w-5xl space-y-6 p-6">
         <h1 className="text-3xl font-bold">Occasion food enquiries</h1>
         <p>Review a request before quoting. A quote is not a confirmed booking. When dedicated bulk production is enabled, approving a pickup quote automatically creates its production plan; the deposit commits it. Daily online stock is unchanged.</p>
@@ -105,6 +124,18 @@ export default function OccasionEnquiriesPage() {
             {!!enquiry.productionPlan?.length && <div className="rounded-xl bg-blue-50 p-3 text-sm">
                 <p className="font-semibold">Dedicated bulk production — separate from daily online stock</p>
                 {enquiry.productionPlan.map(line => <p key={line.productId}>{enquiry.items.find(item => item.productId === line.productId)?.productName}: {line.unit === "GRAM" ? `${line.quantity / 1000} kg` : `${line.quantity} pcs`} · ready by {line.expectedReadyAt.replace("T", " ")} IST · {line.state === "PLANNED" ? "Awaiting deposit" : line.state === "HELD" ? "Payment in progress" : line.state === "COMMITTED" ? "Production committed" : "Released"}</p>)}
+                {enquiry.productionPlan.map(line => <div key={`ready-${line.productId}`} className="mt-3 rounded-lg border bg-white p-3">
+                    <p>{enquiry.items.find(item => item.productId === line.productId)?.productName}: physically prepared {line.unit === "GRAM" ? `${line.readyQuantity / 1000} kg` : `${line.readyQuantity} pcs`}</p>
+                    {enquiry.status === "CONFIRMED" && line.state === "COMMITTED" && hasPermission("ORDER_MARK_READY") && <div className="mt-2 flex flex-wrap items-end gap-2">
+                        <label>Actual ready quantity ({line.unit === "GRAM" ? "kg" : "pcs"})
+                            <input type="number" min="0" max={line.unit === "GRAM" ? line.quantity / 1000 : line.quantity} step={line.unit === "GRAM" ? ".001" : "1"}
+                                value={actualReady[`${enquiry.id}:${line.productId}`] ?? ""} onChange={event => setActualReady(current => ({...current, [`${enquiry.id}:${line.productId}`]: event.target.value}))}
+                                className="block w-40 rounded-lg border p-2" />
+                        </label>
+                        <button type="button" disabled={busy} onClick={() => void saveReadiness(enquiry, line.productId, line.readinessRevision, line.unit)} className="min-h-11 rounded-lg border px-3 disabled:opacity-50">Record prepared quantity</button>
+                        <p className="w-full text-xs">Enter the total actually prepared, not an additional quantity. Start preparation in the linked order first. Partial preparation does not make the whole order ready; every item must reach its approved quantity. Changes are audited and daily online stock is unchanged.</p>
+                    </div>}
+                </div>)}
                 <p>Approval records a plan, not physically ready stock. Review procurement, time remaining and all existing kitchen commitments before approving.</p>
             </div>}
             {hasPermission("APPROVAL_MANAGE") && ["REQUESTED", "QUOTED"].includes(enquiry.status) && <div className="grid gap-3 sm:grid-cols-3">

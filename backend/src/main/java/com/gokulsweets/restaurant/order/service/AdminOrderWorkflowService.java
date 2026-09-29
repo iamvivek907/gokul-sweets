@@ -64,6 +64,7 @@ public class AdminOrderWorkflowService {
             preparationEligibilityService;
 
     private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch;
+    private final com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService bulkReadiness;
 
 
     /*
@@ -184,6 +185,7 @@ public class AdminOrderWorkflowService {
                 currentStatus,
                 targetStatus
         );
+        if (targetStatus == OrderStatus.READY_FOR_PICKUP) bulkReadiness.requireReady(order.getId());
         if (order.getFulfillmentType() == FulfillmentType.DELIVERY
                 && targetStatus == OrderStatus.OUT_FOR_DELIVERY)
             dispatch.requireAssignment(order.getId());

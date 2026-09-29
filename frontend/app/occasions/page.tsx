@@ -19,7 +19,7 @@ type Item = {productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
     status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
     quoteTerms: string | null; quoteExpiresAt: string | null; balanceDueAt: string | null;
-    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; productionPlan?: {expectedReadyAt: string; state: string}[];
+    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; productionPlan?: {expectedReadyAt: string; state: string; quantity: number; readyQuantity: number}[];
     pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number;
         taxAmount: number; cgstRate: number; sgstRate: number}[]};
 type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
@@ -238,6 +238,9 @@ export default function OccasionsPage() {
                         </div>}
                         {enquiry.orderNumber && <p className="mt-2">Confirmed order <Link href={`/orders/${encodeURIComponent(enquiry.orderNumber)}`} className="underline">{enquiry.orderNumber}</Link></p>}
                         {!!enquiry.productionPlan?.length && <p className="mt-2 text-sm">The branch has planned production specifically for your request. A verified deposit reserves it; full verified payment confirms pickup. This does not mean the food is already prepared.</p>}
+                        {enquiry.status === "CONFIRMED" && !!enquiry.productionPlan?.length && <p className="mt-2 text-sm">{enquiry.productionPlan.every(line => line.readyQuantity >= line.quantity)
+                            ? "The branch has recorded all requested quantities as prepared. Check your linked order for pickup status."
+                            : "Your pickup is confirmed. The branch will update preparation and pickup status in your linked order."}</p>}
                         {enquiry.quoteTerms && <p className="mt-2">{enquiry.quoteTerms}</p>}
                         {enquiry.balanceDueAt && <p className="mt-2">Balance due {new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.</p>}
                         {features.occasionPayments && enquiry.status === "QUOTED" && enquiry.fulfilment === "PICKUP" && <div className="mt-4 space-y-3">
