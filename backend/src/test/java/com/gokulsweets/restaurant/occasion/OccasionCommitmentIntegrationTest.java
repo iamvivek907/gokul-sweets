@@ -311,6 +311,39 @@ class OccasionCommitmentIntegrationTest {
         }
     }
 
+    @Test
+    void fullyPaidCancellationCancelsLinkedOrderAndPreservesVerifiedPayments() {
+        var fixture = paidDeposit();
+        boolean oldBulk = features.isOccasionBulkProduction();
+        boolean oldEnquiries = features.isOccasionEnquiries(), oldPayments = features.isOccasionPayments();
+        try {
+            features.setOccasionBulkProduction(true);
+            features.setOccasionEnquiries(true);
+            features.setOccasionPayments(true);
+            Date date = jdbc.queryForObject("SELECT service_date FROM occasion_enquiries WHERE id = ?", Date.class, fixture.enquiry());
+            jdbc.update("""
+                    INSERT INTO occasion_production_allocations(enquiry_id, product_id, quantity, unit, expected_ready_at, state, approved_by)
+                    VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
+                    """, fixture.enquiry(), fixture.product(), Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
+            when(phonePe.createPayment(anyString(), eq(new BigDecimal("800.00")), anyString(), eq(600)))
+                    .thenAnswer(invocation -> new PhonePeClient.CreatePaymentResponse("cancel-full",
+                            invocation.getArgument(0), "PENDING", "https://pay.example/balance", null, null));
+            var checkout = commitments.beginBalance(ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry());
+            commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.completed", "COMPLETED", "full-balance");
+            assertThatThrownBy(() -> cancellations.cancel(ConsentEnvironment.PROD, fixture.branch(),
+                    fixture.enquiry(), "manager", "Wrong environment"))
+                    .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            cancellations.cancel(ConsentEnvironment.DEV, fixture.branch(), fixture.enquiry(), "manager", "Customer requested cancellation before preparation");
+            assertThat(jdbc.queryForObject("SELECT order_status FROM orders WHERE id = (SELECT order_id FROM occasion_enquiries WHERE id = ?)", String.class, fixture.enquiry())).isEqualTo("CANCELLED");
+            assertThat(jdbc.queryForObject("SELECT paid_amount FROM occasion_cancellation_reviews WHERE enquiry_id = ?", BigDecimal.class, fixture.enquiry())).isEqualByComparingTo("1000.00");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM payments WHERE order_id = (SELECT order_id FROM occasion_enquiries WHERE id = ?) AND payment_status = 'PAID'", Integer.class, fixture.enquiry())).isEqualTo(2);
+        } finally {
+            features.setOccasionBulkProduction(oldBulk);
+            features.setOccasionEnquiries(oldEnquiries);
+            features.setOccasionPayments(oldPayments);
+        }
+    }
+
     private String merchant(UUID attemptId) {
         return jdbc.queryForObject("SELECT merchant_order_id FROM occasion_payment_attempts WHERE id = ?",
                 String.class, attemptId);
