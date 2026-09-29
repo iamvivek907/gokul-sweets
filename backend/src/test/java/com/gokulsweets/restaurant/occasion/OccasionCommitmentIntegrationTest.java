@@ -28,9 +28,25 @@ import static org.mockito.Mockito.*;
 class OccasionCommitmentIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired OccasionCommitmentService commitments;
+    @Autowired OccasionEnquiryService enquiries;
     @Autowired EnhancementProperties features;
     @Autowired Clock clock;
     @MockitoBean PhonePeClient phonePe;
+
+    @Test
+    void managerQuoteSnapshotsConfiguredTaxAndExactItemTotal() {
+        var fixture = paidDeposit();
+        jdbc.update("DELETE FROM occasion_quote_lines WHERE enquiry_id = ?", fixture.enquiry());
+        jdbc.update("UPDATE occasion_enquiries SET status = 'REQUESTED', paid_amount = 0 WHERE id = ?", fixture.enquiry());
+        var quoted = enquiries.quote(ConsentEnvironment.DEV, fixture.branch(), fixture.enquiry(), "manager",
+                new OccasionEnquiryService.Quote(new BigDecimal("1000.00"), new BigDecimal("200.00"),
+                        clock.instant().plus(Duration.ofHours(1)), clock.instant().plus(Duration.ofDays(1)),
+                        "Pickup only", java.util.List.of(new OccasionEnquiryService.QuoteLine(fixture.product(),
+                        new BigDecimal("1000.00")))));
+        assertThat(quoted.pricedLines()).hasSize(1);
+        assertThat(quoted.pricedLines().getFirst().subtotal()).isEqualByComparingTo("952.38");
+        assertThat(quoted.pricedLines().getFirst().taxAmount()).isEqualByComparingTo("47.62");
+    }
 
     @Test
     void balanceRetryUsesOneCheckoutAndVerifiedPaymentConfirmsOnce() {
@@ -53,6 +69,19 @@ class OccasionCommitmentIntegrationTest {
                     fixture.enquiry())).isEqualTo("CONFIRMED");
             assertThat(jdbc.queryForObject("SELECT paid_amount FROM occasion_enquiries WHERE id = ?",
                     BigDecimal.class, fixture.enquiry())).isEqualByComparingTo("1000.00");
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM occasion_enquiries e JOIN orders o ON o.id = e.order_id
+                    JOIN verified_order_ownership own ON own.order_id = o.id
+                    WHERE e.id = ? AND o.order_status = 'CONFIRMED' AND own.verified_subject_id = ?
+                    """, Integer.class, fixture.enquiry(), fixture.subject())).isEqualTo(1);
+            assertThat(jdbc.queryForObject("""
+                    SELECT o.order_number FROM occasion_enquiries e JOIN orders o ON o.id = e.order_id
+                    WHERE e.id = ?
+                    """, String.class, fixture.enquiry())).matches("GKS-[0-9]{8}-[A-F0-9]{16}");
+            assertThat(jdbc.queryForObject("""
+                    SELECT count(*) FROM payments p JOIN occasion_enquiries e ON e.order_id = p.order_id
+                    WHERE e.id = ? AND p.payment_status = 'PAID'
+                    """, Integer.class, fixture.enquiry())).isEqualTo(2);
         } finally {
             features.setOccasionPayments(payments);
             features.setOccasionEnquiries(enquiries);
@@ -89,19 +118,53 @@ class OccasionCommitmentIntegrationTest {
         UUID suffix = UUID.randomUUID();
         long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Occasion test') RETURNING id",
                 Long.class, "OCC-" + suffix.toString().substring(0, 8));
+        long category = jdbc.queryForObject("INSERT INTO categories(code, name) VALUES (?, 'Occasion category') RETURNING id",
+                Long.class, "OCC-C-" + suffix.toString().substring(0, 8));
+        long tax = jdbc.queryForObject("""
+                INSERT INTO tax_categories(code, name, cgst_rate, sgst_rate)
+                VALUES (?, 'Occasion food', 2.5, 2.5) RETURNING id
+                """, Long.class, "OCC-T-" + suffix.toString().substring(0, 8));
+        long product = jdbc.queryForObject("""
+                INSERT INTO products(code, category_id, name, base_price, tax_category_id)
+                VALUES (?, ?, 'Occasion sweets', 100, ?)
+                RETURNING id
+                """, Long.class, "OCC-P-" + suffix.toString().substring(0, 8), category, tax);
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(2);
+        long slot = jdbc.queryForObject("""
+                INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity, booked_count)
+                VALUES (?, ?, '12:00', '12:30', 10, 1) RETURNING id
+                """, Long.class, branch, Date.valueOf(date));
         UUID subject = UUID.randomUUID(), enquiry = UUID.randomUUID();
+        jdbc.update("INSERT INTO verified_customer_subjects(id, environment, verified_phone) VALUES (?, 'DEV', ?)",
+                subject, "+91" + (7000000000L + Math.abs(suffix.hashCode())));
         jdbc.update("""
                 INSERT INTO occasion_enquiries(id, environment, subject_id, branch_id, occasion_type,
                     service_date, guest_count, fulfilment, status, quoted_amount, deposit_amount,
-                    paid_amount, quote_terms, quote_expires_at, balance_due_at)
+                    paid_amount, quote_terms, quote_expires_at, balance_due_at, pickup_slot_id)
                 VALUES (?, 'DEV', ?, ?, 'Celebration', ?, 20, 'PICKUP', 'PAID', 1000, 200,
-                    200, 'Pickup only', ?, ?)
+                    200, 'Pickup only', ?, ?, ?)
                 """, enquiry, subject, branch,
-                Date.valueOf(LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(2)),
+                Date.valueOf(date),
                 Timestamp.from(clock.instant().plus(Duration.ofHours(1))),
-                Timestamp.from(clock.instant().plus(Duration.ofDays(1))));
-        return new Fixture(enquiry, subject);
+                Timestamp.from(clock.instant().plus(Duration.ofDays(1))), slot);
+        jdbc.update("""
+                INSERT INTO occasion_quote_lines(enquiry_id, product_id, product_name, sale_mode,
+                    quantity, gross_amount, subtotal, tax_amount, cgst_rate, sgst_rate)
+                VALUES (?, ?, 'Occasion sweets', 'UNIT', 10, 1000, 952.38, 47.62, 2.5, 2.5)
+                """, enquiry, product);
+        jdbc.update("""
+                INSERT INTO occasion_enquiry_items(enquiry_id, product_id, requested_quantity, unit)
+                VALUES (?, ?, 10, 'PIECE')
+                """, enquiry, product);
+        UUID deposit = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO occasion_payment_attempts(id, enquiry_id, environment, stage, status,
+                    amount, merchant_order_id, expires_at, paid_at)
+                VALUES (?, ?, 'DEV', 'DEPOSIT', 'PAID', 200, ?, ?, ?)
+                """, deposit, enquiry, "GKS-DEV-OCC-" + deposit,
+                Timestamp.from(clock.instant().minus(Duration.ofMinutes(1))), Timestamp.from(clock.instant()));
+        return new Fixture(enquiry, subject, branch, product);
     }
 
-    private record Fixture(UUID enquiry, UUID subject) {}
+    private record Fixture(UUID enquiry, UUID subject, long branch, long product) {}
 }

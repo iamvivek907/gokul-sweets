@@ -9,7 +9,9 @@ type Branch = {id: number; name: string};
 type Enquiry = {id: string; occasionType: string; serviceDate: string; guestCount: number; fulfilment: string;
     customerPhone: string; deliveryAddress: string | null; notes: string | null; status: string;
     items: {productId: number; productName: string; quantity: number; unit: string}[];
+    pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number; taxAmount: number; cgstRate: number; sgstRate: number}[];
     quotedAmount: number | null; depositAmount: number | null; paidAmount: number; balanceDueAt: string | null;
+    orderNumber: string | null;
     quoteTerms: string | null; nextStep: string};
 
 export default function OccasionEnquiriesPage() {
@@ -17,7 +19,7 @@ export default function OccasionEnquiriesPage() {
     const [branches, setBranches] = useState<Branch[]>([]);
     const [branchId, setBranchId] = useState<number | null>(null);
     const [requests, setRequests] = useState<Enquiry[]>([]);
-    const [amount, setAmount] = useState<Record<string, string>>({});
+    const [lineAmounts, setLineAmounts] = useState<Record<string, Record<number, string>>>({});
     const [deposit, setDeposit] = useState<Record<string, string>>({});
     const [balanceDue, setBalanceDue] = useState<Record<string, string>>({});
     const [terms, setTerms] = useState<Record<string, string>>({});
@@ -47,12 +49,15 @@ export default function OccasionEnquiriesPage() {
         setBusy(true); setNotice("");
         try {
             // Quote lifetime begins when the staff member submits the decision.
-            const total = Number(amount[enquiry.id]);
+            const lines = enquiry.items.map(item => ({productId: item.productId,
+                grossAmount: Number(lineAmounts[enquiry.id]?.[item.productId])}));
+            const total = Math.round(lines.reduce((sum, line) => sum + line.grossAmount, 0) * 100) / 100;
             const advance = Number(deposit[enquiry.id]);
-            if (action === "quote" && (!Number.isFinite(total) || total <= 0 || !Number.isFinite(advance)
+            if (action === "quote" && (lines.some(line => !Number.isFinite(line.grossAmount) || line.grossAmount <= 0)
+                || !Number.isFinite(total) || total <= 0 || !Number.isFinite(advance)
                 || advance <= 0 || advance > total || advance < total && !balanceDue[enquiry.id]))
                 throw new Error("Enter a positive deposit and a balance deadline when a balance remains.");
-            const body = action === "quote" ? {amount: total, deposit: advance,
+            const body = action === "quote" ? {amount: total, deposit: advance, lines,
                 // eslint-disable-next-line react-hooks/purity
                 expiresAt: new Date(Math.min(Date.now() + 24 * 60 * 60 * 1000,
                     new Date(`${enquiry.serviceDate}T00:00:00+05:30`).getTime() - 2 * 60 * 60 * 1000,
@@ -84,15 +89,25 @@ export default function OccasionEnquiriesPage() {
             {enquiry.deliveryAddress && <p>Requested delivery address: {enquiry.deliveryAddress} (coverage requires staff review)</p>}
             {enquiry.notes && <p>Customer notes: {enquiry.notes}</p>}
             <ul className="list-inside list-disc">{enquiry.items.map(item => <li key={item.productId}>{item.productName}: {item.quantity} {item.unit.toLowerCase()}</li>)}</ul>
+            {enquiry.pricedLines?.length > 0 && <ul className="text-sm">{enquiry.pricedLines.map(line => <li key={line.productId}>
+                {line.productName}: ₹{line.grossAmount} inclusive (base ₹{line.subtotal}, tax ₹{line.taxAmount} at {line.cgstRate}% CGST + {line.sgstRate}% SGST)
+            </li>)}</ul>}
+            {enquiry.orderNumber && <p>Operational order: {enquiry.orderNumber}</p>}
             {enquiry.quotedAmount != null && <p>Quoted ₹{enquiry.quotedAmount}; deposit ₹{enquiry.depositAmount}; paid ₹{enquiry.paidAmount}.
                 {enquiry.balanceDueAt && ` Balance due ${new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.`} {enquiry.quoteTerms}</p>}
             <p className="text-sm">{enquiry.nextStep}</p>
             {hasPermission("APPROVAL_MANAGE") && ["REQUESTED", "QUOTED"].includes(enquiry.status) && <div className="grid gap-3 sm:grid-cols-3">
-                <label>Quote ₹ <input type="number" min="0.01" step="0.01" value={amount[enquiry.id] ?? ""} onChange={event => setAmount(current => ({...current, [enquiry.id]: event.target.value}))} className="block w-full rounded-lg border p-2" /></label>
+                <div className="sm:col-span-3"><p className="font-semibold">Approved item totals, including configured tax</p>
+                    {enquiry.items.map(item => <label key={item.productId} className="mt-2 block">{item.productName} ({item.quantity} {item.unit.toLowerCase()}) ₹
+                        <input type="number" min="0.01" step="0.01" value={lineAmounts[enquiry.id]?.[item.productId] ?? ""}
+                            onChange={event => setLineAmounts(current => ({...current, [enquiry.id]: {...current[enquiry.id], [item.productId]: event.target.value}}))}
+                            className="mt-1 block w-full rounded-lg border p-2" /></label>)}
+                    <p className="mt-2">Quote total ₹{enquiry.items.reduce((sum, item) => sum + Number(lineAmounts[enquiry.id]?.[item.productId] ?? 0), 0).toFixed(2)}</p>
+                </div>
                 <label>Deposit ₹ <input type="number" min="0.01" step="0.01" value={deposit[enquiry.id] ?? ""} onChange={event => setDeposit(current => ({...current, [enquiry.id]: event.target.value}))} className="block w-full rounded-lg border p-2" /></label>
                 <label>Balance due (IST) <input type="datetime-local" value={balanceDue[enquiry.id] ?? ""} onChange={event => setBalanceDue(current => ({...current, [enquiry.id]: event.target.value}))} className="block w-full rounded-lg border p-2" /></label>
                 <label>Terms or reason <input maxLength={500} value={terms[enquiry.id] ?? ""} onChange={event => setTerms(current => ({...current, [enquiry.id]: event.target.value}))} className="block w-full rounded-lg border p-2" /></label>
-                <button type="button" disabled={busy || !amount[enquiry.id] || !terms[enquiry.id]} onClick={() => void decide(enquiry, "quote")} className="min-h-11 rounded-lg bg-[#143936] px-4 text-white disabled:opacity-50">Send reviewed quote</button>
+                <button type="button" disabled={busy || !terms[enquiry.id]} onClick={() => void decide(enquiry, "quote")} className="min-h-11 rounded-lg bg-[#143936] px-4 text-white disabled:opacity-50">Send reviewed quote</button>
                 <button type="button" disabled={busy || !terms[enquiry.id]} onClick={() => void decide(enquiry, "decline")} className="min-h-11 rounded-lg border px-4 disabled:opacity-50">Decline with reason</button>
             </div>}
         </article>)}

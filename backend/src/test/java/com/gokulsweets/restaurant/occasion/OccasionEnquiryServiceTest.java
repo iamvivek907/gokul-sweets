@@ -35,10 +35,10 @@ class OccasionEnquiryServiceTest {
         var expires = clock.instant().plusSeconds(3600);
         assertThatThrownBy(() -> service.quote(ConsentEnvironment.DEV, 1, UUID.randomUUID(), "manager",
                 new OccasionEnquiryService.Quote(new BigDecimal("1000.00"), BigDecimal.ZERO,
-                        expires, null, "Pickup"))).isInstanceOf(ResponseStatusException.class);
+                        expires, null, "Pickup", List.of()))).isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> service.quote(ConsentEnvironment.DEV, 1, UUID.randomUUID(), "manager",
                 new OccasionEnquiryService.Quote(new BigDecimal("1000.00"), new BigDecimal("200.00"),
-                        expires, null, "Pickup"))).isInstanceOf(ResponseStatusException.class);
+                        expires, null, "Pickup", List.of()))).isInstanceOf(ResponseStatusException.class);
         verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
     private final UUID subject = UUID.randomUUID();
