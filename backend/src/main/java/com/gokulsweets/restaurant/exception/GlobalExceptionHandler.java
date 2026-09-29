@@ -27,8 +27,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleUploadSize(
             org.springframework.web.multipart.MaxUploadSizeExceededException exception, HttpServletRequest request
     ) {
-        return loggedResponse(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE",
-                "Media must be 5 MB or smaller.", request);
+        String message = request.getRequestURI().contains("homepage-campaigns")
+                ? "Campaign images must be under 5 MB and videos under 50 MB."
+                : "Media must be 5 MB or smaller.";
+        return loggedResponse(HttpStatus.PAYLOAD_TOO_LARGE, "UPLOAD_TOO_LARGE", message, request);
     }
 
     @ExceptionHandler(PaymentSignatureException.class)

@@ -170,6 +170,8 @@ class CampaignServiceTest {
     @Test void mobileVideoIsSavedInPublishedSnapshotAndRestoredWithItsType() {
         flags.setControlledCampaignPublishing(true);
         var draft = campaign(); draft.setAltText("Sweets on display");
+        draft.setMainX(35); draft.setMainY(65); draft.setMainZoom(145); draft.setMainFit("COVER");
+        draft.setMobileX(60); draft.setMobileY(30); draft.setMobileZoom(175); draft.setMobileFit("CONTAIN");
         var file = new MockMultipartFile("file", "portrait.mp4", "video/mp4", "1234ftypisom".getBytes());
         when(repository.findForUpdate(1L)).thenReturn(Optional.of(draft));
         when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -180,6 +182,11 @@ class CampaignServiceTest {
         var snapshot = CampaignPublication.from(draft, now);
         assertThat(snapshot.asCampaign().getMobileMediaUrl()).endsWith("portrait.mp4");
         assertThat(snapshot.asCampaign().getMobileMediaType()).isEqualTo("video/mp4");
+        assertThat(snapshot.asCampaign().getMainZoom()).isEqualTo(145);
+        assertThat(snapshot.asCampaign().getMobileX()).isEqualTo(60);
+        assertThat(snapshot.asCampaign().getMobileY()).isEqualTo(30);
+        assertThat(snapshot.asCampaign().getMobileZoom()).isEqualTo(175);
+        assertThat(snapshot.asCampaign().getMobileFit()).isEqualTo("CONTAIN");
         service.removeMobile(1L);
         assertThat(draft.getMobileMediaType()).isNull();
         assertThat(snapshot.asCampaign().getMobileMediaType()).isEqualTo("video/mp4");

@@ -11,8 +11,18 @@ public record CampaignRequest(
         @Pattern(regexp = "^/(menu|cart|about)$") String ctaTarget,
         Instant startAt, Instant endAt,
         boolean active, @Min(0) @Max(10000) int displayOrder,
-        @Size(max = 180) String altText, @Positive Long branchId
+        @Size(max = 180) String altText, @Positive Long branchId,
+        @Min(0) @Max(100) Integer mainX, @Min(0) @Max(100) Integer mainY,
+        @Min(100) @Max(300) Integer mainZoom, @Pattern(regexp = "COVER|CONTAIN") String mainFit,
+        @Min(0) @Max(100) Integer mobileX, @Min(0) @Max(100) Integer mobileY,
+        @Min(100) @Max(300) Integer mobileZoom, @Pattern(regexp = "COVER|CONTAIN") String mobileFit
 ) {
+    public CampaignRequest(String type, String title, String subtitle, String ctaLabel, String ctaTarget,
+                           Instant startAt, Instant endAt, boolean active, int displayOrder,
+                           String altText, Long branchId) {
+        this(type, title, subtitle, ctaLabel, ctaTarget, startAt, endAt, active, displayOrder,
+                altText, branchId, null, null, null, null, null, null, null, null);
+    }
     public CampaignRequest(String type, String title, String subtitle, String ctaLabel, String ctaTarget,
                            Instant startAt, Instant endAt, boolean active, int displayOrder) {
         this(type, title, subtitle, ctaLabel, ctaTarget, startAt, endAt, active, displayOrder, null, null);

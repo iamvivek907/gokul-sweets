@@ -4,6 +4,7 @@ import Image from "next/image";
 import {useEffect, useRef, useState, useSyncExternalStore} from "react";
 import type {HomepageCampaign} from "@/types/campaign";
 import {useStaticCampaignMedia} from "@/lib/mediaRecovery";
+import {campaignFrameStyle} from "@/lib/campaignFraming";
 
 function subscribe(callback: () => void) {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -50,6 +51,11 @@ export default function CampaignMedia({campaign, hero = false, immersive = false
     const animated = selectedType === "image/gif" || selectedType?.startsWith("video/") === true;
     const useFallback = useStaticCampaignMedia(animated, reduced, accessible && saveData, failed, visible);
     const source = useFallback ? campaign.fallbackMediaUrl : selectedUrl;
+    const frameStyle = campaignFrameStyle(mobileAsset ? {
+        x: campaign.mobileX ?? 50, y: campaign.mobileY ?? 50, zoom: campaign.mobileZoom ?? 100,
+        fit: campaign.mobileFit ?? "COVER"
+    } : {x: campaign.mainX ?? 50, y: campaign.mainY ?? 50, zoom: campaign.mainZoom ?? 100,
+        fit: campaign.mainFit ?? "COVER"});
     if (!source) return null;
     const fail = () => {
         if (animated && !useFallback && campaign.fallbackMediaUrl) setFailed(true);
@@ -60,9 +66,9 @@ export default function CampaignMedia({campaign, hero = false, immersive = false
             src={source} poster={campaign.fallbackMediaUrl ?? undefined} muted loop playsInline autoPlay
             disablePictureInPicture disableRemotePlayback preload={hero ? "metadata" : "none"}
             aria-label={campaign.altText || campaign.title}
-            className="h-full w-full object-cover" onError={fail} />
+            className="h-full w-full" style={frameStyle} onError={fail} />
             : <Image src={source} alt={campaign.altText || campaign.title} fill sizes="(max-width: 768px) 100vw, 50vw"
                 loading={hero ? "eager" : "lazy"} unoptimized={selectedType === "image/gif" && !useFallback}
-                className="object-cover" onError={fail} />}
+                className="object-cover" style={frameStyle} onError={fail} />}
     </div>;
 }

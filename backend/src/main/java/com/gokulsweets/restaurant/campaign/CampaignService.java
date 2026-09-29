@@ -37,7 +37,8 @@ public class CampaignService {
         var canonical = new StringBuilder();
         for (Object field : new Object[]{request.type(), request.title(), request.subtitle(), request.ctaLabel(),
                 request.ctaTarget(), request.startAt(), request.endAt(), request.active(), request.displayOrder(),
-                request.altText(), request.branchId()}) {
+                request.altText(), request.branchId(), request.mainX(), request.mainY(), request.mainZoom(), request.mainFit(),
+                request.mobileX(), request.mobileY(), request.mobileZoom(), request.mobileFit()}) {
             String value = field == null ? null : field.toString();
             canonical.append(value == null ? -1 : value.length()).append(':').append(value == null ? "" : value);
         }
@@ -79,6 +80,14 @@ public class CampaignService {
         campaign.setEndAt(request.endAt());
         campaign.setDisplayOrder(request.displayOrder());
         campaign.setActive(request.active());
+        if (request.mainX() != null) campaign.setMainX(request.mainX());
+        if (request.mainY() != null) campaign.setMainY(request.mainY());
+        if (request.mainZoom() != null) campaign.setMainZoom(request.mainZoom());
+        if (request.mainFit() != null) campaign.setMainFit(request.mainFit());
+        if (request.mobileX() != null) campaign.setMobileX(request.mobileX());
+        if (request.mobileY() != null) campaign.setMobileY(request.mobileY());
+        if (request.mobileZoom() != null) campaign.setMobileZoom(request.mobileZoom());
+        if (request.mobileFit() != null) campaign.setMobileFit(request.mobileFit());
         if (features.isControlledCampaignPublishing()) {
             campaign.setAltText(request.altText() == null ? null : request.altText().trim());
             campaign.setBranchId(request.branchId());
@@ -142,7 +151,10 @@ public class CampaignService {
         HomepageCampaign campaign = require(id);
         String requestHash = null;
         if (requestId != null) {
-            if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024) throw new IllegalArgumentException("Choose a campaign file of 5 MB or smaller.");
+            boolean video = file != null && !fallback && ("video/mp4".equals(file.getContentType())
+                    || "video/webm".equals(file.getContentType()));
+            long limit = video ? 50L * 1024 * 1024 : 5L * 1024 * 1024;
+            if (file == null || file.isEmpty() || file.getSize() > limit) throw new IllegalArgumentException("Choose an image up to 5 MB or video up to 50 MB.");
             try {requestHash = hash((file.getContentType() + ":" + hash(file.getBytes())).getBytes(StandardCharsets.UTF_8));}
             catch (IOException exception) {throw new IllegalStateException("Unable to read campaign media.", exception);}
             var previousHash = repository.mediaRequestHash(id, fallback, requestId);
@@ -208,9 +220,9 @@ public class CampaignService {
         if (!features.isControlledCampaignPublishing()) throw new IllegalArgumentException("Controlled publishing is disabled.");
         var campaign = require(id);
         String mobileType = file == null ? "" : file.getContentType();
-        long limit = mobileType != null && mobileType.startsWith("video/") ? 20L * 1024 * 1024 : 5L * 1024 * 1024;
+        long limit = mobileType != null && mobileType.startsWith("video/") ? 50L * 1024 * 1024 : 5L * 1024 * 1024;
         if (file == null || file.isEmpty() || file.getSize() > limit)
-            throw new IllegalArgumentException("Choose a mobile image up to 5 MB or video up to 20 MB.");
+            throw new IllegalArgumentException("Choose a mobile image up to 5 MB or video up to 50 MB.");
         String requestHash;
         try {requestHash = hash((file.getContentType() + ":" + hash(file.getBytes())).getBytes(StandardCharsets.UTF_8));}
         catch (IOException exception) {throw new IllegalStateException("Unable to read mobile media.", exception);}
