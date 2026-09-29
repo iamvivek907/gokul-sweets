@@ -1,6 +1,6 @@
 "use client";
 
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {apiClient} from "@/services/apiClient";
@@ -17,6 +17,7 @@ import {accountMilestones, currentMilestone} from "@/lib/accountMilestones";
 import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import type {CustomerOrderSummaryResponse, CustomerOrderResponse} from "@/types/order";
 import type {MenuProduct} from "@/types/menu";
+import {formatOrderCurrency, formatOrderDate, formatOrderTime} from "@/lib/orderTracking";
 
 const base = "/api/customer/identity/account";
 type Address = {id: number; label: string; addressLine: string; locality: string; postalCode: string};
@@ -35,6 +36,10 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
     const router = useRouter();
     const [account, setAccount] = useState<Account | null>(null);
     const [orders, setOrders] = useState<CustomerOrderSummaryResponse[]>([]);
+    const detailDialog = useRef<HTMLDialogElement>(null);
+    const [selectedOrder, setSelectedOrder] = useState<CustomerOrderResponse | null>(null);
+    const [detailError, setDetailError] = useState("");
+    const [detailLoading, setDetailLoading] = useState(false);
     const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
@@ -128,6 +133,18 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 unavailable: [...new Set(unavailable)], stock, cartSnapshot, date: features.today});
         } catch {setMessage("We could not recheck this order. Please try again.");}
         finally {setBusy(false);}
+    }
+
+    async function showOrderDetails(orderNumber: string) {
+        setSelectedOrder(null); setDetailError(""); setDetailLoading(true);
+        detailDialog.current?.showModal();
+        try {
+            const detail = await apiClient<CustomerOrderResponse>(
+                `/api/customer/identity/orders/${encodeURIComponent(orderNumber)}`, {credentials: "include"});
+            if (detailDialog.current?.open) setSelectedOrder(detail);
+        } catch {
+            if (detailDialog.current?.open) setDetailError("Order details could not load. Please try again.");
+        } finally {setDetailLoading(false);}
     }
 
     async function confirmReorder() {
@@ -234,11 +251,30 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
         {activeSection === "orders" && <section id="account-orders" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]">Your orders</h2>
                 <p className="mt-1 text-sm text-[#756763]">Only orders placed while signed in to this account.</p></div>
-                <Link href="/orders" className="text-sm font-semibold text-[#7a1625] underline">All orders →</Link></div>
-            {orders.length ? <div className="mt-4 space-y-3">{orders.slice(0, 3).map(order => <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3">
-                <div><Link href={`/orders/${encodeURIComponent(order.orderNumber)}`} className="font-semibold text-[#7a1625] underline">{order.orderNumber}</Link>
+                <span className="text-sm text-[#756763]">All branches</span></div>
+            {orders.length ? <div className="mt-4 max-h-[36rem] space-y-3 overflow-y-auto">{orders.map(order => <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3">
+                <div><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{order.orderNumber}</button>
                 <p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_", " ")}</p></div>
-                <button type="button" disabled={busy} onClick={() => {void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50">Reorder</button></div>)}</div> : <p className="mt-5 text-sm text-[#756763]">No orders belong to this verified account yet.</p>}
+                <div className="flex gap-2"><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]">Details</button>
+                <button type="button" disabled={busy} onClick={() => {void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50">Reorder</button></div></div>)}</div> : <p className="mt-5 text-sm text-[#756763]">No orders belong to this verified account yet.</p>}
+            <dialog ref={detailDialog} onClose={() => {setSelectedOrder(null); setDetailError("");}}
+                className="m-auto max-h-[85dvh] w-[min(34rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-[#eadfd6] bg-white p-6 text-[#241715] shadow-2xl backdrop:bg-black/60"
+                aria-label="Order details">
+                <div className="flex items-start justify-between gap-4"><h3 className="text-xl font-bold">Order details</h3>
+                    <button type="button" onClick={() => detailDialog.current?.close()} className="min-h-11 min-w-11 rounded-full border border-[#eadfd6]" aria-label="Close order details">✕</button></div>
+                {detailLoading && <p role="status" className="mt-5">Loading order details…</p>}
+                {detailError && <p role="alert" className="mt-5 text-[#9e2732]">{detailError}</p>}
+                {selectedOrder && <div className="mt-5 space-y-4 text-sm">
+                    <p className="break-all font-semibold">{selectedOrder.orderNumber}</p>
+                    <p>{selectedOrder.branchName} · {selectedOrder.orderStatus.replaceAll("_", " ")}</p>
+                    <p>{selectedOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}: {selectedOrder.pickupDate
+                        ? formatOrderDate(selectedOrder.pickupDate) : selectedOrder.deliveryDate ? formatOrderDate(selectedOrder.deliveryDate) : "Date pending"}
+                        {selectedOrder.pickupStartTime ? ` · ${formatOrderTime(selectedOrder.pickupStartTime)}` : ""}</p>
+                    <ul className="divide-y divide-[#eadfd6] border-y border-[#eadfd6]">{selectedOrder.items.map(item =>
+                        <li key={item.id} className="flex justify-between gap-3 py-3"><span>{item.productName} · {item.weightGrams ? `${item.weightGrams} g` : `× ${item.quantity}`}</span><span>{formatOrderCurrency(item.lineTotal)}</span></li>)}</ul>
+                    <p className="flex justify-between font-bold"><span>Total</span><span>{formatOrderCurrency(selectedOrder.totalAmount)}</span></p>
+                </div>}
+            </dialog>
             {preview && <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-[#fff8ef] p-5" role="status"><h3 className="font-bold text-[#241715]">Review this reorder</h3>
                 <p className="mt-2 text-sm text-[#756763]">{preview.items.map(line => line.product.name).join(", ") || "No available items"}</p>
                 {preview.changed.length > 0 && <p className="mt-2 text-sm text-[#7a1625]">Prices changed: {preview.changed.join(", ")}. Current menu prices will apply.</p>}
