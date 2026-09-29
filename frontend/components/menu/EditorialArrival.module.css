@@ -37,7 +37,6 @@
 @keyframes arrival-cue-text{0%,100%{opacity:1;transform:translateY(0)}50%{opacity:.72;transform:translateY(-3px)}}
 @keyframes arrival-scroll-dot{0%{opacity:0;transform:translateY(0)}30%{opacity:1}75%{opacity:1;transform:translateY(12px)}100%{opacity:0;transform:translateY(12px)}}
 .branches{background:#fff;color:#172e2c;padding:5rem clamp(1.5rem,5vw,5rem)}
-.backToWelcome{display:inline-flex;align-items:center;min-height:44px;margin:-2.5rem 0 1.5rem;color:#143936;font-weight:700;text-decoration:underline;text-underline-offset:4px}
 .sectionHead{max-width:760px;margin:0 auto 2.8rem}.sectionHead>span{color:#a83232}.sectionHead h2{font-size:clamp(2.5rem,4.5vw,4.2rem);margin:.6rem 0}.sectionHead p{font-size:1rem;color:#4e605c}
 .branchGrid{grid-template-columns:repeat(3,minmax(0,1fr));max-width:1320px;margin:auto;gap:1.25rem}
 .branchCard{min-height:370px;border-radius:1rem;background:#e8f0eb;color:#173a37;box-shadow:0 14px 30px #163d3020}
