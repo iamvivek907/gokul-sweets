@@ -134,8 +134,10 @@ public class OrderInventoryReservationService {
                         order.getReservationExpiresAt()
                 )
         ) {
-            if (features.isSmartAvailability() && pickupChanged) {
-                // Same-date holds can be reused, but moving to an earlier slot must still meet preparation promises.
+            if ((features.isSmartAvailability() && pickupChanged)
+                    || (order.getFulfillmentType() == FulfillmentType.DELIVERY
+                    && serviceDate.isAfter(LocalDate.now(inventoryClock)))) {
+                // Reused holds still need current preparation and approved production promises.
                 var locked = lockAllRequiredAllocations(existing, requested);
                 for (RequestedHold hold : requested.values()) {
                     validatePolicyForOrder(order, requireLockedAllocation(locked, hold.key()),
@@ -591,6 +593,16 @@ public class OrderInventoryReservationService {
         }
         LocalDateTime now = LocalDateTime.now(inventoryClock);
         LocalDate serviceDate = serviceAt.toLocalDate();
+
+        if (order.getFulfillmentType() == FulfillmentType.DELIVERY && serviceDate.isAfter(now.toLocalDate())) {
+            if (!features.isPlannedDeliveryProduction()
+                    || policy.getControlMode() != InventoryControlMode.DAILY_PRODUCTION
+                    || allocation.getExpectedReadyAt() == null
+                    || serviceAt.isBefore(allocation.getExpectedReadyAt())) {
+                throw new InventoryConflictException("DELIVERY_PRODUCTION_NOT_READY",
+                        "Approved production is not ready before this delivery window. Choose another time or pickup.");
+            }
+        }
 
         if (serviceDate.isAfter(
                 now.toLocalDate().plusDays(policy.getBookingHorizonDays())

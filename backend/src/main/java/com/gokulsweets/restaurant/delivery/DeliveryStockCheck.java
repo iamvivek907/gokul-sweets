@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -35,6 +37,19 @@ public class DeliveryStockCheck {
 
     @Transactional(readOnly = true)
     public Check check(long branchId, LocalDate date, List<CreateOrderItemRequest> requested) {
+        return check(branchId, date, requested, null);
+    }
+
+    /** A future rider window must fit every line's approved plan and preparation cutoff. */
+    @Transactional(readOnly = true)
+    public Check checkWindow(long branchId, LocalDate date, LocalTime startsAt,
+                             List<CreateOrderItemRequest> requested) {
+        if (startsAt == null) return new Check(false, "Choose a delivery window.");
+        return check(branchId, date, requested, startsAt);
+    }
+
+    private Check check(long branchId, LocalDate date, List<CreateOrderItemRequest> requested,
+                        LocalTime startsAt) {
         if (requested == null || requested.isEmpty() || requested.size() > 50)
             return new Check(false, "Add between 1 and 50 valid cart items.");
         if (!inventory.isEnforcementEnabled())
@@ -61,6 +76,15 @@ public class DeliveryStockCheck {
             var available = availability.calculate(allocation, policy);
             if (!available.orderable() || available.availableQuantity().compareTo(quantity) < 0)
                 return new Check(false, "One or more cart items lack enough available stock for this date.");
+            if (startsAt != null) {
+                LocalDateTime windowStart = date.atTime(startsAt);
+                if (policy.getControlMode() != InventoryControlMode.DAILY_PRODUCTION
+                        || allocation.getExpectedReadyAt() == null
+                        || windowStart.isBefore(allocation.getExpectedReadyAt())
+                        || windowStart.isBefore(LocalDateTime.now(inventoryClock)
+                        .plusMinutes(policy.getProductionLeadMinutes())))
+                    return new Check(false, "Production is not approved and ready before this delivery window.");
+            }
         }
         return new Check(true, null);
     }

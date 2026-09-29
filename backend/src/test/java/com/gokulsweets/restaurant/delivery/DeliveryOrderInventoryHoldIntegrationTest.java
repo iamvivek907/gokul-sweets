@@ -96,6 +96,7 @@ class DeliveryOrderInventoryHoldIntegrationTest {
         allocation.setBranchProduct(branchProduct);
         allocation.setServiceDate(deliveryDate);
         allocation.setInventoryUnit(InventoryUnit.PIECE);
+        allocation.setExpectedReadyAt(deliveryDate.atTime(10, 30));
         var policy = new BranchInventoryPolicy();
         policy.setOnlineEnabled(true);
         policy.setControlMode(InventoryControlMode.DAILY_PRODUCTION);
@@ -111,9 +112,19 @@ class DeliveryOrderInventoryHoldIntegrationTest {
         inventory.setEnforcementEnabled(true);
         var flags = new EnhancementProperties();
         flags.setDeliveryRiderHolds(true);
+        flags.setPlannedDeliveryProduction(true);
         var service = new OrderInventoryReservationService(inventory, reservations, allocations, policies,
                 available, quantities, mock(InventoryLedgerService.class), ist, flags,
                 mock(SmartOrderingRules.class), jdbc);
+
+        allocation.setExpectedReadyAt(deliveryDate.atTime(11, 30));
+        assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
+                .hasMessageContaining("Approved production is not ready");
+        allocation.setExpectedReadyAt(deliveryDate.atTime(10, 30));
+        flags.setPlannedDeliveryProduction(false);
+        assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
+                .hasMessageContaining("Approved production is not ready");
+        flags.setPlannedDeliveryProduction(true);
 
         service.synchronizePendingDeliveryOrder(order, validated);
         assertThat(allocation.getHeldQuantity()).isEqualByComparingTo(BigDecimal.ONE);

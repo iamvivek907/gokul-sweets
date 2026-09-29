@@ -87,6 +87,9 @@ public class DeliveryCapacityService {
         LocalDate today = LocalDate.now(inventoryClock);
         if (request.serviceDate().isBefore(today) || request.serviceDate().isAfter(today.plusDays(30)))
             return unavailable("Choose a date within the next 30 IST business days.");
+        boolean future = request.serviceDate().isAfter(today);
+        if (future && !flags.isPlannedDeliveryProduction())
+            return unavailable("Future delivery is not available yet. Choose today's eligible window or pickup.");
         List<Long> productIds = request.items().stream().map(CreateOrderItemRequest::productId).distinct().toList();
         if (productIds.size() != request.items().size()) return unavailable("Choose each item only once.");
         // Only exact zone, branch and active catalog matches qualify. No inferred radius or pickup slot reuse.
@@ -132,9 +135,12 @@ public class DeliveryCapacityService {
                             JOIN delivery_pilot_riders r ON r.id = a.rider_id
                             WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
                             """, Integer.class, window.id(), request.branchId()) > window.reservedCount())
+                .filter(window -> !future || stock.checkWindow(request.branchId(), request.serviceDate(),
+                        window.startsAt(), request.items()).available())
                 .toList();
         return new Quote(windows, false, windows.isEmpty()
-                ? "No delivery windows are currently configured with rider capacity."
+                ? future ? "No rider window can support the approved production and delivery capacity for this cart. Choose another date or pickup."
+                : "No delivery windows are currently configured with rider capacity."
                 : "Windows are provisional; product inventory and rider capacity are not reserved. Delivery checkout is not open yet.");
     }
 
