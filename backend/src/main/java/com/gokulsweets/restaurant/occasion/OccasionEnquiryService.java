@@ -282,7 +282,10 @@ public class OccasionEnquiryService {
             case "EXPIRED" -> "This quote has expired. Ask the branch for a new quote.";
             case "DECLINED" -> "The branch cannot take this request. Please choose another date or branch.";
             case "PAYMENT_PENDING", "HELD" -> "Your pickup and inventory are held briefly while the deposit is pending. Check payment status before retrying.";
-            case "PAID" -> "Your deposit is verified and your items are committed. Pay the remaining balance by its deadline to confirm.";
+            case "PAID" -> rs.getTimestamp("balance_due_at") != null
+                    && !rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant())
+                    ? "The balance deadline passed. Your deposit is recorded, but this booking is not confirmed. Contact the branch before making another payment."
+                    : "Your deposit is verified and your items are committed. Pay the remaining balance by its deadline to confirm.";
             case "CONFIRMED" -> "The required payments are verified and this pickup is confirmed.";
             default -> "The branch will confirm the next step. This is not a confirmed booking.";
         };

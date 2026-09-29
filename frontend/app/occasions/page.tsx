@@ -251,7 +251,8 @@ export default function OccasionsPage() {
                                 className="min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay deposit ₹{enquiry.depositAmount}</button>
                         </div>}
                         {features.occasionPayments && enquiry.status === "PAID" && enquiry.quotedAmount != null
-                            && enquiry.quotedAmount > enquiry.paidAmount && <button type="button" disabled={busy}
+                            && enquiry.quotedAmount > enquiry.paidAmount && enquiry.balanceDueAt
+                            && new Date(enquiry.balanceDueAt).getTime() > Date.now() && <button type="button" disabled={busy}
                             onClick={() => void pay(enquiry, "balance")}
                             className="mt-4 min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay balance ₹{(enquiry.quotedAmount - enquiry.paidAmount).toFixed(2)}</button>}
                         {features.occasionPayments && ["PAYMENT_PENDING", "HELD", "PAID", "CONFIRMED", "EXPIRED"].includes(enquiry.status)
