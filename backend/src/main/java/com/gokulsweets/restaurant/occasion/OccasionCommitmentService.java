@@ -82,9 +82,6 @@ public class OccasionCommitmentService {
                     Integer.class, id);
             if (priced == null || priced.compareTo(enquiry.quote()) != 0 || !Objects.equals(pricedCount, itemCount))
                 throw conflict("This quote needs item prices and tax reviewed by the branch before payment.");
-            if (inventoryProperties.getTemporaryHoldMinutes() < 12 || !inventoryProperties.isEnforcementEnabled())
-                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                        "Occasion inventory holds are not configured.");
             Instant serviceStart = jdbc.query("""
                     SELECT slot_date, start_time FROM pickup_slots
                     WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
@@ -113,6 +110,9 @@ public class OccasionCommitmentService {
                 jdbc.update("UPDATE occasion_production_allocations SET state = 'HELD', updated_at = CURRENT_TIMESTAMP WHERE enquiry_id = ?", id);
                 earliestHoldExpiry = clock.instant().plus(Duration.ofMinutes(15));
             } else {
+            if (inventoryProperties.getTemporaryHoldMinutes() < 12 || !inventoryProperties.isEnforcementEnabled())
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                        "Occasion inventory holds are not configured.");
                 if (features.isOccasionBulkProduction()) throw conflict("Ask the manager to approve a dedicated production plan before payment.");
             List<Object[]> requested = jdbc.query("""
                     SELECT bp.id, i.product_id, i.requested_quantity FROM occasion_enquiry_items i

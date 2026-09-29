@@ -213,6 +213,40 @@ class OccasionCommitmentIntegrationTest {
         }
     }
 
+    @Test
+    void failedBulkDepositReleasesDedicatedPlanAndSlot() {
+        var fixture = paidDeposit();
+        boolean oldBulk = features.isOccasionBulkProduction();
+        boolean oldEnquiries = features.isOccasionEnquiries(), oldPayments = features.isOccasionPayments();
+        try {
+            features.setOccasionBulkProduction(true);
+            features.setOccasionEnquiries(true);
+            features.setOccasionPayments(true);
+            jdbc.update("DELETE FROM occasion_payment_attempts WHERE enquiry_id = ?", fixture.enquiry());
+            jdbc.update("UPDATE occasion_enquiries SET status = 'QUOTED', paid_amount = 0 WHERE id = ?", fixture.enquiry());
+            Long slot = jdbc.queryForObject("SELECT pickup_slot_id FROM occasion_enquiries WHERE id = ?", Long.class, fixture.enquiry());
+            jdbc.update("UPDATE pickup_slots SET booked_count = 0 WHERE id = ?", slot);
+            Date date = jdbc.queryForObject("SELECT service_date FROM occasion_enquiries WHERE id = ?", Date.class, fixture.enquiry());
+            jdbc.update("""
+                    INSERT INTO occasion_production_allocations(enquiry_id, product_id, quantity, unit, expected_ready_at, state, approved_by)
+                    VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
+                    """, fixture.enquiry(), fixture.product(), Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
+            when(phonePe.createPayment(anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
+                    .thenAnswer(invocation -> new PhonePeClient.CreatePaymentResponse("bulk-failure",
+                            invocation.getArgument(0), "PENDING", "https://pay.example/bulk", null, null));
+            var checkout = commitments.beginDeposit(ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+            commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
+            commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
+            assertThat(jdbc.queryForObject("SELECT state FROM occasion_production_allocations WHERE enquiry_id = ?", String.class, fixture.enquiry())).isEqualTo("RELEASED");
+            assertThat(jdbc.queryForObject("SELECT booked_count FROM pickup_slots WHERE id = ?", Integer.class, slot)).isZero();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM occasion_hold_items WHERE enquiry_id = ?", Integer.class, fixture.enquiry())).isZero();
+        } finally {
+            features.setOccasionBulkProduction(oldBulk);
+            features.setOccasionEnquiries(oldEnquiries);
+            features.setOccasionPayments(oldPayments);
+        }
+    }
+
     private String merchant(UUID attemptId) {
         return jdbc.queryForObject("SELECT merchant_order_id FROM occasion_payment_attempts WHERE id = ?",
                 String.class, attemptId);
