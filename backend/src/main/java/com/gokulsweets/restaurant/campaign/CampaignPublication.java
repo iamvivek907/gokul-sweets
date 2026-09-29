@@ -24,11 +24,11 @@ public class CampaignPublication {
     private int mainX = 50;
     private int mainY = 50;
     private int mainZoom = 100;
-    private String mainFit = "COVER";
+    @Column(length = 8) private String mainFit = "COVER";
     private int mobileX = 50;
     private int mobileY = 50;
     private int mobileZoom = 100;
-    private String mobileFit = "COVER";
+    @Column(length = 8) private String mobileFit = "COVER";
     private String fallbackMediaUrl;
     private String ctaLabel;
     private String ctaTarget;

@@ -79,3 +79,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: JUnit, enhancement regressions, and build
         run: ./gradlew --no-daemon clean build bootJar
+      - name: Show test failure details
+        if: failure()
+        run: |
+          find build/test-results -name '*.xml' -type f -print0 | xargs -0 -r grep -h -m 1 -A 10 '<failure' | head -120 || true
