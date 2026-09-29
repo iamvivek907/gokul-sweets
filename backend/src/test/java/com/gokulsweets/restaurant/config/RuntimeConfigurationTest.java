@@ -28,7 +28,7 @@ class RuntimeConfigurationTest {
             assertThat(properties.getProperty(feature)).endsWith(":true}");
         }
         assertThat(properties.getProperty("gokul.features.customer-account-hub")).endsWith(":true}");
-        assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":false}");
+        assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":true}");
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("inventory.automation.scheduler-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("gokul.identity.provider-abuse-controls-verified")).endsWith(":false}");
