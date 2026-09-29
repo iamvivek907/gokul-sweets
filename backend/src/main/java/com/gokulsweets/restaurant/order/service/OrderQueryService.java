@@ -169,6 +169,7 @@ public class OrderQueryService {
         return new CustomerOrderSummaryResponse(
                 order.getOrderNumber(),
                 order.getOrderStatus(),
+                order.getBranch().getId(),
                 order.getBranch().getName(),
                 slot == null ? null : slot.getSlotDate(),
                 slot == null ? null : slot.getStartTime(),
