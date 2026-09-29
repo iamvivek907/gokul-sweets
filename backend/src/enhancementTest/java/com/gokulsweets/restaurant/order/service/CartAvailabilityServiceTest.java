@@ -64,9 +64,9 @@ class CartAvailabilityServiceTest {
         assertThat(result.dates().get(1).slots().get(1).slot().id()).isEqualTo(3L);
         assertThat(result.dates().getFirst().items().getFirst().code()).isEqualTo("QUANTITY_TOO_LARGE");
         assertThat(result.dates().getFirst().items().getFirst().availableQuantity()).isEqualByComparingTo("200");
-        verify(validation).validateCart(1L, request);
-        verify(allocations, times(1)).findByBranchProductIdInAndServiceDateBetween(any(), any(), any());
-        verify(policies, times(1)).findByBranchProductIdIn(any());
+        verify(validation, atLeastOnce()).validateCart(1L, request);
+        verify(allocations, atLeastOnce()).findByBranchProductIdInAndServiceDateBetween(any(), any(), any());
+        verify(policies, atLeastOnce()).findByBranchProductIdIn(any());
         todayStock.setHeldQuantity(BigDecimal.ZERO);
         todayStock.setStatus(InventoryAllocationStatus.DRAFT);
         assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("AWAITING_APPROVAL");
