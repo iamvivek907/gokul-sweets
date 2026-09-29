@@ -233,7 +233,11 @@ bucket and public base URL under `campaigns/{id}/{uuid}.{extension}`. Allowed ma
 JPG/PNG/static WebP/GIF/MP4/WebM, **5 MB maximum**, checked by declared MIME and file
 signature. Animated PNG/WebP are rejected to keep static fallback promises meaningful.
 Fallback accepts static JPG/PNG/WebP only. Multipart overflow returns explicit 413.
-Video should be short and silent; rendering is muted, looping, inline with native controls.
+Video should be short and silent; customer rendering is muted, looping, inline without native controls.
+The controlled publishing form also accepts a phone portrait asset: a static image up to
+5 MB or MP4/WebM video up to 20 MB. The phone video uses a 9:16 preview and its MIME type
+is saved with the publication snapshot. A desktop banner remains the phone fallback when
+no mobile asset exists; reduced motion uses the static fallback image for animated media.
 Below-fold animation waits for viewport proximity, images are responsive/lazy, and
 reduced-motion uses the static image without autoplay.
 

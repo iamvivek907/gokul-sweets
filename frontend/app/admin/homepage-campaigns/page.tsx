@@ -92,7 +92,7 @@ export default function HomepageCampaignsPage() {
         inFlight.current = true;
         setBusy(true); setError(""); setMessage("");
         try {
-            validateFile(mainFile, false); validateFile(fallbackFile, true); validateFile(mobileFile, true);
+            validateFile(mainFile, false); validateFile(fallbackFile, true); validateMobileFile(mobileFile);
             const type = mainFile?.type ?? persisted.current?.mediaType;
             const animated = type === "image/gif" || type?.startsWith("video/");
             if (publish && !mainFile && !persisted.current?.mediaUrl) throw new Error("Choose banner media before publishing, or save a draft without media.");
@@ -125,7 +125,7 @@ export default function HomepageCampaignsPage() {
                 uploaded.current[key] = file;
             }
             if (controlled && mobileFile && uploaded.current.mobile !== mobileFile) {
-                setMessage("Uploading mobile image...");
+                setMessage("Uploading mobile media...");
                 const body = new FormData(); body.append("file", mobileFile);
                 if (!uploadKeys.current.has(mobileFile)) uploadKeys.current.set(mobileFile, crypto.randomUUID());
                 retain(await adminManagementApi<HomepageCampaign>(`${path}/${persisted.current!.id}/mobile-media`, authorization,
@@ -166,8 +166,8 @@ export default function HomepageCampaignsPage() {
         try {
             const campaign = await adminManagementApi<HomepageCampaign>(`${path}/${editing}/mobile-media`, authorization, {method: "DELETE", headers: versionHeaders()});
             accept(campaign); persisted.current = campaign; setMobileFile(null); uploaded.current.mobile = null;
-            setMessage("Mobile draft image removed. Any published version stays available until you publish again.");
-        } catch (error) {setError(error instanceof Error ? error.message : "Could not remove the mobile image.");}
+            setMessage("Mobile draft media removed. Any published version stays available until you publish again.");
+        } catch (error) {setError(error instanceof Error ? error.message : "Could not remove the mobile media.");}
         finally {inFlight.current = false; setBusy(false);}
     }
 
@@ -248,17 +248,17 @@ export default function HomepageCampaignsPage() {
                     </div>)}
                 </div>
                 {controlled && <div className="sm:col-span-2">
-                    <SettingField label="Mobile image" help="Optional portrait crop for phones. Static JPG, PNG or WebP, up to 5 MB." htmlFor="campaign-mobile">
-                        <input id="campaign-mobile" key={`${editing}-mobile`} type="file" accept="image/jpeg,image/png,image/webp"
+                    <SettingField label="Mobile image or video (9:16)" help="Optional portrait version for phones. JPG/PNG/WebP up to 5 MB, or MP4/WebM up to 20 MB. A short muted 9:16 video works best." htmlFor="campaign-mobile">
+                        <input id="campaign-mobile" key={`${editing}-mobile`} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
                             className="min-h-11 w-full py-2" onChange={event => {
                                 const file = event.target.files?.[0] ?? null;
-                                try {validateFile(file, true); setMobileFile(file); setError("");}
+                                try {validateMobileFile(file); setMobileFile(file); setError("");}
                                 catch (error) {setError((error as Error).message); event.target.value = "";}
                             }} />
                     </SettingField>
-                    <LocalPreview file={mobileFile} savedUrl={selected?.mobileMediaUrl} type="image/png" />
+                    <div className="max-w-44"><LocalPreview file={mobileFile} savedUrl={selected?.mobileMediaUrl} type={selected?.mobileMediaType ?? "image/png"} portrait /></div>
                     {selected?.mobileMediaUrl && <button type="button" onClick={() => void removeMobile()}
-                        className="min-h-11 text-red-700 underline">Remove draft mobile image</button>}
+                        className="min-h-11 text-red-700 underline">Remove draft mobile media</button>}
                 </div>}
                 <div className="flex gap-3">
                     <button className="min-h-11 rounded-xl border px-5 font-bold">Save draft</button>
@@ -276,7 +276,7 @@ export default function HomepageCampaignsPage() {
             <h2 className="font-bold">Preview and earlier versions</h2>
             <p className="text-sm text-[#756763]">Check the current artwork on a narrow and wide screen before publishing. Earlier versions remain available for restore.</p>
             <div className="mt-3 flex flex-wrap gap-4">
-                <div className="w-44 rounded-xl border p-2"><span className="text-xs">Phone preview</span><LocalPreview file={mobileFile ?? mainFile} savedUrl={selected.mobileMediaUrl ?? selected.mediaUrl} type={selected.mediaType} /></div>
+                <div className="w-44 rounded-xl border p-2"><span className="text-xs">Phone preview</span><LocalPreview file={mobileFile ?? (!selected.mobileMediaUrl ? mainFile : null)} savedUrl={selected.mobileMediaUrl ?? selected.mediaUrl} type={selected.mobileMediaUrl ? selected.mobileMediaType ?? "image/png" : selected.mediaType} portrait /></div>
                 <div className="w-80 max-w-full rounded-xl border p-2"><span className="text-xs">Desktop preview</span><LocalPreview file={mainFile} savedUrl={selected.mediaUrl} type={selected.mediaType} /></div>
             </div>
             <ul className="mt-4 space-y-2">{history.map(version => <li key={version.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -302,7 +302,16 @@ function validateFile(file: File | null, fallback: boolean) {
     }
 }
 
-function LocalPreview({file, savedUrl, type}: {file: File | null; savedUrl?: string | null; type?: string | null}) {
+function validateMobileFile(file: File | null) {
+    if (!file) return;
+    const video = file.type === "video/mp4" || file.type === "video/webm";
+    const image = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
+    if ((!video && !image) || file.size > (video ? 20 : 5) * 1024 * 1024) {
+        throw new Error("Choose a mobile image up to 5 MB or MP4/WebM video up to 20 MB.");
+    }
+}
+
+function LocalPreview({file, savedUrl, type, portrait = false}: {file: File | null; savedUrl?: string | null; type?: string | null; portrait?: boolean}) {
     const [local, setLocal] = useState<{file: File; url: string} | null>(null);
     useEffect(() => {
         if (!file) return;
@@ -314,8 +323,8 @@ function LocalPreview({file, savedUrl, type}: {file: File | null; savedUrl?: str
     const url = file ? local?.file === file ? local.url : null : savedUrl;
     if (!url) return null;
     return (file?.type ?? type)?.startsWith("video/")
-        ? <video src={url} controls muted preload="metadata" className="mt-3 max-h-48 rounded-xl" aria-label="Banner preview" />
+        ? <video src={url} muted loop playsInline autoPlay preload="metadata" className={`mt-3 max-h-48 rounded-xl object-cover ${portrait ? "aspect-[9/16] w-full" : ""}`} aria-label="Banner preview" />
         // Local data URLs never send preview bytes to R2.
         // eslint-disable-next-line @next/next/no-img-element
-        : <img src={url} alt="Campaign preview" className="mt-3 max-h-48 rounded-xl object-contain" />;
+        : <img src={url} alt="Campaign preview" className={`mt-3 max-h-48 rounded-xl ${portrait ? "aspect-[9/16] w-full object-cover" : "object-contain"}`} />;
 }

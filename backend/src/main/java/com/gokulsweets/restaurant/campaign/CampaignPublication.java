@@ -20,6 +20,7 @@ public class CampaignPublication {
     private String mediaUrl;
     private String mediaType;
     private String mobileMediaUrl;
+    private String mobileMediaType;
     private String fallbackMediaUrl;
     private String ctaLabel;
     private String ctaTarget;
@@ -34,7 +35,8 @@ public class CampaignPublication {
         copy.setType(source.getType()); copy.setTitle(source.getTitle()); copy.setSubtitle(source.getSubtitle());
         copy.setAltText(source.getAltText()); copy.setBranchId(source.getBranchId());
         copy.setMediaUrl(source.getMediaUrl()); copy.setMediaType(source.getMediaType());
-        copy.setMobileMediaUrl(source.getMobileMediaUrl()); copy.setFallbackMediaUrl(source.getFallbackMediaUrl());
+        copy.setMobileMediaUrl(source.getMobileMediaUrl()); copy.setMobileMediaType(source.getMobileMediaType());
+        copy.setFallbackMediaUrl(source.getFallbackMediaUrl());
         copy.setCtaLabel(source.getCtaLabel()); copy.setCtaTarget(source.getCtaTarget());
         copy.setStartAt(source.getStartAt()); copy.setEndAt(source.getEndAt());
         copy.setDisplayOrder(source.getDisplayOrder()); copy.setPublishedAt(now);
@@ -46,7 +48,8 @@ public class CampaignPublication {
         result.setId(campaignId); result.setType(type); result.setTitle(title); result.setSubtitle(subtitle);
         result.setAltText(altText); result.setBranchId(branchId);
         result.setMediaUrl(mediaUrl); result.setMediaType(mediaType);
-        result.setMobileMediaUrl(mobileMediaUrl); result.setFallbackMediaUrl(fallbackMediaUrl);
+        result.setMobileMediaUrl(mobileMediaUrl); result.setMobileMediaType(mobileMediaType);
+        result.setFallbackMediaUrl(fallbackMediaUrl);
         result.setCtaLabel(ctaLabel); result.setCtaTarget(ctaTarget);
         result.setStartAt(startAt); result.setEndAt(endAt); result.setDisplayOrder(displayOrder);
         result.setActive(true); result.setUpdatedAt(publishedAt);

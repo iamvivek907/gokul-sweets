@@ -10,6 +10,11 @@ function subscribe(callback: () => void) {
     query.addEventListener("change", callback);
     return () => query.removeEventListener("change", callback);
 }
+function subscribeMobile(callback: () => void) {
+    const query = window.matchMedia("(max-width: 767px)");
+    query.addEventListener("change", callback);
+    return () => query.removeEventListener("change", callback);
+}
 
 type DataConnection = {saveData?: boolean; addEventListener?: (name: string, fn: () => void) => void;
     removeEventListener?: (name: string, fn: () => void) => void};
@@ -25,6 +30,8 @@ export default function CampaignMedia({campaign, hero = false, immersive = false
 }) {
     const reduced = useSyncExternalStore(subscribe,
         () => window.matchMedia("(prefers-reduced-motion: reduce)").matches, () => true);
+    const mobile = useSyncExternalStore(subscribeMobile,
+        () => window.matchMedia("(max-width: 767px)").matches, () => false);
     const [failed, setFailed] = useState(false);
     const saveData = useSyncExternalStore(subscribeSaveData, () => connection()?.saveData === true, () => true);
     const [visible, setVisible] = useState(hero);
@@ -37,24 +44,25 @@ export default function CampaignMedia({campaign, hero = false, immersive = false
         observer.observe(frame.current);
         return () => observer.disconnect();
     }, [hero]);
-    const animated = campaign.mediaType === "image/gif" || campaign.mediaType?.startsWith("video/") === true;
+    const mobileAsset = mobile && Boolean(campaign.mobileMediaUrl);
+    const selectedType = mobileAsset ? campaign.mobileMediaType ?? "image/png" : campaign.mediaType;
+    const selectedUrl = mobileAsset ? campaign.mobileMediaUrl : campaign.mediaUrl;
+    const animated = selectedType === "image/gif" || selectedType?.startsWith("video/") === true;
     const useFallback = useStaticCampaignMedia(animated, reduced, accessible && saveData, failed, visible);
-    const source = useFallback ? campaign.fallbackMediaUrl : campaign.mediaUrl;
+    const source = useFallback ? campaign.fallbackMediaUrl : selectedUrl;
     if (!source) return null;
     const fail = () => {
         if (animated && !useFallback && campaign.fallbackMediaUrl) setFailed(true);
         else onUnavailable();
     };
     return <div ref={frame} className={immersive ? "entry-campaign-media" : "relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-[#fff0dc]"}>
-        {!useFallback && campaign.mediaType?.startsWith("video/") ? <video
+        {!useFallback && selectedType?.startsWith("video/") ? <video key={source}
             src={source} poster={campaign.fallbackMediaUrl ?? undefined} muted loop playsInline autoPlay
-            preload={hero ? "metadata" : "none"} aria-label={campaign.altText || campaign.title}
-            className={immersive ? "h-full w-full object-cover" : campaign.mobileMediaUrl ? "hidden h-full w-full object-cover md:block" : "h-full w-full object-cover"} onError={fail} />
+            disablePictureInPicture disableRemotePlayback preload={hero ? "metadata" : "none"}
+            aria-label={campaign.altText || campaign.title}
+            className="h-full w-full object-cover" onError={fail} />
             : <Image src={source} alt={campaign.altText || campaign.title} fill sizes="(max-width: 768px) 100vw, 50vw"
-                loading={hero ? "eager" : "lazy"} unoptimized={campaign.mediaType === "image/gif" && !useFallback}
-                className={immersive ? "object-cover" : campaign.mobileMediaUrl && !useFallback ? "hidden object-cover md:block" : "object-cover"} onError={fail} />}
-        {campaign.mobileMediaUrl && !useFallback && !immersive && <Image
-            src={campaign.mobileMediaUrl} alt={campaign.altText || campaign.title} fill sizes="100vw"
-            className="object-cover md:hidden" onError={fail} />}
+                loading={hero ? "eager" : "lazy"} unoptimized={selectedType === "image/gif" && !useFallback}
+                className="object-cover" onError={fail} />}
     </div>;
 }

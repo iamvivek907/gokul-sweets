@@ -167,6 +167,24 @@ class CampaignServiceTest {
         verifyNoInteractions(publications);
     }
 
+    @Test void mobileVideoIsSavedInPublishedSnapshotAndRestoredWithItsType() {
+        flags.setControlledCampaignPublishing(true);
+        var draft = campaign(); draft.setAltText("Sweets on display");
+        var file = new MockMultipartFile("file", "portrait.mp4", "video/mp4", "1234ftypisom".getBytes());
+        when(repository.findForUpdate(1L)).thenReturn(Optional.of(draft));
+        when(repository.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(storage.uploadMobileCampaignMedia(1L, file))
+                .thenReturn(new R2StorageService.CampaignMedia("https://media.example/portrait.mp4", "video/mp4"));
+        TransactionSynchronizationManager.initSynchronization();
+        service.uploadMobile(1L, file, null);
+        var snapshot = CampaignPublication.from(draft, now);
+        assertThat(snapshot.asCampaign().getMobileMediaUrl()).endsWith("portrait.mp4");
+        assertThat(snapshot.asCampaign().getMobileMediaType()).isEqualTo("video/mp4");
+        service.removeMobile(1L);
+        assertThat(draft.getMobileMediaType()).isNull();
+        assertThat(snapshot.asCampaign().getMobileMediaType()).isEqualTo("video/mp4");
+    }
+
     private HomepageCampaign campaign() {
         var c = new HomepageCampaign(); c.setId(1L); c.setTitle("Test"); c.setActive(true); c.setMediaUrl("old"); c.setMediaType("image/png");
         return c;

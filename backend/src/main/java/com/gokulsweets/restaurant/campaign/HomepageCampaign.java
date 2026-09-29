@@ -31,6 +31,8 @@ public class HomepageCampaign {
     private Long branchId;
     @Column(length = 1000)
     private String mobileMediaUrl;
+    @Column(length = 40)
+    private String mobileMediaType;
     @JsonIgnore private UUID mobileRequestId;
     private Long publishedRevision;
     @Version private long editVersion;

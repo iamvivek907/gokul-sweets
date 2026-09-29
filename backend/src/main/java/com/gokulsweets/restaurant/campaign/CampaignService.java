@@ -207,22 +207,24 @@ public class CampaignService {
     public HomepageCampaign uploadMobile(Long id, MultipartFile file, UUID requestId) {
         if (!features.isControlledCampaignPublishing()) throw new IllegalArgumentException("Controlled publishing is disabled.");
         var campaign = require(id);
-        if (file == null || file.isEmpty() || file.getSize() > 5L * 1024 * 1024)
-            throw new IllegalArgumentException("Choose a mobile image of 5 MB or smaller.");
+        String mobileType = file == null ? "" : file.getContentType();
+        long limit = mobileType != null && mobileType.startsWith("video/") ? 20L * 1024 * 1024 : 5L * 1024 * 1024;
+        if (file == null || file.isEmpty() || file.getSize() > limit)
+            throw new IllegalArgumentException("Choose a mobile image up to 5 MB or video up to 20 MB.");
         String requestHash;
         try {requestHash = hash((file.getContentType() + ":" + hash(file.getBytes())).getBytes(StandardCharsets.UTF_8));}
-        catch (IOException exception) {throw new IllegalStateException("Unable to read mobile image.", exception);}
+        catch (IOException exception) {throw new IllegalStateException("Unable to read mobile media.", exception);}
         if (requestId != null) {
             var previous = repository.mobileRequestHash(id, requestId);
             if (previous.isPresent()) {
-                if (!previous.get().equals(requestHash)) throw new IllegalArgumentException("This upload key was used for another image.");
+                if (!previous.get().equals(requestHash)) throw new IllegalArgumentException("This upload key was used for another file.");
                 if (!requestId.equals(campaign.getMobileRequestId()))
-                    throw new IllegalArgumentException("This mobile image has since been replaced. Reload the draft.");
+                    throw new IllegalArgumentException("This mobile media has since been replaced. Reload the draft.");
                 return campaign;
             }
         }
         String oldUrl = campaign.getMobileMediaUrl();
-        var media = storage.uploadCampaignMedia(id, file, true);
+        var media = storage.uploadMobileCampaignMedia(id, file);
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override public void afterCompletion(int status) {
                 if (status != STATUS_COMMITTED) cleanup(media.url());
@@ -230,7 +232,8 @@ public class CampaignService {
                 else if (oldUrl != null && campaign.getPublishedRevision() == null) cleanup(oldUrl);
             }
         });
-        campaign.setMobileMediaUrl(media.url()); campaign.setMobileRequestId(requestId);
+        campaign.setMobileMediaUrl(media.url()); campaign.setMobileMediaType(media.contentType());
+        campaign.setMobileRequestId(requestId);
         if (requestId != null) repository.recordMobileRequest(id, requestId, requestHash);
         return repository.saveAndFlush(campaign);
     }
@@ -246,7 +249,7 @@ public class CampaignService {
         if (!features.isControlledCampaignPublishing()) throw new IllegalArgumentException("Controlled publishing is disabled.");
         var campaign = require(id);
         String oldUrl = campaign.getMobileMediaUrl();
-        campaign.setMobileMediaUrl(null); campaign.setMobileRequestId(null);
+        campaign.setMobileMediaUrl(null); campaign.setMobileMediaType(null); campaign.setMobileRequestId(null);
         if (campaign.getPublishedRevision() == null) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCommit() { cleanup(oldUrl); }

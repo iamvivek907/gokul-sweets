@@ -7,6 +7,7 @@ export interface HomepageCampaign {
     mediaType: string | null;
     fallbackMediaUrl: string | null;
     mobileMediaUrl?: string | null;
+    mobileMediaType?: string | null;
     altText?: string | null;
     branchId?: number | null;
     publishedRevision?: number | null;

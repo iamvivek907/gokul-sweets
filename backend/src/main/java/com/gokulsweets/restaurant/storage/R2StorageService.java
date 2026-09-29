@@ -22,6 +22,7 @@ public class R2StorageService {
 
     private static final long MAX_IMAGE_SIZE =
             5L * 1024L * 1024L;
+    private static final long MAX_MOBILE_VIDEO_SIZE = 20L * 1024L * 1024L;
 
     private static final Set<String> ALLOWED_CONTENT_TYPES =
             Set.of(
@@ -41,11 +42,22 @@ public class R2StorageService {
     public record CampaignMedia(String url, String contentType) {}
 
     public CampaignMedia uploadCampaignMedia(Long campaignId, MultipartFile file, boolean staticOnly) {
-        if (file == null || file.isEmpty() || file.getSize() > MAX_IMAGE_SIZE) {
-            throw new IllegalArgumentException("Choose a campaign file of 5 MB or smaller.");
+        return uploadCampaignMedia(campaignId, file, staticOnly, false);
+    }
+
+    public CampaignMedia uploadMobileCampaignMedia(Long campaignId, MultipartFile file) {
+        return uploadCampaignMedia(campaignId, file, false, true);
+    }
+
+    private CampaignMedia uploadCampaignMedia(Long campaignId, MultipartFile file, boolean staticOnly, boolean mobile) {
+        String type = file == null || file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        long limit = mobile && type.startsWith("video/") ? MAX_MOBILE_VIDEO_SIZE : MAX_IMAGE_SIZE;
+        if (file == null || file.isEmpty() || file.getSize() > limit) {
+            throw new IllegalArgumentException(mobile ? "Choose a mobile image up to 5 MB or video up to 20 MB."
+                    : "Choose a campaign file of 5 MB or smaller.");
         }
-        String type = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        Set<String> allowed = staticOnly ? ALLOWED_CONTENT_TYPES
+        Set<String> allowed = mobile ? Set.of("image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm")
+                : staticOnly ? ALLOWED_CONTENT_TYPES
                 : Set.of("image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4", "video/webm");
         if (!allowed.contains(type)) throw new IllegalArgumentException("Unsupported campaign media type.");
         try {
