@@ -2215,7 +2215,8 @@ export default function AdminBranchesPage() {
                             && (<>
                                 <BranchExperienceEditor key={`experience-${selectedBranch.id}`}
                                     branch={selectedBranch} authorization={authorization}
-                                    allowed={hasPermission("MENU_MANAGE")} />
+                                    allowed={hasPermission("MENU_MANAGE")}
+                                    customerVisible={features?.branchExperience ?? null} />
                                 <section className="m-5 rounded-2xl border border-[#eadfd6] bg-[#fffaf3] p-5" aria-label="Branch services">
                                     <h3 className="text-lg font-bold">Services at this branch</h3>
                                     <p className="mt-2 text-sm">Public branch artwork: {features === null ? "checking deployment configuration"

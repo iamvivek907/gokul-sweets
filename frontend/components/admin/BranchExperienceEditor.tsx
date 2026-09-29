@@ -11,8 +11,8 @@ type Snapshot = {branchId: number; draftImageUrl: string | null; draftMobileUrl:
     editVersion: number; publishedRevision: number};
 type Publication = {revision: number; imageUrl: string; altText: string; actorStaffId: number};
 
-export default function BranchExperienceEditor({branch, authorization, allowed}: {
-    branch: AdminBranch; authorization: string; allowed: boolean;
+export default function BranchExperienceEditor({branch, authorization, allowed, customerVisible}: {
+    branch: AdminBranch; authorization: string; allowed: boolean; customerVisible: boolean | null;
 }) {
     const path = `/api/admin/branches/${branch.id}/experience`;
     const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -74,7 +74,10 @@ export default function BranchExperienceEditor({branch, authorization, allowed}:
                     : `${path}/publications/${revision}/restore`, authorization, {method: "POST", headers: headers()});
                 setSnapshot(next); setAltText(next.draftAltText ?? ""); setDescription(next.draftDescription ?? "");
                 setHistory(await adminManagementApi<Publication[]>(`${path}/publications`, authorization));
-                setMessage(action === "publish" ? "Branch artwork published." : "Previous publication restored as a new revision.");
+                setMessage(action === "publish" ? customerVisible
+                    ? "Branch artwork published. Customer pages will show it after refreshing."
+                    : "Branch artwork published. Customer pages stay unchanged until GOKUL_FEATURES_BRANCH_EXPERIENCE is enabled on the backend and redeployed."
+                    : "Previous publication restored as a new revision.");
             }
         } catch (cause) {setError(cause instanceof Error ? cause.message : "Could not save branch artwork. Reload and try again.");}
         finally {setBusy(false);}
@@ -89,7 +92,7 @@ export default function BranchExperienceEditor({branch, authorization, allowed}:
                     <div><p className="text-sm font-semibold">Draft preview</p>
                         {(preview ?? snapshot.draftImageUrl) ? <Image unoptimized width={640} height={360} src={preview ?? snapshot.draftImageUrl!} alt={altText || "Draft branch cover"} className="mt-2 aspect-[16/9] w-full rounded-xl object-cover" />
                             : <div className="mt-2 grid aspect-[16/9] place-items-center rounded-xl bg-[#e8f0eb] text-sm">No draft image</div>}</div>
-                    <div><p className="text-sm font-semibold">Published on customer pages · revision {snapshot.publishedRevision}</p>
+                    <div><p className="text-sm font-semibold">Published revision {snapshot.publishedRevision} · {customerVisible === null ? "checking visibility" : customerVisible ? "visible on customer pages" : "hidden by deployment flag"}</p>
                         {snapshot.publishedImageUrl ? <Image unoptimized width={640} height={360} src={snapshot.publishedImageUrl} alt={snapshot.publishedAltText ?? branch.name} className="mt-2 aspect-[16/9] w-full rounded-xl object-cover" />
                             : <div className="mt-2 grid aspect-[16/9] place-items-center rounded-xl bg-[#e8f0eb] text-sm">No published image</div>}</div>
                 </div>

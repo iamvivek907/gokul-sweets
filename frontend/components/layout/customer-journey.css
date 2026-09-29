@@ -87,6 +87,8 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 .app-container img{pointer-events:none;-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
 .future-storefront :is(input,textarea,select,code,time,.selectable-text,[data-copyable]){-webkit-user-select:text;user-select:text}
 .future-storefront :is(button,button *,a,.gokul-branch-card-action-label){-webkit-user-select:none;user-select:none}
+.future-storefront .account-order-dialog,.future-storefront .account-order-dialog :not(.selectable-text){-webkit-user-select:none;user-select:none}
+.future-storefront .account-order-dialog .selectable-text{-webkit-user-select:text;user-select:text}
 .future-storefront :is(img,video){-webkit-user-drag:none}
 .future-storefront :is(button,a){touch-action:manipulation}
 .future-storefront :is(.gokul-pickup-options,.gokul-pickup-times,.gokul-branch-gallery,.gokul-editorial-menu,.checkout-experience-v2){min-width:0;max-width:100%}

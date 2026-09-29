@@ -258,22 +258,30 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 <div className="flex gap-2"><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]">Details</button>
                 <button type="button" disabled={busy} onClick={() => {void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50">Reorder</button></div></div>)}</div> : <p className="mt-5 text-sm text-[#756763]">No orders belong to this verified account yet.</p>}
             <dialog ref={detailDialog} onClose={() => {setSelectedOrder(null); setDetailError("");}}
-                className="m-auto max-h-[85dvh] w-[min(34rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-[#eadfd6] bg-white p-6 text-[#241715] shadow-2xl backdrop:bg-black/60"
+                className="account-order-dialog m-auto max-h-[85dvh] w-[min(38rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-[#d9e5dc] bg-[#fffaf2] p-0 text-[#172e2c] shadow-2xl backdrop:bg-[#092725b3]"
                 aria-label="Order details">
-                <div className="flex items-start justify-between gap-4"><h3 className="text-xl font-bold">Order details</h3>
-                    <button type="button" onClick={() => detailDialog.current?.close()} className="min-h-11 min-w-11 rounded-full border border-[#eadfd6]" aria-label="Close order details">✕</button></div>
-                {detailLoading && <p role="status" className="mt-5">Loading order details…</p>}
-                {detailError && <p role="alert" className="mt-5 text-[#9e2732]">{detailError}</p>}
-                {selectedOrder && <div className="mt-5 space-y-4 text-sm">
-                    <p className="break-all font-semibold">{selectedOrder.orderNumber}</p>
-                    <p>{selectedOrder.branchName} · {selectedOrder.orderStatus.replaceAll("_", " ")}</p>
-                    <p>{selectedOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}: {selectedOrder.pickupDate
-                        ? formatOrderDate(selectedOrder.pickupDate) : selectedOrder.deliveryDate ? formatOrderDate(selectedOrder.deliveryDate) : "Date pending"}
-                        {selectedOrder.pickupStartTime ? ` · ${formatOrderTime(selectedOrder.pickupStartTime)}` : ""}</p>
-                    <ul className="divide-y divide-[#eadfd6] border-y border-[#eadfd6]">{selectedOrder.items.map(item =>
-                        <li key={item.id} className="flex justify-between gap-3 py-3"><span>{item.productName} · {item.weightGrams ? `${item.weightGrams} g` : `× ${item.quantity}`}</span><span>{formatOrderCurrency(item.lineTotal)}</span></li>)}</ul>
-                    <p className="flex justify-between font-bold"><span>Total</span><span>{formatOrderCurrency(selectedOrder.totalAmount)}</span></p>
+                <div className="flex items-start justify-between gap-4 bg-[#143936] px-5 py-5 text-white sm:px-7">
+                    <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3bca9]">Your order</p>
+                        <h3 className="mt-1 font-serif text-3xl">Order details</h3></div>
+                    <button type="button" onClick={() => detailDialog.current?.close()} className="grid min-h-11 min-w-11 place-items-center rounded-full border border-white/50 text-xl hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" aria-label="Close order details">×</button></div>
+                <div className="px-5 py-5 sm:px-7 sm:py-6">
+                {detailLoading && <p role="status">Loading order details…</p>}
+                {detailError && <p role="alert" className="text-[#9e2732]">{detailError}</p>}
+                {selectedOrder && <div className="space-y-5 text-sm">
+                    <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">Order number</p>
+                        <p className="selectable-text mt-1 break-all font-semibold">{selectedOrder.orderNumber}</p></div>
+                    <div className="flex flex-wrap items-center gap-2"><strong className="text-base">{selectedOrder.branchName}</strong>
+                        <span className="rounded-full bg-[#e5f0e8] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#143936]">{selectedOrder.orderStatus.replaceAll("_", " ")}</span></div>
+                    <div className="rounded-2xl border border-[#d9e5dc] bg-white p-4"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">{selectedOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} schedule</p>
+                        <p className="mt-1 font-semibold">{selectedOrder.pickupDate
+                            ? formatOrderDate(selectedOrder.pickupDate) : selectedOrder.deliveryDate ? formatOrderDate(selectedOrder.deliveryDate) : "Date pending"}
+                            {selectedOrder.pickupStartTime ? ` · ${formatOrderTime(selectedOrder.pickupStartTime)}` : ""}</p></div>
+                    <div><h4 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">Items</h4>
+                        <ul className="divide-y divide-[#d9e5dc] border-y border-[#d9e5dc]">{selectedOrder.items.map(item =>
+                            <li key={item.id} className="flex justify-between gap-3 py-3"><span><strong className="font-semibold">{item.productName}</strong><small className="mt-1 block text-[#59706a]">{item.weightGrams ? `${item.weightGrams} g` : `Quantity ${item.quantity}`}</small></span><span className="selectable-text shrink-0 font-semibold">{formatOrderCurrency(item.lineTotal)}</span></li>)}</ul></div>
+                    <p className="flex justify-between border-t border-[#d9e5dc] pt-4 text-base font-bold"><span>Order total</span><span className="selectable-text">{formatOrderCurrency(selectedOrder.totalAmount)}</span></p>
                 </div>}
+                </div>
             </dialog>
             {preview && <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-[#fff8ef] p-5" role="status"><h3 className="font-bold text-[#241715]">Review this reorder</h3>
                 <p className="mt-2 text-sm text-[#756763]">{preview.items.map(line => line.product.name).join(", ") || "No available items"}</p>
