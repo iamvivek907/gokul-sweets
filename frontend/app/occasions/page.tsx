@@ -19,7 +19,7 @@ type Item = {productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
     status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
     quoteTerms: string | null; quoteExpiresAt: string | null; balanceDueAt: string | null;
-    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean;
+    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; productionPlan?: {expectedReadyAt: string; state: string}[];
     pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number;
         taxAmount: number; cgstRate: number; sgstRate: number}[]};
 type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
@@ -229,7 +229,7 @@ export default function OccasionsPage() {
                 {message && <p role="status" className="mt-5 rounded-xl bg-[#fff0dc] p-4">{message}</p>}
                 {session.authenticated && historyPhone === (session.phone ?? "") && <section className="mt-10"><h2 className="font-serif text-3xl">Your requests</h2>
                     {history.map(enquiry => <article key={enquiry.id} className="mt-4 rounded-2xl border bg-white p-5">
-                        <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{enquiry.status}</span></div>
+                        <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{{REQUESTED: "Under branch review", QUOTED: "Quote ready — deposit due", PAYMENT_PENDING: "Deposit payment in progress", HELD: "Deposit payment in progress", PAID: "Deposit received — balance due", CONFIRMED: "Pickup confirmed", EXPIRED: "Quote or payment window expired", DECLINED: "Request declined"}[enquiry.status] ?? "Contact the branch"}</span></div>
                         <p className="mt-2">{enquiry.nextStep}</p>
                         {enquiry.quotedAmount != null && <p className="mt-2">Quoted: ₹{enquiry.quotedAmount} · Requested deposit: ₹{enquiry.depositAmount} · Paid: ₹{enquiry.paidAmount}</p>}
                         {enquiry.pricedLines?.length > 0 && <div className="mt-3 rounded-xl border border-[#d9e5df] p-3 text-sm">
@@ -237,6 +237,7 @@ export default function OccasionsPage() {
                             {enquiry.pricedLines.map(line => <p key={line.productId} className="mt-1">{line.productName}: ₹{line.grossAmount} (base ₹{line.subtotal}, tax ₹{line.taxAmount}; {line.cgstRate}% CGST + {line.sgstRate}% SGST)</p>)}
                         </div>}
                         {enquiry.orderNumber && <p className="mt-2">Confirmed order <Link href={`/orders/${encodeURIComponent(enquiry.orderNumber)}`} className="underline">{enquiry.orderNumber}</Link></p>}
+                        {!!enquiry.productionPlan?.length && <p className="mt-2 text-sm">The branch has planned production specifically for your request. A verified deposit reserves it; full verified payment confirms pickup. This does not mean the food is already prepared.</p>}
                         {enquiry.quoteTerms && <p className="mt-2">{enquiry.quoteTerms}</p>}
                         {enquiry.balanceDueAt && <p className="mt-2">Balance due {new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.</p>}
                         {features.occasionPayments && enquiry.status === "QUOTED" && enquiry.fulfilment === "PICKUP" && <div className="mt-4 space-y-3">
