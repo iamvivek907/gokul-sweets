@@ -82,4 +82,5 @@ jobs:
       - name: Show test failure details
         if: failure()
         run: |
-          find build/test-results -name '*.xml' -type f -print0 | xargs -0 -r grep -h -m 1 -A 10 '<failure' | head -120 || true
+          grep -m 1 -A 3 'SchemaManagementException' build/test-results/test/TEST-com.gokulsweets.restaurant.RestaurantBackendApplicationTests.xml || true
+          grep -m 1 -A 3 'Caused by: org.flywaydb' build/test-results/test/TEST-com.gokulsweets.restaurant.RestaurantBackendApplicationTests.xml || true
