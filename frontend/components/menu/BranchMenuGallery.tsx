@@ -38,6 +38,7 @@ export default function BranchMenuGallery({branch, products, activeTab, onTabCha
             </div>)}
         </div> : <div className="gokul-gallery-fallback" role="img" aria-label="Gokul Sweets brand banner"><strong>Freshly made.<br />Ready for you.</strong></div>)}
         <nav className="gokul-branch-tabs" aria-label="Branch pages">
+            {branchExperience && <Link href={`/branches/${branch.id}`}>Home</Link>}
             <button type="button" aria-current={activeTab === "menu" ? "page" : undefined} onClick={() => onTabChange("menu")}>Menu</button>
             {branchExperience ? <button type="button" aria-current={activeTab === "details" ? "page" : undefined} onClick={() => onTabChange("details")}>Branch details</button>
                 : <Link href="/about#our-branches">Branch details</Link>}

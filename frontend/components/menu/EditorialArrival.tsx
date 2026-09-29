@@ -100,9 +100,13 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                     <Link href="/branches">Plan an occasion</Link>
                 </div>
             </div>
-            <Link className={styles.scrollCue} href="/branches">Scroll to explore <span aria-hidden="true">↓</span></Link>
+            <Link className={styles.scrollCue} href="/branches">
+                <span className={styles.scrollCueText}>Scroll to explore</span>
+                <span className={styles.scrollCueIcon} aria-hidden="true"><span /></span>
+            </Link>
         </section>}
         <section id="gokul-branches" className={styles.branches}>
+            {branchesOnly && <Link className={styles.backToWelcome} href="/">← Back to welcome</Link>}
             <div className={styles.sectionHead}>
                 <span>OUR BRANCHES</span><h2>Your next visit starts here.</h2>
                 <p>Choose a Gokul branch near you to see its live menu and pickup choices.</p>

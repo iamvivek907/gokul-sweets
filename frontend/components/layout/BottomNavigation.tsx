@@ -77,9 +77,12 @@ export default function BottomNavigation() {
 
     const pathname =
         usePathname();
-    const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
+    const features = useStorefrontFeatures();
+    const checkoutExperienceV2 = features?.checkoutExperienceV2 === true;
     const selectedBranch = useSelectedBranch().branch;
-    const homeHref = selectedBranch ? `/branches/${selectedBranch.id}` : "/branches";
+    const homeHref = features?.branchExperience === true
+        ? selectedBranch ? `/branches/${selectedBranch.id}` : "/branches"
+        : "/";
 
 
     const {
@@ -155,7 +158,7 @@ export default function BottomNavigation() {
                                         item.icon === "home" ? homeHref : item.href
                                     }
                                     href={
-                                        item.href
+                                        item.icon === "home" ? homeHref : item.href
                                     }
                                     aria-current={
                                         active
