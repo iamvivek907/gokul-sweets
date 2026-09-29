@@ -13,8 +13,8 @@ import type {Branch} from "@/types/branch";
 import type {HomepageCampaign} from "@/types/campaign";
 import styles from "./EditorialArrival.module.css";
 
-export default function EditorialArrival({campaignsEnabled, accessible, branchExperience = false, branchesOnly = false}: {
-    campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; branchesOnly?: boolean;
+export default function EditorialArrival({campaignsEnabled, accessible, branchExperience = false}: {
+    campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean;
 }) {
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -76,7 +76,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
         .find(value => value.type === "HERO" && !failed.includes(value.id));
 
     return <div className={`gokul-arrival ${styles.arrival}`}>
-        {!branchesOnly && <section className={styles.hero} aria-labelledby="gokul-arrival-title">
+        <section className={styles.hero} aria-labelledby="gokul-arrival-title">
             {hero && <div className={styles.media}><CampaignMedia
                 campaign={hero} hero immersive accessible={accessible}
                 onUnavailable={() => setFailed(current => [...current, hero.id])}
@@ -87,7 +87,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <nav aria-label="Welcome navigation">
                     <a href="#gokul-arrival-title" aria-current="page">Home</a>
                     <Link href="/about">Our story</Link>
-                    <Link href="/branches">Our branches</Link>
+                    <a href="#gokul-branches">Our branches</a>
                     <Link href="/branches" className={styles.orderFood}>Order food</Link>
                 </nav>
             </div>
@@ -100,13 +100,18 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                     <Link href="/branches">Plan an occasion</Link>
                 </div>
             </div>
-            <Link className={styles.scrollCue} href="/branches">
+            <a className={styles.scrollCue} href="#gokul-branches" onClick={event => {
+                const target = document.getElementById("gokul-branches");
+                if (!target) return;
+                event.preventDefault();
+                target.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
+                window.history.replaceState(null, "", "#gokul-branches");
+            }}>
                 <span className={styles.scrollCueText}>Scroll to explore</span>
                 <span className={styles.scrollCueIcon} aria-hidden="true"><span /></span>
-            </Link>
-        </section>}
+            </a>
+        </section>
         <section id="gokul-branches" className={styles.branches}>
-            {branchesOnly && <Link className={styles.backToWelcome} href="/">← Back to welcome</Link>}
             <div className={styles.sectionHead}>
                 <span>OUR BRANCHES</span><h2>Your next visit starts here.</h2>
                 <p>Choose a Gokul branch near you to see its live menu and pickup choices.</p>
