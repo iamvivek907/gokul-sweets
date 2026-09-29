@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.occasion;
 
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
 import com.gokulsweets.restaurant.customer.identity.VerifiedCustomerPhoneLookup;
+import com.gokulsweets.restaurant.order.service.OrderNumberGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import java.util.UUID;
 public class OccasionOrderFinalizer {
     private final JdbcTemplate jdbc;
     private final VerifiedCustomerPhoneLookup customers;
+    private final OrderNumberGenerator orderNumbers;
 
     public String create(UUID enquiryId, ConsentEnvironment environment, UUID subject,
                          long branchId, long pickupSlotId, BigDecimal gross) {
@@ -38,7 +40,7 @@ public class OccasionOrderFinalizer {
                 .orElseThrow(() -> new IllegalStateException("Verified customer phone is unavailable."));
         String name = customers.displayName(environment, subject).filter(value -> !value.isBlank())
                 .orElse("Occasion customer");
-        String number = "GKS-OCC-" + UUID.randomUUID().toString().replace("-", "").toUpperCase();
+        String number = orderNumbers.generate();
         BigDecimal subtotal = lines.stream().map(Line::subtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal tax = lines.stream().map(Line::tax).reduce(BigDecimal.ZERO, BigDecimal::add);
         LocalDate serviceDate = jdbc.query("SELECT service_date FROM occasion_enquiries WHERE id = ?",

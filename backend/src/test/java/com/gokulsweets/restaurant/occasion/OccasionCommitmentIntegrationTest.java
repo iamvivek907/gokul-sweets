@@ -75,6 +75,10 @@ class OccasionCommitmentIntegrationTest {
                     WHERE e.id = ? AND o.order_status = 'CONFIRMED' AND own.verified_subject_id = ?
                     """, Integer.class, fixture.enquiry(), fixture.subject())).isEqualTo(1);
             assertThat(jdbc.queryForObject("""
+                    SELECT o.order_number FROM occasion_enquiries e JOIN orders o ON o.id = e.order_id
+                    WHERE e.id = ?
+                    """, String.class, fixture.enquiry())).matches("GKS-[0-9]{8}-[A-F0-9]{16}");
+            assertThat(jdbc.queryForObject("""
                     SELECT count(*) FROM payments p JOIN occasion_enquiries e ON e.order_id = p.order_id
                     WHERE e.id = ? AND p.payment_status = 'PAID'
                     """, Integer.class, fixture.enquiry())).isEqualTo(2);
