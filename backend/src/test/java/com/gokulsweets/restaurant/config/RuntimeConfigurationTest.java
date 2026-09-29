@@ -22,13 +22,15 @@ class RuntimeConfigurationTest {
                 .filter(key -> key.startsWith("gokul.features."))
                 .filter(key -> !key.endsWith("future-ordering-days"))
                 .filter(key -> !key.endsWith("branch-experience"))
+                .filter(key -> !key.endsWith("planned-pickup-production"))
                 .toList();
         assertThat(enabledFeatures).hasSizeGreaterThan(30);
         for (var feature : enabledFeatures) {
             assertThat(properties.getProperty(feature)).endsWith(":true}");
         }
         assertThat(properties.getProperty("gokul.features.customer-account-hub")).endsWith(":true}");
-        assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":false}");
+        assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":true}");
+        assertThat(properties.getProperty("gokul.features.planned-pickup-production")).endsWith(":false}");
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("inventory.automation.scheduler-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("gokul.identity.provider-abuse-controls-verified")).endsWith(":false}");
@@ -61,6 +63,7 @@ class RuntimeConfigurationTest {
             assertThat(features.isTruthfulOrderTracking()).isFalse();
             assertThat(features.isCustomerAccountHub()).isFalse();
             assertThat(features.isBranchExperience()).isFalse();
+            assertThat(features.isPlannedPickupProduction()).isFalse();
             features.setFutureOrderingDays(0);
             assertThat(validator.validate(features)).isNotEmpty();
             features.setFutureOrderingDays(61);

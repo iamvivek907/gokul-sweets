@@ -19,7 +19,8 @@ export interface CartAvailability {
     fulfilmentType: "PICKUP";
     today: string;
     maximumDate: string;
-    dates: {date: string; available: boolean; slots: SlotAvailability[]; items?: ItemAvailability[]; reason?: string | null}[];
+    dates: {date: string; available: boolean; slots: SlotAvailability[]; items?: ItemAvailability[]; reason?: string | null;
+        plannedProduction?: boolean}[];
 }
 
 export function availabilityItems(items: CartItem[]) {
