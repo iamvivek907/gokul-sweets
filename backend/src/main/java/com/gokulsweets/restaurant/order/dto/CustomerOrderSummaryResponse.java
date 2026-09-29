@@ -12,6 +12,7 @@ import java.time.LocalTime;
 public record CustomerOrderSummaryResponse(
         String orderNumber,
         OrderStatus orderStatus,
+        Long branchId,
         String branchName,
         LocalDate pickupDate,
         LocalTime pickupStartTime,
