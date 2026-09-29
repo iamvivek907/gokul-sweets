@@ -17,6 +17,7 @@ export default function HomeEntry({children}: {children: ReactNode}) {
 
     return <AppShell editorial showSocialPopup={false}>
         <EditorialArrival campaignsEnabled={features.homepageCampaigns} branchExperience={features.branchExperience}
+            occasionEnquiries={features.occasionEnquiries}
             accessible={features.accessibleOrderingV2} />
     </AppShell>;
 }

@@ -13,6 +13,7 @@ export interface StorefrontFeatures {
     contextualStorefrontV2: boolean;
     controlledCampaignPublishing: boolean;
     branchExperience: boolean;
+    occasionEnquiries: boolean;
     accessibleOrderingV2: boolean;
     checkoutExperienceV2: boolean;
     futuristicStorefrontV2: boolean;
