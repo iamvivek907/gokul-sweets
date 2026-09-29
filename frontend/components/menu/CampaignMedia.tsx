@@ -47,7 +47,7 @@ export default function CampaignMedia({campaign, hero = false, immersive = false
     };
     return <div ref={frame} className={immersive ? "entry-campaign-media" : "relative aspect-[4/3] w-full overflow-hidden rounded-2xl bg-[#fff0dc]"}>
         {!useFallback && campaign.mediaType?.startsWith("video/") ? <video
-            src={source} poster={campaign.fallbackMediaUrl ?? undefined} muted loop playsInline autoPlay controls
+            src={source} poster={campaign.fallbackMediaUrl ?? undefined} muted loop playsInline autoPlay
             preload={hero ? "metadata" : "none"} aria-label={campaign.altText || campaign.title}
             className={immersive ? "h-full w-full object-cover" : campaign.mobileMediaUrl ? "hidden h-full w-full object-cover md:block" : "h-full w-full object-cover"} onError={fail} />
             : <Image src={source} alt={campaign.altText || campaign.title} fill sizes="(max-width: 768px) 100vw, 50vw"

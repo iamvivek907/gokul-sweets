@@ -11,6 +11,7 @@ import {
     useCart
 } from "@/hooks/useCart";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 
 
 interface NavigationItem {
@@ -77,6 +78,8 @@ export default function BottomNavigation() {
     const pathname =
         usePathname();
     const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
+    const selectedBranch = useSelectedBranch().branch;
+    const homeHref = selectedBranch ? `/branches/${selectedBranch.id}` : "/branches";
 
 
     const {
@@ -93,7 +96,7 @@ export default function BottomNavigation() {
             href === "/"
         ) {
 
-            return pathname === "/";
+            return pathname === homeHref;
         }
 
 
@@ -149,7 +152,7 @@ export default function BottomNavigation() {
                             return (
                                 <Link
                                     key={
-                                        item.href
+                                        item.icon === "home" ? homeHref : item.href
                                     }
                                     href={
                                         item.href

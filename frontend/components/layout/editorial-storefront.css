@@ -47,6 +47,14 @@
 .editorial-storefront .gokul-footer-bottom{border-color:#baccc2}
 .editorial-storefront .customer-site-footer a:hover{text-decoration:underline}
 @media(max-width:700px){.editorial-storefront .gokul-footer-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Keep the footer useful without occupying a full screen. */
+.editorial-storefront .customer-site-footer{padding:1.7rem clamp(1.25rem,4vw,3rem) 2rem}
+.editorial-storefront .gokul-footer-grid{gap:1.25rem}
+.editorial-storefront .gokul-footer-grid h2{font-size:1.75rem}
+.gokul-footer-grid h3{margin-bottom:.4rem}.gokul-footer-grid a,.gokul-footer-grid span{margin:.3rem 0}
+.gokul-footer-bottom{margin-top:1.25rem;padding-top:.7rem}
+.editorial-storefront .gokul-fssai{margin-top:1rem}
+@media(max-width:700px){.editorial-storefront .customer-site-footer{padding-bottom:calc(5rem + env(safe-area-inset-bottom))}}
 /* SCRUM-26: branch-level menu in the approved editorial visual language. */
 .editorial-storefront .gokul-editorial-menu{max-width:1380px;padding:clamp(1rem,3vw,3rem);color:#173a37}
 .gokul-branch-gallery{margin-bottom:1.6rem;color:#173a37}
@@ -63,6 +71,24 @@
 .gokul-branch-tabs{display:flex;gap:clamp(1rem,4vw,3rem);overflow-x:auto;min-height:4rem;align-items:center;border-bottom:1px solid #cad8cf}
 .gokul-branch-tabs a{display:flex;min-height:4rem;align-items:center;flex:none;padding:.2rem .4rem;color:#435d58;font-weight:600}
 .gokul-branch-tabs a[aria-current="page"]{border-bottom:3px solid #c76752;color:#a83232}
+.gokul-branch-tabs button{display:flex;min-height:4rem;align-items:center;flex:none;padding:.2rem .4rem;color:#435d58;font-weight:600;background:transparent;border:0;cursor:pointer}
+.gokul-branch-tabs button[aria-current="page"]{border-bottom:3px solid #c76752;color:#a83232}
+.branch-details-active > :not(.gokul-branch-gallery){display:none}
+.branch-details-panel{margin:1.5rem 0 2rem;overflow:hidden;border-radius:1.5rem;background:#fff;border:1px solid #dbe6df}
+.branch-details-photo{display:block;width:100%;max-height:380px;aspect-ratio:16/6;object-fit:cover}
+.branch-details-content{padding:clamp(1.25rem,3vw,2.5rem)}
+.branch-details-content h2,.branch-home-hero h1,.branch-home-welcome h2{font:500 clamp(2rem,4vw,3.8rem)/1.1 Georgia,serif;margin:.5rem 0 1rem}
+.branch-details-content>p{max-width:60ch;line-height:1.6}
+.branch-details-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.5rem;margin-top:1.5rem}
+.branch-details-facts h3{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:#536b66;font-weight:700}
+.branch-details-facts p,.branch-details-facts a{margin-top:.4rem;line-height:1.6}
+.branch-home-hero{margin:1.5rem 0 0;padding:clamp(1.5rem,5vw,4rem);border-radius:1.5rem;background:#143936;color:#fff}
+.branch-home-hero h1{color:#fff}.branch-home-hero>p:not(.gokul-overline){max-width:60ch;line-height:1.7}
+.branch-home-actions{position:relative;margin-top:1.5rem;display:inline-block}
+.branch-home-actions a,.branch-home-actions button,.branch-home-welcome button{display:inline-block;position:static;min-height:44px;border:0;border-radius:999px;background:#c76752;color:#fff;padding:.8rem 1.3rem;font-weight:700;cursor:pointer}
+.branch-home-actions .gokul-branch-card-action-label{position:static;opacity:1;color:#fff}
+.branch-home-welcome{padding:clamp(1.5rem,4vw,3rem) 0}.branch-home-welcome p{margin:1rem 0 1.5rem}
+@media(max-width:700px){.branch-details-photo{aspect-ratio:4/3}.branch-details-facts{grid-template-columns:1fr}}
 .editorial-storefront .gokul-editorial-menu>header{border:0!important;box-shadow:none!important;background:transparent!important;padding:1rem 0!important}
 .editorial-storefront .gokul-editorial-menu>header h1{font:500 clamp(2.2rem,4vw,3.5rem)/1.08 Georgia,serif;letter-spacing:-.04em;color:#173a37!important}
 .editorial-storefront .gokul-editorial-menu>header [class*="bg-[#fffaf3]"]{background:#f1f6f2!important;border-color:#cbd8d0!important}

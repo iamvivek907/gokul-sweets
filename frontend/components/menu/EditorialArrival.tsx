@@ -87,8 +87,8 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <nav aria-label="Welcome navigation">
                     <a href="#gokul-arrival-title" aria-current="page">Home</a>
                     <Link href="/about">Our story</Link>
-                    <a href="#gokul-branches">Our branches</a>
-                    <a href="#gokul-branches" className={styles.orderFood}>Order food</a>
+                    <Link href="/branches">Our branches</Link>
+                    <Link href="/branches" className={styles.orderFood}>Order food</Link>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
@@ -96,11 +96,11 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
                 <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
-                    <a href="#gokul-branches" className={styles.orderFood}>Order food</a>
-                    <a href="#gokul-branches">Plan an occasion</a>
+                    <Link href="/branches" className={styles.orderFood}>Order food</Link>
+                    <Link href="/branches">Plan an occasion</Link>
                 </div>
             </div>
-            <a className={styles.scrollCue} href="#gokul-branches">Scroll to explore</a>
+            <Link className={styles.scrollCue} href="/branches">Scroll to explore <span aria-hidden="true">↓</span></Link>
         </section>}
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
@@ -121,8 +121,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                         {branchExperience && <p>{item.pickupAvailable ? "Order for pickup" : "Online pickup unavailable"}</p>}
                         <span className={styles.cardPrompt}>Explore this branch</span>
                     </div>
-                    {branchExperience ? <Link className={styles.branchDetailLink} href={`/branches/${item.id}`} aria-label={`Explore ${item.name} details`} />
-                        : <BranchSelector cardBranch={item} />}
+                    <BranchSelector cardBranch={item} destination={branchExperience ? "branchHome" : "menu"} />
                 </article>)}
             </div>
             {!branches.length && <p className={styles.branchFallback}>Branch details will appear here when available. You can still explore the menu.</p>}

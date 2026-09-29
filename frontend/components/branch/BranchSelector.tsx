@@ -48,7 +48,7 @@ function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
 }
 
 
-export default function BranchSelector({compact = false, locationControl = false, cardBranch}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch}) {
+export default function BranchSelector({compact = false, locationControl = false, cardBranch, destination = "menu"}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch; destination?: "menu" | "branchHome"}) {
     const router = useRouter();
     const uniqueId = useId();
     const popoverId = compact || locationControl || cardBranch ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
@@ -195,7 +195,7 @@ export default function BranchSelector({compact = false, locationControl = false
         );
 
         closePopover();
-        router.push("/menu");
+        router.push(destination === "branchHome" ? `/branches/${selectedBranch.id}` : "/menu");
     }
 
     function closePopover() {
@@ -228,7 +228,7 @@ export default function BranchSelector({compact = false, locationControl = false
         selectBranch(proposedBranch);
         setProposedBranch(null);
         closePopover();
-        router.push("/menu");
+        router.push(destination === "branchHome" ? `/branches/${proposedBranch.id}` : "/menu");
     }
 
 

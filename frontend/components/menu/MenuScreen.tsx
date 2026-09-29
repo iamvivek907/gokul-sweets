@@ -64,6 +64,7 @@ interface ProductRatingState {
 
 
 export default function MenuScreen() {
+    const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
     const {
         branch
@@ -961,6 +962,7 @@ export default function MenuScreen() {
             <section
                 className={`
                     ${pickupCheck.features?.contextualStorefrontV2 ? "gokul-editorial-menu" : ""}
+                    ${branchTab === "details" ? "branch-details-active" : ""}
                     mx-auto
                     max-w-295
                     future-menu-width
@@ -973,7 +975,7 @@ export default function MenuScreen() {
                 `}
             >
 
-                {pickupCheck.features?.contextualStorefrontV2 && <BranchMenuGallery branch={branch} products={allProducts} />}
+                {pickupCheck.features?.contextualStorefrontV2 && <BranchMenuGallery branch={branch} products={allProducts} activeTab={branchTab} onTabChange={setBranchTab} />}
 
                 <header
                     className="
