@@ -29,6 +29,8 @@ public class EnhancementProperties {
     private boolean branchExperience;
     /** SCRUM-33: identify future pickup backed entirely by approved daily production. */
     private boolean plannedPickupProduction;
+    /** SCRUM-34: future delivery needs approved daily production ready by the rider window. */
+    private boolean plannedDeliveryProduction;
     /** SCRUM-35: reviewed occasion food enquiries; OFF until staff and customer QA. */
     private boolean occasionEnquiries;
     /** SCRUM-35: PhonePe deposit and balance settlement, independently OFF until DEV provider QA. */

@@ -23,6 +23,7 @@ class RuntimeConfigurationTest {
                 .filter(key -> !key.endsWith("future-ordering-days"))
                 .filter(key -> !key.endsWith("branch-experience"))
                 .filter(key -> !key.endsWith("planned-pickup-production"))
+                .filter(key -> !key.endsWith("planned-delivery-production"))
                 .filter(key -> !key.endsWith("occasion-enquiries"))
                 .filter(key -> !key.endsWith("occasion-payments"))
                 .toList();
@@ -33,6 +34,7 @@ class RuntimeConfigurationTest {
         assertThat(properties.getProperty("gokul.features.customer-account-hub")).endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.planned-pickup-production")).endsWith(":false}");
+        assertThat(properties.getProperty("gokul.features.planned-delivery-production")).endsWith(":false}");
         assertThat(properties.getProperty("gokul.features.occasion-enquiries")).endsWith(":false}");
         assertThat(properties.getProperty("gokul.features.occasion-payments")).endsWith(":false}");
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
@@ -68,6 +70,7 @@ class RuntimeConfigurationTest {
             assertThat(features.isCustomerAccountHub()).isFalse();
             assertThat(features.isBranchExperience()).isFalse();
             assertThat(features.isPlannedPickupProduction()).isFalse();
+            assertThat(features.isPlannedDeliveryProduction()).isFalse();
             features.setFutureOrderingDays(0);
             assertThat(validator.validate(features)).isNotEmpty();
             features.setFutureOrderingDays(61);
