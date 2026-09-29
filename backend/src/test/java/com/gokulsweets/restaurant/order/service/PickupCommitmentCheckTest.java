@@ -62,7 +62,7 @@ class PickupCommitmentCheckTest {
         assertThatCode(() -> check.checkNewOrder(order(PickupType.PRIORITY), cart)).doesNotThrowAnyException();
         assertThatThrownBy(() -> check.checkNewOrder(order(PickupType.ADMIN_OVERRIDE), cart))
                 .isInstanceOf(InventoryConflictException.class);
-        var missingSlot = new CartAvailabilityService.DateAvailability(day, true, List.of(), List.of(), null);
+        var missingSlot = new CartAvailabilityService.DateAvailability(day, true, List.of(), List.of(), null, false);
         when(availability.check(1L, day, 1, cart)).thenReturn(
                 new CartAvailabilityService.Availability("PICKUP", day, day, List.of(missingSlot)));
         assertThatThrownBy(() -> check.checkNewOrder(order(PickupType.NORMAL), cart))
@@ -86,7 +86,7 @@ class PickupCommitmentCheckTest {
                 1, 0, 1, true, true, 1, 0, 1, BigDecimal.ZERO);
         var offered = new CartAvailabilityService.SlotAvailability(slot, normal, priority, reason,
                 reason == null ? null : "SLOT_FULL", issues);
-        var date = new CartAvailabilityService.DateAvailability(day, normal || priority, List.of(offered), issues, reason);
+        var date = new CartAvailabilityService.DateAvailability(day, normal || priority, List.of(offered), issues, reason, false);
         return new CartAvailabilityService.Availability("PICKUP", day, day, List.of(date));
     }
 }
