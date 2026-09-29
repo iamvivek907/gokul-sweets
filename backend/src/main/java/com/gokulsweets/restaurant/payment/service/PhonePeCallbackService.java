@@ -1,13 +1,13 @@
 package com.gokulsweets.restaurant.payment.service;
 
 import com.gokulsweets.restaurant.payment.entity.Payment;
+import com.gokulsweets.restaurant.occasion.OccasionCommitmentService;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
 import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
@@ -20,8 +20,8 @@ public class PhonePeCallbackService {
     private final ObjectMapper objectMapper;
     private final PaymentRepository paymentRepository;
     private final PaymentStatusService paymentStatusService;
+    private final OccasionCommitmentService occasionCommitments;
 
-    @Transactional
     public void process(
             byte[] rawBody,
             String checksumKeyId,
@@ -65,6 +65,12 @@ public class PhonePeCallbackService {
                 )
                         .trim()
                         .toUpperCase();
+
+        if (occasionCommitments.ownsMerchantOrder(merchantOrderId)) {
+            occasionCommitments.verifiedWebhook(merchantOrderId, event, state,
+                    extractLatestTransactionId(payload));
+            return;
+        }
 
         Payment payment =
                 paymentRepository

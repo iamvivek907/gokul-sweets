@@ -63,6 +63,16 @@ public class PhonePeClient {
             BigDecimal amount,
             String redirectUrl
     ) {
+        return createPayment(merchantOrderId, amount, redirectUrl, 1200);
+    }
+
+    /** A shorter provider window keeps occasion deposit attempts inside the inventory hold. */
+    public CreatePaymentResponse createPayment(
+            String merchantOrderId,
+            BigDecimal amount,
+            String redirectUrl,
+            int expireAfterSeconds
+    ) {
         properties.requireApiConfiguration();
 
         if (merchantOrderId == null || merchantOrderId.isBlank()) {
@@ -75,6 +85,9 @@ public class PhonePeClient {
             throw new IllegalArgumentException(
                     "PhonePe redirect URL is required."
             );
+        }
+        if (expireAfterSeconds < 300 || expireAfterSeconds > 3600) {
+            throw new IllegalArgumentException("Payment expiry must be between 300 and 3600 seconds.");
         }
 
         ObjectNode payload = objectMapper.createObjectNode();
@@ -93,10 +106,7 @@ public class PhonePeClient {
          * PhonePe allows 300-3600 seconds.
          * 20 minutes is a reasonable checkout lifetime.
          */
-        payload.put(
-                "expireAfter",
-                1200
-        );
+        payload.put("expireAfter", expireAfterSeconds);
 
         ObjectNode paymentFlow = payload.putObject(
                 "paymentFlow"

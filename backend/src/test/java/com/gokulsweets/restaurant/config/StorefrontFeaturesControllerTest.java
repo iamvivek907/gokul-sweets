@@ -13,6 +13,20 @@ class StorefrontFeaturesControllerTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-25T18:31:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @Test
+    void occasionPaymentsRequireEnquiriesAndVerifiedIdentity() {
+        var properties = new EnhancementProperties();
+        var controller = new StorefrontFeaturesController(properties, clock);
+        properties.setOccasionPayments(true);
+        assertThat(controller.features().occasionPayments()).isFalse();
+        properties.setOccasionEnquiries(true);
+        assertThat(controller.features().occasionPayments()).isFalse();
+        properties.setCustomerOtpIdentity(true);
+        assertThat(controller.features().occasionPayments()).isTrue();
+        properties.setOccasionPayments(false);
+        assertThat(controller.features().occasionPayments()).isFalse();
+    }
+
+    @Test
     void deliveryLocationCheckRequiresPrivacyAndIdentityGates() {
         var properties = new EnhancementProperties();
         var controller = new StorefrontFeaturesController(properties, clock);

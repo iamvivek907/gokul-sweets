@@ -42,12 +42,14 @@ public class OccasionEnquiryService {
                           @NotEmpty @Size(max = 30) List<@Valid Item> items) {}
     public record Quote(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
                         @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal deposit,
-                        @NotNull Instant expiresAt, @NotBlank @Size(max = 500) String terms) {}
+                        @NotNull Instant expiresAt, Instant balanceDueAt,
+                        @NotBlank @Size(max = 500) String terms) {}
     public record Summary(UUID id, long branchId, String occasionType, LocalDate serviceDate, int guestCount,
                           Fulfilment fulfilment, String status, BigDecimal quotedAmount,
                           BigDecimal depositAmount, BigDecimal paidAmount, String quoteTerms, Instant quoteExpiresAt,
                           Instant createdAt, String nextStep, String customerPhone, String deliveryAddress,
-                          String notes, List<Item> items) {}
+                          String notes, Instant balanceDueAt, Instant holdExpiresAt,
+                          Long pickupSlotId, List<Item> items) {}
 
     @Transactional
     public Summary submit(ConsentEnvironment environment, UUID subject, Request input) {
@@ -137,15 +139,31 @@ public class OccasionEnquiryService {
         if (quote.deposit().compareTo(quote.amount()) > 0 || !quote.expiresAt().isAfter(clock.instant())
                 || quote.expiresAt().isAfter(clock.instant().plus(Duration.ofDays(14))))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Quote amount or expiry is invalid.");
+        if (quote.deposit().signum() <= 0
+                || quote.deposit().compareTo(quote.amount()) < 0 && (quote.balanceDueAt() == null
+                || !quote.balanceDueAt().isAfter(quote.expiresAt()))
+                || quote.deposit().compareTo(quote.amount()) == 0 && quote.balanceDueAt() != null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Choose a positive deposit and a balance deadline after the quote expires.");
         String before = lockedStatus(environment, branchId, id);
+        LocalDate serviceDate = jdbc.query("""
+                SELECT service_date FROM occasion_enquiries WHERE id = ? AND environment = ? AND branch_id = ?
+                """, rs -> rs.next() ? rs.getDate(1).toLocalDate() : null,
+                id, environment.name(), branchId);
+        if (quote.balanceDueAt() != null && (serviceDate == null
+                || !quote.balanceDueAt().isBefore(serviceDate.atStartOfDay(IST).toInstant())))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Balance must be due before the event date in India.");
         if (!"REQUESTED".equals(before) && !"QUOTED".equals(before))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only an open request can be quoted.");
         if ("QUOTED".equals(before) && expired(environment, branchId, id))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This quote expired; ask for a new enquiry.");
         jdbc.update("""
                 UPDATE occasion_enquiries SET status = 'QUOTED', quoted_amount = ?, deposit_amount = ?,
-                    quote_terms = ?, quote_expires_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
-                """, quote.amount(), quote.deposit(), quote.terms().trim(), Timestamp.from(quote.expiresAt()), id);
+                    quote_terms = ?, quote_expires_at = ?, balance_due_at = ?,
+                    updated_at = CURRENT_TIMESTAMP WHERE id = ?
+                """, quote.amount(), quote.deposit(), quote.terms().trim(), Timestamp.from(quote.expiresAt()),
+                quote.balanceDueAt() == null ? null : Timestamp.from(quote.balanceDueAt()), id);
         event(id, staff, before, "QUOTED", quote.terms().trim());
         return staffGet(environment, branchId, id);
     }
@@ -220,6 +238,9 @@ public class OccasionEnquiryService {
             case "QUOTED" -> "A manager has prepared a quote. Contact the branch to review it; no booking is confirmed.";
             case "EXPIRED" -> "This quote has expired. Ask the branch for a new quote.";
             case "DECLINED" -> "The branch cannot take this request. Please choose another date or branch.";
+            case "PAYMENT_PENDING", "HELD" -> "Your pickup and inventory are held briefly while the deposit is pending. Check payment status before retrying.";
+            case "PAID" -> "Your deposit is verified and your items are committed. Pay the remaining balance by its deadline to confirm.";
+            case "CONFIRMED" -> "The required payments are verified and this pickup is confirmed.";
             default -> "The branch will confirm the next step. This is not a confirmed booking.";
         };
         return new Summary((UUID) rs.getObject("id"), rs.getLong("branch_id"), rs.getString("occasion_type"),
@@ -230,6 +251,9 @@ public class OccasionEnquiryService {
                 customers.verifiedPhone(ConsentEnvironment.valueOf(rs.getString("environment")),
                         (UUID) rs.getObject("subject_id")).orElse(""),
                 rs.getString("delivery_address"), rs.getString("notes"),
+                rs.getTimestamp("balance_due_at") == null ? null : rs.getTimestamp("balance_due_at").toInstant(),
+                rs.getTimestamp("hold_expires_at") == null ? null : rs.getTimestamp("hold_expires_at").toInstant(),
+                rs.getObject("pickup_slot_id", Long.class),
                 jdbc.query("""
                         SELECT i.product_id, i.requested_quantity, i.unit, p.name
                         FROM occasion_enquiry_items i JOIN products p ON p.id = i.product_id

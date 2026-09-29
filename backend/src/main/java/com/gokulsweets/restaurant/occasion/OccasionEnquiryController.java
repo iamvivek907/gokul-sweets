@@ -23,6 +23,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OccasionEnquiryController {
     private final OccasionEnquiryService service;
+    private final OccasionCommitmentService commitments;
     private final EnhancementProperties features;
     private final Environment settings;
     private final TrustedCheckoutIdentity identity;
@@ -43,6 +44,30 @@ public class OccasionEnquiryController {
     @GetMapping("/api/occasion-enquiries/{id}")
     public OccasionEnquiryService.Summary mine(@PathVariable UUID id, HttpServletRequest request) {
         return service.get(environment(), subject(request), id);
+    }
+
+    public record DepositChoice(long pickupSlotId) {}
+
+    @PostMapping("/api/occasion-enquiries/{id}/deposit")
+    public OccasionCommitmentService.Checkout deposit(@PathVariable UUID id, @RequestBody DepositChoice choice,
+                                                       HttpServletRequest request) {
+        return commitments.beginDeposit(environment(), subject(request), id, choice.pickupSlotId());
+    }
+
+    @PostMapping("/api/occasion-enquiries/{id}/balance")
+    public OccasionCommitmentService.Checkout balance(@PathVariable UUID id, HttpServletRequest request) {
+        return commitments.beginBalance(environment(), subject(request), id);
+    }
+
+    @GetMapping("/api/occasion-enquiries/{id}/payments/{attemptId}")
+    public OccasionCommitmentService.Checkout payment(@PathVariable UUID id, @PathVariable UUID attemptId,
+                                                       HttpServletRequest request) {
+        return commitments.status(environment(), subject(request), id, attemptId);
+    }
+
+    @GetMapping("/api/occasion-enquiries/{id}/payments/latest")
+    public OccasionCommitmentService.Checkout latestPayment(@PathVariable UUID id, HttpServletRequest request) {
+        return commitments.latest(environment(), subject(request), id);
     }
 
     @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries")
