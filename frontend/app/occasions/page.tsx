@@ -19,7 +19,7 @@ type Item = {productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
     status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
     quoteTerms: string | null; quoteExpiresAt: string | null; balanceDueAt: string | null;
-    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; productionPlan?: {expectedReadyAt: string; state: string; quantity: number; readyQuantity: number}[];
+    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; cancellationReview?: {paidAmount: number; reason: string; state: string} | null; productionPlan?: {expectedReadyAt: string; state: string; quantity: number; readyQuantity: number}[];
     pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number;
         taxAmount: number; cgstRate: number; sgstRate: number}[]};
 type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
@@ -229,7 +229,7 @@ export default function OccasionsPage() {
                 {message && <p role="status" className="mt-5 rounded-xl bg-[#fff0dc] p-4">{message}</p>}
                 {session.authenticated && historyPhone === (session.phone ?? "") && <section className="mt-10"><h2 className="font-serif text-3xl">Your requests</h2>
                     {history.map(enquiry => <article key={enquiry.id} className="mt-4 rounded-2xl border bg-white p-5">
-                        <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{{REQUESTED: "Under branch review", QUOTED: "Quote ready — deposit due", PAYMENT_PENDING: "Deposit payment in progress", HELD: "Deposit payment in progress", PAID: "Deposit received — balance due", CONFIRMED: "Pickup confirmed", EXPIRED: "Quote or payment window expired", DECLINED: "Request declined"}[enquiry.status] ?? "Contact the branch"}</span></div>
+                        <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{{REQUESTED: "Under branch review", QUOTED: "Quote ready — deposit due", PAYMENT_PENDING: "Deposit payment in progress", HELD: "Deposit payment in progress", PAID: "Deposit received — balance due", CONFIRMED: "Pickup confirmed", EXPIRED: "Quote or payment window expired", DECLINED: "Request declined", CANCELLED: "Cancelled — finance review pending"}[enquiry.status] ?? "Contact the branch"}</span></div>
                         <p className="mt-2">{enquiry.nextStep}</p>
                         {enquiry.quotedAmount != null && <p className="mt-2">Quoted: ₹{enquiry.quotedAmount} · Requested deposit: ₹{enquiry.depositAmount} · Paid: ₹{enquiry.paidAmount}</p>}
                         {enquiry.pricedLines?.length > 0 && <div className="mt-3 rounded-xl border border-[#d9e5df] p-3 text-sm">
@@ -241,6 +241,10 @@ export default function OccasionsPage() {
                         {enquiry.status === "CONFIRMED" && !!enquiry.productionPlan?.length && <p className="mt-2 text-sm">{enquiry.productionPlan.every(line => line.readyQuantity >= line.quantity)
                             ? "The branch has recorded all requested quantities as prepared. Check your linked order for pickup status."
                             : "Your pickup is confirmed. The branch will update preparation and pickup status in your linked order."}</p>}
+                        {enquiry.cancellationReview && <div className="mt-3 rounded-xl bg-[#fff0dc] p-3 text-sm">
+                            <p>Cancellation reason: {enquiry.cancellationReview.reason}</p>
+                            <p>₹{enquiry.cancellationReview.paidAmount} already paid needs branch finance review under your booking terms. No refund is confirmed yet. Please contact the branch.</p>
+                        </div>}
                         {enquiry.quoteTerms && <p className="mt-2">{enquiry.quoteTerms}</p>}
                         {enquiry.balanceDueAt && <p className="mt-2">Balance due {new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.</p>}
                         {features.occasionPayments && enquiry.status === "QUOTED" && enquiry.fulfilment === "PICKUP" && <div className="mt-4 space-y-3">
@@ -258,7 +262,7 @@ export default function OccasionsPage() {
                             && enquiry.quotedAmount > enquiry.paidAmount && enquiry.balancePaymentOpen && <button type="button" disabled={busy}
                             onClick={() => void pay(enquiry, "balance")}
                             className="mt-4 min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay balance ₹{(enquiry.quotedAmount - enquiry.paidAmount).toFixed(2)}</button>}
-                        {features.occasionPayments && ["PAYMENT_PENDING", "HELD", "PAID", "CONFIRMED", "EXPIRED"].includes(enquiry.status)
+                        {features.occasionPayments && ["PAYMENT_PENDING", "HELD", "PAID", "CONFIRMED", "EXPIRED", "CANCELLED"].includes(enquiry.status)
                             && <button type="button" disabled={busy} onClick={() => void checkPayment(enquiry)}
                             className="mt-4 ml-2 min-h-11 rounded-full border border-[#173a37] px-5 disabled:opacity-50">Check latest payment</button>}
                         {attempts[enquiry.id] && <p role="status" className="mt-3 rounded-xl bg-[#fff0dc] p-3">{attempts[enquiry.id].status === "REFUND_PENDING"
