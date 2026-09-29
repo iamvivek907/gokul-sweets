@@ -27,6 +27,8 @@ public class EnhancementProperties {
     private boolean controlledCampaignPublishing;
     /** SCRUM-105: published branch artwork and details; OFF until staff and media QA. */
     private boolean branchExperience;
+    /** SCRUM-33: identify future pickup backed entirely by approved daily production. */
+    private boolean plannedPickupProduction;
     /** SCRUM-28: accessible dialogs, mobile actions, motion and network recovery. */
     private boolean accessibleOrderingV2;
     /** Customer-facing site and navigation visual direction; never affects staff or admin pages. */

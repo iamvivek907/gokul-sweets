@@ -50,6 +50,16 @@ class CartAvailabilityServiceTest {
         assertThat(result.fulfilmentType()).isEqualTo("PICKUP");
         assertThat(result.dates().get(0).available()).isFalse();
         assertThat(result.dates().get(1).available()).isTrue();
+        assertThat(result.dates().get(1).plannedProduction()).isFalse();
+        features.setPlannedPickupProduction(true);
+        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction()).isTrue();
+        tomorrowStock.setStatus(InventoryAllocationStatus.DRAFT);
+        tomorrowStock.setForecastQuantity(BigDecimal.valueOf(500));
+        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction()).isFalse();
+        tomorrowStock.setStatus(InventoryAllocationStatus.APPROVED);
+        inventory.setEnforcementEnabled(false);
+        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction()).isFalse();
+        inventory.setEnforcementEnabled(true);
         assertThat(result.dates().get(1).slots().get(0).normalAvailable()).isFalse();
         assertThat(result.dates().get(1).slots().get(1).slot().id()).isEqualTo(3L);
         assertThat(result.dates().getFirst().items().getFirst().code()).isEqualTo("QUANTITY_TOO_LARGE");

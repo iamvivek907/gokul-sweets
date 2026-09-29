@@ -123,7 +123,18 @@ public class CartAvailabilityService {
             String dateReason = available ? null : slots.isEmpty() ? "No pickup times have been scheduled for this date."
                     : dateItems.stream().filter(i -> !i.available()).map(i -> i.productName() + ": " + i.reason())
                     .findFirst().orElse("No single pickup time can fulfil all items. Try another date.");
-            dates.add(new DateAvailability(date, available, slots, dateItems, dateReason));
+            boolean plannedProduction = features.isPlannedPickupProduction() && inventoryProperties.isEnforcementEnabled()
+                    && date.isAfter(today) && available && !items.isEmpty()
+                    && items.stream().allMatch(item -> {
+                        var policy = policies.get(item.branchProduct().getId());
+                        var allocation = allocations.get(new StockKey(item.branchProduct().getId(), date));
+                        return policy != null && policy.getControlMode() == InventoryControlMode.DAILY_PRODUCTION
+                                && allocation != null && (allocation.getStatus()
+                                == com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus.APPROVED
+                                || allocation.getStatus()
+                                == com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus.READY);
+                    });
+            dates.add(new DateAvailability(date, available, slots, dateItems, dateReason, plannedProduction));
         }
         return new Availability("PICKUP", today, maximumDate, dates);
     }
@@ -169,7 +180,8 @@ public class CartAvailabilityService {
             return new ItemAvailability(productId, productName, unit, requestedQuantity, availableQuantity, false, code, reason, expectedReadyAt);
         }
     }
-    public record DateAvailability(LocalDate date, boolean available, List<SlotAvailability> slots, List<ItemAvailability> items, String reason) {}
+    public record DateAvailability(LocalDate date, boolean available, List<SlotAvailability> slots, List<ItemAvailability> items,
+                                   String reason, boolean plannedProduction) {}
     public record SlotAvailability(PickupSlotResponse slot, boolean normalAvailable, boolean priorityAvailable, String reason,
                                    String code, List<ItemAvailability> issues) {}
 }

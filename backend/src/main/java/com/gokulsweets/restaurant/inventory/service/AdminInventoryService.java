@@ -16,6 +16,7 @@ import com.gokulsweets.restaurant.inventory.repository.InventoryDailyAllocationR
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -37,6 +38,7 @@ public class AdminInventoryService {
     private final InventoryQuantityService quantityService;
     private final InventoryProperties properties;
     private final Clock inventoryClock;
+    private final JdbcTemplate jdbc;
 
     @Transactional
     public InventoryPolicyResponse upsertPolicy(
@@ -140,6 +142,7 @@ public class AdminInventoryService {
         );
 
         BigDecimal previousApproved = allocation.getApprovedQuantity();
+        String beforePlan = planSnapshot(allocation);
 
         allocation.setApprovedQuantity(approvedQuantity);
         allocation.setSafetyBufferQuantity(safetyBuffer);
@@ -160,6 +163,12 @@ public class AdminInventoryService {
         );
 
         InventoryDailyAllocation saved = allocationRepository.save(allocation);
+        jdbc.update("""
+                INSERT INTO inventory_allocation_plan_audit
+                    (allocation_id, branch_product_id, service_date, performed_by, before_state, after_state)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, saved.getId(), branchProductId, serviceDate, performedBy,
+                beforePlan, planSnapshot(saved));
 
         BigDecimal delta = approvedQuantity.subtract(previousApproved);
         if (delta.compareTo(BigDecimal.ZERO) != 0) {
@@ -184,6 +193,15 @@ public class AdminInventoryService {
         );
 
         return toResponse(saved, policy);
+    }
+
+    private static String planSnapshot(InventoryDailyAllocation allocation) {
+        return "status=" + allocation.getStatus() + "; approved=" + allocation.getApprovedQuantity()
+                + "; ready=" + allocation.getReadyQuantity()
+                + "; buffer=" + allocation.getSafetyBufferQuantity()
+                + "; forecast=" + allocation.getForecastQuantity()
+                + "; confidence=" + allocation.getForecastConfidence()
+                + "; expectedReady=" + allocation.getExpectedReadyAt();
     }
 
     @Transactional
@@ -220,6 +238,7 @@ public class AdminInventoryService {
                 );
 
         BigDecimal previousReady = allocation.getReadyQuantity();
+        String beforePlan = planSnapshot(allocation);
 
         if (
                 request.status() == InventoryAllocationStatus.READY
@@ -266,6 +285,12 @@ public class AdminInventoryService {
         allocation.setNote(normalize(request.note()));
 
         InventoryDailyAllocation saved = allocationRepository.save(allocation);
+        jdbc.update("""
+                INSERT INTO inventory_allocation_plan_audit
+                    (allocation_id, branch_product_id, service_date, performed_by, before_state, after_state)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, saved.getId(), branchProductId, serviceDate, performedBy,
+                beforePlan, planSnapshot(saved));
 
         BigDecimal delta = readyQuantity.subtract(previousReady);
         if (delta.compareTo(BigDecimal.ZERO) != 0) {
