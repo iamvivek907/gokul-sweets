@@ -22,7 +22,9 @@ class RuntimeConfigurationTest {
                 .filter(key -> key.startsWith("gokul.features."))
                 .filter(key -> !key.endsWith("future-ordering-days"))
                 .filter(key -> !key.endsWith("branch-experience"))
+                .filter(key -> !key.endsWith("notification-inbox"))
                 .toList();
+        assertThat(properties.getProperty("gokul.features.notification-inbox")).endsWith(":false}");
         assertThat(enabledFeatures).hasSizeGreaterThan(30);
         for (var feature : enabledFeatures) {
             assertThat(properties.getProperty(feature)).endsWith(":true}");

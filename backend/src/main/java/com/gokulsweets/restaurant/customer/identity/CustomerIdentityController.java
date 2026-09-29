@@ -51,6 +51,7 @@ public class CustomerIdentityController {
     private final ConsentLedger consents;
     private final CustomerPrivacyRequests privacyRequests;
     private final CustomerAccountHub accountHub;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
 
     /** Called before opening the widget. Source and device limits are shared across instances. */
     @PostMapping("/start")
@@ -256,6 +257,45 @@ public class CustomerIdentityController {
         requireTrustedMutation(request);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(privacyRequests.submit(environment, requiredSubject(request, environment), kind));
+    }
+
+    @GetMapping("/notifications")
+    public ResponseEntity<com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.Page> notifications(
+            @RequestParam(required = false) Long before, HttpServletRequest request) {
+        var environment = notificationEnvironment();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(notifications.page(environment.name(), requiredSubject(request, environment), before));
+    }
+
+    @PutMapping("/notifications/{id}/read")
+    public ResponseEntity<Void> readNotification(@PathVariable long id, HttpServletRequest request) {
+        var environment = notificationEnvironment();
+        requireTrustedMutation(request);
+        notifications.markRead(environment.name(), requiredSubject(request, environment), id);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    @GetMapping("/notification-preferences")
+    public ResponseEntity<com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.Preferences> notificationPreferences(HttpServletRequest request) {
+        var environment = notificationEnvironment();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(notifications.preferences(environment.name(), requiredSubject(request, environment)));
+    }
+
+    @PutMapping("/notification-preferences")
+    public ResponseEntity<com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.Preferences> saveNotificationPreferences(
+            @RequestBody com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.PreferenceInput input,
+            HttpServletRequest request) {
+        var environment = notificationEnvironment();
+        requireTrustedMutation(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(notifications.savePreferences(environment.name(), requiredSubject(request, environment), input));
+    }
+
+    private ConsentEnvironment notificationEnvironment() {
+        var environment = enabledEnvironment();
+        if (!notifications.enabled()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return environment;
     }
 
     private ConsentEnvironment consentEnvironment() {

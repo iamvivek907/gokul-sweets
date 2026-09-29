@@ -60,6 +60,12 @@ export default function OccasionsPage() {
     const [message, setMessage] = useState("");
 
     useEffect(() => {
+        const hash = window.location.hash.slice(1);
+        if (hash.startsWith("occasion-") && history.length)
+            document.getElementById(hash)?.scrollIntoView({block: "start"});
+    }, [history]);
+
+    useEffect(() => {
         if (!branch || !features?.occasionEnquiries) return;
         const controller = new AbortController();
         getMenu(branch.id, controller.signal).then(categories => {
@@ -228,7 +234,7 @@ export default function OccasionsPage() {
                 </>}
                 {message && <p role="status" className="mt-5 rounded-xl bg-[#fff0dc] p-4">{message}</p>}
                 {session.authenticated && historyPhone === (session.phone ?? "") && <section className="mt-10"><h2 className="font-serif text-3xl">Your requests</h2>
-                    {history.map(enquiry => <article key={enquiry.id} className="mt-4 rounded-2xl border bg-white p-5">
+                    {history.map(enquiry => <article id={`occasion-${enquiry.id}`} key={enquiry.id} className="scroll-mt-28 mt-4 rounded-2xl border bg-white p-5">
                         <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{{REQUESTED: "Under branch review", QUOTED: "Quote ready — deposit due", PAYMENT_PENDING: "Deposit payment in progress", HELD: "Deposit payment in progress", PAID: "Deposit received — balance due", CONFIRMED: "Pickup confirmed", EXPIRED: "Quote or payment window expired", DECLINED: "Request declined", CANCELLED: "Cancelled — finance review pending"}[enquiry.status] ?? "Contact the branch"}</span></div>
                         <p className="mt-2">{enquiry.nextStep}</p>
                         {enquiry.quotedAmount != null && <p className="mt-2">Quoted: ₹{enquiry.quotedAmount} · Requested deposit: ₹{enquiry.depositAmount} · Paid: ₹{enquiry.paidAmount}</p>}

@@ -1,5 +1,6 @@
 "use client";
 
+import CustomerNotificationInbox from "@/components/customer/CustomerNotificationInbox";
 import {useCallback, useEffect, useRef, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
@@ -25,7 +26,7 @@ type Account = {paidOrders: number; favouriteProductIds: number[]; addresses: Ad
     preferences: {dietaryNotes: string | null; preferredBranchId: number | null}};
 type Preview = {orderNumber: string; items: Array<{product: MenuProduct; quantity: number; weightGrams: number | null}>;
     changed: string[]; unavailable: string[]; stock: CartSwitchPreview; cartSnapshot: string; date: string};
-type AccountSection = "badges" | "orders" | "favourites" | "addresses" | "preferences" | "details";
+type AccountSection = "badges" | "orders" | "favourites" | "addresses" | "preferences" | "details" | "notifications";
 
 export default function CustomerAccountHub({session, onSessionChange}: {session: CustomerSession | null;
     onSessionChange: (session: CustomerSession) => void}) {
@@ -56,7 +57,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
         const fromHash = () => {
             const selected = ({"#account-milestones": "badges", "#account-orders": "orders",
                 "#account-favourites": "favourites", "#account-addresses": "addresses",
-                "#account-preferences": "preferences", "#account-details": "details"} as Record<string, AccountSection>)[window.location.hash];
+                "#account-preferences": "preferences", "#account-details": "details", "#account-notifications": "notifications"} as Record<string, AccountSection>)[window.location.hash];
             if (selected) setActiveSection(selected);
         };
         fromHash();
@@ -229,9 +230,11 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                     ['addresses', 'My addresses'], ['preferences', 'Preferences'], ['details', 'Profile details']] as const)
                     .map(([section, label]) => <button key={section} type="button" aria-pressed={activeSection === section}
                         onClick={() => showSection(section)}>{label}</button>)}
+                {features?.notificationInbox && <button type="button" aria-pressed={activeSection === "notifications"} onClick={() => showSection("notifications")}>Notification inbox</button>}
                 <Link href="/profile/privacy">Privacy and data</Link>
             </nav>
             <div id="account-content" className="account-panels min-w-0 scroll-mt-28 space-y-6" aria-live="polite">
+                {activeSection === "notifications" && features?.notificationInbox && <CustomerNotificationInbox key={session.phone} />}
                 {activeSection === "badges" && <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#c88a20]">Gokul journey</p>

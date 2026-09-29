@@ -29,7 +29,7 @@ class AdminDeliveryPreparationWorkflowTest {
     private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch = mock(com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService.class);
     private final com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService bulkReadiness = mock(com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService.class);
     private final AdminOrderWorkflowService workflow = new AdminOrderWorkflowService(
-            orders, queries, staff, kots, eligibility, dispatch, bulkReadiness);
+            orders, queries, staff, kots, eligibility, dispatch, bulkReadiness, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
     private Order order;
 
     @BeforeEach

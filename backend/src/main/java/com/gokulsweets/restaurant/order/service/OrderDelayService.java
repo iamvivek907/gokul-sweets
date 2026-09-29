@@ -28,6 +28,7 @@ public class OrderDelayService {
     private final OrderRepository orders;
     private final StaffAuthorizationService authorization;
     private final AdminOrderQueryService queries;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
 
     @Transactional
     public AdminOrderDetailResponse report(String orderNumber, UpdateOrderDelayRequest request) {
@@ -63,6 +64,7 @@ public class OrderDelayService {
             order.setDelayReason(reason);
             order.setDelayReportedAt(now);
             orders.saveAndFlush(order);
+            notifications.delayChanged(order.getId());
         }
         return queries.getOrder(orderNumber);
     }

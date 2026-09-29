@@ -48,6 +48,7 @@ public class PaymentStatusService {
             orderInventoryReservationService;
     private final PaymentReconciliationPolicy reconciliationPolicy;
     private final DeliveryRiderHoldService deliveryRiderHolds;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
 
     // =========================================================
     // MARK PAID
@@ -359,6 +360,10 @@ public class PaymentStatusService {
                         order
                 );
 
+        orderRepository.flush();
+        paymentRepository.flush();
+        notifications.paymentChanged(paymentId);
+
         log.info(
                 "Payment marked paid, order confirmed and rebate redemption processed: paymentId={}, orderId={}",
                 paymentId,
@@ -472,6 +477,9 @@ public class PaymentStatusService {
         paymentRepository.save(
                 refundablePayment
         );
+
+        paymentRepository.flush();
+        notifications.paymentChanged(refundablePayment.getId());
 
         log.error(
                 "Late provider success moved to automatic refund workflow: paymentId={}, orderId={}, orderNumber={}, previousLocalStatus={}, refundReferenceId={}",
@@ -682,6 +690,9 @@ public class PaymentStatusService {
         paymentRepository.save(
                 payment
         );
+
+        paymentRepository.flush();
+        notifications.paymentChanged(paymentId);
 
         log.info(
                 "Payment refund completed: paymentId={}, orderId={}, providerRefundId={}",

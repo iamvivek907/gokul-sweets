@@ -39,6 +39,21 @@ jobs:
           NEXT_PUBLIC_API_URL: https://api-ci.example.invalid
           NEXT_PUBLIC_API_BASE_URL: https://api-ci.example.invalid
 
+      - name: Install inbox browser regression runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.56.1
+          npx playwright install --with-deps chromium
+      - name: Customer inbox desktop/mobile browser regression
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3311 > /tmp/gokul-inbox-next.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:3311/profile > /dev/null; then break; fi
+            sleep 1
+          done
+          node tests/customer-notification-inbox.browser.mjs
+
   backend:
     runs-on: ubuntu-latest
     services:

@@ -35,7 +35,7 @@ class PaymentStatusLateSuccessTest {
         var holds = mock(OrderInventoryReservationService.class);
         var service = new PaymentStatusService(repository, mock(OrderRepository.class), slots,
                 mock(RebateRedemptionService.class), commitments, holds,
-                new PaymentReconciliationPolicy(new EnhancementProperties()), mock(DeliveryRiderHoldService.class));
+                new PaymentReconciliationPolicy(new EnhancementProperties()), mock(DeliveryRiderHoldService.class), mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
         var order = new Order();
         order.setOrderStatus(OrderStatus.CANCELLED);
         Payment queued = payment(order, PaymentStatus.REFUND_PENDING);
@@ -57,7 +57,7 @@ class PaymentStatusLateSuccessTest {
         var features = new EnhancementProperties();
         features.setPaymentReconciliationV2(true);
         var service = new PaymentStatusService(repository, orders, slots, redemptions,
-                commitments, holds, new PaymentReconciliationPolicy(features), mock(DeliveryRiderHoldService.class));
+                commitments, holds, new PaymentReconciliationPolicy(features), mock(DeliveryRiderHoldService.class), mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
 
         var order = new Order();
         order.setId(11L);
@@ -98,7 +98,7 @@ class PaymentStatusLateSuccessTest {
         when(riders.commit("server-issued-hold")).thenReturn(true);
         var service = new PaymentStatusService(payments, orders, slots,
                 mock(RebateRedemptionService.class), inventory, mock(OrderInventoryReservationService.class),
-                new PaymentReconciliationPolicy(new EnhancementProperties()), riders);
+                new PaymentReconciliationPolicy(new EnhancementProperties()), riders, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
         var order = new Order();
         order.setId(12L);
         order.setOrderNumber("GKS-DELIVERY");
@@ -132,7 +132,7 @@ class PaymentStatusLateSuccessTest {
         when(riders.release("server-issued-hold")).thenReturn(true);
         var service = new PaymentStatusService(payments, mock(OrderRepository.class), pickup,
                 mock(RebateRedemptionService.class), mock(OrderInventoryCommitmentService.class), inventory,
-                new PaymentReconciliationPolicy(new EnhancementProperties()), riders);
+                new PaymentReconciliationPolicy(new EnhancementProperties()), riders, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
 
         service.markFailed(26L, "Provider declined");
 
@@ -155,7 +155,7 @@ class PaymentStatusLateSuccessTest {
         when(payments.findById(27L)).thenReturn(Optional.of(payment(order, PaymentStatus.PAID)));
         var service = new PaymentStatusService(payments, mock(OrderRepository.class), pickup,
                 mock(RebateRedemptionService.class), mock(OrderInventoryCommitmentService.class), inventory,
-                new PaymentReconciliationPolicy(new EnhancementProperties()), riders);
+                new PaymentReconciliationPolicy(new EnhancementProperties()), riders, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
 
         service.markFailed(27L, "Late provider failure");
 

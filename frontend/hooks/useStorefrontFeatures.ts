@@ -32,6 +32,7 @@ export interface StorefrontFeatures {
     deliveryAddressBoundaries: boolean;
     deliveryCheckout: boolean;
     customerAccountHub: boolean;
+    notificationInbox: boolean;
     futureOrderingDays: number;
     today: string;
 }

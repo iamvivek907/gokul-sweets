@@ -28,7 +28,7 @@ class OrderDelayServiceTest {
     private final OrderRepository orders = mock(OrderRepository.class);
     private final StaffAuthorizationService authorization = mock(StaffAuthorizationService.class);
     private final AdminOrderQueryService queries = mock(AdminOrderQueryService.class);
-    private final OrderDelayService service = new OrderDelayService(features, clock, orders, authorization, queries);
+    private final OrderDelayService service = new OrderDelayService(features, clock, orders, authorization, queries, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
     private final LocalDateTime now = LocalDateTime.of(2026, 9, 26, 10, 0);
     private final Order order = new Order();
 

@@ -1,0 +1,68 @@
+import assert from "node:assert/strict";
+import {createRequire} from "node:module";
+const require = createRequire(import.meta.url);
+const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
+const browser = await chromium.launch({headless: true});
+const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
+const page = await context.newPage();
+let enabled = true, authenticated = true, failLoad = false, failRead = false, read = false, reads = 0;
+const message = {id: 42, eventKey: "payment:1:PAID", kind: "PAYMENT_PAID", targetType: "ORDER", targetId: "GKS-EXACT-42",
+    title: "Payment received", message: "Your payment was verified. Open this order for its current fulfilment status.",
+    createdAt: "2026-09-29T18:35:00Z", deliveryState: "AVAILABLE"};
+try {
+    await page.route("**/api/**", async route => {
+        const path = new URL(route.request().url()).pathname;
+        let json = [];
+        if (path === "/api/storefront/features") json = {customerAccountHub: true, customerHomeV2: true, notificationInbox: enabled, futuristicStorefrontV2: true};
+        else if (path === "/api/storefront/customer-identity") json = {enabled: true};
+        else if (path === "/api/customer/identity/me") json = {authenticated, phone: "+919876543210", name: "Test customer"};
+        else if (path === "/api/customer/identity/account") json = {paidOrders: 0, favouriteProductIds: [], addresses: [], preferences: {dietaryNotes: null, preferredBranchId: null}};
+        else if (path === "/api/customer/identity/notifications") {
+            if (failLoad) return route.abort("failed");
+            json = {messages: [{...message, readAt: read ? "2026-09-29T18:40:00Z" : null},
+                {...message, id: 43, title: "Occasion deposit received", targetType: "OCCASION", targetId: "request-43", readAt: "2026-09-29T18:40:00Z"}], unreadCount: read ? 0 : 1, nextBefore: null};
+        } else if (path === "/api/customer/identity/notification-preferences") json = {offerInboxEnabled: false, marketingConsentGranted: false};
+        else if (path.endsWith("/notifications/42/read")) {
+            if (failRead) return route.abort("failed");
+            reads++; read = true; return route.fulfill({status: 204});
+        }
+        return route.fulfill({json});
+    });
+    const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
+    await page.goto(`${base}/profile`);
+    await page.getByRole("button", {name: "Notification inbox", exact: true}).click();
+    await page.getByRole("heading", {name: "Payment received"}).waitFor();
+    assert.equal(await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).getAttribute("href"), "/orders/GKS-EXACT-42");
+    assert.equal(await page.getByRole("link", {name: "Open occasion request"}).getAttribute("href"), "/occasions#occasion-request-43");
+    assert.match(await page.locator("time").first().textContent(), /30 Sept|30 Sep/);
+    assert.match(await page.locator("time").first().textContent(), /12:05.*am.*IST/i);
+    assert.equal(await page.getByRole("checkbox").isDisabled(), true);
+    failRead = true;
+    await page.getByRole("button", {name: "Mark as read"}).click();
+    await page.getByRole("alert").filter({hasText: "could not confirm"}).waitFor();
+    assert.equal(reads, 0);
+    assert.equal(await page.getByRole("button", {name: "Mark as read"}).count(), 1);
+    failRead = false;
+    await page.getByRole("button", {name: "Mark as read"}).click();
+    await page.getByRole("heading", {name: /Notification inbox.*0 unread/}).waitFor();
+    assert.equal(reads, 1);
+    assert.equal(await page.getByRole("button", {name: "Mark as read"}).count(), 0);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await page.setViewportSize({width: 1440, height: 1000});
+    failLoad = true;
+    await page.getByRole("button", {name: "Refresh inbox"}).click();
+    await page.getByRole("alert").filter({hasText: "could not confirm"}).waitFor();
+    assert.equal(await page.getByRole("heading", {name: "Payment received"}).count(), 1);
+    failLoad = false;
+    enabled = false;
+    await page.evaluate(() => sessionStorage.clear());
+    await page.reload();
+    await page.getByRole("button", {name: "Order history", exact: true}).waitFor();
+    assert.equal(await page.getByRole("button", {name: "Notification inbox", exact: true}).count(), 0);
+    enabled = true; authenticated = false;
+    await page.evaluate(() => sessionStorage.clear());
+    await page.reload();
+    await page.getByRole("heading", {name: "All your Gokul moments, together."}).waitFor();
+    assert.equal(await page.getByRole("heading", {name: "Payment received"}).count(), 0);
+    console.log("PASS: exact links, IST, read acknowledgement, offline recovery, consent, mobile layout, flag-OFF and guest isolation.");
+} finally {await browser.close();}
