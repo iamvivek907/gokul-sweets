@@ -194,3 +194,7 @@ pending verification in Jira before declaring this story done.
    historical repair. Reconcile mixed origin rows individually.
 5. After rollout, remove the temporary toggles when the migration and customer
    timestamp contract are stable.
+
+## SCRUM-105 branch experience
+
+`GOKUL_FEATURES_BRANCH_EXPERIENCE=false` by default. Owner: branch operations. Dependencies: V79, R2 public storage, approved branch artwork, `BRANCH_MANAGE` scoped staff. OFF keeps existing branch cards and About link. ON displays only published branch covers/copy and a branch-specific details route; pickup eligibility remains backed by branch pickup settings. Drafts never reach public responses. See `docs/design/SCRUM-105-branch-experience.md` for QA and rollback.

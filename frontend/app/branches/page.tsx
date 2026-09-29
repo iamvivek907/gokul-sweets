@@ -8,6 +8,7 @@ export default function BranchesPage() {
     const features = useStorefrontFeatures();
     return <AppShell editorial showSocialPopup={false}>
         <EditorialArrival branchesOnly campaignsEnabled={features?.homepageCampaigns === true}
+            branchExperience={features?.branchExperience === true}
             accessible={features?.accessibleOrderingV2 === true} />
     </AppShell>;
 }

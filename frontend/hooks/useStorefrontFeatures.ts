@@ -12,6 +12,7 @@ export interface StorefrontFeatures {
     preHomeIntentGateway: boolean;
     contextualStorefrontV2: boolean;
     controlledCampaignPublishing: boolean;
+    branchExperience: boolean;
     accessibleOrderingV2: boolean;
     checkoutExperienceV2: boolean;
     futuristicStorefrontV2: boolean;

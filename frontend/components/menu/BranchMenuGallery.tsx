@@ -5,8 +5,10 @@ import Link from "next/link";
 import {useState} from "react";
 import type {Branch} from "@/types/branch";
 import type {MenuProduct} from "@/types/menu";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 export default function BranchMenuGallery({branch, products}: {branch: Branch; products: MenuProduct[]}) {
+    const branchExperience = useStorefrontFeatures()?.branchExperience === true;
     const [failed, setFailed] = useState<string[]>([]);
     const photos = products.filter(product => product.available && product.imageUrl && !failed.includes(product.imageUrl))
         .filter((product, index, list) => list.findIndex(candidate => candidate.imageUrl === product.imageUrl) === index).slice(0, 3);
@@ -26,6 +28,6 @@ export default function BranchMenuGallery({branch, products}: {branch: Branch; p
                 <span>{product.name}</span>
             </div>)}
         </div> : <div className="gokul-gallery-fallback" role="img" aria-label="Gokul Sweets brand banner"><strong>Freshly made.<br />Ready for you.</strong></div>}
-        <nav className="gokul-branch-tabs" aria-label="Branch pages"><a href="#gokul-menu-items" aria-current="page">Menu</a><Link href="/about#our-branches">Branch details</Link></nav>
+        <nav className="gokul-branch-tabs" aria-label="Branch pages"><a href="#gokul-menu-items" aria-current="page">Menu</a><Link href={branchExperience ? `/branches/${branch.id}` : "/about#our-branches"}>Branch details</Link></nav>
     </div>;
 }

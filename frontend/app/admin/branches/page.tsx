@@ -22,6 +22,7 @@ import {
     BranchOperationalSettings
 } from "@/components/admin/BranchOperationalSettings";
 import {DeliveryZonesSettings} from "@/components/admin/DeliveryZonesSettings";
+import BranchExperienceEditor from "@/components/admin/BranchExperienceEditor";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
@@ -252,7 +253,8 @@ function formatDateTime(
 
 export default function AdminBranchesPage() {
 
-    const deliveryZonesEnabled = useStorefrontFeatures()?.deliveryZones === true;
+    const features = useStorefrontFeatures();
+    const deliveryZonesEnabled = features?.deliveryZones === true;
 
     const {
         profile,
@@ -2211,6 +2213,18 @@ export default function AdminBranchesPage() {
                             &&
                             authorization
                             && (<>
+                                <BranchExperienceEditor key={`experience-${selectedBranch.id}`}
+                                    branch={selectedBranch} authorization={authorization}
+                                    allowed={hasPermission("MENU_MANAGE")} />
+                                <section className="m-5 rounded-2xl border border-[#eadfd6] bg-[#fffaf3] p-5" aria-label="Branch services">
+                                    <h3 className="text-lg font-bold">Services at this branch</h3>
+                                    <p className="mt-2 text-sm">Public branch artwork: {features === null ? "checking deployment configuration"
+                                        : features.branchExperience ? "published content is visible"
+                                            : "deployment flag is OFF; drafts and publications are hidden from customers"}.</p>
+                                    <p className="mt-2 text-sm">Pickup availability is managed in the operational settings below and checked against live slots. Table, occasion and banquet booking are not available to publish until their booking systems are implemented.</p>
+                                    <p className="mt-2 text-sm">Homepage campaign media is managed separately in <a className="font-semibold underline" href="/admin/homepage-campaigns">Storefront campaigns</a>.</p>
+                                    <p className="mt-2 text-sm">Customer-facing service labels show only supported, enabled services. Future booking settings will appear here when the service can accept bookings.</p>
+                                </section>
                                 <BranchOperationalSettings
                                     key={
                                         selectedBranch.id

@@ -17,4 +17,9 @@ export interface Branch {
     closingTime: string | null;
 
     active: boolean;
+    coverImageUrl?: string | null;
+    mobileCoverImageUrl?: string | null;
+    coverAltText?: string | null;
+    description?: string | null;
+    pickupAvailable?: boolean;
 }
