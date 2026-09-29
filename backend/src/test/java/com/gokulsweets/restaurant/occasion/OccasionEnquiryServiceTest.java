@@ -79,4 +79,19 @@ class OccasionEnquiryServiceTest {
                 .isInstanceOf(ResponseStatusException.class);
         verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
+
+    @Test
+    void limitsVerifiedCustomerToThreeRequestsPerDayBeforeWriting() {
+        features.setOccasionEnquiries(true);
+        when(phones.verifiedPhone(ConsentEnvironment.DEV, subject)).thenReturn(Optional.of("+919876543210"));
+        when(jdbc.queryForObject(contains("count(*) FROM occasion_enquiries"), eq(Integer.class),
+                eq("DEV"), eq(subject), any())).thenReturn(3);
+
+        assertThatThrownBy(() -> service.submit(ConsentEnvironment.DEV, subject,
+                request(LocalDate.of(2026, 10, 1), OccasionEnquiryService.Fulfilment.PICKUP, null, BigDecimal.ONE)))
+                .isInstanceOf(ResponseStatusException.class)
+                .satisfies(error -> org.assertj.core.api.Assertions.assertThat(((ResponseStatusException) error)
+                        .getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS));
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
 }

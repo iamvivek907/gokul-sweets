@@ -13,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.*;
@@ -62,6 +65,22 @@ public class OccasionEnquiryService {
                 || i.unit() == Unit.PIECE && i.quantity().stripTrailingZeros().scale() > 0)
                 || input.items().stream().map(Item::productId).distinct().count() != input.items().size())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose distinct products and valid quantities.");
+        // Serialize submissions for this verified subject so concurrent tabs cannot evade the limit.
+        jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 0))", subject.toString());
+        String requestHash = requestHash(input);
+        List<UUID> duplicate = jdbc.query("""
+                SELECT id FROM occasion_enquiries WHERE environment = ? AND subject_id = ?
+                  AND request_hash = ? AND created_at >= ? ORDER BY created_at DESC LIMIT 1
+                """, (rs, row) -> (UUID) rs.getObject(1), environment.name(), subject, requestHash,
+                Timestamp.from(clock.instant().minus(Duration.ofMinutes(15))));
+        if (!duplicate.isEmpty()) return get(environment, subject, duplicate.getFirst());
+        Integer recent = jdbc.queryForObject("""
+                SELECT count(*) FROM occasion_enquiries WHERE environment = ? AND subject_id = ?
+                  AND created_at >= ?
+                """, Integer.class, environment.name(), subject, Timestamp.from(clock.instant().minus(Duration.ofDays(1))));
+        if (recent != null && recent >= 3)
+            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                    "You have sent three enquiries in the last 24 hours. Please contact the branch for changes.");
         if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM branches WHERE id = ? AND active)",
                 Boolean.class, input.branchId()))) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Branch is unavailable.");
         for (Item item : input.items()) {
@@ -79,11 +98,11 @@ public class OccasionEnquiryService {
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO occasion_enquiries (id, environment, subject_id, branch_id, occasion_type,
-                    service_date, guest_count, fulfilment, delivery_address, notes, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REQUESTED')
+                    service_date, guest_count, fulfilment, delivery_address, notes, request_hash, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'REQUESTED')
                 """, id, environment.name(), subject, input.branchId(), input.occasionType().trim(),
                 Date.valueOf(input.serviceDate()), input.guestCount(), input.fulfilment().name(),
-                input.fulfilment() == Fulfilment.PICKUP ? null : input.deliveryAddress().trim(), input.notes());
+                input.fulfilment() == Fulfilment.PICKUP ? null : input.deliveryAddress().trim(), input.notes(), requestHash);
         for (Item item : input.items()) jdbc.update("""
                 INSERT INTO occasion_enquiry_items (enquiry_id, product_id, requested_quantity, unit)
                 VALUES (?, ?, ?, ?)
@@ -162,6 +181,34 @@ public class OccasionEnquiryService {
     private void event(UUID id, String actor, String before, String after, String detail) {
         jdbc.update("INSERT INTO occasion_enquiry_events (enquiry_id, actor, from_status, to_status, detail) VALUES (?, ?, ?, ?, ?)",
                 id, actor, before, after, detail);
+    }
+
+    private static String requestHash(Request input) {
+        StringBuilder canonical = new StringBuilder();
+        appendField(canonical, Long.toString(input.branchId()));
+        appendField(canonical, input.occasionType().trim());
+        appendField(canonical, input.serviceDate().toString());
+        appendField(canonical, Integer.toString(input.guestCount()));
+        appendField(canonical, input.fulfilment().name());
+        appendField(canonical, input.deliveryAddress() == null ? "" : input.deliveryAddress().trim());
+        appendField(canonical, input.notes() == null ? "" : input.notes().trim());
+        input.items().stream().sorted(Comparator.comparingLong(Item::productId))
+                .forEach(item -> {
+                    appendField(canonical, Long.toString(item.productId()));
+                    appendField(canonical, item.quantity().stripTrailingZeros().toPlainString());
+                    appendField(canonical, item.unit().name());
+                });
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(canonical.toString().getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException unavailable) {
+            throw new IllegalStateException("SHA-256 is unavailable.", unavailable);
+        }
+    }
+
+    private static void appendField(StringBuilder canonical, String value) {
+        canonical.append(value.length()).append(':').append(value);
     }
 
     private Summary map(java.sql.ResultSet rs) throws java.sql.SQLException {

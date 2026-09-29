@@ -172,6 +172,18 @@ function subscribeToDate():
 }
 
 
+function getOccasionDate(): string | null {
+    const date = new URLSearchParams(window.location.search).get("occasionDate");
+    return date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T00:00:00Z`))
+        ? date : null;
+}
+
+
+function getServerOccasionDate(): string | null {
+    return null;
+}
+
+
 function getMaximumPickupDate(
     fromDate: string,
     numberOfDays: number
@@ -426,6 +438,9 @@ function LegacyPickupPage({
             null
         );
 
+    // A requested occasion date is a preference only; checkout still validates live capacity.
+    const occasionDate = useSyncExternalStore(subscribeToDate, getOccasionDate, getServerOccasionDate);
+
 
     const [
         loadedCurrentReservation,
@@ -498,6 +513,7 @@ function LegacyPickupPage({
     const pickupDate =
         clampDateWithinBounds(
             selectedDate
+            ?? (pendingOrderNumber ? null : occasionDate)
             ?? today,
             today,
             maximumDate
