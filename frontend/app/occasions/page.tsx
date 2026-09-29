@@ -2,6 +2,7 @@
 
 import {useEffect, useState} from "react";
 import Link from "next/link";
+import {useRouter} from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
@@ -9,19 +10,37 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {getMenu} from "@/services/menuApi";
 import {apiClient, ApiError} from "@/services/apiClient";
 import type {MenuProduct} from "@/types/menu";
+import {useCart} from "@/hooks/useCart";
+import {saveCart} from "@/lib/cartStorage";
 
 type Item = {productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
     status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
     quoteTerms: string | null; quoteExpiresAt: string | null; nextStep: string; items: Item[]};
 
+function nextBusinessDate(today: string): string {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return today;
+    const date = new Date(`${today}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + 1);
+    return date.toISOString().slice(0, 10);
+}
+
+function lastOnlineDate(today: string, days: number): string {
+    const date = new Date(`${today}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+}
+
 export default function OccasionsPage() {
+    const router = useRouter();
+    const cart = useCart();
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [products, setProducts] = useState<MenuProduct[]>([]);
     const [items, setItems] = useState<Record<number, number>>({});
     const [history, setHistory] = useState<Enquiry[]>([]);
+    const [historyPhone, setHistoryPhone] = useState("");
     const [type, setType] = useState("Family celebration");
     const [date, setDate] = useState("");
     const [guests, setGuests] = useState(20);
@@ -43,15 +62,18 @@ export default function OccasionsPage() {
     useEffect(() => {
         if (!session.authenticated || !features?.occasionEnquiries) return;
         let cancelled = false;
-        apiClient<Enquiry[]>("/api/occasion-enquiries", {credentials: "include"})
-            .then(list => {if (!cancelled) setHistory(list);})
-            .catch(() => {if (!cancelled) setMessage("We couldn't load your enquiries. Please retry.");});
-        return () => {cancelled = true;};
-    }, [session.authenticated, features?.occasionEnquiries]);
+        const load = () => {void apiClient<Enquiry[]>("/api/occasion-enquiries", {credentials: "include"})
+            .then(list => {if (!cancelled) {setHistory(list); setHistoryPhone(session.phone ?? "");}})
+            .catch(() => {if (!cancelled) setMessage("We couldn't load your enquiries. Please retry.");});};
+        load();
+        const timer = window.setInterval(load, 60_000);
+        return () => {cancelled = true; window.clearInterval(timer);};
+    }, [session.authenticated, session.phone, features?.occasionEnquiries]);
 
     async function submit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!branch || busy) return;
+        if (!date || date <= (features?.today ?? "")) {setMessage("Choose a future service date in India."); return;}
         const chosen = products.filter(product => Number(items[product.id]) > 0).map(product => ({
             productId: product.id, quantity: Number(items[product.id]), unit: product.saleMode === "WEIGHT" ? "GRAM" : "PIECE"
         }));
@@ -62,13 +84,40 @@ export default function OccasionsPage() {
                 body: JSON.stringify({branchId: branch.id, occasionType: type, serviceDate: date, guestCount: guests,
                     fulfilment: mode, deliveryAddress: mode === "DELIVERY_REQUEST" ? address : null, notes, items: chosen})});
             setHistory(current => [result, ...current]);
+            setHistoryPhone(session.phone ?? "");
             setMessage("Request sent. The branch will review it before sharing a quote. No booking or payment has been made.");
             setItems({});
         } catch (error) {
             setMessage(error instanceof ApiError && error.status === 401 ? "Please verify your phone, then try again."
+                : error instanceof ApiError && error.status === 429 ? "You have sent three enquiries in the last 24 hours. Please contact the branch for changes."
                 : error instanceof ApiError && error.status === 400 ? error.message
                 : "The request could not be sent. Your entries are still here; please retry.");
         } finally {setBusy(false);}
+    }
+
+    function startOnlinePickup() {
+        if (!branch || busy) return;
+        if (!date || date <= (features?.today ?? "")) {setMessage("Choose a future service date in India first."); return;}
+        if (features && date > lastOnlineDate(features.today, features.futureOrderingDays)) {
+            setMessage("Online pickup is not open this far ahead. Send a reviewed enquiry to discuss the date with the branch."); return;
+        }
+        if (mode !== "PICKUP") {setMessage("Online checkout currently supports branch pickup. Ask the team about delivery instead."); return;}
+        const chosen = products.filter(product => Number(items[product.id]) > 0);
+        if (!chosen.length || chosen.length > 30) {setMessage("Choose 1 to 30 menu products first."); return;}
+        if (chosen.some(product => {
+            const quantity = Number(items[product.id]);
+            return !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 100000
+                || product.saleMode === "WEIGHT" && (quantity < (product.minimumWeightGrams ?? 250)
+                    || quantity % (product.weightStepGrams ?? 50) !== 0);
+        })) {setMessage("Check the quantities: pieces must be whole numbers, and weights must follow the product's minimum and step."); return;}
+        if (cart.items.length && !window.confirm("Replace your current cart with these occasion items? Your existing cart will be removed.")) return;
+        try {
+            saveCart({branchId: branch.id, items: chosen.map(product => ({
+                product, quantity: product.saleMode === "WEIGHT" ? 1 : Number(items[product.id]),
+                weightGrams: product.saleMode === "WEIGHT" ? Number(items[product.id]) : null
+            }))});
+            router.push(`/checkout/pickup?occasionDate=${encodeURIComponent(date)}`);
+        } catch {setMessage("Your cart could not be saved on this device. Check available storage and retry.");}
     }
 
     return <AppShell editorial showSocialPopup={false}>
@@ -86,7 +135,7 @@ export default function OccasionsPage() {
                         <p className="font-semibold">This is an enquiry. A quote is not a booking or stock reservation.</p>
                         <label className="block">Occasion <input required maxLength={80} value={type} onChange={event => setType(event.target.value)} className="mt-2 w-full rounded-xl border p-3" /></label>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <label>Date in India <input type="date" required min={features.today} value={date} onChange={event => setDate(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
+                            <label>Date in India <input type="date" required min={nextBusinessDate(features.today)} value={date} onChange={event => setDate(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
                             <label>Guests <input type="number" required min={1} max={10000} value={guests} onChange={event => setGuests(Number(event.target.value))} className="mt-2 block w-full rounded-xl border p-3" /></label>
                         </div>
                         <label className="block">How should food be collected?
@@ -103,11 +152,16 @@ export default function OccasionsPage() {
                                     className="w-24 rounded-lg border p-2" /></label>)}</div>
                         </fieldset>
                         <label className="block">Anything else? <textarea maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
-                        <button disabled={busy || !products.length} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
+                        <div className="flex flex-wrap gap-3">
+                            <button disabled={busy || !products.length} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
+                            {mode === "PICKUP" && <button type="button" disabled={busy || !products.length} onClick={startOnlinePickup}
+                                className="min-h-12 rounded-full border border-[#173a37] px-6 font-bold disabled:opacity-50">Continue to online pickup</button>}
+                        </div>
+                        <p className="text-sm text-[#4e605c]">Online pickup uses live menu prices and full payment. We carry your requested date to checkout, where you must choose an available time; capacity and stock are checked there. A manager quote follows a separate review and cannot be paid here.</p>
                     </form>}
                 </>}
                 {message && <p role="status" className="mt-5 rounded-xl bg-[#fff0dc] p-4">{message}</p>}
-                {session.authenticated && <section className="mt-10"><h2 className="font-serif text-3xl">Your requests</h2>
+                {session.authenticated && historyPhone === (session.phone ?? "") && <section className="mt-10"><h2 className="font-serif text-3xl">Your requests</h2>
                     {history.map(enquiry => <article key={enquiry.id} className="mt-4 rounded-2xl border bg-white p-5">
                         <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{enquiry.status}</span></div>
                         <p className="mt-2">{enquiry.nextStep}</p>
