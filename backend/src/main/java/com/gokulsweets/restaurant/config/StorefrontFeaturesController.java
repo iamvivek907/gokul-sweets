@@ -22,6 +22,7 @@ public class StorefrontFeaturesController {
                 properties.isContextualStorefrontV2(), properties.isControlledCampaignPublishing(),
                 properties.isBranchExperience(),
                 properties.isOccasionEnquiries() && properties.isCustomerOtpIdentity(),
+                properties.isOccasionEnquiries() && properties.isOccasionPayments() && properties.isCustomerOtpIdentity(),
                 properties.isAccessibleOrderingV2(), properties.isFuturisticStorefrontV2(),
                 properties.isCheckoutExperienceV2() && properties.isSmartAvailability()
                         && properties.isSmartPickupSelection() && properties.isAuthoritativePickupCommitment()
@@ -54,6 +55,7 @@ public class StorefrontFeaturesController {
                            boolean inventoryAutomationV2, boolean customerHomeV2,
                            boolean homepageCampaigns, boolean preHomeIntentGateway, boolean contextualStorefrontV2,
                            boolean controlledCampaignPublishing, boolean branchExperience, boolean occasionEnquiries,
+                           boolean occasionPayments,
                            boolean accessibleOrderingV2,
                            boolean futuristicStorefrontV2, boolean checkoutExperienceV2, boolean persistentPickupContext, boolean cartSwitchPreview,
                            boolean inPlaceBranchSwitch,

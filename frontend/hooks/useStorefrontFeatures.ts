@@ -14,6 +14,7 @@ export interface StorefrontFeatures {
     controlledCampaignPublishing: boolean;
     branchExperience: boolean;
     occasionEnquiries: boolean;
+    occasionPayments: boolean;
     accessibleOrderingV2: boolean;
     checkoutExperienceV2: boolean;
     futuristicStorefrontV2: boolean;

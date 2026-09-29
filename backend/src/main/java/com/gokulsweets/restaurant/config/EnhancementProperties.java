@@ -31,6 +31,8 @@ public class EnhancementProperties {
     private boolean plannedPickupProduction;
     /** SCRUM-35: reviewed occasion food enquiries; OFF until staff and customer QA. */
     private boolean occasionEnquiries;
+    /** SCRUM-35: PhonePe deposit and balance settlement, independently OFF until DEV provider QA. */
+    private boolean occasionPayments;
     /** SCRUM-28: accessible dialogs, mobile actions, motion and network recovery. */
     private boolean accessibleOrderingV2;
     /** Customer-facing site and navigation visual direction; never affects staff or admin pages. */

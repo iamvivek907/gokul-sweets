@@ -28,6 +28,19 @@ class OccasionEnquiryServiceTest {
     private final VerifiedCustomerPhoneLookup phones = mock(VerifiedCustomerPhoneLookup.class);
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-29T06:00:00Z"), ZoneOffset.UTC);
     private OccasionEnquiryService service;
+
+    @Test
+    void quoteRequiresPositiveDepositAndBalanceDeadlineBeforeAnyDatabaseWrite() {
+        features.setOccasionEnquiries(true);
+        var expires = clock.instant().plusSeconds(3600);
+        assertThatThrownBy(() -> service.quote(ConsentEnvironment.DEV, 1, UUID.randomUUID(), "manager",
+                new OccasionEnquiryService.Quote(new BigDecimal("1000.00"), BigDecimal.ZERO,
+                        expires, null, "Pickup"))).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> service.quote(ConsentEnvironment.DEV, 1, UUID.randomUUID(), "manager",
+                new OccasionEnquiryService.Quote(new BigDecimal("1000.00"), new BigDecimal("200.00"),
+                        expires, null, "Pickup"))).isInstanceOf(ResponseStatusException.class);
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
     private final UUID subject = UUID.randomUUID();
 
     @BeforeEach

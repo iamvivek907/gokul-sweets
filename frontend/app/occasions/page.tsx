@@ -12,11 +12,15 @@ import {apiClient, ApiError} from "@/services/apiClient";
 import type {MenuProduct} from "@/types/menu";
 import {useCart} from "@/hooks/useCart";
 import {saveCart} from "@/lib/cartStorage";
+import {getPickupSlots} from "@/services/pickupApi";
+import type {PickupSlot} from "@/types/pickup";
 
 type Item = {productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
     status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
-    quoteTerms: string | null; quoteExpiresAt: string | null; nextStep: string; items: Item[]};
+    quoteTerms: string | null; quoteExpiresAt: string | null; balanceDueAt: string | null;
+    nextStep: string; fulfilment: string; items: Item[]};
+type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
 
 function nextBusinessDate(today: string): string {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return today;
@@ -41,6 +45,9 @@ export default function OccasionsPage() {
     const [items, setItems] = useState<Record<number, number>>({});
     const [history, setHistory] = useState<Enquiry[]>([]);
     const [historyPhone, setHistoryPhone] = useState("");
+    const [slots, setSlots] = useState<Record<string, PickupSlot[]>>({});
+    const [selectedSlots, setSelectedSlots] = useState<Record<string, number>>({});
+    const [attempts, setAttempts] = useState<Record<string, Checkout>>({});
     const [type, setType] = useState("Family celebration");
     const [date, setDate] = useState("");
     const [guests, setGuests] = useState(20);
@@ -69,6 +76,63 @@ export default function OccasionsPage() {
         const timer = window.setInterval(load, 60_000);
         return () => {cancelled = true; window.clearInterval(timer);};
     }, [session.authenticated, session.phone, features?.occasionEnquiries]);
+
+    useEffect(() => {
+        if (!session.authenticated || !features?.occasionPayments) return;
+        const query = new URLSearchParams(window.location.search);
+        const enquiry = query.get("enquiry");
+        const attempt = query.get("payment");
+        if (!enquiry || !attempt || !/^[0-9a-f-]{36}$/i.test(enquiry) || !/^[0-9a-f-]{36}$/i.test(attempt)) return;
+        let cancelled = false;
+        const check = () => {void apiClient<Checkout>(`/api/occasion-enquiries/${enquiry}/payments/${attempt}`,
+            {credentials: "include"}).then(result => {
+            if (cancelled) return;
+            setAttempts(current => ({...current, [enquiry]: result}));
+            if (result.status !== "PENDING") {
+                void apiClient<Enquiry[]>("/api/occasion-enquiries", {credentials: "include"})
+                    .then(list => {if (!cancelled) setHistory(list);});
+            }
+        }).catch(() => {if (!cancelled) setMessage("Payment status is not available yet. Please retry from this page; do not pay again.");});};
+        check();
+        const timer = window.setInterval(check, 5000);
+        return () => {cancelled = true; window.clearInterval(timer);};
+    }, [session.authenticated, features?.occasionPayments]);
+
+    async function loadSlots(enquiry: Enquiry) {
+        setBusy(true); setMessage("");
+        try {
+            const available = await getPickupSlots(enquiry.branchId, enquiry.serviceDate);
+            setSlots(current => ({...current, [enquiry.id]: available.filter(slot => slot.active && slot.remainingCapacity > 0)}));
+        } catch {setMessage("Pickup times could not be loaded. Please retry.");}
+        finally {setBusy(false);}
+    }
+
+    async function pay(enquiry: Enquiry, stage: "deposit" | "balance") {
+        if (busy || stage === "deposit" && !selectedSlots[enquiry.id]) return;
+        setBusy(true); setMessage("");
+        try {
+            const result = await apiClient<Checkout>(`/api/occasion-enquiries/${enquiry.id}/${stage}`,
+                {method: "POST", credentials: "include", body: JSON.stringify(stage === "deposit"
+                    ? {pickupSlotId: selectedSlots[enquiry.id]} : {})});
+            setAttempts(current => ({...current, [enquiry.id]: result}));
+            if (result.paymentUrl) window.location.assign(result.paymentUrl);
+            else setMessage("Checkout is being prepared. Refresh this page to check its status before retrying.");
+        } catch (error) {
+            setMessage(error instanceof ApiError ? error.message : "Payment could not start. Check the request status before retrying.");
+        } finally {setBusy(false);}
+    }
+
+    async function checkPayment(enquiry: Enquiry) {
+        setBusy(true); setMessage("");
+        try {
+            const result = await apiClient<Checkout>(`/api/occasion-enquiries/${enquiry.id}/payments/latest`,
+                {credentials: "include"});
+            setAttempts(current => ({...current, [enquiry.id]: result}));
+            const list = await apiClient<Enquiry[]>("/api/occasion-enquiries", {credentials: "include"});
+            setHistory(list);
+        } catch {setMessage("Payment status is unavailable. Please wait and check again; do not start another payment.");}
+        finally {setBusy(false);}
+    }
 
     async function submit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -157,7 +221,7 @@ export default function OccasionsPage() {
                             {mode === "PICKUP" && <button type="button" disabled={busy || !products.length} onClick={startOnlinePickup}
                                 className="min-h-12 rounded-full border border-[#173a37] px-6 font-bold disabled:opacity-50">Continue to online pickup</button>}
                         </div>
-                        <p className="text-sm text-[#4e605c]">Online pickup uses live menu prices and full payment. We carry your requested date to checkout, where you must choose an available time; capacity and stock are checked there. A manager quote follows a separate review and cannot be paid here.</p>
+                        <p className="text-sm text-[#4e605c]">Online pickup uses live menu prices and full payment. We carry your requested date to checkout, where you must choose an available time. Manager quotes require branch review and, when enabled, a separate deposit and balance.</p>
                     </form>}
                 </>}
                 {message && <p role="status" className="mt-5 rounded-xl bg-[#fff0dc] p-4">{message}</p>}
@@ -167,6 +231,29 @@ export default function OccasionsPage() {
                         <p className="mt-2">{enquiry.nextStep}</p>
                         {enquiry.quotedAmount != null && <p className="mt-2">Quoted: ₹{enquiry.quotedAmount} · Requested deposit: ₹{enquiry.depositAmount} · Paid: ₹{enquiry.paidAmount}</p>}
                         {enquiry.quoteTerms && <p className="mt-2">{enquiry.quoteTerms}</p>}
+                        {enquiry.balanceDueAt && <p className="mt-2">Balance due {new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.</p>}
+                        {features.occasionPayments && enquiry.status === "QUOTED" && enquiry.fulfilment === "PICKUP" && <div className="mt-4 space-y-3">
+                            <button type="button" disabled={busy} onClick={() => void loadSlots(enquiry)} className="min-h-11 rounded-full border border-[#173a37] px-5">Choose a live pickup time</button>
+                            {slots[enquiry.id] && <label className="block">Pickup time (IST)
+                                <select className="mt-2 block w-full max-w-sm rounded-xl border p-3" value={selectedSlots[enquiry.id] ?? ""}
+                                    onChange={event => setSelectedSlots(current => ({...current, [enquiry.id]: Number(event.target.value)}))}>
+                                    <option value="">Choose time</option>{slots[enquiry.id].map(slot => <option key={slot.id} value={slot.id}>{slot.startTime}–{slot.endTime}</option>)}
+                                </select></label>}
+                            {slots[enquiry.id] && slots[enquiry.id].length === 0 && <p>No pickup capacity remains on this date. Contact the branch for a new quote.</p>}
+                            <button type="button" disabled={busy || !selectedSlots[enquiry.id]} onClick={() => void pay(enquiry, "deposit")}
+                                className="min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay deposit ₹{enquiry.depositAmount}</button>
+                        </div>}
+                        {features.occasionPayments && enquiry.status === "PAID" && enquiry.quotedAmount != null
+                            && enquiry.quotedAmount > enquiry.paidAmount && <button type="button" disabled={busy}
+                            onClick={() => void pay(enquiry, "balance")}
+                            className="mt-4 min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay balance ₹{(enquiry.quotedAmount - enquiry.paidAmount).toFixed(2)}</button>}
+                        {features.occasionPayments && ["PAYMENT_PENDING", "HELD", "PAID", "CONFIRMED", "EXPIRED"].includes(enquiry.status)
+                            && <button type="button" disabled={busy} onClick={() => void checkPayment(enquiry)}
+                            className="mt-4 ml-2 min-h-11 rounded-full border border-[#173a37] px-5 disabled:opacity-50">Check latest payment</button>}
+                        {attempts[enquiry.id] && <p role="status" className="mt-3 rounded-xl bg-[#fff0dc] p-3">{attempts[enquiry.id].status === "REFUND_PENDING"
+                            ? "A late payment needs branch refund review. Please do not pay again; contact the branch."
+                            : `Payment ${attempts[enquiry.id].status.toLowerCase()}.`} {attempts[enquiry.id].status === "PENDING" && attempts[enquiry.id].paymentUrl
+                            && <a className="underline" href={attempts[enquiry.id].paymentUrl ?? undefined}>Resume secure checkout</a>}</p>}
                     </article>)}
                 </section>}
             </>}
