@@ -144,6 +144,7 @@ export interface CustomerOrderResponse {
 export interface CustomerOrderSummaryResponse {
     orderNumber: string;
     orderStatus: OrderStatus;
+    branchId: number;
     branchName: string;
     estimatedReadyAt?: string | null;
     delayReportedAt?: string | null;
