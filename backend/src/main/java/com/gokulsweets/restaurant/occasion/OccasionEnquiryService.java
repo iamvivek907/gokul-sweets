@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -43,13 +44,19 @@ public class OccasionEnquiryService {
     public record Quote(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
                         @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal deposit,
                         @NotNull Instant expiresAt, Instant balanceDueAt,
-                        @NotBlank @Size(max = 500) String terms) {}
+                        @NotBlank @Size(max = 500) String terms,
+                        @NotEmpty List<@Valid QuoteLine> lines) {}
+    public record QuoteLine(@Positive long productId,
+                            @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal grossAmount) {}
+    public record PricedLine(long productId, String productName, BigDecimal grossAmount,
+                             BigDecimal subtotal, BigDecimal taxAmount, BigDecimal cgstRate,
+                             BigDecimal sgstRate, String hsnSacCode) {}
     public record Summary(UUID id, long branchId, String occasionType, LocalDate serviceDate, int guestCount,
                           Fulfilment fulfilment, String status, BigDecimal quotedAmount,
                           BigDecimal depositAmount, BigDecimal paidAmount, String quoteTerms, Instant quoteExpiresAt,
                           Instant createdAt, String nextStep, String customerPhone, String deliveryAddress,
                           String notes, Instant balanceDueAt, Instant holdExpiresAt,
-                          Long pickupSlotId, List<Item> items) {}
+                          Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber) {}
 
     @Transactional
     public Summary submit(ConsentEnvironment environment, UUID subject, Request input) {
@@ -158,6 +165,42 @@ public class OccasionEnquiryService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only an open request can be quoted.");
         if ("QUOTED".equals(before) && expired(environment, branchId, id))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This quote expired; ask for a new enquiry.");
+        if (quote.lines() == null || quote.lines().isEmpty() || quote.lines().size() > 30
+                || quote.lines().stream().anyMatch(line -> line == null || line.grossAmount() == null
+                    || line.grossAmount().signum() <= 0 || line.grossAmount().scale() > 2)
+                || quote.lines().stream().map(QuoteLine::productId).distinct().count() != quote.lines().size()
+                || quote.lines().stream().map(QuoteLine::grossAmount).reduce(BigDecimal.ZERO, BigDecimal::add)
+                    .compareTo(quote.amount()) != 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Item prices must add up to the quote amount.");
+        Integer requestedCount = jdbc.queryForObject("SELECT count(*) FROM occasion_enquiry_items WHERE enquiry_id = ?",
+                Integer.class, id);
+        if (requestedCount == null || requestedCount != quote.lines().size())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price every requested product exactly once.");
+        jdbc.update("DELETE FROM occasion_quote_lines WHERE enquiry_id = ?", id);
+        for (QuoteLine line : quote.lines()) {
+            var tax = jdbc.query("""
+                    SELECT tc.cgst_rate, tc.sgst_rate, tc.hsn_sac_code,
+                           p.name, p.sale_mode, i.requested_quantity
+                    FROM occasion_enquiry_items i JOIN products p ON p.id = i.product_id
+                    JOIN tax_categories tc ON tc.id = p.tax_category_id AND tc.active
+                    WHERE i.enquiry_id = ? AND i.product_id = ?
+                    """, rs -> rs.next() ? new Object[]{rs.getBigDecimal(1), rs.getBigDecimal(2),
+                            rs.getString(3), rs.getString(4), rs.getString(5), rs.getBigDecimal(6)} : null,
+                    id, line.productId());
+            if (tax == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "A product has no active tax category. Configure it before quoting.");
+            BigDecimal rate = ((BigDecimal) tax[0]).add((BigDecimal) tax[1]);
+            BigDecimal subtotal = line.grossAmount().divide(BigDecimal.ONE.add(rate.movePointLeft(2)),
+                    2, RoundingMode.HALF_UP);
+            jdbc.update("""
+                    INSERT INTO occasion_quote_lines(enquiry_id, product_id, product_name, sale_mode,
+                        quantity, weight_grams, gross_amount, subtotal, tax_amount,
+                        cgst_rate, sgst_rate, hsn_sac_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, id, line.productId(), tax[3], tax[4],
+                    "WEIGHT".equals(tax[4]) ? 1 : ((BigDecimal) tax[5]).intValueExact(),
+                    "WEIGHT".equals(tax[4]) ? ((BigDecimal) tax[5]).intValueExact() : null,
+                    line.grossAmount(), subtotal, line.grossAmount().subtract(subtotal), tax[0], tax[1], tax[2]);
+        }
         jdbc.update("""
                 UPDATE occasion_enquiries SET status = 'QUOTED', quoted_amount = ?, deposit_amount = ?,
                     quote_terms = ?, quote_expires_at = ?, balance_due_at = ?,
@@ -261,7 +304,18 @@ public class OccasionEnquiryService {
                         """,
                         (items, row) -> new Item(items.getLong(1), items.getBigDecimal(2),
                                 Unit.valueOf(items.getString(3)), items.getString(4)),
-                        (UUID) rs.getObject("id")));
+                        (UUID) rs.getObject("id")),
+                jdbc.query("""
+                        SELECT q.product_id, p.name, q.gross_amount, q.subtotal, q.tax_amount,
+                               q.cgst_rate, q.sgst_rate, q.hsn_sac_code
+                        FROM occasion_quote_lines q JOIN products p ON p.id = q.product_id
+                        WHERE q.enquiry_id = ? ORDER BY p.name
+                        """, (lines, row) -> new PricedLine(lines.getLong(1), lines.getString(2),
+                        lines.getBigDecimal(3), lines.getBigDecimal(4), lines.getBigDecimal(5),
+                        lines.getBigDecimal(6), lines.getBigDecimal(7), lines.getString(8)),
+                        (UUID) rs.getObject("id")),
+                rs.getObject("order_id") == null ? null : jdbc.queryForObject(
+                        "SELECT order_number FROM orders WHERE id = ?", String.class, rs.getLong("order_id")));
     }
 
     private static <T> T throwNotFound() { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }

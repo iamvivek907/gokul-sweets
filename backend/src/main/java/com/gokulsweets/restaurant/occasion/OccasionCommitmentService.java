@@ -39,6 +39,7 @@ public class OccasionCommitmentService {
     private final EnhancementProperties features;
     private final PhonePeClient phonePe;
     private final PhonePeProperties phonePeProperties;
+    private final OccasionOrderFinalizer orders;
     private final Clock clock;
 
     public record Checkout(UUID attemptId, String stage, String status, BigDecimal amount,
@@ -71,6 +72,14 @@ public class OccasionCommitmentService {
             if (enquiry.deposit() == null || enquiry.deposit().signum() <= 0
                     || enquiry.quote() == null || enquiry.deposit().compareTo(enquiry.quote()) > 0)
                 throw conflict("The branch must issue a payable quote with a valid deposit.");
+            BigDecimal priced = jdbc.queryForObject("SELECT COALESCE(sum(gross_amount), 0) FROM occasion_quote_lines WHERE enquiry_id = ?",
+                    BigDecimal.class, id);
+            Integer pricedCount = jdbc.queryForObject("SELECT count(*) FROM occasion_quote_lines WHERE enquiry_id = ?",
+                    Integer.class, id);
+            Integer itemCount = jdbc.queryForObject("SELECT count(*) FROM occasion_enquiry_items WHERE enquiry_id = ?",
+                    Integer.class, id);
+            if (priced == null || priced.compareTo(enquiry.quote()) != 0 || !Objects.equals(pricedCount, itemCount))
+                throw conflict("This quote needs item prices and tax reviewed by the branch before payment.");
             if (inventoryProperties.getTemporaryHoldMinutes() < 12 || !inventoryProperties.isEnforcementEnabled())
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                         "Occasion inventory holds are not configured.");
@@ -276,6 +285,9 @@ public class OccasionCommitmentService {
             for (HeldItem item : heldItems(id)) inventory.confirmHold(item.key());
             BigDecimal paid = enquiry.paid().add(attempt.amount());
             boolean fullyPaid = paid.compareTo(enquiry.quote()) == 0;
+            markAttemptPaid(attempt, providerTransactionId);
+            if (fullyPaid) orders.create(id, enquiry.environment(), enquiry.subject(), enquiry.branchId(),
+                    enquiry.slotId(), enquiry.quote());
             jdbc.update("""
                     UPDATE occasion_enquiries SET status = ?, paid_amount = ?, hold_expires_at = NULL,
                         confirmed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
@@ -286,16 +298,22 @@ public class OccasionCommitmentService {
             BigDecimal paid = enquiry.paid().add(attempt.amount());
             if (!"PAID".equals(enquiry.status()) || paid.compareTo(enquiry.quote()) != 0)
                 throw conflict("Balance does not match the approved quote.");
+            markAttemptPaid(attempt, providerTransactionId);
+            orders.create(id, enquiry.environment(), enquiry.subject(), enquiry.branchId(),
+                    enquiry.slotId(), enquiry.quote());
             jdbc.update("""
                     UPDATE occasion_enquiries SET status = 'CONFIRMED', paid_amount = ?,
                         confirmed_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
                     """, paid, Timestamp.from(clock.instant()), id);
             event(id, "provider", "PAID", "CONFIRMED", "Balance verified");
         }
+    }
+
+    private void markAttemptPaid(Attempt attempt, String providerTransactionId) {
         jdbc.update("""
                 UPDATE occasion_payment_attempts SET status = 'PAID', provider_transaction_id = ?,
-                    updated_at = CURRENT_TIMESTAMP WHERE id = ?
-                """, providerTransactionId, attempt.id());
+                    paid_at = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?
+                """, providerTransactionId, Timestamp.from(clock.instant()), attempt.id());
     }
 
     private void refundPending(String merchantOrderId) {

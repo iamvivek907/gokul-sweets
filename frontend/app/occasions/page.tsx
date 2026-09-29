@@ -19,7 +19,9 @@ type Item = {productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
     status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
     quoteTerms: string | null; quoteExpiresAt: string | null; balanceDueAt: string | null;
-    nextStep: string; fulfilment: string; items: Item[]};
+    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null;
+    pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number;
+        taxAmount: number; cgstRate: number; sgstRate: number}[]};
 type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
 
 function nextBusinessDate(today: string): string {
@@ -230,6 +232,11 @@ export default function OccasionsPage() {
                         <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{enquiry.status}</span></div>
                         <p className="mt-2">{enquiry.nextStep}</p>
                         {enquiry.quotedAmount != null && <p className="mt-2">Quoted: ₹{enquiry.quotedAmount} · Requested deposit: ₹{enquiry.depositAmount} · Paid: ₹{enquiry.paidAmount}</p>}
+                        {enquiry.pricedLines?.length > 0 && <div className="mt-3 rounded-xl border border-[#d9e5df] p-3 text-sm">
+                            <p className="font-semibold">Approved quote details</p>
+                            {enquiry.pricedLines.map(line => <p key={line.productId} className="mt-1">{line.productName}: ₹{line.grossAmount} (base ₹{line.subtotal}, tax ₹{line.taxAmount}; {line.cgstRate}% CGST + {line.sgstRate}% SGST)</p>)}
+                        </div>}
+                        {enquiry.orderNumber && <p className="mt-2">Confirmed order <Link href={`/orders/${encodeURIComponent(enquiry.orderNumber)}`} className="underline">{enquiry.orderNumber}</Link></p>}
                         {enquiry.quoteTerms && <p className="mt-2">{enquiry.quoteTerms}</p>}
                         {enquiry.balanceDueAt && <p className="mt-2">Balance due {new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.</p>}
                         {features.occasionPayments && enquiry.status === "QUOTED" && enquiry.fulfilment === "PICKUP" && <div className="mt-4 space-y-3">
