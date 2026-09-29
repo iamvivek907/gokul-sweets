@@ -1,0 +1,9 @@
+# SCRUM-33 — approved future pickup
+
+The existing checkout already supports dated pickup slots. The branch's advance window, each product's booking horizon and preparation lead time, daily inventory allocation, safety buffer, holds/commitments and pickup slot capacity determine whether a date is orderable. The final order transaction locks allocations and reserves inventory; an availability preview is not a reservation.
+
+V80 adds an append-only audit row for every staff allocation approval and readiness adjustment, including changes with no quantity delta. It records the actor, branch product, service date and the prior and resulting plan state in the same transaction. The inventory ledger remains responsible for nonzero stock movements.
+
+`GOKUL_FEATURES_PLANNED_PICKUP_PRODUCTION` defaults OFF. When enabled, a future pickup date is labelled “Approved for future preparation” only when the whole cart has available pickup capacity and each line has an approved or ready dated `DAILY_PRODUCTION` allocation. Forecast or draft quantities cannot earn that label. The flag only changes this customer explanation; inventory enforcement, plan approval, lead time and locked reservation remain authoritative regardless of its value. This does not introduce installment payment or delivery promises.
+
+QA: configure two products with different lead times, approve future dated quantities below forecast, and confirm only dates and slots fitting the entire cart can be selected. Verify a draft/closed plan, buffer, held and committed quantities, slot exhaustion, India midnight cutoff, a staff adjustment with unchanged approved quantity, parallel order attempts and flag OFF. Inspect `inventory_allocation_plan_audit` for actor and before/after state. Deploy backend V80 before frontend; enable the flag only after DEV staff and checkout QA. No live DEV QA is claimed by this document.

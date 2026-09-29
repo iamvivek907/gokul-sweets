@@ -162,6 +162,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                             className={`min-h-16 min-w-28 rounded-xl border px-3 py-2 text-sm ${date === day.date ? "border-[#7a1625] bg-[#fff1e9]" : "border-[#eadfd6] bg-white"}`}>
                             <span className="block font-bold">{dateLabel(day.date)}</span>
                             <span className={day.available ? "text-green-800" : "text-[#756763]"}>{day.available ? "Times available" : "No matching time"}</span>
+                            {day.plannedProduction && <span className="mt-1 block text-xs text-[#59706a]">Approved for future preparation</span>}
                         </button>)}</div>
                     </section>
                     <section aria-label="Pickup times">
