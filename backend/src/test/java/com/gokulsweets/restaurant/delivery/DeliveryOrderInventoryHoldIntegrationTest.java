@@ -9,6 +9,7 @@ import com.gokulsweets.restaurant.inventory.entity.InventoryDailyAllocation;
 import com.gokulsweets.restaurant.inventory.entity.InventoryReservation;
 import com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus;
 import com.gokulsweets.restaurant.inventory.enums.InventoryControlMode;
+import com.gokulsweets.restaurant.inventory.enums.InventoryReservationStatus;
 import com.gokulsweets.restaurant.inventory.enums.InventoryUnit;
 import com.gokulsweets.restaurant.inventory.model.InventoryAvailability;
 import com.gokulsweets.restaurant.inventory.repository.BranchInventoryPolicyRepository;
@@ -97,6 +98,8 @@ class DeliveryOrderInventoryHoldIntegrationTest {
         allocation.setServiceDate(deliveryDate);
         allocation.setInventoryUnit(InventoryUnit.PIECE);
         allocation.setExpectedReadyAt(deliveryDate.atTime(10, 30));
+        allocation.setStatus(InventoryAllocationStatus.APPROVED);
+        allocation.setApprovedQuantity(BigDecimal.TEN);
         var policy = new BranchInventoryPolicy();
         policy.setOnlineEnabled(true);
         policy.setControlMode(InventoryControlMode.DAILY_PRODUCTION);
@@ -138,6 +141,45 @@ class DeliveryOrderInventoryHoldIntegrationTest {
         service.synchronizePendingDeliveryOrder(order, validated);
         assertThat(allocation.getHeldQuantity()).isEqualByComparingTo(BigDecimal.ONE);
         verify(allocations).findForUpdate(13L, deliveryDate);
+
+        var held = new InventoryReservation();
+        held.setAllocation(allocation);
+        held.setOrderNumber(order.getOrderNumber());
+        held.setStatus(InventoryReservationStatus.TEMPORARY_HOLD);
+        held.setQuantity(BigDecimal.ONE);
+        held.setExpiresAt(order.getReservationExpiresAt());
+        when(reservations.findByOrderNumberForUpdate(order.getOrderNumber())).thenReturn(List.of(held));
+
+        // No spare stock is needed when a valid hold already owns the last unit.
+        allocation.setApprovedQuantity(BigDecimal.ONE);
+        service.synchronizePendingDeliveryOrder(order, validated);
+        assertThat(allocation.getHeldQuantity()).isEqualByComparingTo(BigDecimal.ONE);
+        for (var status : List.of(InventoryAllocationStatus.DRAFT, InventoryAllocationStatus.DELAYED,
+                InventoryAllocationStatus.UNAVAILABLE, InventoryAllocationStatus.CLOSED)) {
+            allocation.setStatus(status);
+            assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
+                    .hasMessageContaining("Approved production is not ready");
+        }
+        allocation.setStatus(InventoryAllocationStatus.APPROVED);
+        allocation.setApprovedQuantity(BigDecimal.ZERO);
+        assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
+                .hasMessageContaining("no longer covers");
+        allocation.setApprovedQuantity(BigDecimal.ONE);
+        allocation.setWastedQuantity(BigDecimal.ONE);
+        assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
+                .hasMessageContaining("no longer covers");
+        allocation.setWastedQuantity(BigDecimal.ZERO);
+        policy.setReadyStockRequired(true);
+        assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
+                .hasMessageContaining("Approved production is not ready");
+        allocation.setStatus(InventoryAllocationStatus.READY);
+        allocation.setReadyQuantity(BigDecimal.ZERO);
+        assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
+                .hasMessageContaining("no longer covers");
+        allocation.setReadyQuantity(BigDecimal.ONE);
+        service.synchronizePendingDeliveryOrder(order, validated);
+        assertThat(allocation.getHeldQuantity()).isEqualByComparingTo(BigDecimal.ONE);
+        assertThat(held.getStatus()).isEqualTo(InventoryReservationStatus.TEMPORARY_HOLD);
 
         order.setDeliveryHoldKey("another-hold");
         assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
