@@ -30,6 +30,9 @@ import java.util.List;
 @Slf4j
 public class AdminInventoryService {
 
+    public record PlanChange(long id, String performedBy, LocalDateTime changedAt,
+                             String beforeState, String afterState) {}
+
     private final BranchProductRepository branchProductRepository;
     private final BranchInventoryPolicyRepository policyRepository;
     private final InventoryDailyAllocationRepository allocationRepository;
@@ -39,6 +42,18 @@ public class AdminInventoryService {
     private final InventoryProperties properties;
     private final Clock inventoryClock;
     private final JdbcTemplate jdbc;
+
+    @Transactional(readOnly = true)
+    public List<PlanChange> getPlanHistory(Long branchProductId, LocalDate serviceDate) {
+        return jdbc.query("""
+                SELECT id, performed_by, changed_at, before_state, after_state
+                FROM inventory_allocation_plan_audit
+                WHERE branch_product_id = ? AND service_date = ?
+                ORDER BY changed_at DESC, id DESC LIMIT 30
+                """, (rs, row) -> new PlanChange(rs.getLong("id"), rs.getString("performed_by"),
+                rs.getTimestamp("changed_at").toLocalDateTime(), rs.getString("before_state"),
+                rs.getString("after_state")), branchProductId, serviceDate);
+    }
 
     @Transactional
     public InventoryPolicyResponse upsertPolicy(

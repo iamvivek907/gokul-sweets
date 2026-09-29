@@ -5,6 +5,8 @@ import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.config.InventoryProperties;
 import com.gokulsweets.restaurant.inventory.entity.BranchInventoryPolicy;
+import com.gokulsweets.restaurant.inventory.entity.InventoryDailyAllocation;
+import com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus;
 import com.gokulsweets.restaurant.inventory.enums.InventoryControlMode;
 import com.gokulsweets.restaurant.inventory.enums.InventoryUnit;
 import com.gokulsweets.restaurant.inventory.repository.BranchInventoryPolicyRepository;
@@ -35,6 +37,91 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.when;
 
 class CartAvailabilityServiceTest {
+
+    @Test
+    void plannedLabelRequiresApprovedDatedCapacityForEveryItemAndDisappearsAtIstMidnight() {
+        ZoneId ist = ZoneId.of("Asia/Kolkata");
+        Clock beforeMidnight = Clock.fixed(Instant.parse("2026-09-29T18:29:00Z"), ist);
+        LocalDate date = LocalDate.of(2026, 9, 30);
+        long branchId = 10L;
+        Branch branch = new Branch(); branch.setId(branchId);
+        EnhancementProperties features = new EnhancementProperties();
+        features.setFutureOrderingDays(7);
+        features.setPlannedPickupProduction(true);
+        InventoryProperties inventory = new InventoryProperties();
+        inventory.setEnforcementEnabled(true);
+        var policies = Mockito.mock(BranchInventoryPolicyRepository.class);
+        var allocations = Mockito.mock(InventoryDailyAllocationRepository.class);
+        var validation = Mockito.mock(OrderValidationService.class);
+        var slotRepository = Mockito.mock(PickupSlotRepository.class);
+        var settings = Mockito.mock(BranchPickupSettingsRepository.class);
+        var first = branchProduct(branch, 101L, 201L, "Laddu");
+        var second = branchProduct(branch, 102L, 202L, "Barfi");
+        var firstPolicy = productionPolicy(first);
+        var secondPolicy = productionPolicy(second);
+        var firstAllocation = approved(first, date, 10);
+        var secondAllocation = approved(second, date, 10);
+        when(validation.validateCart(any(), anyList())).thenReturn(List.of(
+                new ValidatedOrderItem(first.getProduct(), first, ProductSaleMode.UNIT, 2, null),
+                new ValidatedOrderItem(second.getProduct(), second, ProductSaleMode.UNIT, 2, null)));
+        when(policies.findByBranchProductIdIn(anyList())).thenReturn(List.of(firstPolicy, secondPolicy));
+        when(allocations.findByBranchProductIdInAndServiceDateBetween(anyList(), any(), any()))
+                .thenReturn(List.of(firstAllocation, secondAllocation));
+        when(settings.findByBranchId(branchId)).thenReturn(Optional.empty());
+        var slot = slot(branch, date, 1000L, LocalTime.of(12, 0), LocalTime.of(12, 30));
+        when(slotRepository.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(branchId, date, date))
+                .thenReturn(List.of(slot));
+        var request = List.of(new CreateOrderItemRequest(201L, 2, null),
+                new CreateOrderItemRequest(202L, 2, null));
+        var service = new CartAvailabilityService(features, inventory, validation,
+                new SmartOrderingRules(features, settings, beforeMidnight), policies, allocations,
+                new InventoryAvailabilityService(), slotRepository, settings, beforeMidnight);
+        assertThat(service.check(branchId, date, 1, request).dates().getFirst().plannedProduction()).isTrue();
+
+        secondAllocation.setStatus(InventoryAllocationStatus.DRAFT);
+        secondAllocation.setForecastQuantity(BigDecimal.valueOf(1000));
+        assertThat(service.check(branchId, date, 1, request).dates().getFirst().plannedProduction()).isFalse();
+        secondAllocation.setStatus(InventoryAllocationStatus.APPROVED);
+        secondAllocation.setHeldQuantity(BigDecimal.valueOf(9));
+        assertThat(service.check(branchId, date, 1, request).dates().getFirst().plannedProduction()).isFalse();
+        secondAllocation.setHeldQuantity(BigDecimal.ZERO);
+        slot.setBookedCount(slot.getCapacity());
+        slot.setPriorityBookedCount(slot.getPriorityCapacity());
+        assertThat(service.check(branchId, date, 1, request).dates().getFirst().plannedProduction()).isFalse();
+        slot.setBookedCount(0);
+        slot.setPriorityBookedCount(0);
+        features.setPlannedPickupProduction(false);
+        assertThat(service.check(branchId, date, 1, request).dates().getFirst().plannedProduction()).isFalse();
+        features.setPlannedPickupProduction(true);
+        Clock afterMidnight = Clock.fixed(Instant.parse("2026-09-29T18:31:00Z"), ist);
+        var sameDateService = new CartAvailabilityService(features, inventory, validation,
+                new SmartOrderingRules(features, settings, afterMidnight), policies, allocations,
+                new InventoryAvailabilityService(), slotRepository, settings, afterMidnight);
+        assertThat(sameDateService.check(branchId, date, 1, request).dates().getFirst().plannedProduction()).isFalse();
+    }
+
+    private BranchProduct branchProduct(Branch branch, long id, long productId, String name) {
+        var product = new Product(); product.setId(productId); product.setName(name);
+        var branchProduct = new BranchProduct(); branchProduct.setId(id);
+        branchProduct.setBranch(branch); branchProduct.setProduct(product);
+        return branchProduct;
+    }
+
+    private BranchInventoryPolicy productionPolicy(BranchProduct branchProduct) {
+        var policy = new BranchInventoryPolicy(); policy.setBranchProduct(branchProduct);
+        policy.setControlMode(InventoryControlMode.DAILY_PRODUCTION);
+        policy.setInventoryUnit(InventoryUnit.PIECE); policy.setOnlineEnabled(true);
+        policy.setBookingHorizonDays(7); policy.setProductionLeadMinutes(0);
+        return policy;
+    }
+
+    private InventoryDailyAllocation approved(BranchProduct branchProduct, LocalDate date, int quantity) {
+        var allocation = new InventoryDailyAllocation(); allocation.setBranchProduct(branchProduct);
+        allocation.setServiceDate(date); allocation.setInventoryUnit(InventoryUnit.PIECE);
+        allocation.setStatus(InventoryAllocationStatus.APPROVED);
+        allocation.setApprovedQuantity(BigDecimal.valueOf(quantity));
+        return allocation;
+    }
 
     @Test
     void excludesSameDaySlotsBeforePreparationLeadTime() {

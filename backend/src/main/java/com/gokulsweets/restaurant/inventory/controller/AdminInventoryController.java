@@ -85,6 +85,15 @@ public class AdminInventoryController {
         );
     }
 
+    @GetMapping("/allocations/{branchProductId}/{serviceDate}/history")
+    public ResponseEntity<List<AdminInventoryService.PlanChange>> getPlanHistory(
+            @PathVariable Long branchProductId,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate serviceDate
+    ) {
+        authorizeBranchProduct(branchProductId, PermissionName.INVENTORY_VIEW);
+        return ResponseEntity.ok(adminInventoryService.getPlanHistory(branchProductId, serviceDate));
+    }
+
     private void authorizeBranchProduct(
             Long branchProductId,
             PermissionName permission

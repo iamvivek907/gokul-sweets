@@ -14,10 +14,12 @@ import {
 
 import {
     completeBulkInventorySetup,
+    getInventoryPlanHistory,
     getInventoryCatalogue,
     updateBulkInventoryPolicies,
     updateBulkInventoryReadiness
 } from "@/services/adminInventoryApi";
+import type {InventoryPlanChange} from "@/services/adminInventoryApi";
 
 import type {
     InventoryCatalogueFilter,
@@ -165,6 +167,9 @@ export default function AdminInventoryPage() {
     const [editorApproved, setEditorApproved] = useState("");
     const [editorReady, setEditorReady] = useState("");
     const [editorItem, setEditorItem] = useState<InventoryCatalogueItem | null>(null);
+    const [planHistory, setPlanHistory] = useState<InventoryPlanChange[] | null>(null);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [showBulkQuantityPanel, setShowBulkQuantityPanel] = useState(false);
     const [bulkGroupInputs, setBulkGroupInputs] = useState<Record<InventoryUnit, string>>({
         GRAM: "",
@@ -472,6 +477,8 @@ export default function AdminInventoryPage() {
     }
 
     function openItemEditor(item: InventoryCatalogueItem) {
+        setPlanHistory(null);
+        setHistoryError(null);
         setBulkPolicyGroups([]);
         setBulkPolicyGroupIndex(0);
         loadConfiguration([item]);
@@ -480,7 +487,21 @@ export default function AdminInventoryPage() {
     function closeConfiguration() {
         setShowPolicyPanel(false);
         setEditorItem(null);
+        setPlanHistory(null);
         setPolicyTargetItems([]);
+    }
+
+    async function loadPlanHistory(item: InventoryCatalogueItem) {
+        if (!authorization) return;
+        setHistoryLoading(true);
+        setHistoryError(null);
+        try {
+            setPlanHistory(await getInventoryPlanHistory(item.branchProductId, serviceDate, authorization));
+        } catch (cause) {
+            setHistoryError(cause instanceof Error ? cause.message : "Unable to load plan history.");
+        } finally {
+            setHistoryLoading(false);
+        }
     }
 
     function policyFromEditor(): InventoryPolicyRequest | null {
@@ -1091,6 +1112,22 @@ export default function AdminInventoryPage() {
                                             </div>
                                         </div>
                                     )}
+
+                                    {editorItem && <section className="mt-6 rounded-2xl border border-[#eadfd6] p-4" aria-label="Production plan history">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div><h3 className="font-bold text-[#241715]">Plan history</h3><p className="text-xs text-[#756763]">Recent approvals and readiness changes for this product and pickup date.</p></div>
+                                            <button type="button" disabled={historyLoading} onClick={() => void loadPlanHistory(editorItem)} className="min-h-10 rounded-lg border border-[#eadfd6] px-3 text-xs font-bold text-[#7a1625] disabled:opacity-50">{historyLoading ? "Loading…" : planHistory ? "Refresh history" : "View history"}</button>
+                                        </div>
+                                        {historyError && <p role="alert" className="mt-3 text-sm text-red-700">{historyError}</p>}
+                                        {planHistory?.length === 0 && <p className="mt-3 text-sm text-[#756763]">No plan changes recorded for this date.</p>}
+                                        {planHistory && planHistory.length > 0 && <ol className="mt-4 max-h-64 space-y-3 overflow-y-auto text-xs">
+                                            {planHistory.map(change => <li key={change.id} className="rounded-xl bg-[#fffaf3] p-3">
+                                                <p className="font-bold text-[#241715]">{change.performedBy} · {change.changedAt.replace("T", " ")}</p>
+                                                <p className="mt-1 break-words text-[#756763]">Before: {change.beforeState.replaceAll("; ", " · ")}</p>
+                                                <p className="mt-1 break-words text-[#241715]">After: {change.afterState.replaceAll("; ", " · ")}</p>
+                                            </li>)}
+                                        </ol>}
+                                    </section>}
 
                                     {error && <Message tone="error" text={error} />}
                                 </div>
