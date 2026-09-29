@@ -120,10 +120,19 @@ class DeliveryOrderInventoryHoldIntegrationTest {
         allocation.setExpectedReadyAt(deliveryDate.atTime(11, 30));
         assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
                 .hasMessageContaining("Approved production is not ready");
+        verify(allocations).findForUpdate(13L, deliveryDate);
+        verify(reservations, never()).save(any(InventoryReservation.class));
+        assertThat(allocation.getHeldQuantity()).isEqualByComparingTo(BigDecimal.ZERO);
+        clearInvocations(allocations);
+
         allocation.setExpectedReadyAt(deliveryDate.atTime(10, 30));
         flags.setPlannedDeliveryProduction(false);
         assertThatThrownBy(() -> service.synchronizePendingDeliveryOrder(order, validated))
                 .hasMessageContaining("Approved production is not ready");
+        verify(allocations).findForUpdate(13L, deliveryDate);
+        verify(reservations, never()).save(any(InventoryReservation.class));
+        assertThat(allocation.getHeldQuantity()).isEqualByComparingTo(BigDecimal.ZERO);
+        clearInvocations(allocations);
         flags.setPlannedDeliveryProduction(true);
 
         service.synchronizePendingDeliveryOrder(order, validated);
