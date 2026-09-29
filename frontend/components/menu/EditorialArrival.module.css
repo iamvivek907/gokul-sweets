@@ -8,7 +8,7 @@
 .topbar nav{display:flex;align-items:center;gap:1.5rem}.topbar nav a,.topbar nav button{color:#fffaf0;font-size:.82rem;font-weight:700}.topbar nav button{background:transparent;border:0}.topbar nav a:last-child{border:1px solid #fff8e1b8;border-radius:999px;padding:.75rem 1rem}
 .heroCopy{position:relative;z-index:1;max-width:820px;padding:8rem 1.25rem 6rem}.heroCopy>p{font-size:.75rem;font-weight:800;letter-spacing:.22em}.heroCopy h1{font:500 clamp(3.2rem,7vw,6.7rem)/.99 Georgia,serif;letter-spacing:-.055em;margin:1.1rem 0}.heroCopy h1 em{color:#ffd39d;font-weight:400}.heroCopy>span{display:block;max-width:570px;margin:auto;color:#fff0dc;line-height:1.65}
 .actions{display:flex;align-items:center;justify-content:center;gap:1.2rem;margin:1.8rem 0}.actions a{background:#f3bf78;color:#2e241a;border-radius:999px;padding:.95rem 1.4rem;font-weight:800}.actions button{background:transparent;color:#fff9ed;border:0;border-bottom:1px solid #fff9ed;padding:.8rem .2rem;font-weight:700}.heroCopy small{color:#fff0dd}
-.scrollCue{position:absolute;z-index:2;bottom:1.3rem;left:50%;transform:translateX(-50%);display:grid;justify-items:center;gap:.1rem;color:#fff9ed;font-size:.7rem;font-weight:700;letter-spacing:.17em;text-transform:uppercase;white-space:nowrap}.scrollCue span{font-size:1.7rem;line-height:1}
+.scrollCue{position:absolute;z-index:2;bottom:1.3rem;left:50%;transform:translateX(-50%);display:grid;justify-items:center;gap:.1rem;color:#fff9ed;font-size:.7rem;font-weight:700;letter-spacing:.17em;text-transform:uppercase;white-space:nowrap}
 .intro{display:grid;grid-template-columns:.65fr 1.65fr 1fr;gap:2rem;align-items:start;padding:5rem clamp(1.25rem,7vw,7rem);background:#fffaf2;color:#29251f}.intro>span,.sectionHead>span,.closing span{font-size:.7rem;font-weight:800;letter-spacing:.16em;color:#aa5e38}.intro h2,.sectionHead h2,.closing h2{font:500 clamp(2rem,3.8vw,3.5rem)/1.1 Georgia,serif;letter-spacing:-.035em;margin:0}.intro h2 em,.closing h2 em{color:#b9633c;font-weight:400}.intro p,.sectionHead p,.closing p{color:#695d52;font-size:.9rem;line-height:1.7;margin:.2rem 0}
 .branches{background:#f1e8d8;color:#29251f;padding:5rem clamp(1.25rem,7vw,7rem)}.sectionHead{text-align:center;max-width:600px;margin:0 auto 2rem}.sectionHead h2{margin:.65rem 0}
 .branchGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.branchCard{position:relative;display:flex;align-items:end;min-height:340px;overflow:hidden;border-radius:1.25rem;background:linear-gradient(135deg,#7c5337,#303f31);color:#fffaf0}.branchCard:before{content:"";position:absolute;inset:0;background:linear-gradient(0deg,#1d1b16ed,#1d1b1620 75%);z-index:1}.branchPhoto{object-fit:cover}.branchCopy{position:relative;z-index:2;padding:2rem}.branchCopy>span{color:#ffd396;font-size:.7rem;letter-spacing:.16em;font-weight:800}.branchCopy h3{font:2.2rem Georgia,serif;margin:.4rem 0}.branchCopy p{font-size:.85rem}.branchCopy button{color:#ffe0ac;background:transparent;border:0;border-bottom:1px solid #ffe0ac;padding:.5rem 0;font-weight:700}
@@ -30,9 +30,14 @@
 .actions{justify-content:flex-start;gap:.8rem;margin:2rem 0}.actions a{background:#c76752;color:#fff;border-radius:999px;padding:1rem 1.6rem;font-size:.95rem}
 .actions a:last-child{background:transparent;border:1px solid #fff;color:#fff}
 .scrollCue{font-size:.8rem;text-transform:none;letter-spacing:.04em}
-.scrollCue span{display:block;font-size:1.8rem;animation:arrival-arrow 1.8s ease-in-out infinite}
-@keyframes arrival-arrow{0%,100%{transform:translateY(0);opacity:.8}50%{transform:translateY(7px);opacity:1}}
+.scrollCue{gap:.55rem;text-decoration:none;text-shadow:0 2px 9px #092725}
+.scrollCueText{animation:arrival-cue-text 2.4s ease-in-out infinite}
+.scrollCueIcon{display:grid;justify-items:center;width:27px;height:42px;border:2px solid currentColor;border-radius:18px;background:#09272555}
+.scrollCueIcon span{width:4px;height:9px;margin-top:8px;border-radius:3px;background:currentColor;animation:arrival-scroll-dot 2.4s ease-in-out infinite}
+@keyframes arrival-cue-text{0%,100%{opacity:1;transform:translateY(0)}50%{opacity:.72;transform:translateY(-3px)}}
+@keyframes arrival-scroll-dot{0%{opacity:0;transform:translateY(0)}30%{opacity:1}75%{opacity:1;transform:translateY(12px)}100%{opacity:0;transform:translateY(12px)}}
 .branches{background:#fff;color:#172e2c;padding:5rem clamp(1.5rem,5vw,5rem)}
+.backToWelcome{display:inline-flex;align-items:center;min-height:44px;margin:-2.5rem 0 1.5rem;color:#143936;font-weight:700;text-decoration:underline;text-underline-offset:4px}
 .sectionHead{max-width:760px;margin:0 auto 2.8rem}.sectionHead>span{color:#a83232}.sectionHead h2{font-size:clamp(2.5rem,4.5vw,4.2rem);margin:.6rem 0}.sectionHead p{font-size:1rem;color:#4e605c}
 .branchGrid{grid-template-columns:repeat(3,minmax(0,1fr));max-width:1320px;margin:auto;gap:1.25rem}
 .branchCard{min-height:370px;border-radius:1rem;background:#e8f0eb;color:#173a37;box-shadow:0 14px 30px #163d3020}
@@ -57,7 +62,7 @@
 .arrival .orderFood{display:inline-flex;align-items:center;justify-content:center;gap:.7rem;min-height:48px;transition:transform .32s cubic-bezier(.2,1.4,.4,1),box-shadow .32s ease,background-color .25s ease;touch-action:manipulation}
 .arrival .orderFood:hover{transform:translateY(-3px);box-shadow:0 12px 28px #051d1a70;background:#d27661}
 .arrival .orderFood:active{transform:scale(.96);box-shadow:0 3px 10px #051d1a55}
-@media(prefers-reduced-motion:reduce){.arrival .orderFood{transition:none}.arrival .orderFood:hover,.arrival .orderFood:active{transform:none}.scrollCue span{animation:none}}
+@media(prefers-reduced-motion:reduce){.arrival .orderFood{transition:none}.arrival .orderFood:hover,.arrival .orderFood:active{transform:none}.scrollCueText,.scrollCueIcon span{animation:none}}
 @media(max-width:900px){.branchGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.heroCopy{width:78%}}
 @media(max-width:700px){.hero{min-height:100dvh;background-position:64% center}.scrim{background:linear-gradient(0deg,#092725eb,#0d302c9c 77%,#0d302b6b)}.topbar{padding:1.2rem}.logo{font-size:2rem}.topbar nav{gap:0}.topbar nav a:last-child{padding:.65rem;font-size:.75rem}.heroCopy{width:100%;margin:4rem 0 0;padding:7rem 1.4rem 6rem}.heroCopy h1{font-size:clamp(3.2rem,12vw,5rem)}.heroCopy>span{font-size:1rem}.actions{flex-direction:row;flex-wrap:wrap}.actions a{padding:.85rem 1.15rem}.branchGrid{grid-template-columns:1fr}.branchCard{min-height:310px}.branches{padding:3.5rem 1.2rem}}
 @media(max-width:700px){.branchGrid:has(.branchCard:nth-child(2):last-child){grid-template-columns:1fr}}
