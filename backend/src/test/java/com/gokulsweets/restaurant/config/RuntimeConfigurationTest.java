@@ -26,6 +26,7 @@ class RuntimeConfigurationTest {
                 .filter(key -> !key.endsWith("planned-delivery-production"))
                 .filter(key -> !key.endsWith("occasion-enquiries"))
                 .filter(key -> !key.endsWith("occasion-payments"))
+                .filter(key -> !key.endsWith("occasion-bulk-production"))
                 .toList();
         assertThat(enabledFeatures).hasSizeGreaterThan(30);
         for (var feature : enabledFeatures) {
@@ -37,6 +38,7 @@ class RuntimeConfigurationTest {
         assertThat(properties.getProperty("gokul.features.planned-delivery-production")).endsWith(":false}");
         assertThat(properties.getProperty("gokul.features.occasion-enquiries")).endsWith(":false}");
         assertThat(properties.getProperty("gokul.features.occasion-payments")).endsWith(":false}");
+        assertThat(properties.getProperty("gokul.features.occasion-bulk-production")).endsWith(":false}");
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("inventory.automation.scheduler-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("gokul.identity.provider-abuse-controls-verified")).endsWith(":false}");

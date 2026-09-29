@@ -45,7 +45,12 @@ public class OccasionEnquiryService {
                         @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal deposit,
                         @NotNull Instant expiresAt, Instant balanceDueAt,
                         @NotBlank @Size(max = 500) String terms,
-                        @NotEmpty List<@Valid QuoteLine> lines) {}
+                        @NotEmpty List<@Valid QuoteLine> lines, LocalDateTime expectedReadyAt) {
+        public Quote(BigDecimal amount, BigDecimal deposit, Instant expiresAt, Instant balanceDueAt,
+                     String terms, List<QuoteLine> lines) {
+            this(amount, deposit, expiresAt, balanceDueAt, terms, lines, null);
+        }
+    }
     public record QuoteLine(@Positive long productId,
                             @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal grossAmount) {}
     public record PricedLine(long productId, String productName, BigDecimal grossAmount,
@@ -57,7 +62,8 @@ public class OccasionEnquiryService {
                           Instant createdAt, String nextStep, String customerPhone, String deliveryAddress,
                           String notes, Instant balanceDueAt, Instant holdExpiresAt,
                           Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber,
-                          boolean balancePaymentOpen) {}
+                          boolean balancePaymentOpen, List<ProductionLine> productionPlan) {}
+    public record ProductionLine(long productId, BigDecimal quantity, String unit, LocalDateTime expectedReadyAt, String state) {}
 
     @Transactional
     public Summary submit(ConsentEnvironment environment, UUID subject, Request input) {
@@ -208,6 +214,22 @@ public class OccasionEnquiryService {
                     updated_at = CURRENT_TIMESTAMP WHERE id = ?
                 """, quote.amount(), quote.deposit(), quote.terms().trim(), Timestamp.from(quote.expiresAt()),
                 quote.balanceDueAt() == null ? null : Timestamp.from(quote.balanceDueAt()), id);
+        if (features.isOccasionBulkProduction()) {
+            String fulfilment = jdbc.queryForObject("SELECT fulfilment FROM occasion_enquiries WHERE id = ?", String.class, id);
+            if ("PICKUP".equals(fulfilment)) {
+                if (quote.expectedReadyAt() == null || !quote.expectedReadyAt().toLocalDate().equals(serviceDate)
+                        || !quote.expectedReadyAt().isAfter(LocalDateTime.now(clock.withZone(IST))))
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Enter a kitchen-ready time on the fulfilment date in IST after reviewing procurement and existing commitments.");
+                jdbc.update("DELETE FROM occasion_production_allocations WHERE enquiry_id = ?", id);
+                jdbc.update("""
+                        INSERT INTO occasion_production_allocations(enquiry_id, product_id, quantity, unit,
+                            expected_ready_at, state, approved_by)
+                        SELECT enquiry_id, product_id, requested_quantity, unit, ?, 'PLANNED', ?
+                        FROM occasion_enquiry_items WHERE enquiry_id = ?
+                        """, Timestamp.valueOf(quote.expectedReadyAt()), staff, id);
+            }
+        }
         event(id, staff, before, "QUOTED", quote.terms().trim());
         return staffGet(environment, branchId, id);
     }
@@ -218,6 +240,7 @@ public class OccasionEnquiryService {
         if (!"REQUESTED".equals(before) && !"QUOTED".equals(before))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This request is no longer open.");
         jdbc.update("UPDATE occasion_enquiries SET status = 'DECLINED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", id);
+        jdbc.update("UPDATE occasion_production_allocations SET state = 'RELEASED', updated_at = CURRENT_TIMESTAMP WHERE enquiry_id = ?", id);
         event(id, staff, before, "DECLINED", reason == null ? null : reason.substring(0, Math.min(500, reason.length())));
         return staffGet(environment, branchId, id);
     }
@@ -279,7 +302,9 @@ public class OccasionEnquiryService {
         if ("QUOTED".equals(status) && expiry != null && !expiry.isAfter(clock.instant())) status = "EXPIRED";
         String next = switch (status) {
             case "REQUESTED" -> "Your request is with the branch. No booking or payment is due yet.";
-            case "QUOTED" -> "A manager has prepared a quote. Contact the branch to review it; no booking is confirmed.";
+            case "QUOTED" -> features.isOccasionPayments() && "PICKUP".equals(rs.getString("fulfilment"))
+                    ? "Review your quote, choose a pickup time and pay the deposit to reserve production. This is not yet confirmed."
+                    : "A manager has prepared a quote. Contact the branch to review it; no booking is confirmed.";
             case "EXPIRED" -> "This quote has expired. Ask the branch for a new quote.";
             case "DECLINED" -> "The branch cannot take this request. Please choose another date or branch.";
             case "PAYMENT_PENDING", "HELD" -> "Your pickup and inventory are held briefly while the deposit is pending. Check payment status before retrying.";
@@ -290,6 +315,7 @@ public class OccasionEnquiryService {
             case "CONFIRMED" -> "The required payments are verified and this pickup is confirmed.";
             default -> "The branch will confirm the next step. This is not a confirmed booking.";
         };
+        final String currentStatus = status;
         return new Summary((UUID) rs.getObject("id"), rs.getLong("branch_id"), rs.getString("occasion_type"),
                 rs.getDate("service_date").toLocalDate(), rs.getInt("guest_count"),
                 Fulfilment.valueOf(rs.getString("fulfilment")), status, rs.getBigDecimal("quoted_amount"),
@@ -321,7 +347,11 @@ public class OccasionEnquiryService {
                 rs.getObject("order_id") == null ? null : jdbc.queryForObject(
                         "SELECT order_number FROM orders WHERE id = ?", String.class, rs.getLong("order_id")),
                 "PAID".equals(status) && rs.getTimestamp("balance_due_at") != null
-                        && rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant()));
+                        && rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant()),
+                jdbc.query("SELECT product_id, quantity, unit, expected_ready_at, state FROM occasion_production_allocations WHERE enquiry_id = ? ORDER BY product_id",
+                        (plan, row) -> new ProductionLine(plan.getLong(1), plan.getBigDecimal(2), plan.getString(3),
+                                plan.getTimestamp(4).toLocalDateTime(), "EXPIRED".equals(currentStatus) && "PLANNED".equals(plan.getString(5))
+                                ? "RELEASED" : plan.getString(5)), (UUID) rs.getObject("id")));
     }
 
     private static <T> T throwNotFound() { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }

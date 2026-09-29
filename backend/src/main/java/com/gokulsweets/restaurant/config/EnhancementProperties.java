@@ -35,6 +35,8 @@ public class EnhancementProperties {
     private boolean occasionEnquiries;
     /** SCRUM-35: PhonePe deposit and balance settlement, independently OFF until DEV provider QA. */
     private boolean occasionPayments;
+    /** Manager-approved bulk production, separate from daily retail stock. */
+    private boolean occasionBulkProduction;
     /** SCRUM-28: accessible dialogs, mobile actions, motion and network recovery. */
     private boolean accessibleOrderingV2;
     /** Customer-facing site and navigation visual direction; never affects staff or admin pages. */

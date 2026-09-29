@@ -167,6 +167,52 @@ class OccasionCommitmentIntegrationTest {
         }
     }
 
+    @Test
+    void bulkApprovalCreates100KgPlanAndPaymentCommitsWithoutDailyInventory() {
+        var fixture = paidDeposit();
+        boolean oldBulk = features.isOccasionBulkProduction();
+        boolean oldEnquiries = features.isOccasionEnquiries(), oldPayments = features.isOccasionPayments();
+        try {
+            features.setOccasionBulkProduction(true);
+            features.setOccasionEnquiries(true);
+            features.setOccasionPayments(true);
+            jdbc.update("DELETE FROM occasion_payment_attempts WHERE enquiry_id = ?", fixture.enquiry());
+            jdbc.update("UPDATE occasion_enquiries SET status = 'REQUESTED', paid_amount = 0 WHERE id = ?", fixture.enquiry());
+            jdbc.update("UPDATE products SET sale_mode = 'WEIGHT' WHERE id = ?", fixture.product());
+            jdbc.update("UPDATE occasion_enquiry_items SET requested_quantity = 100000, unit = 'GRAM' WHERE enquiry_id = ?", fixture.enquiry());
+            var date = jdbc.queryForObject("SELECT service_date FROM occasion_enquiries WHERE id = ?", Date.class, fixture.enquiry()).toLocalDate();
+            Long slot = jdbc.queryForObject("SELECT pickup_slot_id FROM occasion_enquiries WHERE id = ?", Long.class, fixture.enquiry());
+            jdbc.update("UPDATE pickup_slots SET booked_count = 0 WHERE id = ?", slot);
+            var quote = new OccasionEnquiryService.Quote(new BigDecimal("1000.00"), new BigDecimal("1000.00"),
+                    clock.instant().plus(Duration.ofHours(1)), null, "Dedicated production after procurement review",
+                    java.util.List.of(new OccasionEnquiryService.QuoteLine(fixture.product(), new BigDecimal("1000.00"))),
+                    date.atTime(12, 0));
+            var approved = enquiries.quote(ConsentEnvironment.DEV, fixture.branch(), fixture.enquiry(), "manager", quote);
+            assertThat(approved.productionPlan()).hasSize(1);
+            assertThat(approved.productionPlan().getFirst().quantity()).isEqualByComparingTo("100000");
+            assertThat(approved.productionPlan().getFirst().state()).isEqualTo("PLANNED");
+            // Reapproval replaces, rather than duplicates, the uncommitted allocation.
+            enquiries.quote(ConsentEnvironment.DEV, fixture.branch(), fixture.enquiry(), "manager", quote);
+            Integer dailyBefore = jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations", Integer.class);
+            when(phonePe.createPayment(anyString(), eq(new BigDecimal("1000.00")), anyString(), eq(600)))
+                    .thenAnswer(invocation -> new PhonePeClient.CreatePaymentResponse("bulk-provider",
+                            invocation.getArgument(0), "PENDING", "https://pay.example/bulk", null, null));
+            var checkout = commitments.beginDeposit(ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+            assertThat(jdbc.queryForObject("SELECT state FROM occasion_production_allocations WHERE enquiry_id = ?", String.class, fixture.enquiry())).isEqualTo("HELD");
+            commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.completed", "COMPLETED", "bulk-paid");
+            commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.completed", "COMPLETED", "bulk-paid");
+            assertThat(jdbc.queryForObject("SELECT state FROM occasion_production_allocations WHERE enquiry_id = ?", String.class, fixture.enquiry())).isEqualTo("COMMITTED");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations", Integer.class)).isEqualTo(dailyBefore);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM occasion_hold_items WHERE enquiry_id = ?", Integer.class, fixture.enquiry())).isZero();
+            assertThat(jdbc.queryForObject("SELECT status FROM occasion_enquiries WHERE id = ?", String.class, fixture.enquiry())).isEqualTo("CONFIRMED");
+            assertThat(jdbc.queryForObject("SELECT weight_grams FROM order_items WHERE order_id = (SELECT order_id FROM occasion_enquiries WHERE id = ?)", Integer.class, fixture.enquiry())).isEqualTo(100000);
+        } finally {
+            features.setOccasionBulkProduction(oldBulk);
+            features.setOccasionEnquiries(oldEnquiries);
+            features.setOccasionPayments(oldPayments);
+        }
+    }
+
     private String merchant(UUID attemptId) {
         return jdbc.queryForObject("SELECT merchant_order_id FROM occasion_payment_attempts WHERE id = ?",
                 String.class, attemptId);

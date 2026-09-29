@@ -100,6 +100,20 @@ public class OccasionCommitmentService {
             } catch (IllegalStateException unavailable) {
                 throw conflict("That pickup time is full. Choose another time.");
             }
+            Instant earliestHoldExpiry;
+            Integer dedicated = jdbc.queryForObject("SELECT count(*) FROM occasion_production_allocations WHERE enquiry_id = ?", Integer.class, id);
+            if (dedicated != null && dedicated > 0) {
+                if (!features.isOccasionBulkProduction()) throw conflict("Bulk checkout is paused. Contact the branch.");
+                var plan = jdbc.query("SELECT expected_ready_at, state FROM occasion_production_allocations WHERE enquiry_id = ? ORDER BY product_id FOR UPDATE",
+                        (rs, row) -> new Object[]{rs.getTimestamp(1).toLocalDateTime(), rs.getString(2)}, id);
+                Integer count = jdbc.queryForObject("SELECT count(*) FROM occasion_enquiry_items WHERE enquiry_id = ?", Integer.class, id);
+                if (plan.size() != count || plan.stream().anyMatch(line -> !"PLANNED".equals(line[1])
+                        || serviceStart.isBefore(((LocalDateTime) line[0]).atZone(IST).toInstant())))
+                    throw conflict("Approved bulk production is not ready for this pickup. Choose a later time or contact the branch.");
+                jdbc.update("UPDATE occasion_production_allocations SET state = 'HELD', updated_at = CURRENT_TIMESTAMP WHERE enquiry_id = ?", id);
+                earliestHoldExpiry = clock.instant().plus(Duration.ofMinutes(15));
+            } else {
+                if (features.isOccasionBulkProduction()) throw conflict("Ask the manager to approve a dedicated production plan before payment.");
             List<Object[]> requested = jdbc.query("""
                     SELECT bp.id, i.product_id, i.requested_quantity FROM occasion_enquiry_items i
                     JOIN branch_products bp ON bp.branch_id = ? AND bp.product_id = i.product_id
@@ -110,7 +124,7 @@ public class OccasionCommitmentService {
             Integer count = jdbc.queryForObject("SELECT count(*) FROM occasion_enquiry_items WHERE enquiry_id = ?",
                     Integer.class, id);
             if (requested.isEmpty() || requested.size() != count) throw conflict("A quoted product is no longer on this branch's menu.");
-            Instant earliestHoldExpiry = null;
+            earliestHoldExpiry = null;
             for (Object[] item : requested) {
                 long branchProductId = (long) item[0];
                 long productId = (long) item[1];
@@ -134,6 +148,7 @@ public class OccasionCommitmentService {
                 if (earliestHoldExpiry == null || expires.isBefore(earliestHoldExpiry)) earliestHoldExpiry = expires;
                 jdbc.update("INSERT INTO occasion_hold_items(enquiry_id, product_id, reservation_key) VALUES (?, ?, ?)",
                         id, productId, key);
+            }
             }
             Instant paymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
             if (earliestHoldExpiry == null || !earliestHoldExpiry.isAfter(paymentExpiry.plusSeconds(30)))
@@ -290,6 +305,7 @@ public class OccasionCommitmentService {
             return;
         }
         if ("DEPOSIT".equals(attempt.stage())) {
+            jdbc.update("UPDATE occasion_production_allocations SET state = 'COMMITTED', updated_at = CURRENT_TIMESTAMP WHERE enquiry_id = ? AND state = 'HELD'", id);
             for (HeldItem item : heldItems(id)) inventory.confirmHold(item.key());
             BigDecimal paid = enquiry.paid().add(attempt.amount());
             boolean fullyPaid = paid.compareTo(enquiry.quote()) == 0;
@@ -354,6 +370,11 @@ public class OccasionCommitmentService {
 
     /** Batch expiry also releases pickup capacity; inventory expiry alone cannot do that. */
     public void expireDue() {
+        jdbc.update("""
+                UPDATE occasion_production_allocations p SET state = 'RELEASED', updated_at = CURRENT_TIMESTAMP
+                FROM occasion_enquiries e WHERE e.id = p.enquiry_id AND p.state = 'PLANNED'
+                AND e.status = 'QUOTED' AND e.quote_expires_at <= ?
+                """, Timestamp.from(clock.instant()));
         List<UUID> due = jdbc.query("""
                 SELECT e.id FROM occasion_enquiries e WHERE e.status IN ('HELD', 'PAYMENT_PENDING')
                 AND (e.hold_expires_at <= ? OR EXISTS (
@@ -365,6 +386,7 @@ public class OccasionCommitmentService {
     }
 
     private void release(Enquiry enquiry, String reason) {
+        jdbc.update("UPDATE occasion_production_allocations SET state = 'RELEASED', updated_at = CURRENT_TIMESTAMP WHERE enquiry_id = ? AND state IN ('PLANNED','HELD')", enquiry.id());
         for (HeldItem item : heldItems(enquiry.id())) inventory.releaseHold(item.key(), reason);
         if (enquiry.slotId() != null) pickupSlots.releaseNormalCapacity(enquiry.slotId());
         jdbc.update("""
