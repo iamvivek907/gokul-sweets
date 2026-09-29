@@ -2,14 +2,23 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import {useState} from "react";
+import {useEffect, useState} from "react";
 import type {Branch} from "@/types/branch";
 import type {MenuProduct} from "@/types/menu";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import BranchDetails from "@/components/branch/BranchDetails";
+import {getBranch} from "@/services/branchApi";
 
-export default function BranchMenuGallery({branch, products}: {branch: Branch; products: MenuProduct[]}) {
+export default function BranchMenuGallery({branch, products, activeTab, onTabChange}: {branch: Branch; products: MenuProduct[]; activeTab: "menu" | "details"; onTabChange: (tab: "menu" | "details") => void}) {
     const branchExperience = useStorefrontFeatures()?.branchExperience === true;
     const [failed, setFailed] = useState<string[]>([]);
+    const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
+    useEffect(() => {
+        const controller = new AbortController();
+        getBranch(branch.id, controller.signal).then(result => {if (!controller.signal.aborted) setCurrentBranch(result);})
+            .catch(() => { /* Keep the selected branch details when a refresh is unavailable. */ });
+        return () => controller.abort();
+    }, [branch.id]);
     const photos = products.filter(product => product.available && product.imageUrl && !failed.includes(product.imageUrl))
         .filter((product, index, list) => list.findIndex(candidate => candidate.imageUrl === product.imageUrl) === index).slice(0, 3);
 
@@ -21,13 +30,18 @@ export default function BranchMenuGallery({branch, products}: {branch: Branch; p
             <div className="gokul-branch-meta"><span>{[branch.address, branch.city].filter(Boolean).join(", ") || "Your selected pickup branch"}</span>
                 <a href="#gokul-menu-items" className="gokul-branch-menu-cta">Browse menu</a></div>
         </div>
-        {photos.length ? <div className="gokul-gallery-photos" aria-label="Food from this branch's menu">
+        {activeTab === "menu" && (photos.length ? <div className="gokul-gallery-photos" aria-label="Food from this branch's menu">
             {photos.map((product, index) => <div key={product.id} className={`gokul-gallery-tile gokul-gallery-tile-${index}`}>
                 <Image src={product.imageUrl!} alt={product.name} fill sizes={index === 0 ? "(max-width: 700px) 100vw, 65vw" : "(max-width: 700px) 50vw, 25vw"}
                     className="object-cover" onError={() => setFailed(current => [...current, product.imageUrl!])} />
                 <span>{product.name}</span>
             </div>)}
-        </div> : <div className="gokul-gallery-fallback" role="img" aria-label="Gokul Sweets brand banner"><strong>Freshly made.<br />Ready for you.</strong></div>}
-        <nav className="gokul-branch-tabs" aria-label="Branch pages"><a href="#gokul-menu-items" aria-current="page">Menu</a><Link href={branchExperience ? `/branches/${branch.id}` : "/about#our-branches"}>Branch details</Link></nav>
+        </div> : <div className="gokul-gallery-fallback" role="img" aria-label="Gokul Sweets brand banner"><strong>Freshly made.<br />Ready for you.</strong></div>)}
+        <nav className="gokul-branch-tabs" aria-label="Branch pages">
+            <button type="button" aria-current={activeTab === "menu" ? "page" : undefined} onClick={() => onTabChange("menu")}>Menu</button>
+            {branchExperience ? <button type="button" aria-current={activeTab === "details" ? "page" : undefined} onClick={() => onTabChange("details")}>Branch details</button>
+                : <Link href="/about#our-branches">Branch details</Link>}
+        </nav>
+        {activeTab === "details" && <BranchDetails branch={currentBranch?.id === branch.id ? currentBranch : branch} />}
     </div>;
 }

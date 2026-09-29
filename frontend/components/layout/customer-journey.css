@@ -20,6 +20,7 @@
 .future-storefront .gokul-branch-meta{color:#e8eee9!important}.future-storefront .gokul-branch-menu-cta{display:inline-flex;align-items:center;min-height:48px;padding:.7rem 1.25rem;border-radius:999px;background:var(--journey-coral);color:white!important;font-weight:800;text-decoration:none}
 .future-storefront .gokul-gallery-photos,.future-storefront .gokul-gallery-fallback{grid-column:2;grid-row:1/3;min-height:310px}
 .future-storefront .gokul-branch-tabs{grid-column:1/-1;border-color:#ffffff55}.future-storefront .gokul-branch-tabs a{color:#e5f0e9}.future-storefront .gokul-branch-tabs a[aria-current="page"]{color:white;border-color:var(--journey-coral)}
+.future-storefront .gokul-branch-tabs button{color:#e5f0e9}.future-storefront .gokul-branch-tabs button[aria-current="page"]{color:white;border-color:var(--journey-coral)}
 .future-storefront .gokul-editorial-menu [class*="text-[#7a1625]"],.future-storefront .gokul-editorial-menu [class*="text-[#c88a20]"]{color:var(--journey-teal)!important}
 .future-storefront .gokul-editorial-menu :is(button,a)[class*="bg-[#7a1625]"]{background:var(--journey-teal)!important;color:white!important}
 .future-storefront .gokul-editorial-menu [class~="bg-white"]{border-color:var(--journey-line)!important;box-shadow:0 8px 24px #1439360d!important}

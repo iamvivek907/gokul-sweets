@@ -9,10 +9,14 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {getActiveBranches} from "@/services/branchApi";
 import type {Branch} from "@/types/branch";
 import type {HomepageCampaign, CampaignPublication} from "@/types/campaign";
+import CampaignFramingEditor from "@/components/admin/CampaignFramingEditor";
+import type {CampaignFrame} from "@/lib/campaignFraming";
 
 const path = "/api/admin/homepage-campaigns";
 const blank = {type: "HERO", title: "", subtitle: "", ctaLabel: "", ctaTarget: "",
-    startAt: "", endAt: "", active: false, displayOrder: 0, altText: "", branchId: ""};
+    startAt: "", endAt: "", active: false, displayOrder: 0, altText: "", branchId: "",
+    mainX: 50, mainY: 50, mainZoom: 100, mainFit: "COVER" as "COVER" | "CONTAIN",
+    mobileX: 50, mobileY: 50, mobileZoom: 100, mobileFit: "COVER" as "COVER" | "CONTAIN"};
 const fields = [
     ["title", "Title", "Short campaign heading shown to customers.", "text", 120],
     ["subtitle", "Supporting text", "Optional concise description; keep ordering prominent.", "text", 240],
@@ -82,7 +86,9 @@ export default function HomepageCampaignsPage() {
         setForm({type: campaign.type, title: campaign.title, subtitle: campaign.subtitle ?? "", ctaLabel: campaign.ctaLabel ?? "",
             ctaTarget: campaign.ctaTarget ?? "", startAt: toIndiaDateTimeInput(campaign.startAt), endAt: toIndiaDateTimeInput(campaign.endAt),
             active: campaign.active, displayOrder: campaign.displayOrder,
-            altText: campaign.altText ?? "", branchId: campaign.branchId?.toString() ?? ""});
+            altText: campaign.altText ?? "", branchId: campaign.branchId?.toString() ?? "",
+            mainX: campaign.mainX ?? 50, mainY: campaign.mainY ?? 50, mainZoom: campaign.mainZoom ?? 100, mainFit: campaign.mainFit ?? "COVER",
+            mobileX: campaign.mobileX ?? 50, mobileY: campaign.mobileY ?? 50, mobileZoom: campaign.mobileZoom ?? 100, mobileFit: campaign.mobileFit ?? "COVER"});
         setError(""); setMessage("");
         setHistory([]); void loadHistory(campaign.id);
     }
@@ -92,7 +98,7 @@ export default function HomepageCampaignsPage() {
         inFlight.current = true;
         setBusy(true); setError(""); setMessage("");
         try {
-            validateFile(mainFile, false); validateFile(fallbackFile, true); validateFile(mobileFile, true);
+            validateFile(mainFile, false); validateFile(fallbackFile, true); validateMobileFile(mobileFile);
             const type = mainFile?.type ?? persisted.current?.mediaType;
             const animated = type === "image/gif" || type?.startsWith("video/");
             if (publish && !mainFile && !persisted.current?.mediaUrl) throw new Error("Choose banner media before publishing, or save a draft without media.");
@@ -125,7 +131,7 @@ export default function HomepageCampaignsPage() {
                 uploaded.current[key] = file;
             }
             if (controlled && mobileFile && uploaded.current.mobile !== mobileFile) {
-                setMessage("Uploading mobile image...");
+                setMessage("Uploading mobile media...");
                 const body = new FormData(); body.append("file", mobileFile);
                 if (!uploadKeys.current.has(mobileFile)) uploadKeys.current.set(mobileFile, crypto.randomUUID());
                 retain(await adminManagementApi<HomepageCampaign>(`${path}/${persisted.current!.id}/mobile-media`, authorization,
@@ -166,8 +172,8 @@ export default function HomepageCampaignsPage() {
         try {
             const campaign = await adminManagementApi<HomepageCampaign>(`${path}/${editing}/mobile-media`, authorization, {method: "DELETE", headers: versionHeaders()});
             accept(campaign); persisted.current = campaign; setMobileFile(null); uploaded.current.mobile = null;
-            setMessage("Mobile draft image removed. Any published version stays available until you publish again.");
-        } catch (error) {setError(error instanceof Error ? error.message : "Could not remove the mobile image.");}
+            setMessage("Mobile draft media removed. Any published version stays available until you publish again.");
+        } catch (error) {setError(error instanceof Error ? error.message : "Could not remove the mobile media.");}
         finally {inFlight.current = false; setBusy(false);}
     }
 
@@ -176,9 +182,7 @@ export default function HomepageCampaignsPage() {
         inFlight.current = true;
         setBusy(true); setError(""); setMessage("");
         try {
-            if (file && (file.size > 5 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", ...(!fallback ? ["image/gif", "video/mp4", "video/webm"] : [])].includes(file.type))) {
-                throw new Error("Choose a supported file of 5 MB or smaller.");
-            }
+            validateFile(file, fallback);
             const body = new FormData();
             if (file) body.append("file", file);
             const campaign = await adminManagementApi<HomepageCampaign>(`${path}/${editing}/media?fallback=${fallback}`, authorization,
@@ -228,38 +232,33 @@ export default function HomepageCampaignsPage() {
                         </select>
                     </SettingField>
                 </>}
-                <div className="sm:col-span-2 grid gap-5 sm:grid-cols-2">
-                    {([false, true] as const).map(fallback => <div key={String(fallback)}>
-                        <SettingField label={fallback ? "Static fallback image" : "Banner image or video"} htmlFor={fallback ? "poster" : "media"}
-                            help={fallback ? "Required for GIF/video. Static JPG, PNG or WebP, up to 5 MB. Used for reduced motion."
-                                : "JPG, PNG, static WebP, GIF, MP4 or WebM, up to 5 MB. Choosing a file does not upload it."}>
-                            <input key={`${editing}-${fallback}`} id={fallback ? "poster" : "media"} type="file"
-                                accept={fallback ? "image/jpeg,image/png,image/webp" : "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm"}
-                                className="min-h-11 w-full py-2" onChange={event => {
-                                    const file = event.target.files?.[0] ?? null;
-                                    try {validateFile(file, fallback); setError(""); if (fallback) setFallbackFile(file); else setMainFile(file);}
-                                    catch (error) {setError((error as Error).message); event.target.value = "";}
-                                }} />
-                        </SettingField>
-                        <LocalPreview file={fallback ? fallbackFile : mainFile} savedUrl={fallback ? selected?.fallbackMediaUrl : selected?.mediaUrl}
-                            type={fallback ? "image/png" : selected?.mediaType} />
-                        {(fallback ? selected?.fallbackMediaUrl : selected?.mediaUrl) && <button type="button" onClick={() => media(null, fallback, true)}
-                            className="min-h-11 text-red-700 underline">Remove saved {fallback ? "fallback" : "banner"}</button>}
-                    </div>)}
+                <div className="sm:col-span-2 grid gap-5 lg:grid-cols-2">
+                    <div className="space-y-4">
+                        <UploadCard id="media" label="Desktop hero image or video" hint="JPG, PNG, WebP or GIF up to 5 MB · MP4 or WebM up to 50 MB"
+                            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm" file={mainFile} saved={Boolean(selected?.mediaUrl)}
+                            onFile={file => {validateFile(file, false); setMainFile(file); setForm(current => ({...current, mainX: 50, mainY: 50, mainZoom: 100, mainFit: "COVER"}));}} onError={setError} />
+                        <CampaignFramingEditor label="Desktop framing" file={mainFile} savedUrl={selected?.mediaUrl} mediaType={selected?.mediaType}
+                            portrait={false} frame={{x: form.mainX, y: form.mainY, zoom: form.mainZoom, fit: form.mainFit}}
+                            onChange={(frame: CampaignFrame) => setForm(current => ({...current, mainX: frame.x, mainY: frame.y, mainZoom: frame.zoom, mainFit: frame.fit}))} />
+                        {selected?.mediaUrl && <button type="button" onClick={() => media(null, false, true)} className="min-h-11 text-red-700 underline">Remove saved desktop media</button>}
+                    </div>
+                    {controlled && <div className="space-y-4">
+                        <UploadCard id="campaign-mobile" label="Phone hero image or video" hint="Portrait 9:16 recommended · images up to 5 MB · MP4/WebM up to 50 MB"
+                            accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" file={mobileFile} saved={Boolean(selected?.mobileMediaUrl)}
+                            onFile={file => {validateMobileFile(file); setMobileFile(file); setForm(current => ({...current, mobileX: 50, mobileY: 50, mobileZoom: 100, mobileFit: "COVER"}));}} onError={setError} />
+                        <CampaignFramingEditor label="Phone framing" file={mobileFile} savedUrl={selected?.mobileMediaUrl} mediaType={selected?.mobileMediaType ?? "image/png"}
+                            portrait frame={{x: form.mobileX, y: form.mobileY, zoom: form.mobileZoom, fit: form.mobileFit}}
+                            onChange={(frame: CampaignFrame) => setForm(current => ({...current, mobileX: frame.x, mobileY: frame.y, mobileZoom: frame.zoom, mobileFit: frame.fit}))} />
+                        {selected?.mobileMediaUrl && <button type="button" onClick={() => void removeMobile()} className="min-h-11 text-red-700 underline">Remove saved phone media</button>}
+                    </div>}
+                    <div className="lg:col-span-2 rounded-xl border border-[#dce8e2] bg-[#f5faf7] p-4">
+                        <UploadCard id="poster" label="Static fallback image" hint="Required for videos and GIFs · JPG, PNG or WebP up to 5 MB · shown when motion is reduced"
+                            accept="image/jpeg,image/png,image/webp" file={fallbackFile} saved={Boolean(selected?.fallbackMediaUrl)}
+                            onFile={file => {validateFile(file, true); setFallbackFile(file);}} onError={setError} />
+                        <LocalPreview file={fallbackFile} savedUrl={selected?.fallbackMediaUrl} type="image/png" />
+                        {selected?.fallbackMediaUrl && <button type="button" onClick={() => media(null, true, true)} className="min-h-11 text-red-700 underline">Remove saved fallback</button>}
+                    </div>
                 </div>
-                {controlled && <div className="sm:col-span-2">
-                    <SettingField label="Mobile image" help="Optional portrait crop for phones. Static JPG, PNG or WebP, up to 5 MB." htmlFor="campaign-mobile">
-                        <input id="campaign-mobile" key={`${editing}-mobile`} type="file" accept="image/jpeg,image/png,image/webp"
-                            className="min-h-11 w-full py-2" onChange={event => {
-                                const file = event.target.files?.[0] ?? null;
-                                try {validateFile(file, true); setMobileFile(file); setError("");}
-                                catch (error) {setError((error as Error).message); event.target.value = "";}
-                            }} />
-                    </SettingField>
-                    <LocalPreview file={mobileFile} savedUrl={selected?.mobileMediaUrl} type="image/png" />
-                    {selected?.mobileMediaUrl && <button type="button" onClick={() => void removeMobile()}
-                        className="min-h-11 text-red-700 underline">Remove draft mobile image</button>}
-                </div>}
                 <div className="flex gap-3">
                     <button className="min-h-11 rounded-xl border px-5 font-bold">Save draft</button>
                     <button type="button" onClick={event => {if (event.currentTarget.form?.reportValidity()) void save(true);}}
@@ -274,11 +273,7 @@ export default function HomepageCampaignsPage() {
         </form>
         {controlled && selected && <section className="rounded-2xl border bg-white p-5" aria-label="Publication history">
             <h2 className="font-bold">Preview and earlier versions</h2>
-            <p className="text-sm text-[#756763]">Check the current artwork on a narrow and wide screen before publishing. Earlier versions remain available for restore.</p>
-            <div className="mt-3 flex flex-wrap gap-4">
-                <div className="w-44 rounded-xl border p-2"><span className="text-xs">Phone preview</span><LocalPreview file={mobileFile ?? mainFile} savedUrl={selected.mobileMediaUrl ?? selected.mediaUrl} type={selected.mediaType} /></div>
-                <div className="w-80 max-w-full rounded-xl border p-2"><span className="text-xs">Desktop preview</span><LocalPreview file={mainFile} savedUrl={selected.mediaUrl} type={selected.mediaType} /></div>
-            </div>
+            <p className="text-sm text-[#756763]">Use the desktop and phone framing previews above before publishing. Earlier versions remain available for restore.</p>
             <ul className="mt-4 space-y-2">{history.map(version => <li key={version.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                 <span>Version {version.id} · {new Date(version.publishedAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST · {version.title}</span>
                 <button type="button" disabled={busy || selected.publishedRevision === version.id} onClick={() => void restore(version.id)}
@@ -297,25 +292,61 @@ export default function HomepageCampaignsPage() {
 }
 
 function validateFile(file: File | null, fallback: boolean) {
-    if (file && (file.size > 5 * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", ...(!fallback ? ["image/gif", "video/mp4", "video/webm"] : [])].includes(file.type))) {
-        throw new Error("Choose a supported file of 5 MB or smaller.");
+    const video = !fallback && (file?.type === "video/mp4" || file?.type === "video/webm");
+    if (file && (file.size > (video ? 50 : 5) * 1024 * 1024 || !["image/jpeg", "image/png", "image/webp", ...(!fallback ? ["image/gif", "video/mp4", "video/webm"] : [])].includes(file.type))) {
+        throw new Error("Choose an image up to 5 MB or MP4/WebM video up to 50 MB.");
     }
 }
 
-function LocalPreview({file, savedUrl, type}: {file: File | null; savedUrl?: string | null; type?: string | null}) {
+function validateMobileFile(file: File | null) {
+    if (!file) return;
+    const video = file.type === "video/mp4" || file.type === "video/webm";
+    const image = ["image/jpeg", "image/png", "image/webp"].includes(file.type);
+    if ((!video && !image) || file.size > (video ? 50 : 5) * 1024 * 1024) {
+        throw new Error("Choose a mobile image up to 5 MB or MP4/WebM video up to 50 MB.");
+    }
+}
+
+function UploadCard({id, label, hint, accept, file, saved, onFile, onError}: {
+    id: string; label: string; hint: string; accept: string; file: File | null; saved: boolean;
+    onFile: (file: File) => void; onError: (message: string) => void;
+}) {
+    const choose = (picked: File | null) => {
+        if (!picked) return;
+        try {onFile(picked); onError("");}
+        catch (error) {onError(error instanceof Error ? error.message : "Unsupported file.");}
+    };
+    return <div className="rounded-2xl border-2 border-dashed border-[#aac6bb] bg-[#f7fbf8] p-5 transition hover:border-[#4c8c7a] hover:bg-[#edf7f1]">
+        <input id={id} type="file" accept={accept} className="sr-only" onChange={event => {
+            choose(event.target.files?.[0] ?? null); event.target.value = "";
+        }} />
+        <label htmlFor={id} className="flex min-h-32 cursor-pointer flex-col items-center justify-center gap-2 text-center text-[#173a37]">
+            <span aria-hidden="true" className="grid h-11 w-11 place-items-center rounded-full bg-[#dceee5] text-2xl">↑</span>
+            <strong className="text-base">{label}</strong>
+            <span className="rounded-full bg-[#143936] px-4 py-2 text-sm font-semibold text-white">Choose file</span>
+            <span className="text-xs leading-5 text-[#526e65]">{hint}</span>
+        </label>
+        <div onDragOver={event => event.preventDefault()} onDrop={event => {event.preventDefault(); choose(event.dataTransfer.files[0] ?? null);}}
+            className="mt-3 min-h-11 rounded-xl bg-white p-3 text-center text-xs text-[#526e65]">
+            {file ? `${file.name} · ${(file.size / 1024 / 1024).toFixed(1)} MB selected` : saved ? "Saved media · choose or drop a replacement" : "Drop a file here or use Choose file"}
+        </div>
+    </div>;
+}
+
+function LocalPreview({file, savedUrl, type, portrait = false}: {file: File | null; savedUrl?: string | null; type?: string | null; portrait?: boolean}) {
     const [local, setLocal] = useState<{file: File; url: string} | null>(null);
     useEffect(() => {
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {if (typeof reader.result === "string") setLocal({file, url: reader.result});};
-        reader.readAsDataURL(file);
-        return () => {reader.onload = null; if (reader.readyState === FileReader.LOADING) reader.abort();};
+        const url = URL.createObjectURL(file);
+        let active = true;
+        queueMicrotask(() => {if (active) setLocal({file, url});});
+        return () => {active = false; URL.revokeObjectURL(url);};
     }, [file]);
     const url = file ? local?.file === file ? local.url : null : savedUrl;
     if (!url) return null;
     return (file?.type ?? type)?.startsWith("video/")
-        ? <video src={url} controls muted preload="metadata" className="mt-3 max-h-48 rounded-xl" aria-label="Banner preview" />
-        // Local data URLs never send preview bytes to R2.
+        ? <video src={url} muted loop playsInline autoPlay preload="metadata" className={`mt-3 max-h-48 rounded-xl object-cover ${portrait ? "aspect-[9/16] w-full" : ""}`} aria-label="Banner preview" />
+        // Local object URLs never send preview bytes to R2.
         // eslint-disable-next-line @next/next/no-img-element
-        : <img src={url} alt="Campaign preview" className="mt-3 max-h-48 rounded-xl object-contain" />;
+        : <img src={url} alt="Campaign preview" className={`mt-3 max-h-48 rounded-xl ${portrait ? "aspect-[9/16] w-full object-cover" : "object-contain"}`} />;
 }

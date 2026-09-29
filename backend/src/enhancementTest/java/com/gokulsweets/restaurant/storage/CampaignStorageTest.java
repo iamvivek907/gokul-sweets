@@ -66,4 +66,20 @@ class CampaignStorageTest {
         assertThat(R2StorageService.matchesSignature("image/png", "\u0089PNG\r\n\u001a\n1234".getBytes(StandardCharsets.ISO_8859_1))).isTrue();
         assertThat(R2StorageService.hasAnimationChunk("image/webp", "RIFF1234WEBPANIM0000".getBytes())).isTrue();
     }
+
+    @Test void mobileUploadAcceptsVideoButKeepsMainAndImageLimits() {
+        ReflectionTestUtils.setField(storage, "bucketName", "test-bucket");
+        ReflectionTestUtils.setField(storage, "publicUrl", "https://example.invalid");
+        var video = new MockMultipartFile("file", "portrait.mp4", "video/mp4", "1234ftypisom".getBytes());
+        assertThat(storage.uploadMobileCampaignMedia(7L, video).contentType()).isEqualTo("video/mp4");
+        var oversized = mock(org.springframework.web.multipart.MultipartFile.class);
+        when(oversized.getContentType()).thenReturn("video/mp4");
+        when(oversized.getSize()).thenReturn(50L * 1024 * 1024 + 1);
+        assertThatThrownBy(() -> storage.uploadMobileCampaignMedia(7L, oversized))
+                .hasMessageContaining("50 MB");
+        assertThatThrownBy(() -> storage.uploadMobileCampaignMedia(7L,
+                new MockMultipartFile("file", "animation.gif", "image/gif", "GIF89a1234567".getBytes())))
+                .hasMessageContaining("Unsupported");
+        verify(client, times(1)).putObject(any(PutObjectRequest.class), any(RequestBody.class));
+    }
 }

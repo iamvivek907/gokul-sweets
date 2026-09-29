@@ -79,3 +79,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: JUnit, enhancement regressions, and build
         run: ./gradlew --no-daemon clean build bootJar
+      - name: Show test failure details
+        if: failure()
+        run: |
+          grep -m 1 -A 3 'SchemaManagementException' build/test-results/test/TEST-com.gokulsweets.restaurant.RestaurantBackendApplicationTests.xml || true
+          grep -m 1 -A 3 'Caused by: org.flywaydb' build/test-results/test/TEST-com.gokulsweets.restaurant.RestaurantBackendApplicationTests.xml || true
