@@ -30,6 +30,7 @@ class OccasionCommitmentIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired OccasionCommitmentService commitments;
     @Autowired OccasionEnquiryService enquiries;
+    @Autowired OccasionProductionReadinessService readiness;
     @Autowired EnhancementProperties features;
     @Autowired Clock clock;
     @MockitoBean PhonePeClient phonePe;
@@ -206,6 +207,28 @@ class OccasionCommitmentIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT count(*) FROM occasion_hold_items WHERE enquiry_id = ?", Integer.class, fixture.enquiry())).isZero();
             assertThat(jdbc.queryForObject("SELECT status FROM occasion_enquiries WHERE id = ?", String.class, fixture.enquiry())).isEqualTo("CONFIRMED");
             assertThat(jdbc.queryForObject("SELECT weight_grams FROM order_items WHERE order_id = (SELECT order_id FROM occasion_enquiries WHERE id = ?)", Integer.class, fixture.enquiry())).isEqualTo(100000);
+            Long orderId = jdbc.queryForObject("SELECT order_id FROM occasion_enquiries WHERE id = ?", Long.class, fixture.enquiry());
+            assertThatThrownBy(() -> readiness.requireReady(orderId)).hasMessageContaining("full actual ready quantity");
+            jdbc.update("UPDATE orders SET order_status = 'PREPARING' WHERE id = ?", orderId);
+            assertThatThrownBy(() -> readiness.record(ConsentEnvironment.DEV, fixture.branch() + 1,
+                    fixture.enquiry(), fixture.product(), new BigDecimal("60000"), 0, "staff"))
+                    .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            assertThatThrownBy(() -> readiness.record(ConsentEnvironment.DEV, fixture.branch(),
+                    fixture.enquiry(), fixture.product(), new BigDecimal("100001"), 0, "staff"))
+                    .hasMessageContaining("approved quantity");
+            readiness.record(ConsentEnvironment.DEV, fixture.branch(), fixture.enquiry(), fixture.product(), new BigDecimal("60000"), 0, "staff-a");
+            assertThatThrownBy(() -> readiness.requireReady(orderId)).hasMessageContaining("full actual ready quantity");
+            assertThatThrownBy(() -> readiness.record(ConsentEnvironment.DEV, fixture.branch(),
+                    fixture.enquiry(), fixture.product(), new BigDecimal("100000"), 0, "staff-b"))
+                    .hasMessageContaining("Another staff member");
+            readiness.record(ConsentEnvironment.DEV, fixture.branch(), fixture.enquiry(), fixture.product(), new BigDecimal("100000"), 1, "staff-b");
+            readiness.requireReady(orderId);
+            readiness.record(ConsentEnvironment.DEV, fixture.branch(), fixture.enquiry(), fixture.product(), new BigDecimal("100000"), 2, "staff-b");
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM occasion_production_readiness_events WHERE enquiry_id = ?", Integer.class, fixture.enquiry())).isEqualTo(2);
+            jdbc.update("UPDATE orders SET order_status = 'READY_FOR_PICKUP' WHERE id = ?", orderId);
+            assertThatThrownBy(() -> readiness.record(ConsentEnvironment.DEV, fixture.branch(),
+                    fixture.enquiry(), fixture.product(), new BigDecimal("50000"), 2, "staff-b"))
+                    .hasMessageContaining("while this confirmed order is preparing");
         } finally {
             features.setOccasionBulkProduction(oldBulk);
             features.setOccasionEnquiries(oldEnquiries);

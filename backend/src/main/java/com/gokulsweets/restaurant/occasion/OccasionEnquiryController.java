@@ -24,6 +24,7 @@ import java.util.UUID;
 public class OccasionEnquiryController {
     private final OccasionEnquiryService service;
     private final OccasionCommitmentService commitments;
+    private final OccasionProductionReadinessService readiness;
     private final EnhancementProperties features;
     private final Environment settings;
     private final TrustedCheckoutIdentity identity;
@@ -91,6 +92,18 @@ public class OccasionEnquiryController {
                                                   @RequestBody Decline input) {
         staff.requireBranchAccess(branchId);
         return service.decline(environment(), branchId, id, staff.getCurrentStaff().getUsername(), input.reason());
+    }
+
+    public record ReadyQuantity(java.math.BigDecimal quantity, long revision) {}
+
+    @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/production/{productId}/readiness")
+    @PreAuthorize("hasAuthority('ORDER_MARK_READY')")
+    public OccasionEnquiryService.Summary readiness(@PathVariable long branchId, @PathVariable UUID id,
+            @PathVariable long productId, @RequestBody ReadyQuantity input) {
+        staff.requireBranchAccess(branchId);
+        readiness.record(environment(), branchId, id, productId, input.quantity(), input.revision(),
+                staff.getCurrentStaff().getUsername());
+        return service.staffGet(environment(), branchId, id);
     }
 
     public record Decline(String reason) {}

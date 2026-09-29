@@ -27,8 +27,9 @@ class AdminDeliveryPreparationWorkflowTest {
     private final KotService kots = mock(KotService.class);
     private final PreparationEligibilityService eligibility = mock(PreparationEligibilityService.class);
     private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch = mock(com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService.class);
+    private final com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService bulkReadiness = mock(com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService.class);
     private final AdminOrderWorkflowService workflow = new AdminOrderWorkflowService(
-            orders, queries, staff, kots, eligibility, dispatch);
+            orders, queries, staff, kots, eligibility, dispatch, bulkReadiness);
     private Order order;
 
     @BeforeEach
@@ -42,6 +43,18 @@ class AdminDeliveryPreparationWorkflowTest {
         branch.setId(7L);
         order.setBranch(branch);
         when(orders.findByOrderNumber(order.getOrderNumber())).thenReturn(Optional.of(order));
+    }
+
+    @Test
+    void incompleteBulkProductionCannotBypassReadinessThroughStandardOrderTransition() {
+        order.setFulfillmentType(FulfillmentType.PICKUP);
+        order.setOrderStatus(OrderStatus.PREPARING);
+        doThrow(new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT))
+                .when(bulkReadiness).requireReady(42L);
+        assertThrows(org.springframework.web.server.ResponseStatusException.class,
+                () -> workflow.transitionStatus(order.getOrderNumber(), OrderStatus.READY_FOR_PICKUP));
+        verify(staff).requirePermission(PermissionName.ORDER_MARK_READY);
+        verify(orders, never()).transitionStatus(anyLong(), any(), any());
     }
 
     @Test
