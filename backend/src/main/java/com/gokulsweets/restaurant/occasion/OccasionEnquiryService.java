@@ -56,7 +56,8 @@ public class OccasionEnquiryService {
                           BigDecimal depositAmount, BigDecimal paidAmount, String quoteTerms, Instant quoteExpiresAt,
                           Instant createdAt, String nextStep, String customerPhone, String deliveryAddress,
                           String notes, Instant balanceDueAt, Instant holdExpiresAt,
-                          Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber) {}
+                          Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber,
+                          boolean balancePaymentOpen) {}
 
     @Transactional
     public Summary submit(ConsentEnvironment environment, UUID subject, Request input) {
@@ -318,7 +319,9 @@ public class OccasionEnquiryService {
                         lines.getBigDecimal(6), lines.getBigDecimal(7), lines.getString(8)),
                         (UUID) rs.getObject("id")),
                 rs.getObject("order_id") == null ? null : jdbc.queryForObject(
-                        "SELECT order_number FROM orders WHERE id = ?", String.class, rs.getLong("order_id")));
+                        "SELECT order_number FROM orders WHERE id = ?", String.class, rs.getLong("order_id")),
+                "PAID".equals(status) && rs.getTimestamp("balance_due_at") != null
+                        && rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant()));
     }
 
     private static <T> T throwNotFound() { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }
