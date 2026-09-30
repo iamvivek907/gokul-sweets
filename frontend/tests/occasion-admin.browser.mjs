@@ -35,7 +35,7 @@ try {
  await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
  assert.equal(await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).count(),1);
  await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
- assert.equal(await page.getByLabel("Box name",{exact:true}).inputValue(),existing.name);
+ assert.equal(await page.getByLabel("Box name",{exact:false}).inputValue(),existing.name);
  assert.equal(await page.getByLabel("Food weight capacity",{exact:true}).inputValue(),"500");
  await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).fill("18");
  await page.getByRole("button",{name:"Refresh now",exact:true}).click();
@@ -45,7 +45,7 @@ try {
  assert.equal(box.id,7);assert.equal(box.price,18);assert.equal(boxes.length,1);
  await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
  await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
- assert.equal(await page.getByLabel("Box name",{exact:true}).inputValue(),existing.name);
+ assert.equal(await page.getByLabel("Box name",{exact:false}).inputValue(),existing.name);
  await page.getByRole("button",{name:"New box",exact:true}).click();
  await page.getByLabel("Box name").fill("Celebration collection");
  await page.getByLabel("Dimensions",{exact:false}).fill("18 × 12 × 4 cm");
