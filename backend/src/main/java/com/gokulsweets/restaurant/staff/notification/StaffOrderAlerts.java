@@ -80,7 +80,7 @@ public class StaffOrderAlerts {
         if(!enabled())return;
         jdbc.update("""
           INSERT INTO staff_order_alerts(environment,event_key,enquiry_id,branch_id,kind,required_permission,title,message)
-          SELECT environment,?||id,id,branch_id,?,'APPROVAL_MANAGE',?,
+          SELECT environment,?||id,id,branch_id,?,'ORDER_VIEW',?,
            occasion_type||' · '||to_char(service_date,'DD Mon YYYY')||' IST. '||?
           FROM occasion_enquiries WHERE id=? AND environment=?
           ON CONFLICT(environment,event_key) DO NOTHING

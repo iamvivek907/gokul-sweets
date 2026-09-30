@@ -63,6 +63,7 @@ try {
  await page.getByLabel("Verified occasion contact").waitFor();
  await page.getByRole("button",{name:/Date in India/}).click();
  await page.getByRole("button",{name:/10 October/}).click();
+ assert.equal(await page.getByRole("button",{name:"Add mixed-piece boxes"}).evaluate(node=>getComputedStyle(node).color),"rgb(255, 250, 242)");
  await page.getByRole("button",{name:"Add mixed-piece boxes"}).click();
  await page.getByLabel("Group 1 box count").fill("700");
  for(const [id,name,qty]of [[1,"Kaju Barfi","4"],[2,"Peda","2"],[3,"Laddoo","2"]]){await page.getByLabel("Group 1 add mixed item").selectOption(String(id));await page.getByLabel(`Group 1 ${name} pieces per box`).fill(qty);}

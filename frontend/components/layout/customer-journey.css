@@ -195,3 +195,5 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 .future-storefront .occasion-categories button{position:relative;display:flex;flex-direction:column;justify-content:flex-start}
 .future-storefront .occasion-categories button[aria-pressed="true"] strong::after{content:none!important}
 .future-storefront .occasion-categories button[aria-pressed="true"]::before{content:"✓";position:absolute;top:.65rem;right:.65rem;z-index:1;display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:50%;background:#fffaf2;color:#143936;font-weight:800}
+
+.future-storefront .occasion-packing-action{min-height:48px;border:1px solid #143936;border-radius:1rem;background:#143936!important;color:#fffaf2!important;padding:.75rem 1.25rem;font-weight:700}.future-storefront .occasion-packing-action:disabled{background:#dde7e0!important;color:#173a37!important;border-color:#b9ccc4}
