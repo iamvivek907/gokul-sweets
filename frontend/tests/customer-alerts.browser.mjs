@@ -38,7 +38,7 @@ await context.route("**/api/**", async route => {
     else if (path === "/api/customer/identity/me") json = {authenticated: true, phone: "+919876543210", name: "Alert customer"};
     else if (path === "/api/customer/identity/account") json = {paidOrders: 0, favouriteProductIds: [], addresses: [], preferences: {dietaryNotes: null, preferredBranchId: null}};
     else if (path === "/api/customer/identity/notification-preferences") json = {offerInboxEnabled: false, marketingConsentGranted: false};
-    else if (path === "/api/customer/identity/notifications") json = {messages: [{id: nextId, targetType: "ORDER", targetId: "TEST-ORDER", title: "Payment received", message: "Open your order", createdAt: new Date().toISOString(), readAt: null}], unreadCount: 1, nextBefore: null};
+    else if (path === "/api/customer/identity/notifications") json = {messages: [{id: nextId, kind: "READY_FOR_PICKUP", targetType: "ORDER", targetId: "TEST-ORDER", title: "Your order is ready for pickup", message: "Order TEST-ORDER · Main branch. Your order is ready. Open your order for branch and booked pickup details.", createdAt: new Date().toISOString(), readAt: null}], unreadCount: 1, nextBefore: null};
     else if (path === "/api/customer/identity/notification-alerts") {
         if (route.request().method() === "PUT") settings = {...settings, ...route.request().postDataJSON()};
         json = settings;
@@ -51,6 +51,7 @@ const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
 try {
     await page.goto(`${base}/profile#account-notifications`);
     await page.getByRole("heading", {name: "Browser alerts and sound"}).waitFor();
+    await page.getByRole("link", {name: "Notifications, 1 unread"}).waitFor();
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
     assert.equal(await page.evaluate(() => window._chimes), 0);
     await page.getByRole("button", {name: "Enable push for this browser"}).click();
@@ -97,7 +98,13 @@ try {
     assert.equal(await page.evaluate(() => window._chimes) + await second.evaluate(() => window._chimes), after);
     await second.close();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (process.env.ALERT_SCREENSHOT_DIR) {
+        await page.getByRole("region", {name: "Notification inbox"}).screenshot({path: `${process.env.ALERT_SCREENSHOT_DIR}/alerts-mobile.png`});
+    }
     await page.setViewportSize({width: 1440, height: 1000});
+    if (process.env.ALERT_SCREENSHOT_DIR) {
+        await page.getByRole("region", {name: "Notification inbox"}).screenshot({path: `${process.env.ALERT_SCREENSHOT_DIR}/alerts-desktop.png`});
+    }
     enabled = false; await page.evaluate(() => sessionStorage.clear()); await page.reload();
     await page.getByRole("heading", {name: /Notification inbox/}).waitFor();
     assert.equal(await page.getByRole("heading", {name: "Browser alerts and sound"}).count(), 0);
