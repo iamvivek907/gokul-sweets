@@ -29,7 +29,7 @@ export default function StaffNotificationsPage() {
         setSupported(window.isSecureContext && "Notification" in window && "PushManager" in window && "serviceWorker" in navigator);
         if (next.enabled) {
             const result = await staffAlertsRequest<StaffInbox>("", {signal});
-            if (!signal?.aborted) {setInbox(result); setError("");}
+            if (!signal?.aborted) {setInbox(result);}
         }
     }, [key]);
     useEffect(() => {

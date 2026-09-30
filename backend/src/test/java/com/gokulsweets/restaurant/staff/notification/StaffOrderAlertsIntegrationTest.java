@@ -86,7 +86,7 @@ class StaffOrderAlertsIntegrationTest {
     private void status(String status) {jdbc.update("UPDATE orders SET order_status = ? WHERE id = ?", status, order); entities.clear();}
     private long latest() {return alerts.page(staff, null).messages().getFirst().event().id();}
 
-    @Test void paidReplayIsOneExactBranchEventAndReadIsIdempotentWithoutChangingOrder() {
+    @Test void paidReplayIsOneExactBranchEventAndReadIsIdempotentWithoutChangingOrder() throws Exception {
         jdbc.update("UPDATE payments SET payment_status = 'PENDING' WHERE id = ?", payment);
         alerts.paymentConfirmed(payment); assertThat(alerts.page(staff, null).messages()).isEmpty();
         jdbc.update("UPDATE payments SET payment_status = 'PAID' WHERE id = ?", payment);
@@ -151,7 +151,7 @@ class StaffOrderAlertsIntegrationTest {
         sessions.revoke(cookie);
         assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, input("revoked"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
     }
-    @Test void emailRetriesAreBoundedAndStopWhenOrderActionChanges() throws Exception {
+    @Test void emailRetriesAreBounded() throws Exception {
         now(18, 5); alerts.generateReminders(); long event = latest();
         when(email.send(eq(staff), anyString(), anyString(), anyString(), eq(event))).thenReturn(503);
         dispatcher.dispatchBatch(); dispatcher.dispatchBatch();

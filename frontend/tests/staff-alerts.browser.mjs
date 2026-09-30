@@ -10,14 +10,14 @@ const registrationId = "d1779266-3814-48cf-8f6d-8c23b832c1c3";
 const csrf = "test-only-staff-csrf";
 const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
 await context.addInitScript(() => {
-    window._permissionRequests = 0; window._swSteps = [];
+    window._permissionRequests = 0;
     class Notification {static permission = "default"; static async requestPermission() {
         window._permissionRequests++; this.permission = window._denyPush ? "denied" : "granted"; return this.permission;
     }}
     Object.defineProperty(window, "Notification", {value: Notification, configurable: true});
     const subscription = {endpoint: "https://fcm.googleapis.com/fcm/send/staff-browser-test", toJSON: () => ({keys: {p256dh: "test-key", auth: "test-auth"}}), async unsubscribe() {return true;}};
-    const registration = {pushManager: {async getSubscription() {window._swSteps.push("subscription"); return subscription;}, async subscribe() {return subscription;}}};
-    Object.defineProperty(navigator, "serviceWorker", {value: {async register() {window._swSteps.push("register"); return registration;}, ready: Promise.resolve(registration), async getRegistration() {return registration;}, async getRegistrations() {return [];}}});
+    const registration = {pushManager: {async getSubscription() {return subscription;}, async subscribe() {return subscription;}}};
+    Object.defineProperty(navigator, "serviceWorker", {value: {async register() {return registration;}, ready: Promise.resolve(registration), async getRegistration() {return registration;}, async getRegistrations() {return [];}}});
 });
 const order = () => ({orderNumber: "STAFF-ORDER", branchId: 1, branchName: "Main branch", branchAddress: "Test branch",
     customerName: "Test customer", customerPhone: "9876543210", pickupDate: "2026-10-01", pickupStartTime: "18:00", pickupEndTime: "18:30",
@@ -28,7 +28,7 @@ await context.route("**/api/**", async route => {
     if (request.method() === "OPTIONS") return route.fulfill({status: 204, headers: {"Access-Control-Allow-Origin": base, "Access-Control-Allow-Credentials": "true", "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS", "Access-Control-Allow-Headers": "content-type,x-staff-csrf"}});
     let json = [];
     if (path === "/api/admin/auth/me") return route.fulfill({json: {staffId: 12, username: "test-staff", fullName: "Kitchen staff", roleName: "KITCHEN", phone: null,
-        branchIds: [1], permissions: ["ORDER_VIEW", "ORDER_START_PREPARATION", "ORDER_MARK_READY"]}, headers: {"X-Staff-CSRF": csrf}});
+        branchIds: [1], permissions: ["ORDER_VIEW", "ORDER_START_PREPARATION", "ORDER_MARK_READY"]}, headers: {"X-Staff-CSRF": csrf, "Access-Control-Expose-Headers": "X-Staff-CSRF"}});
     if (path === "/api/admin/notifications/settings") json = {enabled, environment: "DEV", staffId: 12, pushConfigured: true,
         applicationServerKey: Buffer.concat([Buffer.from([4]), Buffer.alloc(64)]).toString("base64url"), deviceActive: registered,
         emailConfigured: false, reminderMinutes: 10, escalationMinutes: 5};
@@ -58,7 +58,6 @@ await context.route("**/api/**", async route => {
 });
 const page = await context.newPage();
 page.on("pageerror", error => console.error("BROWSER", error.message));
-page.on("requestfailed", request => console.error("REQUEST", request.url(), request.failure()));
 try {
     await page.goto(`${base}/admin/staff-notifications`);
     await page.getByRole("heading", {name: "Get alerts when the portal is closed"}).waitFor();
