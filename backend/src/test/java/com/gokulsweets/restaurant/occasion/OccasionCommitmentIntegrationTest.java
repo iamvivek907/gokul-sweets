@@ -610,6 +610,35 @@ class OccasionCommitmentIntegrationTest {
         var second=enquiries.staffList(ConsentEnvironment.DEV,f.branch(),date,first.getLast().id());assertThat(second).hasSize(50);
         assertThat(second.stream().map(OccasionEnquiryService.Summary::id)).doesNotContainAnyElementsOf(first.stream().map(OccasionEnquiryService.Summary::id).toList());
         assertThat(workspace.week(ConsentEnvironment.PROD,f.branch(),date).days().getFirst().orderCount()).isZero();
+        var month=workspace.month(ConsentEnvironment.DEV,f.branch(),java.time.YearMonth.from(date));
+        assertThat(month.days()).hasSize(java.time.YearMonth.from(date).lengthOfMonth());
+        var calendarDay=month.days().stream().filter(d->d.date().equals(date)).findFirst().orElseThrow();
+        assertThat(calendarDay.orderCount()).isEqualTo(150);assertThat(calendarDay.needsReview()).isEqualTo(150);
+        assertThat(workspace.month(ConsentEnvironment.PROD,f.branch(),java.time.YearMonth.from(date)).days()).allMatch(d->d.orderCount()==0);
+        assertThat(workspace.month(ConsentEnvironment.DEV,f.branch()+1000000,java.time.YearMonth.from(date)).days()).allMatch(d->d.orderCount()==0);
+        assertThatThrownBy(()->workspace.month(ConsentEnvironment.DEV,f.branch(),java.time.YearMonth.from(date).plusYears(3)))
+            .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+
+    }
+
+    @Test
+    void customerCanSubmitMoreThanThreeDistinctEnquiriesWhileRetriesRemainDeduplicated() {
+        var f=paidDeposit();boolean enabled=features.isOccasionEnquiries();
+        try {
+            features.setOccasionEnquiries(true);
+            jdbc.update("INSERT INTO branch_products(branch_id,product_id,occasion_published) VALUES(?,?,TRUE)",f.branch(),f.product());
+            var date=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(5);
+            var ids=new java.util.HashSet<UUID>();
+            for(int n=1;n<=6;n++) {
+                var input=new OccasionEnquiryService.Request(f.branch(),"Celebration "+n,date,20,OccasionEnquiryService.Fulfilment.PICKUP,null,"",
+                    java.util.List.of(new OccasionEnquiryService.Item(f.product(),BigDecimal.valueOf(n),OccasionEnquiryService.Unit.PIECE,"")));
+                var request=enquiries.submit(ConsentEnvironment.DEV,f.subject(),input);
+                ids.add(request.id());
+                assertThat(enquiries.submit(ConsentEnvironment.DEV,f.subject(),input).id()).isEqualTo(request.id());
+            }
+            assertThat(ids).hasSize(6);
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM occasion_enquiries WHERE subject_id=? AND service_date=?",Integer.class,f.subject(),Date.valueOf(date))).isEqualTo(6);
+        }finally{features.setOccasionEnquiries(enabled);}
     }
 
     private Fixture paidDeposit() {
