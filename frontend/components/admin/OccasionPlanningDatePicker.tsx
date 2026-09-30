@@ -17,12 +17,13 @@ export default function OccasionPlanningDatePicker({date, today, branchId, autho
     const minDay = Math.min(Number(today.slice(8)), new Date(Date.UTC(minYear, Number(today.slice(5, 7)), 0)).getUTCDate());
     const min = `${minYear}-${today.slice(5, 7)}-${String(minDay).padStart(2, "0")}`;
     const max = addDays(today, 365);
+    useEffect(() => {if (open) document.getElementById("bulk-planning-calendar")?.focus();}, [open]);
     const close = () => {setOpen(false); trigger.current?.focus();};
     return <div>
         <button ref={trigger} type="button" aria-expanded={open} aria-controls="bulk-planning-calendar"
             onClick={() => {setMonth(date.slice(0, 7)); setOpen(!open);}}
             className="min-h-11 rounded-xl bg-[#173c39] px-4 font-semibold text-white">Open calendar</button>
-        {open && <section id="bulk-planning-calendar" aria-label="Booking calendar"
+        {open && <section id="bulk-planning-calendar" aria-label="Booking calendar" tabIndex={-1}
             onKeyDown={event => {if (event.key === "Escape") close();}}
             className="mt-4 max-w-xl rounded-2xl border bg-white p-3 shadow-sm sm:p-5">
             <div className="flex items-start justify-between gap-3"><div><h3 className="font-bold">Choose a pickup date</h3>

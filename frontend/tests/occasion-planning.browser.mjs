@@ -44,7 +44,7 @@ await page.getByRole("button",{name:"Open calendar",exact:true}).click();
 failCalendar=true;await page.getByRole("button",{name:"Next calendar month",exact:true}).click();
 await page.getByRole("alert").filter({hasText:"Could not refresh calendar counts"}).waitFor();
 failCalendar=false;await page.getByRole("button",{name:"Retry",exact:true}).click();
-await calendar.getByRole("button",{name:/1 December.*0 orders/}).waitFor();
+await calendar.getByRole("button",{name:/\b1 December.*0 orders/}).waitFor();
 await calendar.press("Escape");assert.equal(await calendar.count(),0);
 await page.goto(`${base}/admin/occasion-enquiries?branch=1&enquiry=${ids[1]}`);await page.locator(`#occasion-admin-${ids[1]}[open]`).waitFor();await page.getByRole("heading",{name:/2 October.*2026 · product totals/}).waitFor();
 console.log("PASS: date strip, segregated cards, daily product totals, dedicated approval, 30-second refresh, notification deep link, monthly counts, future-date order details, count refresh, retry and mobile fit.");}catch(error){console.error(await page.locator("body").innerText());throw error;}finally{await browser.close();}
