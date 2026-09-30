@@ -189,6 +189,16 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(org.springframework.web.server.ResponseStatusException.class)
+    public ResponseEntity<ApiErrorResponse> handleRequestStatus(
+            org.springframework.web.server.ResponseStatusException exception, HttpServletRequest request) {
+        // Preserve intentional authentication/validation failures instead of turning them into a 500.
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+        if (status == null) status = HttpStatus.INTERNAL_SERVER_ERROR;
+        return buildResponse(status, "REQUEST_REJECTED",
+                messageOrDefault(exception.getReason(), status.getReasonPhrase()), request);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(
             Exception exception,
