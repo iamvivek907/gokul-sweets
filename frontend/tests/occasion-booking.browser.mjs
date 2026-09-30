@@ -37,7 +37,9 @@ try {
  await page.evaluate(()=>document.fonts.ready);
  const [quantityBox,unitBox]=await page.evaluate(()=>["Kaju Barfi quantity","Kaju Barfi unit"].map(name=>{const element=document.querySelector(`[aria-label="${name}"]`),r=element.getBoundingClientRect();return {y:r.y,height:r.height};}));
  if(process.env.ALERT_SCREENSHOT_DIR)await page.locator(".occasion-product").first().screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/quantity-alignment.png`});
- assert.ok(Math.abs(quantityBox.y-unitBox.y)<2);assert.ok(Math.abs(quantityBox.height-unitBox.height)<2);
+ assert.ok(Math.abs(quantityBox.y-unitBox.y)<2);
+ const categoryTops=await page.evaluate(()=>Array.from(document.querySelectorAll(".occasion-categories button")).map(button=>button.firstElementChild.getBoundingClientRect().top));
+ assert.ok(Math.abs(categoryTops[0]-categoryTops[1])<2);assert.ok(Math.abs(quantityBox.height-unitBox.height)<2);
  if(process.env.ALERT_SCREENSHOT_DIR)await page.locator(".occasion-journey").screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/occasion-mobile.png`});
  await page.getByRole("button",{name:/Paneer category/}).click();
  await page.getByLabel("Paneer quantity").fill("100");
