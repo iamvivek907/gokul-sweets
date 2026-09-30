@@ -355,12 +355,8 @@ ready push even while the PWA is closed, subject to permission, live session, qu
 provider/device support. The header bell shows unread count; inbox cards use stage icons,
 unread badges and clear links. Device notification layout remains OS controlled.
 
-Staff new-order/preparation reminders and overdue email escalation are tracked as
-**SCRUM-109** in Sprint 5, separate follow-on work requested by the owner on 30 September 2026. They are not implemented by this customer
-alert PR. Required design: eligible active staff scoped to branch and permissions, server-side
-IST scheduling, action-state rechecks, deduplication, acknowledgement, bounded retry/escalation,
-configured staff email recipients/provider, and staff push registration/help text. Do not imply
-customer push also covers staff operational alerts.
+Staff new-order/preparation reminders and overdue email escalation are implemented in the
+SCRUM-109 follow-on below. Customer push alone does not cover staff operational alerts.
 
 ## Sprint 5 — staff operational notifications (SCRUM-109)
 

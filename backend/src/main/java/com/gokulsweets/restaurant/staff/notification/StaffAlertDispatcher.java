@@ -46,7 +46,7 @@ public class StaffAlertDispatcher {
                 var recipients = jdbc.query("""
                     SELECT e.id, u.id staff_id FROM staff_order_alerts e JOIN staff_users u ON TRUE
                     WHERE e.environment = ? AND e.kind IN ('PREPARATION_OVERDUE','READY_OVERDUE')
-                      AND e.scheduled_at + (? * INTERVAL '1 minute') <= ? AND e.scheduled_at > ? - INTERVAL '1 day'
+                      AND e.scheduled_at + (? * INTERVAL '1 minute') <= ? AND e.scheduled_at > CAST(? AS TIMESTAMP) - INTERVAL '1 day'
                       AND
                     """ + StaffOrderAlerts.ELIGIBLE, (rs, row) -> new Recipient(rs.getLong(1), rs.getLong(2)),
                         alerts.scope(), alerts.escalationMinutes(), Timestamp.valueOf(alerts.now()), Timestamp.valueOf(alerts.now()));

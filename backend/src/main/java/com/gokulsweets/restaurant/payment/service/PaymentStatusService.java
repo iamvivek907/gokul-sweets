@@ -695,7 +695,6 @@ public class PaymentStatusService {
 
         paymentRepository.flush();
         notifications.paymentChanged(paymentId);
-        staffAlerts.paymentConfirmed(paymentId);
 
         log.info(
                 "Payment refund completed: paymentId={}, orderId={}, providerRefundId={}",
