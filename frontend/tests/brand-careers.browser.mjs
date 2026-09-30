@@ -9,10 +9,10 @@ const story={title:'Test brand story',subtitle:'Verified test introduction',stor
 const applicant={id:'11111111-1111-4111-8111-111111111111',jobId:1,branchId:1,branchName:'Test branch',jobTitle:'Test role',name:'Test applicant',phone:'9876543210',email:null,desiredRole:'Test role',experience:2,qualifications:'Test qualifications',status:'NEW',staffNotes:'',createdAt:'2026-09-30T20:00:00Z',version:0};
 let applications=0,updates=0,conflict=false;
 await context.route('**/api/**',async route=>{const req=route.request(),u=new URL(req.url()),p=u.pathname;let json=[];
- if(req.method()==='OPTIONS')return route.fulfill({status:204});
+ if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'content-type,x-staff-csrf,if-match'}});
  if(p==='/api/storefront/features')json={brandCareers:true,futuristicStorefrontV2:true,customerHomeV2:true};
  else if(p==='/api/branches')json=[{id:1,name:'Test branch',active:true,address:'Test address'}];
- else if(p==='/api/admin/auth/me')return route.fulfill({json:{staffId:1,username:'test',fullName:'Test manager',roleName:'OWNER_ADMIN',branchIds:[1],permissions:['ABOUT_MANAGE','CAREERS_MANAGE']},headers:{'X-Staff-CSRF':'test-csrf'}});
+ else if(p==='/api/admin/auth/me')return route.fulfill({json:{staffId:1,username:'test',fullName:'Test manager',roleName:'OWNER_ADMIN',branchIds:[1],permissions:['ABOUT_MANAGE','CAREERS_MANAGE']},headers:{'X-Staff-CSRF':'test-csrf','Access-Control-Expose-Headers':'X-Staff-CSRF','Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true'}});
  else if(p==='/api/storefront/about'||p==='/api/admin/about'){
   if(req.method()==='PUT'){assert.equal(req.headers()['if-match'],'0');assert.equal(req.headers()['x-staff-csrf'],'test-csrf');if(conflict)return route.fulfill({status:409,json:{}});updates++;json={...story,...req.postDataJSON(),version:1};}else json={story,people:[]};
  }
@@ -20,7 +20,7 @@ await context.route('**/api/**',async route=>{const req=route.request(),u=new UR
  else if(p==='/api/storefront/careers/applications'){const body=req.postDataJSON();assert.equal(body.jobId,1);assert.equal(body.branchId,1);assert.equal(body.consent,true);assert.ok(body.requestId);applications++;json={reference:body.requestId,message:'Application received.'};}
  else if(p==='/api/admin/careers/applications'){assert.equal(u.searchParams.get('size'),'25');json={items:[applicant],total:1,page:0,size:25,counts:{NEW:1}};}
  else if(p.endsWith(applicant.id)){if(req.method()==='PUT'){assert.equal(req.headers()['if-match'],'0');updates++;json={...applicant,...req.postDataJSON(),version:1};}else json=applicant;}
- return route.fulfill({json});
+ return route.fulfill({json,headers:{'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true'}});
 });
 try{
  await page.goto(`${base}/about`);await page.getByRole('heading',{name:'Test brand story'}).waitFor();assert.equal(await page.getByRole('link',{name:/Explore opportunities/}).getAttribute('href'),'/careers');

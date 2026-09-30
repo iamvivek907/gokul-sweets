@@ -152,7 +152,7 @@ public class RebateEligibilityService {
         var order=orderRepository.findDetailedByOrderNumber(orderNumber).orElseThrow();
         if(order.getPickupType()!=com.gokulsweets.restaurant.order.enums.PickupType.NORMAL || order.getFulfillmentType()!=com.gokulsweets.restaurant.order.enums.FulfillmentType.PICKUP)return List.of();
         var eligible=calculateEligibleAmount(order);
-        var baseline=available.stream().map(AvailableRebateResponse::rebateAmount).max(BigDecimal::compareTo).orElse(BigDecimal.ZERO).max(defaultZero(order.getRebateAmount()));
+        var baseline=available.stream().map(AvailableRebateResponse::rebateAmount).max(BigDecimal::compareTo).orElse(BigDecimal.ZERO).max(defaultZero(order.getRebateDiscountAmount()));
         var targets=new ArrayList<AvailableRebateResponse>();
         for(var rebate:rebateRepository.findActivePublicCandidates(order.getBranch().getId(),LocalDateTime.now(BUSINESS_ZONE))) {
             if(!isScopeEligible(rebate,order)||!isUsageEligible(rebate,order))continue;
