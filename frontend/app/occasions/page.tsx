@@ -31,6 +31,7 @@ function nextBusinessDate(today: string): string {
 export default function OccasionsPage() {
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();
+    const [sessionVersion, setSessionVersion] = useState(0);
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [catalogueSearch, setCatalogueSearch] = useState("");
     const [specialOnly, setSpecialOnly] = useState(false);
@@ -156,6 +157,10 @@ export default function OccasionsPage() {
             setMessage("Request sent. The branch will review it before sharing a quote. No booking or payment has been made.");
             setItems({});
         } catch (error) {
+            if (error instanceof ApiError && error.status === 401) {
+                setSession({authenticated: false}); setHistory([]); setSessionVersion(current => current + 1);
+                window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+            }
             setMessage(error instanceof ApiError && error.status === 401 ? "Please verify your phone, then try again."
                 : error instanceof ApiError && error.status === 429 ? "You have sent three enquiries in the last 24 hours. Please contact the branch for changes."
                 : error instanceof ApiError && error.status === 400 ? error.message
@@ -173,7 +178,7 @@ export default function OccasionsPage() {
             {features?.occasionEnquiries && <>
                 {!branch ? <p className="mt-8 rounded-xl bg-white p-6">Choose a branch first. <Link href="/branches" className="underline">Explore branches</Link>.</p> : <>
                     <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline">Change branch</Link></p>
-                    <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel mode="occasion" onSessionChange={setSession} /></div>
+                    <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel key={sessionVersion} mode="occasion" onSessionChange={setSession} /></div>
                     {<form onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
                         <p className="text-xs font-bold uppercase tracking-widest text-[#c76752]">01 · Plan your celebration</p><p className="text-sm">Choose your sweets and packaging. Our branch reviews production, box fit and pricing before you pay.</p>
                         <label className="block">Occasion <input required maxLength={80} value={type} onChange={event => setType(event.target.value)} className="mt-2 w-full rounded-xl border p-3" /></label>

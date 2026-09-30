@@ -14,7 +14,7 @@ A reviewed quote contains inclusive item totals, applicable configured item taxe
 
 ## Admin setup and review
 
-**Occasion food enquiries → select branch → Occasion sweets & packaging catalogue** requires `MENU_MANAGE`. Create products and actual product photos through the existing menu editor; configure occasion-only/publication/lead days/measured piece grams here. Occasion-only items are excluded by the regular menu and checkout repository queries. Fields include visible helptext.
+**Occasion food enquiries → select branch → Occasion sweets & packaging catalogue** requires `MENU_MANAGE`. Create products and actual product photos through the existing menu editor; configure occasion-only/publication/lead days/measured piece grams here. Occasion publication is independent of the daily menu availability switch; an active sweet can be offered for future production even when daily pickup is unavailable. Occasion-only items are excluded by the regular menu and checkout repository queries. Fields include visible helptext.
 
 Add or edit packaging with an actual HTTPS photo URL, usable dimensions, material, compartments, conservative piece capacity, estimate, branding and sourcing lead days. Empty photo is a labelled placeholder. An empty price is an enquiry requiring reviewed pricing. Unpublish stops new selection and preserves existing enquiry snapshots.
 

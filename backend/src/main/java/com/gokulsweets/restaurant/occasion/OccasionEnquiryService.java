@@ -33,7 +33,9 @@ public class OccasionEnquiryService {
     private final Clock clock;
 
     public record Item(@Positive long productId, @DecimalMin("0.001") @Digits(integer = 9, fraction = 3)
-                       BigDecimal quantity, @NotNull Unit unit, String productName) {}
+                       BigDecimal quantity, @NotNull Unit unit, String productName, String productionUnit, BigDecimal suggestedProductionQuantity) {
+        public Item(long productId, BigDecimal quantity, Unit unit, String productName) {this(productId,quantity,unit,productName,null,null);}
+    }
     public enum Unit { PIECE, GRAM }
     public enum Fulfilment { PICKUP, DELIVERY_REQUEST }
     public record Request(@Positive long branchId, @NotBlank @Size(max = 80) String occasionType,
@@ -194,6 +196,14 @@ public class OccasionEnquiryService {
         if (requestedCount == null || requestedCount != quote.lines().size())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price every requested product exactly once.");
         String giftJson=jdbc.queryForObject("SELECT packaging_snapshot::text FROM occasion_enquiries WHERE id=?",String.class,id);
+        Boolean requiresDedicated = jdbc.queryForObject("""
+            SELECT EXISTS (SELECT 1 FROM occasion_enquiry_items i
+              JOIN occasion_enquiries e ON e.id=i.enquiry_id JOIN products p ON p.id=i.product_id
+              LEFT JOIN branch_products bp ON bp.branch_id=e.branch_id AND bp.product_id=i.product_id
+              WHERE i.enquiry_id=? AND (bp.occasion_only OR (p.sale_mode='WEIGHT' AND i.unit='PIECE')))
+            """, Boolean.class,id);
+        if(!features.isOccasionBulkProduction() && (giftJson!=null || Boolean.TRUE.equals(requiresDedicated)))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"Dedicated bulk production must be enabled before approving this occasion request.");
         if(giftJson!=null) {
             if(!quote.packagingReviewed() || quote.packagingTotal()==null || quote.packagingTotal().signum()<0
                 || quote.packagingTotal().scale()>2 || quote.packagingTotal().compareTo(quote.amount())>=0)
@@ -359,12 +369,16 @@ public class OccasionEnquiryService {
                 rs.getTimestamp("hold_expires_at") == null ? null : rs.getTimestamp("hold_expires_at").toInstant(),
                 rs.getObject("pickup_slot_id", Long.class),
                 jdbc.query("""
-                        SELECT i.product_id, i.requested_quantity, i.unit, p.name
+                        SELECT i.product_id, i.requested_quantity, i.unit, p.name,
+                               CASE WHEN p.sale_mode='WEIGHT' THEN 'GRAM' ELSE 'PIECE' END,
+                               CASE WHEN p.sale_mode='WEIGHT' AND i.unit='PIECE' THEN i.requested_quantity*bp.occasion_piece_grams ELSE i.requested_quantity END
                         FROM occasion_enquiry_items i JOIN products p ON p.id = i.product_id
+                        JOIN occasion_enquiries e ON e.id=i.enquiry_id
+                        LEFT JOIN branch_products bp ON bp.branch_id=e.branch_id AND bp.product_id=i.product_id
                         WHERE i.enquiry_id = ? ORDER BY p.name
                         """,
                         (items, row) -> new Item(items.getLong(1), items.getBigDecimal(2),
-                                Unit.valueOf(items.getString(3)), items.getString(4)),
+                                Unit.valueOf(items.getString(3)), items.getString(4),items.getString(5),items.getBigDecimal(6)),
                         (UUID) rs.getObject("id")),
                 jdbc.query("""
                         SELECT q.product_id, q.product_name, q.gross_amount, q.subtotal, q.tax_amount,

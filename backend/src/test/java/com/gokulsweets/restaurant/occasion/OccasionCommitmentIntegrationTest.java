@@ -377,6 +377,8 @@ class OccasionCommitmentIntegrationTest {
             assertThat(jdbc.queryForObject("SELECT weight_grams FROM occasion_quote_lines WHERE enquiry_id=?",Integer.class,f.enquiry())).isEqualTo(20000);
             assertThat(branchProducts.findForOrder(f.branch(),java.util.List.of(f.product()))).isEmpty();
             assertThat(branchProducts.findAvailableMenu(f.branch())).isEmpty();
+            jdbc.update("UPDATE branch_products SET available=false WHERE branch_id=? AND product_id=?",f.branch(),f.product());
+            assertThat(catalogue.catalogue(f.branch(),false).sweets()).anyMatch(sweet->sweet.id()==f.product());
         } finally {features.setOccasionBulkProduction(old);}
     }
 

@@ -39,7 +39,7 @@ public class OccasionCatalogue {
             SELECT p.id,p.name,p.description,p.image_url,p.sale_mode,bp.occasion_only,bp.occasion_published,
                    bp.occasion_lead_days,bp.occasion_piece_grams
             FROM branch_products bp JOIN products p ON p.id=bp.product_id JOIN branches b ON b.id=bp.branch_id
-            WHERE bp.branch_id=? AND b.active AND p.active AND bp.available AND (? OR bp.occasion_published)
+            WHERE bp.branch_id=? AND b.active AND p.active AND (? OR bp.occasion_published)
             ORDER BY bp.occasion_only DESC,bp.display_order,p.name
             """, (rs,n)->new Sweet(rs.getLong(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),
                 rs.getBoolean(6),rs.getBoolean(7),rs.getInt(8),rs.getBigDecimal(9)),branchId,admin);
@@ -82,7 +82,7 @@ public class OccasionCatalogue {
             .orElseThrow(()->new ResponseStatusException(HttpStatus.BAD_REQUEST,"Packaging is unavailable."));
         long pieces=0;Set<Long> seen=new HashSet<>();
         for(Recipe recipe:gift.recipe()) {
-            if(recipe.pieces()<1 || !seen.add(recipe.productId())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Each sweet needs a positive pieces-per-box quantity.");
+            if(recipe==null || recipe.pieces()<1 || !seen.add(recipe.productId())) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Each sweet needs a positive pieces-per-box quantity.");
             pieces+=recipe.pieces();
             BigDecimal total=BigDecimal.valueOf((long)recipe.pieces()*gift.boxCount());
             if(items.stream().noneMatch(i->i.productId()==recipe.productId() && i.unit()==OccasionEnquiryService.Unit.PIECE && i.quantity().compareTo(total)==0))

@@ -11,7 +11,7 @@ type Branch = {id: number; name: string};
 type Enquiry = {id: string; occasionType: string; serviceDate: string; guestCount: number; fulfilment: string;
     customerPhone: string; deliveryAddress: string | null; notes: string | null; status: string;
     gift?: GiftSnapshot | null;
-    items: {productId: number; productName: string; quantity: number; unit: string}[];
+    items: {productId: number; productName: string; quantity: number; unit: string; productionUnit?: string; suggestedProductionQuantity?: number | null}[];
     pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number; taxAmount: number; cgstRate: number; sgstRate: number}[];
     quotedAmount: number | null; depositAmount: number | null; paidAmount: number; balanceDueAt: string | null;
     orderNumber: string | null;
@@ -63,7 +63,7 @@ export default function OccasionEnquiriesPage() {
             // Quote lifetime begins when the staff member submits the decision.
             const lines = enquiry.items.map(item => ({productId: item.productId,
                 grossAmount: Number(lineAmounts[enquiry.id]?.[item.productId]),
-                productionQuantity: production[enquiry.id]?.[item.productId] ? Number(production[enquiry.id][item.productId]) : null}));
+                productionQuantity: production[enquiry.id]?.[item.productId] ? Number(production[enquiry.id][item.productId]) * (item.productionUnit === "GRAM" ? 1000 : 1) : null}));
             const total = Math.round(lines.reduce((sum, line) => sum + line.grossAmount, 0) * 100) / 100;
             const advance = Number(deposit[enquiry.id]);
             if (action === "quote" && (lines.some(line => !Number.isFinite(line.grossAmount) || line.grossAmount <= 0)
@@ -85,7 +85,10 @@ export default function OccasionEnquiriesPage() {
                 : {reason: terms[enquiry.id] ?? ""};
             const response = await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries/${enquiry.id}/${action}`,
                 authorization, {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
-            if (!response.ok) throw new Error("Could not save. Check your permission, amount and request status.");
+            if (!response.ok) {
+                const problem = await response.json().catch(() => null) as {message?: string; detail?: string} | null;
+                throw new Error(problem?.message || problem?.detail || "Could not save. Check your permission, amount and request status.");
+            }
             const updated = await response.json() as Enquiry;
             setRequests(current => current.map(item => item.id === updated.id ? updated : item));
             setNotice(action === "quote" ? "Quote saved. The customer can choose a live pickup slot and start a deposit if payments are enabled." : "Enquiry declined.");
@@ -185,7 +188,7 @@ export default function OccasionEnquiriesPage() {
                         <input type="number" min="0.01" step="0.01" value={lineAmounts[enquiry.id]?.[item.productId] ?? ""}
                             onChange={event => setLineAmounts(current => ({...current, [enquiry.id]: {...current[enquiry.id], [item.productId]: event.target.value}}))}
                             className="mt-1 block w-full rounded-lg border p-2" /></label>)}
-                    <fieldset className="mt-4 rounded-xl border p-3"><legend className="px-2 font-semibold">Approved production quantities</legend><p className="text-sm">For weight-based sweets requested in pieces, enter the measured total grams needed. Leave blank only when a configured piece size can determine it. For weight requests, leave blank to retain the requested grams; unit sweets must retain their pieces. This quantity becomes the dedicated production plan.</p>{enquiry.items.map(item => <label key={item.productId} className="mt-3 block text-sm">{item.productName} · approved production quantity<input type="number" min={1} step={1} value={production[enquiry.id]?.[item.productId] ?? ""} onChange={event => setProduction(current => ({...current,[enquiry.id]: {...current[enquiry.id],[item.productId]:event.target.value}}))} className="mt-1 block w-full rounded-lg border p-2" /></label>)}</fieldset>
+                    <fieldset className="mt-4 rounded-xl border p-3"><legend className="px-2 font-semibold">Approved production quantities</legend><p className="text-sm">For weight-based sweets requested in pieces, enter the measured total kg needed. Leave blank only when a configured piece size determines it. For weight requests, leave blank to retain the requested kg; unit sweets must retain their pieces. This quantity becomes the dedicated production plan.</p>{enquiry.items.map(item => <label key={item.productId} className="mt-3 block text-sm">{item.productName} · approved {item.productionUnit === "GRAM" ? "kg" : "pieces"}<input type="number" min={item.productionUnit === "GRAM" ? 0.001 : 1} step={item.productionUnit === "GRAM" ? 0.001 : 1} placeholder={item.suggestedProductionQuantity == null ? "Manager sizing required" : String(item.suggestedProductionQuantity / (item.productionUnit === "GRAM" ? 1000 : 1))} value={production[enquiry.id]?.[item.productId] ?? ""} onChange={event => setProduction(current => ({...current,[enquiry.id]: {...current[enquiry.id],[item.productId]:event.target.value}}))} className="mt-1 block w-full rounded-lg border p-2" /></label>)}</fieldset>
                     {enquiry.gift && <fieldset className="mt-4 rounded-xl border p-3"><legend className="px-2 font-semibold">Packaging approval</legend><label className="block text-sm">Final packaging total ₹<input type="number" min={0} step={0.01} value={packagingTotal[enquiry.id] ?? ""} onChange={event => setPackagingTotal(current => ({...current,[enquiry.id]:event.target.value}))} className="mt-1 block w-full rounded-lg border p-2" /><span className="mt-1 block text-xs">Include this cost in the item totals above, with the applicable configured item tax. Do not add it again to the booking total. Explain the allocation and any branding in customer-visible quote terms.</span></label><label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={packagingReviewed[enquiry.id] ?? false} onChange={event => setPackagingReviewed(current => ({...current,[enquiry.id]:event.target.checked}))} />I checked the actual sweet sizes and box fit, packaging availability, branding, lead time and final inclusive price.</label></fieldset>}
                     <p className="mt-2">Quote total ₹{enquiry.items.reduce((sum, item) => sum + Number(lineAmounts[enquiry.id]?.[item.productId] ?? 0), 0).toFixed(2)}</p>
                 </div>

@@ -4,7 +4,7 @@ const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE??"playwright");
 const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:390,height:844}});
-let authenticated=true, submitted=null, requests=0;
+let authenticated=true, submitted=null, requests=0, expireNext=false;
 const branch={id:1,code:"TEST",name:"Celebration branch",active:true,pickupAvailable:true};
 const sweets=[{id:1,name:"Kaju Barfi",description:"Made fresh for your celebration",saleMode:"WEIGHT",occasionOnly:true,published:true,leadDays:3,pieceGrams:null},{id:2,name:"Peda",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null},{id:3,name:"Laddoo",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null}];
 const box={id:8,name:"Celebration eight",dimensions:"18 × 12 × 4 cm",material:"Food-safe cardboard",compartments:3,capacityPieces:8,price:10,branding:"Ribbon and gift message",leadDays:3,published:true,imageUrl:null};
@@ -19,6 +19,7 @@ await context.route("**/api/**",async route=>{
  else if(path==="/api/branches/1")json=branch;
  else if(path==="/api/branches")json=[branch];
  else if(path==="/api/occasion-enquiries"&&request.method()==="POST") {
+  if(expireNext) {authenticated=false;return route.fulfill({status:401,json:{message:"Session expired"}});}
   submitted=request.postDataJSON();requests++;json={...submitted,id:`request-${requests}`,status:"REQUESTED",nextStep:"The branch is reviewing your enquiry",paidAmount:0,pricedLines:[],items:submitted.items,gift:submitted.gift?{box,boxCount:submitted.gift.boxCount,recipe:submitted.gift.recipe,packagingEstimate:7000,approvedPackagingTotal:null}:null};
  }
  await route.fulfill({json});
@@ -46,6 +47,13 @@ try {
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.setViewportSize({width:1440,height:1000});
  if(process.env.ALERT_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/occasion-desktop.png`,fullPage:true});
+ await page.getByRole("button",{name:/^Bulk sweets/}).click();
+ await page.getByLabel("Kaju Barfi quantity").fill("1250");expireNext=true;
+ await page.getByRole("button",{name:"Request a reviewed quote"}).click();
+ await page.getByText("Please verify your phone, then try again.",{exact:true}).waitFor();
+ assert.equal(await page.getByLabel("Kaju Barfi quantity").inputValue(),"1250");
+ await page.getByRole("button",{name:"Verify with SMS"}).waitFor();
+ assert.equal(await page.getByLabel("Verified occasion contact").count(),0);
  authenticated=false;await page.reload();
  await page.getByLabel("Kaju Barfi quantity").waitFor();
  assert.equal(await page.getByRole("button",{name:"Request a reviewed quote"}).isDisabled(),true);
