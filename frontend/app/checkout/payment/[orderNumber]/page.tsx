@@ -2701,7 +2701,7 @@ export default function PaymentPage() {
                         )
                     }
 
-                    <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} onCancel={cancelCheckout}/>
+                    <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={error} onCancel={cancelCheckout}/>
                     {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm">Payable amount includes a convenience fee of {formatCurrency(feeBreakdown.fee)} (including {formatCurrency(feeBreakdown.tax)} fee tax).</p>}
                     {(isPending || isFailed || isExpired) && <section aria-label="Payment recovery" className="mt-4 rounded-2xl border border-[#c4d4c9] bg-[#fffaf2] p-4 text-[#173c39]">
                         <p className="font-bold">{isPending ? "Need to stop this checkout?" : "Your cart is ready to try again"}</p>
