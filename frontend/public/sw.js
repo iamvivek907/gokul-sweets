@@ -355,7 +355,10 @@ async function networkFirstNavigation(
     }
 }
 
-// Browser push stays generic on the lock screen. Custom audio belongs to an explicitly activated page.
+// Stage-specific push works while the app is closed; custom audio belongs to an explicitly activated page.
+function notificationDestination(value) {
+    return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/occasions#occasion-[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
+}
 let pushSequence = Promise.resolve();
 self.addEventListener("push", event => {
     let payload;
@@ -368,10 +371,14 @@ self.addEventListener("push", event => {
         const previous = await cache.match(key);
         const seen = previous ? await previous.json() : [];
         if (Array.isArray(seen) && seen.includes(eventId)) return;
-        await self.registration.showNotification("Gokul Sweets", {
-            body: "A new account update is waiting in your notification inbox.",
+        const destination = notificationDestination(payload.url);
+        const custom = destination !== "/profile#account-notifications";
+        const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
+        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 240) : "A new account update is waiting in your notification inbox.";
+        await self.registration.showNotification(title, {
+            body, badge: "/notification-badge.svg",
             icon: "/icon-192.png", tag: `gokul-event-${eventId}`, renotify: false,
-            data: {url: "/profile#account-notifications"}
+            data: {url: destination}
         });
         await cache.put(key, new Response(JSON.stringify([...(Array.isArray(seen) ? seen : []), eventId].slice(-256)),
             {headers: {"Content-Type": "application/json"}}));
@@ -381,7 +388,7 @@ self.addEventListener("push", event => {
 self.addEventListener("notificationclick", event => {
     event.notification.close();
     event.waitUntil((async () => {
-        const url = new URL("/profile#account-notifications", self.location.origin).href;
+        const url = new URL(notificationDestination(event.notification.data?.url), self.location.origin).href;
         const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
         for (const client of windows) {
             const current = new URL(client.url);

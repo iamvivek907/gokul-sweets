@@ -58,8 +58,8 @@ public class WebPushTransport {
         } catch (Exception invalid) {return false;}
     }
 
-    public int send(String endpoint, String publicKey, String auth, long eventId) throws Exception {
-        var encrypted = prepare(endpoint, publicKey, auth, eventId);
+    public int send(String endpoint, String publicKey, String auth, long eventId, String title, String body, String url) throws Exception {
+        var encrypted = prepare(endpoint, publicKey, auth, eventId, title, body, url);
         var request = HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(10));
         encrypted.getHeaders().forEach(request::header);
         return client.send(request.POST(HttpRequest.BodyPublishers.ofByteArray(encrypted.getBody())).build(),
@@ -67,11 +67,24 @@ public class WebPushTransport {
     }
 
     nl.martijndwars.webpush.HttpRequest prepare(String endpoint, String publicKey, String auth, long eventId) throws Exception {
+        return prepare(endpoint, publicKey, auth, eventId, "Gokul Sweets", "A new account update is waiting in your inbox.", "/profile#account-notifications");
+    }
+
+    nl.martijndwars.webpush.HttpRequest prepare(String endpoint, String publicKey, String auth, long eventId, String title, String body, String url) throws Exception {
         if (!validEndpoint(endpoint) || !configured()) throw new IllegalStateException("Push delivery unavailable");
-        // Generic lock-screen copy: no phone, product, payment amount or order identifier.
-        String payload = "{\"title\":\"Gokul Sweets\",\"body\":\"A new account update is waiting in your notification inbox.\",\"eventId\":\"" + eventId + "\",\"url\":\"/profile#account-notifications\"}";
-        var service = new PushService(properties.getPublicKey(), properties.getPrivateKey(), properties.getSubject());
+        // Trusted event copy only: never customer phone, address, item contents or payment amounts.
+        String payload = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(java.util.Map.of(
+                "title", title, "body", body, "eventId", String.valueOf(eventId), "url", url));
+        var service = new RequestBuilder(properties.getPublicKey(), properties.getPrivateKey(), properties.getSubject());
         var notification = new Notification(endpoint, publicKey, auth, payload.getBytes(StandardCharsets.UTF_8), 60);
-        return service.prepareRequest(notification, Encoding.AES128GCM);
+        return service.encrypted(notification);
+    }
+    private static final class RequestBuilder extends PushService {
+        RequestBuilder(String publicKey, String privateKey, String subject) throws java.security.GeneralSecurityException {
+            super(publicKey, privateKey, subject);
+        }
+        nl.martijndwars.webpush.HttpRequest encrypted(Notification notification) throws Exception {
+            return prepareRequest(notification, Encoding.AES128GCM);
+        }
     }
 }

@@ -63,7 +63,7 @@ public class CustomerPushDispatcher {
                 finish(task, "SKIPPED", null); continue;
             }
             try {
-                int code = transport.send(task.endpoint(), task.publicKey(), task.auth(), task.eventId());
+                int code = transport.send(task.endpoint(), task.publicKey(), task.auth(), task.eventId(), task.title(), task.message(), task.url());
                 if (code >= 200 && code < 300) finish(task, "ACCEPTED", code);
                 else if (code == 404 || code == 410) {
                     transactions.executeWithoutResult(status -> {
@@ -81,13 +81,13 @@ public class CustomerPushDispatcher {
     private Task claim(String environment) {
         var tasks = jdbc.query("""
                 SELECT d.id, d.event_id, d.subscription_id, d.attempts, s.subject_id, s.endpoint,
-                    s.public_key, s.auth_secret, e.created_at
+                    s.public_key, s.auth_secret, e.created_at, e.title, e.message, e.target_type, e.target_id
                 FROM customer_push_deliveries d JOIN customer_push_subscriptions s ON s.id = d.subscription_id
                 JOIN customer_notification_events e ON e.id = d.event_id
                 WHERE d.state = 'QUEUED' AND d.next_attempt_at <= CURRENT_TIMESTAMP AND s.environment = ?
                 ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                 """, (rs, row) -> new Task(rs.getLong(1), rs.getLong(2), (UUID) rs.getObject(3), rs.getInt(4) + 1,
-                (UUID) rs.getObject(5), rs.getString(6), rs.getString(7), rs.getString(8), rs.getTimestamp(9).toInstant(), UUID.randomUUID()), environment);
+                (UUID) rs.getObject(5), rs.getString(6), rs.getString(7), rs.getString(8), rs.getTimestamp(9).toInstant(), rs.getString(10), rs.getString(11), destination(rs.getString(12), rs.getString(13)), UUID.randomUUID()), environment);
         if (tasks.isEmpty()) return null;
         var task = tasks.getFirst();
         jdbc.update("UPDATE customer_push_deliveries SET state = 'SENDING', attempts = ?, lease_token = ?, lease_until = CURRENT_TIMESTAMP + INTERVAL '30 seconds' WHERE id = ?",
@@ -111,6 +111,10 @@ public class CustomerPushDispatcher {
                 WHERE id = ? AND state = 'SENDING' AND lease_token = ?
                 """, code, task.id(), task.lease());
     }
+    private static String destination(String type, String id) {
+        String encoded = java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+        return "ORDER".equals(type) ? "/orders/" + encoded : "/occasions#occasion-" + encoded;
+    }
     private record Task(long id, long eventId, UUID subscriptionId, int attempts, UUID subject,
-                        String endpoint, String publicKey, String auth, Instant createdAt, UUID lease) {}
+                        String endpoint, String publicKey, String auth, Instant createdAt, String title, String message, String url, UUID lease) {}
 }

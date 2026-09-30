@@ -82,16 +82,16 @@ class CustomerPushIntegrationTest {
         preferences.save("DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
         var registration = preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
         long event = event();
-        when(transport.send(anyString(), anyString(), anyString(), eq(event))).thenReturn(201);
+        when(transport.send(anyString(), anyString(), anyString(), eq(event), anyString(), anyString(), anyString())).thenReturn(201);
         dispatcher.dispatchBatch(); dispatcher.dispatchBatch();
-        verify(transport, times(1)).send(anyString(), anyString(), anyString(), eq(event));
+        verify(transport, times(1)).send(anyString(), anyString(), anyString(), eq(event), anyString(), anyString(), anyString());
         assertThat(jdbc.queryForObject("SELECT state FROM customer_push_deliveries WHERE event_id = ?", String.class, event)).isEqualTo("ACCEPTED");
         long gone = event();
-        when(transport.send(anyString(), anyString(), anyString(), eq(gone))).thenReturn(410);
+        when(transport.send(anyString(), anyString(), anyString(), eq(gone), anyString(), anyString(), anyString())).thenReturn(410);
         dispatcher.dispatchBatch();
         assertThat(jdbc.queryForObject("SELECT revoked_at IS NOT NULL FROM customer_push_subscriptions WHERE id = ?", Boolean.class, registration.id())).isTrue();
         long later = event(); dispatcher.dispatchBatch();
-        verify(transport, never()).send(anyString(), anyString(), anyString(), eq(later));
+        verify(transport, never()).send(anyString(), anyString(), anyString(), eq(later), anyString(), anyString(), anyString());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM customer_notification_events WHERE subject_id = ?", Long.class, subject)).isEqualTo(3);
     }
 
@@ -100,15 +100,15 @@ class CustomerPushIntegrationTest {
         preferences.save("DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
         preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
         long event = event();
-        when(transport.send(anyString(), anyString(), anyString(), eq(event))).thenReturn(503);
+        when(transport.send(anyString(), anyString(), anyString(), eq(event), anyString(), anyString(), anyString())).thenReturn(503);
         dispatcher.dispatchBatch(); dispatcher.dispatchBatch();
-        verify(transport, times(1)).send(anyString(), anyString(), anyString(), eq(event));
+        verify(transport, times(1)).send(anyString(), anyString(), anyString(), eq(event), anyString(), anyString(), anyString());
         for (int i = 0; i < 2; i++) {
             jdbc.update("UPDATE customer_push_deliveries SET next_attempt_at = CURRENT_TIMESTAMP WHERE event_id = ?", event);
             dispatcher.dispatchBatch();
         }
         assertThat(jdbc.queryForObject("SELECT state FROM customer_push_deliveries WHERE event_id = ?", String.class, event)).isEqualTo("FAILED");
-        verify(transport, times(3)).send(anyString(), anyString(), anyString(), eq(event));
+        verify(transport, times(3)).send(anyString(), anyString(), anyString(), eq(event), anyString(), anyString(), anyString());
     }
 
     @Test
@@ -118,13 +118,13 @@ class CustomerPushIntegrationTest {
         preferences.save("DEV", subject, new CustomerAlertPreferences.Input(true, true, (minute + 1435) % 1440, (minute + 5) % 1440));
         preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
         long event = event(); dispatcher.dispatchBatch();
-        verify(transport, never()).send(anyString(), anyString(), anyString(), anyLong());
+        verify(transport, never()).send(anyString(), anyString(), anyString(), anyLong(), anyString(), anyString(), anyString());
         assertThat(jdbc.queryForObject("SELECT state FROM customer_push_deliveries WHERE event_id = ?", String.class, event)).isEqualTo("SKIPPED");
         preferences.save("DEV", subject, new CustomerAlertPreferences.Input(true, false, 1320, 480));
         long read = event();
         jdbc.update("UPDATE customer_notification_events SET read_at = CURRENT_TIMESTAMP WHERE id = ?", read);
         dispatcher.dispatchBatch();
-        verify(transport, never()).send(anyString(), anyString(), anyString(), anyLong());
+        verify(transport, never()).send(anyString(), anyString(), anyString(), anyLong(), anyString(), anyString(), anyString());
         assertThatThrownBy(() -> preferences.save("DEV", subject, new CustomerAlertPreferences.Input(true, true, 500, 500))).isInstanceOf(ResponseStatusException.class);
         assertThat(preferences.settings("PROD", subject).soundEnabled()).isFalse();
     }

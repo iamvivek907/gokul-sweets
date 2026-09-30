@@ -53,12 +53,13 @@ public class CustomerNotificationInbox {
                     target_type, target_id, title, message)
                 SELECT own.environment, own.verified_subject_id, 'payment:' || p.id || ':' || p.payment_status,
                     'PAYMENT_' || p.payment_status, 'ORDER', o.order_number,
-                    CASE p.payment_status WHEN 'PAID' THEN 'Payment received'
+                    CASE p.payment_status WHEN 'PAID' THEN 'Your order is confirmed'
                          WHEN 'REFUNDED' THEN 'Refund completed' ELSE 'Payment needs refund review' END,
-                    CASE p.payment_status WHEN 'PAID' THEN 'Your payment was verified. Open this order for its current fulfilment status.'
+                    CASE p.payment_status WHEN 'PAID' THEN 'Order ' || o.order_number || ' · ' || b.name || '. Payment verified. ' || CASE WHEN ps.id IS NOT NULL THEN 'Pickup booked for ' || to_char(ps.slot_date, 'DD Mon YYYY') || ', ' || to_char(ps.start_time, 'HH12:MI AM') || ' IST. We will notify you when preparation starts.' ELSE 'Open your order for its delivery window.' END
                          WHEN 'REFUNDED' THEN 'The payment provider confirmed your refund. Bank processing times may apply.'
                          ELSE 'This payment requires a refund review. This message does not confirm that money has been refunded.' END
                 FROM payments p JOIN orders o ON o.id = p.order_id
+                JOIN branches b ON b.id = o.branch_id LEFT JOIN pickup_slots ps ON ps.id = o.pickup_slot_id
                 JOIN verified_order_ownership own ON own.order_id = o.id
                 WHERE p.id = ? AND own.environment = ? AND p.payment_status IN ('PAID','REFUNDED','REFUND_PENDING')
                 ON CONFLICT (environment, subject_id, event_key) DO NOTHING
@@ -73,12 +74,33 @@ public class CustomerNotificationInbox {
                     target_type, target_id, title, message)
                 SELECT own.environment, own.verified_subject_id, 'order:' || o.id || ':' || o.order_status,
                     o.order_status, 'ORDER', o.order_number,
-                    CASE o.order_status WHEN 'READY_FOR_PICKUP' THEN 'Your order is ready for pickup'
-                         ELSE 'Your order is ready for delivery' END,
-                    CASE o.order_status WHEN 'READY_FOR_PICKUP' THEN 'The branch marked your order ready. Open the order for your pickup details.'
-                         ELSE 'The kitchen marked your order ready. Open the order for the current rider status; delivery has not been confirmed.' END
+                    CASE o.order_status WHEN 'CONFIRMED' THEN 'Your order is confirmed'
+                         WHEN 'PREPARING' THEN 'Freshly preparing your order'
+                         WHEN 'READY_FOR_PICKUP' THEN 'Your order is ready for pickup'
+                         WHEN 'READY_FOR_DELIVERY' THEN 'Your order is ready for delivery'
+                         WHEN 'OUT_FOR_DELIVERY' THEN 'Your order is on its way'
+                         WHEN 'PICKED_UP' THEN 'Pickup completed — thank you!'
+                         WHEN 'DELIVERED' THEN 'Your order has been delivered'
+                         WHEN 'PICKUP_WINDOW_EXPIRED' THEN 'Your pickup window has ended'
+                         WHEN 'NO_SHOW' THEN 'Your order was not collected'
+                         ELSE 'Your order was cancelled' END,
+                    'Order ' || o.order_number || ' · ' || b.name || '. ' ||
+                    CASE o.order_status WHEN 'CONFIRMED' THEN
+                            CASE WHEN ps.id IS NOT NULL THEN 'Pickup booked for ' || to_char(ps.slot_date, 'DD Mon YYYY') || ', ' || to_char(ps.start_time, 'HH12:MI AM') || ' IST. We will notify you when preparation starts.'
+                                 ELSE 'Your delivery booking is confirmed. Open the order for its delivery window.' END
+                         WHEN 'PREPARING' THEN 'Preparation has started. Please wait for the ready notification before arriving.'
+                         WHEN 'READY_FOR_PICKUP' THEN 'Your order is ready. Open your order for branch and booked pickup details.'
+                         WHEN 'READY_FOR_DELIVERY' THEN 'The kitchen has finished preparation. Rider dispatch is still pending.'
+                         WHEN 'OUT_FOR_DELIVERY' THEN 'The branch marked your order dispatched. Open the order for the latest delivery status.'
+                         WHEN 'PICKED_UP' THEN 'The branch confirmed your pickup. We hope you enjoy your order.'
+                         WHEN 'DELIVERED' THEN 'Delivery was confirmed by the branch. Thank you for ordering with us.'
+                         WHEN 'PICKUP_WINDOW_EXPIRED' THEN 'Please contact the branch to arrange late collection. This does not confirm a refund.'
+                         WHEN 'NO_SHOW' THEN 'The branch recorded that this order was not collected. Contact the branch for help; a refund has not been confirmed.'
+                         ELSE 'This order was cancelled. Check your order for payment or refund status.' END
                 FROM orders o JOIN verified_order_ownership own ON own.order_id = o.id
-                WHERE o.id = ? AND own.environment = ? AND o.order_status IN ('READY_FOR_PICKUP','READY_FOR_DELIVERY')
+                JOIN branches b ON b.id = o.branch_id LEFT JOIN pickup_slots ps ON ps.id = o.pickup_slot_id
+                WHERE o.id = ? AND own.environment = ? AND o.order_status IN
+                    ('CONFIRMED','PREPARING','READY_FOR_PICKUP','READY_FOR_DELIVERY','OUT_FOR_DELIVERY','PICKED_UP','DELIVERED','CANCELLED','PICKUP_WINDOW_EXPIRED','NO_SHOW')
                 ON CONFLICT (environment, subject_id, event_key) DO NOTHING
                 """, orderId, environment());
     }
@@ -92,7 +114,7 @@ public class CustomerNotificationInbox {
                 SELECT own.environment, own.verified_subject_id,
                     'delay:' || o.id || ':' || md5(o.delay_reported_at::text || o.estimated_ready_at::text || o.delay_reason),
                     'READY_TIME_CHANGED', 'ORDER', o.order_number, 'Your ready-time estimate changed',
-                    'The branch updated your ready-time estimate. Open the order for the latest time and explanation (IST).'
+                    'Order ' || o.order_number || ': revised ready time ' || to_char(o.estimated_ready_at, 'DD Mon YYYY, HH12:MI AM') || ' IST. Open your order for the branch explanation.'
                 FROM orders o JOIN verified_order_ownership own ON own.order_id = o.id
                 WHERE o.id = ? AND own.environment = ? AND o.order_status IN ('CONFIRMED','PREPARING')
                   AND o.delay_reported_at IS NOT NULL AND o.estimated_ready_at IS NOT NULL AND o.delay_reason IS NOT NULL

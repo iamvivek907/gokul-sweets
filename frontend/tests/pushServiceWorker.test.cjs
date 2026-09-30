@@ -32,3 +32,15 @@ test('malformed push cannot navigate arbitrary URLs or cause duplicate alarms', 
     runtime.listeners.push({data: {json: () => ({eventId: 'bad'})}, waitUntil() {throw new Error('Unexpected push');}});
     assert.equal(runtime.shown.length, 0);
 });
+test('closed-app push shows stage-specific copy and opens only the exact local order', async () => {
+    const runtime = worker();
+    let pending;
+    runtime.listeners.push({data: {json: () => ({eventId: '43', title: 'Your order is ready for pickup', body: 'Order GS-43 · Main branch. Ready for your booked pickup.', url: '/orders/GS-43'})}, waitUntil(value) {pending = value;}});
+    await pending;
+    assert.equal(runtime.shown[0].title, 'Your order is ready for pickup');
+    assert.match(runtime.shown[0].body, /Main branch/);
+    assert.equal(runtime.shown[0].badge, '/notification-badge.svg');
+    runtime.listeners.notificationclick({notification: {data: runtime.shown[0].data, close() {}}, waitUntil(value) {pending = value;}});
+    await pending;
+    assert.deepEqual(runtime.opened, ['https://dev.gokulsweets.in/orders/GS-43']);
+});

@@ -2,6 +2,7 @@
 
 import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
+import NotificationIcon from "@/components/customer/NotificationIcon";
 import CustomerAlertPreferences from "@/components/customer/CustomerAlertPreferences";
 import {apiClient, ApiError} from "@/services/apiClient";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
@@ -24,7 +25,7 @@ export default function CustomerNotificationInbox() {
             apiClient<Inbox>(`${base}/notifications`, {credentials: "include", signal}),
             apiClient<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal})
         ]);
-        setInbox(next); setPreferences(choices); setError("");
+        setInbox(next); setPreferences(choices); setError(""); window.dispatchEvent(new Event("gokul-inbox-changed"));
     }, []);
     useEffect(() => {
         const controller = new AbortController();
@@ -59,9 +60,8 @@ export default function CustomerNotificationInbox() {
         {!inbox && !error && <p role="status" className="mt-4">Loading your inbox…</p>}
         {inbox?.messages.length === 0 && <p className="mt-5 rounded-xl bg-[#fffaf2] p-4 text-sm">No messages yet. New verified payments and branch updates will appear here.</p>}
         <ul className="mt-5 space-y-3">
-            {inbox?.messages.map(item => <li key={item.id} className="rounded-2xl border border-[#eadfd6] p-4">
-                <div className="flex flex-wrap justify-between gap-2"><h3 className="font-semibold">{item.title}</h3>
-                    <span className="text-xs">{item.readAt ? "Read" : "Unread"}</span></div>
+            {inbox?.messages.map(item => <li key={item.id} className={`rounded-2xl border p-4 sm:p-5 ${item.readAt ? "border-[#eadfd6] bg-white" : "border-[#dfc4ab] bg-gradient-to-br from-[#fffaf2] to-white shadow-sm"}`}>
+                <div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5e9dd] text-[#7a1625]"><NotificationIcon kind={item.kind} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{item.title}</h3><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${item.readAt ? "bg-[#f5f1eb] text-[#756763]" : "bg-[#7a1625] text-white"}`}>{item.readAt ? "Read" : "Unread"}</span></div><p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-[#756763]">{item.targetType === "ORDER" ? "Order update" : "Occasion update"}</p></div></div>
                 <p className="mt-2 text-sm leading-6">{item.message}</p>
                 <time dateTime={item.createdAt} className="mt-2 block text-xs text-[#756763]">
                     {formatBusinessTimestamp(item.createdAt, {day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit"})} IST
