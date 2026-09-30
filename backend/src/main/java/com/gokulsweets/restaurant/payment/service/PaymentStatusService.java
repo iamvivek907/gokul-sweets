@@ -49,6 +49,7 @@ public class PaymentStatusService {
     private final PaymentReconciliationPolicy reconciliationPolicy;
     private final DeliveryRiderHoldService deliveryRiderHolds;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
+    private final com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts staffAlerts;
 
     // =========================================================
     // MARK PAID
@@ -363,6 +364,7 @@ public class PaymentStatusService {
         orderRepository.flush();
         paymentRepository.flush();
         notifications.paymentChanged(paymentId);
+        staffAlerts.paymentConfirmed(paymentId);
 
         log.info(
                 "Payment marked paid, order confirmed and rebate redemption processed: paymentId={}, orderId={}",
@@ -693,6 +695,7 @@ public class PaymentStatusService {
 
         paymentRepository.flush();
         notifications.paymentChanged(paymentId);
+        staffAlerts.paymentConfirmed(paymentId);
 
         log.info(
                 "Payment refund completed: paymentId={}, orderId={}, providerRefundId={}",

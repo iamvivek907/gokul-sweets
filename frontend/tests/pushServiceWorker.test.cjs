@@ -44,3 +44,14 @@ test('closed-app push shows stage-specific copy and opens only the exact local o
     await pending;
     assert.deepEqual(runtime.opened, ['https://dev.gokulsweets.in/orders/GS-43']);
 });
+test('staff push has a distinct event namespace and safe exact admin destination', async () => {
+    const runtime = worker(); let pending;
+    for (const payload of [{eventId: '44', title: 'Customer ready', body: 'Collect order', url: '/orders/GS-44'},
+        {eventId: 'staff:44', title: 'Preparation is due', body: 'Branch A: start preparing GS-44', url: '/admin/orders/GS-44'}]) {
+        runtime.listeners.push({data: {json: () => payload}, waitUntil(value) {pending = value;}}); await pending;
+    }
+    assert.equal(runtime.shown.length, 2);
+    assert.equal(runtime.shown[1].title, 'Preparation is due'); assert.equal(runtime.shown[1].data.staff, true);
+    runtime.listeners.notificationclick({notification: {data: runtime.shown[1].data, close() {}}, waitUntil(value) {pending = value;}}); await pending;
+    assert.deepEqual(runtime.opened, ['https://dev.gokulsweets.in/admin/orders/GS-44']);
+});

@@ -21,6 +21,7 @@ public class OccasionOrderFinalizer {
     private final JdbcTemplate jdbc;
     private final VerifiedCustomerPhoneLookup customers;
     private final OrderNumberGenerator orderNumbers;
+    private final com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts staffAlerts;
 
     public String create(UUID enquiryId, ConsentEnvironment environment, UUID subject,
                          long branchId, long pickupSlotId, BigDecimal gross) {
@@ -76,6 +77,7 @@ public class OccasionOrderFinalizer {
                 FROM occasion_payment_attempts WHERE enquiry_id = ? AND status = 'PAID'
                 """, orderId, enquiryId);
         jdbc.update("UPDATE occasion_enquiries SET order_id = ? WHERE id = ?", orderId, enquiryId);
+        jdbc.query("SELECT id FROM payments WHERE order_id = ? AND payment_status = 'PAID'", (rs, row) -> rs.getLong(1), orderId).forEach(staffAlerts::paymentConfirmed);
         return number;
     }
 

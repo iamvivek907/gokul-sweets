@@ -57,6 +57,7 @@ jobs:
           done
           node tests/customer-notification-inbox.browser.mjs
           node tests/customer-alerts.browser.mjs
+          node tests/staff-alerts.browser.mjs
 
   backend:
     runs-on: ubuntu-latest

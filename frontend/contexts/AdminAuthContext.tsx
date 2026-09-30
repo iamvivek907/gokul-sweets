@@ -31,7 +31,9 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
     }, []);
     useEffect(() => {
         const controller = new AbortController();
-        fetchAdminProfile(controller.signal).then(setProfile).catch(() => setProfile(null)).finally(() => setReady(true));
+        fetchAdminProfile(controller.signal).then(value => {if (!controller.signal.aborted) setProfile(value);})
+            .catch(() => {if (!controller.signal.aborted) setProfile(null);})
+            .finally(() => {if (!controller.signal.aborted) setReady(true);});
         const onExpired = () => {setProfile(null); setReady(true);};
         const onFocus = () => {void refresh();};
         let channel: BroadcastChannel | null = null;
