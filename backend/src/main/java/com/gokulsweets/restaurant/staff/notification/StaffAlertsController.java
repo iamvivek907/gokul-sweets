@@ -24,7 +24,7 @@ public class StaffAlertsController {
     private final StaffAlertEmail email;
     public record Settings(boolean enabled, String environment, long staffId, boolean pushConfigured,
                            String applicationServerKey, boolean deviceActive, boolean emailConfigured,
-                           int reminderMinutes, int escalationMinutes) {}
+                           int reminderMinutes, int escalationMinutes, boolean emailTestRouting) {}
     private long staff() {
         authorization.requirePermission(PermissionName.ORDER_VIEW);
         return authorization.getCurrentStaff().getId();
@@ -34,7 +34,7 @@ public class StaffAlertsController {
         long staffId = staff(); boolean enabled = alerts.enabled(), configured = enabled && push.configured();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new Settings(enabled, alerts.scope(), staffId, configured,
                 configured ? pushProperties.getPublicKey() : null, enabled && subscriptions.live(staffId, deviceId, StaffSessionService.cookie(request)),
-                enabled && email.recipient(staffId) != null, alerts.reminderMinutes(), alerts.escalationMinutes()));
+                enabled && email.recipient(staffId) != null, alerts.reminderMinutes(), alerts.escalationMinutes(), enabled && email.testRouting(staffId)));
     }
     @GetMapping public ResponseEntity<StaffOrderAlerts.Page> page(@RequestParam(required = false) Long before) {
         long staffId = staff(); enabled();

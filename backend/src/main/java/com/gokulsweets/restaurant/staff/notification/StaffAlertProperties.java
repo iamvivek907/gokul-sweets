@@ -16,4 +16,7 @@ public class StaffAlertProperties {
     private String emailRecipients = "{}";
     private String emailApiKey = "";
     private String emailFrom = "";
+    private String emailReplyTo = "";
+    private String emailTestRecipient = "";
+    private String emailSubjectPrefix = "[Gokul Sweets]";
 }

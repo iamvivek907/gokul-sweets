@@ -1,7 +1,7 @@
 import {adminFetch} from "@/services/adminApi";
 
 export type StaffAlertSettings = {enabled: boolean; environment: string; staffId: number; pushConfigured: boolean;
-    applicationServerKey: string | null; deviceActive: boolean; emailConfigured: boolean; reminderMinutes: number; escalationMinutes: number};
+    applicationServerKey: string | null; deviceActive: boolean; emailConfigured: boolean; emailTestRouting?: boolean; reminderMinutes: number; escalationMinutes: number};
 export type StaffAlert = {event: {id: number; orderNumber: string; branchId: number; kind: string; title: string; message: string; createdAt: string};
     readAt: string | null; actionRequired: boolean; pushState: string | null; emailState: string | null};
 export type StaffInbox = {messages: StaffAlert[]; unreadCount: number; nextBefore: number | null};

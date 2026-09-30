@@ -98,7 +98,7 @@ export default function StaffNotificationsPage() {
                 <div className="mt-5 rounded-2xl bg-[#fffaf2] p-4 text-sm leading-6">
                     <h3 className="font-semibold">Reminders and email follow-up</h3>
                     <p>Preparation reminders start {settings.reminderMinutes} minutes before the preparation window, followed by an alert when preparation is due. If an order is still waiting or preparing after its booked time, overdue alerts appear.</p>
-                    <p className="mt-2">{settings.emailConfigured ? `Email escalation is configured for your staff account, ${settings.escalationMinutes} minutes after the booked time if action is still missing.` : "Email escalation is not configured for your staff account. Ask your administrator to configure a verified recipient and email sender."} Reading an alert does not stop escalation; starting preparation or marking ready changes which action is still needed.</p>
+                    <p className="mt-2">{settings.emailTestRouting ? `DEV testing: unresolved email escalation is routed to the configured QA mailbox after ${settings.escalationMinutes} minutes. This does not verify delivery to each staff member.` : settings.emailConfigured ? `Email escalation is configured for your staff account, ${settings.escalationMinutes} minutes after the booked time if action is still missing.` : "Email escalation is not configured for your staff account. Ask your administrator to configure a verified recipient and email sender."} Reading an alert does not stop escalation; starting preparation or marking ready changes which action is still needed.</p>
                 </div>
             </section>
             <section className="mt-6" aria-label="Staff notification inbox">

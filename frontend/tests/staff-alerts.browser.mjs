@@ -4,6 +4,7 @@ const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
 const browser = await chromium.launch({headless: true});
 const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
+let testingEmail = false;
 let enabled = true, registered = false, read = false, denied = true, failDisable = true, failRead = true;
 let orderStatus = "CONFIRMED", firstPreparation = true, mutations = 0;
 const registrationId = "d1779266-3814-48cf-8f6d-8c23b832c1c3";
@@ -31,7 +32,7 @@ await context.route("**/api/**", async route => {
         branchIds: [1], permissions: ["ORDER_VIEW", "ORDER_START_PREPARATION", "ORDER_MARK_READY"]}, headers: {"X-Staff-CSRF": csrf, "Access-Control-Expose-Headers": "X-Staff-CSRF"}});
     if (path === "/api/admin/notifications/settings") json = {enabled, environment: "DEV", staffId: 12, pushConfigured: true,
         applicationServerKey: Buffer.concat([Buffer.from([4]), Buffer.alloc(64)]).toString("base64url"), deviceActive: registered,
-        emailConfigured: false, reminderMinutes: 10, escalationMinutes: 5};
+        emailConfigured: testingEmail, emailTestRouting: testingEmail, reminderMinutes: 10, escalationMinutes: 5};
     else if (path === "/api/admin/notifications") json = {messages: [{event: {id: 1, orderNumber: "STAFF-ORDER", branchId: 1,
         kind: "PREPARATION_OVERDUE", title: "Preparation is overdue", message: "Order STAFF-ORDER · Main branch. Booked pickup 01 Oct 2026, 6:00 pm IST has passed. Take action.",
         createdAt: "2026-10-01T12:30:00Z"}, readAt: read ? "2026-10-01T12:31:00Z" : null, actionRequired: orderStatus === "CONFIRMED", emailState: null, pushState: null}], unreadCount: read ? 0 : 1, nextBefore: null};
@@ -98,6 +99,9 @@ try {
     await page.getByText("READY FOR PICKUP", {exact: true}).waitFor();
     await page.setViewportSize({width: 1440, height: 1000});
     if (process.env.ALERT_SCREENSHOT_DIR) await page.screenshot({path: `${process.env.ALERT_SCREENSHOT_DIR}/staff-order-desktop.png`, fullPage: true});
+    testingEmail = true; await page.goto(`${base}/admin/staff-notifications`);
+    await page.getByText("DEV testing: unresolved email escalation", {exact: false}).waitFor();
+    assert.equal(await page.getByText("This does not verify delivery to each staff member.", {exact: false}).count(), 1);
     enabled = false; await page.goto(`${base}/admin/staff-notifications`);
     await page.getByText("Staff alerts are not enabled yet.", {exact: false}).waitFor();
     assert.equal(await page.getByRole("button", {name: "Enable staff push for this browser"}).count(), 0);
