@@ -5,13 +5,13 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:390,height:844}});
 let box=null,branding=null,uploads=0;
 const existing={id:7,name:"Existing wedding box",dimensions:"20 × 15 × 5 cm",material:"Food-safe card",branding:"Ribbon",compartments:3,capacityPieces:8,leadDays:3,price:15,published:true,imageUrl:null,imageUrls:[],capacityGrams:500};
-let boxes=[existing],catalogueError=false;
+let boxes=[existing],catalogueError=false,authOutage=false,authExpired=false;
 const csrf="occasion-csrf";
 const branches=[{id:1,name:"First branch",active:true},{id:2,name:"Gifting branch",active:true}];
 await context.route("**/api/**",async route=>{
  const request=route.request(),path=new URL(request.url()).pathname;let json=[];
  if(request.method()==="OPTIONS")return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Methods":"GET,POST,PUT,OPTIONS","Access-Control-Allow-Headers":"content-type,x-staff-csrf"}});
- if(path==="/api/admin/auth/me")return route.fulfill({json:{staffId:77,username:"owner",fullName:"Owner",roleName:"OWNER_ADMIN",branchIds:[1,2],permissions:["MENU_MANAGE","ORDER_VIEW"]},headers:{"X-Staff-CSRF":csrf,"Access-Control-Expose-Headers":"X-Staff-CSRF"}});
+ if(path==="/api/admin/auth/me"){if(authExpired)return route.fulfill({status:401,json:{}});if(authOutage)return route.fulfill({status:503,json:{}});return route.fulfill({json:{staffId:77,username:"owner",fullName:"Owner",roleName:"OWNER_ADMIN",branchIds:[1,2],permissions:["MENU_MANAGE","ORDER_VIEW"]},headers:{"X-Staff-CSRF":csrf,"Access-Control-Expose-Headers":"X-Staff-CSRF"}});}
  if(path==="/api/branches")json=branches;
  else if(path.endsWith("/occasion-enquiries/planning"))json={today:"2026-09-30",days:Array.from({length:7},(_,n)=>({date:`2026-10-0${n+1}`,orderCount:0,needsReview:0,committedOrders:0,products:[]}))};
  else if(path.includes("occasion-catalogue")) {
@@ -38,6 +38,13 @@ try {
  assert.equal(await page.getByLabel("Box name",{exact:false}).inputValue(),existing.name);
  assert.equal(await page.getByLabel("Food weight capacity",{exact:true}).inputValue(),"500");
  await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).fill("18");
+ // Focus verification must preserve mounted inputs, even if the session endpoint is down.
+ authOutage=true;const failedSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===503);
+ await page.evaluate(()=>window.dispatchEvent(new Event("focus")));
+ await failedSession;
+ await page.waitForTimeout(150);assert.match(page.url(),/occasion-enquiries/);
+ assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
+ authOutage=false;const verifiedSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===200);await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await verifiedSession;
  await page.getByRole("button",{name:"Refresh now",exact:true}).click();
  assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
  console.log("PACKAGING VALIDATION",await page.getByRole("button",{name:"Save packaging",exact:true}).evaluate(button=>Array.from(button.form.elements).filter(element=>element.willValidate&&!element.validity.valid).map(element=>({name:element.outerHTML,value:element.value,message:element.validationMessage}))));
@@ -83,5 +90,6 @@ try {
  await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
  assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
  assert.equal(await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).count(),1);
+ authExpired=true;const expiredSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===401);await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await expiredSession;await page.waitForURL("**/admin/login");
  console.log("PASS: per-staff branch retention, multi-photo uploads/preview/removal, CSRF/branch scope, campaign publication and mobile fit.");
 }catch(error){console.error("ADMIN BOX",JSON.stringify({box,boxes}));console.error("ADMIN BODY",await page.locator("body").innerText());throw error;}finally{await browser.close();}

@@ -40,7 +40,8 @@ export async function confirmStaffMfa(token: string, code: string): Promise<{pro
 export async function fetchAdminProfile(signal?: AbortSignal): Promise<AdminProfile | null> {
     const response = await fetch(`${API_BASE}/api/admin/auth/me`,
         {credentials: "include", cache: "no-store", signal});
-    if (!response.ok) {csrfToken = null; return null;}
+    if (response.status === 401 || response.status === 403) {csrfToken = null; return null;}
+    if (!response.ok) throw new Error("Unable to verify staff session. Try again.");
     rememberCsrf(response);
     return response.json();
 }
