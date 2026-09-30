@@ -184,7 +184,7 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 .future-storefront .occasion-gallery{padding:1rem;border:1px solid #d9e5df;border-radius:1.5rem;background:#fffaf2}
 .future-storefront .occasion-gallery>img{width:100%;max-height:360px;object-fit:contain;border-radius:1rem;background:#f1eee5}
 .future-storefront .occasion-gallery>div{display:flex;gap:.5rem;margin:1rem 0;overflow-x:auto}.future-storefront .occasion-gallery button{padding:3px;flex:none}.future-storefront .occasion-gallery button img{width:80px;height:64px;object-fit:cover;border-radius:1rem}
-.future-storefront .occasion-selection{position:sticky;bottom:6.5rem;z-index:10;border:1px solid #b9ccc4;border-radius:1.25rem;background:#fffaf2;padding:1.25rem;box-shadow:0 8px 24px #09272518}
+.future-storefront .occasion-selection{position:static;border:1px solid #b9ccc4;border-radius:1.25rem;background:#fffaf2;padding:1.25rem;box-shadow:0 8px 24px #09272518}
 .future-storefront .occasion-selection ul{max-height:160px;overflow:auto;margin:.75rem 0}.future-storefront .occasion-selection li{display:flex;align-items:center;justify-content:space-between;gap:.75rem;border-bottom:1px solid #d9e5df;padding:.5rem 0;font-size:.85rem}.future-storefront .occasion-selection li button{min-height:44px;text-decoration:underline;color:#8d3927}
 .future-storefront .occasion-tracker{background:#eff4ef;border:1px solid #c9d9d0;border-radius:1.5rem;padding:clamp(1rem,3vw,2rem)}
 .future-storefront .occasion-tracker-heading{display:flex;justify-content:space-between;gap:1rem;align-items:center}
@@ -195,3 +195,5 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 .future-storefront .occasion-categories button{position:relative;display:flex;flex-direction:column;justify-content:flex-start}
 .future-storefront .occasion-categories button[aria-pressed="true"] strong::after{content:none!important}
 .future-storefront .occasion-categories button[aria-pressed="true"]::before{content:"✓";position:absolute;top:.65rem;right:.65rem;z-index:1;display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:50%;background:#fffaf2;color:#143936;font-weight:800}
+
+.future-storefront .occasion-packing-action{min-height:48px;border:1px solid #143936;border-radius:1rem;background:#143936!important;color:#fffaf2!important;padding:.75rem 1.25rem;font-weight:700}.future-storefront .occasion-packing-action:disabled{background:#dde7e0!important;color:#173a37!important;border-color:#b9ccc4}

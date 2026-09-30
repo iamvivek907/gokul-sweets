@@ -78,7 +78,7 @@ public class StaffAlertDispatcher {
                 finish(task, "SKIPPED", null); continue;
             }
             try {
-                String path = "/admin/orders/" + java.net.URLEncoder.encode(task.event().orderNumber(), java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
+                String path = task.event().targetUrl();
                 int code = task.channel().equals("PUSH")
                     ? push.sendStaff(task.endpoint(), task.publicKey(), task.auth(), task.event().id(), task.event().title(), task.event().message(), path)
                     : email.send(task.staffId(), task.event().title(), task.event().message(), task.event().orderNumber(), task.event().id());
@@ -97,9 +97,9 @@ public class StaffAlertDispatcher {
     }
     private Task claim() {
         var tasks = jdbc.query("""
-            SELECT e.*, o.order_number, d.id delivery_id, d.staff_id, d.channel, d.subscription_id, d.attempts,
+            SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) order_number, d.id delivery_id, d.staff_id, d.channel, d.subscription_id, d.attempts,
               s.endpoint, s.public_key, s.auth_secret FROM staff_alert_deliveries d
-            JOIN staff_order_alerts e ON e.id = d.event_id JOIN orders o ON o.id = e.order_id
+            JOIN staff_order_alerts e ON e.id = d.event_id LEFT JOIN orders o ON o.id = e.order_id
             LEFT JOIN staff_push_subscriptions s ON s.id = d.subscription_id
             WHERE e.environment = ? AND d.state = 'QUEUED' AND d.next_attempt_at <= CURRENT_TIMESTAMP
             ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED

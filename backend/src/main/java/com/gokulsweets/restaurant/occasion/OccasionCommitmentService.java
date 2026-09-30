@@ -33,6 +33,7 @@ public class OccasionCommitmentService {
     private static final Duration PAYMENT_WINDOW = Duration.ofMinutes(10);
     private final JdbcTemplate jdbc;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
+    private final com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts staffAlerts;
     private final TransactionTemplate transactions;
     private final InventoryReservationService inventory;
     private final BranchInventoryPolicyRepository policies;
@@ -329,6 +330,7 @@ public class OccasionCommitmentService {
                     """, fullyPaid ? "CONFIRMED" : "PAID", paid,
                     fullyPaid ? Timestamp.from(clock.instant()) : null, id);
             event(id, "provider", enquiry.status(), fullyPaid ? "CONFIRMED" : "PAID", "Deposit verified");
+            staffAlerts.occasionChanged(id,true);
         } else {
             BigDecimal paid = enquiry.paid().add(attempt.amount());
             if (!"PAID".equals(enquiry.status()) || paid.compareTo(enquiry.quote()) != 0)

@@ -87,6 +87,21 @@ class StaffOrderAlertsIntegrationTest {
     private void status(String status) {jdbc.update("UPDATE orders SET order_status = ? WHERE id = ?", status, order); entities.clear();}
     private long latest() {return alerts.page(staff, null).messages().getFirst().event().id();}
 
+    @Test void occasionRequestsUseScopedDeduplicatedStaffInboxAndPushTargets() throws Exception {
+        jdbc.update("INSERT INTO role_permissions(role_id,permission_id) SELECT ?,id FROM permissions WHERE name='APPROVAL_MANAGE'",role);
+        subscriptions.subscribe(staff,cookie,input("occasion-"+UUID.randomUUID()));
+        UUID subject=UUID.randomUUID(),request=UUID.randomUUID();
+        jdbc.update("INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES(?,'DEV','+919876543299')",subject);
+        jdbc.update("INSERT INTO occasion_enquiries(id,environment,subject_id,branch_id,occasion_type,service_date,guest_count,fulfilment,status) VALUES(?,'DEV',?,?,'Mixed gifts','2026-10-03',1000,'PICKUP','REQUESTED')",request,subject,branch);
+        alerts.occasionChanged(request,false);alerts.occasionChanged(request,false);
+        var inbox=alerts.page(staff,null);assertThat(inbox.messages()).hasSize(1);assertThat(inbox.unreadCount()).isEqualTo(1);
+        var event=inbox.messages().getFirst().event();assertThat(event.enquiryId()).isEqualTo(request);assertThat(event.targetUrl()).isEqualTo("/admin/occasion-enquiries?branch="+branch+"&enquiry="+request);assertThat(inbox.messages().getFirst().actionRequired()).isTrue();
+        assertThat(alerts.page(otherStaff,null).messages()).isEmpty();
+        when(push.sendStaff(anyString(),anyString(),anyString(),eq(event.id()),anyString(),anyString(),eq(event.targetUrl()))).thenReturn(201);
+        dispatcher.dispatchBatch();verify(push).sendStaff(anyString(),anyString(),anyString(),eq(event.id()),anyString(),anyString(),eq(event.targetUrl()));
+        jdbc.update("UPDATE occasion_enquiries SET status='QUOTED' WHERE id=?",request);alerts.occasionReviewed(request);
+        assertThat(alerts.page(staff,null).unreadCount()).isZero();assertThat(alerts.actionable(event)).isFalse();
+    }
     @Test void markAllReadPreservesLaterAlertsOtherStaffAndUnresolvedActions() {
         alerts.paymentConfirmed(payment);
         long snapshot=alerts.page(staff,null).readThrough();

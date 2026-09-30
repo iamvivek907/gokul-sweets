@@ -11,6 +11,7 @@ await context.route("**/api/**",async route=>{
  if(request.method()==="OPTIONS")return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Methods":"GET,POST,PUT,OPTIONS","Access-Control-Allow-Headers":"content-type,x-staff-csrf"}});
  if(path==="/api/admin/auth/me")return route.fulfill({json:{staffId:77,username:"owner",fullName:"Owner",roleName:"OWNER_ADMIN",branchIds:[1,2],permissions:["MENU_MANAGE","ORDER_VIEW"]},headers:{"X-Staff-CSRF":csrf,"Access-Control-Expose-Headers":"X-Staff-CSRF"}});
  if(path==="/api/branches")json=branches;
+ else if(path.endsWith("/occasion-enquiries/planning"))json={today:"2026-09-30",days:Array.from({length:7},(_,n)=>({date:`2026-10-0${n+1}`,orderCount:0,needsReview:0,committedOrders:0,products:[]}))};
  else if(path.includes("occasion-catalogue")) {
   if(request.method()!=="GET") {assert.equal(request.headers()["x-staff-csrf"],csrf);assert.ok(path.includes("/branches/2/"));}
   if(path.endsWith("/photos")){uploads++;return route.fulfill({json:{url:`https://images.example.invalid/upload-${uploads}.png`}});}
@@ -31,6 +32,7 @@ try {
  await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
  await page.getByLabel("Box name").fill("Celebration collection");
  await page.getByLabel("Dimensions",{exact:false}).fill("18 × 12 × 4 cm");
+ await page.getByLabel("Food weight capacity",{exact:true}).selectOption("500");
  await page.getByLabel("Material",{exact:false}).fill("Food-safe card");
  const photo={name:"photo.png",mimeType:"image/png",buffer:Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aWo0AAAAASUVORK5CYII=","base64")};
  await page.getByLabel("Upload packaging photos",{exact:true}).setInputFiles([photo,{...photo,name:"inside.png"}]);
@@ -38,7 +40,7 @@ try {
  await page.getByLabel("Publish packaging",{exact:false}).check();
  await page.getByRole("button",{name:"Save packaging",exact:true}).click();
  await page.getByText("Catalogue saved.",{exact:false}).waitFor();
- assert.equal(box.imageUrls.length,2);assert.equal(box.imageUrl,box.imageUrls[0]);assert.equal(box.published,true);
+ assert.equal(box.imageUrls.length,2);assert.equal(box.imageUrl,box.imageUrls[0]);assert.equal(box.published,true);assert.equal(box.capacityGrams,500);
  await page.getByLabel("Campaign headline",{exact:false}).fill("Celebrate with Gokul");
  await page.getByLabel("Campaign description",{exact:false}).fill("A thoughtful gift for every guest");
  await page.getByLabel("Upload campaign photo",{exact:false}).setInputFiles(photo);

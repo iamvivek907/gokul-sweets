@@ -27,6 +27,7 @@ public class OccasionEnquiryController {
     private final OccasionPackingFinalizer packing;
     private final OccasionCommitmentService commitments;
     private final OccasionProductionReadinessService readiness;
+    private final OccasionProductionWorkspace workspace;
     private final OccasionCancellationService cancellations;
     private final EnhancementProperties features;
     private final Environment settings;
@@ -76,9 +77,25 @@ public class OccasionEnquiryController {
 
     @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries")
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
-    public List<OccasionEnquiryService.Summary> staffList(@PathVariable long branchId) {
+    public List<OccasionEnquiryService.Summary> staffList(@PathVariable long branchId,@RequestParam(required=false) java.time.LocalDate serviceDate,@RequestParam(required=false) UUID before) {
         staff.requireBranchAccess(branchId);
-        return service.staffList(environment(), branchId);
+        return serviceDate==null?service.staffList(environment(),branchId):service.staffList(environment(),branchId,serviceDate,before);
+    }
+
+    @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/planning")
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    public OccasionProductionWorkspace.Week planning(@PathVariable long branchId,@RequestParam(required=false) java.time.LocalDate from) {
+        staff.requireBranchAccess(branchId);return workspace.week(environment(),branchId,from);
+    }
+    @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}")
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    public OccasionEnquiryService.Summary staffRequest(@PathVariable long branchId,@PathVariable UUID id) {
+        staff.requireBranchAccess(branchId);return service.staffGet(environment(),branchId,id);
+    }
+    @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/production/{date}/{productId}/approve")
+    @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
+    public java.util.Map<String,Integer> approveProduction(@PathVariable long branchId,@PathVariable java.time.LocalDate date,@PathVariable long productId,@RequestBody OccasionProductionWorkspace.Approval input) {
+        staff.requireBranchAccess(branchId);return java.util.Map.of("updatedCount",workspace.approve(environment(),branchId,date,productId,input.token(),staff.getCurrentStaff().getUsername()));
     }
 
     @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/quote")

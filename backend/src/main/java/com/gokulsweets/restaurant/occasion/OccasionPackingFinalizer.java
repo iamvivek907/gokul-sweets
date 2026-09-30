@@ -59,18 +59,21 @@ public class OccasionPackingFinalizer {
                     || "GRAM".equals(old.unit())&&actual.compareTo(new BigDecimal("250"))<0
                     || "PIECE".equals(old.unit())&&actual.compareTo(old.requestedQuantity())!=0)
                 invalid("Enter whole grams (at least 250 g) or retain all requested pieces.");
-            BigDecimal foodBase=OccasionQuoteCalculator.money(old.unitPrice().multiply("GRAM".equals(old.unit())?actual.movePointLeft(3):actual));
+            if("GRAM".equals(old.requestedUnit()) && actual.compareTo(old.requestedQuantity())<0)invalid("Packed weight must supply at least the customer's requested kg and weight packs.");
+            if(old.requestedSupplementalGrams()!=null && old.requestedSupplementalGrams().signum()>0 && actual.compareTo(old.requestedSupplementalGrams())<=0)invalid("Final weight must include the additional kg and all mixed-box pieces.");
+            BigDecimal originalBase=OccasionQuoteCalculator.money(old.unitPrice().multiply("GRAM".equals(old.unit())?actual.movePointLeft(3):actual));
+            BigDecimal foodBase=OccasionQuoteCalculator.discounted(originalBase,old.rebatePercent(),quote.bulkRebatePercent());
             BigDecimal foodTax=OccasionQuoteCalculator.money(foodBase.multiply(old.cgstRate().add(old.sgstRate())).movePointLeft(2));
             base=base.add(foodBase);tax=tax.add(foodTax);
             lines.add(new OccasionQuoteCalculator.Line(old.productId(),old.name(),old.unit(),old.requestedQuantity(),old.requestedUnit(),old.unitPrice(),old.pieceGrams(),actual,
-                old.cgstRate(),old.sgstRate(),foodBase,foodTax,BigDecimal.ZERO,foodBase.add(foodTax)));
+                old.cgstRate(),old.sgstRate(),foodBase,foodTax,BigDecimal.ZERO,foodBase.add(foodTax),old.rebatePercent(),originalBase,originalBase.subtract(foodBase),old.requestedSupplementalGrams()));
         }
         BigDecimal food=base.add(tax),allocated=BigDecimal.ZERO;
         for(int n=0;n<lines.size();n++) {
             var line=lines.get(n);
             BigDecimal part=n==lines.size()-1?quote.packagingTotal().subtract(allocated):quote.packagingTotal().multiply(line.grossAmount()).divide(food,2,RoundingMode.HALF_UP).min(quote.packagingTotal().subtract(allocated));
             allocated=allocated.add(part);BigDecimal gross=line.grossAmount().add(part);
-            var updated=new OccasionQuoteCalculator.Line(line.productId(),line.name(),line.unit(),line.requestedQuantity(),line.requestedUnit(),line.unitPrice(),line.pieceGrams(),line.productionQuantity(),line.cgstRate(),line.sgstRate(),line.foodBase(),line.foodTax(),part,gross);
+            var updated=new OccasionQuoteCalculator.Line(line.productId(),line.name(),line.unit(),line.requestedQuantity(),line.requestedUnit(),line.unitPrice(),line.pieceGrams(),line.productionQuantity(),line.cgstRate(),line.sgstRate(),line.foodBase(),line.foodTax(),part,gross,line.rebatePercent(),line.originalFoodBase(),line.rebateAmount(),line.requestedSupplementalGrams());
             lines.set(n,updated);
             BigDecimal subtotal=gross.divide(BigDecimal.ONE.add(line.cgstRate().add(line.sgstRate()).movePointLeft(2)),2,RoundingMode.HALF_UP);
             jdbc.update("""
@@ -87,7 +90,7 @@ public class OccasionPackingFinalizer {
         BigDecimal total=food.add(quote.packagingTotal()),remaining=total.subtract(request.paidAmount());
         if(total.compareTo(new BigDecimal("9999999999.99"))>0) invalid("Final invoice exceeds the supported amount.");
         var finalCalculation=new OccasionQuoteCalculator.Calculation(List.copyOf(lines),base,tax,quote.packagingTotal(),total,request.depositAmount(),remaining.max(BigDecimal.ZERO),
-            quote.expiresAt(),cutoff,quote.expectedReadyAt(),quote.extras(),true);
+            quote.expiresAt(),cutoff,quote.expectedReadyAt(),quote.extras(),true,quote.bulkRebatePercent(),lines.stream().map(OccasionQuoteCalculator.Line::rebateAmount).reduce(BigDecimal.ZERO,BigDecimal::add),quote.packingCharges());
         int revision=request.packingRevision()+1;
         jdbc.update("""
             INSERT INTO occasion_packing_finalizations(enquiry_id,revision,original_estimate,final_amount,calculation,actor)

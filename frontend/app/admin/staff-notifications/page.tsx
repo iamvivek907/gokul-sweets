@@ -125,7 +125,7 @@ export default function StaffNotificationsPage() {
                     <p className="mt-3 break-words text-sm leading-6">{item.event.message}</p>
                     <time dateTime={item.event.createdAt} className="mt-3 block text-xs text-[#756763]">{formatBusinessTimestamp(item.event.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST · {item.readAt ? "Read" : "Unread"}</time>
                     {item.emailState && <p className="mt-2 text-xs">Email follow-up: {item.emailState === "ACCEPTED" ? "accepted by provider; inbox delivery not confirmed" : item.emailState === "FAILED" ? "could not send; use the queue" : item.emailState === "SKIPPED" ? "skipped after action or configuration changed" : "waiting or retrying"}.</p>}
-                    <div className="mt-3 flex flex-wrap gap-4"><Link href={`/admin/orders/${encodeURIComponent(item.event.orderNumber)}`} className="flex min-h-11 items-center text-sm font-bold text-[#173c39] underline">Open order {item.event.orderNumber}</Link>
+                    <div className="mt-3 flex flex-wrap gap-4"><Link href={item.event.targetUrl??`/admin/orders/${encodeURIComponent(item.event.orderNumber)}`} className="flex min-h-11 items-center text-sm font-bold text-[#173c39] underline">{item.event.enquiryId?"Open bulk request":"Open order"} {item.event.orderNumber}</Link>
                         {!item.readAt && <button type="button" disabled={busy} onClick={() => void perform(async () => {
                             await staffAlertsRequest(`/${item.event.id}/read`, {method: "PUT"}); await load(); window.dispatchEvent(new Event("gokul-staff-inbox-changed"));
                         })} className="min-h-11 text-sm underline">Mark as read</button>}</div>

@@ -39,6 +39,7 @@ class OccasionCommitmentIntegrationTest {
     @Autowired Clock clock;
     @Autowired OccasionQuoteCalculator calculator;
     @Autowired OccasionPackingFinalizer packing;
+    @Autowired OccasionProductionWorkspace workspace;
     @Autowired com.gokulsweets.restaurant.reporting.AnalyticsRefreshService analytics;
     @MockitoBean PhonePeClient phonePe;
 
@@ -543,6 +544,72 @@ class OccasionCommitmentIntegrationTest {
             assertThat(result.box().compartments()).isEqualTo(1);assertThat(result.recipe()).hasSize(3);assertThat(result.includeSpoons()).isTrue();
             assertThat(result.packagingEstimate()).isEqualByComparingTo("6000");
         }finally{features.setOccasionEnquiries(enabled);}
+    }
+
+    @Test
+    void mixedGroupsKgSplitsAndRebatesSurviveFinalMeasuredInvoice() {
+        var f=paidDeposit();boolean enabled=features.isOccasionEnquiries(),bulk=features.isOccasionBulkProduction();
+        try {
+            features.setOccasionEnquiries(true);features.setOccasionBulkProduction(true);
+            jdbc.update("UPDATE products SET sale_mode='WEIGHT',base_price=400 WHERE id=?",f.product());
+            jdbc.update("INSERT INTO branch_products(branch_id,product_id,occasion_published,occasion_piece_grams) VALUES(?,?,TRUE,20)",f.branch(),f.product());
+            var ids=new java.util.ArrayList<Long>();
+            for(int n=0;n<3;n++) {
+                long product=jdbc.queryForObject("INSERT INTO products(code,category_id,name,base_price,tax_category_id,sale_mode) SELECT ?,category_id,?, ?,tax_category_id,? FROM products WHERE id=? RETURNING id",Long.class,"PACK-"+UUID.randomUUID(),n==2?"Paneer":"Mixed sweet "+n,n==2?300:10,n==2?"WEIGHT":"UNIT",f.product());
+                jdbc.update("INSERT INTO branch_products(branch_id,product_id,occasion_published) VALUES(?,?,TRUE)",f.branch(),product);ids.add(product);
+            }
+            var box=catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,"400 ml plastic",null,"400 ml","Plastic",1,3,new BigDecimal("10"),"",1,true));
+            var boxes=new java.util.HashMap<Integer,OccasionCatalogue.Box>();
+            for(int grams:java.util.List.of(1000,500,250))boxes.put(grams,catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,grams+" g box",null,"Reviewed dimensions","Food-safe cardboard",1,100,BigDecimal.valueOf(grams==1000?20:grams==500?12:8),"",1,true,java.util.List.of(),grams)));
+            var groups=java.util.List.of(
+                new OccasionCatalogue.PackingGroup("MIXED",box.id(),1000,java.util.List.of(new OccasionCatalogue.Recipe(f.product(),1),new OccasionCatalogue.Recipe(ids.get(0),1),new OccasionCatalogue.Recipe(ids.get(1),1)),null,null,null,true),
+                new OccasionCatalogue.PackingGroup("WEIGHT",boxes.get(1000).id(),10,java.util.List.of(),f.product(),new BigDecimal("10000"),1000,false),
+                new OccasionCatalogue.PackingGroup("WEIGHT",boxes.get(500).id(),10,java.util.List.of(),f.product(),new BigDecimal("5000"),500,false),
+                new OccasionCatalogue.PackingGroup("WEIGHT",boxes.get(250).id(),20,java.util.List.of(),f.product(),new BigDecimal("5000"),250,false));
+            var items=java.util.List.of(new OccasionEnquiryService.Item(f.product(),new BigDecimal("1000"),OccasionEnquiryService.Unit.PIECE,"",null,null,new BigDecimal("20000")),
+                new OccasionEnquiryService.Item(ids.get(0),new BigDecimal("1000"),OccasionEnquiryService.Unit.PIECE,""),new OccasionEnquiryService.Item(ids.get(1),new BigDecimal("1000"),OccasionEnquiryService.Unit.PIECE,""),
+                new OccasionEnquiryService.Item(ids.get(2),new BigDecimal("100000"),OccasionEnquiryService.Unit.GRAM,""));
+            var date=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(3);
+            var request=enquiries.submit(ConsentEnvironment.DEV,f.subject(),new OccasionEnquiryService.Request(f.branch(),"Assorted gifts & bulk",date,1000,OccasionEnquiryService.Fulfilment.PICKUP,null,"",items,null,groups));
+            assertThat(request.packingGroups()).hasSize(4);assertThat(request.items().stream().filter(x->x.productId()==f.product()).findFirst().orElseThrow().supplementalGrams()).isEqualByComparingTo("20000");
+            assertThat(catalogue.catalogue(f.branch(),false).sweets().stream().filter(x->x.id()==f.product()).findFirst().orElseThrow().unitPrice()).isEqualByComparingTo("400");
+            var rates=java.util.List.of(new OccasionQuoteCalculator.Rate(f.product(),null,null,null,new BigDecimal("10")),new OccasionQuoteCalculator.Rate(ids.get(0),null,null,null),new OccasionQuoteCalculator.Rate(ids.get(1),null,null,null),new OccasionQuoteCalculator.Rate(ids.get(2),null,null,null));
+            var input=new OccasionQuoteCalculator.Input(rates,new BigDecimal("25"),null,true,java.time.LocalTime.of(10,0),"Agreed food rebates; packing is separate",true,java.util.List.of(new OccasionQuoteCalculator.Extra("Plastic spoons",1000,BigDecimal.ONE)),null,new BigDecimal("5"),java.util.List.of());
+            var calc=calculator.preview(ConsentEnvironment.DEV,f.branch(),request.id(),input);
+            assertThat(calc.total()).isEqualByComparingTo("75719");assertThat(calc.rebateTotal()).isEqualByComparingTo("4820");assertThat(calc.packagingTotal()).isEqualByComparingTo("11480");assertThat(calc.packingCharges()).hasSize(4);
+            assertThatThrownBy(()->catalogue.validateGroups(f.branch(),date,items,java.util.List.of(new OccasionCatalogue.PackingGroup("WEIGHT",boxes.get(500).id(),21,java.util.List.of(),f.product(),new BigDecimal("21000"),1000,false)))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            var quoted=calculator.approve(ConsentEnvironment.DEV,f.branch(),request.id(),"manager",new OccasionQuoteCalculator.Input(rates,new BigDecimal("25"),null,true,java.time.LocalTime.of(10,0),input.terms(),true,input.extras(),calc.total(),new BigDecimal("5"),java.util.List.of()));
+            assertThat(quoted.packingGroups()).hasSize(4);
+            var today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));long slot=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity,booked_count) VALUES(?,?,'00:00','23:59:59',10,1) RETURNING id",Long.class,f.branch(),Date.valueOf(today));
+            jdbc.update("UPDATE occasion_enquiries SET status='PAID',paid_amount=deposit_amount,service_date=?,pickup_slot_id=? WHERE id=?",Date.valueOf(today),slot,request.id());
+            jdbc.update("UPDATE occasion_production_allocations SET state='COMMITTED' WHERE enquiry_id=?",request.id());
+            var planning=workspace.week(ConsentEnvironment.DEV,f.branch(),today).days().getFirst();
+            var planned=planning.products().stream().filter(x->x.productId()==f.product()).findFirst().orElseThrow();
+            assertThat(planned.committedGrams()).isEqualByComparingTo("40000");assertThat(planned.approvalToken()).isNotNull();
+            assertThatThrownBy(()->workspace.approve(ConsentEnvironment.DEV,f.branch(),today,f.product(),"stale", "manager")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            assertThat(workspace.approve(ConsentEnvironment.DEV,f.branch(),today,f.product(),planned.approvalToken(),"manager")).isEqualTo(1);
+            assertThat(workspace.approve(ConsentEnvironment.DEV,f.branch(),today,f.product(),planned.approvalToken(),"manager")).isZero();
+            var approved=workspace.week(ConsentEnvironment.DEV,f.branch(),today).days().getFirst().products().stream().filter(x->x.productId()==f.product()).findFirst().orElseThrow();
+            assertThat(approved.approvedGrams()).isEqualByComparingTo("40000");assertThat(approved.readyGrams()).isZero();
+            var actual=java.util.List.of(new OccasionPackingFinalizer.Packed(f.product(),new BigDecimal("41000")),new OccasionPackingFinalizer.Packed(ids.get(0),new BigDecimal("1000")),new OccasionPackingFinalizer.Packed(ids.get(1),new BigDecimal("1000")),new OccasionPackingFinalizer.Packed(ids.get(2),new BigDecimal("100000")));
+            var result=packing.finalizePacking(ConsentEnvironment.DEV,f.branch(),request.id(),"manager",new OccasionPackingFinalizer.Input(actual,0,true));
+            assertThat(result.quotedAmount()).isEqualByComparingTo("76078.10");assertThat(result.calculation().bulkRebatePercent()).isEqualByComparingTo("5");assertThat(result.calculation().packingCharges()).hasSize(4);assertThat(result.packingGroups()).hasSize(4);
+            assertThat(result.calculation().lines().stream().filter(x->x.productId()==f.product()).findFirst().orElseThrow().rebatePercent()).isEqualByComparingTo("10");
+        }finally{features.setOccasionEnquiries(enabled);features.setOccasionBulkProduction(bulk);}
+    }
+
+    @Test
+    void planningTotalsIncludeEveryRequestBeyondThePaginatedCards() {
+        var f=paidDeposit();var date=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(5);
+        jdbc.update("INSERT INTO occasion_enquiries(id,environment,subject_id,branch_id,occasion_type,service_date,guest_count,fulfilment,status) SELECT gen_random_uuid(),'DEV',?,?, 'Planning load',?,10,'PICKUP','REQUESTED' FROM generate_series(1,150)",f.subject(),f.branch(),Date.valueOf(date));
+        jdbc.update("INSERT INTO occasion_enquiry_items(enquiry_id,product_id,requested_quantity,unit) SELECT id,?,10,'PIECE' FROM occasion_enquiries WHERE branch_id=? AND service_date=?",f.product(),f.branch(),Date.valueOf(date));
+        var day=workspace.week(ConsentEnvironment.DEV,f.branch(),date).days().getFirst();
+        assertThat(day.orderCount()).isEqualTo(150);assertThat(day.needsReview()).isEqualTo(150);
+        assertThat(day.products().getFirst().requestedPieces()).isEqualByComparingTo("1500");
+        var first=enquiries.staffList(ConsentEnvironment.DEV,f.branch(),date,null);assertThat(first).hasSize(50);
+        var second=enquiries.staffList(ConsentEnvironment.DEV,f.branch(),date,first.getLast().id());assertThat(second).hasSize(50);
+        assertThat(second.stream().map(OccasionEnquiryService.Summary::id)).doesNotContainAnyElementsOf(first.stream().map(OccasionEnquiryService.Summary::id).toList());
+        assertThat(workspace.week(ConsentEnvironment.PROD,f.branch(),date).days().getFirst().orderCount()).isZero();
     }
 
     private Fixture paidDeposit() {

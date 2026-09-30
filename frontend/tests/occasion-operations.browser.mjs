@@ -18,6 +18,7 @@ await context.route("**/api/**",async route=>{
  else if(path==="/api/storefront/customer-identity")json={enabled:true};
  else if(path==="/api/customer/identity/me")json={authenticated:true,name:"Customer",phone:"+919876543210"};
  else if(path.endsWith("/occasion-catalogue"))json={sweets:[],boxes:[],branding:null};
+ else if(path.endsWith("/occasion-enquiries/planning"))json={today:enquiry.serviceDate,days:Array.from({length:7},(_,n)=>({date:`2026-10-${10+n}`,orderCount:n===0?1:0,needsReview:enquiry.status==="REQUESTED"?1:0,committedOrders:enquiry.status==="PAID"?1:0,products:[]}))};
  else if(path.endsWith("/dashboard/today"))json={today:"2026-09-30",orders:7,preparing:2,ready:3,completed:2,updatedAt:"2026-09-30T12:00:00Z"};
  else if(path==="/api/occasion-enquiries"||path.endsWith("/branches/1/occasion-enquiries"))json=[enquiry];
  else if(path.endsWith("/quote-preview")){previewBody=request.postDataJSON();json=calculation;}
@@ -36,6 +37,7 @@ try {
  const order=await page.evaluate(()=>[...document.querySelectorAll("h2")].map(x=>x.textContent));
  assert.ok(order.indexOf("Today at a glance")<order.indexOf("Quick access"));
  await page.goto(`${base}/admin/occasion-enquiries`);
+ await page.locator("details[id^=occasion-admin] > summary").click();
  await page.getByRole("checkbox",{name:/Final weight measured/}).check();
  for(const [index,value]of ["10","15","20"].entries())await page.getByLabel("Estimated total kg",{exact:false}).nth(index).fill(value);
  await page.getByLabel("₹ each including tax").fill("1");
@@ -60,6 +62,7 @@ try {
  await page.reload();await page.getByText("Advance received. The branch will finalize",{exact:false}).waitFor();
  assert.equal(await page.getByRole("button",{name:/Pay balance/}).count(),0);
  await page.goto(`${base}/admin/occasion-enquiries`);
+ await page.locator("details[id^=occasion-admin] > summary").click();
  await page.getByRole("heading",{name:"Weigh packed food & finalize invoice"}).waitFor();
  for(const [index,value]of ["10.2","15.3","20.5"].entries())await page.getByLabel(/actual kg/).nth(index).fill(value);
  await page.getByRole("checkbox",{name:/All requested piece counts/}).check();await page.getByRole("checkbox",{name:/I reviewed the measured weights/}).check();
