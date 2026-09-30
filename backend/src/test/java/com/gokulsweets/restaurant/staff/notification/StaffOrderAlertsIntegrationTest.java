@@ -36,6 +36,7 @@ import static org.mockito.Mockito.*;
 @Transactional
 class StaffOrderAlertsIntegrationTest {
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox customerInbox;
     @Autowired jakarta.persistence.EntityManager entities;
     @Autowired EnhancementProperties flags;
     @MockitoSpyBean StaffOrderAlerts alerts;
@@ -85,6 +86,23 @@ class StaffOrderAlertsIntegrationTest {
     private void now(int hour, int minute) {doReturn(LocalDateTime.of(2026, 10, 1, hour, minute)).when(alerts).now();}
     private void status(String status) {jdbc.update("UPDATE orders SET order_status = ? WHERE id = ?", status, order); entities.clear();}
     private long latest() {return alerts.page(staff, null).messages().getFirst().event().id();}
+
+    @Test void committedStagesAcknowledgeEligibleTaskAlertsButReadAloneDoesNotResolve() {
+        long colleague=staff(branch);
+        alerts.paymentConfirmed(payment);now(18,5);alerts.generateReminders();
+        alerts.markRead(staff,latest());
+        assertThat(alerts.page(staff,null).messages()).anyMatch(m->m.actionRequired());
+        status("PREPARING");customerInbox.orderReady(order);
+        assertThat(alerts.page(staff,null).unreadCount()).isZero();
+        assertThat(alerts.page(colleague,null).unreadCount()).isZero();
+        assertThat(alerts.page(otherStaff,null).messages()).isEmpty();
+        alerts.generateReminders();
+        assertThat(alerts.page(staff,null).messages().getFirst().event().kind()).isEqualTo("READY_OVERDUE");
+        assertThat(alerts.page(staff,null).messages().getFirst().readAt()).isNull();
+        status("READY_FOR_PICKUP");customerInbox.orderReady(order);customerInbox.orderReady(order);
+        assertThat(alerts.page(staff,null).unreadCount()).isZero();
+        assertThat(alerts.page(colleague,null).messages()).allMatch(m->m.readAt()!=null&&!m.actionRequired());
+    }
 
     @Test void paidReplayIsOneExactBranchEventAndReadIsIdempotentWithoutChangingOrder() throws Exception {
         jdbc.update("UPDATE payments SET payment_status = 'PENDING' WHERE id = ?", payment);

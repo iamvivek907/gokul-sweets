@@ -512,7 +512,7 @@ export default function MobileMenu() {
                     >
 
                         {
-                            MENU_ITEMS.map(
+                            [...MENU_ITEMS, ...(features?.occasionEnquiries ? [{label: "Occasions & gifting", href: "/occasions", description: "Plan bulk sweets and celebration gift boxes"}] : [])].map(
                                 item => {
 
                                     const active =

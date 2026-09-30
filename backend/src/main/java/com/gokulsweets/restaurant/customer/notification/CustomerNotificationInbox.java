@@ -68,6 +68,18 @@ public class CustomerNotificationInbox {
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void orderReady(Long orderId) {
+        // Runs in the order transition transaction. A rollback also rolls back acknowledgement.
+        if (features.isStaffOrderAlerts()) jdbc.update("""
+                INSERT INTO staff_order_alert_reads(event_id, staff_id)
+                SELECT e.id, u.id FROM staff_order_alerts e
+                JOIN orders o ON o.id = e.order_id CROSS JOIN staff_users u
+                WHERE o.id = ? AND e.environment = ? AND
+                """ + com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.ELIGIBLE + """
+                AND ((e.kind IN ('NEW_ORDER','PREPARATION_SOON','PREPARATION_DUE','PREPARATION_OVERDUE')
+                        AND o.order_status <> 'CONFIRMED')
+                     OR (e.kind = 'READY_OVERDUE' AND o.order_status NOT IN ('CONFIRMED','PREPARING')))
+                ON CONFLICT DO NOTHING
+                """, orderId, environment());
         if (!enabled()) return;
         jdbc.update("""
                 INSERT INTO customer_notification_events(environment, subject_id, event_key, kind,
@@ -142,15 +154,24 @@ public class CustomerNotificationInbox {
 
     @Transactional(readOnly = true)
     public Page page(String environment, UUID subject, Long before) {
+        return page(environment, subject, before, false, "");
+    }
+
+    @Transactional(readOnly = true)
+    public Page page(String environment, UUID subject, Long before, boolean unreadOnly, String search) {
+        String query = search == null ? "" : search.trim();
+        if (query.length() > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         if (before != null && before <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
         var messages = jdbc.query("""
                 SELECT * FROM customer_notification_events WHERE environment = ? AND subject_id = ?
-                  AND id < ? ORDER BY id DESC LIMIT 31
+                  AND id < ? AND (NOT ? OR read_at IS NULL)
+                  AND (? = '' OR strpos(lower(target_id || ' ' || title || ' ' || message), lower(?)) > 0)
+                  ORDER BY id DESC LIMIT 31
                 """, (rs, row) -> new Message(rs.getLong("id"), rs.getString("event_key"), rs.getString("kind"),
                 rs.getString("target_type"), rs.getString("target_id"), rs.getString("title"), rs.getString("message"),
                 rs.getString("delivery_state"), rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("read_at") == null ? null : rs.getTimestamp("read_at").toInstant()),
-                environment, subject, before == null ? Long.MAX_VALUE : before);
+                environment, subject, before == null ? Long.MAX_VALUE : before, unreadOnly, query, query);
         Long unread = jdbc.queryForObject("SELECT COUNT(*) FROM customer_notification_events WHERE environment = ? AND subject_id = ? AND read_at IS NULL",
                 Long.class, environment, subject);
         return new Page(messages.stream().limit(30).toList(), unread == null ? 0 : unread,

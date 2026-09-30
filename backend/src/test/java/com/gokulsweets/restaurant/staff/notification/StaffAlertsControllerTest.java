@@ -24,7 +24,7 @@ class StaffAlertsControllerTest {
         assertThat(response.getBody().enabled()).isFalse(); assertThat(response.getBody().applicationServerKey()).isNull();
         assertThat(response.getHeaders().getCacheControl()).isEqualTo("no-store");
         verify(authorization).requirePermission(PermissionName.ORDER_VIEW);
-        assertThatThrownBy(() -> controller.page(null)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> controller.page(null, false, "")).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         var id = java.util.UUID.randomUUID(); controller.revoke(id); verify(subscriptions).revoke(12, id);
         when(alerts.enabled()).thenReturn(true); when(push.configured()).thenReturn(true);
         assertThat(controller.settings(null, new MockHttpServletRequest()).getBody().applicationServerKey()).isEqualTo("public-test-key");

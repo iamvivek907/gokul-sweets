@@ -76,11 +76,11 @@ class CustomerIdentityControllerTest {
         trusted.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
         var subject = UUID.randomUUID();
         when(sessions.subject(eq(ConsentEnvironment.DEV), eq("current-session"), any())).thenReturn(Optional.of(subject));
-        assertThatThrownBy(() -> controller.notifications(null, trusted)).isInstanceOf(ResponseStatusException.class);
-        verify(notifications, never()).page(anyString(), any(), any());
+        assertThatThrownBy(() -> controller.notifications(null, false, "", trusted)).isInstanceOf(ResponseStatusException.class);
+        verify(notifications, never()).page(anyString(), any(), any(), anyBoolean(), anyString());
         when(notifications.enabled()).thenReturn(true);
-        controller.notifications(null, trusted);
-        verify(notifications).page("DEV", subject, null);
+        controller.notifications(null, false, "", trusted);
+        verify(notifications).page("DEV", subject, null, false, "");
         controller.readNotification(42, trusted);
         verify(notifications).markRead("DEV", subject, 42);
         var foreign = request();

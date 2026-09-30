@@ -33,7 +33,7 @@ public class StaffOrderAlerts {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a", java.util.Locale.ENGLISH);
 
     // Same rule is used for inbox, registration recipients and the pre-send permission recheck.
-    static final String ELIGIBLE = """
+    public static final String ELIGIBLE = """
         u.active AND (EXISTS (SELECT 1 FROM roles r WHERE r.id = u.role_id AND r.name = 'OWNER_ADMIN')
           OR EXISTS (SELECT 1 FROM staff_branch_access b WHERE b.staff_user_id = u.id AND b.branch_id = e.branch_id))
         AND EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
@@ -153,7 +153,11 @@ public class StaffOrderAlerts {
                 rs.getTimestamp("created_at").toInstant());
     }
     @Transactional(readOnly = true)
-    public Page page(long staffId, Long before) {
+    public Page page(long staffId, Long before) {return page(staffId, before, false, "");}
+    @Transactional(readOnly = true)
+    public Page page(long staffId, Long before, boolean unreadOnly, String search) {
+        String query = search == null ? "" : search.trim();
+        if (query.length() > 100) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         if (before != null && before <= 0) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         var messages = jdbc.query("""
             SELECT e.*, o.order_number, r.read_at,
@@ -161,11 +165,12 @@ public class StaffOrderAlerts {
               (SELECT state FROM staff_alert_deliveries d WHERE d.event_id = e.id AND d.staff_id = u.id AND d.channel = 'EMAIL') email_state
             FROM staff_order_alerts e JOIN orders o ON o.id = e.order_id JOIN staff_users u ON u.id = ?
             LEFT JOIN staff_order_alert_reads r ON r.event_id = e.id AND r.staff_id = u.id
-            WHERE e.environment = ? AND e.id < ? AND
+            WHERE e.environment = ? AND e.id < ? AND (NOT ? OR r.read_at IS NULL)
+              AND (? = '' OR strpos(lower(o.order_number || ' ' || e.title || ' ' || e.message), lower(?)) > 0) AND
             """ + ELIGIBLE + " ORDER BY e.id DESC LIMIT 31", (rs, row) -> {
                 var event = event(rs); var read = rs.getTimestamp("read_at");
                 return new Message(event, read == null ? null : read.toInstant(), actionable(event), rs.getString("push_state"), rs.getString("email_state"));
-            }, staffId, scope(), before == null ? Long.MAX_VALUE : before);
+            }, staffId, scope(), before == null ? Long.MAX_VALUE : before, unreadOnly, query, query);
         Long unread = jdbc.queryForObject("SELECT COUNT(*) FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.environment = ? AND "
                 + ELIGIBLE + " AND NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = e.id AND r.staff_id = u.id)", Long.class, staffId, scope());
         return new Page(messages.stream().limit(30).toList(), unread == null ? 0 : unread, messages.size() > 30 ? messages.get(29).event().id() : null);

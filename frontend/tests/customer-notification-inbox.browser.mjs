@@ -36,7 +36,8 @@ try {
     assert.equal(await page.getByRole("link", {name: "Open occasion request"}).getAttribute("href"), "/occasions#occasion-request-43");
     assert.match(await page.locator("time").first().textContent(), /30 Sept|30 Sep/);
     assert.match(await page.locator("time").first().textContent(), /12:05.*am.*IST/i);
-    assert.equal(await page.getByRole("checkbox").isDisabled(), true);
+    await page.getByText("Notification settings", {exact: true}).click();
+    assert.equal(await page.getByRole("checkbox", {name: "Include optional offers in my inbox when available"}).isDisabled(), true);
     failRead = true;
     await page.getByRole("button", {name: "Mark as read"}).click();
     await page.getByRole("alert").filter({hasText: "could not confirm"}).waitFor();

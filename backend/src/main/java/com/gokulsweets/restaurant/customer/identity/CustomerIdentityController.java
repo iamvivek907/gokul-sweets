@@ -262,10 +262,11 @@ public class CustomerIdentityController {
 
     @GetMapping("/notifications")
     public ResponseEntity<com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.Page> notifications(
-            @RequestParam(required = false) Long before, HttpServletRequest request) {
+            @RequestParam(required = false) Long before, @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(defaultValue = "") String search, HttpServletRequest request) {
         var environment = notificationEnvironment();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(notifications.page(environment.name(), requiredSubject(request, environment), before));
+                .body(notifications.page(environment.name(), requiredSubject(request, environment), before, unreadOnly, search));
     }
 
     @PutMapping("/notifications/{id}/read")

@@ -43,6 +43,7 @@ export default function BranchHomePage() {
                 <nav className="gokul-branch-tabs" aria-label="Branch pages">
                     <button type="button" aria-current={tab === "home" ? "page" : undefined} onClick={() => setTab("home")}>Home</button>
                     {selected?.id === branch.id ? <Link href="/menu">Menu</Link> : <BranchSelector cardBranch={branch} destination="menu" />}
+                    {occasionEnquiries && (selected?.id === branch.id ? <Link href="/occasions">Occasions & gifting</Link> : <BranchSelector cardBranch={branch} destination="occasions" />)}
                     <button type="button" aria-current={tab === "details" ? "page" : undefined} onClick={() => setTab("details")}>Branch details</button>
                 </nav>
                 {tab === "details" ? <BranchDetails branch={branch} /> : <section className="branch-home-welcome">

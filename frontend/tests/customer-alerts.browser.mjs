@@ -50,6 +50,7 @@ const page = await context.newPage();
 const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
 try {
     await page.goto(`${base}/profile#account-notifications`);
+    await page.getByText("Notification settings", {exact: true}).click();
     await page.getByRole("heading", {name: "Browser alerts and sound"}).waitFor();
     await page.getByRole("link", {name: "Notifications, 1 unread"}).waitFor();
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
@@ -58,6 +59,7 @@ try {
     await page.getByText("Browser alerts are not allowed.", {exact: false}).waitFor();
     assert.equal(subscriptions, 0);
     await page.reload();
+    await page.getByText("Notification settings", {exact: true}).click();
     await page.getByRole("heading", {name: "Browser alerts and sound"}).waitFor();
     await page.evaluate(() => {window._denyPush = false;});
     await page.getByRole("button", {name: "Enable push for this browser"}).click();
@@ -80,6 +82,7 @@ try {
     await page.waitForFunction(() => window._chimes === 2);
     const second = await context.newPage();
     await second.goto(`${base}/profile#account-notifications`);
+    await second.getByText("Notification settings", {exact: true}).click();
     await second.getByRole("heading", {name: "Browser alerts and sound"}).waitFor();
     await second.evaluate(() => {window._blockAudio = false;});
     await second.getByRole("button", {name: "Activate and test sound in this tab"}).click();

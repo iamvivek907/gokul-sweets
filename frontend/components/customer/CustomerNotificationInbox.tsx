@@ -14,6 +14,9 @@ type Inbox = {messages: Message[]; unreadCount: number; nextBefore: number | nul
 type Preferences = {offerInboxEnabled: boolean; marketingConsentGranted: boolean};
 
 export default function CustomerNotificationInbox() {
+    const [search, setSearch] = useState("");
+    const [unreadOnly, setUnreadOnly] = useState(false);
+    const query = new URLSearchParams({search, unreadOnly: String(unreadOnly)}).toString();
     const [inbox, setInbox] = useState<Inbox | null>(null);
     const [preferences, setPreferences] = useState<Preferences | null>(null);
     const [error, setError] = useState("");
@@ -22,15 +25,15 @@ export default function CustomerNotificationInbox() {
     const [unavailable, setUnavailable] = useState(false);
     const load = useCallback(async (signal?: AbortSignal) => {
         const [next, choices] = await Promise.all([
-            apiClient<Inbox>(`${base}/notifications`, {credentials: "include", signal}),
+            apiClient<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal}),
             apiClient<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal})
         ]);
         setInbox(next); setPreferences(choices); setError(""); window.dispatchEvent(new Event("gokul-inbox-changed"));
-    }, []);
+    }, [query]);
     useEffect(() => {
         const controller = new AbortController();
         void Promise.all([
-            apiClient<Inbox>(`${base}/notifications`, {credentials: "include", signal: controller.signal}),
+            apiClient<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal: controller.signal}),
             apiClient<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal: controller.signal})
         ]).then(([next, choices]) => {
             if (!controller.signal.aborted) {setInbox(next); setPreferences(choices); setError("");}
@@ -40,7 +43,7 @@ export default function CustomerNotificationInbox() {
             else setError("Your inbox could not load. Check Order history for current updates, or refresh when connected.");
         });
         return () => controller.abort();
-    }, []);
+    }, [query]);
     async function perform(action: () => Promise<void>) {
         setBusy(true); setError(""); setSaved("");
         try {await action();}
@@ -59,8 +62,11 @@ export default function CustomerNotificationInbox() {
         {error && <p role="alert" className="mt-4 rounded-xl border border-[#c76752] p-3 text-sm">{error}</p>}
         {!inbox && !error && <p role="status" className="mt-4">Loading your inbox…</p>}
         {inbox?.messages.length === 0 && <p className="mt-5 rounded-xl bg-[#fffaf2] p-4 text-sm">No messages yet. New verified payments and branch updates will appear here.</p>}
+        <div className="mt-5 flex flex-wrap gap-3"><label className="min-w-0 flex-1 text-sm">Search all updates<input type="search" disabled={busy} maxLength={100} value={search} onChange={event => setSearch(event.target.value)} placeholder="Order number or update" className="mt-1 min-h-11 w-full rounded-xl border px-3" /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={busy} checked={unreadOnly} onChange={event => setUnreadOnly(event.target.checked)} />Unread only</label></div>
         <ul className="mt-5 space-y-3">
-            {inbox?.messages.map(item => <li key={item.id} className={`rounded-2xl border p-4 sm:p-5 ${item.readAt ? "border-[#eadfd6] bg-white" : "border-[#dfc4ab] bg-gradient-to-br from-[#fffaf2] to-white shadow-sm"}`}>
+            {Array.from(new Set(inbox?.messages.map(item => `${item.targetType}:${item.targetId}`))).map(target => {
+                const events = inbox!.messages.filter(item => `${item.targetType}:${item.targetId}` === target);
+                return <li key={target} className="overflow-hidden rounded-2xl border border-[#eadfd6]">{events.some(item => !item.readAt) && <p className="bg-[#143936] px-4 py-2 text-xs font-semibold text-white">{events.filter(item => !item.readAt).length} unread update{events.filter(item => !item.readAt).length === 1 ? "" : "s"}</p>}<ul>{events.slice(0, 1).map(item => <li key={item.id} className={`rounded-2xl border p-4 sm:p-5 ${item.readAt ? "border-[#eadfd6] bg-white" : "border-[#dfc4ab] bg-gradient-to-br from-[#fffaf2] to-white shadow-sm"}`}>
                 <div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#f5e9dd] text-[#7a1625]"><NotificationIcon kind={item.kind} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{item.title}</h3><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${item.readAt ? "bg-[#f5f1eb] text-[#756763]" : "bg-[#7a1625] text-white"}`}>{item.readAt ? "Read" : "Unread"}</span></div><p className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-[#756763]">{item.targetType === "ORDER" ? "Order update" : "Occasion update"}</p></div></div>
                 <p className="mt-2 text-sm leading-6">{item.message}</p>
                 <time dateTime={item.createdAt} className="mt-2 block text-xs text-[#756763]">
@@ -76,13 +82,15 @@ export default function CustomerNotificationInbox() {
                             await load();
                         })}>Mark as read</button>}
                 </div>
-            </li>)}
+            </li>)}</ul>{events.length > 1 && <details className="border-t px-4 py-3"><summary className="cursor-pointer text-sm font-semibold">Earlier updates · {events.length - 1}</summary><ol className="mt-3 space-y-3">{events.slice(1).map(item => <li key={item.id} className="border-l-2 border-[#dfc4ab] pl-3"><p className="text-sm font-semibold">{item.title} · {item.readAt ? "Read" : "Unread"}</p><p className="text-sm">{item.message}</p><time className="text-xs">{formatBusinessTimestamp(item.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST</time>{!item.readAt && <button disabled={busy} type="button" className="ml-3 min-h-11 text-sm underline" onClick={() => void perform(async () => {await apiClient<void>(`${base}/notifications/${item.id}/read`, {method: "PUT", credentials: "include"}); await load();})}>Mark as read</button>}</li>)}</ol></details>}</li>;
+            })}
         </ul>
         {inbox?.nextBefore && <button type="button" disabled={busy} className="mt-4 min-h-11 rounded-xl border px-4 text-sm"
             onClick={() => void perform(async () => {
-                const older = await apiClient<Inbox>(`${base}/notifications?before=${inbox.nextBefore}`, {credentials: "include"});
+                const older = await apiClient<Inbox>(`${base}/notifications?${query}&before=${inbox.nextBefore}`, {credentials: "include"});
                 setInbox(current => current ? {...older, messages: [...current.messages, ...older.messages.filter(item => !current.messages.some(existing => existing.id === item.id))]} : older);
             })}>Load older messages</button>}
+        <details className="mt-6 rounded-2xl border p-4"><summary className="cursor-pointer font-semibold">Notification settings</summary>
         {preferences && <div className="mt-7 rounded-2xl bg-[#fffaf2] p-4">
             <h3 className="font-semibold">Notification preferences</h3>
             <p className="mt-2 text-sm leading-6">Order and payment messages stay in this inbox. Optional browser alerts and sound have separate controls below when available. SMS and email alerts are not enabled here.</p>
@@ -100,6 +108,6 @@ export default function CustomerNotificationInbox() {
             {!preferences.marketingConsentGranted && <p className="mt-2 text-sm">Marketing consent is currently off. Manage it in <Link href="/profile/privacy" className="underline">Privacy and data choices</Link>.</p>}
             {saved && <p role="status" className="mt-2 text-sm">Notification preference saved.</p>}
         </div>}
-        <CustomerAlertPreferences />
+        <CustomerAlertPreferences /></details>
     </section>;
 }

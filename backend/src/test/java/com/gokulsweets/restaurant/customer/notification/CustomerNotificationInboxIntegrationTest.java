@@ -241,6 +241,26 @@ class CustomerNotificationInboxIntegrationTest {
         }
     }
 
+    @Test
+    void searchAndUnreadFilterApplyBeforePaginationAcrossHundredsOfEvents() {
+        fixture("CONFIRMED");
+        jdbc.update("""
+            INSERT INTO customer_notification_events(environment,subject_id,event_key,kind,target_type,target_id,title,message)
+            SELECT 'DEV',?,'scale:'||n,'CONFIRMED','ORDER','SCALE-'||n,'Order update','Payment verified'
+            FROM generate_series(1,105) n
+            """,subject);
+        var first=inbox.page("DEV",subject,null,false,"");
+        assertThat(first.messages()).hasSize(30);assertThat(first.nextBefore()).isNotNull();
+        var second=inbox.page("DEV",subject,first.nextBefore(),false,"");
+        assertThat(second.messages()).hasSize(30);
+        assertThat(second.messages()).noneMatch(m->first.messages().stream().anyMatch(previous->previous.id()==m.id()));
+        var match=inbox.page("DEV",subject,null,false,"scale-105");
+        assertThat(match.messages()).hasSize(1);
+        inbox.markRead("DEV",subject,match.messages().getFirst().id());
+        assertThat(inbox.page("DEV",subject,null,true,"scale-105").messages()).isEmpty();
+        assertThat(inbox.page("DEV",UUID.randomUUID(),null,false,"scale").messages()).isEmpty();
+    }
+
     private Fixture fixture(String status) {
         Long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Inbox test') RETURNING id", Long.class, "INBOX-" + UUID.randomUUID().toString().substring(0, 8));
         Long slot = jdbc.queryForObject("INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity) VALUES (?, '2026-09-30', '11:00', '11:30', 20) RETURNING id", Long.class, branch);

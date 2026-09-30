@@ -36,9 +36,9 @@ public class StaffAlertsController {
                 configured ? pushProperties.getPublicKey() : null, enabled && subscriptions.live(staffId, deviceId, StaffSessionService.cookie(request)),
                 enabled && email.recipient(staffId) != null, alerts.reminderMinutes(), alerts.escalationMinutes(), enabled && email.testRouting(staffId)));
     }
-    @GetMapping public ResponseEntity<StaffOrderAlerts.Page> page(@RequestParam(required = false) Long before) {
+    @GetMapping public ResponseEntity<StaffOrderAlerts.Page> page(@RequestParam(required = false) Long before, @RequestParam(defaultValue = "false") boolean unreadOnly, @RequestParam(defaultValue = "") String search) {
         long staffId = staff(); enabled();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(alerts.page(staffId, before));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(alerts.page(staffId, before, unreadOnly, search));
     }
     @PutMapping("/{id}/read") public ResponseEntity<Void> read(@PathVariable long id) {
         long staffId = staff(); enabled(); alerts.markRead(staffId, id);

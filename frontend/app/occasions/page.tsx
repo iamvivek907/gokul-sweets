@@ -1,25 +1,22 @@
+/* eslint-disable @next/next/no-img-element -- Real catalogue URLs are rendered directly without transforming supplier photos. */
 "use client";
 
 import {useEffect, useState} from "react";
 import Link from "next/link";
-import {useRouter} from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
-import {getMenu} from "@/services/menuApi";
 import {apiClient, ApiError} from "@/services/apiClient";
-import type {MenuProduct} from "@/types/menu";
-import {useCart} from "@/hooks/useCart";
-import {saveCart} from "@/lib/cartStorage";
+import type {OccasionSweet, OccasionBox, OccasionCatalogue, GiftSnapshot} from "@/types/occasionCatalogue";
 import {getPickupSlots} from "@/services/pickupApi";
 import type {PickupSlot} from "@/types/pickup";
 
 type Item = {productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
-    status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
+    gift?: GiftSnapshot | null; status: string; quotedAmount: number | null; depositAmount: number | null; paidAmount: number;
     quoteTerms: string | null; quoteExpiresAt: string | null; balanceDueAt: string | null;
-    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; cancellationReview?: {paidAmount: number; reason: string; state: string} | null; productionPlan?: {expectedReadyAt: string; state: string; quantity: number; readyQuantity: number}[];
+    nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; cancellationReview?: {paidAmount: number; reason: string; state: string} | null; productionPlan?: {productId: number; unit: string; expectedReadyAt: string; state: string; quantity: number; readyQuantity: number}[];
     pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number;
         taxAmount: number; cgstRate: number; sgstRate: number}[]};
 type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
@@ -31,19 +28,17 @@ function nextBusinessDate(today: string): string {
     return date.toISOString().slice(0, 10);
 }
 
-function lastOnlineDate(today: string, days: number): string {
-    const date = new Date(`${today}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + days);
-    return date.toISOString().slice(0, 10);
-}
-
 export default function OccasionsPage() {
-    const router = useRouter();
-    const cart = useCart();
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
-    const [products, setProducts] = useState<MenuProduct[]>([]);
+    const [catalogueSearch, setCatalogueSearch] = useState("");
+    const [specialOnly, setSpecialOnly] = useState(false);
+    const [products, setProducts] = useState<OccasionSweet[]>([]);
+    const [boxes, setBoxes] = useState<OccasionBox[]>([]);
+    const [boxId, setBoxId] = useState<number | null>(null);
+    const [boxCount, setBoxCount] = useState(700);
+    const [units, setUnits] = useState<Record<number, "KG" | "PIECE">>({});
     const [items, setItems] = useState<Record<number, number>>({});
     const [history, setHistory] = useState<Enquiry[]>([]);
     const [historyPhone, setHistoryPhone] = useState("");
@@ -68,8 +63,8 @@ export default function OccasionsPage() {
     useEffect(() => {
         if (!branch || !features?.occasionEnquiries) return;
         const controller = new AbortController();
-        getMenu(branch.id, controller.signal).then(categories => {
-            if (!controller.signal.aborted) setProducts(categories.flatMap(category => category.products).filter(product => product.available));
+        apiClient<OccasionCatalogue>(`/api/branches/${branch.id}/occasion-catalogue`, {signal: controller.signal}).then(catalogue => {
+            if (!controller.signal.aborted) {setProducts(catalogue.sweets); setBoxes(catalogue.boxes); setItems({}); setBoxId(null);}
         }).catch(() => {if (!controller.signal.aborted) setMessage("Menu unavailable. Please retry before requesting a quote.");});
         return () => controller.abort();
     }, [branch, features?.occasionEnquiries]);
@@ -145,16 +140,17 @@ export default function OccasionsPage() {
     async function submit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!branch || busy) return;
+        if (!session.authenticated) {setMessage("Verify your phone before sending your enquiry. Your selection is saved on this page."); return;}
         if (!date || date <= (features?.today ?? "")) {setMessage("Choose a future service date in India."); return;}
         const chosen = products.filter(product => Number(items[product.id]) > 0).map(product => ({
-            productId: product.id, quantity: Number(items[product.id]), unit: product.saleMode === "WEIGHT" ? "GRAM" : "PIECE"
+            productId: product.id, quantity: Number(items[product.id]) * (boxId ? boxCount : (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "KG" ? 1000 : 1), unit: boxId || (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? "PIECE" : "GRAM"
         }));
         if (!chosen.length) {setMessage("Add at least one product and quantity."); return;}
         setBusy(true); setMessage("");
         try {
             const result = await apiClient<Enquiry>("/api/occasion-enquiries", {method: "POST", credentials: "include",
                 body: JSON.stringify({branchId: branch.id, occasionType: type, serviceDate: date, guestCount: guests,
-                    fulfilment: mode, deliveryAddress: mode === "DELIVERY_REQUEST" ? address : null, notes, items: chosen})});
+                    fulfilment: mode, deliveryAddress: mode === "DELIVERY_REQUEST" ? address : null, notes, items: chosen, gift: boxId ? {boxId, boxCount, recipe: products.filter(product => Number(items[product.id]) > 0).map(product => ({productId: product.id, pieces: Number(items[product.id])}))} : null})});
             setHistory(current => [result, ...current]);
             setHistoryPhone(session.phone ?? "");
             setMessage("Request sent. The branch will review it before sharing a quote. No booking or payment has been made.");
@@ -167,44 +163,19 @@ export default function OccasionsPage() {
         } finally {setBusy(false);}
     }
 
-    function startOnlinePickup() {
-        if (!branch || busy) return;
-        if (!date || date <= (features?.today ?? "")) {setMessage("Choose a future service date in India first."); return;}
-        if (features && date > lastOnlineDate(features.today, features.futureOrderingDays)) {
-            setMessage("Online pickup is not open this far ahead. Send a reviewed enquiry to discuss the date with the branch."); return;
-        }
-        if (mode !== "PICKUP") {setMessage("Online checkout currently supports branch pickup. Ask the team about delivery instead."); return;}
-        const chosen = products.filter(product => Number(items[product.id]) > 0);
-        if (!chosen.length || chosen.length > 30) {setMessage("Choose 1 to 30 menu products first."); return;}
-        if (chosen.some(product => {
-            const quantity = Number(items[product.id]);
-            return !Number.isSafeInteger(quantity) || quantity <= 0 || quantity > 100000
-                || product.saleMode === "WEIGHT" && (quantity < (product.minimumWeightGrams ?? 250)
-                    || quantity % (product.weightStepGrams ?? 50) !== 0);
-        })) {setMessage("Check the quantities: pieces must be whole numbers, and weights must follow the product's minimum and step."); return;}
-        if (cart.items.length && !window.confirm("Replace your current cart with these occasion items? Your existing cart will be removed.")) return;
-        try {
-            saveCart({branchId: branch.id, items: chosen.map(product => ({
-                product, quantity: product.saleMode === "WEIGHT" ? 1 : Number(items[product.id]),
-                weightGrams: product.saleMode === "WEIGHT" ? Number(items[product.id]) : null
-            }))});
-            router.push(`/checkout/pickup?occasionDate=${encodeURIComponent(date)}`);
-        } catch {setMessage("Your cart could not be saved on this device. Check available storage and retry.");}
-    }
-
     return <AppShell editorial showSocialPopup={false}>
-        <div className="mx-auto max-w-5xl px-4 py-8 text-[#173a37] sm:px-6">
-            <p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]">Occasions at Gokul</p>
-            <h1 className="mt-3 font-serif text-4xl sm:text-6xl">Tell us what you&apos;re planning.</h1>
-            <p className="mt-4 max-w-2xl">Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment.</p>
+        <div className="occasion-journey mx-auto max-w-5xl px-4 py-8 text-[#173a37] sm:px-6">
+            <header className="occasion-hero"><p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]">Occasions at Gokul</p>
+            <h1 className="mt-3 font-serif text-4xl sm:text-6xl">Sweet moments. Thoughtfully planned.</h1>
+            <p className="mt-4 max-w-2xl">Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment.</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div></header>
             {!features && <p role="status" className="mt-8">Checking availability…</p>}
             {features && !features.occasionEnquiries && <p className="mt-8 rounded-xl bg-white p-6">Occasion enquiries are not available yet. <Link href="/menu" className="underline">Explore pickup ordering</Link>.</p>}
             {features?.occasionEnquiries && <>
                 {!branch ? <p className="mt-8 rounded-xl bg-white p-6">Choose a branch first. <Link href="/branches" className="underline">Explore branches</Link>.</p> : <>
                     <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline">Change branch</Link></p>
-                    <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel onSessionChange={setSession} /></div>
-                    {session.authenticated && <form onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
-                        <p className="font-semibold">This is an enquiry. A quote is not a booking or stock reservation.</p>
+                    <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel mode="occasion" onSessionChange={setSession} /></div>
+                    {<form onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
+                        <p className="text-xs font-bold uppercase tracking-widest text-[#c76752]">01 · Plan your celebration</p><p className="text-sm">Choose your sweets and packaging. Our branch reviews production, box fit and pricing before you pay.</p>
                         <label className="block">Occasion <input required maxLength={80} value={type} onChange={event => setType(event.target.value)} className="mt-2 w-full rounded-xl border p-3" /></label>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <label>Date in India <input type="date" required min={nextBusinessDate(features.today)} value={date} onChange={event => setDate(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
@@ -216,20 +187,26 @@ export default function OccasionsPage() {
                             </select>
                         </label>
                         {mode === "DELIVERY_REQUEST" && <label className="block">Delivery address for review <textarea required maxLength={500} value={address} onChange={event => setAddress(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>}
-                        <fieldset><legend className="font-semibold">Food and approximate quantities</legend>
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2">{products.map(product => <label key={product.id} className="flex items-center justify-between gap-3 rounded-xl border p-3">
-                                <span>{product.name}<small className="block text-[#4e605c]">{product.saleMode === "WEIGHT" ? "grams" : "pieces"}</small></span>
-                                <input aria-label={`${product.name} quantity`} type="number" min={0} step={product.saleMode === "WEIGHT" ? 50 : 1}
-                                    value={items[product.id] ?? 0} onChange={event => setItems(current => ({...current, [product.id]: Number(event.target.value)}))}
-                                    className="w-24 rounded-lg border p-2" /></label>)}</div>
+                        <fieldset><legend className="font-serif text-2xl">02 · Choose how to present your sweets</legend>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2"><button type="button" aria-pressed={!boxId} onClick={() => {setBoxId(null); setItems({});}} className={`rounded-2xl border p-5 text-left ${!boxId ? "border-[#c76752] bg-[#fffaf2]" : ""}`}><strong>Bulk sweets</strong><p className="mt-1 text-sm">Order in kilograms or pieces for your gathering.</p></button>{boxes.map(box => <button type="button" key={box.id} aria-pressed={boxId === box.id} onClick={() => {setBoxId(box.id); setItems({});}} className={`overflow-hidden rounded-2xl border text-left ${boxId === box.id ? "border-[#c76752] bg-[#fffaf2]" : ""}`}>
+                                {box.imageUrl ? <img src={box.imageUrl} alt={`${box.name} packaging`} className="h-40 w-full object-cover" /> : <div className="flex h-32 items-center justify-center bg-[#f1eee5] text-sm">Packaging photo coming soon</div>}
+                                <div className="p-4"><strong>{box.name}</strong><p className="mt-1 text-sm">{box.dimensions} · {box.material}</p><p className="text-sm">{box.compartments} compartments · up to {box.capacityPieces} pieces</p><p className="text-sm">{box.price == null ? "Packaging price on review" : `Packaging estimate ₹${box.price} per box`} · {box.leadDays} days lead time</p>{box.branding && <p className="text-sm">{box.branding}</p>}</div></button>)}</div>
+                            {boxId && <label className="mt-4 block">Number of gift boxes<input type="number" min={1} max={10000} required value={boxCount} onChange={event => setBoxCount(Number(event.target.value))} className="ml-3 w-32 rounded-xl border p-3" /><span className="mt-2 block text-sm">Choose pieces per box below. We calculate the full production request automatically. The branch confirms physical fit and packaging cost in your quote.</span></label>}
+                        </fieldset>
+                        <fieldset><legend className="font-serif text-2xl">03 · Build your sweet selection</legend>
+                            <p className="mt-2 text-sm">Discover celebration specials alongside your favourites. Piece requests for weight-based sweets are sized by the branch before quoting.</p>
+                            <div className="mt-4 flex flex-wrap gap-3"><label className="flex-1 text-sm">Find your favourites<input type="search" value={catalogueSearch} onChange={event => setCatalogueSearch(event.target.value)} placeholder="Search sweets" className="mt-1 w-full rounded-xl border p-3" /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={specialOnly} onChange={event => setSpecialOnly(event.target.checked)} />Occasion specials only</label></div>
+                            <div className="mt-4 grid gap-4 sm:grid-cols-2">{products.filter(product => (!specialOnly || product.occasionOnly) && product.name.toLowerCase().includes(catalogueSearch.trim().toLowerCase())).map(product => <div key={product.id} className="overflow-hidden rounded-2xl border">
+                                {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-40 w-full object-cover" /> : <div className="flex h-24 items-center justify-center bg-[#fffaf2] font-serif text-xl">Gokul celebration selection</div>}
+                                <div className="p-4">{product.occasionOnly && <p className="text-xs font-bold uppercase tracking-wider text-[#c76752]">Made for occasions</p>}<h3 className="mt-1 text-lg font-semibold">{product.name}</h3>{product.description && <p className="mt-1 text-sm">{product.description}</p>}<p className="mt-2 text-xs">{product.leadDays} days advance notice{product.pieceGrams ? ` · configured piece size ${product.pieceGrams} g` : ""}</p>
+                                <div className="mt-3 flex gap-2"><label className="flex-1 text-sm">{boxId ? "Pieces in each box" : "Requested quantity"}<input aria-label={`${product.name} quantity`} type="number" min={0} max={boxId ? 1000 : 100000} step={boxId || (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? 1 : 0.001} value={items[product.id] ?? 0} onChange={event => setItems(current => ({...current, [product.id]: Number(event.target.value)}))} className="mt-1 w-full rounded-xl border p-3" /></label>{!boxId && <label className="text-sm">Unit<select aria-label={`${product.name} unit`} value={units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")} onChange={event => {setUnits(current => ({...current, [product.id]: event.target.value as "KG" | "PIECE"})); setItems(current => ({...current, [product.id]: 0}));}} className="mt-1 rounded-xl border p-3">{product.saleMode === "WEIGHT" && <option value="KG">kg</option>}<option value="PIECE">pieces</option></select></label>}</div>
+                                {boxId && Number(items[product.id]) > 0 && <p className="mt-2 text-sm font-semibold">{items[product.id]} × {boxCount} boxes = {(items[product.id] * boxCount).toLocaleString("en-IN")} pieces total</p>}</div></div>)}</div>
                         </fieldset>
                         <label className="block">Anything else? <textarea maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
                         <div className="flex flex-wrap gap-3">
-                            <button disabled={busy || !products.length} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
-                            {mode === "PICKUP" && <button type="button" disabled={busy || !products.length} onClick={startOnlinePickup}
-                                className="min-h-12 rounded-full border border-[#173a37] px-6 font-bold disabled:opacity-50">Continue to online pickup</button>}
+                            <button disabled={busy || !products.length || !session.authenticated} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
                         </div>
-                        <p className="text-sm text-[#4e605c]">Online pickup uses live menu prices and full payment. We carry your requested date to checkout, where you must choose an available time. Manager quotes require branch review and, when enabled, a separate deposit and balance.</p>
+                        <p className="text-sm text-[#4e605c]">Verify your phone above to send your request. This enquiry creates no booking or stock reservation. The manager reviews a dedicated future production plan, packaging, taxes, deposit and balance before payment.</p>
                     </form>}
                 </>}
                 {message && <p role="status" className="mt-5 rounded-xl bg-[#fff0dc] p-4">{message}</p>}
@@ -237,12 +214,15 @@ export default function OccasionsPage() {
                     {history.map(enquiry => <article id={`occasion-${enquiry.id}`} key={enquiry.id} className="scroll-mt-28 mt-4 rounded-2xl border bg-white p-5">
                         <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span>{{REQUESTED: "Under branch review", QUOTED: "Quote ready — deposit due", PAYMENT_PENDING: "Deposit payment in progress", HELD: "Deposit payment in progress", PAID: "Deposit received — balance due", CONFIRMED: "Pickup confirmed", EXPIRED: "Quote or payment window expired", DECLINED: "Request declined", CANCELLED: "Cancelled — finance review pending"}[enquiry.status] ?? "Contact the branch"}</span></div>
                         <p className="mt-2">{enquiry.nextStep}</p>
+                        <ul className="mt-3 text-sm">{enquiry.items.map(item => <li key={item.productId}>Requested: {products.find(product => product.id === item.productId)?.name ?? "Sweet"} · {item.unit === "GRAM" ? `${item.quantity / 1000} kg` : `${item.quantity.toLocaleString("en-IN")} pieces`}</li>)}</ul>
+                        {enquiry.gift && <div className="mt-3 rounded-xl bg-[#fffaf2] p-3 text-sm"><strong>{enquiry.gift.boxCount} × {enquiry.gift.box.name}</strong><p>{enquiry.gift.box.dimensions} · {enquiry.gift.box.material} · {enquiry.gift.box.branding}</p><p>{enquiry.gift.approvedPackagingTotal == null ? "Packaging is awaiting manager price and fit review." : `Packaging ₹${enquiry.gift.approvedPackagingTotal}, included in the approved item totals.`}</p></div>}
                         {enquiry.quotedAmount != null && <p className="mt-2">Quoted: ₹{enquiry.quotedAmount} · Requested deposit: ₹{enquiry.depositAmount} · Paid: ₹{enquiry.paidAmount}</p>}
                         {enquiry.pricedLines?.length > 0 && <div className="mt-3 rounded-xl border border-[#d9e5df] p-3 text-sm">
                             <p className="font-semibold">Approved quote details</p>
                             {enquiry.pricedLines.map(line => <p key={line.productId} className="mt-1">{line.productName}: ₹{line.grossAmount} (base ₹{line.subtotal}, tax ₹{line.taxAmount}; {line.cgstRate}% CGST + {line.sgstRate}% SGST)</p>)}
                         </div>}
                         {enquiry.orderNumber && <p className="mt-2">Confirmed order <Link href={`/orders/${encodeURIComponent(enquiry.orderNumber)}`} className="underline">{enquiry.orderNumber}</Link></p>}
+                        {!!enquiry.productionPlan?.length && <ul className="mt-2 text-sm">{enquiry.productionPlan.map(line => <li key={line.productId}>Approved production: {products.find(product => product.id === line.productId)?.name ?? "Sweet"} · {line.unit === "GRAM" ? `${line.quantity / 1000} kg` : `${line.quantity} pieces`}</li>)}</ul>}
                         {!!enquiry.productionPlan?.length && <p className="mt-2 text-sm">The branch has planned production specifically for your request. A verified deposit reserves it; full verified payment confirms pickup. This does not mean the food is already prepared.</p>}
                         {enquiry.status === "CONFIRMED" && !!enquiry.productionPlan?.length && <p className="mt-2 text-sm">{enquiry.productionPlan.every(line => line.readyQuantity >= line.quantity)
                             ? "The branch has recorded all requested quantities as prepared. Check your linked order for pickup status."

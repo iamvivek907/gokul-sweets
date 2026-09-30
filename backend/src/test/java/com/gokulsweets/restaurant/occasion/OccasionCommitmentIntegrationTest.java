@@ -351,6 +351,56 @@ class OccasionCommitmentIntegrationTest {
                 String.class, attemptId);
     }
 
+    @Autowired OccasionCatalogue catalogue;
+    @Autowired com.gokulsweets.restaurant.branchproduct.BranchProductRepository branchProducts;
+
+    @Test
+    void pieceRequestRequiresSizingAndPreservesRequestedPiecesWhilePlanningWeight() {
+        var f=paidDeposit();boolean old=features.isOccasionBulkProduction();
+        try {
+            features.setOccasionBulkProduction(true);
+            jdbc.update("INSERT INTO branch_products(branch_id,product_id,occasion_only) VALUES(?,?,true)",f.branch(),f.product());
+            jdbc.update("UPDATE products SET sale_mode='WEIGHT',minimum_weight_grams=250,weight_step_grams=50 WHERE id=?",f.product());
+            jdbc.update("UPDATE occasion_enquiries SET status='REQUESTED',paid_amount=0 WHERE id=?",f.enquiry());
+            jdbc.update("UPDATE occasion_enquiry_items SET requested_quantity=1000 WHERE enquiry_id=?",f.enquiry());
+            var date=jdbc.queryForObject("SELECT service_date FROM occasion_enquiries WHERE id=?",java.sql.Date.class,f.enquiry()).toLocalDate();
+            var expiry=clock.instant().plus(Duration.ofHours(1));var balance=clock.instant().plus(Duration.ofDays(1));
+            assertThatThrownBy(()->enquiries.quote(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",
+                new OccasionEnquiryService.Quote(new BigDecimal("1000"),new BigDecimal("200"),expiry,balance,"1000 measured pieces",java.util.List.of(new OccasionEnquiryService.QuoteLine(f.product(),new BigDecimal("1000"))),date.atTime(10,0))))
+                .hasMessageContaining("Approve a whole-gram");
+            var approved=enquiries.quote(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",
+                new OccasionEnquiryService.Quote(new BigDecimal("1000"),new BigDecimal("200"),expiry,balance,"1000 measured pieces",java.util.List.of(new OccasionEnquiryService.QuoteLine(f.product(),new BigDecimal("1000"),new BigDecimal("20000"))),date.atTime(10,0)));
+            assertThat(approved.items().getFirst().quantity()).isEqualByComparingTo("1000");
+            assertThat(approved.items().getFirst().unit()).isEqualTo(OccasionEnquiryService.Unit.PIECE);
+            assertThat(approved.productionPlan().getFirst().quantity()).isEqualByComparingTo("20000");
+            assertThat(approved.productionPlan().getFirst().unit()).isEqualTo("GRAM");
+            assertThat(jdbc.queryForObject("SELECT weight_grams FROM occasion_quote_lines WHERE enquiry_id=?",Integer.class,f.enquiry())).isEqualTo(20000);
+            assertThat(branchProducts.findForOrder(f.branch(),java.util.List.of(f.product()))).isEmpty();
+            assertThat(branchProducts.findAvailableMenu(f.branch())).isEmpty();
+        } finally {features.setOccasionBulkProduction(old);}
+    }
+
+    @Test
+    void giftArithmeticAndSnapshotRemainStableAfterCatalogueChanges() {
+        var f=paidDeposit();boolean old=features.isOccasionEnquiries();
+        try {
+            features.setOccasionEnquiries(true);
+            var box=catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,"Celebration eight","https://images.example.invalid/real-box.jpg","18 × 12 × 4 cm","Food-safe cardboard",3,8,new BigDecimal("10.00"),"Ribbon",1,true));
+            var recipe=java.util.List.of(new OccasionCatalogue.Recipe(f.product(),4),new OccasionCatalogue.Recipe(f.product()+1,2),new OccasionCatalogue.Recipe(f.product()+2,2));
+            var items=java.util.List.of(new OccasionEnquiryService.Item(f.product(),new BigDecimal("2800"),OccasionEnquiryService.Unit.PIECE,"Barfi"),new OccasionEnquiryService.Item(f.product()+1,new BigDecimal("1400"),OccasionEnquiryService.Unit.PIECE,"Peda"),new OccasionEnquiryService.Item(f.product()+2,new BigDecimal("1400"),OccasionEnquiryService.Unit.PIECE,"Laddoo"));
+            var date=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(3);
+            var snapshot=catalogue.validateGift(f.branch(),date,items,new OccasionCatalogue.GiftRequest(box.id(),700,recipe));
+            assertThat(snapshot.packagingEstimate()).isEqualByComparingTo("7000");
+            assertThat(snapshot.boxCount()).isEqualTo(700);
+            assertThatThrownBy(()->catalogue.validateGift(f.branch(),date,items,new OccasionCatalogue.GiftRequest(box.id(),701,recipe))).hasMessageContaining("multiplied");
+            assertThatThrownBy(()->catalogue.validateGift(f.branch(),date,items,new OccasionCatalogue.GiftRequest(box.id(),700,java.util.List.of(new OccasionCatalogue.Recipe(f.product(),9))))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            jdbc.update("UPDATE occasion_enquiries SET packaging_snapshot=?::jsonb WHERE id=?",new tools.jackson.databind.ObjectMapper().writeValueAsString(snapshot),f.enquiry());
+            catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(box.id(),"Changed box",null,"20 cm","Paper",1,4,null,"",0,false));
+            assertThat(enquiries.staffGet(ConsentEnvironment.DEV,f.branch(),f.enquiry()).gift().box().name()).isEqualTo("Celebration eight");
+            assertThatThrownBy(()->catalogue.validateGift(f.branch(),date,items,new OccasionCatalogue.GiftRequest(box.id(),700,recipe))).hasMessageContaining("unavailable");
+        }finally{features.setOccasionEnquiries(old);}
+    }
+
     private Fixture paidDeposit() {
         UUID suffix = UUID.randomUUID();
         long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Occasion test') RETURNING id",

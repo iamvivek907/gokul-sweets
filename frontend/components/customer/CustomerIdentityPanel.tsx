@@ -40,11 +40,11 @@ async function loadWidget(): Promise<Msg91Window> {
 }
 
 export default function CustomerIdentityPanel({mode = "profile", onSessionChange}: {
-    mode?: "profile" | "checkout";
+    mode?: "profile" | "checkout" | "occasion";
     onSessionChange?: (session: CustomerSession) => void;
 }) {
     const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
-        widgetId && widgetToken ? "loading" : "disabled");
+        "loading");
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [busy, setBusy] = useState(false);
     const [promptDismissed, setPromptDismissed] = useState(false);
@@ -57,7 +57,6 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
 
     useEffect(() => {
         alive.current = true;
-        if (!widgetId || !widgetToken) return;
         void (async () => {
             try {
                 const config = await apiClient<{enabled: boolean}>("/api/storefront/customer-identity");
@@ -84,7 +83,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     }, [mode, availability, session.authenticated, promptDismissed]);
 
     if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status">Checking phone verification…</p>;
-    if (availability !== "ready" || !widgetId || !widgetToken) return mode === "checkout" ? null : <section
+    if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" ? null : <section
         className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"
         aria-label="Phone verification">
         <h2 className="text-xl font-semibold text-[#241715]">Phone verification is unavailable</h2>
@@ -189,6 +188,8 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
             if (alive.current) setBusy(false);
         }
     }
+
+    if (mode === "occasion" && session.authenticated) return <div className="flex flex-wrap items-center justify-between gap-3" aria-label="Verified occasion contact"><div><p className="font-semibold text-[#245b38]">✓ Phone verified</p><p className="mt-1 text-sm">{session.name || "Your Gokul account"} · {session.phone}</p></div><Link href="/profile" className="text-sm underline">Manage account</Link></div>;
 
     if (mode === "checkout") return <>
         {session.authenticated ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f4faf4] p-4" aria-label="Verified pickup contact">
