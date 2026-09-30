@@ -54,7 +54,12 @@ public class CustomerPushDispatcher {
                     JOIN verified_customer_sessions v ON v.id = s.session_id
                     JOIN customer_notification_events e ON e.id = ?
                     WHERE s.id = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
-                      AND v.expires_at > CURRENT_TIMESTAMP AND e.read_at IS NULL)
+                      AND v.expires_at > CURRENT_TIMESTAMP AND e.read_at IS NULL
+                      AND (e.kind NOT IN ('CONFIRMED','PREPARING','READY_FOR_PICKUP','READY_FOR_DELIVERY',
+                        'OUT_FOR_DELIVERY','PICKED_UP','DELIVERED','CANCELLED','PICKUP_WINDOW_EXPIRED','NO_SHOW')
+                        OR EXISTS (SELECT 1 FROM orders o JOIN verified_order_ownership own ON own.order_id = o.id
+                          WHERE o.order_number = e.target_id AND o.order_status = e.kind
+                            AND own.environment = e.environment AND own.verified_subject_id = e.subject_id)))
                     """, Boolean.class, task.eventId(), task.subscriptionId());
             var preference = alerts.settings(environment, task.subject());
             if (!Boolean.TRUE.equals(live) || CustomerAlertPreferences.quiet(preference.quietHoursEnabled(),

@@ -33,6 +33,7 @@ class CustomerPushIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired CustomerAlertPreferences preferences;
     @Autowired CustomerPushDispatcher dispatcher;
+    @Autowired CustomerNotificationInbox inbox;
     @Autowired VerifiedCustomerSessionStore sessions;
     @MockitoBean WebPushTransport transport;
     private final UUID subject = UUID.randomUUID();
@@ -93,6 +94,32 @@ class CustomerPushIntegrationTest {
         long later = event(); dispatcher.dispatchBatch();
         verify(transport, never()).send(anyString(), anyString(), anyString(), eq(later), anyString(), anyString(), anyString());
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM customer_notification_events WHERE subject_id = ?", Long.class, subject)).isEqualTo(3);
+    }
+
+    @Test
+    void stalePreparationPushIsSkippedWhenOrderAlreadyReadyAndLatestReadyCopyIsSent() throws Exception {
+        preferences.save("DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
+        preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
+        Long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Push branch') RETURNING id", Long.class, "PUSH-" + UUID.randomUUID().toString().substring(0, 8));
+        Long slot = jdbc.queryForObject("INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity) VALUES (?, '2026-10-01', '18:00', '18:30', 20) RETURNING id", Long.class, branch);
+        String number = "PUSH-" + UUID.randomUUID();
+        Long order = jdbc.queryForObject("""
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name, customer_phone,
+                    pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, number, branch, slot);
+        jdbc.update("INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id) VALUES (?, 'DEV', ?)", order, subject);
+        inbox.orderReady(order);
+        long old = inbox.page("DEV", subject, null).messages().getFirst().id();
+        jdbc.update("UPDATE orders SET order_status = 'READY_FOR_PICKUP' WHERE id = ?", order);
+        inbox.orderReady(order);
+        long ready = inbox.page("DEV", subject, null).messages().getFirst().id();
+        when(transport.send(anyString(), anyString(), anyString(), eq(ready), anyString(), anyString(), anyString())).thenReturn(201);
+        dispatcher.dispatchBatch();
+        verify(transport, never()).send(anyString(), anyString(), anyString(), eq(old), anyString(), anyString(), anyString());
+        verify(transport).send(anyString(), anyString(), anyString(), eq(ready), eq("Your order is ready for pickup"), contains("Push branch"), eq("/orders/" + number));
+        assertThat(inbox.page("DEV", subject, null).messages()).hasSize(2);
+        assertThat(jdbc.queryForObject("SELECT state FROM customer_push_deliveries WHERE event_id = ?", String.class, old)).isEqualTo("SKIPPED");
     }
 
     @Test

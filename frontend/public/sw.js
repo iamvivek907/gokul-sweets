@@ -374,7 +374,7 @@ self.addEventListener("push", event => {
         const destination = notificationDestination(payload.url);
         const custom = destination !== "/profile#account-notifications";
         const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
-        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 240) : "A new account update is waiting in your notification inbox.";
+        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
         await self.registration.showNotification(title, {
             body, badge: "/notification-badge.svg",
             icon: "/icon-192.png", tag: `gokul-event-${eventId}`, renotify: false,

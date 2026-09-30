@@ -306,7 +306,7 @@ keeps push unavailable; sound and the inbox remain usable. HTTPS is required out
 Key rotation requires re-registering browser subscriptions.
 
 Permission is requested only after **Enable browser notifications** is tapped. Registration
-binds to the exact verified account, environment and current browser session. Maximum five
+binds to the exact verified account, environment and current browser session (existing 30-day absolute customer-session lifetime). Maximum five
 live browsers per account; logout, session revocation/expiry, explicit disable and provider
 404/410 stop future sends. Permission revocation can be removed by the browser/provider;
 the customer can explicitly disable the stored registration. Failed disables do not claim success.
@@ -314,7 +314,9 @@ Browser support follows standard Web Push; iOS/iPadOS 16.4+ requires a Home Scre
 See [WebKit guidance](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
 
 The worker selects committed, unread transaction messages created after subscription and
-within five minutes. It leases work in the database, sends up to three tasks per batch, retries
+within five minutes. Before sending an order-stage push it rechecks the current stage; superseded stage alerts
+are skipped while historical inbox messages remain. It leases work in the database, sends
+up to three tasks per batch, retries
 429/5xx/network failures after 60 seconds, and stops after three attempts. It uses AES128GCM
 and VAPID from [webpush-java](https://github.com/web-push-libs/webpush-java). Only allowlisted
 HTTPS browser-provider endpoints are accepted; redirects are disabled and requests time out.
