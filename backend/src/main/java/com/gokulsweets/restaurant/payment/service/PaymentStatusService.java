@@ -1074,9 +1074,8 @@ public class PaymentStatusService {
                     "Payment expired."
             );
 
-            orderRepository.save(
-                    order
-            );
+            orderRepository.saveAndFlush(order);
+            notifications.orderReady(order.getId());
 
             log.info(
                     "Payment expired and capacity released: paymentId={}, orderId={}",

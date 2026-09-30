@@ -37,6 +37,7 @@ class CustomerIdentityControllerTest {
     private final CustomerPrivacyRequests privacyRequests = mock(CustomerPrivacyRequests.class);
     private final CustomerAccountHub accountHub = mock(CustomerAccountHub.class);
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications = mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class);
+    private final com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences alerts = mock(com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences.class);
     private final EnhancementProperties features = new EnhancementProperties();
     private final MockEnvironment settings = new MockEnvironment()
             .withProperty("gokul.environment-isolation.enabled", "true")
@@ -45,7 +46,28 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(
             exchange, sessions, subjects, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
-            ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub, notifications);
+            ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub, notifications, alerts);
+
+    @Test
+    void alertsRequireTrustedCurrentSessionAndCanAlwaysRevokeOwnedSubscription() {
+        features.setCustomerOtpIdentity(true);
+        var trusted = request();
+        trusted.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
+        var subject = UUID.randomUUID();
+        when(sessions.subject(eq(ConsentEnvironment.DEV), eq("current-session"), any())).thenReturn(Optional.of(subject));
+        assertThatThrownBy(() -> controller.alertSettings(trusted)).isInstanceOf(ResponseStatusException.class);
+        when(alerts.enabled()).thenReturn(true);
+        controller.alertSettings(trusted);
+        verify(alerts).settings("DEV", subject);
+        var id = UUID.randomUUID();
+        when(alerts.enabled()).thenReturn(false);
+        controller.unsubscribePush(id, trusted);
+        verify(alerts).unsubscribe("DEV", subject, id);
+        var foreign = request();
+        foreign.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
+        foreign.removeHeader(HttpHeaders.ORIGIN); foreign.addHeader(HttpHeaders.ORIGIN, "https://untrusted.example");
+        assertThatThrownBy(() -> controller.unsubscribePush(id, foreign)).isInstanceOf(ResponseStatusException.class);
+    }
 
     @Test
     void inboxRequiresEnabledFlagTrustedOriginAndCurrentSubjectForReadAndMutation() {

@@ -62,8 +62,6 @@ class CustomerNotificationInboxIntegrationTest {
     @Test
     void realReadyTransitionCommitsOneEventAndReplayOrWrongStateCannotInventAnother() {
         var fixture = fixture("PREPARING");
-        inbox.orderReady(fixture.id());
-        assertThat(inbox.page("DEV", subject, null).messages()).isEmpty();
         workflow.transitionStatus(fixture.number(), OrderStatus.READY_FOR_PICKUP);
         workflow.transitionStatus(fixture.number(), OrderStatus.READY_FOR_PICKUP);
         inbox.orderReady(fixture.id());
@@ -76,6 +74,21 @@ class CustomerNotificationInboxIntegrationTest {
         assertThatThrownBy(() -> workflow.transitionStatus(fixture.number(), OrderStatus.CONFIRMED))
                 .isInstanceOf(IllegalStateException.class);
         assertThat(inbox.page("DEV", subject, null).unreadCount()).isEqualTo(1);
+    }
+
+    @Test
+    void eachPersistedStageHasUsefulCopyAndReplaysStayUnique() {
+        var fixture = fixture("CONFIRMED");
+        for (String stage : new String[]{"CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "PICKED_UP"}) {
+            jdbc.update("UPDATE orders SET order_status = ? WHERE id = ?", stage, fixture.id());
+            inbox.orderReady(fixture.id()); inbox.orderReady(fixture.id());
+            var message = inbox.page("DEV", subject, null).messages().getFirst();
+            assertThat(message.kind()).isEqualTo(stage);
+            assertThat(message.message()).contains(fixture.number());
+            if (stage.equals("CONFIRMED")) assertThat(message.message()).contains("IST", "Pickup booked");
+            if (stage.equals("PREPARING")) assertThat(message.message()).contains("wait for the ready");
+        }
+        assertThat(inbox.page("DEV", subject, null).messages()).hasSize(4);
     }
 
     @Test

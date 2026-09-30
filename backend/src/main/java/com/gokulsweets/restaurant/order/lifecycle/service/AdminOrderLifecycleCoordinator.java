@@ -46,6 +46,7 @@ public class AdminOrderLifecycleCoordinator {
     private final PickupSlotReservationService pickupSlotReservationService;
     private final DeliveryRiderHoldService deliveryRiderHolds;
     private final OrderInventoryLifecycleService inventoryLifecycleService;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
 
     @Transactional
     public AdminOrderDetailResponse transitionStatus(
@@ -108,6 +109,7 @@ public class AdminOrderLifecycleCoordinator {
         );
         order.setOrderStatus(OrderStatus.CANCELLED);
         orderRepository.saveAndFlush(order);
+        notifications.orderReady(order.getId());
 
         log.info(
                 "Unpaid order cancelled by admin: orderNumber={}, previousStatus={}, actor={}",
@@ -144,6 +146,7 @@ public class AdminOrderLifecycleCoordinator {
         inventoryLifecycleService.fulfilOrderInventory(orderNumber, currentActor());
         order.setOrderStatus(OrderStatus.PICKED_UP);
         orderRepository.saveAndFlush(order);
+        notifications.orderReady(order.getId());
 
         log.info("Late order collected: orderNumber={}, actor={}",
                 orderNumber, currentActor());

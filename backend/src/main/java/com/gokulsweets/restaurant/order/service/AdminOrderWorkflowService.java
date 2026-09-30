@@ -237,7 +237,7 @@ public class AdminOrderWorkflowService {
          * =====================================================
          */
 
-        if (updatedRows == 1 && (targetStatus == OrderStatus.READY_FOR_PICKUP || targetStatus == OrderStatus.READY_FOR_DELIVERY))
+        if (updatedRows == 1)
             notifications.orderReady(order.getId());
         if (updatedRows == 1 && order.getFulfillmentType() == FulfillmentType.DELIVERY) {
             if (targetStatus == OrderStatus.OUT_FOR_DELIVERY) dispatch.recordTransition(order.getId(), "DISPATCHED");
@@ -498,6 +498,7 @@ public class AdminOrderWorkflowService {
         }
 
 
+        notifications.orderReady(order.getId());
         createPreparationKot(
                 order.getId(),
                 orderNumber

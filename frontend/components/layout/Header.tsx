@@ -8,6 +8,7 @@ import BranchSelector from "@/components/branch/BranchSelector";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useCart} from "@/hooks/useCart";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import CustomerNotificationBell from "@/components/customer/CustomerNotificationBell";
 import CustomerAccountLink from "@/components/customer/CustomerAccountLink";
 
 
@@ -100,6 +101,7 @@ export default function Header() {
 
                 <div className="customer-header-actions ml-auto flex shrink-0 flex-row-reverse items-center gap-3 sm:flex-row">
                     <MobileMenu />
+                    <CustomerNotificationBell />
                     <CustomerAccountLink />
                 </div>
 

@@ -13,6 +13,20 @@ class StorefrontFeaturesControllerTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-25T18:31:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @Test
+    void optionalAlertsRequireInboxAndIdentityAndNeverEnableThem() {
+        var properties = new EnhancementProperties();
+        properties.setNotificationAlerts(true);
+        var controller = new StorefrontFeaturesController(properties, clock);
+        assertThat(controller.features().notificationAlerts()).isFalse();
+        properties.setNotificationInbox(true);
+        assertThat(controller.features().notificationAlerts()).isFalse();
+        properties.setCustomerOtpIdentity(true);
+        assertThat(controller.features().notificationAlerts()).isTrue();
+        properties.setNotificationInbox(false);
+        assertThat(controller.features().notificationAlerts()).isFalse();
+    }
+
+    @Test
     void notificationInboxRequiresItsOwnSwitchAndVerifiedIdentity() {
         var properties = new EnhancementProperties();
         var controller = new StorefrontFeaturesController(properties, clock);

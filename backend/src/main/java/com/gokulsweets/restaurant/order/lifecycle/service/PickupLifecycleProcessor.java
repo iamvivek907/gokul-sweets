@@ -22,6 +22,7 @@ public class PickupLifecycleProcessor {
     private final OrderInventoryLifecycleService inventoryLifecycleService;
     private final PickupLifecycleProperties properties;
     private final Clock inventoryClock;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
 
     @Transactional
     public boolean expirePickupWindow(String orderNumber) {
@@ -39,6 +40,7 @@ public class PickupLifecycleProcessor {
 
         order.setOrderStatus(OrderStatus.PICKUP_WINDOW_EXPIRED);
         orderRepository.saveAndFlush(order);
+        notifications.orderReady(order.getId());
 
         log.info("Pickup window expired: orderNumber={}, dueAt={}", orderNumber, dueAt);
         return true;
@@ -70,6 +72,7 @@ public class PickupLifecycleProcessor {
         );
         order.setOrderStatus(OrderStatus.NO_SHOW);
         orderRepository.saveAndFlush(order);
+        notifications.orderReady(order.getId());
 
         log.info("Order marked no-show: orderNumber={}, dueAt={}", orderNumber, dueAt);
         return true;

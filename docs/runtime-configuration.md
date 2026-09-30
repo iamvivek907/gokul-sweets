@@ -274,3 +274,90 @@ installed Playwright module; `BROWSER_BASE` defaults to `http://127.0.0.1:3311`.
 Deployment/provider/staff DEV verification remains an owner QA step; CI alone does not prove it.
 SCRUM-39 remains open until its remaining sender work and DEV evidence are complete;
 SCRUM-40 depends on this inbox foundation.
+
+## Sprint 5 — optional customer browser alerts (SCRUM-40)
+
+Baseline: merged PR 139, `dev` `92836c6fab1b78f3940ea329036b8eec8c82a856`.
+Migration **V91** adds session-bound push subscriptions, bounded delivery attempts, sound
+preferences and quiet hours. No new admin columns are introduced. Customer controls include
+help text for permission denial, sound activation, device mute, IST times and inbox fallback.
+
+| Setting | Default | Purpose |
+| --- | --- | --- |
+| `GOKUL_FEATURES_NOTIFICATION_ALERTS` | `false` | Enables customer alert controls and sender; also requires the inbox and verified-identity prerequisites |
+| `GOKUL_WEB_PUSH_PUBLIC_KEY` | empty | Base64url uncompressed P-256 public VAPID key; exposed to the signed-in browser |
+| `GOKUL_WEB_PUSH_PRIVATE_KEY` | empty | Base64url 32-byte P-256 private VAPID key; backend secret only |
+| `GOKUL_WEB_PUSH_SUBJECT` | empty | Operator-controlled `mailto:` contact or HTTPS contact URL |
+
+Keep both notification switches OFF until DEV configuration is approved. Existing Sprint 4
+QA flags are unchanged. Generate a distinct key pair per environment on an operator machine:
+
+```js
+const { createECDH } = require('node:crypto');
+const key = createECDH('prime256v1');
+key.generateKeys();
+console.log('Public:', key.getPublicKey().toString('base64url'));
+console.log('Private:', key.getPrivateKey().toString('base64url'));
+```
+
+Store the private key in backend deployment secrets, never frontend environment variables,
+source control or Jira. Supply a real operator contact as subject. Missing/invalid configuration
+keeps push unavailable; sound and the inbox remain usable. HTTPS is required outside localhost.
+Key rotation requires re-registering browser subscriptions.
+
+Permission is requested only after **Enable browser notifications** is tapped. Registration
+binds to the exact verified account, environment and current browser session (existing 30-day absolute customer-session lifetime). Maximum five
+live browsers per account; logout, session revocation/expiry, explicit disable and provider
+404/410 stop future sends. Permission revocation can be removed by the browser/provider;
+the customer can explicitly disable the stored registration. Failed disables do not claim success.
+Browser support follows standard Web Push; iOS/iPadOS 16.4+ requires a Home Screen web app.
+See [WebKit guidance](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
+
+The worker selects committed, unread transaction messages created after subscription and
+within five minutes. Before sending an order-stage push it rechecks the current stage; superseded stage alerts
+are skipped while historical inbox messages remain. It leases work in the database, sends
+up to three tasks per batch, retries
+429/5xx/network failures after 60 seconds, and stops after three attempts. It uses AES128GCM
+and VAPID from [webpush-java](https://github.com/web-push-libs/webpush-java). Only allowlisted
+HTTPS browser-provider endpoints are accepted; redirects are disabled and requests time out.
+`ACCEPTED` means provider acceptance, not device delivery or customer read. External delivery
+is best effort, not exactly once. The service worker serializes push events and retains the last
+256 event IDs to suppress repeat alerts, with stage-specific copy, a brand icon/badge and a validated exact order/request
+link. Copy includes order reference, branch, booked pickup time or revised ready time when
+applicable; never customer phone, address, items or payment amounts. It never plays custom audio. Marketing broadcasting is excluded.
+
+Sound defaults OFF. **Activate and test sound in this tab** explicitly unlocks browser audio;
+the separate saved sound preference permits one short chime for fresh unread updates while
+the page is visible. Initial/history loads stay silent. Web Locks and a metadata-only cursor
+coordinate tabs; unsupported coordination/storage falls back to silence. Device mute and
+browser autoplay rules still apply. No background custom sound is promised.
+
+Quiet hours default to **22:00–08:00 IST**, inclusive start/exclusive end, across midnight.
+They suppress push and in-page sound while messages remain in the inbox. Skipped alerts do
+not burst after quiet hours. Alert flag OFF hides controls and stops the sender/runtime;
+existing order history and inbox behavior follow their own switches. Stored read state remains.
+
+After merge and DEV deployment, enable the two switches with configured VAPID credentials.
+Test a fresh payment/ready/delay/occasion message on Chromium, Firefox and a supported iOS
+Home Screen app. Check stage-specific locked-screen copy and the exact order/request on click; deny/revoke permission,
+logout/expire the session, simulate offline enable/disable, provider rejection and retry, multiple
+tabs, browser/device mute, quiet boundaries and flag OFF. Confirm the inbox remains authoritative.
+Automated tests mock external delivery and permission/audio APIs; they do not prove real
+provider acceptance, OS delivery or device audio. Record that DEV evidence before moving
+SCRUM-39/40 to QA or Done.
+
+
+Customer stages now include payment-confirmed booking (with booked pickup time in IST),
+preparation, kitchen ready, pickup/delivery completion, dispatch, cancellation, pickup-window
+expiry and no-show, plus revised ready estimates and truthful refund states. The persisted
+transition owns its message; duplicates do not invent new stages. Future bookings receive
+ready push even while the PWA is closed, subject to permission, live session, quiet hours and
+provider/device support. The header bell shows unread count; inbox cards use stage icons,
+unread badges and clear links. Device notification layout remains OS controlled.
+
+Staff new-order/preparation reminders and overdue email escalation are tracked as
+**SCRUM-109** in Sprint 5, separate follow-on work requested by the owner on 30 September 2026. They are not implemented by this customer
+alert PR. Required design: eligible active staff scoped to branch and permissions, server-side
+IST scheduling, action-state rechecks, deduplication, acknowledgement, bounded retry/escalation,
+configured staff email recipients/provider, and staff push registration/help text. Do not imply
+customer push also covers staff operational alerts.
