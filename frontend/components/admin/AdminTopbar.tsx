@@ -8,6 +8,7 @@ import {
     useAdminAuth
 } from "@/contexts/AdminAuthContext";
 
+import StaffNotificationBell from "@/components/admin/StaffNotificationBell";
 import AdminMobileNav
     from "@/components/admin/AdminMobileNav";
 
@@ -127,6 +128,7 @@ export default function AdminTopbar() {
                 </div>
 
 
+                <div className="flex shrink-0 items-center gap-3"><StaffNotificationBell />
                 <button
                     type="button"
                     onClick={
@@ -154,6 +156,7 @@ export default function AdminTopbar() {
                 >
                     Logout
                 </button>
+                </div>
 
             </div>
 

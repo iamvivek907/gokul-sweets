@@ -59,6 +59,12 @@ public class WebPushTransport {
     }
 
     public int send(String endpoint, String publicKey, String auth, long eventId, String title, String body, String url) throws Exception {
+        return transmit(endpoint, publicKey, auth, String.valueOf(eventId), title, body, url);
+    }
+    public int sendStaff(String endpoint, String publicKey, String auth, long eventId, String title, String body, String url) throws Exception {
+        return transmit(endpoint, publicKey, auth, "staff:" + eventId, title, body, url);
+    }
+    private int transmit(String endpoint, String publicKey, String auth, String eventId, String title, String body, String url) throws Exception {
         var encrypted = prepare(endpoint, publicKey, auth, eventId, title, body, url);
         var request = HttpRequest.newBuilder(URI.create(endpoint)).timeout(Duration.ofSeconds(10));
         encrypted.getHeaders().forEach(request::header);
@@ -71,6 +77,9 @@ public class WebPushTransport {
     }
 
     nl.martijndwars.webpush.HttpRequest prepare(String endpoint, String publicKey, String auth, long eventId, String title, String body, String url) throws Exception {
+        return prepare(endpoint, publicKey, auth, String.valueOf(eventId), title, body, url);
+    }
+    private nl.martijndwars.webpush.HttpRequest prepare(String endpoint, String publicKey, String auth, String eventId, String title, String body, String url) throws Exception {
         if (!validEndpoint(endpoint) || !configured()) throw new IllegalStateException("Push delivery unavailable");
         // Trusted event copy only: never customer phone, address, item contents or payment amounts.
         String payload = tools.jackson.databind.json.JsonMapper.builder().build().writeValueAsString(java.util.Map.of(

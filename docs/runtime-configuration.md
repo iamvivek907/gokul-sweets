@@ -355,9 +355,91 @@ ready push even while the PWA is closed, subject to permission, live session, qu
 provider/device support. The header bell shows unread count; inbox cards use stage icons,
 unread badges and clear links. Device notification layout remains OS controlled.
 
-Staff new-order/preparation reminders and overdue email escalation are tracked as
-**SCRUM-109** in Sprint 5, separate follow-on work requested by the owner on 30 September 2026. They are not implemented by this customer
-alert PR. Required design: eligible active staff scoped to branch and permissions, server-side
-IST scheduling, action-state rechecks, deduplication, acknowledgement, bounded retry/escalation,
-configured staff email recipients/provider, and staff push registration/help text. Do not imply
-customer push also covers staff operational alerts.
+Staff new-order/preparation reminders and overdue email escalation are implemented in the
+SCRUM-109 follow-on below. Customer push alone does not cover staff operational alerts.
+
+## Sprint 5 — staff operational notifications (SCRUM-109)
+
+Baseline: merged PR 140, `dev` `c3eeba9c57b6ca10c80c29ed482866986578e802`.
+Migration **V92** adds branch order alerts, per-staff read state, live-session push registrations
+and leased push/email delivery attempts. Staff UI: the topbar bell and
+**/admin/staff-notifications**. Existing **/admin/notifications** remains offer management.
+Alert links open **/admin/orders/{orderNumber}**, with existing preparation/ready/delay APIs,
+permissions, eligibility and inventory checks. All new controls include explanatory help text.
+No staff email column is added, and no address is inferred from usernames.
+
+| Setting | Default | Owner / dependency |
+| --- | --- | --- |
+| `GOKUL_FEATURES_STAFF_ORDER_ALERTS` | `false` | Operations; secure staff sessions, DEV/PROD isolation and trusted Origin/CSRF |
+| `GOKUL_STAFF_ALERTS_REMINDER_MINUTES` | `10` | Operations; 1–60 minutes before the existing preparation window opens |
+| `GOKUL_STAFF_ALERTS_ESCALATION_MINUTES` | `5` | Operations; 1–60 minutes after booked pickup/service time for unresolved email escalation |
+| `GOKUL_STAFF_ALERTS_EMAIL_ENABLED` | `false` | Operations; enables the email adapter only with valid configuration |
+| `GOKUL_STAFF_ALERTS_EMAIL_API_KEY` | empty | Backend secret: Resend sending API key, scoped to a verified sender domain |
+| `GOKUL_STAFF_ALERTS_EMAIL_FROM` | empty | Operator-approved verified sender address, e.g. a mailbox on the verified domain |
+| `GOKUL_STAFF_ALERTS_EMAIL_RECIPIENTS` | `{}` | Backend-only JSON mapping real staff IDs to operator-verified recipients; e.g. `{"12":"verified-staff@example.invalid"}` is syntax only |
+| `GOKUL_WEB_PUSH_PUBLIC_KEY/PRIVATE_KEY/SUBJECT` | empty | Existing shared VAPID configuration; private key stays backend-only |
+
+The staff flag is independent of customer inbox/push toggles. Existing Sprint 4 QA flags stay
+unchanged. Push needs explicit permission and registration on each staff browser, with at most
+five live registrations per staff account. Registration is tied to the current secure staff
+session, whose existing maximum lifetime is eight hours. Logout/expiry/staff edits/provider
+404/410 stop sends to that registration. Re-register after signing in again. Denial, unsupported
+browsers or missing configuration fall back to the queue/inbox. iOS Home Screen limitations and
+OS sound controls are explained in the UI; no guaranteed custom background audio is claimed.
+Customer and staff push IDs use different namespaces. Disabling staff push revokes only its
+server registration so a shared customer subscription is not inadvertently removed.
+
+Paid order confirmation records a unique NEW_ORDER alert in the payment transaction, including
+fully paid occasion orders when finalized. Pending, failed or late-payment refund-review states
+do not create a paid-order promise. Rollbacks remove the alert. Reminders reuse
+PreparationEligibilityService for NORMAL/PRIORITY/admin override and delivery lead windows;
+no new preparation rule or automatic order-status change is introduced. The worker checks
+live CONFIRMED/PREPARING orders in keyset pages every 30 seconds while enabled:
+
+- PREPARATION_SOON from the configured reminder boundary until eligibility opens.
+- PREPARATION_DUE from eligibility until booked pickup/service start.
+- PREPARATION_OVERDUE if still CONFIRMED at booked time; READY_OVERDUE if still PREPARING.
+
+Timing uses Asia/Kolkata, including across India midnight. Reminder keys include their schedule,
+so rescheduled windows are distinct; stale-window or already-completed actions are rechecked
+before sending and skipped. The overdue scan covers the last day, not historical orders.
+Branch-scoped inbox/sender authorization requires active staff, branch access (OWNER_ADMIN
+may access all branches), ORDER_VIEW and the relevant preparation/ready permission. Permissions
+are checked again before each attempt, so role/branch changes are respected. Staff who cannot
+perform that action do not receive that reminder. NEW_ORDER needs ORDER_VIEW only.
+
+Reading is per staff and idempotent. It suppresses that staff member's pending push, but does
+not mark an order prepared/ready or suppress unresolved email escalation. Configured eligible
+recipients get one email attempt sequence per overdue event after the escalation threshold.
+Starting preparation ends preparation-overdue escalation; if the order is still not ready after
+booked time, the separate ready-overdue action can escalate. Each task is leased with SKIP
+LOCKED, max three attempts and 60-second retry backoff for 429/5xx/network errors. Push is limited
+to fresh unread events after registration; queued stale alerts are skipped. Worker batches process
+up to ten sends; provider calls have five-second connect and ten-second request bounds.
+
+Email uses the [Resend HTTPS send API](https://resend.com/docs/api-reference/emails/send-email)
+and stable environment/event/staff [idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys).
+Keep recipients and payload unchanged during retries; a provider idempotency conflict fails
+rather than claiming another delivery. ACCEPTED records HTTP/provider acceptance, not mailbox
+or OS delivery, read or order action. Generic operational copy includes order reference, branch
+and IST timing, never customer phone/address/items/payment amounts. No provider response body,
+email recipient or secret is logged. Email is optional and no external account is provisioned
+or message sent by this implementation task.
+
+**Deployment prerequisite:** scheduled reminders require an always-on backend/worker.
+[Render free services](https://render.com/docs/free) sleep without inbound traffic; an asleep
+service cannot execute these reminders. HTTPS avoids their SMTP-port restriction, but does not
+remove the sleep limitation. Do not claim timely background operation on a sleeping deployment.
+Flag OFF stops recording/generation/sending, hides the bell and retains the queue as fallback;
+server push revocation is still allowed. Existing read state is preserved. There is no paid-order
+historical backfill or new alerts for completed/cancelled orders.
+
+After merge, apply V92 in DEV, keep production OFF, configure VAPID and Resend sender/recipient
+secrets, and enable the staff flag on an always-on service. Use two staff accounts from different
+branches plus a read-only role. Create/pay an order with the portal closed; confirm only eligible
+staff get a useful alert and the exact authorized order opens after sign-in. Verify each timing
+boundary, action before send, read-without-action email follow-up, provider denial/retry/410,
+logout/expiry/permission change, future reschedule, two workers, offline enable/disable/read,
+mobile/desktop, iOS Home Screen, no eligible staff and flag OFF. Verify staff email receipt with
+the actual approved recipient. CI mocks external delivery; real DEV provider/device/staff evidence
+is still required before moving SCRUM-109 to QA/Done. Preserve earlier owner QA stories.

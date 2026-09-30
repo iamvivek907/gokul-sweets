@@ -24,9 +24,11 @@ class RuntimeConfigurationTest {
                 .filter(key -> !key.endsWith("branch-experience"))
                 .filter(key -> !key.endsWith("notification-inbox"))
                 .filter(key -> !key.endsWith("notification-alerts"))
+                .filter(key -> !key.endsWith("staff-order-alerts"))
                 .toList();
         assertThat(properties.getProperty("gokul.features.notification-inbox")).endsWith(":false}");
         assertThat(properties.getProperty("gokul.features.notification-alerts")).endsWith(":false}");
+        assertThat(properties.getProperty("gokul.features.staff-order-alerts")).endsWith(":false}");
         assertThat(enabledFeatures).hasSizeGreaterThan(30);
         for (var feature : enabledFeatures) {
             assertThat(properties.getProperty(feature)).endsWith(":true}");
