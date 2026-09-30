@@ -223,7 +223,7 @@ Baseline: merged `dev` `c99e8a38d7cd36297c0ef5ca573e02bd0cd2c71b` (PR 138).
 
 | Setting | Default | Owner / dependency | OFF fallback |
 | --- | --- | --- | --- |
-| `GOKUL_FEATURES_NOTIFICATION_INBOX` | `false` | Customer service; verified OTP identity, trusted HTTPS Origin, DEV/PROD isolation and abuse-controls verification; account hub for the profile entry point | Existing order history, tracking and occasion request history |
+| `GOKUL_FEATURES_NOTIFICATION_INBOX` | ON for owner DEV QA | Customer service; verified OTP identity, trusted HTTPS Origin, DEV/PROD isolation and abuse-controls verification; account hub for the profile entry point | Existing order history, tracking and occasion request history |
 
 Migration **V90** adds durable customer notification events and channel preferences.
 There are no new admin columns. Existing payment, staff readiness and delay actions
@@ -284,13 +284,15 @@ help text for permission denial, sound activation, device mute, IST times and in
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
-| `GOKUL_FEATURES_NOTIFICATION_ALERTS` | `false` | Enables customer alert controls and sender; also requires the inbox and verified-identity prerequisites |
+| `GOKUL_FEATURES_NOTIFICATION_ALERTS` | ON for owner DEV QA | Enables customer alert controls and sender; also requires the inbox and verified-identity prerequisites |
 | `GOKUL_WEB_PUSH_PUBLIC_KEY` | empty | Base64url uncompressed P-256 public VAPID key; exposed to the signed-in browser |
 | `GOKUL_WEB_PUSH_PRIVATE_KEY` | empty | Base64url 32-byte P-256 private VAPID key; backend secret only |
 | `GOKUL_WEB_PUSH_SUBJECT` | empty | Operator-controlled `mailto:` contact or HTTPS contact URL |
 
-Keep both notification switches OFF until DEV configuration is approved. Existing Sprint 4
-QA flags are unchanged. Generate a distinct key pair per environment on an operator machine:
+Owner-requested DEV QA defaults now enable both notification switches. Explicit environment
+values override these defaults; set both false in PROD until rollout is approved. Existing Sprint 4
+QA flags are unchanged. Push still requires configured keys and explicit device permission.
+Generate a distinct key pair per environment on an operator machine:
 
 ```js
 const { createECDH } = require('node:crypto');
@@ -337,7 +339,8 @@ They suppress push and in-page sound while messages remain in the inbox. Skipped
 not burst after quiet hours. Alert flag OFF hides controls and stops the sender/runtime;
 existing order history and inbox behavior follow their own switches. Stored read state remains.
 
-After merge and DEV deployment, enable the two switches with configured VAPID credentials.
+After merge and DEV deployment, remove stale false overrides or set both switches true,
+then configure VAPID credentials.
 Test a fresh payment/ready/delay/occasion message on Chromium, Firefox and a supported iOS
 Home Screen app. Check stage-specific locked-screen copy and the exact order/request on click; deny/revoke permission,
 logout/expire the session, simulate offline enable/disable, provider rejection and retry, multiple
@@ -370,7 +373,7 @@ No staff email column is added, and no address is inferred from usernames.
 
 | Setting | Default | Owner / dependency |
 | --- | --- | --- |
-| `GOKUL_FEATURES_STAFF_ORDER_ALERTS` | `false` | Operations; secure staff sessions, DEV/PROD isolation and trusted Origin/CSRF |
+| `GOKUL_FEATURES_STAFF_ORDER_ALERTS` | ON for owner DEV QA | Operations; secure staff sessions, DEV/PROD isolation and trusted Origin/CSRF |
 | `GOKUL_STAFF_ALERTS_REMINDER_MINUTES` | `10` | Operations; 1–60 minutes before the existing preparation window opens |
 | `GOKUL_STAFF_ALERTS_ESCALATION_MINUTES` | `5` | Operations; 1–60 minutes after booked pickup/service time for unresolved email escalation |
 | `GOKUL_STAFF_ALERTS_EMAIL_ENABLED` | `false` | Operations; enables the email adapter only with valid configuration |
@@ -434,8 +437,10 @@ Flag OFF stops recording/generation/sending, hides the bell and retains the queu
 server push revocation is still allowed. Existing read state is preserved. There is no paid-order
 historical backfill or new alerts for completed/cancelled orders.
 
-After merge, apply V92 in DEV, keep production OFF, configure VAPID and Resend sender/recipient
-secrets, and enable the staff flag on an always-on service. Use two staff accounts from different
+After merge, apply V92 in DEV. The staff flag defaults ON for owner QA; remove a stale false
+override or set it true. Set all three notification flags explicitly false in production until
+rollout approval. Configure VAPID on an always-on service. Email remains OFF until verified
+Resend sender/recipient secrets are configured and its separate switch is explicitly enabled. Use two staff accounts from different
 branches plus a read-only role. Create/pay an order with the portal closed; confirm only eligible
 staff get a useful alert and the exact authorized order opens after sign-in. Verify each timing
 boundary, action before send, read-without-action email follow-up, provider denial/retry/410,
@@ -443,3 +448,15 @@ logout/expiry/permission change, future reschedule, two workers, offline enable/
 mobile/desktop, iOS Home Screen, no eligible staff and flag OFF. Verify staff email receipt with
 the actual approved recipient. CI mocks external delivery; real DEV provider/device/staff evidence
 is still required before moving SCRUM-109 to QA/Done. Preserve earlier owner QA stories.
+
+### Notification DEV QA configuration handoff
+
+The owner requested notification QA toggles on after PR 141. Application defaults now enable
+`GOKUL_FEATURES_NOTIFICATION_INBOX`, `GOKUL_FEATURES_NOTIFICATION_ALERTS` and
+`GOKUL_FEATURES_STAFF_ORDER_ALERTS`. These are shared application defaults, not an automatic
+DEV-only profile: deployments without rollout approval must set explicit false overrides.
+No VAPID/Resend secrets or recipient addresses are introduced; email stays OFF.
+The inbox and staff bell still require secure sessions, trusted CORS and environment isolation.
+Missing VAPID configuration shows unavailable push honestly. Staff reminders require an always-on
+backend. Deploy the merged frontend/backend SHA before testing; a merge alone does not prove
+provider/device delivery. Keep QA/Done pending actual DEV evidence.
