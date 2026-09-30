@@ -43,6 +43,9 @@ public class BranchProduct {
     private BigDecimal priceOverride;
 
     @Column(nullable = false)
+    private boolean occasionOnly;
+
+    @Column(nullable = false)
     private boolean available = true;
 
     @Column(nullable = false)

@@ -36,12 +36,17 @@ public class StaffAlertsController {
                 configured ? pushProperties.getPublicKey() : null, enabled && subscriptions.live(staffId, deviceId, StaffSessionService.cookie(request)),
                 enabled && email.recipient(staffId) != null, alerts.reminderMinutes(), alerts.escalationMinutes(), enabled && email.testRouting(staffId)));
     }
-    @GetMapping public ResponseEntity<StaffOrderAlerts.Page> page(@RequestParam(required = false) Long before) {
+    @GetMapping public ResponseEntity<StaffOrderAlerts.Page> page(@RequestParam(required = false) Long before, @RequestParam(defaultValue = "false") boolean unreadOnly, @RequestParam(defaultValue = "") String search) {
         long staffId = staff(); enabled();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(alerts.page(staffId, before));
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(alerts.page(staffId, before, unreadOnly, search));
     }
     @PutMapping("/{id}/read") public ResponseEntity<Void> read(@PathVariable long id) {
         long staffId = staff(); enabled(); alerts.markRead(staffId, id);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+    public record ReadAll(@jakarta.validation.constraints.Positive long throughId) {}
+    @PutMapping("/read-all") public ResponseEntity<Void> readAll(@jakarta.validation.Valid @RequestBody ReadAll input) {
+        long staffId=staff();enabled();alerts.markAllRead(staffId,input.throughId());
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
     }
     @PostMapping("/push-subscriptions") public ResponseEntity<StaffPushSubscriptions.Result> subscribe(@RequestBody StaffPushSubscriptions.Input input, HttpServletRequest request) {

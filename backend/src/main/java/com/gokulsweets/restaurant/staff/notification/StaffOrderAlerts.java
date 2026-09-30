@@ -33,7 +33,7 @@ public class StaffOrderAlerts {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a", java.util.Locale.ENGLISH);
 
     // Same rule is used for inbox, registration recipients and the pre-send permission recheck.
-    static final String ELIGIBLE = """
+    public static final String ELIGIBLE = """
         u.active AND (EXISTS (SELECT 1 FROM roles r WHERE r.id = u.role_id AND r.name = 'OWNER_ADMIN')
           OR EXISTS (SELECT 1 FROM staff_branch_access b WHERE b.staff_user_id = u.id AND b.branch_id = e.branch_id))
         AND EXISTS (SELECT 1 FROM role_permissions rp JOIN permissions p ON p.id = rp.permission_id
@@ -44,7 +44,9 @@ public class StaffOrderAlerts {
     public record Event(long id, long orderId, String orderNumber, long branchId, String kind, String title,
                         String message, LocalDateTime scheduledAt, java.time.Instant createdAt) {}
     public record Message(Event event, java.time.Instant readAt, boolean actionRequired, String pushState, String emailState) {}
-    public record Page(List<Message> messages, long unreadCount, Long nextBefore) {}
+    public record Page(List<Message> messages, long unreadCount, Long nextBefore, long readThrough) {
+        public Page(List<Message> messages, long unreadCount, Long nextBefore) {this(messages,unreadCount,nextBefore,0);}
+    }
     public boolean enabled() {
         return flags.isStaffOrderAlerts() && flags.isSecureStaffSessions()
                 && environment.getProperty("gokul.environment-isolation.enabled", Boolean.class, false)
@@ -152,8 +154,12 @@ public class StaffOrderAlerts {
                 rs.getString("kind"), rs.getString("title"), rs.getString("message"), scheduled == null ? null : scheduled.toLocalDateTime(),
                 rs.getTimestamp("created_at").toInstant());
     }
-    @Transactional(readOnly = true)
-    public Page page(long staffId, Long before) {
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Page page(long staffId, Long before) {return page(staffId, before, false, "");}
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Page page(long staffId, Long before, boolean unreadOnly, String search) {
+        String query = search == null ? "" : search.trim();
+        if (query.length() > 100) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         if (before != null && before <= 0) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         var messages = jdbc.query("""
             SELECT e.*, o.order_number, r.read_at,
@@ -161,20 +167,27 @@ public class StaffOrderAlerts {
               (SELECT state FROM staff_alert_deliveries d WHERE d.event_id = e.id AND d.staff_id = u.id AND d.channel = 'EMAIL') email_state
             FROM staff_order_alerts e JOIN orders o ON o.id = e.order_id JOIN staff_users u ON u.id = ?
             LEFT JOIN staff_order_alert_reads r ON r.event_id = e.id AND r.staff_id = u.id
-            WHERE e.environment = ? AND e.id < ? AND
+            WHERE e.environment = ? AND e.id < ? AND (NOT ? OR r.read_at IS NULL)
+              AND (? = '' OR strpos(lower(o.order_number || ' ' || e.title || ' ' || e.message), lower(?)) > 0) AND
             """ + ELIGIBLE + " ORDER BY e.id DESC LIMIT 31", (rs, row) -> {
                 var event = event(rs); var read = rs.getTimestamp("read_at");
                 return new Message(event, read == null ? null : read.toInstant(), actionable(event), rs.getString("push_state"), rs.getString("email_state"));
-            }, staffId, scope(), before == null ? Long.MAX_VALUE : before);
-        Long unread = jdbc.queryForObject("SELECT COUNT(*) FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.environment = ? AND "
+            }, staffId, scope(), before == null ? Long.MAX_VALUE : before, unreadOnly, query, query);
+        Long unread = jdbc.queryForObject("SELECT COUNT(DISTINCT e.order_id) FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.environment = ? AND "
                 + ELIGIBLE + " AND NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = e.id AND r.staff_id = u.id)", Long.class, staffId, scope());
-        return new Page(messages.stream().limit(30).toList(), unread == null ? 0 : unread, messages.size() > 30 ? messages.get(29).event().id() : null);
+        return new Page(messages.stream().limit(30).toList(), unread == null ? 0 : unread, messages.size() > 30 ? messages.get(29).event().id() : null,
+                jdbc.queryForObject("SELECT COALESCE(MAX(e.id),0) FROM staff_order_alerts e JOIN staff_users u ON u.id=? WHERE e.environment=? AND "+ELIGIBLE,Long.class,staffId,scope()));
     }
     @Transactional
     public void markRead(long staffId, long eventId) {
         Boolean allowed = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.id = ? AND e.environment = ? AND " + ELIGIBLE + ")", Boolean.class, staffId, eventId, scope());
         if (!Boolean.TRUE.equals(allowed)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);
         jdbc.update("INSERT INTO staff_order_alert_reads(event_id, staff_id) VALUES (?, ?) ON CONFLICT DO NOTHING", eventId, staffId);
+    }
+    @Transactional
+    public void markAllRead(long staffId,long throughId) {
+        if(throughId<=0)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
+        jdbc.update("INSERT INTO staff_order_alert_reads(event_id,staff_id) SELECT e.id,u.id FROM staff_order_alerts e JOIN staff_users u ON u.id=? WHERE e.environment=? AND e.id<=? AND "+ELIGIBLE+" ON CONFLICT DO NOTHING",staffId,scope(),throughId);
     }
     public boolean eligible(long eventId, long staffId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.id = ? AND e.environment = ? AND " + ELIGIBLE + ")", Boolean.class, staffId, eventId, scope()));

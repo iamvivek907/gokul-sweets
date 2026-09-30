@@ -148,3 +148,15 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
  .gokul-pickup-mobile-continue button:disabled{opacity:.5}
  .future-storefront .checkout-experience-v2{padding-bottom:6rem}
 }
+
+/* Occasion booking inherits the storefront palette and stays scoped to its visual flag. */
+.future-storefront .occasion-hero {background:linear-gradient(125deg,#092725,#143936);color:#fffaf2;border-radius:28px;padding:clamp(24px,5vw,48px);box-shadow:0 16px 40px #09272515;}
+.future-storefront .occasion-hero>p:first-child {color:#f0b39b;}
+.future-storefront .occasion-hero h1 {max-width:720px;line-height:1.08;letter-spacing:-.03em;}
+.future-storefront .occasion-hero span {border:1px solid #fffaf235;border-radius:999px;padding:8px 12px;}
+.future-storefront .occasion-journey form {box-shadow:0 10px 32px #09272508;}
+.future-storefront .occasion-journey input:focus-visible,.future-storefront .occasion-journey select:focus-visible,.future-storefront .occasion-journey textarea:focus-visible {outline:2px solid #c76752;outline-offset:3px;}
+
+.future-storefront .occasion-journey button[aria-pressed] {border:1px solid #d9e5df!important;border-radius:20px!important;box-shadow:none!important;}
+.future-storefront .occasion-journey button[aria-pressed="true"] {border:2px solid #c76752!important;background:#fff5e9!important;}
+.future-storefront .occasion-journey button[aria-pressed="true"] strong::after {content:" ✓ Selected";font-size:12px;color:#a14d39;}

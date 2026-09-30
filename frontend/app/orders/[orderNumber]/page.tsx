@@ -19,6 +19,8 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {reconcilePaidCart} from "@/lib/paidCartRecovery";
 import Link from "next/link";
 
+import NotificationReadOnOpen from "@/components/customer/NotificationReadOnOpen";
+
 import OrderReviewCard
     from "@/components/order/OrderReviewCard";
 
@@ -349,6 +351,7 @@ export default function OrderDetailPage() {
 
     return (
         <AppShell>
+            <NotificationReadOnOpen orderNumber={orderNumber} />
             <section className="mx-auto w-full max-w-3xl px-4 pb-28 pt-5 sm:px-6 sm:pt-7">
 
                 <button
@@ -519,9 +522,9 @@ export default function OrderDetailPage() {
                     </div>}
 
                     {order.orderStatus === terminalStatus && (
-                        <OrderReviewCard
+                        <div id="order-review" className="scroll-mt-28"><OrderReviewCard
                             orderNumber={order.orderNumber}
-                        />
+                        /></div>
                     )}
 
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row">

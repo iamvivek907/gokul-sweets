@@ -116,7 +116,7 @@ public class OccasionCommitmentService {
                         "Occasion inventory holds are not configured.");
                 if (features.isOccasionBulkProduction()) throw conflict("Ask the manager to approve a dedicated production plan before payment.");
             List<Object[]> requested = jdbc.query("""
-                    SELECT bp.id, i.product_id, i.requested_quantity FROM occasion_enquiry_items i
+                    SELECT bp.id, i.product_id, COALESCE(i.approved_quantity,i.requested_quantity) FROM occasion_enquiry_items i
                     JOIN branch_products bp ON bp.branch_id = ? AND bp.product_id = i.product_id
                     JOIN products p ON p.id = bp.product_id
                     WHERE i.enquiry_id = ? AND bp.available AND p.active ORDER BY bp.id

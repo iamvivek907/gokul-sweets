@@ -61,6 +61,7 @@ const page = await context.newPage();
 page.on("pageerror", error => console.error("BROWSER", error.message));
 try {
     await page.goto(`${base}/admin/staff-notifications`);
+    await page.getByText("Notification delivery settings", {exact: true}).click();
     await page.getByRole("heading", {name: "Get alerts when the portal is closed"}).waitFor();
     await page.getByRole("link", {name: "Staff alerts, 1 unread"}).waitFor();
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
@@ -69,6 +70,7 @@ try {
     await page.getByText("Push permission was not granted.", {exact: false}).waitFor();
     assert.equal(registered, false);
     denied = false; await page.reload();
+    await page.getByText("Notification delivery settings", {exact: true}).click();
     await page.getByRole("heading", {name: "Get alerts when the portal is closed"}).waitFor();
     await page.evaluate(value => {window._denyPush = value;}, denied);
     await page.getByRole("button", {name: "Enable staff push for this browser"}).click();
@@ -100,6 +102,7 @@ try {
     await page.setViewportSize({width: 1440, height: 1000});
     if (process.env.ALERT_SCREENSHOT_DIR) await page.screenshot({path: `${process.env.ALERT_SCREENSHOT_DIR}/staff-order-desktop.png`, fullPage: true});
     testingEmail = true; await page.goto(`${base}/admin/staff-notifications`);
+    await page.getByText("Notification delivery settings", {exact: true}).click();
     await page.getByText("DEV testing: unresolved email escalation", {exact: false}).waitFor();
     assert.equal(await page.getByText("This does not verify delivery to each staff member.", {exact: false}).count(), 1);
     enabled = false; await page.goto(`${base}/admin/staff-notifications`);

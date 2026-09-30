@@ -358,7 +358,7 @@ async function networkFirstNavigation(
 // Stage-specific push works while the app is closed; custom audio belongs to an explicitly activated page.
 function notificationDestination(value, staff = false) {
     if (staff) return typeof value === "string" && /^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) ? value : "/admin/staff-notifications";
-    return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/occasions#occasion-[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
+    return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}(?:#order-review)?$/.test(value) || /^\/occasions#occasion-[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
 }
 let pushSequence = Promise.resolve();
 self.addEventListener("push", event => {
@@ -379,7 +379,7 @@ self.addEventListener("push", event => {
         const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
         await self.registration.showNotification(title, {
             body, badge: "/notification-badge.svg",
-            icon: "/icon-192.png", tag: `gokul-event-${eventId}`, renotify: false,
+            icon: "/icon-192.png", tag: `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: false,
             data: {url: destination, staff}
         });
         await cache.put(key, new Response(JSON.stringify([...(Array.isArray(seen) ? seen : []), eventId].slice(-256)),

@@ -37,7 +37,7 @@ public class CustomerPushDispatcher {
                     SELECT e.id, s.id FROM customer_notification_events e
                     JOIN customer_push_subscriptions s ON s.environment = e.environment AND s.subject_id = e.subject_id
                     JOIN verified_customer_sessions v ON v.id = s.session_id
-                    WHERE e.environment = ? AND e.read_at IS NULL AND s.revoked_at IS NULL
+                    WHERE e.environment = ? AND (e.read_at IS NULL OR (e.auto_acknowledged AND e.kind IN ('PICKED_UP','DELIVERED'))) AND s.revoked_at IS NULL
                       AND v.environment = e.environment AND v.verified_subject_id = e.subject_id
                       AND v.revoked_at IS NULL AND v.expires_at > CURRENT_TIMESTAMP
                       AND e.created_at >= s.subscribed_at AND e.created_at > CURRENT_TIMESTAMP - INTERVAL '5 minutes'
@@ -54,7 +54,12 @@ public class CustomerPushDispatcher {
                     JOIN verified_customer_sessions v ON v.id = s.session_id
                     JOIN customer_notification_events e ON e.id = ?
                     WHERE s.id = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
-                      AND v.expires_at > CURRENT_TIMESTAMP AND e.read_at IS NULL
+                      AND v.expires_at > CURRENT_TIMESTAMP
+                      AND (e.read_at IS NULL OR (e.auto_acknowledged AND e.kind IN ('PICKED_UP','DELIVERED')))
+                      AND NOT EXISTS (SELECT 1 FROM customer_notification_events newer WHERE newer.environment=e.environment
+                        AND newer.subject_id=e.subject_id AND newer.target_type=e.target_type AND newer.target_id=e.target_id AND newer.id>e.id)
+                      AND (e.kind NOT IN ('PICKED_UP','DELIVERED') OR NOT EXISTS (SELECT 1 FROM reviews r
+                        JOIN orders reviewed ON reviewed.id=r.order_id WHERE reviewed.order_number=e.target_id))
                       AND (e.kind NOT IN ('CONFIRMED','PREPARING','READY_FOR_PICKUP','READY_FOR_DELIVERY',
                         'OUT_FOR_DELIVERY','PICKED_UP','DELIVERED','CANCELLED','PICKUP_WINDOW_EXPIRED','NO_SHOW')
                         OR EXISTS (SELECT 1 FROM orders o JOIN verified_order_ownership own ON own.order_id = o.id
@@ -86,13 +91,13 @@ public class CustomerPushDispatcher {
     private Task claim(String environment) {
         var tasks = jdbc.query("""
                 SELECT d.id, d.event_id, d.subscription_id, d.attempts, s.subject_id, s.endpoint,
-                    s.public_key, s.auth_secret, e.created_at, e.title, e.message, e.target_type, e.target_id
+                    s.public_key, s.auth_secret, e.created_at, e.title, e.message, e.target_type, e.target_id, e.kind
                 FROM customer_push_deliveries d JOIN customer_push_subscriptions s ON s.id = d.subscription_id
                 JOIN customer_notification_events e ON e.id = d.event_id
                 WHERE d.state = 'QUEUED' AND d.next_attempt_at <= CURRENT_TIMESTAMP AND s.environment = ?
                 ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                 """, (rs, row) -> new Task(rs.getLong(1), rs.getLong(2), (UUID) rs.getObject(3), rs.getInt(4) + 1,
-                (UUID) rs.getObject(5), rs.getString(6), rs.getString(7), rs.getString(8), rs.getTimestamp(9).toInstant(), rs.getString(10), rs.getString(11), destination(rs.getString(12), rs.getString(13)), UUID.randomUUID()), environment);
+                (UUID) rs.getObject(5), rs.getString(6), rs.getString(7), rs.getString(8), rs.getTimestamp(9).toInstant(), rs.getString(10), rs.getString(11), destination(rs.getString(12), rs.getString(13)) + (java.util.Set.of("PICKED_UP","DELIVERED").contains(rs.getString(14)) ? "#order-review" : ""), UUID.randomUUID()), environment);
         if (tasks.isEmpty()) return null;
         var task = tasks.getFirst();
         jdbc.update("UPDATE customer_push_deliveries SET state = 'SENDING', attempts = ?, lease_token = ?, lease_until = CURRENT_TIMESTAMP + INTERVAL '30 seconds' WHERE id = ?",

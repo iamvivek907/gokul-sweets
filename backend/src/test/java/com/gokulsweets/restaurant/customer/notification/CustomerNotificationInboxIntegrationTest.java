@@ -43,6 +43,7 @@ import static org.mockito.Mockito.when;
 @Transactional
 class CustomerNotificationInboxIntegrationTest {
     @Autowired CustomerNotificationInbox inbox;
+    @Autowired CustomerNotificationMaintenance maintenance;
     @Autowired JdbcTemplate jdbc;
     @Autowired EnhancementProperties features;
     @Autowired AdminOrderWorkflowService workflow;
@@ -145,7 +146,50 @@ class CustomerNotificationInboxIntegrationTest {
         var readAt = inbox.page("DEV", subject, null).messages().getFirst().readAt();
         inbox.markRead("DEV", subject, id);
         assertThat(inbox.page("DEV", subject, null).messages().getFirst().readAt()).isEqualTo(readAt);
-        assertThat(inbox.page("DEV", subject, null).unreadCount()).isEqualTo(34);
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isEqualTo(1);
+    }
+
+    @Test
+    void openingConversationAndMarkAllRespectSnapshotAndOwnership() {
+        var order = fixture("PREPARING");
+        inbox.orderReady(order.id());
+        long snapshot = inbox.page("DEV", subject, null).readThrough();
+        jdbc.update("UPDATE orders SET order_status='READY_FOR_PICKUP' WHERE id=?", order.id());
+        inbox.orderReady(order.id());
+        assertThatThrownBy(() -> inbox.markTargetRead("DEV", UUID.randomUUID(), "ORDER", order.number(), snapshot))
+                .isInstanceOf(ResponseStatusException.class);
+        inbox.markTargetRead("DEV", subject, "ORDER", order.number(), snapshot);
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isEqualTo(1);
+        inbox.markAllRead("DEV", subject, snapshot);
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isEqualTo(1);
+        inbox.markAllRead("DEV", subject, inbox.page("DEV", subject, null).readThrough());
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isZero();
+    }
+
+    @Test
+    void pickupClearsStagesButReplayPreservesLaterFinancialAttention() {
+        var order = fixture("READY_FOR_PICKUP");
+        inbox.orderReady(order.id());
+        jdbc.update("UPDATE orders SET order_status='PICKED_UP' WHERE id=?", order.id());
+        inbox.orderReady(order.id());
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isZero();
+        assertThat(inbox.page("DEV", subject, null).messages().getFirst().message()).contains("completely optional");
+        assertThat(jdbc.queryForObject("SELECT auto_acknowledged FROM customer_notification_events WHERE subject_id=? AND kind='PICKED_UP'", Boolean.class, subject)).isTrue();
+        jdbc.update("INSERT INTO customer_notification_events(environment,subject_id,event_key,kind,target_type,target_id,title,message) VALUES ('DEV',?,'later-refund','REFUND_PENDING','ORDER',?,'Refund needs attention','Review refund')", subject, order.number());
+        inbox.orderReady(order.id());
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isEqualTo(1);
+        inbox.markTargetRead("DEV", subject, "ORDER", order.number(), null);
+        assertThat(jdbc.queryForObject("SELECT auto_acknowledged FROM customer_notification_events WHERE subject_id=? AND kind='PICKED_UP'", Boolean.class, subject)).isFalse();
+    }
+
+    @Test
+    void routineAgeingPreservesFinancialExceptionsAndOtherEnvironments() {
+        for (String kind : new String[]{"READY_FOR_PICKUP", "REFUND_PENDING"})
+            jdbc.update("INSERT INTO customer_notification_events(environment,subject_id,event_key,kind,target_type,target_id,title,message,created_at) VALUES ('DEV',?,?,?,'ORDER',?,'Update','Details',CURRENT_TIMESTAMP-INTERVAL '8 days')", subject, "age:"+kind, kind, kind);
+        jdbc.update("INSERT INTO customer_notification_events(environment,subject_id,event_key,kind,target_type,target_id,title,message,created_at) VALUES ('PROD',?,'other-env','READY_FOR_PICKUP','ORDER','OTHER','Update','Details',CURRENT_TIMESTAMP-INTERVAL '8 days')", subject);
+        maintenance.archiveRoutineUpdates();
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isEqualTo(1);
+        assertThat(inbox.page("PROD", subject, null).unreadCount()).isEqualTo(1);
     }
 
     @Test
@@ -239,6 +283,26 @@ class CustomerNotificationInboxIntegrationTest {
                 jdbc.update("DELETE FROM branches WHERE id = ?", branch);
             });
         }
+    }
+
+    @Test
+    void searchAndUnreadFilterApplyBeforePaginationAcrossHundredsOfEvents() {
+        fixture("CONFIRMED");
+        jdbc.update("""
+            INSERT INTO customer_notification_events(environment,subject_id,event_key,kind,target_type,target_id,title,message)
+            SELECT 'DEV',?,'scale:'||n,'CONFIRMED','ORDER','SCALE-'||n,'Order update','Payment verified'
+            FROM generate_series(1,105) n
+            """,subject);
+        var first=inbox.page("DEV",subject,null,false,"");
+        assertThat(first.messages()).hasSize(30);assertThat(first.nextBefore()).isNotNull();
+        var second=inbox.page("DEV",subject,first.nextBefore(),false,"");
+        assertThat(second.messages()).hasSize(30);
+        assertThat(second.messages()).noneMatch(m->first.messages().stream().anyMatch(previous->previous.id()==m.id()));
+        var match=inbox.page("DEV",subject,null,false,"scale-105");
+        assertThat(match.messages()).hasSize(1);
+        inbox.markRead("DEV",subject,match.messages().getFirst().id());
+        assertThat(inbox.page("DEV",subject,null,true,"scale-105").messages()).isEmpty();
+        assertThat(inbox.page("DEV",UUID.randomUUID(),null,false,"scale").messages()).isEmpty();
     }
 
     private Fixture fixture(String status) {

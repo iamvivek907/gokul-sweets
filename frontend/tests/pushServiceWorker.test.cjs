@@ -55,3 +55,17 @@ test('staff push has a distinct event namespace and safe exact admin destination
     runtime.listeners.notificationclick({notification: {data: runtime.shown[1].data, close() {}}, waitUntil(value) {pending = value;}}); await pending;
     assert.deepEqual(runtime.opened, ['https://dev.gokulsweets.in/admin/orders/GS-44']);
 });
+
+test('order stages replace the same device alert and optional review uses a safe destination', async () => {
+    const runtime = worker(); let pending;
+    for (const [eventId, url] of [['81','/orders/GS-81'], ['82','/orders/GS-81#order-review'], ['83','/orders/GS-83']]) {
+        runtime.listeners.push({data: {json: () => ({eventId, title:'Order update',body:'Details',url})}, waitUntil(value) {pending=value;}});
+        await pending;
+    }
+    assert.equal(runtime.shown[0].tag, runtime.shown[1].tag);
+    assert.notEqual(runtime.shown[1].tag, runtime.shown[2].tag);
+    assert.equal(runtime.shown[1].renotify, false);
+    runtime.listeners.notificationclick({notification:{data:runtime.shown[1].data,close(){}},waitUntil(value){pending=value;}});
+    await pending;
+    assert.deepEqual(runtime.opened,['https://dev.gokulsweets.in/orders/GS-81#order-review']);
+});

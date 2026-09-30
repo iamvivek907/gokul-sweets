@@ -38,6 +38,7 @@ public interface BranchProductRepository
               AND bp.available = true
               AND bp.product.active = true
               AND bp.product.category.active = true
+              AND bp.occasionOnly = false
             ORDER BY bp.product.category.displayOrder ASC,
                      bp.displayOrder ASC,
                      bp.product.name ASC
@@ -64,6 +65,7 @@ public interface BranchProductRepository
             SELECT bp FROM BranchProduct bp
             WHERE bp.branch.id = :branchId
               AND bp.product.id IN :productIds
+              AND bp.occasionOnly = false
             """)
     List<BranchProduct> findForOrder(
             @Param("branchId") Long branchId,

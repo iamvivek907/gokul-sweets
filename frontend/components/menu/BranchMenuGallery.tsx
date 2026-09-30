@@ -10,7 +10,8 @@ import BranchDetails from "@/components/branch/BranchDetails";
 import {getBranch} from "@/services/branchApi";
 
 export default function BranchMenuGallery({branch, products, activeTab, onTabChange}: {branch: Branch; products: MenuProduct[]; activeTab: "menu" | "details"; onTabChange: (tab: "menu" | "details") => void}) {
-    const branchExperience = useStorefrontFeatures()?.branchExperience === true;
+    const features = useStorefrontFeatures();
+    const branchExperience = features?.branchExperience === true;
     const [failed, setFailed] = useState<string[]>([]);
     const [currentBranch, setCurrentBranch] = useState<Branch | null>(null);
     useEffect(() => {
@@ -42,6 +43,7 @@ export default function BranchMenuGallery({branch, products, activeTab, onTabCha
             <button type="button" aria-current={activeTab === "menu" ? "page" : undefined} onClick={() => onTabChange("menu")}>Menu</button>
             {branchExperience ? <button type="button" aria-current={activeTab === "details" ? "page" : undefined} onClick={() => onTabChange("details")}>Branch details</button>
                 : <Link href="/about#our-branches">Branch details</Link>}
+            {features?.occasionEnquiries && <Link href="/occasions">Occasions & gifting</Link>}
         </nav>
         {activeTab === "details" && <BranchDetails branch={currentBranch?.id === branch.id ? currentBranch : branch} />}
     </div>;
