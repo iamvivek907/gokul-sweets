@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??"playwright");
 const browser=await chromium.launch({headless:true});
-const context=await browser.newContext({viewport:{width:390,height:844}});
+const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"block"});
 let box=null,branding=null,uploads=0;
 const existing={id:7,name:"Existing wedding box",dimensions:"20 × 15 × 5 cm",material:"Food-safe card",branding:"Ribbon",compartments:3,capacityPieces:8,leadDays:3,price:15,published:true,imageUrl:null,imageUrls:[],capacityGrams:500};
 let boxes=[existing],catalogueError=false,authOutage=false,authExpired=false;
@@ -32,8 +32,8 @@ try {
  await page.reload();
  await page.getByRole("combobox",{name:/^Branch/}).waitFor();
  await page.waitForFunction(()=>document.querySelector('select').value==="2");
- await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
- assert.equal(await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).count(),1);
+ await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
  await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
  assert.equal(await page.getByLabel("Box name",{exact:false}).inputValue(),existing.name);
  assert.equal(await page.getByLabel("Food weight capacity",{exact:true}).inputValue(),"500");
@@ -45,14 +45,21 @@ try {
  await page.waitForTimeout(150);assert.match(page.url(),/occasion-enquiries/);
  assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
  authOutage=false;const verifiedSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===200);await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await verifiedSession;
- await page.getByRole("button",{name:"Refresh now",exact:true}).click();
+ await page.getByLabel("Campaign headline",{exact:false}).fill("Wedding");
+ await Promise.all([page.getByLabel("Campaign headline",{exact:false}).pressSequentially(" Special",{delay:30}),page.evaluate(()=>window.dispatchEvent(new Event("focus")))]);
+ for(let refresh=0;refresh<3;refresh++){
+  const planning=page.waitForResponse(response=>response.url().includes("occasion-enquiries/planning"));
+  await page.getByRole("button",{name:"Refresh now",exact:true}).click();await planning;await page.waitForTimeout(75);
+  assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
+  assert.equal(await page.getByLabel("Campaign headline",{exact:false}).inputValue(),"Wedding Special");
+ }
  assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
- console.log("PACKAGING VALIDATION",await page.getByRole("button",{name:"Save packaging",exact:true}).evaluate(button=>Array.from(button.form.elements).filter(element=>element.willValidate&&!element.validity.valid).map(element=>({name:element.outerHTML,value:element.value,message:element.validationMessage}))));
+ assert.equal(await page.getByRole("button",{name:"Save packaging",exact:true}).evaluate(button=>button.form.checkValidity()),true);
  await page.getByRole("button",{name:"Save packaging",exact:true}).click();
  await page.getByText("Catalogue saved.",{exact:false}).waitFor();
  assert.equal(box.id,7);assert.equal(box.price,18);assert.equal(boxes.length,1);
- await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
- await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
+ await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
  assert.equal(await page.getByLabel("Box name",{exact:false}).inputValue(),existing.name);
  await page.getByRole("button",{name:"New box",exact:true}).click();
  await page.getByLabel("Box name").fill("Celebration collection");
@@ -76,20 +83,22 @@ try {
  assert.equal(branding.published,true);assert.match(branding.imageUrl,/upload-3/);
  assert.equal(await page.getByLabel("Real photo URL",{exact:false}).count(),0);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- await page.reload();await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
+ await page.reload();await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
  await page.getByRole("button",{name:"Edit Celebration collection"}).click();
  await page.getByRole("button",{name:"Remove photo 2"}).click();
  await page.getByRole("button",{name:"Save packaging",exact:true}).click();
  await page.getByText("Catalogue saved.",{exact:false}).waitFor();assert.equal(box.imageUrls.length,1);
  assert.equal(boxes.length,2);assert.equal(box.id,8);
  // A failed load must not expose a blank editor that could create a duplicate.
- catalogueError=true;await page.reload();await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
+ catalogueError=true;await page.reload();await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
  await page.getByRole("button",{name:"Reload catalogue",exact:true}).waitFor();
  assert.equal(await page.getByRole("button",{name:"Save packaging",exact:true}).count(),0);
  catalogueError=false;await page.getByRole("button",{name:"Reload catalogue",exact:true}).click();
  await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
  assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
- assert.equal(await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).count(),1);
+ assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
+ assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
+ if(process.env.SCREENSHOT_DIR){for(const width of [390,1440]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/occasion-catalogue-${width}.png`,fullPage:true});}}
  authExpired=true;const expiredSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===401);await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await expiredSession;await page.waitForURL("**/admin/login");
- console.log("PASS: per-staff branch retention, multi-photo uploads/preview/removal, CSRF/branch scope, campaign publication and mobile fit.");
-}catch(error){console.error("ADMIN BOX",JSON.stringify({box,boxes}));console.error("ADMIN BODY",await page.locator("body").innerText());throw error;}finally{await browser.close();}
+ console.log("PASS: one editor through repeated refreshes, continuous typing/focus, session outage and real expiry; existing packaging update identity, load recovery, branch retention, photos, CSRF and mobile fit.");
+}catch(error){console.error("ADMIN BODY",await page.locator("body").innerText());throw error;}finally{await browser.close();}

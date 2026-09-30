@@ -116,9 +116,9 @@ export default function OccasionEnquiriesPage() {
         <label className="block">Branch <select value={branchId ?? ""} onChange={event => {const id=Number(event.target.value);setBranchId(id);setRequests([]);setWeek(null);setServiceDate("");setWeekFrom("");setPages(1);setOpenRequest(null);if(profile)rememberAdminBranchId(profile.staffId,id);}} className="ml-3 rounded-lg border p-2">
             {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
         </select></label>
-        {branchId && authorization && hasPermission("MENU_MANAGE") && <OccasionCatalogueEditor key={branchId} branchId={branchId} authorization={authorization} />}
+        {branchId && authorization && hasPermission("MENU_MANAGE") && <OccasionCatalogueEditor key={`catalogue-${branchId}`} branchId={branchId} authorization={authorization} />}
         {loading&&!week&&<p role="status">Loading dates and production totals…</p>}
-        {week&&branchId&&authorization&&<OccasionPlanningDatePicker key={branchId} date={selectedDate} today={week.today} branchId={branchId} authorization={authorization} refreshKey={refreshedAt+":"+refresh} onDate={date=>{setWeekFrom(date);setServiceDate(date);setPages(1);setOpenRequest(null);}} />}
+        {week&&branchId&&authorization&&<OccasionPlanningDatePicker key={`planning-picker-${branchId}`} date={selectedDate} today={week.today} branchId={branchId} authorization={authorization} refreshKey={refreshedAt+":"+refresh} onDate={date=>{setWeekFrom(date);setServiceDate(date);setPages(1);setOpenRequest(null);}} />}
         {week&&<OccasionProductionCalendar week={week} date={selectedDate} onDate={date=>{setServiceDate(date);setPages(1);setOpenRequest(null);}} onWeek={from=>{setWeekFrom(from);setServiceDate(from);setPages(1);setOpenRequest(null);}} onApprove={product=>void approveProduction(product)} canApprove={hasPermission("APPROVAL_MANAGE")} busy={busy} />}
         <h2 className="text-xl font-bold">{selectedDate?prettyDate(selectedDate):"Selected date"} · bookings & requests</h2>
         {!loading&&!requests.length&&<p className="rounded-2xl border bg-white p-5">No requests for this date.</p>}

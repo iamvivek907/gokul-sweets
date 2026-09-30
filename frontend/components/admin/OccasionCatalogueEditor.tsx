@@ -1,14 +1,12 @@
 /* eslint-disable @next/next/no-img-element -- Admin previews managed image uploads. */
 "use client";
-import {useEffect, useId, useState} from "react";
+import {useEffect, useState} from "react";
 import {adminFetch} from "@/services/adminApi";
 import type {OccasionCatalogue, OccasionBox, OccasionSweet, OccasionBranding} from "@/types/occasionCatalogue";
 const empty: OccasionBox = {id:null,name:"",imageUrl:"",dimensions:"",material:"",compartments:3,capacityPieces:8,price:null,branding:"",leadDays:3,published:false};
 export default function OccasionCatalogueEditor({branchId, authorization}: {branchId: number; authorization: string}) {
-    const [expanded,setExpanded]=useState(false);
     const [loading,setLoading]=useState(true);
     const [reload,setReload]=useState(0);
-    const panelId=useId();
     const [catalogue,setCatalogue]=useState<OccasionCatalogue | null>(null);
     const [branding,setBranding]=useState<OccasionBranding>({headline:"",description:"",imageUrl:null,published:false});
     const [box,setBox]=useState<OccasionBox>(empty);
@@ -41,7 +39,7 @@ export default function OccasionCatalogueEditor({branchId, authorization}: {bran
         }catch(error){setMessage(error instanceof Error?error.message:"Upload unavailable.");}finally{setBusy(false);}
     }
     function updateSweet(sweet:OccasionSweet,patch:Partial<OccasionSweet>) {setCatalogue(current=>current ? {...current,sweets:current.sweets.map(item=>item.id===sweet.id?{...item,...patch}:item)}:current);}
-    return <section className="rounded-2xl border bg-white p-5" aria-label="Occasion catalogue"><h2><button type="button" aria-expanded={expanded} aria-controls={panelId} onClick={()=>setExpanded(current=>!current)} className="min-h-11 w-full text-left text-xl font-bold">Occasion sweets & packaging catalogue <span aria-hidden="true">{expanded?"▾":"▸"}</span></button></h2><div id={panelId} hidden={!expanded}><p className="mt-3 text-sm">Create sweet products and upload their real photos in the existing branch menu editor, then configure their occasion availability here. Catalogue changes apply to new requests. Approved bookings retain their snapshots.</p>
+    return <details className="rounded-2xl border bg-white p-5"><summary className="cursor-pointer text-xl font-bold">Occasion sweets & packaging catalogue</summary><p className="mt-3 text-sm">Create sweet products and upload their real photos in the existing branch menu editor, then configure their occasion availability here. Catalogue changes apply to new requests. Approved bookings retain their snapshots.</p>
         {message && <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3">{message}</p>}
         {loading && <p role="status">Loading occasion catalogue…</p>}
         {!loading && !catalogue && <button type="button" onClick={()=>{setLoading(true);setReload(value=>value+1);}} className="min-h-11 rounded-xl border px-4">Reload catalogue</button>}
@@ -66,5 +64,5 @@ export default function OccasionCatalogueEditor({branchId, authorization}: {bran
         </form>
         <form onSubmit={event=>{event.preventDefault();void save(`${path}/branding`,branding);}} className="mt-6 space-y-4 rounded-xl border p-4"><h3 className="text-lg font-bold">Occasion page branding & promotion</h3><p className="text-sm">Branch-specific content shown above category browsing. Use genuine shop photos and accurate claims. Saving never changes existing quotes.</p><label className="block">Campaign headline<input required maxLength={100} value={branding.headline} onChange={event=>setBranding(current=>({...current,headline:event.target.value}))} className="mt-1 block w-full rounded-lg border p-2" /><span className="text-xs">A short invitation for weddings, family celebrations or corporate gifting.</span></label><label className="block">Campaign description<textarea required maxLength={500} value={branding.description} onChange={event=>setBranding(current=>({...current,description:event.target.value}))} className="mt-1 block w-full rounded-lg border p-2" /><span className="text-xs">Explain what the branch offers. Prices and promises must match the reviewed quote.</span></label><label className="block">Upload campaign photo<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event=>{void upload(event.target.files,true);event.target.value="";}} className="mt-1 block w-full" /><span className="text-xs">One real JPG, PNG or WebP photo, up to 5 MB. Text remains readable beside the photo.</span></label>{branding.imageUrl&&<div><img src={branding.imageUrl} alt="Occasion campaign preview" className="h-40 w-full rounded-xl object-cover" /><button type="button" disabled={busy} onClick={()=>setBranding(current=>({...current,imageUrl:null}))} className="min-h-11 underline">Remove campaign photo</button></div>}<label className="block"><input type="checkbox" checked={branding.published} onChange={event=>setBranding(current=>({...current,published:event.target.checked}))} /> Publish occasion campaign<span className="block text-xs">Unpublished content is hidden from customers; the standard Gokul introduction remains.</span></label><button disabled={busy} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white">Save occasion campaign</button></form>
     </fieldset>}
-    </div></section>;
+    </details>;
 }
