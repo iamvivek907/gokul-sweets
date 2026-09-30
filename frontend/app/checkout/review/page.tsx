@@ -1,4 +1,8 @@
 "use client";
+import {usePickupClock} from "@/hooks/usePickupClock";
+import {pickupIsFresh} from "@/lib/pickupFreshness";
+import PickupAddOns from "@/components/checkout/PickupAddOns";
+import {formatWeight} from "@/lib/orderQuantity";
 
 import Link from "next/link";
 
@@ -114,28 +118,6 @@ function cartItemSubtotal(
     return item.product.saleMode === "WEIGHT"
         ? item.product.price * (item.weightGrams ?? 0) / 1000
         : item.product.price * item.quantity;
-}
-
-
-function formatWeight(
-    weightGrams: number
-): string {
-
-    if (weightGrams >= 1000) {
-        const kilograms =
-            weightGrams / 1000;
-
-        return `${new Intl.NumberFormat(
-            "en-IN",
-            {
-                maximumFractionDigits: 3
-            }
-        ).format(kilograms)} kg`;
-    }
-
-    return `${new Intl.NumberFormat(
-        "en-IN"
-    ).format(weightGrams)} g`;
 }
 
 
@@ -583,6 +565,7 @@ export default function ReviewPage() {
     const storefrontFeatures = useStorefrontFeatures();
     const accessible = storefrontFeatures?.accessibleOrderingV2 === true;
     const online = useOnlineStatus();
+    const [addonBusy,setAddonBusy]=useState(false);
     const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
     const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
     const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
@@ -713,14 +696,12 @@ export default function ReviewPage() {
         );
 
 
+    const pickupClock = usePickupClock();
     const pickupSelection =
         useMemo(
-            () =>
-                parsePickupSlot(
-                    pickupSnapshot
-                ),
+            () => {const saved = parsePickupSlot(pickupSnapshot); return saved && (!pickupClock || pickupIsFresh(saved,new Date(pickupClock))) ? saved : null;},
             [
-                pickupSnapshot
+                pickupSnapshot, pickupClock
             ]
         );
 
@@ -772,6 +753,7 @@ export default function ReviewPage() {
      */
 
     async function handlePlaceOrder() {
+        if(addonBusy)return;
 
         if (accessible && !online) {
             setOrderError("You're offline. Your cart and pickup details are saved. Reconnect, then check your final price again.");
@@ -2406,6 +2388,7 @@ try {
                 }
 
 
+                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdded={()=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);}}/>}
                 {/* Offers + final price */}
 
                 {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
@@ -2425,6 +2408,7 @@ try {
                             </p>
                         ))}
                         <p className="mt-3 text-sm">Items ₹{acceptedQuote.quote.subtotal} · Tax ₹{acceptedQuote.quote.taxAmount} · Pickup charge ₹{acceptedQuote.quote.priorityCharge}</p>
+                        {Number(acceptedQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm">Convenience fee ₹{acceptedQuote.quote.convenienceFee} (includes ₹{acceptedQuote.quote.convenienceFeeTax} tax)</p>}
                         <p className="mt-2 font-bold">Total before optional offers ₹{acceptedQuote.quote.totalAmount}</p>
                         {!quoteExpired && <p className="mt-2 text-xs">This price is available until {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy">See the cancellation policy</Link> before paying.</p>}
                     </div>
@@ -2487,7 +2471,7 @@ try {
                                 <button
                                     type="button"
                                     disabled={
-                                        submitting || pickupRecovery || (accessible && !online)
+                                        submitting || addonBusy || pickupRecovery || (accessible && !online)
                                     }
                                     onClick={
                                         handlePlaceOrder

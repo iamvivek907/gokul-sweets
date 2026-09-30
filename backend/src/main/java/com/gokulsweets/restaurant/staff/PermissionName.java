@@ -24,5 +24,7 @@ public enum PermissionName {
     PAYROLL_MANAGE,
     REBATE_VIEW,
     REBATE_MANAGE,
+    ABOUT_MANAGE,
+    CAREERS_MANAGE,
     BRANCH_MANAGE
 }

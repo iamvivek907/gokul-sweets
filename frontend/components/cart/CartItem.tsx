@@ -1,4 +1,5 @@
 "use client";
+import {formatWeight as readableWeight} from "@/lib/orderQuantity";
 
 import Image
     from "next/image";
@@ -70,7 +71,7 @@ function formatWeight(
     }
 
 
-    return `${weightGrams} g`;
+    return readableWeight(weightGrams);
 }
 
 

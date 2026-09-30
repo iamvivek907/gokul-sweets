@@ -43,6 +43,8 @@ public record AdminOrderDetailResponse(
         BigDecimal taxAmount,
 
         BigDecimal priorityCharge,
+        BigDecimal convenienceFee,
+        BigDecimal convenienceFeeTax,
 
         BigDecimal totalAmount,
 

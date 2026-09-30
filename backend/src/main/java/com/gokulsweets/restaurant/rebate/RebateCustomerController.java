@@ -45,6 +45,12 @@ public class RebateCustomerController {
         );
     }
 
+    @GetMapping("/{orderNumber}/rebate-spend-targets")
+    public List<AvailableRebateResponse> spendTargets(@PathVariable String orderNumber,HttpServletRequest request) {
+        orderAccess.requireOrder(orderNumber,request);
+        return rebateEligibilityService.getSpendTargets(orderNumber);
+    }
+
     @PostMapping(
             "/{orderNumber}/rebate"
     )

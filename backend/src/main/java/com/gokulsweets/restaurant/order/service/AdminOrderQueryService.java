@@ -593,6 +593,8 @@ public class AdminOrderQueryService {
                 order.getTaxAmount(),
 
                 order.getPriorityCharge(),
+                order.getConvenienceFee(),
+                order.getConvenienceFeeTax(),
 
                 order.getTotalAmount(),
 

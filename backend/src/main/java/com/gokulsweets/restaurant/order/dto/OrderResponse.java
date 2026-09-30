@@ -32,6 +32,8 @@ public record OrderResponse(
         PickupType pickupType,
 
         BigDecimal priorityCharge,
+        BigDecimal convenienceFee,
+        BigDecimal convenienceFeeTax,
 
         BigDecimal subtotal,
 

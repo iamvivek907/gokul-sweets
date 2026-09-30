@@ -1096,6 +1096,15 @@ public class PaymentStatusService {
         }
     }
 
+    /** Failed attempts already released resources; explicit cancellation only closes the failed order. */
+    @Transactional
+    public void cancelFailedOrder(Long paymentId) {
+        var payment=getPayment(paymentId);
+        if(payment.getPaymentStatus()!=PaymentStatus.FAILED)return;
+        // Conditional SQL cannot overwrite a concurrently confirmed or refunded order.
+        orderRepository.cancelFailedCheckout(payment.getOrder().getId());
+    }
+
     // =========================================================
     // GET PAYMENT
     // =========================================================

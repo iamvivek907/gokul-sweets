@@ -24,6 +24,7 @@ export const adminGroups: {label: string; items: Item[]}[] = [
         {href: "/admin/tax-categories", label: "Tax categories", permissions: ["MENU_MANAGE"]}
     ]},
     {label: "Storefront", items: [
+        {href: "/admin/about", label: "About & people", permissions: ["ABOUT_MANAGE"]},
         {href: "/admin/homepage-campaigns", label: "Homepage campaigns", permissions: ["MENU_MANAGE"]},
         {href: "/admin/notifications", label: "Offers", permissions: ["REBATE_VIEW", "REBATE_MANAGE"]}
     ]},
@@ -38,6 +39,7 @@ export const adminGroups: {label: string; items: Item[]}[] = [
         {href: "/admin/inventory/production", label: "Production & ready stock", permissions: ["INVENTORY_VIEW", "INVENTORY_MANAGE"]}
     ]},
     {label: "Team", items: [
+        {href: "/admin/careers", label: "Recruitment", permissions: ["CAREERS_MANAGE"]},
         {href: "/admin/staff", label: "Staff", permissions: ["STAFF_MANAGE"]},
         {href: "/admin/approvals", label: "Approvals", permissions: ["APPROVAL_VIEW"]},
         {href: "/admin/payroll", label: "Payroll", permissions: ["PAYROLL_VIEW"]}

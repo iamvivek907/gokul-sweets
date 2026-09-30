@@ -1,4 +1,5 @@
 "use client";
+import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
 
 import {
     useCallback,
@@ -60,6 +61,7 @@ import {
 } from "@/services/orderApi";
 
 import {
+    cancelPaymentCheckout,
     createPayment,
     getPaymentForOrder,
     refreshPayment
@@ -1302,11 +1304,29 @@ export default function PaymentPage() {
      * =========================================================
      */
 
+    const [feeBreakdown,setFeeBreakdown]=useState<{fee:number;tax:number}|null>(null);
+    useEffect(()=>{let alive=true;getCustomerOrder(orderNumber).then(order=>{if(alive)setFeeBreakdown({fee:order.convenienceFee??0,tax:order.convenienceFeeTax??0});}).catch(()=>{});return()=>{alive=false;};},[orderNumber]);
+    const [cancelling,setCancelling]=useState(false);
+    const [confirmCancel,setConfirmCancel]=useState(false);
+    async function cancelCheckout() {
+        if(!payment || cancelling || openingPayment || refreshing) return;
+        setCancelling(true);setError(null);
+        try {
+            const result=await cancelPaymentCheckout(payment.paymentId);
+            applyPaymentResult(result);
+            if(result.paymentStatus==="EXPIRED" || result.paymentStatus==="FAILED") {
+                clearPendingPayment();clearPendingOrder();clearPaymentGatewayVisit(payment.orderNumber);
+                router.push(deliveryOrder ? "/delivery/check" : "/checkout/review");
+            } else {setConfirmCancel(false);setError("Payment was already confirmed. View this order before starting another checkout.");}
+        } catch(error) {setError(error instanceof Error ? error.message : "Could not check payment. Your order is unchanged; try again.");}
+        finally {setCancelling(false);}
+    }
+
     async function handlePayNow():
         Promise<void> {
 
         if (
-            !payment
+            !payment || cancelling
         ) {
 
             return;
@@ -2672,7 +2692,7 @@ export default function PaymentPage() {
                                 {
                                     openingPayment
                                         ? "Opening payment..."
-                                        : `Pay ${formatCurrency(
+                                        : `${gatewayOpened ? "Retry payment" : "Pay"} ${formatCurrency(
                                             payment.amount
                                         )}`
                                 }
@@ -2681,6 +2701,16 @@ export default function PaymentPage() {
                         )
                     }
 
+                    <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} onCancel={cancelCheckout}/>
+                    {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm">Payable amount includes a convenience fee of {formatCurrency(feeBreakdown.fee)} (including {formatCurrency(feeBreakdown.tax)} fee tax).</p>}
+                    {(isPending || isFailed || isExpired) && <section aria-label="Payment recovery" className="mt-4 rounded-2xl border border-[#c4d4c9] bg-[#fffaf2] p-4 text-[#173c39]">
+                        <p className="font-bold">{isPending ? "Need to stop this checkout?" : "Your cart is ready to try again"}</p>
+                        <p className="mt-1 text-sm leading-6">Check payment and release the unpaid pickup reservation. Keep your items for another attempt.</p>
+                        {confirmCancel ? <div className="mt-3"><p className="text-sm">Close the gateway first. A payment received after cancellation enters the refund process.</p>
+                            <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={()=>void cancelCheckout()} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white disabled:opacity-50">{cancelling ? "Checking payment…" : "Cancel order & keep cart"}</button>
+                            <button type="button" disabled={cancelling} onClick={()=>setConfirmCancel(false)} className="min-h-11 rounded-xl border px-4 font-bold">Continue payment</button></div></div>
+                            : <button type="button" disabled={openingPayment || refreshing} onClick={()=>setConfirmCancel(true)} className="mt-3 min-h-11 rounded-xl border border-[#c4d4c9] bg-white px-4 font-bold">{isPending ? "Cancel this order" : "Check & retry checkout"}</button>}
+                    </section>}
                     {paymentPollingV2 && isPending && paymentDeadlineReached &&
                         <p role="status" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
                             This payment window has closed. Please check its status before starting a new checkout.

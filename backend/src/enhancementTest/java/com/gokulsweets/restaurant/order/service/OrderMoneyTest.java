@@ -13,6 +13,17 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.*;
 
 class OrderMoneyTest {
+    @Test void convenienceFeeIsInclusiveAndOnlyNormalPickupReceivesIt() {
+        var product=new Product();product.setBasePrice(new BigDecimal("100"));
+        var branch=new Branch();branch.setId(1L);branch.setPickupConvenienceFee(new BigDecimal("10"));branch.setPickupConvenienceFeeTaxRate(new BigDecimal("5"));
+        var slot=new PickupSlot();slot.setId(1L);slot.setPriorityCharge(new BigDecimal("20"));
+        var items=List.of(new ValidatedOrderItem(product,new BranchProduct(),ProductSaleMode.UNIT,1,null));
+        var calculation=new OrderCalculationService();
+        var normal=calculation.calculate(new ValidatedOrderData(branch,slot,PickupType.NORMAL,items));
+        assertThat(normal.totalAmount()).isEqualByComparingTo("110.00");assertThat(normal.convenienceFeeTax()).isEqualByComparingTo("0.48");
+        assertThat(calculation.calculate(new ValidatedOrderData(branch,slot,PickupType.PRIORITY,items)).totalAmount()).isEqualByComparingTo("120.00");
+        assertThat(calculation.calculateDelivery(items).convenienceFee()).isZero();
+    }
     @Test void unitAndWeightPricesKeepExistingTaxMath() {
         var tax = new TaxCategory(); tax.setCgstRate(new BigDecimal("2.5")); tax.setSgstRate(new BigDecimal("2.5"));
         tax.setIgstRate(new BigDecimal("99")); // Stored IGST must not be silently introduced into existing pickup calculations.

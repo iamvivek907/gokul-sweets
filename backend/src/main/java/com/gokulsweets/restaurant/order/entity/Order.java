@@ -62,6 +62,13 @@ import java.util.List;
 @Getter
 @Setter
 public class Order {
+    @Column(nullable=false, precision=10, scale=2)
+    private BigDecimal convenienceFee = BigDecimal.ZERO;
+    @Column(nullable=false, precision=10, scale=2)
+    private BigDecimal convenienceFeeTax = BigDecimal.ZERO;
+    @Column(nullable=false,precision=5,scale=2)
+    private BigDecimal convenienceFeeTaxRate = BigDecimal.ZERO;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -198,8 +198,8 @@ public class AnalyticsRefreshService {
                     COALESCE(ps.slot_date, dw.service_date) AS business_date,
                     COUNT(*) AS completed_orders,
                     COUNT(DISTINCT o.customer_contact_id) AS unique_customers,
-                    COALESCE(SUM(o.subtotal), 0) AS subtotal_amount,
-                    COALESCE(SUM(o.tax_amount), 0) AS tax_amount,
+                    COALESCE(SUM(o.subtotal+o.convenience_fee-o.convenience_fee_tax), 0) AS subtotal_amount,
+                    COALESCE(SUM(o.tax_amount+o.convenience_fee_tax), 0) AS tax_amount,
                     COALESCE(SUM(o.priority_charge), 0) AS priority_charge_amount,
                     COALESCE(SUM(o.rebate_discount_amount), 0) AS rebate_discount_amount,
                     COALESCE(SUM(o.total_amount), 0) AS net_revenue
@@ -267,8 +267,8 @@ public class AnalyticsRefreshService {
                     o.branch_id,
                     COUNT(*) AS completed_orders,
                     COUNT(DISTINCT o.customer_contact_id) AS unique_customers,
-                    COALESCE(SUM(o.subtotal), 0) AS subtotal_amount,
-                    COALESCE(SUM(o.tax_amount), 0) AS tax_amount,
+                    COALESCE(SUM(o.subtotal+o.convenience_fee-o.convenience_fee_tax), 0) AS subtotal_amount,
+                    COALESCE(SUM(o.tax_amount+o.convenience_fee_tax), 0) AS tax_amount,
                     COALESCE(SUM(o.priority_charge), 0) AS priority_charge_amount,
                     COALESCE(SUM(o.rebate_discount_amount), 0) AS rebate_discount_amount,
                     COALESCE(SUM(o.total_amount), 0) AS net_revenue

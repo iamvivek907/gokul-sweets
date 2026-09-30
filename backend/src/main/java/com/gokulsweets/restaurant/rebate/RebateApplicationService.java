@@ -271,6 +271,7 @@ public class RebateApplicationService {
                                 order.getPriorityCharge()
                         )
                 )
+                .add(defaultZero(order.getConvenienceFee()))
                 .setScale(
                         2,
                         RoundingMode.HALF_UP

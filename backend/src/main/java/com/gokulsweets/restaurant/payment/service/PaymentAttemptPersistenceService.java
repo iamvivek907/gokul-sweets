@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class PaymentAttemptPersistenceService {
 
     private final PaymentRepository paymentRepository;
+    private final CheckoutUrlVault checkoutUrlVault;
 
     @Transactional
     public Payment storeProviderDetails(
@@ -37,6 +38,7 @@ public class PaymentAttemptPersistenceService {
         }
 
         payment.setProviderOrderId(result.providerOrderId());
+        payment.setCheckoutUrl(checkoutUrlVault.seal(result.paymentUrl()));
         if (result.providerPaymentId() != null
                 && !result.providerPaymentId().isBlank()) {
             payment.setProviderPaymentId(result.providerPaymentId());

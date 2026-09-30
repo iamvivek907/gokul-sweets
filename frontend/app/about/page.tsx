@@ -1,4 +1,6 @@
 "use client";
+import BrandAbout from "@/components/brand/BrandAbout";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import Link from "next/link";
 import {useEffect, useState, type ReactNode} from "react";
@@ -199,6 +201,7 @@ function PolicyCenter() {
 }
 
 export default function AboutPage() {
+    const features=useStorefrontFeatures();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -234,7 +237,7 @@ export default function AboutPage() {
     return (
         <AppShell>
             <div className="mx-auto w-full max-w-6xl pb-12">
-                <section className="overflow-hidden rounded-3xl border border-[#eadfd6] bg-white shadow-[0_8px_30px_rgba(60,30,20,0.08)]">
+                {features?.brandCareers ? <BrandAbout/> : <section className="overflow-hidden rounded-3xl border border-[#eadfd6] bg-white shadow-[0_8px_30px_rgba(60,30,20,0.08)]">
                     <div className="bg-linear-to-br from-[#fff4e5] via-[#fffaf3] to-[#f6dfad]/40 px-6 py-9 sm:px-9 sm:py-12">
                         <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]">Our story</p>
                         <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#7a1625] sm:text-5xl">More than sweets.<br />It&apos;s a feeling.</h1>
@@ -244,7 +247,7 @@ export default function AboutPage() {
                             <a href="#our-branches" className="flex min-h-12 items-center justify-center rounded-xl border border-[#eadfd6] bg-white px-6 font-bold text-[#7a1625]!">Find a Branch</a>
                         </div>
                     </div>
-                </section>
+                </section>}
 
                 <section id="our-branches" className="mt-8 scroll-mt-24">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#c88a20]">Visit us</p>

@@ -33,7 +33,7 @@ public class CheckoutQuoteService {
 
     public record Line(String name, String unitPrice, String taxRate, String taxAmount, String total) {}
     public record Quote(List<Line> items, String subtotal, String taxAmount,
-                        String priorityCharge, String totalAmount, String currency,
+                        String priorityCharge, String convenienceFee, String convenienceFeeTax, String totalAmount, String currency,
                         String expiresAt, String token) {}
 
     @Transactional(readOnly = true)
@@ -61,7 +61,7 @@ public class CheckoutQuoteService {
                         item.unitPrice().toPlainString(), item.taxRate().toPlainString(),
                         item.taxAmount().toPlainString(), item.lineTotal().toPlainString())).toList(),
                 amounts.subtotal().toPlainString(), amounts.taxAmount().toPlainString(),
-                amounts.priorityCharge().toPlainString(), amounts.totalAmount().toPlainString(),
+                amounts.priorityCharge().toPlainString(), amounts.convenienceFee().toPlainString(), amounts.convenienceFeeTax().toPlainString(), amounts.totalAmount().toPlainString(),
                 "INR", Instant.ofEpochSecond(expiry).toString(), token);
     }
 
@@ -102,7 +102,7 @@ public class CheckoutQuoteService {
                 .append(item.unitPrice()).append(':').append(item.taxRate()).append(':')
                 .append(item.taxAmount()).append(':').append(item.lineTotal()).append(';'));
         return value.append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
-                .append('|').append(amounts.priorityCharge()).append('|').append(amounts.totalAmount()).toString();
+                .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).toString();
     }
 
     private String sign(String message) {
