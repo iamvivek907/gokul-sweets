@@ -10,7 +10,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
-import java.util.Map;
 
 /** Explicit operator recipients, HTTPS Resend API and stable idempotency keys; no logged credentials. */
 @Component
@@ -26,15 +25,24 @@ public class StaffAlertEmail {
     }
     public boolean configured() {
         return properties.isEmailEnabled() && properties.getEmailApiKey().matches("re_[A-Za-z0-9_-]{10,200}")
-                && address(properties.getEmailFrom());
+                && address(properties.getEmailFrom())
+                && (properties.getEmailReplyTo().isBlank() || address(properties.getEmailReplyTo()))
+                && properties.getEmailSubjectPrefix().length() <= 80
+                && !properties.getEmailSubjectPrefix().contains("\r") && !properties.getEmailSubjectPrefix().contains("\n");
     }
     public String recipient(long staffId) {
         if (!configured()) return null;
         try {
             var node = JsonMapper.builder().build().readTree(properties.getEmailRecipients()).get(String.valueOf(staffId));
-            String value = node == null ? null : node.asText();
-            return address(value) ? value : null;
+            if (node != null) return address(node.asText()) ? node.asText() : null;
+            // Owner-approved QA routing applies only in DEV; PROD needs explicit staff-ID mappings.
+            String test = properties.getEmailTestRecipient();
+            return "DEV".equals(environment.getProperty("gokul.environment-isolation.environment")) && address(test) ? test : null;
         } catch (Exception invalid) {return null;}
+    }
+    public boolean testRouting(long staffId) {
+        return "DEV".equals(environment.getProperty("gokul.environment-isolation.environment"))
+                && address(properties.getEmailTestRecipient()) && properties.getEmailTestRecipient().equals(recipient(staffId));
     }
     HttpRequest prepare(long staffId, String title, String message, String orderNumber, long eventId) {
         String recipient = recipient(staffId);
@@ -48,8 +56,11 @@ public class StaffAlertEmail {
         String encoded = java.net.URLEncoder.encode(orderNumber, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
         String text = message + "\n\nSign in to take action: " + origin + "/admin/orders/" + encoded
                 + "\n\nAlert reference: " + eventId + ". Reading this message does not start preparation or mark an order ready.";
-        String body = JsonMapper.builder().build().writeValueAsString(Map.of("from", properties.getEmailFrom(),
-                "to", List.of(recipient), "subject", "[Gokul Sweets] " + title, "text", text));
+        var payload = new java.util.LinkedHashMap<String, Object>();
+        payload.put("from", properties.getEmailFrom()); payload.put("to", List.of(recipient));
+        payload.put("subject", properties.getEmailSubjectPrefix() + " " + title); payload.put("text", text);
+        if (!properties.getEmailReplyTo().isBlank()) payload.put("reply_to", properties.getEmailReplyTo());
+        String body = JsonMapper.builder().build().writeValueAsString(payload);
         return HttpRequest.newBuilder(URI.create("https://api.resend.com/emails"))
                 .timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + properties.getEmailApiKey())
                 .header("Content-Type", "application/json")

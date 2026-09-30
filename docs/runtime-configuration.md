@@ -287,7 +287,7 @@ help text for permission denial, sound activation, device mute, IST times and in
 | `GOKUL_FEATURES_NOTIFICATION_ALERTS` | ON for owner DEV QA | Enables customer alert controls and sender; also requires the inbox and verified-identity prerequisites |
 | `GOKUL_WEB_PUSH_PUBLIC_KEY` | empty | Base64url uncompressed P-256 public VAPID key; exposed to the signed-in browser |
 | `GOKUL_WEB_PUSH_PRIVATE_KEY` | empty | Base64url 32-byte P-256 private VAPID key; backend secret only |
-| `GOKUL_WEB_PUSH_SUBJECT` | empty | Operator-controlled `mailto:` contact or HTTPS contact URL |
+| `GOKUL_WEB_PUSH_SUBJECT` | `mailto:gokulsweets.r@gmail.com` for testing | Operator-controlled `mailto:` contact or HTTPS contact URL |
 
 Owner-requested DEV QA defaults now enable both notification switches. Explicit environment
 values override these defaults; set both false in PROD until rollout is approved. Existing Sprint 4
@@ -369,18 +369,19 @@ and leased push/email delivery attempts. Staff UI: the topbar bell and
 **/admin/staff-notifications**. Existing **/admin/notifications** remains offer management.
 Alert links open **/admin/orders/{orderNumber}**, with existing preparation/ready/delay APIs,
 permissions, eligibility and inventory checks. All new controls include explanatory help text.
-No staff email column is added, and no address is inferred from usernames.
+No staff email column is added, and no address is inferred from usernames. Owner-approved
+DEV test routing sends unmapped eligible staff attempts to the QA mailbox, with clear UI help.
 
 | Setting | Default | Owner / dependency |
 | --- | --- | --- |
 | `GOKUL_FEATURES_STAFF_ORDER_ALERTS` | ON for owner DEV QA | Operations; secure staff sessions, DEV/PROD isolation and trusted Origin/CSRF |
 | `GOKUL_STAFF_ALERTS_REMINDER_MINUTES` | `10` | Operations; 1–60 minutes before the existing preparation window opens |
 | `GOKUL_STAFF_ALERTS_ESCALATION_MINUTES` | `5` | Operations; 1–60 minutes after booked pickup/service time for unresolved email escalation |
-| `GOKUL_STAFF_ALERTS_EMAIL_ENABLED` | `false` | Operations; enables the email adapter only with valid configuration |
+| `GOKUL_STAFF_ALERTS_EMAIL_ENABLED` | ON for owner DEV QA | Operations; enables the email adapter only with valid configuration |
 | `GOKUL_STAFF_ALERTS_EMAIL_API_KEY` | empty | Backend secret: Resend sending API key, scoped to a verified sender domain |
-| `GOKUL_STAFF_ALERTS_EMAIL_FROM` | empty | Operator-approved verified sender address, e.g. a mailbox on the verified domain |
-| `GOKUL_STAFF_ALERTS_EMAIL_RECIPIENTS` | `{}` | Backend-only JSON mapping real staff IDs to operator-verified recipients; e.g. `{"12":"verified-staff@example.invalid"}` is syntax only |
-| `GOKUL_WEB_PUSH_PUBLIC_KEY/PRIVATE_KEY/SUBJECT` | empty | Existing shared VAPID configuration; private key stays backend-only |
+| `GOKUL_STAFF_ALERTS_EMAIL_FROM` | `notifications@gokulsweets.in` | Operator-approved verified sender address, e.g. a mailbox on the verified domain |
+| `GOKUL_STAFF_ALERTS_EMAIL_RECIPIENTS` | `{}` | Backend-only JSON mapping real staff IDs to operator-verified recipients; takes priority over DEV test routing; e.g. `{"12":"verified-staff@example.invalid"}` is syntax only |
+| `GOKUL_WEB_PUSH_PUBLIC_KEY/PRIVATE_KEY/SUBJECT` | keys empty; testing subject below | Existing shared VAPID configuration; private key stays backend-only |
 
 The staff flag is independent of customer inbox/push toggles. Existing Sprint 4 QA flags stay
 unchanged. Push needs explicit permission and registration on each staff browser, with at most
@@ -413,7 +414,9 @@ perform that action do not receive that reminder. NEW_ORDER needs ORDER_VIEW onl
 
 Reading is per staff and idempotent. It suppresses that staff member's pending push, but does
 not mark an order prepared/ready or suppress unresolved email escalation. Configured eligible
-recipients get one email attempt sequence per overdue event after the escalation threshold.
+recipients get one email attempt sequence per staff and overdue event after the escalation threshold.
+In DEV, the explicit test mailbox can receive one such sequence for each eligible staff member.
+Test routing does not bypass branch/permission checks and is never used in PROD.
 Starting preparation ends preparation-overdue escalation; if the order is still not ready after
 booked time, the separate ready-overdue action can escalate. Each task is leased with SKIP
 LOCKED, max three attempts and 60-second retry backoff for 429/5xx/network errors. Push is limited
@@ -439,8 +442,9 @@ historical backfill or new alerts for completed/cancelled orders.
 
 After merge, apply V92 in DEV. The staff flag defaults ON for owner QA; remove a stale false
 override or set it true. Set all three notification flags explicitly false in production until
-rollout approval. Configure VAPID on an always-on service. Email remains OFF until verified
-Resend sender/recipient secrets are configured and its separate switch is explicitly enabled. Use two staff accounts from different
+rollout approval. Configure VAPID on an always-on service. Email now defaults ON for owner QA, but valid
+Resend credentials and a verified sender domain are still required before sending. Set email
+explicitly false in deployments that have not approved sending. Use two staff accounts from different
 branches plus a read-only role. Create/pay an order with the portal closed; confirm only eligible
 staff get a useful alert and the exact authorized order opens after sign-in. Verify each timing
 boundary, action before send, read-without-action email follow-up, provider denial/retry/410,
@@ -455,8 +459,40 @@ The owner requested notification QA toggles on after PR 141. Application default
 `GOKUL_FEATURES_NOTIFICATION_INBOX`, `GOKUL_FEATURES_NOTIFICATION_ALERTS` and
 `GOKUL_FEATURES_STAFF_ORDER_ALERTS`. These are shared application defaults, not an automatic
 DEV-only profile: deployments without rollout approval must set explicit false overrides.
-No VAPID/Resend secrets or recipient addresses are introduced; email stays OFF.
+No VAPID/Resend secrets are introduced. The later owner-approved email QA setup below
+enables email and provides the DEV testing mailbox.
 The inbox and staff bell still require secure sessions, trusted CORS and environment isolation.
 Missing VAPID configuration shows unavailable push honestly. Staff reminders require an always-on
 backend. Deploy the merged frontend/backend SHA before testing; a merge alone does not prove
 provider/device delivery. Keep QA/Done pending actual DEV evidence.
+
+### Owner-approved email and VAPID testing setup
+
+SCRUM-39, SCRUM-40 and SCRUM-109 implementation is complete; real DEV acceptance remains.
+Notification inbox, customer alerts, staff alerts and staff email default ON for owner QA.
+All switches accept explicit environment overrides; production must retain false values
+until its rollout is approved. No provider/device delivery is claimed from these defaults.
+
+The owner selected the existing Resend verified-domain adapter. Resend needs a verified
+`gokulsweets.in` sending domain: default From is `notifications@gokulsweets.in`; Gmail
+`gokulsweets.r@gmail.com` is Reply-To, not a forged sender. Set the real Resend sending
+API key in backend secrets. A Resend API key cannot be generated locally.
+
+| Backend variable | QA default / action |
+| --- | --- |
+| `GOKUL_STAFF_ALERTS_EMAIL_ENABLED` | `true`; set false to stop email |
+| `GOKUL_STAFF_ALERTS_EMAIL_FROM` | `notifications@gokulsweets.in`; verify this domain in Resend |
+| `GOKUL_STAFF_ALERTS_EMAIL_REPLY_TO` | `gokulsweets.r@gmail.com` |
+| `GOKUL_STAFF_ALERTS_EMAIL_TEST_RECIPIENT` | `vivek.chaurasia.srm@gmail.com`; applies only when environment is DEV and staff has no explicit mapping |
+| `GOKUL_STAFF_ALERTS_EMAIL_SUBJECT_PREFIX` | `[Gokul Sweets DEV QA]`; event title follows |
+| `GOKUL_STAFF_ALERTS_EMAIL_API_KEY` | Required real Resend secret, not a VAPID key |
+| `GOKUL_WEB_PUSH_PUBLIC_KEY` | Generated valid DEV P-256 public key, supplied privately in conversation |
+| `GOKUL_WEB_PUSH_PRIVATE_KEY` | Matching generated DEV key; backend secret only; never commit to Git/Jira |
+| `GOKUL_WEB_PUSH_SUBJECT` | `mailto:gokulsweets.r@gmail.com`; operator contact for testing |
+
+Explicit staff-ID recipient mapping wins; invalid mappings fail closed. DEV test routing
+never substitutes for a missing PROD staff recipient. The staff settings identify QA routing
+without exposing the mailbox to other staff. Subject/reply-to validation rejects CR/LF.
+The generated VAPID pair was checked for valid P-256 encoding and a matching public/private
+pair. Configure both together and re-register devices if rotating keys. Use a separate pair
+for PROD. Enable provider configuration only after this PR is merged/deployed to DEV.
