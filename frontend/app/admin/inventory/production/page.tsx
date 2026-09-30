@@ -325,6 +325,7 @@ export default function AdminProductionPage() {
 
                         <div className="flex flex-wrap items-center gap-3 self-start xl:self-auto">
                             <InventoryHelp context="PRODUCTION" />
+                            {hasPermission("ORDER_VIEW")&&<Link href={`/admin/occasion-enquiries${branchId?`?branch=${branchId}`:""}`} className="min-h-11 rounded-xl border bg-white px-4 py-3 text-sm font-bold">Dedicated bulk production by date</Link>}
                             <Link
                                 href="/admin/inventory"
                                 className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#eadfd6] bg-white px-5 text-sm font-bold text-[#7a1625] transition hover:border-[#c88a20] hover:bg-[#fff4e5]"

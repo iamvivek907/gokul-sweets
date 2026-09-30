@@ -32,10 +32,12 @@ public class OccasionEnquiryService {
     private final VerifiedCustomerPhoneLookup customers;
     private final Clock clock;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
+    private final com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts staffAlerts;
 
     public record Item(@Positive long productId, @DecimalMin("0.001") @Digits(integer = 9, fraction = 3)
-                       BigDecimal quantity, @NotNull Unit unit, String productName, String productionUnit, BigDecimal suggestedProductionQuantity) {
-        public Item(long productId, BigDecimal quantity, Unit unit, String productName) {this(productId,quantity,unit,productName,null,null);}
+                       BigDecimal quantity, @NotNull Unit unit, String productName, String productionUnit, BigDecimal suggestedProductionQuantity, @DecimalMin("0") @Digits(integer=9,fraction=0) BigDecimal supplementalGrams) {
+        public Item(long productId,BigDecimal quantity,Unit unit,String productName,String productionUnit,BigDecimal suggestedProductionQuantity){this(productId,quantity,unit,productName,productionUnit,suggestedProductionQuantity,null);}
+        public Item(long productId, BigDecimal quantity, Unit unit, String productName) {this(productId,quantity,unit,productName,null,null,null);}
     }
     public enum Unit { PIECE, GRAM }
     public enum Fulfilment { PICKUP, DELIVERY_REQUEST }
@@ -43,9 +45,10 @@ public class OccasionEnquiryService {
                           @NotNull LocalDate serviceDate, @Min(1) @Max(10000) int guestCount,
                           @NotNull Fulfilment fulfilment, @Size(max = 500) String deliveryAddress,
                           @Size(max = 1000) String notes,
-                          @NotEmpty @Size(max = 30) List<@Valid Item> items, OccasionCatalogue.GiftRequest gift) {
+                          @NotEmpty @Size(max = 30) List<@Valid Item> items, OccasionCatalogue.GiftRequest gift, @Size(max=30) List<OccasionCatalogue.PackingGroup> packingGroups) {
+        public Request(long branchId,String occasionType,LocalDate serviceDate,int guestCount,Fulfilment fulfilment,String deliveryAddress,String notes,List<Item> items,OccasionCatalogue.GiftRequest gift) {this(branchId,occasionType,serviceDate,guestCount,fulfilment,deliveryAddress,notes,items,gift,null);}
         public Request(long branchId, String occasionType, LocalDate serviceDate, int guestCount, Fulfilment fulfilment, String deliveryAddress, String notes, List<Item> items) {
-            this(branchId, occasionType, serviceDate, guestCount, fulfilment, deliveryAddress, notes, items, null);
+            this(branchId, occasionType, serviceDate, guestCount, fulfilment, deliveryAddress, notes, items, null, null);
         }
     }
     public record Quote(@NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
@@ -77,7 +80,7 @@ public class OccasionEnquiryService {
                           Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber,
                           boolean balancePaymentOpen, List<ProductionLine> productionPlan, CancellationReview cancellationReview, OccasionCatalogue.GiftSnapshot gift, boolean estimated, BigDecimal originalEstimate,
                           Instant packingFinalizedAt,int packingRevision,BigDecimal creditReviewAmount,
-                          List<OccasionQuoteCalculator.Extra> extraCharges,OccasionQuoteCalculator.Calculation calculation) {}
+                          List<OccasionQuoteCalculator.Extra> extraCharges,OccasionQuoteCalculator.Calculation calculation,List<OccasionCatalogue.PackedGroup> packingGroups) {}
     public record CancellationReview(BigDecimal paidAmount, String reason, String state) {}
     public record ProductionLine(long productId, BigDecimal quantity, String unit, LocalDateTime expectedReadyAt, String state, BigDecimal readyQuantity, long readinessRevision) {}
 
@@ -94,6 +97,7 @@ public class OccasionEnquiryService {
         if (input.items() == null || input.items().isEmpty() || input.items().size() > 30
                 || input.items().stream().anyMatch(i -> i == null || i.quantity() == null || i.quantity().signum() <= 0
                 || i.quantity().compareTo(new BigDecimal("100000000")) > 0 || i.unit() == null
+                || i.supplementalGrams()!=null && (i.supplementalGrams().signum()<0 || i.supplementalGrams().compareTo(new BigDecimal("100000000"))>0 || i.supplementalGrams().stripTrailingZeros().scale()>0 || i.unit()!=Unit.PIECE)
                 || i.unit() == Unit.PIECE && i.quantity().stripTrailingZeros().scale() > 0)
                 || input.items().stream().map(Item::productId).distinct().count() != input.items().size())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose distinct products and valid quantities.");
@@ -120,10 +124,14 @@ public class OccasionEnquiryService {
         for (Item item : input.items()) {
             var sweet = options.stream().filter(p -> p.id() == item.productId()).findFirst()
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "A selected sweet is unavailable for occasion booking."));
+            if(item.supplementalGrams()!=null && item.supplementalGrams().signum()>0 && !"WEIGHT".equals(sweet.saleMode()))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Additional kg requires a weight-priced item.");
             if (input.serviceDate().isBefore(LocalDate.now(clock.withZone(IST)).plusDays(sweet.leadDays()))
                 || item.unit() == Unit.GRAM && (!"WEIGHT".equals(sweet.saleMode()) || item.quantity().stripTrailingZeros().scale() > 0))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Check the sweet's lead time and quantity unit.");
         }
+        if(input.gift()!=null && input.packingGroups()!=null&&!input.packingGroups().isEmpty())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Use one packing plan per request.");
+        var groups=catalogue.validateGroups(input.branchId(),input.serviceDate(),input.items(),input.packingGroups());
         var gift = catalogue.validateGift(input.branchId(), input.serviceDate(), input.items(), input.gift());
         UUID id = UUID.randomUUID();
         jdbc.update("""
@@ -134,11 +142,13 @@ public class OccasionEnquiryService {
                 Date.valueOf(input.serviceDate()), input.guestCount(), input.fulfilment().name(),
                 input.fulfilment() == Fulfilment.PICKUP ? null : input.deliveryAddress().trim(), input.notes(), requestHash);
         for (Item item : input.items()) jdbc.update("""
-                INSERT INTO occasion_enquiry_items (enquiry_id, product_id, requested_quantity, unit)
-                VALUES (?, ?, ?, ?)
-                """, id, item.productId(), item.quantity(), item.unit().name());
+                INSERT INTO occasion_enquiry_items (enquiry_id, product_id, requested_quantity, unit,supplemental_grams)
+                VALUES (?, ?, ?, ?,?)
+                """, id, item.productId(), item.quantity(), item.unit().name(),item.supplementalGrams()==null?BigDecimal.ZERO:item.supplementalGrams());
         event(id, "customer", null, "REQUESTED", null);
         if (gift != null) jdbc.update("UPDATE occasion_enquiries SET packaging_snapshot=?::jsonb WHERE id=?", new tools.jackson.databind.ObjectMapper().writeValueAsString(gift), id);
+        jdbc.update("UPDATE occasion_enquiries SET packing_groups=?::jsonb WHERE id=?",new tools.jackson.databind.ObjectMapper().writeValueAsString(groups),id);
+        staffAlerts.occasionChanged(id,false);
         return get(environment, subject, id);
     }
 
@@ -172,6 +182,12 @@ public class OccasionEnquiryService {
         return jdbc.query("""
                 SELECT * FROM occasion_enquiries WHERE environment = ? AND branch_id = ? ORDER BY created_at DESC,id DESC LIMIT 100
                 """, (rs, row) -> map(rs), environment.name(), branchId);
+    }
+
+    @Transactional(readOnly=true)
+    public List<Summary> staffList(ConsentEnvironment environment,long branchId,LocalDate date,UUID before) {
+        if(before==null)return jdbc.query("SELECT * FROM occasion_enquiries WHERE environment=? AND branch_id=? AND service_date=? ORDER BY created_at DESC,id DESC LIMIT 50",(rs,n)->map(rs),environment.name(),branchId,date);
+        return jdbc.query("SELECT e.* FROM occasion_enquiries e JOIN occasion_enquiries cursor ON cursor.id=? AND cursor.environment=e.environment AND cursor.branch_id=e.branch_id AND cursor.service_date=e.service_date WHERE e.environment=? AND e.branch_id=? AND e.service_date=? AND (e.created_at,e.id)<(cursor.created_at,cursor.id) ORDER BY e.created_at DESC,e.id DESC LIMIT 50",(rs,n)->map(rs),before,environment.name(),branchId,date);
     }
 
     @Transactional
@@ -210,41 +226,44 @@ public class OccasionEnquiryService {
         if (requestedCount == null || requestedCount != quote.lines().size())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Price every requested product exactly once.");
         String giftJson=jdbc.queryForObject("SELECT packaging_snapshot::text FROM occasion_enquiries WHERE id=?",String.class,id);
+        boolean groupPacking=Boolean.TRUE.equals(jdbc.queryForObject("SELECT jsonb_array_length(packing_groups)>0 FROM occasion_enquiries WHERE id=?",Boolean.class,id));
         Boolean requiresDedicated = jdbc.queryForObject("""
             SELECT EXISTS (SELECT 1 FROM occasion_enquiry_items i
               JOIN occasion_enquiries e ON e.id=i.enquiry_id JOIN products p ON p.id=i.product_id
               LEFT JOIN branch_products bp ON bp.branch_id=e.branch_id AND bp.product_id=i.product_id
               WHERE i.enquiry_id=? AND (bp.occasion_only OR (p.sale_mode='WEIGHT' AND i.unit='PIECE')))
             """, Boolean.class,id);
-        if(!features.isOccasionBulkProduction() && (giftJson!=null || Boolean.TRUE.equals(requiresDedicated)))
+        if(!features.isOccasionBulkProduction() && (giftJson!=null || groupPacking || Boolean.TRUE.equals(requiresDedicated)))
             throw new ResponseStatusException(HttpStatus.CONFLICT,"Dedicated bulk production must be enabled before approving this occasion request.");
-        if(giftJson!=null) {
+        if(giftJson!=null || groupPacking) {
             if(!quote.packagingReviewed() || quote.packagingTotal()==null || quote.packagingTotal().signum()<0
                 || quote.packagingTotal().scale()>2 || quote.packagingTotal().compareTo(quote.amount())>=0)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Review physical box fit, branding and lead time; approve the packaging total included in item prices.");
-            jdbc.update("UPDATE occasion_enquiries SET packaging_snapshot=jsonb_set(packaging_snapshot,'{approvedPackagingTotal}',to_jsonb(?::numeric)) WHERE id=?",quote.packagingTotal(),id);
+            if(giftJson!=null) jdbc.update("UPDATE occasion_enquiries SET packaging_snapshot=jsonb_set(packaging_snapshot,'{approvedPackagingTotal}',to_jsonb(?::numeric)) WHERE id=?",quote.packagingTotal(),id);
         }
         jdbc.update("DELETE FROM occasion_quote_lines WHERE enquiry_id = ?", id);
         for (QuoteLine line : quote.lines()) {
             var tax = jdbc.query("""
                     SELECT tc.cgst_rate, tc.sgst_rate, tc.hsn_sac_code,
-                           p.name, p.sale_mode, i.requested_quantity, i.unit, bp.occasion_piece_grams
+                           p.name, p.sale_mode, i.requested_quantity, i.unit, bp.occasion_piece_grams,i.supplemental_grams
                     FROM occasion_enquiry_items i JOIN products p ON p.id = i.product_id
                     JOIN tax_categories tc ON tc.id = p.tax_category_id AND tc.active
                     JOIN occasion_enquiries e ON e.id=i.enquiry_id
                     LEFT JOIN branch_products bp ON bp.product_id=p.id AND bp.branch_id=e.branch_id
                     WHERE i.enquiry_id = ? AND i.product_id = ?
                     """, rs -> rs.next() ? new Object[]{rs.getBigDecimal(1), rs.getBigDecimal(2),
-                            rs.getString(3), rs.getString(4), rs.getString(5), rs.getBigDecimal(6), rs.getString(7), rs.getBigDecimal(8)} : null,
+                            rs.getString(3), rs.getString(4), rs.getString(5), rs.getBigDecimal(6), rs.getString(7), rs.getBigDecimal(8),rs.getBigDecimal(9)} : null,
                     id, line.productId());
             if (tax == null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "A product has no active tax category. Configure it before quoting.");
             BigDecimal production = line.productionQuantity();
             boolean weight = "WEIGHT".equals(tax[4]);
             if (production == null) production = weight && "PIECE".equals(tax[6])
-                ? tax[7] == null ? null : ((BigDecimal)tax[5]).multiply((BigDecimal)tax[7]) : (BigDecimal)tax[5];
+                ? tax[7] == null ? null : ((BigDecimal)tax[5]).multiply((BigDecimal)tax[7]).add((BigDecimal)tax[8]) : (BigDecimal)tax[5];
             if (production == null || production.signum() <= 0 || production.stripTrailingZeros().scale() > 0
                 || production.compareTo(new BigDecimal("100000000")) > 0
+                || weight && "GRAM".equals(tax[6]) && production.compareTo((BigDecimal)tax[5])<0
+                || ((BigDecimal)tax[8]).signum()>0 && production.compareTo((BigDecimal)tax[8])<=0
                 || !weight && production.compareTo((BigDecimal)tax[5]) != 0)
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approve a whole-gram production quantity for piece-based weight sweets before quoting. Unit sweets must retain the requested piece count.");
             jdbc.update("UPDATE occasion_enquiry_items SET approved_quantity=?,approved_unit=? WHERE enquiry_id=? AND product_id=?",
@@ -322,6 +341,7 @@ public class OccasionEnquiryService {
         jdbc.update("INSERT INTO occasion_enquiry_events (enquiry_id, actor, from_status, to_status, detail) VALUES (?, ?, ?, ?, ?)",
                 id, actor, before, after, detail);
         notifications.occasionDecisionChanged(id);
+        if("QUOTED".equals(after)||"DECLINED".equals(after))staffAlerts.occasionReviewed(id);
     }
 
     private static String requestHash(Request input) {
@@ -333,11 +353,13 @@ public class OccasionEnquiryService {
         appendField(canonical, input.fulfilment().name());
         appendField(canonical, input.deliveryAddress() == null ? "" : input.deliveryAddress().trim());
         appendField(canonical, new tools.jackson.databind.ObjectMapper().writeValueAsString(input.gift()));
+        appendField(canonical,new tools.jackson.databind.ObjectMapper().writeValueAsString(input.packingGroups()));
         appendField(canonical, input.notes() == null ? "" : input.notes().trim());
         input.items().stream().sorted(Comparator.comparingLong(Item::productId))
                 .forEach(item -> {
                     appendField(canonical, Long.toString(item.productId()));
                     appendField(canonical, item.quantity().stripTrailingZeros().toPlainString());
+                    appendField(canonical,item.supplementalGrams()==null?"0":item.supplementalGrams().stripTrailingZeros().toPlainString());
                     appendField(canonical, item.unit().name());
                 });
         try {
@@ -388,14 +410,14 @@ public class OccasionEnquiryService {
                 jdbc.query("""
                         SELECT i.product_id, i.requested_quantity, i.unit, p.name,
                                CASE WHEN p.sale_mode='WEIGHT' THEN 'GRAM' ELSE 'PIECE' END,
-                               CASE WHEN p.sale_mode='WEIGHT' AND i.unit='PIECE' THEN i.requested_quantity*bp.occasion_piece_grams ELSE i.requested_quantity END
+                               CASE WHEN p.sale_mode='WEIGHT' AND i.unit='PIECE' THEN i.requested_quantity*bp.occasion_piece_grams+i.supplemental_grams ELSE i.requested_quantity END,i.supplemental_grams
                         FROM occasion_enquiry_items i JOIN products p ON p.id = i.product_id
                         JOIN occasion_enquiries e ON e.id=i.enquiry_id
                         LEFT JOIN branch_products bp ON bp.branch_id=e.branch_id AND bp.product_id=i.product_id
                         WHERE i.enquiry_id = ? ORDER BY p.name
                         """,
                         (items, row) -> new Item(items.getLong(1), items.getBigDecimal(2),
-                                Unit.valueOf(items.getString(3)), items.getString(4),items.getString(5),items.getBigDecimal(6)),
+                                Unit.valueOf(items.getString(3)), items.getString(4),items.getString(5),items.getBigDecimal(6),items.getBigDecimal(7)),
                         (UUID) rs.getObject("id")),
                 jdbc.query("""
                         SELECT q.product_id, q.product_name, q.gross_amount, q.subtotal, q.tax_amount,
@@ -423,7 +445,8 @@ public class OccasionEnquiryService {
                 rs.getTimestamp("packing_finalized_at")==null?null:rs.getTimestamp("packing_finalized_at").toInstant(),
                 rs.getInt("packing_revision"),rs.getBigDecimal("credit_review_amount"),
                 new tools.jackson.databind.ObjectMapper().readValue(rs.getString("extra_charges"),new tools.jackson.core.type.TypeReference<List<OccasionQuoteCalculator.Extra>>() {}),
-                rs.getString("quote_calculation")==null?null:new tools.jackson.databind.ObjectMapper().readValue(rs.getString("quote_calculation"),OccasionQuoteCalculator.Calculation.class));
+                rs.getString("quote_calculation")==null?null:new tools.jackson.databind.ObjectMapper().readValue(rs.getString("quote_calculation"),OccasionQuoteCalculator.Calculation.class),
+                new tools.jackson.databind.ObjectMapper().readValue(rs.getString("packing_groups"),new tools.jackson.core.type.TypeReference<List<OccasionCatalogue.PackedGroup>>() {}));
     }
 
     private static <T> T throwNotFound() { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }

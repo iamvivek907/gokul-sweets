@@ -42,7 +42,9 @@ public class StaffOrderAlerts {
           WHERE rp.role_id = u.role_id AND p.name = e.required_permission)
         """;
     public record Event(long id, long orderId, String orderNumber, long branchId, String kind, String title,
-                        String message, LocalDateTime scheduledAt, java.time.Instant createdAt) {}
+                        String message, LocalDateTime scheduledAt, java.time.Instant createdAt,java.util.UUID enquiryId,String targetUrl) {
+        public Event(long id,long orderId,String orderNumber,long branchId,String kind,String title,String message,LocalDateTime scheduledAt,java.time.Instant createdAt) {this(id,orderId,orderNumber,branchId,kind,title,message,scheduledAt,createdAt,null,"/admin/orders/"+orderNumber);}
+    }
     public record Message(Event event, java.time.Instant readAt, boolean actionRequired, String pushState, String emailState) {}
     public record Page(List<Message> messages, long unreadCount, Long nextBefore, long readThrough) {
         public Page(List<Message> messages, long unreadCount, Long nextBefore) {this(messages,unreadCount,nextBefore,0);}
@@ -73,6 +75,22 @@ public class StaffOrderAlerts {
             """, scope(), paymentId);
     }
 
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void occasionChanged(java.util.UUID id,boolean advance) {
+        if(!enabled())return;
+        jdbc.update("""
+          INSERT INTO staff_order_alerts(environment,event_key,enquiry_id,branch_id,kind,required_permission,title,message)
+          SELECT environment,?||id,id,branch_id,?,'APPROVAL_MANAGE',?,
+           occasion_type||' · '||to_char(service_date,'DD Mon YYYY')||' IST. '||?
+          FROM occasion_enquiries WHERE id=? AND environment=?
+          ON CONFLICT(environment,event_key) DO NOTHING
+          """,advance?"occasion-advance:":"occasion-request:",advance?"OCCASION_ADVANCE_PAID":"NEW_OCCASION_REQUEST",advance?"Bulk advance verified · plan production":"New occasion request · review quote",advance?"Review the dedicated production totals and packing plan.":"Review quantities, packing and readiness before quoting.",id,scope());
+    }
+    @Transactional(propagation=Propagation.MANDATORY)
+    public void occasionReviewed(java.util.UUID id) {
+        if(!enabled())return;
+        jdbc.update("INSERT INTO staff_order_alert_reads(event_id,staff_id) SELECT e.id,u.id FROM staff_order_alerts e JOIN staff_users u ON TRUE WHERE e.environment=? AND e.enquiry_id=? AND e.kind='NEW_OCCASION_REQUEST' AND "+ELIGIBLE+" ON CONFLICT DO NOTHING",scope(),id);
+    }
     @Transactional
     public void generateReminders() {
         if (!enabled()) return;
@@ -129,6 +147,7 @@ public class StaffOrderAlerts {
     }
     @Transactional(readOnly = true)
     public boolean actionable(Event event) {
+        if(event.enquiryId()!=null)return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM occasion_enquiries WHERE id=? AND environment=? AND status IN "+(event.kind().equals("NEW_OCCASION_REQUEST")?"('REQUESTED')":"('PAID','CONFIRMED') AND EXISTS(SELECT 1 FROM occasion_production_allocations a WHERE a.enquiry_id=occasion_enquiries.id AND a.state='COMMITTED' AND a.production_approved_at IS NULL AND a.ready_quantity=0)")+")",Boolean.class,event.enquiryId(),scope()));
         Order order = orders.findById(event.orderId()).orElse(null);
         if (order == null) return false;
         if (event.kind().equals("NEW_ORDER")) return order.getOrderStatus() == OrderStatus.CONFIRMED;
@@ -152,7 +171,8 @@ public class StaffOrderAlerts {
         var scheduled = rs.getTimestamp("scheduled_at");
         return new Event(rs.getLong("id"), rs.getLong("order_id"), rs.getString("order_number"), rs.getLong("branch_id"),
                 rs.getString("kind"), rs.getString("title"), rs.getString("message"), scheduled == null ? null : scheduled.toLocalDateTime(),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(),rs.getObject("enquiry_id",java.util.UUID.class),
+                rs.getObject("enquiry_id")==null?"/admin/orders/"+java.net.URLEncoder.encode(rs.getString("order_number"),java.nio.charset.StandardCharsets.UTF_8):"/admin/occasion-enquiries?branch="+rs.getLong("branch_id")+"&enquiry="+rs.getObject("enquiry_id"));
     }
     @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Page page(long staffId, Long before) {return page(staffId, before, false, "");}
@@ -162,18 +182,18 @@ public class StaffOrderAlerts {
         if (query.length() > 100) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         if (before != null && before <= 0) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         var messages = jdbc.query("""
-            SELECT e.*, o.order_number, r.read_at,
+            SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) order_number, r.read_at,
               (SELECT state FROM staff_alert_deliveries d WHERE d.event_id = e.id AND d.staff_id = u.id AND d.channel = 'PUSH' ORDER BY d.id DESC LIMIT 1) push_state,
               (SELECT state FROM staff_alert_deliveries d WHERE d.event_id = e.id AND d.staff_id = u.id AND d.channel = 'EMAIL') email_state
-            FROM staff_order_alerts e JOIN orders o ON o.id = e.order_id JOIN staff_users u ON u.id = ?
+            FROM staff_order_alerts e LEFT JOIN orders o ON o.id = e.order_id JOIN staff_users u ON u.id = ?
             LEFT JOIN staff_order_alert_reads r ON r.event_id = e.id AND r.staff_id = u.id
             WHERE e.environment = ? AND e.id < ? AND (NOT ? OR r.read_at IS NULL)
-              AND (? = '' OR strpos(lower(o.order_number || ' ' || e.title || ' ' || e.message), lower(?)) > 0) AND
+              AND (? = '' OR strpos(lower(COALESCE(o.order_number,e.enquiry_id::text) || ' ' || e.title || ' ' || e.message), lower(?)) > 0) AND
             """ + ELIGIBLE + " ORDER BY e.id DESC LIMIT 31", (rs, row) -> {
                 var event = event(rs); var read = rs.getTimestamp("read_at");
                 return new Message(event, read == null ? null : read.toInstant(), actionable(event), rs.getString("push_state"), rs.getString("email_state"));
             }, staffId, scope(), before == null ? Long.MAX_VALUE : before, unreadOnly, query, query);
-        Long unread = jdbc.queryForObject("SELECT COUNT(DISTINCT e.order_id) FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.environment = ? AND "
+        Long unread = jdbc.queryForObject("SELECT COUNT(DISTINCT COALESCE(e.order_id::text,e.enquiry_id::text)) FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.environment = ? AND "
                 + ELIGIBLE + " AND NOT EXISTS (SELECT 1 FROM staff_order_alert_reads r WHERE r.event_id = e.id AND r.staff_id = u.id)", Long.class, staffId, scope());
         return new Page(messages.stream().limit(30).toList(), unread == null ? 0 : unread, messages.size() > 30 ? messages.get(29).event().id() : null,
                 jdbc.queryForObject("SELECT COALESCE(MAX(e.id),0) FROM staff_order_alerts e JOIN staff_users u ON u.id=? WHERE e.environment=? AND "+ELIGIBLE,Long.class,staffId,scope()));

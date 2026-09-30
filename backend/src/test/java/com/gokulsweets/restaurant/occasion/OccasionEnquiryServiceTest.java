@@ -45,7 +45,7 @@ class OccasionEnquiryServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new OccasionEnquiryService(jdbc, features, phones, clock, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
+        service = new OccasionEnquiryService(jdbc, features, phones, clock, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class),mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
     }
 
     private OccasionEnquiryService.Request request(LocalDate date, OccasionEnquiryService.Fulfilment mode,

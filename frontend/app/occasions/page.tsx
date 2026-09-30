@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- Real catalogue URLs are rendered directly without transforming supplier photos. */
 "use client";
 
+import OccasionPackingBuilder from "@/components/occasion/OccasionPackingBuilder";
+import {buildOccasionItems,packingError,inclusiveRate,indicativeFood} from "@/lib/occasionPacking";
 import {useRouter} from "next/navigation";
 import OccasionDatePicker,{addDays} from "@/components/occasion/OccasionDatePicker";
 import {useEffect, useState} from "react";
@@ -10,7 +12,7 @@ import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {apiClient, ApiError} from "@/services/apiClient";
-import type {OccasionSweet, OccasionBox, OccasionCatalogue, OccasionBranding, GiftSnapshot} from "@/types/occasionCatalogue";
+import type {OccasionSweet, OccasionBox, OccasionCatalogue, OccasionBranding, GiftSnapshot, PackingDraft} from "@/types/occasionCatalogue";
 
 type Item = {productName?: string; productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
@@ -29,13 +31,10 @@ export default function OccasionsPage() {
     const [catalogueBranchId,setCatalogueBranchId]=useState<number|null>(null);
     const [branding,setBranding]=useState<OccasionBranding|null>(null);
     const [category,setCategory]=useState<string>("");
-    const [galleryIndex,setGalleryIndex]=useState(0);
     const [specialOnly, setSpecialOnly] = useState(false);
     const [products, setProducts] = useState<OccasionSweet[]>([]);
     const [boxes, setBoxes] = useState<OccasionBox[]>([]);
-    const [boxId, setBoxId] = useState<number | null>(null);
-    const [includeSpoons,setIncludeSpoons]=useState(false);
-    const [boxCount, setBoxCount] = useState(700);
+    const [groups,setGroups]=useState<PackingDraft[]>([]);
     const [units, setUnits] = useState<Record<number, "KG" | "PIECE">>({});
     const [items, setItems] = useState<Record<number, number>>({});
     const [type, setType] = useState("Family celebration");
@@ -47,13 +46,13 @@ export default function OccasionsPage() {
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
 
-    useEffect(()=>{const query=new URLSearchParams(window.location.search);if(query.has("enquiry")||window.location.hash.startsWith("#occasion-")){if(!query.has("enquiry"))query.set("enquiry",window.location.hash.slice(10));router.replace(`/occasions/requests?${query}`);}},[router]);
+    useEffect(()=>{const query=new URLSearchParams(window.location.search);if(query.has("enquiry")||window.location.hash.startsWith("#occasion-")&&window.location.hash!=="#occasion-plan"){if(!query.has("enquiry"))query.set("enquiry",window.location.hash.slice(10));router.replace(`/occasions/requests?${query}`);}},[router]);
 
     useEffect(() => {
         if (!branch || !features?.occasionEnquiries) return;
         const controller = new AbortController();
         apiClient<OccasionCatalogue>(`/api/branches/${branch.id}/occasion-catalogue`, {signal: controller.signal}).then(catalogue => {
-            if (!controller.signal.aborted) {setCatalogueBranchId(branch.id);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setBoxId(null);}
+            if (!controller.signal.aborted) {setCatalogueBranchId(branch.id);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setGroups([]);}
         }).catch(() => {if (!controller.signal.aborted) setMessage("Menu unavailable. Please retry before requesting a quote.");});
         return () => controller.abort();
     }, [branch, features?.occasionEnquiries]);
@@ -63,15 +62,15 @@ export default function OccasionsPage() {
         if (!branch || busy || catalogueBranchId!==branch.id) return;
         if (!session.authenticated) {setMessage("Verify your phone before sending your enquiry. Your selection is saved on this page."); return;}
         if (!date || date < earliest || date > latest) {setMessage("Choose a future service date in India."); return;}
-        const chosen = products.filter(product => Number(items[product.id]) > 0).map(product => ({
-            productId: product.id, quantity: Number(items[product.id]) * (boxId ? boxCount : (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "KG" ? 1000 : 1), unit: boxId || (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? "PIECE" : "GRAM"
-        }));
+        const chosen=buildOccasionItems(products,items,units,groups);
+        const packingIssue=packingError(groups,chosen,boxes);
+        if(packingIssue){setMessage(packingIssue);return;}
         if (!chosen.length) {setMessage("Add at least one product and quantity."); return;}
         setBusy(true); setMessage("");
         try {
             const result = await apiClient<Enquiry>("/api/occasion-enquiries", {method: "POST", credentials: "include",
                 body: JSON.stringify({branchId: branch.id, occasionType: type, serviceDate: date, guestCount: guests,
-                    fulfilment: mode, deliveryAddress: mode === "DELIVERY_REQUEST" ? address : null, notes, items: chosen, gift: boxId ? {boxId, boxCount, includeSpoons, recipe: products.filter(product => Number(items[product.id]) > 0).map(product => ({productId: product.id, pieces: Number(items[product.id])}))} : null})});
+                    fulfilment: mode, deliveryAddress: mode === "DELIVERY_REQUEST" ? address : null, notes, items: chosen, gift:null, packingGroups:groups.map(group=>({kind:group.kind,boxId:group.boxId,boxCount:group.boxCount,recipe:group.recipe,productId:group.productId,totalGrams:group.totalGrams,packGrams:group.packGrams,includeSpoons:group.includeSpoons}))})});
             setMessage("Request sent. The branch will review it before sharing a quote. No booking or payment has been made.");
             setItems({});router.push(`/occasions/requests?enquiry=${encodeURIComponent(result.id)}`);
         } catch (error) {
@@ -88,11 +87,16 @@ export default function OccasionsPage() {
 
     const campaign=catalogueBranchId===branch?.id?branding:null;
     const categories=Array.from(new Set(products.map(product=>product.categoryName??"Selection")));
-    const selected=products.filter(product=>Number(items[product.id])>0);
-    const selectedBox=boxes.find(box=>box.id===boxId);
-    const earliest=features?.today?addDays(features.today,Math.max(1,selectedBox?.leadDays??0,...selected.map(product=>product.leadDays))):"";
+    const chosen=buildOccasionItems(products,items,units,groups);
+    const selected=products.filter(product=>chosen.some(item=>item.productId===product.id));
+    const selectedBoxes=boxes.filter(box=>groups.some(group=>group.boxId===box.id));
+    const earliest=features?.today?addDays(features.today,Math.max(1,...selectedBoxes.map(box=>box.leadDays),...selected.map(product=>product.leadDays))):"";
     const latest=features?.today?addDays(features.today,365):"";
-    const gallery=selectedBox?.imageUrls?.length?selectedBox.imageUrls:selectedBox?.imageUrl?[selectedBox.imageUrl]:[];
+    const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(value);
+    const prices=chosen.map(item=>indicativeFood(item,products.find(p=>p.id===item.productId)!));
+    const foodEstimate=prices.reduce<number>((sum,value)=>sum+(value??0),0);
+    const packingEstimate=groups.reduce((sum,group)=>sum+(boxes.find(box=>box.id===group.boxId)?.price??0)*group.boxCount,0);
+    const incompletePrice=prices.some(price=>price==null)||groups.some(group=>boxes.find(box=>box.id===group.boxId)?.price==null||group.includeSpoons);
     return <AppShell editorial showSocialPopup={false}>
         <div className="occasion-journey mx-auto max-w-7xl px-4 py-8 text-[#173a37] sm:px-6">
             <header className="occasion-hero"><p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]">Occasions at Gokul</p>
@@ -105,7 +109,7 @@ export default function OccasionsPage() {
                     <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline">Change branch</Link></p>
                     <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel key={sessionVersion} mode="occasion" onSessionChange={setSession} /></div>
                     {catalogueBranchId!==branch.id?<p role="status" className="mt-7">Loading this branch’s occasion collection…</p>:<form id="occasion-plan" onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
-                        <p className="text-xs font-bold uppercase tracking-widest text-[#c76752]">01 · Plan your celebration</p><p className="text-sm">Choose your food and packaging. Our branch reviews production, box fit and pricing before you pay.</p>
+                        <p className="text-xs font-bold uppercase tracking-widest text-[#c76752]">01 · Plan your celebration</p><p className="text-sm">Choose bulk quantities and optional packing groups. Our branch reviews production, box fit and pricing before you pay.</p>
                         <label className="block">Occasion <input required maxLength={80} value={type} onChange={event => setType(event.target.value)} className="mt-2 w-full rounded-xl border p-3" /></label>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <OccasionDatePicker value={date} onChange={setDate} min={earliest} max={latest} />
@@ -117,25 +121,19 @@ export default function OccasionsPage() {
                             </select>
                         </label>
                         {mode === "DELIVERY_REQUEST" && <label className="block">Delivery address for review <textarea required maxLength={500} value={address} onChange={event => setAddress(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>}
-                        <fieldset><legend className="font-serif text-2xl">02 · Choose how to serve or gift</legend>
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2"><button type="button" aria-pressed={!boxId} onClick={() => {setBoxId(null); setItems({});}} className={`rounded-2xl border p-5 text-left ${!boxId ? "border-[#c76752] bg-[#fffaf2]" : ""}`}><strong>Bulk food & sweets</strong><p className="mt-1 text-sm">Order in kilograms or pieces for your gathering.</p></button>{boxes.map(box => <button type="button" key={box.id} aria-pressed={boxId === box.id} onClick={() => {setBoxId(box.id); setItems({});setGalleryIndex(0);}} className={`overflow-hidden rounded-2xl border text-left ${boxId === box.id ? "border-[#c76752] bg-[#fffaf2]" : ""}`}>
-                                {box.imageUrl ? <img src={box.imageUrl} alt={`${box.name} packaging`} className="h-40 w-full object-cover" /> : <div className="flex h-32 items-center justify-center bg-[#f1eee5] text-sm">Packaging photo coming soon</div>}
-                                <div className="p-4"><strong>{box.name}</strong><p className="mt-1 text-sm">{box.dimensions} · {box.material}</p><p className="text-sm">{box.compartments} compartments · up to {box.capacityPieces} pieces</p><p className="text-sm">{box.price == null ? "Packaging price on review" : `Packaging estimate ₹${box.price} per box`} · {box.leadDays} days lead time</p>{box.branding && <p className="text-sm">{box.branding}</p>}</div></button>)}</div>
-                            {boxId && <label className="mt-4 block">Number of gift boxes<input type="number" min={1} max={10000} required value={boxCount} onChange={event => setBoxCount(Number(event.target.value))} className="ml-3 w-32 rounded-xl border p-3" /><span className="mt-2 block text-sm">Choose pieces per box below. We calculate the full production request automatically. The branch confirms physical fit and packaging cost in your quote.</span></label>}
-                            {boxId&&<label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={includeSpoons} onChange={event=>setIncludeSpoons(event.target.checked)} />Include one spoon per box in the quote<span className="text-xs">Optional · priced separately by the branch</span></label>}
-                        </fieldset>
-                        {selectedBox && gallery.length>0 && <section aria-label="Selected packaging photos" className="occasion-gallery"><img src={gallery[Math.min(galleryIndex,gallery.length-1)]} alt={`${selectedBox.name} view ${galleryIndex+1}`} /><div>{gallery.map((url,index)=><button key={url} type="button" aria-label={`View packaging photo ${index+1}`} aria-pressed={galleryIndex===index} onClick={()=>setGalleryIndex(index)}><img src={url} alt="" /></button>)}</div><p>Actual packaging photos · the branch confirms your assortment fits before quoting.</p></section>}
-                        <fieldset><legend className="font-serif text-2xl">03 · Build your celebration selection</legend>
+                        <fieldset><legend className="font-serif text-2xl">02 · Choose food & quantities</legend>
                             <p className="mt-2 text-sm">Discover celebration specials alongside your favourites. Piece requests for weight-based sweets are sized by the branch before quoting.</p>
-                            <div className="occasion-categories" aria-label="Occasion categories">{categories.map(name=>{const categoryProducts=products.filter(product=>(product.categoryName??"Selection")===name);const photo=categoryProducts.find(product=>product.imageUrl)?.imageUrl;return <button key={name} type="button" aria-label={`${name} category, ${categoryProducts.length} options`} aria-pressed={category===name} onClick={()=>{setCategory(name);setCatalogueSearch("");}}>{photo?<img src={photo} alt={`${name} selection`} />:<div className="occasion-category-fallback">G</div>}<span><strong>{name}</strong><small>{categoryProducts.length} options · {categoryProducts.filter(product=>Number(items[product.id])>0).length} selected</small></span></button>;})}</div>
+                            <div className="occasion-categories" aria-label="Occasion categories">{categories.map(name=>{const categoryProducts=products.filter(product=>(product.categoryName??"Selection")===name);const photo=categoryProducts.find(product=>product.imageUrl)?.imageUrl;return <button key={name} type="button" aria-label={`${name} category, ${categoryProducts.length} options`} aria-pressed={category===name} onClick={()=>{setCategory(name);setCatalogueSearch("");}}>{photo?<img src={photo} alt={`${name} selection`} />:<div className="occasion-category-fallback">G</div>}<span><strong>{name}</strong><small>{categoryProducts.length} options · {categoryProducts.filter(product=>chosen.some(item=>item.productId===product.id)).length} selected</small></span></button>;})}</div>
                             <div className="mt-4 flex flex-wrap gap-3 items-end"><label className="flex-1 text-sm">Find your favourites<input type="search" value={catalogueSearch} onChange={event => setCatalogueSearch(event.target.value)} placeholder="Search the occasion collection" className="mt-1 w-full rounded-xl border p-3" /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={specialOnly} onChange={event => setSpecialOnly(event.target.checked)} />Occasion specials only</label></div>
                             <div className="mt-4 grid gap-4 sm:grid-cols-2">{products.filter(product => (catalogueSearch.trim() || (product.categoryName??"Selection")===category) && (!specialOnly || product.occasionOnly) && product.name.toLowerCase().includes(catalogueSearch.trim().toLowerCase())).map(product => <div key={product.id} className="occasion-product overflow-hidden rounded-2xl border">
                                 {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-40 w-full object-cover" /> : <div className="flex h-24 items-center justify-center bg-[#fffaf2] font-serif text-xl">Gokul celebration selection</div>}
                                 <div className="p-4">{product.occasionOnly && <p className="text-xs font-bold uppercase tracking-wider text-[#c76752]">Made for occasions</p>}<h3 className="mt-1 text-lg font-semibold">{product.name}</h3>{product.description && <p className="mt-1 text-sm">{product.description}</p>}<p className="mt-2 text-xs">{product.leadDays} days advance notice{product.pieceGrams ? ` · configured piece size ${product.pieceGrams} g` : ""}</p>
-                                <div className="occasion-quantity mt-3"><label className="text-sm">{boxId ? "Pieces in each box" : "Requested quantity"}<input aria-label={`${product.name} quantity`} type="number" min={0} max={boxId ? 1000 : 100000} step={boxId || (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? 1 : 0.001} value={items[product.id] ?? 0} onChange={event => setItems(current => ({...current, [product.id]: Number(event.target.value)}))} className="mt-1 w-full rounded-xl border p-3" /></label>{!boxId && <label className="text-sm">Unit<select aria-label={`${product.name} unit`} value={units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")} onChange={event => {setUnits(current => ({...current, [product.id]: event.target.value as "KG" | "PIECE"})); setItems(current => ({...current, [product.id]: 0}));}} className="mt-1 rounded-xl border p-3">{product.saleMode === "WEIGHT" && <option value="KG">kg</option>}<option value="PIECE">pieces</option></select></label>}</div>
-                                {boxId && Number(items[product.id]) > 0 && <p className="mt-2 text-sm font-semibold">{items[product.id]} × {boxCount} boxes = {(items[product.id] * boxCount).toLocaleString("en-IN")} pieces total</p>}</div></div>)}</div>
+                                <p className="mt-3 font-semibold">{inclusiveRate(product)==null?"Price available on branch review":`${money(inclusiveRate(product)!)} per ${product.saleMode==="WEIGHT"?"kg":"piece"} · tax included`}</p>{product.saleMode==="WEIGHT"&&<p className="mt-1 text-xs">Pieces are priced from measured kg; the branch confirms the weight estimate.</p>}
+                                <div className="occasion-quantity mt-3"><label className="text-sm">{"Bulk quantity without individual boxes"}<input aria-label={`${product.name} quantity`} type="number" min={0} max={100000} step={ (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? 1 : 0.001} value={items[product.id] ?? 0} onChange={event => setItems(current => ({...current, [product.id]: Number(event.target.value)}))} className="mt-1 w-full rounded-xl border p-3" /></label>{<label className="text-sm">Unit<select aria-label={`${product.name} unit`} value={units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")} onChange={event => {setUnits(current => ({...current, [product.id]: event.target.value as "KG" | "PIECE"})); setItems(current => ({...current, [product.id]: 0}));}} className="mt-1 rounded-xl border p-3">{product.saleMode === "WEIGHT" && <option value="KG">kg</option>}<option value="PIECE">pieces</option></select></label>}</div>
+                                </div></div>)}</div>
                         </fieldset>
-                        <aside className="occasion-selection" aria-label="Your occasion selection"><div><p className="text-xs font-bold uppercase tracking-widest">Your celebration basket</p><h3 className="text-xl font-semibold">{selected.length} selections{boxId?` · ${boxCount.toLocaleString("en-IN")} gift boxes`:""}</h3><p className="text-sm">{selected.length?"Browse another category to keep adding. Your selections stay here.":"Choose a category and add quantities to build your request."}</p></div><ul>{selected.map(product=><li key={product.id}><span>{product.name}</span><strong>{boxId?`${items[product.id]} per box · ${(items[product.id]*boxCount).toLocaleString("en-IN")} pieces`: `${items[product.id].toLocaleString("en-IN")} ${(units[product.id]??(product.saleMode==="WEIGHT"?"KG":"PIECE"))==="KG"?"kg":"pieces"}`}</strong><button type="button" aria-label={`Remove ${product.name} from occasion selection`} onClick={()=>setItems(current=>({...current,[product.id]:0}))}>Remove</button></li>)}</ul><p className="text-sm">A tailored quote follows branch review. No payment is taken when you send this request.</p></aside>
+                        <OccasionPackingBuilder products={products} boxes={boxes} groups={groups} onChange={setGroups} />
+                        <aside className="occasion-selection" aria-label="Your occasion selection"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest">Your celebration basket</p><h3 className="text-lg font-semibold">{chosen.length} items · {groups.length} packing groups</h3></div><strong>{incompletePrice?"Known-price subtotal":"Indicative total"} {money(foodEstimate+packingEstimate)}</strong></div><details className="mt-2"><summary className="min-h-11 cursor-pointer text-sm font-semibold">Review quantities & indicative costs</summary><ul>{chosen.map((item,index)=>{const product=products.find(p=>p.id===item.productId)!;return <li key={item.productId}><span>{product.name}<small className="block">{item.unit==="GRAM"?`${item.quantity/1000} kg`:`${item.quantity.toLocaleString("en-IN")} pieces`}{item.supplementalGrams?` + ${item.supplementalGrams/1000} kg`:""}</small></span><strong>{prices[index]==null?"Weight / price review needed":money(prices[index]!)}</strong><button type="button" aria-label={`Remove ${product.name} from occasion selection`} onClick={()=>{setItems(current=>({...current,[product.id]:0}));setGroups(current=>current.filter(group=>group.productId!==product.id).map(group=>({...group,recipe:group.recipe.filter(line=>line.productId!==product.id)})));}}>Remove</button></li>;})}</ul><p className="text-sm">Packaging estimate {money(packingEstimate)}{groups.some(g=>g.includeSpoons)?" · spoon price follows branch review":""}.</p></details><p className="mt-2 text-xs">{incompletePrice?"Some items need measured weight or reviewed prices, so this is a partial estimate. ":""}The branch confirms rates, rebates, fit and final quote before any advance. No payment is taken when you send this request.</p></aside>
                         <label className="block">Anything else? <textarea maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
                         <div className="flex flex-wrap gap-3">
                             <button disabled={busy || !products.length || !session.authenticated || !date || date<earliest || date>latest} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>

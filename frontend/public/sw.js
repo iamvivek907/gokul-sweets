@@ -357,7 +357,7 @@ async function networkFirstNavigation(
 
 // Stage-specific push works while the app is closed; custom audio belongs to an explicitly activated page.
 function notificationDestination(value, staff = false) {
-    if (staff) return typeof value === "string" && /^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) ? value : "/admin/staff-notifications";
+    if (staff) return typeof value === "string" && (/^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/admin\/occasion-enquiries\?branch=[0-9]{1,20}&enquiry=[a-f0-9-]{36}$/.test(value)) ? value : "/admin/staff-notifications";
     return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}(?:#order-review)?$/.test(value) || /^\/occasions(?:#occasion-|\/requests\?enquiry=)[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
 }
 let pushSequence = Promise.resolve();

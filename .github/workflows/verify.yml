@@ -61,6 +61,7 @@ jobs:
           node tests/occasion-booking.browser.mjs
           node tests/occasion-admin.browser.mjs
           node tests/occasion-operations.browser.mjs
+          node tests/occasion-planning.browser.mjs
 
   backend:
     runs-on: ubuntu-latest
@@ -108,3 +109,10 @@ jobs:
         run: |
           grep -m 1 -A 3 'SchemaManagementException' build/test-results/test/TEST-com.gokulsweets.restaurant.RestaurantBackendApplicationTests.xml || true
           grep -m 1 -A 3 'Caused by: org.flywaydb' build/test-results/test/TEST-com.gokulsweets.restaurant.RestaurantBackendApplicationTests.xml || true
+          python3 - <<'PYTEST'
+          import glob, xml.etree.ElementTree as ET
+          for path in glob.glob('build/test-results/**/*.xml', recursive=True):
+              for case in ET.parse(path).getroot().iter('testcase'):
+                  for failure in case.findall('failure'):
+                      print(case.attrib.get('name'), failure.attrib.get('message'), (failure.text or '')[:6000])
+          PYTEST
