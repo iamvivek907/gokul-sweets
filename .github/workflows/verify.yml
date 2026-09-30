@@ -44,8 +44,11 @@ jobs:
 
       - name: Install inbox browser regression runner
         run: |
-          npm install --no-save --package-lock=false playwright@1.56.1
-          npx playwright install --with-deps chromium
+          # Keep browser tooling outside the application dependency tree.
+          browser_runner="$RUNNER_TEMP/gokul-browser-runner"
+          npm install --prefix "$browser_runner" --no-save --package-lock=false playwright@1.56.1
+          node "$browser_runner/node_modules/playwright/cli.js" install --with-deps chromium
+          echo "PLAYWRIGHT_MODULE=$browser_runner/node_modules/playwright" >> "$GITHUB_ENV"
       - name: Customer inbox desktop/mobile browser regression
         run: |
           npm run start -- --hostname 127.0.0.1 --port 3311 > /tmp/gokul-inbox-next.log 2>&1 &
