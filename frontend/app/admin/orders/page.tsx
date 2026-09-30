@@ -6145,7 +6145,7 @@ function OrderDetailDrawer({
                                         />
 
 
-                                        {(order.convenienceFee ?? 0)>0 && <AmountRow label="Convenience fee (tax included)" value={order.convenienceFee ?? 0}/>}
+                                        {(order.convenienceFee ?? 0)>0 && <AmountRow label={`Convenience fee (includes ${new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(order.convenienceFeeTax??0)} tax)`} value={order.convenienceFee ?? 0}/>}
                                         {
                                             order.priorityCharge
                                             > 0

@@ -380,6 +380,7 @@ public class RebateEligibilityService {
             Rebate rebate,
             BigDecimal eligibleAmount
     ) {
+        if(!meetsMinimumAmount(eligibleAmount,rebate.getMinimumOrderAmount()))return null;
 
         List<RebateSlab> slabs =
                 rebateSlabRepository

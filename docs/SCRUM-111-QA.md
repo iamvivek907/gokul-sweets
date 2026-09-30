@@ -40,7 +40,7 @@ Backend: Java 21 `./gradlew --no-daemon clean build bootJar` against isolated Po
 - TypeScript: passed.
 - Node regressions: 46 passed in UTC and 46 passed in America/Los_Angeles.
 - Production build: passed with webpack and a synthetic HTTPS API origin.
-- Backend Java 21 build attempted: blocked resolving the existing Spring Boot 4.1.1 Gradle plugin in this environment. PostgreSQL binaries are available, but this environment permits only the root UID, which PostgreSQL refuses for server startup. Backend/Flyway execution is therefore pending CI.
-- Browser execution attempted: Playwright browser downloads returned an unavailable-site response; the cloud browser also blocked the local frontend URL. Desktop/mobile browser suite has been added to CI, but no local browser pass is claimed.
+- Backend Java 21 build attempted: blocked resolving the existing Spring Boot 4.1.1 Gradle plugin in this environment. PostgreSQL binaries are available, but this environment permits only the root UID, which PostgreSQL refuses for server startup. CI run 952 subsequently passed the Java 21 clean build, both test suites, PostgreSQL 17 migrations and Hibernate validation.
+- Browser execution attempted: Playwright browser downloads returned an unavailable-site response; the cloud browser also blocked the local frontend URL. CI run 952 subsequently passed the new desktop/mobile About/Careers/admin regression and the existing notification/occasion browser suites. No local browser pass is claimed.
 
-Do not move SCRUM-111 to QA until CI, browser regression and required implementation review are complete. Keep the PR in draft while these checks are pending or blocked.
+CI run 952 passed on commit 381b86f0. Final presentation adjustments and screenshot evidence are checked again on the latest commit before QA. No merge or deployment.
