@@ -25,9 +25,9 @@ const page=await context.newPage(),base=process.env.BROWSER_BASE??"http://127.0.
 page.on("console",message=>{if(message.type()==="error")console.error("ADMIN",message.text());});
 try {
  await page.goto(`${base}/admin/occasion-enquiries`);
- await page.getByLabel("Branch",{exact:true}).selectOption("2");
+ await page.getByRole("combobox",{name:/^Branch/}).selectOption("2");
  await page.reload();
- await page.getByLabel("Branch",{exact:true}).waitFor();
+ await page.getByRole("combobox",{name:/^Branch/}).waitFor();
  await page.waitForFunction(()=>document.querySelector('select').value==="2");
  await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
  await page.getByLabel("Box name").fill("Celebration collection");

@@ -14,6 +14,8 @@ import org.springframework.validation.annotation.Validated;
 @Getter
 @Setter
 public class EnhancementProperties {
+    private boolean pickupAddOns;
+    private boolean brandCareers;
     private boolean smartAvailability;
     private boolean smartPickupSelection;
     private boolean inventoryAutomationV2;

@@ -1,4 +1,5 @@
 "use client";
+import {formatWeight} from "@/lib/orderQuantity";
 
 import CustomerNotificationInbox from "@/components/customer/CustomerNotificationInbox";
 import {useCallback, useEffect, useRef, useState} from "react";
@@ -281,7 +282,8 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                             {selectedOrder.pickupStartTime ? ` · ${formatOrderTime(selectedOrder.pickupStartTime)}` : ""}</p></div>
                     <div><h4 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">Items</h4>
                         <ul className="divide-y divide-[#d9e5dc] border-y border-[#d9e5dc]">{selectedOrder.items.map(item =>
-                            <li key={item.id} className="flex justify-between gap-3 py-3"><span><strong className="font-semibold">{item.productName}</strong><small className="mt-1 block text-[#59706a]">{item.weightGrams ? `${item.weightGrams} g` : `Quantity ${item.quantity}`}</small></span><span className="selectable-text shrink-0 font-semibold">{formatOrderCurrency(item.lineTotal)}</span></li>)}</ul></div>
+                            <li key={item.id} className="flex justify-between gap-3 py-3"><span><strong className="font-semibold">{item.productName}</strong><small className="mt-1 block text-[#59706a]">{item.weightGrams ? formatWeight(item.weightGrams) : `${item.quantity} pieces`}</small></span><span className="selectable-text shrink-0 font-semibold">{formatOrderCurrency(item.lineTotal)}</span></li>)}</ul></div>
+                    {(selectedOrder.convenienceFee??0)>0 && <p className="flex justify-between gap-3"><span>Convenience fee <small className="block text-[#59706a]">Includes {formatOrderCurrency(selectedOrder.convenienceFeeTax??0)} fee tax</small></span><span>{formatOrderCurrency(selectedOrder.convenienceFee??0)}</span></p>}
                     <p className="flex justify-between border-t border-[#d9e5dc] pt-4 text-base font-bold"><span>Order total</span><span className="selectable-text">{formatOrderCurrency(selectedOrder.totalAmount)}</span></p>
                 </div>}
                 </div>

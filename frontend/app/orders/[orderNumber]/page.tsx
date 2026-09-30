@@ -1,4 +1,5 @@
 "use client";
+import {formatWeight} from "@/lib/orderQuantity";
 
 import {
     useCallback,
@@ -482,7 +483,7 @@ export default function OrderDetailPage() {
                                         <p className="font-semibold text-[#241715]">{item.productName}</p>
                                         <p className="mt-1 text-xs text-[#756763]">
                                             {item.saleMode === "WEIGHT"
-                                                ? `${item.weightGrams ?? 0} g × ${formatOrderCurrency(item.unitPrice)}/kg`
+                                                ? `${formatWeight(item.weightGrams)} × ${formatOrderCurrency(item.unitPrice)}/kg`
                                                 : `${item.quantity} × ${formatOrderCurrency(item.unitPrice)}`}
                                         </p>
                                     </div>
@@ -503,6 +504,7 @@ export default function OrderDetailPage() {
                             <span>Tax</span>
                             <span className="font-semibold text-[#241715]">{formatOrderCurrency(order.taxAmount)}</span>
                         </div>
+                        {(order.convenienceFee ?? 0)>0 && <div className="mt-2 flex justify-between text-sm"><span>Convenience fee <small className="block">Includes {formatOrderCurrency(order.convenienceFeeTax??0)} fee tax</small></span><span>{formatOrderCurrency(order.convenienceFee ?? 0)}</span></div>}
                         {order.priorityCharge > 0 && (
                             <div className="mt-2 flex justify-between text-sm text-[#756763]">
                                 <span>Priority charge</span>

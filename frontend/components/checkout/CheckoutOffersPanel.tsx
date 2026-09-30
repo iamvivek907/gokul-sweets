@@ -1,4 +1,7 @@
 "use client";
+import {apiClient} from "@/services/apiClient";
+import PickupAddOns from "@/components/checkout/PickupAddOns";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import Link
     from "next/link";
@@ -126,6 +129,10 @@ export default function CheckoutOffersPanel({
     orderNumber
 }: CheckoutOffersPanelProps) {
 
+    const features=useStorefrontFeatures();
+    const [addonBusy,setAddonBusy]=useState(false);
+    const [spendTargets,setSpendTargets]=useState<AvailableRebateResponse[]>([]);
+    useEffect(()=>{const c=new AbortController();apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal:c.signal}).then(setSpendTargets).catch(()=>{});return()=>c.abort();},[orderNumber]);
     const router =
         useRouter();
 
@@ -903,6 +910,7 @@ export default function CheckoutOffersPanel({
 
 
     function handleContinueToPayment() {
+        if(addonBusy || applyingCode || removing)return;
 
         if (
             !pendingOrder
@@ -1772,6 +1780,7 @@ export default function CheckoutOffersPanel({
                                                     </span>
                                                 </div>
 
+                                                {(orderSummary.convenienceFee ?? 0)>0 && <div className="flex justify-between gap-4"><span>Convenience fee (tax included)</span><span>{formatCurrency(orderSummary.convenienceFee ?? 0)}</span></div>}
                                                 {
                                                     orderSummary.priorityCharge >
                                                         0
@@ -1822,7 +1831,7 @@ export default function CheckoutOffersPanel({
                                     <button
                                         type="button"
                                         disabled={
-                                            loading
+                                            loading || addonBusy
                                             ||
                                             Boolean(
                                                 applyingCode
@@ -1875,6 +1884,7 @@ export default function CheckoutOffersPanel({
                         )
             }
 
+        {features?.pickupAddOns && pendingOrder && orderSummary?.pickupType==="NORMAL" && orderSummary.pickupDate && orderSummary.orderStatus==="PENDING_PAYMENT" && orderSummary.paymentStatus==null && <PickupAddOns branchId={pendingOrder.branchId} date={orderSummary.pickupDate} orderNumber={orderNumber} offers={spendTargets} disabled={loading || !!applyingCode || removing} onBusy={setAddonBusy} onAdded={()=>router.push("/checkout/review")}/>}
         </div>
     );
 }

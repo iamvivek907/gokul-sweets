@@ -122,7 +122,7 @@ public class RebateEligibilityService {
              * has not been reached.
              */
             if (response != null) {
-                available.add(response);
+                available.add(withFee(response,order));
             }
         }
 
@@ -143,6 +143,34 @@ public class RebateEligibilityService {
         );
 
         return available;
+    }
+
+    /** Informational targets are separate from rebates that may currently be applied. */
+    @Transactional(readOnly=true)
+    public List<AvailableRebateResponse> getSpendTargets(String orderNumber) {
+        var available=getAvailableRebates(orderNumber); // also enforces unpaid/order lifecycle
+        var order=orderRepository.findDetailedByOrderNumber(orderNumber).orElseThrow();
+        if(order.getPickupType()!=com.gokulsweets.restaurant.order.enums.PickupType.NORMAL || order.getFulfillmentType()!=com.gokulsweets.restaurant.order.enums.FulfillmentType.PICKUP)return List.of();
+        var eligible=calculateEligibleAmount(order);
+        var baseline=available.stream().map(AvailableRebateResponse::rebateAmount).max(BigDecimal::compareTo).orElse(BigDecimal.ZERO).max(defaultZero(order.getRebateDiscountAmount()));
+        var targets=new ArrayList<AvailableRebateResponse>();
+        for(var rebate:rebateRepository.findActivePublicCandidates(order.getBranch().getId(),LocalDateTime.now(BUSINESS_ZONE))) {
+            if(!isScopeEligible(rebate,order)||!isUsageEligible(rebate,order))continue;
+            if(rebate.getRebateType()!=RebateType.SLAB)continue;
+            for(var slab:rebateSlabRepository.findByRebateIdOrderByMinimumOrderAmountAsc(rebate.getId())) {
+                var threshold=slab.getMinimumOrderAmount().max(defaultZero(rebate.getMinimumOrderAmount()));
+                if(threshold.compareTo(eligible)<=0)continue;
+                var saving=slab.getRebateAmount().min(threshold);
+                if(rebate.getMaximumDiscountAmount()!=null)saving=saving.min(rebate.getMaximumDiscountAmount());
+                var needed=threshold.subtract(eligible);
+                if(saving.compareTo(baseline)>0 && saving.subtract(baseline).compareTo(needed)<0) {
+                    var target=response(rebate,eligible,baseline,threshold,saving,needed);
+                    if(target.amountNeededForNextSlab()!=null)targets.add(withFee(target,order));
+                    break;
+                }
+            }
+        }
+        return targets;
     }
 
     // =========================================================
@@ -352,6 +380,7 @@ public class RebateEligibilityService {
             Rebate rebate,
             BigDecimal eligibleAmount
     ) {
+        if(!meetsMinimumAmount(eligibleAmount,rebate.getMinimumOrderAmount()))return null;
 
         List<RebateSlab> slabs =
                 rebateSlabRepository
@@ -463,8 +492,16 @@ public class RebateEligibilityService {
             BigDecimal amountNeeded
     ) {
 
-        BigDecimal normalizedRebate =
-                money(rebateAmount);
+        BigDecimal normalizedRebate = money(rebateAmount.min(eligibleAmount));
+        if (rebate.getMaximumDiscountAmount() != null) normalizedRebate = normalizedRebate.min(rebate.getMaximumDiscountAmount());
+        if (nextRebate != null) {
+            if (rebate.getMaximumDiscountAmount() != null) nextRebate = nextRebate.min(rebate.getMaximumDiscountAmount());
+            if (nextMinimum != null) nextRebate = nextRebate.min(nextMinimum);
+            // Protect incremental revenue; costs are unavailable, so this is not a profit test.
+            if (amountNeeded == null || nextRebate.subtract(normalizedRebate).signum() <= 0 || nextRebate.subtract(normalizedRebate).compareTo(amountNeeded) >= 0) {
+                nextMinimum=null;nextRebate=null;amountNeeded=null;
+            }
+        }
 
         BigDecimal payableAfterRebate =
                 eligibleAmount
@@ -499,6 +536,10 @@ public class RebateEligibilityService {
     // =========================================================
     // ORDER VALUE
     // =========================================================
+
+    private AvailableRebateResponse withFee(AvailableRebateResponse r,Order order) {
+        return new AvailableRebateResponse(r.rebateId(),r.code(),r.name(),r.description(),r.scope(),r.rebateType(),r.rebateAmount(),r.payableAfterRebate().add(defaultZero(order.getConvenienceFee())),r.minimumOrderAmount(),r.maximumDiscountAmount(),r.nextSlabMinimumOrderAmount(),r.nextSlabRebateAmount(),r.amountNeededForNextSlab());
+    }
 
     private BigDecimal calculateEligibleAmount(
             Order order
@@ -697,6 +738,6 @@ public class RebateEligibilityService {
             );
         }
 
-        return response;
+        return withFee(response,order);
     }
 }

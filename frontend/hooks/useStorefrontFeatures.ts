@@ -34,6 +34,8 @@ export interface StorefrontFeatures {
     customerAccountHub: boolean;
     notificationInbox: boolean;
     notificationAlerts: boolean;
+    brandCareers: boolean;
+    pickupAddOns: boolean;
     futureOrderingDays: number;
     today: string;
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import {usePickupClock} from "@/hooks/usePickupClock";
+import {indiaToday,validPickupDate} from "@/lib/pickupFreshness";
 import {useEffect, useState} from "react";
 import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
@@ -14,6 +16,8 @@ import type {MenuProduct} from "@/types/menu";
 
 export function useDateAvailability(products?: MenuProduct[]) {
     const features = useStorefrontFeatures();
+    const clock=usePickupClock();
+    const today=clock ? [features?.today ?? "",indiaToday(new Date(clock))].sort().at(-1)! : features?.today ?? "";
     const {branch} = useSelectedBranch();
     const cart = useCart();
     const intent = usePickupIntent(branch?.id);
@@ -26,7 +30,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     }) : [...amounts.values()];
     const itemsJson = JSON.stringify(requested);
     const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability]);
-    const validDate = intent.date && features && intent.date >= features.today;
+    const validDate = intent.date && features && validPickupDate(intent.date,today,features.futureOrderingDays);
     useEffect(() => {
         if (!features?.smartAvailability || !branch || !intent.date || !validDate || !JSON.parse(itemsJson).length) return;
         const controller = new AbortController();
@@ -53,22 +57,24 @@ export function useDateAvailability(products?: MenuProduct[]) {
             : selectedSlot.slot.remainingCapacity <= 0)
         || selectedSlot.issues?.some(issue => cartIds.has(issue.productId)));
     const items = day?.items?.map(item => selectedSlot?.issues?.find(issue => issue.productId === item.productId) ?? item);
-    return {features, branch, intent, data, items, selectionUnavailable, error: result?.key === key ? result.error : null,
+    return {features, today, branch, intent, data, items, selectionUnavailable, error: result?.key === key ? result.error : null,
         hasItems: requested.length > 0, retry: () => setRevision(value => value + 1)};
 }
 
 export default function PickupContext({check, cart = false}: {check: ReturnType<typeof useDateAvailability>; cart?: boolean}) {
-    const {features, branch, intent, data, items, error, hasItems, retry} = check;
+    const {features, today, branch, intent, data, items, error, hasItems, retry} = check;
     const currentCart = useCart();
     const [proposedDate, setProposedDate] = useState<string | null>(null);
+    const [dateError,setDateError]=useState("");
     if (!features?.smartAvailability || !branch) return null;
-    const maximum = new Date(`${features.today}T12:00:00+05:30`);
+    const maximum = new Date(`${today}T12:00:00+05:30`);
     maximum.setUTCDate(maximum.getUTCDate() + features.futureOrderingDays);
     const max = maximum.toISOString().slice(0, 10);
     return <section aria-label="Pickup context" className="my-4 rounded-2xl border border-[#eadfd6] bg-white p-4">
         {proposedDate && <CartSwitchDialog branchId={branch.id} branchName={branch.name} date={proposedDate}
             items={currentCart.items} onKeep={() => setProposedDate(null)} onSwitch={(preview: CartSwitchPreview) => {
                 if (preview.conflicts) return;
+                if (!validPickupDate(proposedDate, indiaToday(new Date()), features.futureOrderingDays)) {setProposedDate(null);setDateError("Choose a current pickup date.");return;}
                 clearPickupSlot();
                 savePickupIntent(branch.id, proposedDate);
                 setProposedDate(null);
@@ -76,9 +82,11 @@ export default function PickupContext({check, cart = false}: {check: ReturnType<
         <div className="flex flex-wrap items-end justify-between gap-3">
             <div><p className="text-xs font-semibold uppercase text-[#756763]">Pickup at {branch.name}</p>
                 <label className="mt-2 block text-sm font-bold">Pickup date
-                    <input aria-label="Pickup date" type="date" min={features.today} max={max} value={intent.date ?? ""}
+                    <input aria-label="Pickup date" type="date" min={today} max={max} value={intent.date ?? ""}
                         onChange={event => {
                             const date = event.target.value;
+                            if (date && !validPickupDate(date,indiaToday(new Date()),features.futureOrderingDays)) {setDateError("Choose today or a future date in the booking window.");return;}
+                            setDateError("");
                             if (features.cartSwitchPreview && !currentCart.isEmpty && date) setProposedDate(date);
                             else {
                                 if (features.cartSwitchPreview) clearPickupSlot();
@@ -90,8 +98,10 @@ export default function PickupContext({check, cart = false}: {check: ReturnType<
             {intent.selection && <Link href="/checkout/pickup" className="min-h-11 py-3 text-sm underline">
                 {intent.selection.slot.startTime.slice(0, 5)} pickup · Change time</Link>}
         </div>
+        {dateError && <p role="alert" className="mt-2 text-sm text-red-700">{dateError}</p>}
+        {intent.expired && <p role="status" className="mt-2 text-sm">Your previous pickup has passed. Choose a new date; your cart is saved.</p>}
         {!intent.date ? <p className="mt-2 text-sm text-[#756763]">Choose pickup to check availability. Browse and build your cart first if you prefer.</p>
-            : intent.date < features.today ? <p role="alert" className="mt-2 text-sm">That pickup date has passed. Choose a new date; your cart is saved.</p>
+            : intent.date < today ? <p role="alert" className="mt-2 text-sm">That pickup date has passed. Choose a new date; your cart is saved.</p>
             : error ? <div role="alert"><p className="mt-2 text-sm">{error}</p><button onClick={retry} className="min-h-11 underline">Try again</button></div>
             : !data && hasItems ? <p role="status" className="mt-2 text-sm">Checking your pickup date...</p>
             : <p className="mt-2 text-xs text-[#756763]">Live preview, not a reservation. {intent.selection ? "Quantities and this time are checked again at checkout." : "Choose a time for all items after building your cart."}</p>}

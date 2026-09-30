@@ -1,4 +1,5 @@
 "use client";
+import {formatWeight} from "@/lib/orderQuantity";
 
 import {
     useCallback,
@@ -6047,7 +6048,7 @@ function OrderDetailDrawer({
                                                                     "
                                                                 >
                                                                     Quantity: {item.saleMode === "WEIGHT"
-                                                                        ? `${item.weightGrams ?? "Not recorded"} g`
+                                                                        ? formatWeight(item.weightGrams)
                                                                         : `${item.quantity} pcs`}
                                                                     <br />
                                                                     Unit price: {formatPrice(item.unitPrice)}
@@ -6144,6 +6145,7 @@ function OrderDetailDrawer({
                                         />
 
 
+                                        {(order.convenienceFee ?? 0)>0 && <AmountRow label={`Convenience fee (includes ${new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(order.convenienceFeeTax??0)} tax)`} value={order.convenienceFee ?? 0}/>}
                                         {
                                             order.priorityCharge
                                             > 0

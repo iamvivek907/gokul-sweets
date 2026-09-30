@@ -125,6 +125,9 @@ public class Payment {
     )
     private String refundFailureReason;
 
+    @Column(name="checkout_url",length=4096)
+    private String checkoutUrl;
+
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
 

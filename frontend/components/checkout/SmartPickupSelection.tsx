@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import {usePickupClock} from "@/hooks/usePickupClock";
+import {indiaToday,validPickupDate} from "@/lib/pickupFreshness";
 import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
@@ -37,22 +39,27 @@ export default function SmartPickupSelection({features, onFallback}: {
     const [message, setMessage] = useState("");
     const [showAllTimes, setShowAllTimes] = useState(false);
     const stateVersion = useRef(0);
-    const date = selectedDate ?? (intent.date && intent.date >= features.today ? intent.date : features.today);
+    const clock=usePickupClock();
+    const today=clock ? [features.today,indiaToday(new Date(clock))].sort().at(-1)! : features.today;
+    const preferred=selectedDate ?? intent.date;
+    const date=preferred && preferred >= today ? preferred : today;
     const itemsJson = JSON.stringify(availabilityItems(cart.items));
-    const key = JSON.stringify([branch?.id, itemsJson, features.today, features.futureOrderingDays, revision]);
+    const key = JSON.stringify([branch?.id, itemsJson, today, features.futureOrderingDays, revision]);
     const data = result?.key === key ? result.data : null;
     const error = failure?.key === key ? failure.message : null;
     const validBranch = branch && branch.id === cart.branchId;
     const currentDate = data?.dates.find(value => value.date === date);
     const chosen = currentDate?.slots.find(value => value.slot.id === selection?.id);
-    const available = selection?.type === "PRIORITY" ? chosen?.priorityAvailable : chosen?.normalAvailable;
-    const selectable = currentDate?.slots.filter(value => value.normalAvailable || value.priorityAvailable) ?? [];
+    const future=chosen && (!clock || Date.parse(`${date}T${chosen.slot.startTime}+05:30`)>clock);
+    const available = future && (selection?.type === "PRIORITY" ? chosen?.priorityAvailable : chosen?.normalAvailable);
+    const selectable = currentDate?.slots.filter(value => (value.normalAvailable || value.priorityAvailable) && (!clock || Date.parse(`${date}T${value.slot.startTime}+05:30`)>clock)) ?? [];
     const timeChoiceCount = selectable.reduce((count, value) => count + Number(value.normalAvailable) + Number(value.priorityAvailable && value.slot.priorityEnabled), 0);
     const unavailable = currentDate?.slots.filter(value => !value.normalAvailable && !value.priorityAvailable) ?? [];
     const next = data?.dates.flatMap(day => day.slots.filter(slot => slot.normalAvailable || slot.priorityAvailable)
         .map(slot => ({day, slot})))[0];
 
     function chooseDate(nextDate: string) {
+        if (!validPickupDate(nextDate,indiaToday(new Date()),features.futureOrderingDays)) {setMessage("Choose a current date in the pickup window.");return;}
         if (features.cartSwitchPreview && cart.items.length && nextDate !== date) {
             setProposedDate(nextDate);
             return;
@@ -61,6 +68,7 @@ export default function SmartPickupSelection({features, onFallback}: {
     }
 
     function chooseDateApproved(nextDate: string) {
+        if (!validPickupDate(nextDate,indiaToday(new Date()),features.futureOrderingDays)) {setProposedDate(null);setMessage("That date is no longer available. Choose again.");return;}
         setSelectedDate(nextDate);
         if (branch) savePickupIntent(branch.id, nextDate);
         setSelection(null);
@@ -75,7 +83,7 @@ export default function SmartPickupSelection({features, onFallback}: {
         if (!branch || branch.id !== cart.branchId || !cart.items.length) return;
         const controller = new AbortController();
         const items: ReturnType<typeof availabilityItems> = JSON.parse(itemsJson);
-        const timer = window.setTimeout(() => {void checkCartAvailability(branch.id, features.today, features.futureOrderingDays + 1, items,
+        const timer = window.setTimeout(() => {void checkCartAvailability(branch.id, today, features.futureOrderingDays + 1, items,
             AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]))
             .then(data => {if (!controller.signal.aborted) setResult({key, data});})
             .catch(error => {if (!controller.signal.aborted) {
@@ -83,11 +91,11 @@ export default function SmartPickupSelection({features, onFallback}: {
                 setFailure({key, message: "We couldn't check pickup times. Your cart is saved. Try again."});
             }});}, 250);
         return () => {controller.abort(); window.clearTimeout(timer);};
-    }, [branch, cart.branchId, cart.items.length, itemsJson, features.today, features.futureOrderingDays, key]);
+    }, [branch, cart.branchId, cart.items.length, itemsJson, today, features.futureOrderingDays, key]);
 
     useEffect(() => {
-        const timer = window.setInterval(() => setRevision(value => value + 1), 60_000);
-        return () => window.clearInterval(timer);
+        const refresh=()=>setRevision(value=>value+1);const timer=window.setInterval(refresh,60_000);window.addEventListener("focus",refresh);document.addEventListener("visibilitychange",refresh);
+        return ()=>{window.clearInterval(timer);window.removeEventListener("focus",refresh);document.removeEventListener("visibilitychange",refresh);};
     }, []);
 
     async function continueCheckout() {
@@ -117,6 +125,7 @@ export default function SmartPickupSelection({features, onFallback}: {
 
     return <AppShell editorial={features.checkoutExperienceV2 === true} showSocialPopup={false}>
         <CheckoutExperienceFrame enabled={features.checkoutExperienceV2 === true} stage="pickup" allowBranchChange>
+        {(intent.expired || preferred && preferred < today) && <p role="status" className="mb-4 rounded-xl bg-[#eef6f1] p-4">Your previous pickup has passed. Showing today’s available times. Your cart is saved.</p>}
         {proposedDate && branch && <CartSwitchDialog branchId={branch.id} branchName={branch.name}
             date={proposedDate} items={cart.items} onKeep={() => setProposedDate(null)}
             onSwitch={(preview: CartSwitchPreview) => {

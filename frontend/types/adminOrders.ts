@@ -310,6 +310,8 @@ export interface AdminOrderDetail {
     taxAmount: number;
 
     priorityCharge: number;
+    convenienceFee?: number;
+    convenienceFeeTax?: number;
 
     totalAmount: number;
 

@@ -48,6 +48,8 @@ export interface CheckoutQuote {
     subtotal: string;
     taxAmount: string;
     priorityCharge: string;
+    convenienceFee?: string;
+    convenienceFeeTax?: string;
     totalAmount: string;
     currency: string;
     expiresAt: string;
@@ -89,6 +91,8 @@ export interface OrderResponse {
     customerPhone: string;
     pickupType: PickupType;
     priorityCharge: number;
+    convenienceFee?: number;
+    convenienceFeeTax?: number;
     subtotal: number;
     taxAmount: number;
     totalAmount: number;
@@ -130,6 +134,8 @@ export interface CustomerOrderResponse {
     subtotal: number;
     taxAmount: number;
     priorityCharge: number;
+    convenienceFee?: number;
+    convenienceFeeTax?: number;
     totalAmount: number;
     reservationExpiresAt: string;
     createdAt: string;

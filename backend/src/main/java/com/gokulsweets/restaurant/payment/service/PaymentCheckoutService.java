@@ -29,6 +29,7 @@ public class PaymentCheckoutService {
     private final PaymentProviderRegistry providerRegistry;
     private final PaymentAttemptPersistenceService persistenceService;
     private final EnhancementProperties features;
+    private final CheckoutUrlVault checkoutUrlVault;
 
 
     /*
@@ -349,6 +350,14 @@ public class PaymentCheckoutService {
      * =========================================================
      */
 
+    /** Provider verification precedes CAS closure; late capture uses the existing refund lifecycle. */
+    public PaymentResponse cancelCheckout(Long paymentId) {
+        var verified=refreshPayment(paymentId);
+        if(verified.paymentStatus()==PaymentStatus.PENDING) paymentStatusService.markExpired(paymentId);
+        if(verified.paymentStatus()==PaymentStatus.FAILED) paymentStatusService.cancelFailedOrder(paymentId);
+        return responseFor(paymentId);
+    }
+
     public PaymentResponse responseFor(
             Long paymentId
     ) {
@@ -504,7 +513,7 @@ public class PaymentCheckoutService {
                         ? null
                         : result.paymentSessionId(),
                 result == null
-                        ? null
+                        ? (payment.getPaymentStatus()==PaymentStatus.PENDING ? checkoutUrlVault.open(payment.getCheckoutUrl()) : null)
                         : result.paymentUrl(),
                 result != null
                         && result.checkoutKeyId() != null

@@ -1,4 +1,5 @@
 "use client";
+import PickupFeeSettings from "@/components/admin/PickupFeeSettings";
 
 import {
     useCallback,
@@ -2226,6 +2227,7 @@ export default function AdminBranchesPage() {
                                     <p className="mt-2 text-sm">Homepage campaign media is managed separately in <a className="font-semibold underline" href="/admin/homepage-campaigns">Storefront campaigns</a>.</p>
                                     <p className="mt-2 text-sm">Customer-facing service labels show only supported, enabled services. Future booking settings will appear here when the service can accept bookings.</p>
                                 </section>
+                                <PickupFeeSettings key={`fee-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization}/>
                                 <BranchOperationalSettings
                                     key={
                                         selectedBranch.id

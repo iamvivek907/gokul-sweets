@@ -165,10 +165,8 @@ function getServerToday():
 }
 
 
-function subscribeToDate():
-    () => void {
-
-    return () => {};
+function subscribeToDate(listener: () => void): () => void {
+ const timer=window.setInterval(listener,15000);window.addEventListener("focus",listener);return ()=>{window.clearInterval(timer);window.removeEventListener("focus",listener);};
 }
 
 
@@ -410,8 +408,7 @@ function LegacyPickupPage({
         useSyncExternalStore(
             subscribeToDate,
             () =>
-                fallbackToday
-                ?? getToday(),
+                [fallbackToday ?? "",getToday()].sort().at(-1)!,
             getServerToday
         );
 

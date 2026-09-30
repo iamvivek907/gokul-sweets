@@ -99,6 +99,12 @@ public class PaymentController {
     }
 
 
+    @PostMapping("/{paymentId}/cancel-checkout")
+    public ResponseEntity<PaymentResponse> cancelCheckout(@PathVariable Long paymentId,HttpServletRequest request) {
+        orderAccess.requirePayment(paymentId,request);
+        return ResponseEntity.ok(paymentCheckoutService.cancelCheckout(paymentId));
+    }
+
     @PostMapping("/{paymentId}/razorpay/verify")
     public ResponseEntity<PaymentResponse> verifyRazorpayPayment(
             @PathVariable Long paymentId,

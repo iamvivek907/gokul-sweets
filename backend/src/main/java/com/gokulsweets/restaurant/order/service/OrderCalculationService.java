@@ -35,17 +35,20 @@ public class OrderCalculationService {
                 validatedOrder.items().size()
         );
 
-        return calculateItems(validatedOrder.items(), determinePriorityCharge(validatedOrder));
+        BigDecimal fee=validatedOrder.pickupType()==PickupType.NORMAL ? money(validatedOrder.branch().getPickupConvenienceFee()) : money(BigDecimal.ZERO);
+        BigDecimal rate=validatedOrder.branch().getPickupConvenienceFeeTaxRate();
+        BigDecimal feeTax=fee.subtract(fee.multiply(ONE_HUNDRED).divide(ONE_HUNDRED.add(rate),MONEY_SCALE,ROUNDING_MODE));
+        return calculateItems(validatedOrder.items(),determinePriorityCharge(validatedOrder),fee,feeTax,validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupFeeVersion():0);
     }
 
     /** Delivery uses the same accepted branch prices, weights and taxes, with no pickup priority charge. */
     public OrderCalculationResult calculateDelivery(List<ValidatedOrderItem> items) {
         if (items == null || items.isEmpty() || items.size() > 50)
             throw new IllegalArgumentException("Select between 1 and 50 delivery items.");
-        return calculateItems(items, money(BigDecimal.ZERO));
+        return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0);
     }
 
-    private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge) {
+    private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge,BigDecimal fee,BigDecimal feeTax,long feeVersion) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
         List<CalculatedOrderItem> calculatedItems = new ArrayList<>();
@@ -60,7 +63,7 @@ public class OrderCalculationService {
         subtotal = money(subtotal);
         totalTax = money(totalTax);
         BigDecimal totalAmount = money(
-                subtotal.add(totalTax).add(priorityCharge)
+                subtotal.add(totalTax).add(priorityCharge).add(fee)
         );
 
         log.debug(
@@ -68,7 +71,7 @@ public class OrderCalculationService {
                 subtotal,
                 totalTax,
                 priorityCharge,
-                totalAmount
+                totalAmount,feeVersion
         );
 
         return new OrderCalculationResult(
@@ -76,7 +79,8 @@ public class OrderCalculationService {
                 subtotal,
                 totalTax,
                 priorityCharge,
-                totalAmount
+                fee,feeTax,
+                totalAmount,feeVersion
         );
     }
 
