@@ -87,6 +87,20 @@ class StaffOrderAlertsIntegrationTest {
     private void status(String status) {jdbc.update("UPDATE orders SET order_status = ? WHERE id = ?", status, order); entities.clear();}
     private long latest() {return alerts.page(staff, null).messages().getFirst().event().id();}
 
+    @Test void markAllReadPreservesLaterAlertsOtherStaffAndUnresolvedActions() {
+        alerts.paymentConfirmed(payment);
+        long snapshot=alerts.page(staff,null).readThrough();
+        now(18,5);alerts.generateReminders();
+        alerts.markAllRead(staff,snapshot);
+        assertThat(alerts.page(staff,null).unreadCount()).isEqualTo(1);
+        assertThat(alerts.page(staff,null).messages()).anyMatch(m->m.actionRequired());
+        alerts.markAllRead(staff,alerts.page(staff,null).readThrough());
+        assertThat(alerts.page(staff,null).unreadCount()).isZero();
+        assertThat(alerts.page(staff,null).messages()).anyMatch(m->m.actionRequired());
+        assertThat(alerts.page(otherStaff,null).messages()).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT order_status FROM orders WHERE id=?",String.class,order)).isEqualTo("CONFIRMED");
+    }
+
     @Test void committedStagesAcknowledgeEligibleTaskAlertsButReadAloneDoesNotResolve() {
         long colleague=staff(branch);
         alerts.paymentConfirmed(payment);now(18,5);alerts.generateReminders();

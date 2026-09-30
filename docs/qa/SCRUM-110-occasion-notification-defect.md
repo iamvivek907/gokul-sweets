@@ -42,3 +42,14 @@ A committed stage transition acknowledges relevant preparation or readiness aler
 - Existing deposit replay, balance settlement, dedicated-production readiness and cancellation regressions.
 
 Automated browser tests use synthetic API responses and never contact payment, email, SMS or push providers. Actual DEV delivery and real box photography/physical fit still require branch QA.
+
+## Notification lifecycle follow-up
+
+- Customer opening an order conversation or its actual order page acknowledges the related order and linked occasion updates. Failed/offline mutations do not fabricate successful read state.
+- Customer and staff “Mark all read” uses a server watermark so notifications arriving after the displayed snapshot remain unread. All mutations preserve authenticated subject/staff, branch and environment isolation.
+- Pickup/delivery automatically acknowledges preceding order/linked occasion updates transactionally. Replaying completion cannot clear subsequent refund alerts.
+- One completion push includes a completely optional, honest review invitation and links to the existing review section. It respects subscription, quiet hours, freshness and retries; explicit acknowledgement or an existing review cancels an unsent invitation. No repeated review campaign.
+- Badge counts represent unread order conversations. Device stages replace the previous notification for that order without renotifying. Routine customer updates leave the unread queue after seven days in bounded batches; history is retained and financial exceptions remain visible.
+- Staff action from live orders continues to acknowledge only tasks resolved by the successful committed transition. Reading/marking all read does not complete a task or suppress overdue escalation.
+
+QA: verify click-to-read, direct order opening, snapshot-safe mark-all, pickup cleanup and later refund preservation; linked occasion cleanup; opt-in completion push/review anchor; same-order device replacement; seven-day expiry and financial exceptions; cross-account/environment/branch denial and failed action rollback.

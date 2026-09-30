@@ -44,6 +44,11 @@ public class StaffAlertsController {
         long staffId = staff(); enabled(); alerts.markRead(staffId, id);
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
     }
+    public record ReadAll(@jakarta.validation.constraints.Positive long throughId) {}
+    @PutMapping("/read-all") public ResponseEntity<Void> readAll(@jakarta.validation.Valid @RequestBody ReadAll input) {
+        long staffId=staff();enabled();alerts.markAllRead(staffId,input.throughId());
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
     @PostMapping("/push-subscriptions") public ResponseEntity<StaffPushSubscriptions.Result> subscribe(@RequestBody StaffPushSubscriptions.Input input, HttpServletRequest request) {
         long staffId = staff(); enabled();
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(subscriptions.subscribe(staffId, StaffSessionService.cookie(request), input));

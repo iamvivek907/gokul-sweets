@@ -20,7 +20,12 @@ try {
         else if (path === "/api/customer/identity/notifications") {
             if (failLoad) return route.abort("failed");
             json = {messages: [{...message, readAt: read ? "2026-09-29T18:40:00Z" : null},
-                {...message, id: 43, title: "Occasion deposit received", targetType: "OCCASION", targetId: "request-43", readAt: "2026-09-29T18:40:00Z"}], unreadCount: read ? 0 : 1, nextBefore: null};
+                {...message, id: 43, title: "Occasion deposit received", targetType: "OCCASION", targetId: "request-43", readAt: "2026-09-29T18:40:00Z"}], unreadCount: read ? 0 : 1, nextBefore: null, readThrough: 43};
+        } else if (path.endsWith("/notifications/read-target") || path.endsWith("/notifications/read-all")) {
+            const input = route.request().postDataJSON();
+            if (path.endsWith("read-target")) assert.equal(input.targetId, "GKS-EXACT-42");
+            else assert.equal(input.throughId, 43);
+            reads++; read = true; return route.fulfill({status: 204});
         } else if (path === "/api/customer/identity/notification-preferences") json = {offerInboxEnabled: false, marketingConsentGranted: false};
         else if (path.endsWith("/notifications/42/read")) {
             if (failRead) return route.abort("failed");
@@ -49,6 +54,19 @@ try {
     assert.equal(reads, 1);
     assert.equal(await page.getByRole("button", {name: "Mark as read"}).count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    read = false;
+    await page.getByRole("button", {name: "Refresh inbox"}).click();
+    await page.getByRole("heading", {name: /Notification inbox.*1 unread/}).waitFor();
+    await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).evaluate(link => link.addEventListener("click", event => event.preventDefault(), {once:true}));
+    await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).click();
+    await page.getByRole("heading", {name: /Notification inbox.*0 unread/}).waitFor();
+    assert.equal(reads, 2);
+    read = false;
+    await page.getByRole("button", {name: "Refresh inbox"}).click();
+    await page.getByRole("heading", {name: /Notification inbox.*1 unread/}).waitFor();
+    await page.getByRole("button", {name: "Mark all read"}).click();
+    await page.getByRole("heading", {name: /Notification inbox.*0 unread/}).waitFor();
+    assert.equal(reads, 3);
     await page.setViewportSize({width: 1440, height: 1000});
     failLoad = true;
     await page.getByRole("button", {name: "Refresh inbox"}).click();

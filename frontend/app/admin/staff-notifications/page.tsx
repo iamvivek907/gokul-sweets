@@ -77,7 +77,7 @@ export default function StaffNotificationsPage() {
     return <main className="mx-auto max-w-4xl p-4 sm:p-8">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest text-[#c88a20]">Your branch operations</p><h1 className="mt-1 text-2xl font-bold text-[#173c39]">Staff notifications</h1></div>
             <Link href="/admin/orders" className="min-h-11 rounded-xl border bg-white px-4 py-3 text-sm font-semibold">Open preparation queue</Link></div>
-        <p className="mt-3 text-sm leading-6 text-[#756763]">New paid orders, preparation reminders and overdue work from branches you can access. All times use IST. Reading an alert does not complete the order action.</p>
+        <p className="mt-3 text-sm leading-6 text-[#756763]">New paid orders, preparation reminders and overdue work from branches you can access. All times use IST. Unread counts are per order. Successful order actions clear the completed task alerts automatically. Reading an alert does not complete the order action.</p>
         {error && <p role="alert" className="mt-4 rounded-xl border border-[#c76752] bg-white p-4 text-sm">{error}</p>}
         {message && <p role="status" className="mt-4 rounded-xl bg-[#eaf3ec] p-4 text-sm">{message}</p>}
         {!settings && !error && <p role="status" className="mt-5">Loading staff alerts…</p>}
@@ -107,7 +107,12 @@ export default function StaffNotificationsPage() {
             </details>
             <section className="mt-6" aria-label="Staff notification inbox">
                 <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-lg font-bold">Updates {inbox && <span className="text-sm font-normal">· {inbox.unreadCount} unread</span>}</h2>
-                    <button type="button" disabled={busy} onClick={() => void perform(() => load())} className="min-h-11 rounded-xl border bg-white px-4 text-sm">Refresh alerts</button></div>
+                    <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !inbox?.unreadCount} onClick={() => void perform(async () => {
+                        const throughId=inbox?.readThrough || Math.max(0,...(inbox?.messages.map(item=>item.event.id) ?? []));
+                        await staffAlertsRequest("/read-all",{method:"PUT",body:JSON.stringify({throughId})});
+                        await load();window.dispatchEvent(new Event("gokul-staff-inbox-changed"));
+                    })} className="min-h-11 rounded-xl border bg-white px-4 text-sm disabled:opacity-50">Mark all read</button>
+                    <button type="button" disabled={busy} onClick={() => void perform(() => load())} className="min-h-11 rounded-xl border bg-white px-4 text-sm">Refresh alerts</button></div></div>
                 {inbox?.messages.length === 0 && <p className="mt-4 rounded-2xl border bg-white p-5 text-sm">You’re all caught up. New paid orders and preparation reminders will appear here.</p>}
                 <div className="mt-4 flex flex-wrap gap-3"><label className="flex-1 text-sm">Search all branch updates<input type="search" disabled={busy} maxLength={100} value={search} onChange={event => setSearch(event.target.value)} placeholder="Order number or task" className="mt-1 min-h-11 w-full rounded-xl border bg-white px-3" /></label><label className="flex items-center gap-2 text-sm"><input type="checkbox" disabled={busy} checked={unreadOnly} onChange={event => setUnreadOnly(event.target.checked)} />Unread only</label></div>
                 <ul className="mt-4 space-y-3">{Array.from(new Set(inbox?.messages.map(item => item.event.orderNumber))).sort((a, b) => {

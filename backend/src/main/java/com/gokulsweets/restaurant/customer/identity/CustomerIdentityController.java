@@ -1,5 +1,7 @@
 package com.gokulsweets.restaurant.customer.identity;
 
+import jakarta.validation.Valid;
+
 import com.gokulsweets.restaurant.common.security.WebCorsProperties;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
@@ -274,6 +276,23 @@ public class CustomerIdentityController {
         var environment = notificationEnvironment();
         requireTrustedMutation(request);
         notifications.markRead(environment.name(), requiredSubject(request, environment), id);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    public record NotificationReadTarget(String targetType, String targetId, Long throughId) {}
+    public record NotificationReadAll(@jakarta.validation.constraints.Positive long throughId) {}
+
+    @PutMapping("/notifications/read-all")
+    public ResponseEntity<Void> readAllNotifications(@Valid @RequestBody NotificationReadAll input, HttpServletRequest request) {
+        var environment=notificationEnvironment(); requireTrustedMutation(request);
+        notifications.markAllRead(environment.name(),requiredSubject(request,environment),input.throughId());
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    @PutMapping("/notifications/read-target")
+    public ResponseEntity<Void> readNotificationTarget(@RequestBody NotificationReadTarget input, HttpServletRequest request) {
+        var environment=notificationEnvironment(); requireTrustedMutation(request);
+        notifications.markTargetRead(environment.name(),requiredSubject(request,environment),input.targetType(),input.targetId(),input.throughId());
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
     }
 

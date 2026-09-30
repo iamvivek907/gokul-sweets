@@ -28,7 +28,9 @@ public class CustomerNotificationInbox {
 
     public record Message(long id, String eventKey, String kind, String targetType, String targetId,
                           String title, String message, String deliveryState, Instant createdAt, Instant readAt) {}
-    public record Page(List<Message> messages, long unreadCount, Long nextBefore) {}
+    public record Page(List<Message> messages, long unreadCount, Long nextBefore, long readThrough) {
+        public Page(List<Message> messages, long unreadCount, Long nextBefore) {this(messages, unreadCount, nextBefore, 0);}
+    }
     public record Preferences(boolean offerInboxEnabled, boolean marketingConsentGranted,
                               String transactionalChannel, boolean browserPushAvailable) {}
     public record PreferenceInput(Boolean offerInboxEnabled) {}
@@ -104,8 +106,8 @@ public class CustomerNotificationInbox {
                          WHEN 'READY_FOR_PICKUP' THEN 'Your order is ready. Open your order for branch and booked pickup details.'
                          WHEN 'READY_FOR_DELIVERY' THEN 'The kitchen has finished preparation. Rider dispatch is still pending.'
                          WHEN 'OUT_FOR_DELIVERY' THEN 'The branch marked your order dispatched. Open the order for the latest delivery status.'
-                         WHEN 'PICKED_UP' THEN 'The branch confirmed your pickup. We hope you enjoy your order.'
-                         WHEN 'DELIVERED' THEN 'Delivery was confirmed by the branch. Thank you for ordering with us.'
+                         WHEN 'PICKED_UP' THEN 'Enjoy your sweets! If you have a moment, share an honest review from your order page. It is completely optional.'
+                         WHEN 'DELIVERED' THEN 'Your delivery is complete. If you have a moment, share an honest review from your order page. It is completely optional.'
                          WHEN 'PICKUP_WINDOW_EXPIRED' THEN 'Please contact the branch to arrange late collection. This does not confirm a refund.'
                          WHEN 'NO_SHOW' THEN 'The branch recorded that this order was not collected. Contact the branch for help; a refund has not been confirmed.'
                          ELSE 'This order was cancelled. Check your order for payment or refund status.' END
@@ -115,6 +117,20 @@ public class CustomerNotificationInbox {
                     ('CONFIRMED','PREPARING','READY_FOR_PICKUP','READY_FOR_DELIVERY','OUT_FOR_DELIVERY','PICKED_UP','DELIVERED','CANCELLED','PICKUP_WINDOW_EXPIRED','NO_SHOW')
                 ON CONFLICT (environment, subject_id, event_key) DO NOTHING
                 """, orderId, environment());
+        // The completion event's immutable ID is the boundary: replays must not acknowledge later refund alerts.
+        jdbc.update("""
+            UPDATE customer_notification_events e SET read_at=COALESCE(e.read_at,CURRENT_TIMESTAMP),
+                auto_acknowledged=CASE WHEN e.read_at IS NULL THEN TRUE ELSE e.auto_acknowledged END
+            FROM orders o JOIN verified_order_ownership own ON own.order_id=o.id
+            JOIN customer_notification_events completed ON completed.environment=own.environment
+                AND completed.subject_id=own.verified_subject_id AND completed.target_type='ORDER'
+                AND completed.target_id=o.order_number AND completed.kind=o.order_status
+            WHERE o.id=? AND own.environment=? AND o.order_status IN ('PICKED_UP','DELIVERED')
+                AND e.environment=own.environment AND e.subject_id=own.verified_subject_id AND e.id<=completed.id
+                AND ((e.target_type='ORDER' AND e.target_id=o.order_number)
+                  OR (e.target_type='OCCASION' AND EXISTS (SELECT 1 FROM occasion_enquiries q
+                    WHERE q.id::text=e.target_id AND q.order_id=o.id AND q.environment=e.environment AND q.subject_id=e.subject_id)))
+            """,orderId,environment());
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -152,12 +168,12 @@ public class CustomerNotificationInbox {
                 """, merchantOrderId, environment());
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Page page(String environment, UUID subject, Long before) {
         return page(environment, subject, before, false, "");
     }
 
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Page page(String environment, UUID subject, Long before, boolean unreadOnly, String search) {
         String query = search == null ? "" : search.trim();
         if (query.length() > 100) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
@@ -172,18 +188,48 @@ public class CustomerNotificationInbox {
                 rs.getString("delivery_state"), rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("read_at") == null ? null : rs.getTimestamp("read_at").toInstant()),
                 environment, subject, before == null ? Long.MAX_VALUE : before, unreadOnly, query, query);
-        Long unread = jdbc.queryForObject("SELECT COUNT(*) FROM customer_notification_events WHERE environment = ? AND subject_id = ? AND read_at IS NULL",
+        Long unread = jdbc.queryForObject("SELECT COUNT(DISTINCT (target_type,target_id)) FROM customer_notification_events WHERE environment = ? AND subject_id = ? AND read_at IS NULL",
                 Long.class, environment, subject);
         return new Page(messages.stream().limit(30).toList(), unread == null ? 0 : unread,
-                messages.size() > 30 ? messages.get(29).id() : null);
+                messages.size() > 30 ? messages.get(29).id() : null,
+                jdbc.queryForObject("SELECT COALESCE(MAX(id),0) FROM customer_notification_events WHERE environment=? AND subject_id=?",Long.class,environment,subject));
     }
 
     @Transactional
     public void markRead(String environment, UUID subject, long id) {
         if (jdbc.update("""
-                UPDATE customer_notification_events SET read_at = COALESCE(read_at, CURRENT_TIMESTAMP)
+                UPDATE customer_notification_events SET read_at = COALESCE(read_at, CURRENT_TIMESTAMP), auto_acknowledged=FALSE
                 WHERE id = ? AND environment = ? AND subject_id = ?
                 """, id, environment, subject) == 0) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
+    @Transactional
+    public void markAllRead(String environment, UUID subject, long throughId) {
+        if (throughId<=0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        jdbc.update("""
+            UPDATE customer_notification_events SET read_at=COALESCE(read_at,CURRENT_TIMESTAMP),auto_acknowledged=FALSE
+            WHERE environment=? AND subject_id=? AND id<=?
+            """,environment,subject,throughId);
+    }
+
+    @Transactional
+    public void markTargetRead(String environment, UUID subject, String type, String target, Long throughId) {
+        if (type==null || !List.of("ORDER","OCCASION").contains(type) || target==null || target.isBlank() || target.length()>80
+                || throughId!=null && throughId<=0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        // Derive ownership only from this verified inbox, never from a client-provided phone/order ID.
+        Boolean allowed=jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM customer_notification_events WHERE environment=? AND subject_id=? AND target_type=? AND target_id=?)",
+                Boolean.class,environment,subject,type,target);
+        if (!Boolean.TRUE.equals(allowed)) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        jdbc.update("""
+            UPDATE customer_notification_events e SET read_at=COALESCE(e.read_at,CURRENT_TIMESTAMP),auto_acknowledged=FALSE
+            WHERE e.environment=? AND e.subject_id=?
+              AND e.id<=COALESCE(?::bigint,(SELECT COALESCE(MAX(id),0) FROM customer_notification_events WHERE environment=? AND subject_id=?))
+              AND ((e.target_type=? AND e.target_id=?)
+                OR EXISTS (SELECT 1 FROM occasion_enquiries q JOIN orders o ON o.id=q.order_id
+                  WHERE q.environment=e.environment AND q.subject_id=e.subject_id
+                    AND ((?='ORDER' AND o.order_number=? AND e.target_type='OCCASION' AND e.target_id=q.id::text)
+                      OR (?='OCCASION' AND q.id::text=? AND e.target_type='ORDER' AND e.target_id=o.order_number))))
+            """,environment,subject,throughId,environment,subject,type,target,type,target,type,target);
     }
 
     @Transactional(readOnly = true)

@@ -10,7 +10,7 @@ import {formatBusinessTimestamp} from "@/lib/businessTime";
 const base = "/api/customer/identity";
 type Message = {id: number; eventKey: string; kind: string; targetType: "ORDER" | "OCCASION";
     targetId: string; title: string; message: string; deliveryState: string; createdAt: string; readAt: string | null};
-type Inbox = {messages: Message[]; unreadCount: number; nextBefore: number | null};
+type Inbox = {messages: Message[]; unreadCount: number; nextBefore: number | null; readThrough?: number};
 type Preferences = {offerInboxEnabled: boolean; marketingConsentGranted: boolean};
 
 export default function CustomerNotificationInbox() {
@@ -50,15 +50,28 @@ export default function CustomerNotificationInbox() {
         catch {setError("We could not confirm that change. Please refresh or try again when connected.");}
         finally {setBusy(false);}
     }
+    async function acknowledgeTarget(item: Message) {
+        setError("");
+        try {
+            await apiClient<void>(`${base}/notifications/read-target`, {method: "PUT", credentials: "include", keepalive: true,
+                body: JSON.stringify({targetType: item.targetType, targetId: item.targetId, throughId: item.id})});
+            await load();
+        } catch {setError("Your order can still be opened. We could not confirm the read acknowledgement; refresh the inbox when connected.");}
+    }
     if (unavailable) return <section className="rounded-3xl border border-[#eadfd6] bg-white p-6">
         <h2 className="text-xl font-semibold">Notification inbox</h2><p className="mt-2 text-sm">The inbox is not available yet. Check Order history for current updates.</p></section>;
     return <section className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8" aria-label="Notification inbox">
         <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold">Notification inbox {inbox && <span className="text-sm font-normal">· {inbox.unreadCount} unread</span>}</h2>
+            <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !inbox?.unreadCount} onClick={() => void perform(async () => {
+                const throughId = inbox?.readThrough || Math.max(0, ...(inbox?.messages.map(item => item.id) ?? []));
+                await apiClient<void>(`${base}/notifications/read-all`, {method: "PUT", credentials: "include", body: JSON.stringify({throughId})});
+                await load();
+            })} className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50">Mark all read</button>
             <button type="button" disabled={busy} onClick={() => void perform(() => load())}
-                className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50">Refresh inbox</button>
+                className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50">Refresh inbox</button></div>
         </div>
-        <p className="mt-2 text-sm leading-6 text-[#756763]">Payment and order updates are saved here for your signed-in account. Open a message’s order or request for its latest status. Times are in IST.</p>
+        <p className="mt-2 text-sm leading-6 text-[#756763]">Payment and order updates are saved here for your signed-in account. Opening an order or request marks its existing updates read. Completed orders clear automatically. Older routine updates leave the unread queue after seven days; payment or refund exceptions remain. Times are in IST.</p>
         {error && <p role="alert" className="mt-4 rounded-xl border border-[#c76752] p-3 text-sm">{error}</p>}
         {!inbox && !error && <p role="status" className="mt-4">Loading your inbox…</p>}
         {inbox?.messages.length === 0 && <p className="mt-5 rounded-xl bg-[#fffaf2] p-4 text-sm">No messages yet. New verified payments and branch updates will appear here.</p>}
@@ -73,9 +86,10 @@ export default function CustomerNotificationInbox() {
                     {formatBusinessTimestamp(item.createdAt, {day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit"})} IST
                 </time>
                 <div className="mt-3 flex flex-wrap items-center gap-4">
-                    <Link className="flex min-h-11 items-center break-all text-sm font-semibold underline" href={item.targetType === "ORDER"
+                    <Link onClick={() => void acknowledgeTarget(item)} className="flex min-h-11 items-center break-all text-sm font-semibold underline" href={item.targetType === "ORDER"
                         ? `/orders/${encodeURIComponent(item.targetId)}` : `/occasions#occasion-${encodeURIComponent(item.targetId)}`}>
                         {item.targetType === "ORDER" ? `Open order ${item.targetId}` : "Open occasion request"}</Link>
+                    {["PICKED_UP", "DELIVERED"].includes(item.kind) && <Link href={`/orders/${encodeURIComponent(item.targetId)}#order-review`} onClick={() => void acknowledgeTarget(item)} className="flex min-h-11 items-center rounded-full bg-[#143936] px-4 text-sm font-semibold text-white">Share an optional review</Link>}
                     {!item.readAt && <button type="button" disabled={busy} className="min-h-11 text-sm underline disabled:opacity-50"
                         onClick={() => void perform(async () => {
                             await apiClient<void>(`${base}/notifications/${item.id}/read`, {method: "PUT", credentials: "include"});

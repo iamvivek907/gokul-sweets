@@ -123,6 +123,69 @@ class CustomerPushIntegrationTest {
     }
 
     @Test
+    void completionIsAutomaticallyReadAndSendsOneOptionalReviewPush() throws Exception {
+        preferences.save("DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
+        preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
+        Long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Push branch') RETURNING id", Long.class, "PUSH-" + UUID.randomUUID().toString().substring(0, 8));
+        Long slot = jdbc.queryForObject("INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity) VALUES (?, '2026-10-01', '18:00', '18:30', 20) RETURNING id", Long.class, branch);
+        String number = "PUSH-" + UUID.randomUUID();
+        Long order = jdbc.queryForObject("""
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name, customer_phone,
+                    pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, number, branch, slot);
+        jdbc.update("INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id) VALUES (?, 'DEV', ?)", order, subject);
+        inbox.orderReady(order);
+        jdbc.update("UPDATE orders SET order_status='PICKED_UP' WHERE id=?", order);
+        inbox.orderReady(order);
+        long completion = inbox.page("DEV", subject, null).messages().getFirst().id();
+        assertThat(inbox.page("DEV", subject, null).unreadCount()).isZero();
+        when(transport.send(anyString(), anyString(), anyString(), eq(completion), anyString(), anyString(), anyString())).thenReturn(201);
+        dispatcher.dispatchBatch(); dispatcher.dispatchBatch();
+        verify(transport, times(1)).send(anyString(), anyString(), anyString(), eq(completion), anyString(), contains("completely optional"), eq("/orders/"+number+"#order-review"));
+    }
+
+    @Test
+    void explicitAcknowledgementCancelsUnsentOptionalCompletionPush() throws Exception {
+        preferences.save("DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
+        preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
+        Long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Push branch') RETURNING id", Long.class, "PUSH-" + UUID.randomUUID().toString().substring(0, 8));
+        Long slot = jdbc.queryForObject("INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity) VALUES (?, '2026-10-01', '18:00', '18:30', 20) RETURNING id", Long.class, branch);
+        String number = "PUSH-" + UUID.randomUUID();
+        Long order = jdbc.queryForObject("""
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name, customer_phone,
+                    pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, number, branch, slot);
+        jdbc.update("INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id) VALUES (?, 'DEV', ?)", order, subject);
+        jdbc.update("UPDATE orders SET order_status='PICKED_UP' WHERE id=?", order);
+        inbox.orderReady(order);
+        inbox.markTargetRead("DEV", subject, "ORDER", number, null);
+        dispatcher.dispatchBatch();
+        verify(transport, never()).send(anyString(), anyString(), anyString(), anyLong(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    void existingReviewSuppressesUnsentCompletionInvitation() throws Exception {
+        preferences.save("DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
+        preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
+        Long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Push branch') RETURNING id", Long.class, "PUSH-" + UUID.randomUUID().toString().substring(0, 8));
+        Long slot = jdbc.queryForObject("INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity) VALUES (?, '2026-10-01', '18:00', '18:30', 20) RETURNING id", Long.class, branch);
+        String number = "PUSH-" + UUID.randomUUID();
+        Long order = jdbc.queryForObject("""
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name, customer_phone,
+                    pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Test', '9876543210', 'NORMAL', 'PREPARING', CURRENT_TIMESTAMP) RETURNING id
+                """, Long.class, number, branch, slot);
+        jdbc.update("INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id) VALUES (?, 'DEV', ?)", order, subject);
+        jdbc.update("UPDATE orders SET order_status='PICKED_UP' WHERE id=?", order);
+        inbox.orderReady(order);
+        jdbc.update("INSERT INTO reviews(order_id,branch_id,overall_rating,created_at,updated_at) VALUES (?,?,5,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)", order,branch);
+        dispatcher.dispatchBatch();
+        verify(transport, never()).send(anyString(), anyString(), anyString(), anyLong(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     void temporaryErrorsBackOffAndRetriesStopAfterThreeAttempts() throws Exception {
         preferences.save("DEV", subject, new CustomerAlertPreferences.Input(false, false, 1320, 480));
         preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));

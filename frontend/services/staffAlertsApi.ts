@@ -4,7 +4,7 @@ export type StaffAlertSettings = {enabled: boolean; environment: string; staffId
     applicationServerKey: string | null; deviceActive: boolean; emailConfigured: boolean; emailTestRouting?: boolean; reminderMinutes: number; escalationMinutes: number};
 export type StaffAlert = {event: {id: number; orderNumber: string; branchId: number; kind: string; title: string; message: string; createdAt: string};
     readAt: string | null; actionRequired: boolean; pushState: string | null; emailState: string | null};
-export type StaffInbox = {messages: StaffAlert[]; unreadCount: number; nextBefore: number | null};
+export type StaffInbox = {messages: StaffAlert[]; unreadCount: number; nextBefore: number | null; readThrough?: number};
 export async function staffAlertsRequest<T>(path = "", init?: RequestInit): Promise<T> {
     const headers = new Headers(init?.headers);
     if (init?.body) headers.set("Content-Type", "application/json");
