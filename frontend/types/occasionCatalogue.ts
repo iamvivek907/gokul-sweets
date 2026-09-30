@@ -2,4 +2,4 @@ export type OccasionSweet = {id: number; categoryId?: number; categoryName?: str
 export type OccasionBox = {id: number | null; imageUrls?: string[]; name: string; imageUrl: string | null; dimensions: string; material: string; compartments: number; capacityPieces: number; price: number | null; branding: string; leadDays: number; published: boolean};
 export type OccasionBranding = {headline: string; description: string; imageUrl: string | null; published: boolean};
 export type OccasionCatalogue = {sweets: OccasionSweet[]; boxes: OccasionBox[]; branding?: OccasionBranding | null};
-export type GiftSnapshot = {box: OccasionBox; boxCount: number; recipe: {productId: number; pieces: number}[]; packagingEstimate: number | null; approvedPackagingTotal?: number | null};
+export type GiftSnapshot = {includeSpoons?: boolean;box: OccasionBox; boxCount: number; recipe: {productId: number; pieces: number}[]; packagingEstimate: number | null; approvedPackagingTotal?: number | null};

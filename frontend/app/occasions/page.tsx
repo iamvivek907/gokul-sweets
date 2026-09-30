@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- Real catalogue URLs are rendered directly without transforming supplier photos. */
 "use client";
 
+import {useRouter} from "next/navigation";
+import OccasionDatePicker,{addDays} from "@/components/occasion/OccasionDatePicker";
 import {useEffect, useState} from "react";
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
@@ -9,8 +11,6 @@ import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {apiClient, ApiError} from "@/services/apiClient";
 import type {OccasionSweet, OccasionBox, OccasionCatalogue, OccasionBranding, GiftSnapshot} from "@/types/occasionCatalogue";
-import {getPickupSlots} from "@/services/pickupApi";
-import type {PickupSlot} from "@/types/pickup";
 
 type Item = {productName?: string; productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
@@ -19,16 +19,8 @@ type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate:
     nextStep: string; fulfilment: string; items: Item[]; orderNumber: string | null; balancePaymentOpen: boolean; cancellationReview?: {paidAmount: number; reason: string; state: string} | null; productionPlan?: {productId: number; unit: string; expectedReadyAt: string; state: string; quantity: number; readyQuantity: number}[];
     pricedLines: {productId: number; productName: string; grossAmount: number; subtotal: number;
         taxAmount: number; cgstRate: number; sgstRate: number}[]};
-type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
-
-function nextBusinessDate(today: string): string {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(today)) return today;
-    const date = new Date(`${today}T00:00:00Z`);
-    date.setUTCDate(date.getUTCDate() + 1);
-    return date.toISOString().slice(0, 10);
-}
-
 export default function OccasionsPage() {
+    const router=useRouter();
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();
     const [sessionVersion, setSessionVersion] = useState(0);
@@ -38,20 +30,14 @@ export default function OccasionsPage() {
     const [branding,setBranding]=useState<OccasionBranding|null>(null);
     const [category,setCategory]=useState<string>("");
     const [galleryIndex,setGalleryIndex]=useState(0);
-    const [historyLimit,setHistoryLimit]=useState(3);
-    const [historySearch,setHistorySearch]=useState("");
     const [specialOnly, setSpecialOnly] = useState(false);
     const [products, setProducts] = useState<OccasionSweet[]>([]);
     const [boxes, setBoxes] = useState<OccasionBox[]>([]);
     const [boxId, setBoxId] = useState<number | null>(null);
+    const [includeSpoons,setIncludeSpoons]=useState(false);
     const [boxCount, setBoxCount] = useState(700);
     const [units, setUnits] = useState<Record<number, "KG" | "PIECE">>({});
     const [items, setItems] = useState<Record<number, number>>({});
-    const [history, setHistory] = useState<Enquiry[]>([]);
-    const [historyPhone, setHistoryPhone] = useState("");
-    const [slots, setSlots] = useState<Record<string, PickupSlot[]>>({});
-    const [selectedSlots, setSelectedSlots] = useState<Record<string, number>>({});
-    const [attempts, setAttempts] = useState<Record<string, Checkout>>({});
     const [type, setType] = useState("Family celebration");
     const [date, setDate] = useState("");
     const [guests, setGuests] = useState(20);
@@ -61,11 +47,7 @@ export default function OccasionsPage() {
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
 
-    useEffect(() => {
-        const hash = window.location.hash.slice(1);
-        if (hash.startsWith("occasion-") && history.length)
-            document.getElementById(hash)?.scrollIntoView({block: "start"});
-    }, [history]);
+    useEffect(()=>{const query=new URLSearchParams(window.location.search);if(query.has("enquiry")||window.location.hash.startsWith("#occasion-")){if(!query.has("enquiry"))query.set("enquiry",window.location.hash.slice(10));router.replace(`/occasions/requests?${query}`);}},[router]);
 
     useEffect(() => {
         if (!branch || !features?.occasionEnquiries) return;
@@ -76,79 +58,11 @@ export default function OccasionsPage() {
         return () => controller.abort();
     }, [branch, features?.occasionEnquiries]);
 
-    useEffect(() => {
-        if (!session.authenticated || !features?.occasionEnquiries) return;
-        let cancelled = false;
-        const load = () => {void apiClient<Enquiry[]>("/api/occasion-enquiries", {credentials: "include"})
-            .then(list => {if (!cancelled) {setHistory(list); setHistoryPhone(session.phone ?? "");}})
-            .catch(() => {if (!cancelled) setMessage("We couldn't load your enquiries. Please retry.");});};
-        load();
-        const timer = window.setInterval(load, 60_000);
-        return () => {cancelled = true; window.clearInterval(timer);};
-    }, [session.authenticated, session.phone, features?.occasionEnquiries]);
-
-    useEffect(() => {
-        if (!session.authenticated || !features?.occasionPayments) return;
-        const query = new URLSearchParams(window.location.search);
-        const enquiry = query.get("enquiry");
-        const attempt = query.get("payment");
-        if (!enquiry || !attempt || !/^[0-9a-f-]{36}$/i.test(enquiry) || !/^[0-9a-f-]{36}$/i.test(attempt)) return;
-        let cancelled = false;
-        const check = () => {void apiClient<Checkout>(`/api/occasion-enquiries/${enquiry}/payments/${attempt}`,
-            {credentials: "include"}).then(result => {
-            if (cancelled) return;
-            setAttempts(current => ({...current, [enquiry]: result}));
-            if (result.status !== "PENDING") {
-                void apiClient<Enquiry[]>("/api/occasion-enquiries", {credentials: "include"})
-                    .then(list => {if (!cancelled) setHistory(list);});
-            }
-        }).catch(() => {if (!cancelled) setMessage("Payment status is not available yet. Please retry from this page; do not pay again.");});};
-        check();
-        const timer = window.setInterval(check, 5000);
-        return () => {cancelled = true; window.clearInterval(timer);};
-    }, [session.authenticated, features?.occasionPayments]);
-
-    async function loadSlots(enquiry: Enquiry) {
-        setBusy(true); setMessage("");
-        try {
-            const available = await getPickupSlots(enquiry.branchId, enquiry.serviceDate);
-            setSlots(current => ({...current, [enquiry.id]: available.filter(slot => slot.active && slot.remainingCapacity > 0)}));
-        } catch {setMessage("Pickup times could not be loaded. Please retry.");}
-        finally {setBusy(false);}
-    }
-
-    async function pay(enquiry: Enquiry, stage: "deposit" | "balance") {
-        if (busy || stage === "deposit" && !selectedSlots[enquiry.id]) return;
-        setBusy(true); setMessage("");
-        try {
-            const result = await apiClient<Checkout>(`/api/occasion-enquiries/${enquiry.id}/${stage}`,
-                {method: "POST", credentials: "include", body: JSON.stringify(stage === "deposit"
-                    ? {pickupSlotId: selectedSlots[enquiry.id]} : {})});
-            setAttempts(current => ({...current, [enquiry.id]: result}));
-            if (result.paymentUrl) window.location.assign(result.paymentUrl);
-            else setMessage("Checkout is being prepared. Refresh this page to check its status before retrying.");
-        } catch (error) {
-            setMessage(error instanceof ApiError ? error.message : "Payment could not start. Check the request status before retrying.");
-        } finally {setBusy(false);}
-    }
-
-    async function checkPayment(enquiry: Enquiry) {
-        setBusy(true); setMessage("");
-        try {
-            const result = await apiClient<Checkout>(`/api/occasion-enquiries/${enquiry.id}/payments/latest`,
-                {credentials: "include"});
-            setAttempts(current => ({...current, [enquiry.id]: result}));
-            const list = await apiClient<Enquiry[]>("/api/occasion-enquiries", {credentials: "include"});
-            setHistory(list);
-        } catch {setMessage("Payment status is unavailable. Please wait and check again; do not start another payment.");}
-        finally {setBusy(false);}
-    }
-
     async function submit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!branch || busy || catalogueBranchId!==branch.id) return;
         if (!session.authenticated) {setMessage("Verify your phone before sending your enquiry. Your selection is saved on this page."); return;}
-        if (!date || date <= (features?.today ?? "")) {setMessage("Choose a future service date in India."); return;}
+        if (!date || date < earliest || date > latest) {setMessage("Choose a future service date in India."); return;}
         const chosen = products.filter(product => Number(items[product.id]) > 0).map(product => ({
             productId: product.id, quantity: Number(items[product.id]) * (boxId ? boxCount : (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "KG" ? 1000 : 1), unit: boxId || (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? "PIECE" : "GRAM"
         }));
@@ -157,14 +71,12 @@ export default function OccasionsPage() {
         try {
             const result = await apiClient<Enquiry>("/api/occasion-enquiries", {method: "POST", credentials: "include",
                 body: JSON.stringify({branchId: branch.id, occasionType: type, serviceDate: date, guestCount: guests,
-                    fulfilment: mode, deliveryAddress: mode === "DELIVERY_REQUEST" ? address : null, notes, items: chosen, gift: boxId ? {boxId, boxCount, recipe: products.filter(product => Number(items[product.id]) > 0).map(product => ({productId: product.id, pieces: Number(items[product.id])}))} : null})});
-            setHistory(current => [result, ...current]);
-            setHistoryPhone(session.phone ?? "");
+                    fulfilment: mode, deliveryAddress: mode === "DELIVERY_REQUEST" ? address : null, notes, items: chosen, gift: boxId ? {boxId, boxCount, includeSpoons, recipe: products.filter(product => Number(items[product.id]) > 0).map(product => ({productId: product.id, pieces: Number(items[product.id])}))} : null})});
             setMessage("Request sent. The branch will review it before sharing a quote. No booking or payment has been made.");
-            setItems({});setHistoryLimit(3);window.setTimeout(()=>document.getElementById("occasion-tracker")?.scrollIntoView({block:"start"}),100);
+            setItems({});router.push(`/occasions/requests?enquiry=${encodeURIComponent(result.id)}`);
         } catch (error) {
             if (error instanceof ApiError && error.status === 401) {
-                setSession({authenticated: false}); setHistory([]); setSessionVersion(current => current + 1);
+                setSession({authenticated: false}); setSessionVersion(current => current + 1);
                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
             }
             setMessage(error instanceof ApiError && error.status === 401 ? "Please verify your phone, then try again."
@@ -178,72 +90,25 @@ export default function OccasionsPage() {
     const categories=Array.from(new Set(products.map(product=>product.categoryName??"Selection")));
     const selected=products.filter(product=>Number(items[product.id])>0);
     const selectedBox=boxes.find(box=>box.id===boxId);
+    const earliest=features?.today?addDays(features.today,Math.max(1,selectedBox?.leadDays??0,...selected.map(product=>product.leadDays))):"";
+    const latest=features?.today?addDays(features.today,365):"";
     const gallery=selectedBox?.imageUrls?.length?selectedBox.imageUrls:selectedBox?.imageUrl?[selectedBox.imageUrl]:[];
-    const matches=history.filter(enquiry=>`${enquiry.occasionType} ${enquiry.serviceDate} ${enquiry.orderNumber??""} ${enquiry.status}`.toLowerCase().includes(historySearch.toLowerCase()));
     return <AppShell editorial showSocialPopup={false}>
         <div className="occasion-journey mx-auto max-w-7xl px-4 py-8 text-[#173a37] sm:px-6">
             <header className="occasion-hero"><p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]">Occasions at Gokul</p>
             <h1 className="mt-3 font-serif text-4xl sm:text-6xl">{campaign?.headline||"Sweet moments. Thoughtfully planned."}</h1>
-            <p className="mt-4 max-w-2xl">{campaign?.description||"Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment."}</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div>{campaign?.imageUrl&&<img src={campaign.imageUrl} alt={`${branch?.name??"Gokul"} occasion collection`} className="occasion-campaign-photo" />}<div className="occasion-hero-actions"><a href="#occasion-plan" className="occasion-primary">Build your celebration</a><a href="#occasion-tracker" className="occasion-secondary">Track requests & quotes</a></div></header>
+            <p className="mt-4 max-w-2xl">{campaign?.description||"Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment."}</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div>{campaign?.imageUrl&&<img src={campaign.imageUrl} alt={`${branch?.name??"Gokul"} occasion collection`} className="occasion-campaign-photo" />}<div className="occasion-hero-actions"><a href="#occasion-plan" className="occasion-primary">Build your celebration</a><Link href="/occasions/requests" className="occasion-secondary">Track requests & quotes</Link></div></header>
             {!features && <p role="status" className="mt-8">Checking availability…</p>}
             {features && !features.occasionEnquiries && <p className="mt-8 rounded-xl bg-white p-6">Occasion enquiries are not available yet. <Link href="/menu" className="underline">Explore pickup ordering</Link>.</p>}
             {features?.occasionEnquiries && <>
                 {!branch ? <p className="mt-8 rounded-xl bg-white p-6">Choose a branch first. <Link href="/branches" className="underline">Explore branches</Link>.</p> : <>
                     <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline">Change branch</Link></p>
                     <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel key={sessionVersion} mode="occasion" onSessionChange={setSession} /></div>
-                {session.authenticated && historyPhone === (session.phone ?? "") && <section id="occasion-tracker" className="occasion-tracker scroll-mt-28 mt-7"><div className="occasion-tracker-heading"><div><p className="text-xs font-bold uppercase tracking-widest">Your celebrations, in one place</p><h2 className="font-serif text-3xl">Requests & quotes</h2><p>Review a quote, complete payment and follow preparation here.</p></div><span>{history.length} requests</span></div><label className="mt-4 block text-sm">Find a request<input type="search" value={historySearch} onChange={event=>{setHistorySearch(event.target.value);setHistoryLimit(3);}} placeholder="Occasion, date or order number" className="mt-1 w-full rounded-xl border p-3" /></label>{!matches.length&&<p className="mt-4">{history.length?"No matching requests.":"Your first celebration starts with a request below. Quotes and updates will appear here."}</p>}
-                    {matches.slice(0,historyLimit).map(enquiry => <article id={`occasion-${enquiry.id}`} key={enquiry.id} className="scroll-mt-28 mt-4 rounded-2xl border bg-white p-5">
-                        <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {enquiry.serviceDate}</strong><span className="occasion-status">{{REQUESTED: "Under branch review", QUOTED: "Quote ready — deposit due", PAYMENT_PENDING: "Deposit payment in progress", HELD: "Deposit payment in progress", PAID: "Deposit received — balance due", CONFIRMED: "Pickup confirmed", EXPIRED: "Quote or payment window expired", DECLINED: "Request declined", CANCELLED: "Cancelled — finance review pending"}[enquiry.status] ?? "Contact the branch"}</span></div>
-                        <p className="mt-2 font-semibold">{enquiry.nextStep}</p><div className="occasion-progress" aria-label="Request milestones">{["Request received","Branch quote","Deposit","Pickup confirmed"].map((label,index)=><span key={label} className={index<=({REQUESTED:0,QUOTED:1,PAYMENT_PENDING:1,HELD:1,PAID:2,CONFIRMED:3}[enquiry.status]??-1)?"is-reached":""}>{label}</span>)}</div><details className="occasion-request-details" open={enquiry.status==="QUOTED"||enquiry.status==="PAID"}><summary>{enquiry.quotedAmount==null?"View request details":`Review quote ₹${enquiry.quotedAmount.toLocaleString("en-IN")} & payment`}</summary>
-                        <ul className="mt-3 text-sm">{enquiry.items.map(item => <li key={item.productId}>Requested: {item.productName ?? enquiry.pricedLines?.find(line=>line.productId===item.productId)?.productName ?? products.find(product => product.id === item.productId)?.name ?? "Item"} · {item.unit === "GRAM" ? `${item.quantity / 1000} kg` : `${item.quantity.toLocaleString("en-IN")} pieces`}</li>)}</ul>
-                        {enquiry.gift && <div className="mt-3 rounded-xl bg-[#fffaf2] p-3 text-sm"><strong>{enquiry.gift.boxCount} × {enquiry.gift.box.name}</strong><p>{enquiry.gift.box.dimensions} · {enquiry.gift.box.material} · {enquiry.gift.box.branding}</p><p>{enquiry.gift.approvedPackagingTotal == null ? "Packaging is awaiting manager price and fit review." : `Packaging ₹${enquiry.gift.approvedPackagingTotal}, included in the approved item totals.`}</p></div>}
-                        {enquiry.quotedAmount != null && <p className="mt-2">Quoted: ₹{enquiry.quotedAmount} · Requested deposit: ₹{enquiry.depositAmount} · Paid: ₹{enquiry.paidAmount}</p>}
-                        {enquiry.pricedLines?.length > 0 && <div className="mt-3 rounded-xl border border-[#d9e5df] p-3 text-sm">
-                            <p className="font-semibold">Approved quote details</p>
-                            {enquiry.pricedLines.map(line => <p key={line.productId} className="mt-1">{line.productName}: ₹{line.grossAmount} (base ₹{line.subtotal}, tax ₹{line.taxAmount}; {line.cgstRate}% CGST + {line.sgstRate}% SGST)</p>)}
-                        </div>}
-                        {enquiry.orderNumber && <p className="mt-2">Confirmed order <Link href={`/orders/${encodeURIComponent(enquiry.orderNumber)}`} className="underline">{enquiry.orderNumber}</Link></p>}
-                        {!!enquiry.productionPlan?.length && <ul className="mt-2 text-sm">{enquiry.productionPlan.map(line => <li key={line.productId}>Approved production: {products.find(product => product.id === line.productId)?.name ?? "Sweet"} · {line.unit === "GRAM" ? `${line.quantity / 1000} kg` : `${line.quantity} pieces`}</li>)}</ul>}
-                        {!!enquiry.productionPlan?.length && <p className="mt-2 text-sm">The branch has planned production specifically for your request. A verified deposit reserves it; full verified payment confirms pickup. This does not mean the food is already prepared.</p>}
-                        {enquiry.status === "CONFIRMED" && !!enquiry.productionPlan?.length && <p className="mt-2 text-sm">{enquiry.productionPlan.every(line => line.readyQuantity >= line.quantity)
-                            ? "The branch has recorded all requested quantities as prepared. Check your linked order for pickup status."
-                            : "Your pickup is confirmed. The branch will update preparation and pickup status in your linked order."}</p>}
-                        {enquiry.cancellationReview && <div className="mt-3 rounded-xl bg-[#fff0dc] p-3 text-sm">
-                            <p>Cancellation reason: {enquiry.cancellationReview.reason}</p>
-                            <p>₹{enquiry.cancellationReview.paidAmount} already paid needs branch finance review under your booking terms. No refund is confirmed yet. Please contact the branch.</p>
-                        </div>}
-                        {enquiry.quoteTerms && <p className="mt-2">{enquiry.quoteTerms}</p>}
-                        {enquiry.balanceDueAt && <p className="mt-2">Balance due {new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.</p>}
-                        {features.occasionPayments && enquiry.status === "QUOTED" && enquiry.fulfilment === "PICKUP" && <div className="mt-4 space-y-3">
-                            <button type="button" disabled={busy} onClick={() => void loadSlots(enquiry)} className="min-h-11 rounded-full border border-[#173a37] px-5">Choose a live pickup time</button>
-                            {slots[enquiry.id] && <label className="block">Pickup time (IST)
-                                <select className="mt-2 block w-full max-w-sm rounded-xl border p-3" value={selectedSlots[enquiry.id] ?? ""}
-                                    onChange={event => setSelectedSlots(current => ({...current, [enquiry.id]: Number(event.target.value)}))}>
-                                    <option value="">Choose time</option>{slots[enquiry.id].map(slot => <option key={slot.id} value={slot.id}>{slot.startTime}–{slot.endTime}</option>)}
-                                </select></label>}
-                            {slots[enquiry.id] && slots[enquiry.id].length === 0 && <p>No pickup capacity remains on this date. Contact the branch for a new quote.</p>}
-                            <button type="button" disabled={busy || !selectedSlots[enquiry.id]} onClick={() => void pay(enquiry, "deposit")}
-                                className="min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay deposit ₹{enquiry.depositAmount}</button>
-                        </div>}
-                        {features.occasionPayments && enquiry.status === "PAID" && enquiry.quotedAmount != null
-                            && enquiry.quotedAmount > enquiry.paidAmount && enquiry.balancePaymentOpen && <button type="button" disabled={busy}
-                            onClick={() => void pay(enquiry, "balance")}
-                            className="mt-4 min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay balance ₹{(enquiry.quotedAmount - enquiry.paidAmount).toFixed(2)}</button>}
-                        {features.occasionPayments && ["PAYMENT_PENDING", "HELD", "PAID", "CONFIRMED", "EXPIRED", "CANCELLED"].includes(enquiry.status)
-                            && <button type="button" disabled={busy} onClick={() => void checkPayment(enquiry)}
-                            className="mt-4 ml-2 min-h-11 rounded-full border border-[#173a37] px-5 disabled:opacity-50">Check latest payment</button>}
-                        {attempts[enquiry.id] && <p role="status" className="mt-3 rounded-xl bg-[#fff0dc] p-3">{attempts[enquiry.id].status === "REFUND_PENDING"
-                            ? "A late payment needs branch refund review. Please do not pay again; contact the branch."
-                            : `Payment ${attempts[enquiry.id].status.toLowerCase()}.`} {attempts[enquiry.id].status === "PENDING" && attempts[enquiry.id].paymentUrl
-                            && <a className="underline" href={attempts[enquiry.id].paymentUrl ?? undefined}>Resume secure checkout</a>}</p>}
-                    </details></article>)}
-                    {matches.length>historyLimit&&<button type="button" onClick={()=>setHistoryLimit(current=>current+10)} className="min-h-11 rounded-xl border px-4">Show more requests</button>}
-                </section>}
                     {catalogueBranchId!==branch.id?<p role="status" className="mt-7">Loading this branch’s occasion collection…</p>:<form id="occasion-plan" onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
                         <p className="text-xs font-bold uppercase tracking-widest text-[#c76752]">01 · Plan your celebration</p><p className="text-sm">Choose your food and packaging. Our branch reviews production, box fit and pricing before you pay.</p>
                         <label className="block">Occasion <input required maxLength={80} value={type} onChange={event => setType(event.target.value)} className="mt-2 w-full rounded-xl border p-3" /></label>
                         <div className="grid gap-4 sm:grid-cols-2">
-                            <label>Date in India <input type="date" required min={nextBusinessDate(features.today)} value={date} onChange={event => setDate(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
+                            <OccasionDatePicker value={date} onChange={setDate} min={earliest} max={latest} />
                             <label>Guests <input type="number" required min={1} max={10000} value={guests} onChange={event => setGuests(Number(event.target.value))} className="mt-2 block w-full rounded-xl border p-3" /></label>
                         </div>
                         <label className="block">How should food be collected?
@@ -257,6 +122,7 @@ export default function OccasionsPage() {
                                 {box.imageUrl ? <img src={box.imageUrl} alt={`${box.name} packaging`} className="h-40 w-full object-cover" /> : <div className="flex h-32 items-center justify-center bg-[#f1eee5] text-sm">Packaging photo coming soon</div>}
                                 <div className="p-4"><strong>{box.name}</strong><p className="mt-1 text-sm">{box.dimensions} · {box.material}</p><p className="text-sm">{box.compartments} compartments · up to {box.capacityPieces} pieces</p><p className="text-sm">{box.price == null ? "Packaging price on review" : `Packaging estimate ₹${box.price} per box`} · {box.leadDays} days lead time</p>{box.branding && <p className="text-sm">{box.branding}</p>}</div></button>)}</div>
                             {boxId && <label className="mt-4 block">Number of gift boxes<input type="number" min={1} max={10000} required value={boxCount} onChange={event => setBoxCount(Number(event.target.value))} className="ml-3 w-32 rounded-xl border p-3" /><span className="mt-2 block text-sm">Choose pieces per box below. We calculate the full production request automatically. The branch confirms physical fit and packaging cost in your quote.</span></label>}
+                            {boxId&&<label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={includeSpoons} onChange={event=>setIncludeSpoons(event.target.checked)} />Include one spoon per box in the quote<span className="text-xs">Optional · priced separately by the branch</span></label>}
                         </fieldset>
                         {selectedBox && gallery.length>0 && <section aria-label="Selected packaging photos" className="occasion-gallery"><img src={gallery[Math.min(galleryIndex,gallery.length-1)]} alt={`${selectedBox.name} view ${galleryIndex+1}`} /><div>{gallery.map((url,index)=><button key={url} type="button" aria-label={`View packaging photo ${index+1}`} aria-pressed={galleryIndex===index} onClick={()=>setGalleryIndex(index)}><img src={url} alt="" /></button>)}</div><p>Actual packaging photos · the branch confirms your assortment fits before quoting.</p></section>}
                         <fieldset><legend className="font-serif text-2xl">03 · Build your celebration selection</legend>
@@ -272,9 +138,9 @@ export default function OccasionsPage() {
                         <aside className="occasion-selection" aria-label="Your occasion selection"><div><p className="text-xs font-bold uppercase tracking-widest">Your celebration basket</p><h3 className="text-xl font-semibold">{selected.length} selections{boxId?` · ${boxCount.toLocaleString("en-IN")} gift boxes`:""}</h3><p className="text-sm">{selected.length?"Browse another category to keep adding. Your selections stay here.":"Choose a category and add quantities to build your request."}</p></div><ul>{selected.map(product=><li key={product.id}><span>{product.name}</span><strong>{boxId?`${items[product.id]} per box · ${(items[product.id]*boxCount).toLocaleString("en-IN")} pieces`: `${items[product.id].toLocaleString("en-IN")} ${(units[product.id]??(product.saleMode==="WEIGHT"?"KG":"PIECE"))==="KG"?"kg":"pieces"}`}</strong><button type="button" aria-label={`Remove ${product.name} from occasion selection`} onClick={()=>setItems(current=>({...current,[product.id]:0}))}>Remove</button></li>)}</ul><p className="text-sm">A tailored quote follows branch review. No payment is taken when you send this request.</p></aside>
                         <label className="block">Anything else? <textarea maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
                         <div className="flex flex-wrap gap-3">
-                            <button disabled={busy || !products.length || !session.authenticated} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
+                            <button disabled={busy || !products.length || !session.authenticated || !date || date<earliest || date>latest} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
                         </div>
-                        <p className="text-sm text-[#4e605c]">Verify your phone above to send your request. This enquiry creates no booking or stock reservation. The manager reviews a dedicated future production plan, packaging, taxes, deposit and balance before payment.</p>
+                        <p className="text-sm text-[#4e605c]">{session.authenticated?"You are signed in with a verified phone. Your request will appear in Requests & quotes.":"Verify your phone above to send your request."} The branch confirms the price and collection time before you pay.</p>
                     </form>}
                 </>}
                 {message && <p role="status" className="mt-5 rounded-xl bg-[#fff0dc] p-4">{message}</p>}

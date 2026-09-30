@@ -38,8 +38,12 @@ public class OccasionCatalogue {
     public record SweetSettings(boolean occasionOnly, boolean published, @Min(0) @Max(365) int leadDays,
                                 @DecimalMin("0.001") @Digits(integer=6,fraction=3) BigDecimal pieceGrams) {}
     public record Recipe(long productId, int pieces) {}
-    public record GiftRequest(long boxId, int boxCount, List<Recipe> recipe) {}
-    public record GiftSnapshot(Box box, int boxCount, List<Recipe> recipe, BigDecimal packagingEstimate, BigDecimal approvedPackagingTotal) {}
+    public record GiftRequest(long boxId, int boxCount, List<Recipe> recipe,boolean includeSpoons) {
+        public GiftRequest(long boxId,int boxCount,List<Recipe> recipe) {this(boxId,boxCount,recipe,false);}
+    }
+    public record GiftSnapshot(Box box, int boxCount, List<Recipe> recipe, BigDecimal packagingEstimate, BigDecimal approvedPackagingTotal,boolean includeSpoons) {
+        public GiftSnapshot(Box box,int boxCount,List<Recipe> recipe,BigDecimal packagingEstimate,BigDecimal approvedPackagingTotal) {this(box,boxCount,recipe,packagingEstimate,approvedPackagingTotal,false);}
+    }
     void enabled() {if (!features.isOccasionEnquiries()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);}
     @Transactional(readOnly=true)
     public Catalogue catalogue(long branchId, boolean admin) {
@@ -107,6 +111,6 @@ public class OccasionCatalogue {
         if(seen.size()!=items.size() || pieces>box.capacityPieces() || seen.size()>box.compartments()
             || date.isBefore(LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(box.leadDays())))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Check box capacity, compartments and packaging lead time. The manager will also review physical fit.");
-        return new GiftSnapshot(box,gift.boxCount(),List.copyOf(gift.recipe()),box.price()==null?null:box.price().multiply(BigDecimal.valueOf(gift.boxCount())),null);
+        return new GiftSnapshot(box,gift.boxCount(),List.copyOf(gift.recipe()),box.price()==null?null:box.price().multiply(BigDecimal.valueOf(gift.boxCount())),null,gift.includeSpoons());
     }
 }

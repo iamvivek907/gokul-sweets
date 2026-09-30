@@ -155,7 +155,7 @@ export default function AdminReportsPage() {
                 new AbortController();
 
 
-            Promise.all([
+            const load = () => Promise.all([
                 getExecutiveDashboardOptions(
                     authorization,
                     controller.signal
@@ -176,6 +176,7 @@ export default function AdminReportsPage() {
                         dashboardResult
                     ]) => {
 
+                        if(controller.signal.aborted)return;
                         setOptions(optionsResult);
                         if (staffId) setBranchId(current => current ?? preferredAdminReportBranchId(staffId, optionsResult.branches));
 
@@ -222,7 +223,10 @@ export default function AdminReportsPage() {
                 );
 
 
+            void load();
+            const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void load();},60000);
             return () => {
+                window.clearInterval(timer);
 
                 controller.abort();
             };

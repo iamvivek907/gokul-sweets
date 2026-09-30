@@ -38,7 +38,7 @@ try {
     await page.getByRole("button", {name: "Notification inbox", exact: true}).click();
     await page.getByRole("heading", {name: "Payment received"}).waitFor();
     assert.equal(await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).getAttribute("href"), "/orders/GKS-EXACT-42");
-    assert.equal(await page.getByRole("link", {name: "Open occasion request"}).getAttribute("href"), "/occasions#occasion-request-43");
+    assert.equal(await page.getByRole("link", {name: "Open occasion request"}).getAttribute("href"), "/occasions/requests?enquiry=request-43");
     assert.match(await page.locator("time").first().textContent(), /30 Sept|30 Sep/);
     assert.match(await page.locator("time").first().textContent(), /12:05.*am.*IST/i);
     await page.getByText("Notification settings", {exact: true}).click();

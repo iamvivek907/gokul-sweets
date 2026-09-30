@@ -4,7 +4,7 @@ const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE??"playwright");
 const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:390,height:844}});
-let authenticated=true, submitted=null, requests=0, expireNext=false;
+let authenticated=true, submitted=null, requests=0, expireNext=false;const history=[];
 const branch={id:1,code:"TEST",name:"Celebration branch",active:true,pickupAvailable:true};
 const sweets=[{id:1,name:"Kaju Barfi",description:"Made fresh for your celebration",saleMode:"WEIGHT",occasionOnly:true,published:true,leadDays:3,pieceGrams:null,categoryName:"Sweets"},{id:2,name:"Peda",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null,categoryName:"Sweets"},{id:3,name:"Laddoo",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null,categoryName:"Sweets"}];
 sweets.push({id:4,name:"Paneer",saleMode:"WEIGHT",occasionOnly:false,published:true,leadDays:2,categoryName:"Paneer"});
@@ -19,9 +19,10 @@ await context.route("**/api/**",async route=>{
  else if(path==="/api/branches/1/occasion-catalogue")json={sweets,boxes:[box],branding:{headline:"Celebrate beautifully with Gokul",description:"A thoughtful selection for your guests",imageUrl:null,published:true}};
  else if(path==="/api/branches/1")json=branch;
  else if(path==="/api/branches")json=[branch];
+ else if(path==="/api/occasion-enquiries"&&request.method()==="GET")json=history;
  else if(path==="/api/occasion-enquiries"&&request.method()==="POST") {
   if(expireNext) {authenticated=false;return route.fulfill({status:401,json:{message:"Session expired"}});}
-  submitted=request.postDataJSON();requests++;json={...submitted,id:`request-${requests}`,status:"REQUESTED",nextStep:"The branch is reviewing your enquiry",paidAmount:0,pricedLines:[],items:submitted.items,gift:submitted.gift?{box,boxCount:submitted.gift.boxCount,recipe:submitted.gift.recipe,packagingEstimate:7000,approvedPackagingTotal:null}:null};
+  submitted=request.postDataJSON();requests++;json={...submitted,id:`request-${requests}`,status:"REQUESTED",nextStep:"The branch is reviewing your enquiry",paidAmount:0,branchId:1,pricedLines:[],items:submitted.items,gift:submitted.gift?{box,boxCount:submitted.gift.boxCount,recipe:submitted.gift.recipe,packagingEstimate:7000,approvedPackagingTotal:null}:null};history.unshift(json);
  }
  await route.fulfill({json});
 });
@@ -31,7 +32,9 @@ try {
  await page.getByLabel("Verified occasion contact").waitFor();
  assert.equal(await page.getByRole("button",{name:"Sign out",exact:true}).count(),0);
  await page.getByRole("heading",{name:"Celebrate beautifully with Gokul"}).waitFor();
- await page.getByLabel("Date in India").fill("2026-10-10");
+ await page.getByRole("button",{name:/Date in India/}).click();
+ assert.equal(await page.getByRole("button",{name:"Previous month"}).isDisabled(),true);
+ await page.getByRole("button",{name:/10 October/}).click();
  await page.getByLabel("Kaju Barfi unit").selectOption("PIECE");
  await page.getByLabel("Kaju Barfi quantity").fill("1000");
  await page.evaluate(()=>document.fonts.ready);
@@ -47,10 +50,15 @@ try {
  assert.equal(await page.getByLabel("Kaju Barfi quantity").inputValue(),"1000");
  await page.getByRole("button",{name:"Remove Paneer from occasion selection"}).click();
  await page.getByRole("button",{name:"Request a reviewed quote"}).click();
- await page.getByText("Request sent.",{exact:false}).waitFor();
+ await page.waitForURL("**/occasions/requests?enquiry=request-1");
+ await page.getByText("The branch is reviewing your enquiry",{exact:true}).waitFor();
  assert.deepEqual(submitted.items,[{productId:1,quantity:1000,unit:"PIECE"}]);
  assert.equal(submitted.gift,null);
- assert.equal(await page.evaluate(()=>document.querySelector("#occasion-tracker").getBoundingClientRect().top<document.querySelector("#occasion-plan").getBoundingClientRect().top),true);
+ assert.equal(await page.locator("#occasion-plan").count(),0);
+ await page.getByRole("link",{name:"Plan another occasion"}).click();
+ await page.getByLabel("Verified occasion contact").waitFor();
+ await page.getByRole("button",{name:/Date in India/}).click();
+ await page.getByRole("button",{name:/10 October/}).click();
  await page.getByRole("button",{name:/Celebration eight/}).click();
  await page.getByRole("button",{name:"View packaging photo 2"}).click();
  assert.match(await page.getByRole("img",{name:"Celebration eight view 2"}).getAttribute("src"),/inside/);
@@ -60,10 +68,14 @@ try {
  await page.getByRole("button",{name:"Request a reviewed quote"}).click();
  await page.waitForFunction(()=>document.querySelector('[id="occasion-request-2"]')!==null);
  assert.deepEqual(submitted.items,[{productId:1,quantity:2800,unit:"PIECE"},{productId:2,quantity:1400,unit:"PIECE"},{productId:3,quantity:1400,unit:"PIECE"}]);
- assert.deepEqual(submitted.gift,{boxId:8,boxCount:700,recipe:[{productId:1,pieces:4},{productId:2,pieces:2},{productId:3,pieces:2}]});
+ assert.deepEqual(submitted.gift,{boxId:8,boxCount:700,includeSpoons:false,recipe:[{productId:1,pieces:4},{productId:2,pieces:2},{productId:3,pieces:2}]});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.setViewportSize({width:1440,height:1000});
  if(process.env.ALERT_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/occasion-desktop.png`,fullPage:true});
+ await page.getByRole("link",{name:"Plan another occasion"}).click();
+ await page.getByLabel("Verified occasion contact").waitFor();
+ await page.getByRole("button",{name:/Date in India/}).click();
+ await page.getByRole("button",{name:/10 October/}).click();
  await page.getByRole("button",{name:/^Bulk food/}).click();
  await page.getByLabel("Kaju Barfi quantity").fill("1250");expireNext=true;
  await page.getByRole("button",{name:"Request a reviewed quote"}).click();
@@ -79,4 +91,4 @@ try {
  const tabs=await page.getByRole("navigation",{name:"Branch pages"}).innerText();
  assert.ok(tabs.indexOf("Occasions & gifting")<tabs.indexOf("Branch details"));
  console.log("PASS: compact verified identity, piece request, 700 mixed boxes, requested-unit payload, mobile layout, guest browsing and branch navigation.");
-}finally{await browser.close();}
+}catch(error){console.error(await page.locator("body").innerText());throw error;}finally{await browser.close();}

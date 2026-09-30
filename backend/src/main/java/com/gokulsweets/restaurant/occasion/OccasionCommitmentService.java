@@ -58,10 +58,15 @@ public class OccasionCommitmentService {
     private record Start(Attempt attempt, boolean newAttempt) {}
 
     public Checkout beginDeposit(ConsentEnvironment environment, UUID subject, UUID id, long pickupSlotId) {
+        return beginDeposit(environment,subject,id,pickupSlotId,false);
+    }
+    public Checkout beginDeposit(ConsentEnvironment environment, UUID subject, UUID id, long pickupSlotId,boolean estimateAccepted) {
         requireEnabled();
         Start start = transactions.execute(state -> {
             Enquiry enquiry = lockEnquiry(id);
             requireOwner(enquiry, environment, subject);
+            if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT estimated FROM occasion_enquiries WHERE id=?",Boolean.class,id)) && !estimateAccepted)
+                throw conflict("Accept the estimated-weight pricing terms before paying the advance.");
             if ("PAYMENT_PENDING".equals(enquiry.status()) || "HELD".equals(enquiry.status())) {
                 Attempt pending = pendingAttempt(id, "DEPOSIT");
                 if (pending != null && pending.expiresAt().isAfter(clock.instant())) return new Start(pending, false);
@@ -83,6 +88,8 @@ public class OccasionCommitmentService {
                     Integer.class, id);
             if (priced == null || priced.compareTo(enquiry.quote()) != 0 || !Objects.equals(pricedCount, itemCount))
                 throw conflict("This quote needs item prices and tax reviewed by the branch before payment.");
+            if(estimateAccepted && jdbc.update("UPDATE occasion_enquiries SET estimate_accepted_at=? WHERE id=? AND estimated AND estimate_accepted_at IS NULL",Timestamp.from(clock.instant()),id)>0)
+                event(id,"customer","QUOTED","QUOTED","Accepted actual packed-weight pricing at agreed rates; advance credited toward final invoice");
             Instant serviceStart = jdbc.query("""
                     SELECT slot_date, start_time FROM pickup_slots
                     WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
@@ -179,6 +186,8 @@ public class OccasionCommitmentService {
         Start start = transactions.execute(state -> {
             Enquiry enquiry = lockEnquiry(id);
             requireOwner(enquiry, environment, subject);
+            if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT estimated AND packing_finalized_at IS NULL FROM occasion_enquiries WHERE id=?",Boolean.class,id)))
+                throw conflict("The branch must finalize actual packed quantities before balance payment.");
             if (!"PAID".equals(enquiry.status()) || enquiry.deposit() == null
                     || enquiry.paid().compareTo(enquiry.deposit()) != 0
                     || enquiry.quote().compareTo(enquiry.paid()) <= 0)
@@ -190,6 +199,7 @@ public class OccasionCommitmentService {
             if (existing != null) jdbc.update("UPDATE occasion_payment_attempts SET status = 'EXPIRED' WHERE id = ?", existing.id());
             UUID attemptId = UUID.randomUUID();
             Instant expiresAt = clock.instant().plus(PAYMENT_WINDOW);
+            if(enquiry.balanceDue()!=null && expiresAt.isAfter(enquiry.balanceDue())) expiresAt=enquiry.balanceDue();
             BigDecimal remaining = enquiry.quote().subtract(enquiry.paid());
             String merchantId = "GKS-" + environment.name() + "-OCC-" + attemptId;
             jdbc.update("""
@@ -256,7 +266,7 @@ public class OccasionCommitmentService {
         // An uncertain provider response must remain pending for status reconciliation; never create a second charge.
         if (attempt.expiresAt().isBefore(clock.instant())) throw conflict("The payment window ended. Refresh the status.");
         String storefront = phonePeProperties.getRedirectUrl().replaceAll("/checkout/?$", "");
-        String redirect = storefront + "/occasions?enquiry=" + attempt.enquiryId() + "&payment=" + attempt.id();
+        String redirect = storefront + "/occasions/requests?enquiry=" + attempt.enquiryId() + "&payment=" + attempt.id();
         var created = phonePe.createPayment(attempt.merchantOrderId(), attempt.amount(), redirect, 600);
         if (created.redirectUrl() == null || created.orderId() == null)
             throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Payment provider did not start checkout.");

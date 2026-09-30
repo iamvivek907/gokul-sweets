@@ -151,6 +151,25 @@ public class CustomerNotificationInbox {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
+    public void occasionDecisionChanged(UUID enquiryId) {
+        if (!enabled()) return;
+        jdbc.update("""
+          INSERT INTO customer_notification_events(environment,subject_id,event_key,kind,target_type,target_id,title,message)
+          SELECT e.environment,e.subject_id,'occasion-decision:'||v.id,
+            CASE WHEN v.detail LIKE 'Packing finalized%' THEN 'OCCASION_PACKING_FINAL' ELSE 'OCCASION_'||v.to_status END,
+            'OCCASION',e.id::text,
+            CASE WHEN v.detail LIKE 'Packing finalized%' THEN 'Your final occasion invoice is ready'
+                 WHEN v.to_status='QUOTED' THEN 'Your occasion quote is ready' ELSE 'Your occasion request was reviewed' END,
+            CASE WHEN v.detail LIKE 'Packing finalized%' THEN 'Packing is complete. Review your measured quantities, final total and any remaining balance before collection.'
+                 WHEN v.to_status='QUOTED' THEN 'The branch shared a quote. Open Requests & quotes to review the total, payment plan and pickup time.'
+                 ELSE 'Open your occasion request to see the branch decision and explanation.' END
+          FROM occasion_enquiries e JOIN LATERAL(SELECT * FROM occasion_enquiry_events WHERE enquiry_id=e.id ORDER BY id DESC LIMIT 1) v ON TRUE
+          WHERE e.id=? AND e.environment=? AND (v.to_status IN ('QUOTED','DECLINED') OR v.detail LIKE 'Packing finalized%')
+          ON CONFLICT(environment,subject_id,event_key) DO NOTHING
+          """,enquiryId,environment());
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
     public void occasionPaymentChanged(String merchantOrderId) {
         if (!enabled()) return;
         jdbc.update("""

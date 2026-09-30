@@ -19,7 +19,7 @@ public class AnalyticsRefreshService {
             staffAuthorizationService;
 
 
-    @Transactional
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public AnalyticsRefreshResponse rebuildAll() {
 
         staffAuthorizationService
@@ -27,6 +27,55 @@ public class AnalyticsRefreshService {
                         PermissionName.REPORT_VIEW
                 );
 
+        return rebuildInternal();
+    }
+
+    /** Runs without a staff session; invoked only by the internal maintenance job. */
+    @Transactional(isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public void refreshChangedOrders() {
+        Boolean locked=jdbcTemplate.queryForObject("SELECT pg_try_advisory_xact_lock(88321096)", Boolean.class);
+        if (!Boolean.TRUE.equals(locked)) return;
+        var source=jdbcTemplate.queryForMap("SELECT COALESCE(MAX(id),0) AS n, MAX(updated_at) AS latest FROM orders");
+        var checkpoint=jdbcTemplate.queryForList("SELECT highest_order_id, latest_order_update, business_date FROM analytics_refresh_checkpoint WHERE id=1");
+        var today=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata"));
+        boolean sameDay=!checkpoint.isEmpty()&&java.sql.Date.valueOf(today).equals(checkpoint.getFirst().get("business_date"));
+        if (sameDay && source.get("n").equals(checkpoint.getFirst().get("highest_order_id"))
+                && java.util.Objects.equals(source.get("latest"),checkpoint.getFirst().get("latest_order_update"))) return;
+        if(!sameDay || checkpoint.getFirst().get("latest_order_update")==null) rebuildInternal();
+        else refreshAffectedSummaries(checkpoint.getFirst().get("latest_order_update"));
+        jdbcTemplate.update("""
+                INSERT INTO analytics_refresh_checkpoint(id,highest_order_id,latest_order_update,business_date) VALUES(1,?,?,?)
+                ON CONFLICT(id) DO UPDATE SET highest_order_id=EXCLUDED.highest_order_id,
+                  latest_order_update=EXCLUDED.latest_order_update,business_date=EXCLUDED.business_date,refreshed_at=CURRENT_TIMESTAMP
+                """,source.get("n"),source.get("latest"),java.sql.Date.valueOf(today));
+    }
+
+    private void refreshAffectedSummaries(Object since) {
+        var dates=jdbcTemplate.queryForList("""
+            SELECT DISTINCT COALESCE(ps.slot_date,dw.service_date) AS d FROM orders o
+            LEFT JOIN pickup_slots ps ON ps.id=o.pickup_slot_id
+            LEFT JOIN delivery_capacity_windows dw ON dw.id=o.delivery_window_id
+            WHERE o.updated_at>=? AND COALESCE(ps.slot_date,dw.service_date) IS NOT NULL
+            """,java.sql.Date.class,since);
+        if(!dates.isEmpty()) {
+            // The dates come from typed DB Date values; no caller text enters SQL.
+            String in=dates.stream().map(date->"DATE '"+date.toLocalDate()+"'").collect(java.util.stream.Collectors.joining(","));
+            String scope="COALESCE(ps.slot_date,dw.service_date) IN ("+in+")";
+            for(String table:java.util.List.of("analytics_product_pair_daily","analytics_product_daily","analytics_sales_hourly","analytics_branch_daily","analytics_sales_daily"))
+                jdbcTemplate.update("DELETE FROM "+table+" WHERE business_date IN ("+in+")");
+            for(String query:java.util.List.of(SALES_DAILY_SQL,BRANCH_DAILY_SQL,SALES_HOURLY_SQL,PRODUCT_DAILY_SQL,PRODUCT_PAIR_DAILY_SQL))
+                jdbcTemplate.update(query.replace("WHERE o.order_status IN", "WHERE "+scope+" AND o.order_status IN"));
+        }
+        var customers=jdbcTemplate.queryForList("SELECT DISTINCT customer_contact_id FROM orders WHERE updated_at>=? AND customer_contact_id IS NOT NULL",Long.class,since);
+        if(!customers.isEmpty()) {
+            String ids=customers.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
+            jdbcTemplate.update("DELETE FROM analytics_customer_metrics WHERE customer_contact_id IN ("+ids+")");
+            jdbcTemplate.update(CUSTOMER_METRICS_SQL.replace("AND o.customer_contact_id IS NOT NULL","AND o.customer_contact_id IN ("+ids+")"));
+        }
+    }
+
+    private AnalyticsRefreshResponse rebuildInternal() {
+        jdbcTemplate.queryForObject("SELECT pg_advisory_xact_lock(88321096)", Object.class);
         long startedAt =
                 System.currentTimeMillis();
 
@@ -325,7 +374,7 @@ public class AnalyticsRefreshService {
                 branch_id,
                 product_id,
                 category_id,
-                order_count,
+                highest_order_id,
                 quantity_sold,
                 gross_item_revenue,
                 unique_customers,
@@ -380,7 +429,7 @@ public class AnalyticsRefreshService {
                 branch_id,
                 product_a_id,
                 product_b_id,
-                pair_order_count,
+                pair_highest_order_id,
                 refreshed_at
             )
             SELECT
