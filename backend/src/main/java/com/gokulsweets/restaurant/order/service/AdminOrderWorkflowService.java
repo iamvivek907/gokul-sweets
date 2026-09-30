@@ -65,6 +65,7 @@ public class AdminOrderWorkflowService {
 
     private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch;
     private final com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService bulkReadiness;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
 
 
     /*
@@ -236,6 +237,8 @@ public class AdminOrderWorkflowService {
          * =====================================================
          */
 
+        if (updatedRows == 1 && (targetStatus == OrderStatus.READY_FOR_PICKUP || targetStatus == OrderStatus.READY_FOR_DELIVERY))
+            notifications.orderReady(order.getId());
         if (updatedRows == 1 && order.getFulfillmentType() == FulfillmentType.DELIVERY) {
             if (targetStatus == OrderStatus.OUT_FOR_DELIVERY) dispatch.recordTransition(order.getId(), "DISPATCHED");
             if (targetStatus == OrderStatus.DELIVERED) dispatch.recordTransition(order.getId(), "DELIVERED");

@@ -32,6 +32,7 @@ public class OccasionCommitmentService {
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
     private static final Duration PAYMENT_WINDOW = Duration.ofMinutes(10);
     private final JdbcTemplate jdbc;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
     private final TransactionTemplate transactions;
     private final InventoryReservationService inventory;
     private final BranchInventoryPolicyRepository policies;
@@ -331,6 +332,7 @@ public class OccasionCommitmentService {
                     """, paid, Timestamp.from(clock.instant()), id);
             event(id, "provider", "PAID", "CONFIRMED", "Balance verified");
         }
+        notifications.occasionPaymentChanged(merchantOrderId);
     }
 
     private void markAttemptPaid(Attempt attempt, String providerTransactionId) {
@@ -351,6 +353,7 @@ public class OccasionCommitmentService {
         if ("DEPOSIT".equals(attempt.stage()) && ("HELD".equals(enquiry.status())
                 || "PAYMENT_PENDING".equals(enquiry.status()))) release(enquiry, "Late payment needs refund review");
         event(id, "provider", enquiry.status(), enquiry.status(), "Verified late payment: manual refund review required");
+        notifications.occasionPaymentChanged(merchantOrderId);
     }
 
     public void expire(UUID enquiryId) {

@@ -216,3 +216,61 @@ Owner QA scenarios:
 - SCRUM-35 / SCRUM-73: request 100 kg; approve price, deposit, balance deadline and readiness; verify automatic dedicated allocation without retail-stock changes; pay deposit/balance; record partial/full physical readiness; test stale staff edits, expiry and pre-preparation cancellation. Verify late payments enter refund review and never confirm cancelled orders. PhonePe refund execution remains manual; cancellation after preparation and automated aggregate kitchen capacity remain outside this implementation.
 
 Repeat with each relevant flag OFF using DEV environment overrides and restore ON afterwards. Record deployed frontend/backend SHAs, branch, IST time, flag values, actual results and defects in QA subtasks. In QA is not Done; no deployment or provider/device/staff test result is claimed by this configuration change.
+
+## Sprint 5 notification inbox (SCRUM-39)
+
+Baseline: merged `dev` `c99e8a38d7cd36297c0ef5ca573e02bd0cd2c71b` (PR 138).
+
+| Setting | Default | Owner / dependency | OFF fallback |
+| --- | --- | --- | --- |
+| `GOKUL_FEATURES_NOTIFICATION_INBOX` | `false` | Customer service; verified OTP identity, trusted HTTPS Origin, DEV/PROD isolation and abuse-controls verification; account hub for the profile entry point | Existing order history, tracking and occasion request history |
+
+Migration **V90** adds durable customer notification events and channel preferences.
+There are no new admin columns. Existing payment, staff readiness and delay actions
+create messages automatically for exact verified owners, within the source transaction.
+A rollback removes both the source change and message; unique source/status keys suppress
+concurrent insert/replay duplicates. Flag OFF stops new recording and hides the API/UI;
+turning it back ON preserves prior read state. There is **no historical backfill**.
+
+Supported events: verified standard-order payments, provider-confirmed refunds, late-payment
+refund reviews, pickup/delivery kitchen-ready transitions, revised pickup estimates,
+and occasion deposit/balance receipts and late-payment refund reviews. Delivery kitchen-ready
+never claims delivered. Refund-review never claims refunded. The provider's existing refund
+capabilities are unchanged. Occasions link their exact request; the resulting order's readiness
+links its exact order. A message is an immutable historical event; its link shows current status.
+All timestamps are explicit instants displayed in Asia/Kolkata.
+
+Customers find **Profile → Notification inbox**, with unread/read state, refresh and bounded
+older-message pagination. Lost-network refresh retains already loaded messages; read status
+changes only after server acknowledgement. No notification data is saved to browser storage.
+The offer channel defaults OFF and cannot opt in without current versioned marketing consent;
+withdrawal remains in Privacy and data choices. The preference does not itself grant consent.
+**Offer broadcasting, browser push, sound, SMS and email dispatch are not part of this PR.**
+They require subsequent sender/device work; there is no external-send claim or delivery state.
+`AVAILABLE` means a message is persisted in the in-app inbox, not read or externally delivered.
+
+### DEV checks after merge and deployment
+
+1. Apply V90 and enable the inbox switch in DEV only after OTP/Origin prerequisites work.
+   Keep Sprint 4 QA switches as configured. Sign in; open Profile → Notification inbox.
+2. Pay a new owner-bound order and replay the provider callback: one payment message.
+   Mark ready through authorized staff actions: one ready message; another customer's inbox
+   and a revoked session cannot access it. Guest orders are not imported by phone.
+3. Publish a revised pickup estimate, retry it, then revise it again: one event per distinct
+   update. Read one message from two tabs; the timestamp stays unchanged on retry.
+4. Verify occasion deposit/balance messages open the exact request after asynchronous history
+   loads. Late success shows refund review, never a confirmed refund. Provider refund completion
+   is separately validated on a provider that supports it.
+5. Lose network during refresh/read, recover, paginate older messages and check mobile,
+   keyboard and desktop. Use a non-IST browser zone across India midnight.
+6. Toggle OFF: new events stop; order/occasion history still works. Toggle ON: existing read
+   state returns, with no old-event backfill. Optional offer preference starts OFF; marketing
+   opt-out is separate from essential transaction messages.
+
+Tests: `CustomerNotificationInboxIntegrationTest`, identity controller and effective-flag tests,
+existing payment/workflow regressions, and `frontend/tests/customer-notification-inbox.browser.mjs`.
+Run the browser regression with a local Next server and `PLAYWRIGHT_MODULE` pointing to an
+installed Playwright module; `BROWSER_BASE` defaults to `http://127.0.0.1:3311`.
+Deployment/provider/staff DEV verification remains an owner QA step; CI alone does not prove it.
+SCRUM-39 remains open until its remaining sender work and DEV evidence are complete;
+SCRUM-40 depends on this inbox foundation.

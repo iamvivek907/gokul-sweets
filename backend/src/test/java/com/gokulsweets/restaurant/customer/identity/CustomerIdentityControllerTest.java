@@ -36,6 +36,7 @@ class CustomerIdentityControllerTest {
     private final ConsentLedger consents = mock(ConsentLedger.class);
     private final CustomerPrivacyRequests privacyRequests = mock(CustomerPrivacyRequests.class);
     private final CustomerAccountHub accountHub = mock(CustomerAccountHub.class);
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications = mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class);
     private final EnhancementProperties features = new EnhancementProperties();
     private final MockEnvironment settings = new MockEnvironment()
             .withProperty("gokul.environment-isolation.enabled", "true")
@@ -44,7 +45,33 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(
             exchange, sessions, subjects, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
-            ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub);
+            ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub, notifications);
+
+    @Test
+    void inboxRequiresEnabledFlagTrustedOriginAndCurrentSubjectForReadAndMutation() {
+        features.setCustomerOtpIdentity(true);
+        var trusted = request();
+        trusted.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
+        var subject = UUID.randomUUID();
+        when(sessions.subject(eq(ConsentEnvironment.DEV), eq("current-session"), any())).thenReturn(Optional.of(subject));
+        assertThatThrownBy(() -> controller.notifications(null, trusted)).isInstanceOf(ResponseStatusException.class);
+        verify(notifications, never()).page(anyString(), any(), any());
+        when(notifications.enabled()).thenReturn(true);
+        controller.notifications(null, trusted);
+        verify(notifications).page("DEV", subject, null);
+        controller.readNotification(42, trusted);
+        verify(notifications).markRead("DEV", subject, 42);
+        var foreign = request();
+        foreign.setCookies(new Cookie("__Host-gokul-customer", "current-session"));
+        foreign.removeHeader(HttpHeaders.ORIGIN);
+        foreign.addHeader(HttpHeaders.ORIGIN, "https://untrusted.example");
+        assertThatThrownBy(() -> controller.readNotification(43, foreign)).isInstanceOf(ResponseStatusException.class);
+        verify(notifications, never()).markRead(anyString(), any(), eq(43L));
+        var revoked = request();
+        revoked.setCookies(new Cookie("__Host-gokul-customer", "revoked"));
+        assertThatThrownBy(() -> controller.notificationPreferences(revoked)).isInstanceOf(ResponseStatusException.class);
+        verify(notifications, never()).preferences(anyString(), any());
+    }
 
     @Test
     void accountHubRequiresFlagTrustedOriginAndExactSessionSubject() {
