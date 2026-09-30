@@ -44,6 +44,7 @@ export default function BranchHomePage() {
                     <button type="button" aria-current={tab === "home" ? "page" : undefined} onClick={() => setTab("home")}>Home</button>
                     {selected?.id === branch.id ? <Link href="/menu">Menu</Link> : <BranchSelector cardBranch={branch} destination="menu" />}
                     {occasionEnquiries && (selected?.id === branch.id ? <Link href="/occasions">Occasions & gifting</Link> : <BranchSelector cardBranch={branch} destination="occasions" />)}
+                    {occasionEnquiries && <Link href="/occasions/requests">My requests & quotes</Link>}
                     <button type="button" aria-current={tab === "details" ? "page" : undefined} onClick={() => setTab("details")}>Branch details</button>
                 </nav>
                 {tab === "details" ? <BranchDetails branch={branch} /> : <section className="branch-home-welcome">

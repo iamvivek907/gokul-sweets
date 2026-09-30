@@ -19,6 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OccasionOrderFinalizer {
     private final JdbcTemplate jdbc;
+    private final com.gokulsweets.restaurant.customer.CustomerContactService contacts;
     private final VerifiedCustomerPhoneLookup customers;
     private final OrderNumberGenerator orderNumbers;
     private final com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts staffAlerts;
@@ -41,6 +42,7 @@ public class OccasionOrderFinalizer {
                 .orElseThrow(() -> new IllegalStateException("Verified customer phone is unavailable."));
         String name = customers.displayName(environment, subject).filter(value -> !value.isBlank())
                 .orElse("Occasion customer");
+        var contact=contacts.resolveGuestContact(phone,name);
         String number = orderNumbers.generate();
         BigDecimal subtotal = lines.stream().map(Line::subtotal).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal tax = lines.stream().map(Line::tax).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -48,10 +50,10 @@ public class OccasionOrderFinalizer {
                 rs -> rs.next() ? rs.getDate(1).toLocalDate() : null, enquiryId);
         Long orderId = jdbc.queryForObject("""
                 INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name, customer_phone,
-                    customer_phone_normalized, pickup_type, subtotal, tax_amount, total_amount,
+                    customer_phone_normalized, customer_contact_id, pickup_type, subtotal, tax_amount, total_amount,
                     order_status, reservation_expires_at)
-                VALUES (?, ?, ?, ?, ?, ?, 'NORMAL', ?, ?, ?, 'CONFIRMED', ?) RETURNING id
-                """, Long.class, number, branchId, pickupSlotId, name, phone, phone,
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'NORMAL', ?, ?, ?, 'CONFIRMED', ?) RETURNING id
+                """, Long.class, number, branchId, pickupSlotId, name, phone, phone,contact.getId(),
                 subtotal, tax, gross, Timestamp.valueOf(serviceDate.atTime(LocalTime.of(23, 59, 59))));
         for (Line line : lines) {
             BigDecimal divisor = "WEIGHT".equals(line.mode())

@@ -82,6 +82,11 @@ public class VerifiedCustomerSubjectStore {
                     VALUES (?, ?, ?, ?, 'PHONE_REVERIFICATION', ?)
                     """, environment.name(), prior, current, Timestamp.from(now), transferred);
         }
+        // Only provider proof reaches this method. Typed checkout phones never promote a contact.
+        jdbc.update("""
+                UPDATE customer_contacts SET verification_status='VERIFIED', updated_at=?
+                WHERE normalized_phone=? AND verification_status='UNVERIFIED'
+                """, Timestamp.valueOf(java.time.LocalDateTime.ofInstant(now, java.time.ZoneId.of("Asia/Kolkata"))), verifiedPhone);
         return current;
     }
 }

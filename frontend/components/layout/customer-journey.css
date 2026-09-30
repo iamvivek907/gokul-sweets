@@ -160,3 +160,38 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 .future-storefront .occasion-journey button[aria-pressed] {border:1px solid #d9e5df!important;border-radius:20px!important;box-shadow:none!important;}
 .future-storefront .occasion-journey button[aria-pressed="true"] {border:2px solid #c76752!important;background:#fff5e9!important;}
 .future-storefront .occasion-journey button[aria-pressed="true"] strong::after {content:" ✓ Selected";font-size:12px;color:#a14d39;}
+
+/* Occasion collection: category discovery, persistent assortment and prominent tracking. */
+.future-storefront .notification-review-action{background:#143936!important;color:#fffaf2!important}
+.future-storefront .occasion-journey{padding-bottom:8rem}
+.future-storefront .occasion-hero{position:relative;overflow:hidden}
+.future-storefront .occasion-hero>*{position:relative;z-index:1}
+.future-storefront .occasion-hero:has(.occasion-campaign-photo){padding-right:45%}
+.future-storefront .occasion-hero .occasion-campaign-photo{position:absolute;inset:0 0 0 auto;width:40%;height:100%;object-fit:cover;z-index:0}
+.future-storefront .occasion-hero-actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:1.75rem}
+.future-storefront .occasion-hero-actions a{display:inline-flex;align-items:center;min-height:48px;border-radius:999px;padding:.7rem 1.2rem;font-weight:700}
+.future-storefront .occasion-primary{background:#fffaf2!important;color:#143936!important}
+.future-storefront .occasion-secondary{border:1px solid #fffaf280;color:#fffaf2!important}
+.future-storefront .occasion-categories{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1rem;margin-top:1.5rem}
+.future-storefront .occasion-categories button{overflow:hidden;text-align:left;padding:0;background:white;color:#143936;min-width:0}
+.future-storefront .occasion-categories img,.future-storefront .occasion-category-fallback{height:120px;width:100%;object-fit:cover}
+.future-storefront .occasion-category-fallback{display:grid;place-items:center;background:#143936;color:#fffaf2;font-family:serif;font-size:3rem}
+.future-storefront .occasion-categories span{display:grid;gap:.3rem;padding:1rem}.future-storefront .occasion-categories small{color:#465c55}
+.future-storefront .occasion-product{display:flex;flex-direction:column;background:#fff}
+.future-storefront .occasion-product>div:last-child{display:flex;flex-direction:column;flex:1}
+.future-storefront .occasion-quantity{display:grid;grid-template-columns:minmax(0,1fr) minmax(100px,.45fr);align-items:end;gap:.75rem;margin-top:auto;padding-top:1rem}
+.future-storefront .occasion-quantity label{display:flex;flex-direction:column;justify-content:flex-end;gap:.25rem;min-width:0}.future-storefront .occasion-quantity input,.future-storefront .occasion-quantity select{display:block;box-sizing:border-box;flex:none;width:100%;min-width:0;height:48px;margin:0}
+.future-storefront .occasion-gallery{padding:1rem;border:1px solid #d9e5df;border-radius:1.5rem;background:#fffaf2}
+.future-storefront .occasion-gallery>img{width:100%;max-height:360px;object-fit:contain;border-radius:1rem;background:#f1eee5}
+.future-storefront .occasion-gallery>div{display:flex;gap:.5rem;margin:1rem 0;overflow-x:auto}.future-storefront .occasion-gallery button{padding:3px;flex:none}.future-storefront .occasion-gallery button img{width:80px;height:64px;object-fit:cover;border-radius:1rem}
+.future-storefront .occasion-selection{position:sticky;bottom:6.5rem;z-index:10;border:1px solid #b9ccc4;border-radius:1.25rem;background:#fffaf2;padding:1.25rem;box-shadow:0 8px 24px #09272518}
+.future-storefront .occasion-selection ul{max-height:160px;overflow:auto;margin:.75rem 0}.future-storefront .occasion-selection li{display:flex;align-items:center;justify-content:space-between;gap:.75rem;border-bottom:1px solid #d9e5df;padding:.5rem 0;font-size:.85rem}.future-storefront .occasion-selection li button{min-height:44px;text-decoration:underline;color:#8d3927}
+.future-storefront .occasion-tracker{background:#eff4ef;border:1px solid #c9d9d0;border-radius:1.5rem;padding:clamp(1rem,3vw,2rem)}
+.future-storefront .occasion-tracker-heading{display:flex;justify-content:space-between;gap:1rem;align-items:center}
+.future-storefront .occasion-status{display:inline-flex;align-items:center;border-radius:999px;background:#eaf2e8;padding:.4rem .75rem;color:#143936;font-size:.8rem;font-weight:700}
+.future-storefront .occasion-progress{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;margin:1rem 0;font-size:.75rem}.future-storefront .occasion-progress span{padding-top:.6rem;border-top:3px solid #d5dfd8;color:#556960}.future-storefront .occasion-progress .is-reached{border-color:#143936;color:#143936;font-weight:700}
+.future-storefront .occasion-request-details summary{cursor:pointer;min-height:44px;font-weight:700;color:#143936}
+@media(max-width:640px){.future-storefront .occasion-hero:has(.occasion-campaign-photo){padding-right:24px;padding-bottom:24px}.future-storefront .occasion-hero .occasion-campaign-photo{position:relative;width:100%;height:200px;border-radius:1rem;margin-top:1rem}.future-storefront .occasion-categories{grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem}.future-storefront .occasion-selection{position:static}.future-storefront .occasion-selection li{flex-wrap:wrap}.future-storefront .occasion-tracker-heading{align-items:flex-start}.future-storefront .occasion-progress{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.future-storefront .occasion-categories button{position:relative;display:flex;flex-direction:column;justify-content:flex-start}
+.future-storefront .occasion-categories button[aria-pressed="true"] strong::after{content:none!important}
+.future-storefront .occasion-categories button[aria-pressed="true"]::before{content:"✓";position:absolute;top:.65rem;right:.65rem;z-index:1;display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:50%;background:#fffaf2;color:#143936;font-weight:800}

@@ -41,7 +41,7 @@ public interface CustomerContactRepository
                     VALUES (
                         :normalizedPhone,
                         :latestName,
-                        'UNVERIFIED',
+                        CASE WHEN EXISTS (SELECT 1 FROM verified_customer_subjects v WHERE v.verified_phone=:normalizedPhone) THEN 'VERIFIED' ELSE 'UNVERIFIED' END,
                         :seenAt,
                         :seenAt,
                         :seenAt,

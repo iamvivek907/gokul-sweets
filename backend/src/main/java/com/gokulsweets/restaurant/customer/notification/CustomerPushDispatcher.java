@@ -123,7 +123,7 @@ public class CustomerPushDispatcher {
     }
     private static String destination(String type, String id) {
         String encoded = java.net.URLEncoder.encode(id, java.nio.charset.StandardCharsets.UTF_8).replace("+", "%20");
-        return "ORDER".equals(type) ? "/orders/" + encoded : "/occasions#occasion-" + encoded;
+        return "ORDER".equals(type) ? "/orders/" + encoded : "/occasions/requests?enquiry=" + encoded;
     }
     private record Task(long id, long eventId, UUID subscriptionId, int attempts, UUID subject,
                         String endpoint, String publicKey, String auth, Instant createdAt, String title, String message, String url, UUID lease) {}

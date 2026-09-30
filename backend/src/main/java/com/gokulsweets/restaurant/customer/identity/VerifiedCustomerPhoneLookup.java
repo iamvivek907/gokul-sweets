@@ -51,5 +51,9 @@ public class VerifiedCustomerPhoneLookup {
                 """, name.trim(), environment.name(), subjectId) != 1) {
             throw new IllegalStateException("Verified customer no longer exists");
         }
+        jdbc.update("""
+                UPDATE customer_contacts SET latest_name=?, verification_status='VERIFIED', updated_at=CURRENT_TIMESTAMP
+                WHERE normalized_phone=(SELECT verified_phone FROM verified_customer_subjects WHERE environment=? AND id=?)
+                """, name.trim(), environment.name(), subjectId);
     }
 }

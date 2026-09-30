@@ -59,6 +59,8 @@ jobs:
           node tests/customer-alerts.browser.mjs
           node tests/staff-alerts.browser.mjs
           node tests/occasion-booking.browser.mjs
+          node tests/occasion-admin.browser.mjs
+          node tests/occasion-operations.browser.mjs
 
   backend:
     runs-on: ubuntu-latest
@@ -87,6 +89,7 @@ jobs:
       PHONEPE_CLIENT_SECRET: ci-only
       PHONEPE_REDIRECT_URL: https://ci.example.invalid/checkout
       INVENTORY_AUTOMATION_SCHEDULER_ENABLED: 'false'
+      GOKUL_REPORTING_AUTOMATIC_REFRESH: 'false'
       GOKUL_ENVIRONMENT_ISOLATION_ENABLED: 'false'
       GOKUL_ENVIRONMENT_CORS_ENABLED: 'false'
       # Test-only 32-byte key so ON-by-default staff sessions can bootstrap in CI.

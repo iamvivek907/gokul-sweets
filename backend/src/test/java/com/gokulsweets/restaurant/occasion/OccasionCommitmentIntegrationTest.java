@@ -32,10 +32,14 @@ class OccasionCommitmentIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired OccasionCommitmentService commitments;
     @Autowired OccasionEnquiryService enquiries;
+    @Autowired OccasionOrderFinalizer orders;
     @Autowired OccasionProductionReadinessService readiness;
     @Autowired OccasionCancellationService cancellations;
     @Autowired EnhancementProperties features;
     @Autowired Clock clock;
+    @Autowired OccasionQuoteCalculator calculator;
+    @Autowired OccasionPackingFinalizer packing;
+    @Autowired com.gokulsweets.restaurant.reporting.AnalyticsRefreshService analytics;
     @MockitoBean PhonePeClient phonePe;
 
     @Test
@@ -401,6 +405,144 @@ class OccasionCommitmentIntegrationTest {
             assertThat(enquiries.staffGet(ConsentEnvironment.DEV,f.branch(),f.enquiry()).gift().box().name()).isEqualTo("Celebration eight");
             assertThatThrownBy(()->catalogue.validateGift(f.branch(),date,items,new OccasionCatalogue.GiftRequest(box.id(),700,recipe))).hasMessageContaining("unavailable");
         }finally{features.setOccasionEnquiries(old);}
+    }
+
+    @Test
+    void categoryGalleryAndBrandingAreBranchScopedAndPublicationSafe() {
+        var f=paidDeposit();boolean old=features.isOccasionEnquiries();
+        try {
+            features.setOccasionEnquiries(true);
+            jdbc.update("INSERT INTO branch_products(branch_id,product_id) VALUES(?,?)",f.branch(),f.product());
+            var photos=java.util.List.of("https://images.example.invalid/outer.jpg","https://images.example.invalid/inside.jpg");
+            var box=catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,"Gallery box",photos.getFirst(),"20 cm","Food-safe card",2,8,null,"",1,true,photos));
+            catalogue.saveBranding(f.branch(),new OccasionCatalogue.Branding("Celebrate with Gokul","Made for your gathering",photos.getFirst(),false));
+            assertThat(catalogue.catalogue(f.branch(),false).branding()).isNull();
+            assertThat(catalogue.catalogue(f.branch(),true).branding().headline()).isEqualTo("Celebrate with Gokul");
+            catalogue.saveBranding(f.branch(),new OccasionCatalogue.Branding("Celebrate with Gokul","Made for your gathering",photos.getFirst(),true));
+            var live=catalogue.catalogue(f.branch(),false);
+            assertThat(live.sweets().getFirst().categoryName()).isEqualTo("Occasion category");
+            assertThat(live.boxes().getFirst().imageUrls()).containsExactlyElementsOf(photos);
+            assertThat(live.branding().published()).isTrue();
+            assertThatThrownBy(()->catalogue.saveBox(f.branch()+100000,new OccasionCatalogue.Box(box.id(),"Other branch",null,"20 cm","Card",1,8,null,"",1,true,photos)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            assertThatThrownBy(()->catalogue.saveBranding(f.branch(),new OccasionCatalogue.Branding("Invalid","Invalid","http://unsafe.example",true)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        }finally{features.setOccasionEnquiries(old);}
+    }
+
+    @Test
+    void automaticQuotePricesFoodBoxesAndSpoonsAndFinalPackingUsesFrozenRates() {
+        boolean bulk=features.isOccasionBulkProduction(), enabled=features.isOccasionEnquiries();
+        try {
+            features.setOccasionBulkProduction(true);features.setOccasionEnquiries(true);
+            var f=paidDeposit();
+            jdbc.update("UPDATE products SET sale_mode='WEIGHT' WHERE id=?",f.product());
+            jdbc.update("INSERT INTO branch_products(branch_id,product_id,price_override,occasion_piece_grams) VALUES(?,?,400,20)",f.branch(),f.product());
+            jdbc.update("UPDATE occasion_enquiry_items SET requested_quantity=600 WHERE enquiry_id=?",f.enquiry());
+            var box=catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,"400 ml plastic box",null,"400 ml","Food-safe plastic",1,3,new BigDecimal("10"),"",0,true));
+            var snapshot=new OccasionCatalogue.GiftSnapshot(box,600,java.util.List.of(new OccasionCatalogue.Recipe(f.product(),1)),new BigDecimal("6000"),null,true);
+            jdbc.update("UPDATE occasion_enquiries SET status='REQUESTED',paid_amount=0,packaging_snapshot=?::jsonb WHERE id=?",new tools.jackson.databind.ObjectMapper().writeValueAsString(snapshot),f.enquiry());
+            var rates=java.util.List.of(new OccasionQuoteCalculator.Rate(f.product(),null,null,new BigDecimal("12")));
+            var extras=java.util.List.of(new OccasionQuoteCalculator.Extra("Plastic spoons",600,new BigDecimal("1")));
+            var input=new OccasionQuoteCalculator.Input(rates,new BigDecimal("25"),null,true,java.time.LocalTime.of(10,0),"600 pieces; actual packed weights at agreed rates",true,extras,null);
+            var preview=calculator.preview(ConsentEnvironment.DEV,f.branch(),f.enquiry(),input);
+            assertThat(preview.foodBase()).isEqualByComparingTo("4800");
+            assertThat(preview.foodTax()).isEqualByComparingTo("240");
+            assertThat(preview.packagingTotal()).isEqualByComparingTo("6600");
+            assertThat(preview.total()).isEqualByComparingTo("11640");
+            assertThat(preview.deposit()).isEqualByComparingTo("2910");
+            assertThat(preview.lines().getFirst().productionQuantity()).isEqualByComparingTo("12000");
+            assertThatThrownBy(()->calculator.approve(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",input)).hasMessageContaining("review");
+            var approved=calculator.approve(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",
+                new OccasionQuoteCalculator.Input(rates,new BigDecimal("25"),null,true,java.time.LocalTime.of(10,0),input.terms(),true,extras,preview.total()));
+            assertThat(approved.estimated()).isTrue();assertThat(approved.gift().approvedPackagingTotal()).isEqualByComparingTo("6000");
+            assertThat(approved.extraCharges().getFirst().quantity()).isEqualTo(600);
+            assertThatThrownBy(()->commitments.beginDeposit(ConsentEnvironment.DEV,f.subject(),f.enquiry(),approved.pickupSlotId())).hasMessageContaining("Accept");
+            jdbc.update("UPDATE occasion_enquiries SET status='PAID',paid_amount=deposit_amount WHERE id=?",f.enquiry());
+            jdbc.update("UPDATE occasion_production_allocations SET state='COMMITTED' WHERE enquiry_id=?",f.enquiry());
+            var actual=new OccasionPackingFinalizer.Input(java.util.List.of(new OccasionPackingFinalizer.Packed(f.product(),new BigDecimal("12500"))),0,true);
+            assertThatThrownBy(()->packing.finalizePacking(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",actual)).hasMessageContaining("pickup date");
+            assertThatThrownBy(()->commitments.beginBalance(ConsentEnvironment.DEV,f.subject(),f.enquiry())).hasMessageContaining("finalize");
+            var today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+            jdbc.update("UPDATE occasion_enquiries SET service_date=? WHERE id=?",Date.valueOf(today),f.enquiry());
+            jdbc.update("UPDATE pickup_slots SET slot_date=?,start_time='23:00',end_time='23:59:59' WHERE id=?",Date.valueOf(today),approved.pickupSlotId());
+            jdbc.update("UPDATE branch_products SET price_override=999 WHERE branch_id=? AND product_id=?",f.branch(),f.product());
+            jdbc.update("UPDATE tax_categories SET cgst_rate=9,sgst_rate=9 WHERE id=(SELECT tax_category_id FROM products WHERE id=?)",f.product());
+            var finalized=packing.finalizePacking(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",actual);
+            assertThat(finalized.quotedAmount()).isEqualByComparingTo("11850");
+            assertThat(finalized.originalEstimate()).isEqualByComparingTo("11640");
+            assertThat(finalized.calculation().lines().getFirst().unitPrice()).isEqualByComparingTo("400");
+            assertThat(finalized.calculation().foodTax()).isEqualByComparingTo("250");
+            assertThat(finalized.balancePaymentOpen()).isTrue();assertThat(finalized.packingFinalizedAt()).isNotNull();
+            assertThat(finalized.items().getFirst().quantity()).isEqualByComparingTo("600");
+            assertThat(finalized.productionPlan().getFirst().readyQuantity()).isEqualByComparingTo("12500");
+            assertThatThrownBy(()->packing.finalizePacking(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",actual)).hasMessageContaining("final invoice");
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM occasion_packing_finalizations WHERE enquiry_id=?",Integer.class,f.enquiry())).isEqualTo(1);
+            jdbc.update("UPDATE occasion_payment_attempts SET amount=2910 WHERE enquiry_id=?",f.enquiry());
+            when(phonePe.createPayment(anyString(),eq(new BigDecimal("8940.00")),anyString(),eq(600)))
+                .thenAnswer(invocation->new PhonePeClient.CreatePaymentResponse("final-balance",invocation.getArgument(0),"PENDING","https://pay.example/checkout",null,null));
+            var balance=commitments.beginBalance(ConsentEnvironment.DEV,f.subject(),f.enquiry());
+            commitments.verifiedWebhook(merchant(balance.attemptId()),"checkout.order.completed","COMPLETED","packing-balance");
+            var confirmed=enquiries.staffGet(ConsentEnvironment.DEV,f.branch(),f.enquiry());
+            assertThat(confirmed.status()).isEqualTo("CONFIRMED");assertThat(confirmed.paidAmount()).isEqualByComparingTo("11850");
+            assertThat(jdbc.queryForObject("SELECT weight_grams FROM order_items oi JOIN occasion_enquiries e ON e.order_id=oi.order_id WHERE e.id=?",Integer.class,f.enquiry())).isEqualTo(12500);
+        }finally{features.setOccasionBulkProduction(bulk);features.setOccasionEnquiries(enabled);}
+    }
+
+    @Test
+    void lowerFinalWeightPreservesCollectedMoneyAndCreatesCreditReviewWithoutRefund() {
+        var f=paidDeposit();var today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+        jdbc.update("UPDATE products SET sale_mode='WEIGHT' WHERE id=?",f.product());
+        jdbc.update("UPDATE occasion_enquiry_items SET requested_quantity=600,approved_quantity=12000,approved_unit='GRAM' WHERE enquiry_id=?",f.enquiry());
+        var line=new OccasionQuoteCalculator.Line(f.product(),"Occasion sweets","GRAM",new BigDecimal("600"),"PIECE",new BigDecimal("400"),null,new BigDecimal("12000"),new BigDecimal("2.5"),new BigDecimal("2.5"),new BigDecimal("4800"),new BigDecimal("240"),new BigDecimal("6600"),new BigDecimal("11640"));
+        var estimate=new OccasionQuoteCalculator.Calculation(java.util.List.of(line),line.foodBase(),line.foodTax(),line.packagingAmount(),line.grossAmount(),new BigDecimal("11058"),new BigDecimal("582"),clock.instant().minusSeconds(60),today.atTime(23,59,59).atZone(ZoneId.of("Asia/Kolkata")).toInstant(),today.atTime(10,0),java.util.List.of(),true);
+        jdbc.update("UPDATE occasion_enquiries SET estimated=TRUE,original_estimate=11640,quoted_amount=11640,deposit_amount=11058,paid_amount=11058,service_date=?,quote_calculation=?::jsonb WHERE id=?",Date.valueOf(today),new tools.jackson.databind.ObjectMapper().writeValueAsString(estimate),f.enquiry());
+        jdbc.update("UPDATE occasion_quote_lines SET sale_mode='WEIGHT',quantity=1,weight_grams=12000 WHERE enquiry_id=?",f.enquiry());
+        jdbc.update("UPDATE occasion_payment_attempts SET amount=11058 WHERE enquiry_id=?",f.enquiry());
+        var slot=enquiries.staffGet(ConsentEnvironment.DEV,f.branch(),f.enquiry()).pickupSlotId();
+        jdbc.update("UPDATE pickup_slots SET slot_date=?,end_time='23:59:59' WHERE id=?",Date.valueOf(today),slot);
+        jdbc.update("INSERT INTO occasion_production_allocations(enquiry_id,product_id,quantity,unit,expected_ready_at,state,approved_by) VALUES(?,?,12000,'GRAM',?,'COMMITTED','manager')",f.enquiry(),f.product(),Timestamp.valueOf(today.atTime(10,0)));
+        var result=packing.finalizePacking(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",new OccasionPackingFinalizer.Input(java.util.List.of(new OccasionPackingFinalizer.Packed(f.product(),new BigDecimal("10000"))),0,true));
+        assertThat(result.quotedAmount()).isEqualByComparingTo("10800");assertThat(result.paidAmount()).isEqualByComparingTo("11058");
+        assertThat(result.creditReviewAmount()).isEqualByComparingTo("258");assertThat(result.status()).isEqualTo("CONFIRMED");
+        assertThat(jdbc.queryForObject("SELECT status FROM occasion_payment_attempts WHERE enquiry_id=?",String.class,f.enquiry())).isEqualTo("PAID");
+        assertThat(jdbc.queryForObject("SELECT SUM(amount) FROM payments p JOIN occasion_enquiries e ON e.order_id=p.order_id WHERE e.id=?",BigDecimal.class,f.enquiry())).isEqualByComparingTo("11058");
+    }
+
+    @Test
+    void reportsBackfillThenRefreshOnlyAffectedBusinessDaysAndCustomers() {
+        var f=paidDeposit();
+        jdbc.update("UPDATE occasion_payment_attempts SET amount=1000 WHERE enquiry_id=?",f.enquiry());
+        jdbc.update("UPDATE occasion_enquiries SET paid_amount=1000,status='CONFIRMED' WHERE id=?",f.enquiry());
+        var number=orders.create(f.enquiry(),ConsentEnvironment.DEV,f.subject(),f.branch(),
+            enquiries.staffGet(ConsentEnvironment.DEV,f.branch(),f.enquiry()).pickupSlotId(),new BigDecimal("1000"));
+        var watermark=Timestamp.from(clock.instant().plus(Duration.ofDays(1)));
+        jdbc.update("UPDATE orders SET order_status='PICKED_UP',updated_at=? WHERE order_number=?",watermark,number);
+        jdbc.update("DELETE FROM analytics_refresh_checkpoint");
+        analytics.refreshChangedOrders();
+        assertThat(jdbc.queryForObject("SELECT completed_orders FROM analytics_branch_daily WHERE branch_id=?",Long.class,f.branch())).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT net_revenue FROM analytics_branch_daily WHERE branch_id=?",BigDecimal.class,f.branch())).isEqualByComparingTo("1000");
+        assertThat(jdbc.queryForObject("SELECT verification_status FROM customer_contacts WHERE id=(SELECT customer_contact_id FROM orders WHERE order_number=?)",String.class,number)).isEqualTo("VERIFIED");
+        jdbc.update("UPDATE orders SET order_status='CANCELLED',updated_at=? WHERE order_number=?",Timestamp.from(watermark.toInstant().plusSeconds(1)),number);
+        analytics.refreshChangedOrders();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM analytics_branch_daily WHERE branch_id=?",Integer.class,f.branch())).isZero();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM analytics_customer_metrics WHERE customer_contact_id=(SELECT customer_contact_id FROM orders WHERE order_number=?)",Integer.class,number)).isZero();
+        analytics.refreshChangedOrders();
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM analytics_refresh_checkpoint",Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void mixedSweetsCanShareOnePlasticBoxCompartmentWithinReviewedCapacity() {
+        var f=paidDeposit();boolean enabled=features.isOccasionEnquiries();
+        try {
+            features.setOccasionEnquiries(true);
+            var box=catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,"400 ml plastic box",null,"400 ml","Food-safe plastic",1,3,new BigDecimal("10"),"",1,true));
+            var recipe=java.util.List.of(new OccasionCatalogue.Recipe(f.product(),1),new OccasionCatalogue.Recipe(f.product()+1,1),new OccasionCatalogue.Recipe(f.product()+2,1));
+            var items=recipe.stream().map(x->new OccasionEnquiryService.Item(x.productId(),new BigDecimal("600"),OccasionEnquiryService.Unit.PIECE,"Assorted sweets")).toList();
+            var result=catalogue.validateGift(f.branch(),LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(3),items,new OccasionCatalogue.GiftRequest(box.id(),600,recipe,true));
+            assertThat(result.box().compartments()).isEqualTo(1);assertThat(result.recipe()).hasSize(3);assertThat(result.includeSpoons()).isTrue();
+            assertThat(result.packagingEstimate()).isEqualByComparingTo("6000");
+        }finally{features.setOccasionEnquiries(enabled);}
     }
 
     private Fixture paidDeposit() {

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 public class OccasionCatalogueController {
  private final OccasionCatalogue catalogue;
  private final StaffAuthorizationService staff;
+ private final com.gokulsweets.restaurant.storage.R2StorageService storage;
  @GetMapping("/api/branches/{branchId}/occasion-catalogue")
  public OccasionCatalogue.Catalogue customer(@PathVariable long branchId) {return catalogue.catalogue(branchId,false);}
  @GetMapping("/api/admin/branches/{branchId}/occasion-catalogue")
@@ -20,4 +21,10 @@ public class OccasionCatalogueController {
  @PostMapping("/api/admin/branches/{branchId}/occasion-catalogue/boxes")
  @PreAuthorize("hasAuthority('MENU_MANAGE')")
  public OccasionCatalogue.Box box(@PathVariable long branchId,@Valid @RequestBody OccasionCatalogue.Box input) {staff.requireBranchAccess(branchId);return catalogue.saveBox(branchId,input);}
+ @PutMapping("/api/admin/branches/{branchId}/occasion-catalogue/branding")
+ @PreAuthorize("hasAuthority('MENU_MANAGE')")
+ public void branding(@PathVariable long branchId,@Valid @RequestBody OccasionCatalogue.Branding input) {staff.requireBranchAccess(branchId);catalogue.saveBranding(branchId,input);}
+ @PostMapping(value="/api/admin/branches/{branchId}/occasion-catalogue/photos",consumes="multipart/form-data")
+ @PreAuthorize("hasAuthority('MENU_MANAGE')")
+ public java.util.Map<String,String> photo(@PathVariable long branchId,@RequestParam("image") org.springframework.web.multipart.MultipartFile image) {staff.requireBranchAccess(branchId);catalogue.enabled();return java.util.Map.of("url",storage.uploadCampaignMedia(branchId,image,true).url());}
 }

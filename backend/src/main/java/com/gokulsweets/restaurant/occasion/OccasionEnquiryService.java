@@ -31,6 +31,7 @@ public class OccasionEnquiryService {
     private final EnhancementProperties features;
     private final VerifiedCustomerPhoneLookup customers;
     private final Clock clock;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
 
     public record Item(@Positive long productId, @DecimalMin("0.001") @Digits(integer = 9, fraction = 3)
                        BigDecimal quantity, @NotNull Unit unit, String productName, String productionUnit, BigDecimal suggestedProductionQuantity) {
@@ -74,7 +75,9 @@ public class OccasionEnquiryService {
                           Instant createdAt, String nextStep, String customerPhone, String deliveryAddress,
                           String notes, Instant balanceDueAt, Instant holdExpiresAt,
                           Long pickupSlotId, List<Item> items, List<PricedLine> pricedLines, String orderNumber,
-                          boolean balancePaymentOpen, List<ProductionLine> productionPlan, CancellationReview cancellationReview, OccasionCatalogue.GiftSnapshot gift) {}
+                          boolean balancePaymentOpen, List<ProductionLine> productionPlan, CancellationReview cancellationReview, OccasionCatalogue.GiftSnapshot gift, boolean estimated, BigDecimal originalEstimate,
+                          Instant packingFinalizedAt,int packingRevision,BigDecimal creditReviewAmount,
+                          List<OccasionQuoteCalculator.Extra> extraCharges,OccasionQuoteCalculator.Calculation calculation) {}
     public record CancellationReview(BigDecimal paidAmount, String reason, String state) {}
     public record ProductionLine(long productId, BigDecimal quantity, String unit, LocalDateTime expectedReadyAt, String state, BigDecimal readyQuantity, long readinessRevision) {}
 
@@ -142,8 +145,19 @@ public class OccasionEnquiryService {
     @Transactional(readOnly = true)
     public List<Summary> customerList(ConsentEnvironment environment, UUID subject) {
         return jdbc.query("""
-                SELECT * FROM occasion_enquiries WHERE environment = ? AND subject_id = ? ORDER BY created_at DESC LIMIT 100
+                SELECT * FROM occasion_enquiries WHERE environment = ? AND subject_id = ? ORDER BY created_at DESC,id DESC LIMIT 100
                 """, (rs, row) -> map(rs), environment.name(), subject);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Summary> customerList(ConsentEnvironment environment,UUID subject,UUID before) {
+        if(before==null)return customerList(environment,subject);
+        return jdbc.query("""
+            SELECT e.* FROM occasion_enquiries e
+            WHERE e.environment=? AND e.subject_id=? AND (e.created_at,e.id)<
+              (SELECT created_at,id FROM occasion_enquiries WHERE id=? AND environment=? AND subject_id=?)
+            ORDER BY e.created_at DESC,e.id DESC LIMIT 100
+            """,(rs,row)->map(rs),environment.name(),subject,before,environment.name(),subject);
     }
 
     @Transactional(readOnly = true)
@@ -156,7 +170,7 @@ public class OccasionEnquiryService {
     @Transactional(readOnly = true)
     public List<Summary> staffList(ConsentEnvironment environment, long branchId) {
         return jdbc.query("""
-                SELECT * FROM occasion_enquiries WHERE environment = ? AND branch_id = ? ORDER BY created_at DESC LIMIT 100
+                SELECT * FROM occasion_enquiries WHERE environment = ? AND branch_id = ? ORDER BY created_at DESC,id DESC LIMIT 100
                 """, (rs, row) -> map(rs), environment.name(), branchId);
     }
 
@@ -250,6 +264,7 @@ public class OccasionEnquiryService {
         jdbc.update("""
                 UPDATE occasion_enquiries SET status = 'QUOTED', quoted_amount = ?, deposit_amount = ?,
                     quote_terms = ?, quote_expires_at = ?, balance_due_at = ?,
+                    estimated=FALSE,quote_calculation=NULL,extra_charges='[]',original_estimate=NULL,estimate_accepted_at=NULL,packing_finalized_at=NULL,
                     updated_at = CURRENT_TIMESTAMP WHERE id = ?
                 """, quote.amount(), quote.deposit(), quote.terms().trim(), Timestamp.from(quote.expiresAt()),
                 quote.balanceDueAt() == null ? null : Timestamp.from(quote.balanceDueAt()), id);
@@ -275,10 +290,11 @@ public class OccasionEnquiryService {
 
     @Transactional
     public Summary decline(ConsentEnvironment environment, long branchId, UUID id, String staff, String reason) {
+        if(reason==null||reason.isBlank()||reason.trim().length()>500) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Explain why this request cannot be fulfilled.");
         String before = lockedStatus(environment, branchId, id);
         if (!"REQUESTED".equals(before) && !"QUOTED".equals(before))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This request is no longer open.");
-        jdbc.update("UPDATE occasion_enquiries SET status = 'DECLINED', updated_at = CURRENT_TIMESTAMP WHERE id = ?", id);
+        jdbc.update("UPDATE occasion_enquiries SET status = 'DECLINED', quote_terms=?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", reason.trim(),id);
         jdbc.update("UPDATE occasion_production_allocations SET state = 'RELEASED', updated_at = CURRENT_TIMESTAMP WHERE enquiry_id = ?", id);
         event(id, staff, before, "DECLINED", reason == null ? null : reason.substring(0, Math.min(500, reason.length())));
         return staffGet(environment, branchId, id);
@@ -305,6 +321,7 @@ public class OccasionEnquiryService {
     private void event(UUID id, String actor, String before, String after, String detail) {
         jdbc.update("INSERT INTO occasion_enquiry_events (enquiry_id, actor, from_status, to_status, detail) VALUES (?, ?, ?, ?, ?)",
                 id, actor, before, after, detail);
+        notifications.occasionDecisionChanged(id);
     }
 
     private static String requestHash(Request input) {
@@ -392,7 +409,8 @@ public class OccasionEnquiryService {
                 rs.getObject("order_id") == null ? null : jdbc.queryForObject(
                         "SELECT order_number FROM orders WHERE id = ?", String.class, rs.getLong("order_id")),
                 "PAID".equals(status) && rs.getTimestamp("balance_due_at") != null
-                        && rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant()),
+                        && rs.getTimestamp("balance_due_at").toInstant().isAfter(clock.instant())
+                        && (!rs.getBoolean("estimated") || rs.getTimestamp("packing_finalized_at")!=null),
                 jdbc.query("SELECT product_id, quantity, unit, expected_ready_at, state, ready_quantity, readiness_revision FROM occasion_production_allocations WHERE enquiry_id = ? ORDER BY product_id",
                         (plan, row) -> new ProductionLine(plan.getLong(1), plan.getBigDecimal(2), plan.getString(3),
                                 plan.getTimestamp(4).toLocalDateTime(), "EXPIRED".equals(currentStatus) && "PLANNED".equals(plan.getString(5))
@@ -400,7 +418,12 @@ public class OccasionEnquiryService {
                 jdbc.query("SELECT paid_amount, reason, state FROM occasion_cancellation_reviews WHERE enquiry_id = ?",
                         review -> review.next() ? new CancellationReview(review.getBigDecimal(1), review.getString(2), review.getString(3)) : null,
                         (UUID) rs.getObject("id")),
-                rs.getString("packaging_snapshot") == null ? null : new tools.jackson.databind.ObjectMapper().readValue(rs.getString("packaging_snapshot"), OccasionCatalogue.GiftSnapshot.class));
+                rs.getString("packaging_snapshot") == null ? null : new tools.jackson.databind.ObjectMapper().readValue(rs.getString("packaging_snapshot"), OccasionCatalogue.GiftSnapshot.class),
+                rs.getBoolean("estimated"),rs.getBigDecimal("original_estimate"),
+                rs.getTimestamp("packing_finalized_at")==null?null:rs.getTimestamp("packing_finalized_at").toInstant(),
+                rs.getInt("packing_revision"),rs.getBigDecimal("credit_review_amount"),
+                new tools.jackson.databind.ObjectMapper().readValue(rs.getString("extra_charges"),new tools.jackson.core.type.TypeReference<List<OccasionQuoteCalculator.Extra>>() {}),
+                rs.getString("quote_calculation")==null?null:new tools.jackson.databind.ObjectMapper().readValue(rs.getString("quote_calculation"),OccasionQuoteCalculator.Calculation.class));
     }
 
     private static <T> T throwNotFound() { throw new ResponseStatusException(HttpStatus.NOT_FOUND); }

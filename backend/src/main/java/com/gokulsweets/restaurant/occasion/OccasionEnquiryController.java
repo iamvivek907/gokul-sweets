@@ -23,6 +23,8 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OccasionEnquiryController {
     private final OccasionEnquiryService service;
+    private final OccasionQuoteCalculator calculator;
+    private final OccasionPackingFinalizer packing;
     private final OccasionCommitmentService commitments;
     private final OccasionProductionReadinessService readiness;
     private final OccasionCancellationService cancellations;
@@ -39,8 +41,8 @@ public class OccasionEnquiryController {
     }
 
     @GetMapping("/api/occasion-enquiries")
-    public List<OccasionEnquiryService.Summary> mine(HttpServletRequest request) {
-        return service.customerList(environment(), subject(request));
+    public List<OccasionEnquiryService.Summary> mine(HttpServletRequest request,@RequestParam(required=false) UUID before) {
+        return service.customerList(environment(), subject(request),before);
     }
 
     @GetMapping("/api/occasion-enquiries/{id}")
@@ -48,12 +50,12 @@ public class OccasionEnquiryController {
         return service.get(environment(), subject(request), id);
     }
 
-    public record DepositChoice(long pickupSlotId) {}
+    public record DepositChoice(long pickupSlotId,boolean estimateAccepted) {}
 
     @PostMapping("/api/occasion-enquiries/{id}/deposit")
     public OccasionCommitmentService.Checkout deposit(@PathVariable UUID id, @RequestBody DepositChoice choice,
                                                        HttpServletRequest request) {
-        return commitments.beginDeposit(environment(), subject(request), id, choice.pickupSlotId());
+        return commitments.beginDeposit(environment(), subject(request), id, choice.pickupSlotId(),choice.estimateAccepted());
     }
 
     @PostMapping("/api/occasion-enquiries/{id}/balance")
@@ -85,6 +87,29 @@ public class OccasionEnquiryController {
                                                 @Valid @RequestBody OccasionEnquiryService.Quote quote) {
         staff.requireBranchAccess(branchId);
         return service.quote(environment(), branchId, id, staff.getCurrentStaff().getUsername(), quote);
+    }
+
+    @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/quote-preview")
+    @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
+    public OccasionQuoteCalculator.Calculation preview(@PathVariable long branchId,@PathVariable UUID id,
+            @Valid @RequestBody OccasionQuoteCalculator.Input input) {
+        staff.requireBranchAccess(branchId);
+        return calculator.preview(environment(),branchId,id,input);
+    }
+    @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/quote-from-rates")
+    @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
+    public OccasionEnquiryService.Summary approveRates(@PathVariable long branchId,@PathVariable UUID id,
+            @Valid @RequestBody OccasionQuoteCalculator.Input input) {
+        staff.requireBranchAccess(branchId);
+        return calculator.approve(environment(),branchId,id,staff.getCurrentStaff().getUsername(),input);
+    }
+
+    @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/finalize-packing")
+    @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
+    public OccasionEnquiryService.Summary finalizePacking(@PathVariable long branchId,@PathVariable UUID id,
+            @Valid @RequestBody OccasionPackingFinalizer.Input input) {
+        staff.requireBranchAccess(branchId);
+        return packing.finalizePacking(environment(),branchId,id,staff.getCurrentStaff().getUsername(),input);
     }
 
     @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/decline")

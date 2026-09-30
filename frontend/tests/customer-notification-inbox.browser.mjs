@@ -20,11 +20,11 @@ try {
         else if (path === "/api/customer/identity/notifications") {
             if (failLoad) return route.abort("failed");
             json = {messages: [{...message, readAt: read ? "2026-09-29T18:40:00Z" : null},
-                {...message, id: 43, title: "Occasion deposit received", targetType: "OCCASION", targetId: "request-43", readAt: "2026-09-29T18:40:00Z"}], unreadCount: read ? 0 : 1, nextBefore: null, readThrough: 43};
+                {...message, id: 43, title: "Occasion deposit received", targetType: "OCCASION", targetId: "request-43", readAt: "2026-09-29T18:40:00Z"}, {...message,id:44,kind:"PICKED_UP",targetId:"COMPLETED",title:"Pickup completed",readAt:"2026-09-29T18:40:00Z"}], unreadCount: read ? 0 : 1, nextBefore: null, readThrough: 44};
         } else if (path.endsWith("/notifications/read-target") || path.endsWith("/notifications/read-all")) {
             const input = route.request().postDataJSON();
             if (path.endsWith("read-target")) assert.equal(input.targetId, "GKS-EXACT-42");
-            else assert.equal(input.throughId, 43);
+            else assert.equal(input.throughId, 44);
             reads++; read = true; return route.fulfill({status: 204});
         } else if (path === "/api/customer/identity/notification-preferences") json = {offerInboxEnabled: false, marketingConsentGranted: false};
         else if (path.endsWith("/notifications/42/read")) {
@@ -38,11 +38,14 @@ try {
     await page.getByRole("button", {name: "Notification inbox", exact: true}).click();
     await page.getByRole("heading", {name: "Payment received"}).waitFor();
     assert.equal(await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).getAttribute("href"), "/orders/GKS-EXACT-42");
-    assert.equal(await page.getByRole("link", {name: "Open occasion request"}).getAttribute("href"), "/occasions#occasion-request-43");
+    assert.equal(await page.getByRole("link", {name: "Open occasion request"}).getAttribute("href"), "/occasions/requests?enquiry=request-43");
     assert.match(await page.locator("time").first().textContent(), /30 Sept|30 Sep/);
     assert.match(await page.locator("time").first().textContent(), /12:05.*am.*IST/i);
     await page.getByText("Notification settings", {exact: true}).click();
     assert.equal(await page.getByRole("checkbox", {name: "Include optional offers in my inbox when available"}).isDisabled(), true);
+    const review=page.getByRole("link",{name:"Share an optional review"});
+    assert.equal(await review.evaluate(element=>getComputedStyle(element).color),"rgb(255, 250, 242)");
+    assert.equal(await review.evaluate(element=>getComputedStyle(element).backgroundColor),"rgb(20, 57, 54)");
     failRead = true;
     await page.getByRole("button", {name: "Mark as read"}).click();
     await page.getByRole("alert").filter({hasText: "could not confirm"}).waitFor();
