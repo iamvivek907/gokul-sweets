@@ -264,7 +264,10 @@ class OccasionCommitmentIntegrationTest {
                     INSERT INTO occasion_production_allocations(enquiry_id, product_id, quantity, unit, expected_ready_at, state, approved_by)
                     VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                     """, fixture.enquiry(), fixture.product(), Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
-            when(phonePe.createPayment(anyString(), eq(new BigDecim…75 tokens truncated…eginDeposit(ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+            when(phonePe.createPayment(anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
+                    .thenAnswer(invocation -> new PhonePeClient.CreatePaymentResponse("bulk-failure",
+                            invocation.getArgument(0), "PENDING", "https://pay.example/bulk", null, null));
+            var checkout = commitments.beginDeposit(ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
             commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
             commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
             assertThat(jdbc.queryForObject("SELECT state FROM occasion_production_allocations WHERE enquiry_id = ?", String.class, fixture.enquiry())).isEqualTo("RELEASED");
