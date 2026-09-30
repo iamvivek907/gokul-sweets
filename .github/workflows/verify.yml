@@ -59,6 +59,7 @@ jobs:
           node tests/customer-alerts.browser.mjs
           node tests/staff-alerts.browser.mjs
           node tests/occasion-booking.browser.mjs
+          node tests/occasion-admin.browser.mjs
 
   backend:
     runs-on: ubuntu-latest

@@ -89,7 +89,7 @@ export default function CustomerNotificationInbox() {
                     <Link onClick={() => void acknowledgeTarget(item)} className="flex min-h-11 items-center break-all text-sm font-semibold underline" href={item.targetType === "ORDER"
                         ? `/orders/${encodeURIComponent(item.targetId)}` : `/occasions#occasion-${encodeURIComponent(item.targetId)}`}>
                         {item.targetType === "ORDER" ? `Open order ${item.targetId}` : "Open occasion request"}</Link>
-                    {["PICKED_UP", "DELIVERED"].includes(item.kind) && <Link href={`/orders/${encodeURIComponent(item.targetId)}#order-review`} onClick={() => void acknowledgeTarget(item)} className="flex min-h-11 items-center rounded-full bg-[#143936] px-4 text-sm font-semibold text-white">Share an optional review</Link>}
+                    {["PICKED_UP", "DELIVERED"].includes(item.kind) && <Link href={`/orders/${encodeURIComponent(item.targetId)}#order-review`} onClick={() => void acknowledgeTarget(item)} className="notification-review-action flex min-h-11 items-center rounded-full bg-[#143936] px-4 text-sm font-semibold text-white">Share an optional review</Link>}
                     {!item.readAt && <button type="button" disabled={busy} className="min-h-11 text-sm underline disabled:opacity-50"
                         onClick={() => void perform(async () => {
                             await apiClient<void>(`${base}/notifications/${item.id}/read`, {method: "PUT", credentials: "include"});

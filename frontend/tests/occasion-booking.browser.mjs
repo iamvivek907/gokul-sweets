@@ -6,8 +6,9 @@ const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:390,height:844}});
 let authenticated=true, submitted=null, requests=0, expireNext=false;
 const branch={id:1,code:"TEST",name:"Celebration branch",active:true,pickupAvailable:true};
-const sweets=[{id:1,name:"Kaju Barfi",description:"Made fresh for your celebration",saleMode:"WEIGHT",occasionOnly:true,published:true,leadDays:3,pieceGrams:null},{id:2,name:"Peda",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null},{id:3,name:"Laddoo",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null}];
-const box={id:8,name:"Celebration eight",dimensions:"18 × 12 × 4 cm",material:"Food-safe cardboard",compartments:3,capacityPieces:8,price:10,branding:"Ribbon and gift message",leadDays:3,published:true,imageUrl:null};
+const sweets=[{id:1,name:"Kaju Barfi",description:"Made fresh for your celebration",saleMode:"WEIGHT",occasionOnly:true,published:true,leadDays:3,pieceGrams:null,categoryName:"Sweets"},{id:2,name:"Peda",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null,categoryName:"Sweets"},{id:3,name:"Laddoo",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null,categoryName:"Sweets"}];
+sweets.push({id:4,name:"Paneer",saleMode:"WEIGHT",occasionOnly:false,published:true,leadDays:2,categoryName:"Paneer"});
+const box={id:8,name:"Celebration eight",dimensions:"18 × 12 × 4 cm",material:"Food-safe cardboard",compartments:3,capacityPieces:8,price:10,branding:"Ribbon and gift message",leadDays:3,published:true,imageUrl:null,imageUrls:["https://images.example.invalid/box-front.jpg","https://images.example.invalid/box-inside.jpg"]};
 await context.addInitScript(branch=>localStorage.setItem("gokul-selected-branch",JSON.stringify(branch)),branch);
 await context.route("**/api/**",async route=>{
  const request=route.request(),path=new URL(request.url()).pathname;
@@ -15,7 +16,7 @@ await context.route("**/api/**",async route=>{
  if(path==="/api/storefront/features")json={occasionEnquiries:true,occasionPayments:true,futuristicStorefrontV2:true,today:"2026-09-30"};
  else if(path==="/api/storefront/customer-identity")json={enabled:true};
  else if(path==="/api/customer/identity/me")json={authenticated,phone:"+919876543210",name:"Celebration customer"};
- else if(path==="/api/branches/1/occasion-catalogue")json={sweets,boxes:[box]};
+ else if(path==="/api/branches/1/occasion-catalogue")json={sweets,boxes:[box],branding:{headline:"Celebrate beautifully with Gokul",description:"A thoughtful selection for your guests",imageUrl:null,published:true}};
  else if(path==="/api/branches/1")json=branch;
  else if(path==="/api/branches")json=[branch];
  else if(path==="/api/occasion-enquiries"&&request.method()==="POST") {
@@ -29,14 +30,28 @@ try {
  await page.goto(`${base}/occasions`);
  await page.getByLabel("Verified occasion contact").waitFor();
  assert.equal(await page.getByRole("button",{name:"Sign out",exact:true}).count(),0);
+ await page.getByRole("heading",{name:"Celebrate beautifully with Gokul"}).waitFor();
  await page.getByLabel("Date in India").fill("2026-10-10");
  await page.getByLabel("Kaju Barfi unit").selectOption("PIECE");
  await page.getByLabel("Kaju Barfi quantity").fill("1000");
+ await page.evaluate(()=>document.fonts.ready);
+ const [quantityBox,unitBox]=await page.evaluate(()=>["Kaju Barfi quantity","Kaju Barfi unit"].map(name=>{const element=document.querySelector(`[aria-label="${name}"]`),r=element.getBoundingClientRect();return {y:r.y,height:r.height};}));
+ if(process.env.ALERT_SCREENSHOT_DIR)await page.locator(".occasion-product").first().screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/quantity-alignment.png`});
+ assert.ok(Math.abs(quantityBox.y-unitBox.y)<2);assert.ok(Math.abs(quantityBox.height-unitBox.height)<2);
+ if(process.env.ALERT_SCREENSHOT_DIR)await page.locator(".occasion-journey").screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/occasion-mobile.png`});
+ await page.getByRole("button",{name:/Paneer category/}).click();
+ await page.getByLabel("Paneer quantity").fill("100");
+ await page.getByRole("button",{name:/Sweets category/}).click();
+ assert.equal(await page.getByLabel("Kaju Barfi quantity").inputValue(),"1000");
+ await page.getByRole("button",{name:"Remove Paneer from occasion selection"}).click();
  await page.getByRole("button",{name:"Request a reviewed quote"}).click();
  await page.getByText("Request sent.",{exact:false}).waitFor();
  assert.deepEqual(submitted.items,[{productId:1,quantity:1000,unit:"PIECE"}]);
  assert.equal(submitted.gift,null);
+ assert.equal(await page.evaluate(()=>document.querySelector("#occasion-tracker").getBoundingClientRect().top<document.querySelector("#occasion-plan").getBoundingClientRect().top),true);
  await page.getByRole("button",{name:/Celebration eight/}).click();
+ await page.getByRole("button",{name:"View packaging photo 2"}).click();
+ assert.match(await page.getByRole("img",{name:"Celebration eight view 2"}).getAttribute("src"),/inside/);
  await page.getByLabel("Number of gift boxes").fill("700");
  for(const [name,qty]of [["Kaju Barfi","4"],["Peda","2"],["Laddoo","2"]])await page.getByLabel(`${name} quantity`).fill(qty);
  await page.getByText("4 × 700 boxes = 2,800 pieces total",{exact:true}).waitFor();
@@ -47,7 +62,7 @@ try {
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await page.setViewportSize({width:1440,height:1000});
  if(process.env.ALERT_SCREENSHOT_DIR)await page.screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/occasion-desktop.png`,fullPage:true});
- await page.getByRole("button",{name:/^Bulk sweets/}).click();
+ await page.getByRole("button",{name:/^Bulk food/}).click();
  await page.getByLabel("Kaju Barfi quantity").fill("1250");expireNext=true;
  await page.getByRole("button",{name:"Request a reviewed quote"}).click();
  await page.getByText("Please verify your phone, then try again.",{exact:true}).waitFor();
@@ -59,5 +74,7 @@ try {
  assert.equal(await page.getByRole("button",{name:"Request a reviewed quote"}).isDisabled(),true);
  assert.equal(await page.getByLabel("Verified occasion contact").count(),0);
  await page.goto(`${base}/branches/1`);await page.getByRole("navigation",{name:"Branch pages"}).getByRole("link",{name:"Occasions & gifting"}).waitFor();
+ const tabs=await page.getByRole("navigation",{name:"Branch pages"}).innerText();
+ assert.ok(tabs.indexOf("Occasions & gifting")<tabs.indexOf("Branch details"));
  console.log("PASS: compact verified identity, piece request, 700 mixed boxes, requested-unit payload, mobile layout, guest browsing and branch navigation.");
 }finally{await browser.close();}

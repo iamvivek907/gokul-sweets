@@ -403,6 +403,29 @@ class OccasionCommitmentIntegrationTest {
         }finally{features.setOccasionEnquiries(old);}
     }
 
+    @Test
+    void categoryGalleryAndBrandingAreBranchScopedAndPublicationSafe() {
+        var f=paidDeposit();boolean old=features.isOccasionEnquiries();
+        try {
+            features.setOccasionEnquiries(true);
+            jdbc.update("INSERT INTO branch_products(branch_id,product_id) VALUES(?,?)",f.branch(),f.product());
+            var photos=java.util.List.of("https://images.example.invalid/outer.jpg","https://images.example.invalid/inside.jpg");
+            var box=catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,"Gallery box",photos.getFirst(),"20 cm","Food-safe card",2,8,null,"",1,true,photos));
+            catalogue.saveBranding(f.branch(),new OccasionCatalogue.Branding("Celebrate with Gokul","Made for your gathering",photos.getFirst(),false));
+            assertThat(catalogue.catalogue(f.branch(),false).branding()).isNull();
+            assertThat(catalogue.catalogue(f.branch(),true).branding().headline()).isEqualTo("Celebrate with Gokul");
+            catalogue.saveBranding(f.branch(),new OccasionCatalogue.Branding("Celebrate with Gokul","Made for your gathering",photos.getFirst(),true));
+            var live=catalogue.catalogue(f.branch(),false);
+            assertThat(live.sweets().getFirst().categoryName()).isEqualTo("Occasion category");
+            assertThat(live.boxes().getFirst().imageUrls()).containsExactlyElementsOf(photos);
+            assertThat(live.branding().published()).isTrue();
+            assertThatThrownBy(()->catalogue.saveBox(f.branch()+100000,new OccasionCatalogue.Box(box.id(),"Other branch",null,"20 cm","Card",1,8,null,"",1,true,photos)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+            assertThatThrownBy(()->catalogue.saveBranding(f.branch(),new OccasionCatalogue.Branding("Invalid","Invalid","http://unsafe.example",true)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        }finally{features.setOccasionEnquiries(old);}
+    }
+
     private Fixture paidDeposit() {
         UUID suffix = UUID.randomUUID();
         long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Occasion test') RETURNING id",

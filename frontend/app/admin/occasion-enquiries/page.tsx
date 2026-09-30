@@ -5,6 +5,7 @@ import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
 import OccasionCatalogueEditor from "@/components/admin/OccasionCatalogueEditor";
 import type {GiftSnapshot} from "@/types/occasionCatalogue";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 import {getActiveBranches} from "@/services/branchApi";
 
 type Branch = {id: number; name: string};
@@ -20,7 +21,7 @@ type Enquiry = {id: string; occasionType: string; serviceDate: string; guestCoun
     quoteTerms: string | null; nextStep: string};
 
 export default function OccasionEnquiriesPage() {
-    const {authorization, hasPermission} = useAdminAuth();
+    const {authorization, hasPermission, profile} = useAdminAuth();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [branchId, setBranchId] = useState<number | null>(null);
     const [requests, setRequests] = useState<Enquiry[]>([]);
@@ -42,10 +43,11 @@ export default function OccasionEnquiriesPage() {
         if (!authorization) return;
         const controller = new AbortController();
         getActiveBranches(controller.signal).then(list => {if (!controller.signal.aborted) {
-            setBranches(list); setBranchId(current => current ?? list[0]?.id ?? null);
+            const allowed=profile?.roleName==="OWNER_ADMIN"?list:list.filter(branch=>profile?.branchIds.includes(branch.id));
+            setBranches(allowed); setBranchId(current => preferredAdminBranchId(profile!.staffId,allowed,current));
         }}).catch(() => {if (!controller.signal.aborted) setNotice("Could not load branches.");});
         return () => controller.abort();
-    }, [authorization]);
+    }, [authorization, profile]);
     useEffect(() => {
         if (!authorization || !branchId) return;
         const controller = new AbortController();
@@ -132,10 +134,10 @@ export default function OccasionEnquiriesPage() {
         <h1 className="text-3xl font-bold">Occasion food enquiries</h1>
         <p>Review a request before quoting. A quote is not a confirmed booking. When dedicated bulk production is enabled, approving a pickup quote automatically creates its production plan; the deposit commits it. Daily online stock is unchanged.</p>
         {notice && <p role="status" className="rounded-xl bg-amber-50 p-3">{notice}</p>}
-        <label className="block">Branch <select value={branchId ?? ""} onChange={event => setBranchId(Number(event.target.value))} className="ml-3 rounded-lg border p-2">
+        <label className="block">Branch <select value={branchId ?? ""} onChange={event => {const id=Number(event.target.value);setBranchId(id);if(profile)rememberAdminBranchId(profile.staffId,id);}} className="ml-3 rounded-lg border p-2">
             {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
         </select></label>
-        {branchId && authorization && hasPermission("MENU_MANAGE") && <OccasionCatalogueEditor branchId={branchId} authorization={authorization} />}
+        {branchId && authorization && hasPermission("MENU_MANAGE") && <OccasionCatalogueEditor key={branchId} branchId={branchId} authorization={authorization} />}
         {requests.map(enquiry => <article key={enquiry.id} className="space-y-3 rounded-2xl border bg-white p-5">
             <h2 className="text-xl font-bold">{enquiry.occasionType} · {enquiry.serviceDate}</h2>
             <p>{enquiry.guestCount} guests · {enquiry.fulfilment} · {enquiry.status}</p>

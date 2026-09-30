@@ -53,3 +53,15 @@ Automated browser tests use synthetic API responses and never contact payment, e
 - Staff action from live orders continues to acknowledge only tasks resolved by the successful committed transition. Reading/marking all read does not complete a task or suppress overdue escalation.
 
 QA: verify click-to-read, direct order opening, snapshot-safe mark-all, pickup cleanup and later refund preservation; linked occasion cleanup; opt-in completion push/review anchor; same-order device replacement; seven-day expiry and financial exceptions; cross-account/environment/branch denial and failed action rollback.
+
+## Post-deployment occasion experience follow-up
+
+- Branch tabs: Home, Menu, Occasions & gifting, Branch details.
+- Photo-led categories use actual product categories and the published branch catalogue. Sweets, paneer and fast-food categories can all be requested. Quantities persist across categories; the basket shows kg/pieces and per-box totals with removal controls.
+- Quantity/unit controls align at the bottom of product cards. Quote tracking sits above the form: latest three cards, search, load more, milestones, expandable details and existing secure quote/deposit/balance actions. New requests scroll to tracking.
+- Admin branch selection uses the shared per-staff preference, validates current access and persists across reload. Branch switches reset the catalogue editor.
+- Packaging supports up to six real JPG/PNG/WebP photos, 5 MB each; preview, remove, save and publish. First photo is the cover; customers can inspect every gallery view. Existing snapshots retain their gallery; legacy single-photo packaging remains usable.
+- Branch branding includes headline, description, real uploaded campaign photo and publication. Unpublished content uses the standard introduction. Fields include helptext. Uploads enforce branch access and MENU_MANAGE, using existing R2 static-content signature/size validation and immutable URLs.
+- Review action has explicit cream text on deep teal. Browser checks computed colours, category retention, 700-box arithmetic, tracking placement, gallery browsing, upload/removal, campaign publication and branch refresh retention.
+
+After merge deploy backend and frontend (Flyway V95), and test real R2 uploads, published/unpublished campaigns, gallery persistence, quote review/payment and mobile navigation. No new secrets beyond existing R2 configuration.
