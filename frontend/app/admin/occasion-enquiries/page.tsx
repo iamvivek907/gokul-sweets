@@ -3,6 +3,7 @@
 import {useEffect, useState, useRef} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
+import OccasionPlanningDatePicker from "@/components/admin/OccasionPlanningDatePicker";
 import OccasionProductionCalendar,{type ProductionWeek,type ProductionProduct} from "@/components/admin/OccasionProductionCalendar";
 import OccasionPackingEditor,{type PackingRequest} from "@/components/admin/OccasionPackingEditor";
 import OccasionQuoteEditor from "@/components/admin/OccasionQuoteEditor";
@@ -64,7 +65,7 @@ export default function OccasionEnquiriesPage() {
                 const nextWeek=await planning.json() as ProductionWeek;selected=selected||nextWeek.today;
                 const list:Enquiry[]=[];let before="";
                 for(let n=0;n<pages;n++) {const response=await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries?serviceDate=${selected}${before?`&before=${before}`:""}`,authorization!,{signal:controller.signal});if(!response.ok)throw Error("Could not refresh bookings.");const batch=await response.json() as Enquiry[];list.push(...batch);if(batch.length<50)break;before=batch.at(-1)!.id;}
-                if(!controller.signal.aborted){setWeek(nextWeek);setRequests(list);setRefreshedAt(new Date().toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour:"numeric",minute:"2-digit"}));setLoading(false);}
+                if(!controller.signal.aborted){setWeek(nextWeek);setRequests(list);setRefreshedAt(new Date().toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour:"numeric",minute:"2-digit",second:"2-digit"}));setLoading(false);}
             }catch(error){if(!controller.signal.aborted){setLoading(false);setNotice(error instanceof Error?error.message:"Could not refresh. Existing details may be out of date.");}}finally{running=false;}
         }
         void load();const timer=window.setInterval(()=>void load(),30000);const visible=()=>{if(document.visibilityState==="visible")void load();};document.addEventListener("visibilitychange",visible);
@@ -117,6 +118,7 @@ export default function OccasionEnquiriesPage() {
         </select></label>
         {branchId && authorization && hasPermission("MENU_MANAGE") && <OccasionCatalogueEditor key={branchId} branchId={branchId} authorization={authorization} />}
         {loading&&!week&&<p role="status">Loading dates and production totals…</p>}
+        {week&&branchId&&authorization&&<OccasionPlanningDatePicker key={branchId} date={selectedDate} today={week.today} branchId={branchId} authorization={authorization} refreshKey={refreshedAt+":"+refresh} onDate={date=>{setWeekFrom(date);setServiceDate(date);setPages(1);setOpenRequest(null);}} />}
         {week&&<OccasionProductionCalendar week={week} date={selectedDate} onDate={date=>{setServiceDate(date);setPages(1);setOpenRequest(null);}} onWeek={from=>{setWeekFrom(from);setServiceDate(from);setPages(1);setOpenRequest(null);}} onApprove={product=>void approveProduction(product)} canApprove={hasPermission("APPROVAL_MANAGE")} busy={busy} />}
         <h2 className="text-xl font-bold">{selectedDate?prettyDate(selectedDate):"Selected date"} · bookings & requests</h2>
         {!loading&&!requests.length&&<p className="rounded-2xl border bg-white p-5">No requests for this date.</p>}

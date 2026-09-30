@@ -101,7 +101,7 @@ public class OccasionEnquiryService {
                 || i.unit() == Unit.PIECE && i.quantity().stripTrailingZeros().scale() > 0)
                 || input.items().stream().map(Item::productId).distinct().count() != input.items().size())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Choose distinct products and valid quantities.");
-        // Serialize submissions for this verified subject so concurrent tabs cannot evade the limit.
+        // Serialize identical submissions so concurrent tabs cannot create duplicate requests.
         jdbc.queryForList("SELECT pg_advisory_xact_lock(hashtextextended(?::text, 0))", subject.toString());
         String requestHash = requestHash(input);
         List<UUID> duplicate = jdbc.query("""
@@ -110,13 +110,6 @@ public class OccasionEnquiryService {
                 """, (rs, row) -> (UUID) rs.getObject(1), environment.name(), subject, requestHash,
                 Timestamp.from(clock.instant().minus(Duration.ofMinutes(15))));
         if (!duplicate.isEmpty()) return get(environment, subject, duplicate.getFirst());
-        Integer recent = jdbc.queryForObject("""
-                SELECT count(*) FROM occasion_enquiries WHERE environment = ? AND subject_id = ?
-                  AND created_at >= ?
-                """, Integer.class, environment.name(), subject, Timestamp.from(clock.instant().minus(Duration.ofDays(1))));
-        if (recent != null && recent >= 3)
-            throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
-                    "You have sent three enquiries in the last 24 hours. Please contact the branch for changes.");
         if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM branches WHERE id = ? AND active)",
                 Boolean.class, input.branchId()))) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Branch is unavailable.");
         var catalogue = new OccasionCatalogue(jdbc, features, clock);

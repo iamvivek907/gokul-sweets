@@ -30,6 +30,28 @@ public class OccasionProductionWorkspace {
         var days=new ArrayList<Day>();for(int n=0;n<7;n++)days.add(day(env,branch,from.plusDays(n)));
         return new Week(LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))),List.copyOf(days));
     }
+    public record CalendarDay(LocalDate date,int orderCount,int needsReview,int committedOrders) {}
+    public record Month(LocalDate today,YearMonth month,List<CalendarDay> days) {}
+    @Transactional(readOnly=true)
+    public Month month(ConsentEnvironment env,long branch,YearMonth month) {
+        LocalDate today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+        if(month==null)month=YearMonth.from(today);
+        if(month.isBefore(YearMonth.from(today.minusYears(2))) || month.isAfter(YearMonth.from(today.plusDays(365))))
+            invalid("Choose a calendar month within the supported dates.");
+        var counts=jdbc.query("""
+          SELECT service_date,COUNT(*) total,COUNT(*) FILTER(WHERE status='REQUESTED') review,
+           COUNT(*) FILTER(WHERE status IN ('PAID','CONFIRMED')) committed
+          FROM occasion_enquiries WHERE environment=? AND branch_id=? AND service_date>=? AND service_date<?
+          GROUP BY service_date
+          """,(rs,n)->new CalendarDay(rs.getObject(1,LocalDate.class),rs.getInt(2),rs.getInt(3),rs.getInt(4)),
+          env.name(),branch,month.atDay(1),month.plusMonths(1).atDay(1));
+        var byDate=new HashMap<LocalDate,CalendarDay>();counts.forEach(day->byDate.put(day.date(),day));
+        var days=new ArrayList<CalendarDay>();
+        for(int n=1;n<=month.lengthOfMonth();n++) {
+            LocalDate date=month.atDay(n);days.add(byDate.getOrDefault(date,new CalendarDay(date,0,0,0)));
+        }
+        return new Month(today,month,List.copyOf(days));
+    }
     private Day day(ConsentEnvironment env,long branch,LocalDate date) {
         var counts=jdbc.query("SELECT COUNT(*) total,COUNT(*) FILTER(WHERE status='REQUESTED') review,COUNT(*) FILTER(WHERE status IN ('PAID','CONFIRMED')) committed FROM occasion_enquiries WHERE environment=? AND branch_id=? AND service_date=?",rs->{rs.next();return new int[]{rs.getInt(1),rs.getInt(2),rs.getInt(3)};},env.name(),branch,date);
         var products=jdbc.query("""

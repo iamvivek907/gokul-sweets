@@ -79,7 +79,7 @@ export default function OccasionsPage() {
                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
             }
             setMessage(error instanceof ApiError && error.status === 401 ? "Please verify your phone, then try again."
-                : error instanceof ApiError && error.status === 429 ? "You have sent three enquiries in the last 24 hours. Please contact the branch for changes."
+                : error instanceof ApiError && error.status === 429 ? "Requests are arriving too quickly. Please wait a moment and retry; your selections are saved here."
                 : error instanceof ApiError && error.status === 400 ? error.message
                 : "The request could not be sent. Your entries are still here; please retry.");
         } finally {setBusy(false);}

@@ -87,6 +87,11 @@ public class OccasionEnquiryController {
     public OccasionProductionWorkspace.Week planning(@PathVariable long branchId,@RequestParam(required=false) java.time.LocalDate from) {
         staff.requireBranchAccess(branchId);return workspace.week(environment(),branchId,from);
     }
+    @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/calendar")
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    public OccasionProductionWorkspace.Month calendar(@PathVariable long branchId,@RequestParam(required=false) @org.springframework.format.annotation.DateTimeFormat(pattern="yyyy-MM") java.time.YearMonth month) {
+        staff.requireBranchAccess(branchId);return workspace.month(environment(),branchId,month);
+    }
     @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}")
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
     public OccasionEnquiryService.Summary staffRequest(@PathVariable long branchId,@PathVariable UUID id) {
