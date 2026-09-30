@@ -40,6 +40,7 @@ try {
  await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).fill("18");
  await page.getByRole("button",{name:"Refresh now",exact:true}).click();
  assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
+ console.log("PACKAGING VALIDATION",await page.getByRole("button",{name:"Save packaging",exact:true}).evaluate(button=>Array.from(button.form.elements).filter(element=>element.willValidate&&!element.validity.valid).map(element=>({name:element.outerHTML,value:element.value,message:element.validationMessage}))));
  await page.getByRole("button",{name:"Save packaging",exact:true}).click();
  await page.getByText("Catalogue saved.",{exact:false}).waitFor();
  assert.equal(box.id,7);assert.equal(box.price,18);assert.equal(boxes.length,1);
@@ -83,4 +84,4 @@ try {
  assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
  assert.equal(await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).count(),1);
  console.log("PASS: per-staff branch retention, multi-photo uploads/preview/removal, CSRF/branch scope, campaign publication and mobile fit.");
-}catch(error){console.error("ADMIN BODY",await page.locator("body").innerText());throw error;}finally{await browser.close();}
+}catch(error){console.error("ADMIN BOX",JSON.stringify({box,boxes}));console.error("ADMIN BODY",await page.locator("body").innerText());throw error;}finally{await browser.close();}
