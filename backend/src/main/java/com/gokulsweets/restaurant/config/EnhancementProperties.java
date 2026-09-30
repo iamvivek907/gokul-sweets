@@ -67,6 +67,8 @@ public class EnhancementProperties {
     private boolean customerAccountHub;
     /** SCRUM-39: durable verified-customer inbox; OFF until lifecycle and customer QA. */
     private boolean notificationInbox;
+    /** SCRUM-40: optional browser push and user-controlled in-page sound. */
+    private boolean notificationAlerts;
     /** SCRUM-49: verified customer optional-purpose controls; requires an approved policy version. */
     private boolean customerConsentControls;
     /** SCRUM-29: delivery locality intake; effective only alongside reviewed privacy controls. */

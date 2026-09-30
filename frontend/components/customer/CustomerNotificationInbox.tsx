@@ -2,6 +2,7 @@
 
 import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
+import CustomerAlertPreferences from "@/components/customer/CustomerAlertPreferences";
 import {apiClient, ApiError} from "@/services/apiClient";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 
@@ -84,7 +85,7 @@ export default function CustomerNotificationInbox() {
             })}>Load older messages</button>}
         {preferences && <div className="mt-7 rounded-2xl bg-[#fffaf2] p-4">
             <h3 className="font-semibold">Notification preferences</h3>
-            <p className="mt-2 text-sm leading-6">Order and payment messages stay in this inbox. Browser push, sound and external message channels are not enabled here yet.</p>
+            <p className="mt-2 text-sm leading-6">Order and payment messages stay in this inbox. Optional browser alerts and sound have separate controls below when available. SMS and email alerts are not enabled here.</p>
             <label className="mt-3 flex min-h-11 items-center gap-3 text-sm">
                 <input type="checkbox" checked={preferences.offerInboxEnabled} disabled={busy || !preferences.marketingConsentGranted && !preferences.offerInboxEnabled}
                     aria-describedby="offer-inbox-help" onChange={event => {
@@ -99,5 +100,6 @@ export default function CustomerNotificationInbox() {
             {!preferences.marketingConsentGranted && <p className="mt-2 text-sm">Marketing consent is currently off. Manage it in <Link href="/profile/privacy" className="underline">Privacy and data choices</Link>.</p>}
             {saved && <p role="status" className="mt-2 text-sm">Notification preference saved.</p>}
         </div>}
+        <CustomerAlertPreferences />
     </section>;
 }

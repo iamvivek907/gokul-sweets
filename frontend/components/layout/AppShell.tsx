@@ -17,6 +17,7 @@ import CustomerFooter
 import PickupJourneyContext from "./PickupJourneyContext";
 import CustomerBreadcrumbs from "./CustomerBreadcrumbs";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import CustomerAlertRuntime from "@/components/customer/CustomerAlertRuntime";
 import "./futuristic-storefront.css";
 import "./editorial-storefront.css";
 import "./customer-journey.css";
@@ -57,6 +58,7 @@ export default function AppShell({
         >
 
             <Header />
+            <CustomerAlertRuntime />
 
             <PickupJourneyContext />
 

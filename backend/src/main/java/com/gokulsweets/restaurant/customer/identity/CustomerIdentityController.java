@@ -52,6 +52,7 @@ public class CustomerIdentityController {
     private final CustomerPrivacyRequests privacyRequests;
     private final CustomerAccountHub accountHub;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
+    private final com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences alerts;
 
     /** Called before opening the widget. Source and device limits are shared across instances. */
     @PostMapping("/start")
@@ -290,6 +291,46 @@ public class CustomerIdentityController {
         requireTrustedMutation(request);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(notifications.savePreferences(environment.name(), requiredSubject(request, environment), input));
+    }
+
+    @GetMapping("/notification-alerts")
+    public ResponseEntity<com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences.Settings> alertSettings(HttpServletRequest request) {
+        var environment = alertEnvironment();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(alerts.settings(environment.name(), requiredSubject(request, environment)));
+    }
+
+    @PutMapping("/notification-alerts")
+    public ResponseEntity<com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences.Settings> saveAlertSettings(
+            @RequestBody com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences.Input input, HttpServletRequest request) {
+        var environment = alertEnvironment();
+        requireTrustedMutation(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(alerts.save(environment.name(), requiredSubject(request, environment), input));
+    }
+
+    @PostMapping("/push-subscriptions")
+    public ResponseEntity<com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences.SubscriptionResult> subscribePush(
+            @RequestBody com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences.SubscriptionInput input, HttpServletRequest request) {
+        var environment = alertEnvironment();
+        requireTrustedMutation(request);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(alerts.subscribe(environment.name(), requiredSubject(request, environment), cookie(request), input));
+    }
+
+    @DeleteMapping("/push-subscriptions/{id}")
+    public ResponseEntity<Void> unsubscribePush(@PathVariable UUID id, HttpServletRequest request) {
+        // Turning delivery off remains possible if the alert rollout is disabled.
+        var environment = enabledEnvironment();
+        requireTrustedMutation(request);
+        alerts.unsubscribe(environment.name(), requiredSubject(request, environment), id);
+        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    private ConsentEnvironment alertEnvironment() {
+        var environment = enabledEnvironment();
+        if (!alerts.enabled()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        return environment;
     }
 
     private ConsentEnvironment notificationEnvironment() {

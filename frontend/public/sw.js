@@ -1,5 +1,7 @@
 const VERSION =
-    "v1";
+    "v2";
+
+const PUSH_DEDUPE_CACHE = "gokul-push-dedupe-v1";
 
 const STATIC_CACHE =
     `gokul-static-${VERSION}`;
@@ -49,7 +51,8 @@ self.addEventListener(
         const allowedCaches = [
             STATIC_CACHE,
             PAGE_CACHE,
-            IMAGE_CACHE
+            IMAGE_CACHE,
+            PUSH_DEDUPE_CACHE
         ];
 
         event.waitUntil(
@@ -351,3 +354,41 @@ async function networkFirstNavigation(
         return Response.error();
     }
 }
+
+// Browser push stays generic on the lock screen. Custom audio belongs to an explicitly activated page.
+let pushSequence = Promise.resolve();
+self.addEventListener("push", event => {
+    let payload;
+    try {payload = event.data?.json();} catch {return;}
+    if (!payload || !/^[0-9]{1,20}$/.test(String(payload.eventId))) return;
+    const eventId = String(payload.eventId);
+    pushSequence = pushSequence.catch(() => {}).then(async () => {
+        const cache = await caches.open(PUSH_DEDUPE_CACHE);
+        const key = new Request(new URL("/__push_seen", self.location.origin));
+        const previous = await cache.match(key);
+        const seen = previous ? await previous.json() : [];
+        if (Array.isArray(seen) && seen.includes(eventId)) return;
+        await self.registration.showNotification("Gokul Sweets", {
+            body: "A new account update is waiting in your notification inbox.",
+            icon: "/icon-192.png", tag: `gokul-event-${eventId}`, renotify: false,
+            data: {url: "/profile#account-notifications"}
+        });
+        await cache.put(key, new Response(JSON.stringify([...(Array.isArray(seen) ? seen : []), eventId].slice(-256)),
+            {headers: {"Content-Type": "application/json"}}));
+    });
+    event.waitUntil(pushSequence);
+});
+self.addEventListener("notificationclick", event => {
+    event.notification.close();
+    event.waitUntil((async () => {
+        const url = new URL("/profile#account-notifications", self.location.origin).href;
+        const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
+        for (const client of windows) {
+            const current = new URL(client.url);
+            if (current.origin === self.location.origin && !current.pathname.startsWith("/admin")) {
+                await client.navigate(url); await client.focus(); return;
+            }
+        }
+        await self.clients.openWindow(url);
+    })());
+});
