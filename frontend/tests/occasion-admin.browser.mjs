@@ -4,6 +4,8 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??"
 const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:390,height:844}});
 let box=null,branding=null,uploads=0;
+const existing={id:7,name:"Existing wedding box",dimensions:"20 × 15 × 5 cm",material:"Food-safe card",branding:"Ribbon",compartments:3,capacityPieces:8,leadDays:3,price:15,published:true,imageUrl:null,imageUrls:[],capacityGrams:500};
+let boxes=[existing],catalogueError=false;
 const csrf="occasion-csrf";
 const branches=[{id:1,name:"First branch",active:true},{id:2,name:"Gifting branch",active:true}];
 await context.route("**/api/**",async route=>{
@@ -15,9 +17,10 @@ await context.route("**/api/**",async route=>{
  else if(path.includes("occasion-catalogue")) {
   if(request.method()!=="GET") {assert.equal(request.headers()["x-staff-csrf"],csrf);assert.ok(path.includes("/branches/2/"));}
   if(path.endsWith("/photos")){uploads++;return route.fulfill({json:{url:`https://images.example.invalid/upload-${uploads}.png`}});}
-  if(path.endsWith("/boxes")){box={...request.postDataJSON(),id:8};return route.fulfill({json:box});}
+  if(path.endsWith("/boxes")){const input=request.postDataJSON();box={...input,id:input.id??8};boxes=boxes.filter(item=>item.id!==box.id).concat(box);return route.fulfill({json:box});}
   if(path.endsWith("/branding")){branding=request.postDataJSON();return route.fulfill({status:204});}
-  json={sweets:[],boxes:box?[box]:[],branding};
+  if(catalogueError)return route.fulfill({status:503,json:{}});
+  json={sweets:[],boxes,branding};
  }
  return route.fulfill({json});
 });
@@ -29,7 +32,21 @@ try {
  await page.reload();
  await page.getByRole("combobox",{name:/^Branch/}).waitFor();
  await page.waitForFunction(()=>document.querySelector('select').value==="2");
- await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
+ assert.equal(await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).count(),1);
+ await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
+ assert.equal(await page.getByLabel("Box name",{exact:true}).inputValue(),existing.name);
+ assert.equal(await page.getByLabel("Food weight capacity",{exact:true}).inputValue(),"500");
+ await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).fill("18");
+ await page.getByRole("button",{name:"Refresh now",exact:true}).click();
+ assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
+ await page.getByRole("button",{name:"Save packaging",exact:true}).click();
+ await page.getByText("Catalogue saved.",{exact:false}).waitFor();
+ assert.equal(box.id,7);assert.equal(box.price,18);assert.equal(boxes.length,1);
+ await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
+ await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
+ assert.equal(await page.getByLabel("Box name",{exact:true}).inputValue(),existing.name);
+ await page.getByRole("button",{name:"New box",exact:true}).click();
  await page.getByLabel("Box name").fill("Celebration collection");
  await page.getByLabel("Dimensions",{exact:false}).fill("18 × 12 × 4 cm");
  await page.getByLabel("Food weight capacity",{exact:true}).selectOption("500");
@@ -51,10 +68,19 @@ try {
  assert.equal(branding.published,true);assert.match(branding.imageUrl,/upload-3/);
  assert.equal(await page.getByLabel("Real photo URL",{exact:false}).count(),0);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- await page.reload();await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ await page.reload();await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
  await page.getByRole("button",{name:"Edit Celebration collection"}).click();
  await page.getByRole("button",{name:"Remove photo 2"}).click();
  await page.getByRole("button",{name:"Save packaging",exact:true}).click();
  await page.getByText("Catalogue saved.",{exact:false}).waitFor();assert.equal(box.imageUrls.length,1);
+ assert.equal(boxes.length,2);assert.equal(box.id,8);
+ // A failed load must not expose a blank editor that could create a duplicate.
+ catalogueError=true;await page.reload();await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).click();
+ await page.getByRole("button",{name:"Reload catalogue",exact:true}).waitFor();
+ assert.equal(await page.getByRole("button",{name:"Save packaging",exact:true}).count(),0);
+ catalogueError=false;await page.getByRole("button",{name:"Reload catalogue",exact:true}).click();
+ await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
+ assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
+ assert.equal(await page.getByRole("button",{name:/Occasion sweets & packaging catalogue/}).count(),1);
  console.log("PASS: per-staff branch retention, multi-photo uploads/preview/removal, CSRF/branch scope, campaign publication and mobile fit.");
 }catch(error){console.error("ADMIN BODY",await page.locator("body").innerText());throw error;}finally{await browser.close();}
