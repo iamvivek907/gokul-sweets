@@ -374,7 +374,7 @@ public class AnalyticsRefreshService {
                 branch_id,
                 product_id,
                 category_id,
-                highest_order_id,
+                order_count,
                 quantity_sold,
                 gross_item_revenue,
                 unique_customers,
@@ -429,7 +429,7 @@ public class AnalyticsRefreshService {
                 branch_id,
                 product_a_id,
                 product_b_id,
-                pair_highest_order_id,
+                pair_order_count,
                 refreshed_at
             )
             SELECT

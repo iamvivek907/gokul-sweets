@@ -264,10 +264,7 @@ class OccasionCommitmentIntegrationTest {
                     INSERT INTO occasion_production_allocations(enquiry_id, product_id, quantity, unit, expected_ready_at, state, approved_by)
                     VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                     """, fixture.enquiry(), fixture.product(), Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
-            when(phonePe.createPayment(anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
-                    .thenAnswer(invocation -> new PhonePeClient.CreatePaymentResponse("bulk-failure",
-                            invocation.getArgument(0), "PENDING", "https://pay.example/bulk", null, null));
-            var checkout = commitments.beginDeposit(ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+            when(phonePe.createPayment(anyString(), eq(new BigDecim…75 tokens truncated…eginDeposit(ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
             commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
             commitments.verifiedWebhook(merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
             assertThat(jdbc.queryForObject("SELECT state FROM occasion_production_allocations WHERE enquiry_id = ?", String.class, fixture.enquiry())).isEqualTo("RELEASED");
@@ -529,6 +526,20 @@ class OccasionCommitmentIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM analytics_customer_metrics WHERE customer_contact_id=(SELECT customer_contact_id FROM orders WHERE order_number=?)",Integer.class,number)).isZero();
         analytics.refreshChangedOrders();
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM analytics_refresh_checkpoint",Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void mixedSweetsCanShareOnePlasticBoxCompartmentWithinReviewedCapacity() {
+        var f=paidDeposit();boolean enabled=features.isOccasionEnquiries();
+        try {
+            features.setOccasionEnquiries(true);
+            var box=catalogue.saveBox(f.branch(),new OccasionCatalogue.Box(null,"400 ml plastic box",null,"400 ml","Food-safe plastic",1,3,new BigDecimal("10"),"",1,true));
+            var recipe=java.util.List.of(new OccasionCatalogue.Recipe(f.product(),1),new OccasionCatalogue.Recipe(f.product()+1,1),new OccasionCatalogue.Recipe(f.product()+2,1));
+            var items=recipe.stream().map(x->new OccasionEnquiryService.Item(x.productId(),new BigDecimal("600"),OccasionEnquiryService.Unit.PIECE,"Assorted sweets")).toList();
+            var result=catalogue.validateGift(f.branch(),LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(3),items,new OccasionCatalogue.GiftRequest(box.id(),600,recipe,true));
+            assertThat(result.box().compartments()).isEqualTo(1);assertThat(result.recipe()).hasSize(3);assertThat(result.includeSpoons()).isTrue();
+            assertThat(result.packagingEstimate()).isEqualByComparingTo("6000");
+        }finally{features.setOccasionEnquiries(enabled);}
     }
 
     private Fixture paidDeposit() {

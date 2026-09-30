@@ -108,9 +108,9 @@ public class OccasionCatalogue {
             if(items.stream().noneMatch(i->i.productId()==recipe.productId() && i.unit()==OccasionEnquiryService.Unit.PIECE && i.quantity().compareTo(total)==0))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Requested pieces must equal boxes multiplied by pieces per box.");
         }
-        if(seen.size()!=items.size() || pieces>box.capacityPieces() || seen.size()>box.compartments()
+        if(seen.size()!=items.size() || pieces>box.capacityPieces()
             || date.isBefore(LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(box.leadDays())))
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Check box capacity, compartments and packaging lead time. The manager will also review physical fit.");
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Check box capacity and packaging lead time. The manager will also review physical fit.");
         return new GiftSnapshot(box,gift.boxCount(),List.copyOf(gift.recipe()),box.price()==null?null:box.price().multiply(BigDecimal.valueOf(gift.boxCount())),null,gift.includeSpoons());
     }
 }

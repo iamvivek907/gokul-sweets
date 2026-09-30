@@ -8,7 +8,7 @@ Select a branch, then **Occasions & gifting** from its Home/Menu/Branch details 
 
 Choose a future date and select bulk sweets or a published gift box. Weight sweets support kg or pieces. A 1,000-piece Kaju Barfi enquiry remains a request for 1,000 pieces. The manager either uses a measured configured piece size or explicitly approves the total grams for production. No guessed conversion or payment is permitted.
 
-For 700 boxes with 4 Barfi, 2 Peda and 2 Laddoo each, the form requests 2,800 / 1,400 / 1,400 pieces. The server checks those totals, packaging publication, piece capacity, distinct-sweet compartments and lead time. The manager confirms actual physical fit and any branding.
+For 700 boxes with 4 Barfi, 2 Peda and 2 Laddoo each, the form requests 2,800 / 1,400 / 1,400 pieces. The server checks those totals, packaging publication, piece capacity and lead time. The manager confirms actual physical fit and any branding.
 
 A reviewed quote contains inclusive item totals, applicable configured item taxes, the packaging total included in those prices, deposit/balance deadlines and a dedicated production plan. Packaging is bundled into the inclusive item prices; it is not an additional checkout charge. The customer sees requested quantities, approved production quantities and packaging details before paying. Existing deposit, balance, readiness and cancellation flows apply. A quote creates no paid booking.
 
@@ -69,7 +69,7 @@ After merge deploy backend and frontend (Flyway V95–V97), and test real R2 upl
 
 ## Automated quotes and final measured packing
 
-1. Publish a real 400 ml plastic box (capacity at least three pieces, compartments matching the assortment), set its inclusive estimated rate and upload its photos. Choose it on the customer occasion page; enter 600 boxes with one Kaju katli, one Mathari and one Chena roll per box. The request is 600 pieces of each. Select the optional one-spoon-per-box choice when needed.
+1. Publish a real 400 ml plastic box (capacity at least three pieces, one compartment may contain the mixed assortment), set its inclusive estimated rate and upload its photos. Choose it on the customer occasion page; enter 600 boxes with one Kaju katli, one Mathari and one Chena roll per box. The request is 600 pieces of each. Select the optional one-spoon-per-box choice when needed.
 2. A manager chooses **Final weight measured after packing**, reviews the branch's configured pre-tax rate per kg and estimates total kg per sweet. Fixed quotes can use configured grams per piece; no weight is guessed. Input the box rate and a spoon rate for 600 spoons. Calculation shows food, food tax, packing/accessories, estimate, advance and balance automatically.
 3. The customer's date cannot be edited. The manager chooses readiness time on that date and accepts packaging-fit review. Rates/amounts must be calculated and reviewed again if inputs or authoritative totals change before sending.
 4. The customer opens **Requests & quotes**, sees estimated kg × agreed rates, separate box/accessory costs, advance and balance. An estimated quote requires acceptance of actual-weight pricing before advance checkout; this acceptance is timestamped/audited. Slots before the approved ready time are omitted and independently rejected by the server.
