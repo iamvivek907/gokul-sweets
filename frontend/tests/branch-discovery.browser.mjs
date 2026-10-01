@@ -57,7 +57,7 @@ try {
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/grouped-menu-${width}.png`,fullPage:true});
   await page.goto(`${base}/checkout/review`);await page.getByRole('heading',{name:'Save on this order'}).waitFor();await page.getByRole('button',{name:'Find available offers'}).click();await page.getByText('Test spend saving',{exact:true}).waitFor();await page.getByRole('button',{name:'Add Test sweet',exact:true}).waitFor();
   const addY=await page.getByRole('button',{name:'Add Test sweet',exact:true}).evaluate(node=>node.getBoundingClientRect().top+scrollY),codeY=await page.getByText('Have a creator or exclusive code?',{exact:true}).evaluate(node=>node.getBoundingClientRect().top+scrollY);assert.ok(addY<codeY,'add-ons must be next to offer cards before the code and payment controls');
-  if(width===390)assert.equal(await page.getByRole('complementary',{name:'Checkout action'}).evaluate(node=>getComputedStyle(node).position),'fixed');
+  if(width===390)assert.equal(await page.getByRole('complementary',{name:'Checkout action'}).evaluate(node=>getComputedStyle(node).position),'static');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/offer-addons-${width}.png`,fullPage:true});
   await page.getByRole('button',{name:'Add Test sweet',exact:true}).click();await page.getByText('We couldn’t complete this addition.',{exact:false}).waitFor();
   assert.equal(new URL(page.url()).pathname,'/checkout/review');assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);assert.equal(await page.getByRole('checkbox',{name:'I have reviewed the updated total and offers.'}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:/^(Continue to payment|Review updated total)$/i}).isDisabled(),true);
@@ -83,5 +83,5 @@ try {
   await page.goto(`${base}/admin/branches`);await page.getByRole('button',{name:/Test Gokul branch/}).first().click();await page.getByLabel('Offering 1 title',{exact:true}).fill('Updated draft');conflict=true;await page.getByRole('button',{name:'Save offerings draft'}).click();await page.getByRole('alert').filter({hasText:'changed'}).waitFor();assert.equal(version,0);
   await context.close();
  }
- console.log('PASS: branch offerings, scoped rating/review display, grouped menu, offer-adjacent add-ons, own-reservation check, signed quote refresh, unchanged expiry, mobile fixed action and required total review.');
+ console.log('PASS: branch offerings, scoped rating/review display, grouped menu, offer-adjacent add-ons, own-reservation check, signed quote refresh, unchanged expiry, mobile in-flow action and required total review.');
 }finally{await browser.close();}
