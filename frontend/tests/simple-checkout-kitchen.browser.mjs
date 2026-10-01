@@ -8,7 +8,7 @@ const now=new Date('2026-10-01T06:30:00Z'),date='2026-10-01';
 const branch={id:1,code:'TEST',name:'Test branch',active:true,address:'Test address',city:'Test city',phone:'9000000000',openingTime:'08:00:00',closingTime:'23:59:00',pickupAvailable:true};
 const product={id:1,name:'Test sweet',categoryId:1,categoryName:'Sweets',description:'Test item',price:100,imageUrl:null,available:true,saleMode:'UNIT'};
 const slot={id:1,branchId:1,slotDate:date,startTime:'23:55:00',endTime:'23:59:00',active:true,remainingCapacity:100,capacity:100,priorityEnabled:false,priorityCharge:0};
-try{async function chooseLanguage(surface,locale){await surface.getByRole('button',{name:'Language / भाषा',exact:true}).click();await surface.getByRole('group',{name:'Language / भाषा',exact:true}).getByRole('button',{name:locale==='hi'?/हिन्दी/:/English/}).click();}
+try{async function chooseLanguage(surface,locale){await surface.getByRole('button',{name:'Language / भाषा',exact:true}).click();const options=(typeof surface.page==='function'?surface.page():surface).getByRole('group',{name:'Language / भाषा',exact:true});for(const label of [/English/,/हिन्दी/])assert.equal(await options.getByRole('button',{name:label}).evaluate(node=>{const r=node.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight&&node.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));}),true,'both language options are visible and unobstructed');await options.getByRole('button',{name:locale==='hi'?/हिन्दी/:/English/}).click();}
 for(const width of [1280,390]){
  const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();await page.clock.install({time:now});let quoteCalls=0,mutations=0,starts=0,readyMoves=0,bestOffers=0,simplified=width===1280,visual=true,gateway=false;
  const errors=[];page.on('pageerror',error=>errors.push(error.message));let authenticated=false;
@@ -114,9 +114,9 @@ for(const width of [1280,390]){
  if(width===390){
   visual=true;gateway=true;await page.evaluate(()=>sessionStorage.removeItem('gokul-storefront-settings'));await page.goto(`${base}/`);await page.locator('#gokul-arrival-title').waitFor();
   const topbar=page.getByRole('navigation',{name:'Welcome navigation'}).locator('..');
-  for(const phoneWidth of [320,390]){await page.setViewportSize({width:phoneWidth,height:900});
+  for(const phoneWidth of [320,390,1280]){await page.setViewportSize({width:phoneWidth,height:900});
    for(const locale of ['en','hi']){await chooseLanguage(topbar,locale);await page.waitForFunction(locale=>document.documentElement.lang===locale,locale);
-    const fits=await topbar.evaluate(node=>{const box=node.getBoundingClientRect(),rects=Array.from(node.children).map(child=>child.getBoundingClientRect());return rects.every(r=>r.left>=box.left&&r.right<=box.right&&r.top>=box.top&&r.bottom<=box.bottom)&&rects.every((r,i)=>rects.slice(i+1).every(s=>r.right<=s.left||s.right<=r.left||r.bottom<=s.top||s.bottom<=r.top));});assert.equal(fits,true,`editorial controls fit without overlap at ${phoneWidth}px in ${locale}`);
+    assert.equal(await topbar.getByRole('link',{name:'Gokul Sweets · Home'}).getAttribute('href'),'/');assert.equal(await topbar.evaluate(node=>{const [brand,nav,language]=Array.from(node.children).map(child=>child.getBoundingClientRect());return brand.right<=nav.left&&nav.right<=language.left;}),true,'brand left, order action then language right');const fits=await topbar.evaluate(node=>{const box=node.getBoundingClientRect(),rects=Array.from(node.children).map(child=>child.getBoundingClientRect());return rects.every(r=>r.left>=box.left&&r.right<=box.right&&r.top>=box.top&&r.bottom<=box.bottom)&&rects.every((r,i)=>rects.slice(i+1).every(s=>r.right<=s.left||s.right<=r.left||r.bottom<=s.top||s.bottom<=r.top));});assert.equal(fits,true,`editorial controls fit without overlap at ${phoneWidth}px in ${locale}`);
    }
   }
  }
