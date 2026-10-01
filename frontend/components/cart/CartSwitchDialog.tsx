@@ -95,7 +95,7 @@ export default function CartSwitchDialog({branchId, branchName, date, items, onK
     return <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Review cart before switching" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
         <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
             <h2 className="text-xl font-bold">Review your cart for {branchName}</h2>
-            <p className="mt-2 text-sm text-[#756763]"><T text="Pickup date:" />{date} (India time). Nothing changes until you confirm.</p>
+            <p className="mt-2 text-sm text-[#756763]"><T text="Pickup date:" />{" "}{date} (India time). Nothing changes until you confirm.</p>
             {!preview && !error && <p role="status" className="mt-4">Checking menu, stock and pickup times...</p>}
             {preview && <>
                 <ul className="mt-4 divide-y divide-[#eadfd6]">

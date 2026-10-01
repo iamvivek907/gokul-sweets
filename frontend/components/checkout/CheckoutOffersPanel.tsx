@@ -1486,7 +1486,7 @@ export default function CheckoutOffersPanel({
                                                                                     usefulRebateTarget([rebate]) !== null
                                                                                     && (
                                                                                         <p className="mt-3 rounded-xl bg-[#fffaf3] px-3 py-2 text-xs leading-5 text-[#756763]">
-                                                                                            <T text="Add" />{formatCurrency(rebate.amountNeededForNextSlab!)} <T text="more to unlock the next saving level." /></p>
+                                                                                            <T text="Add" />{" "}{formatCurrency(rebate.amountNeededForNextSlab!)} <T text="more to unlock the next saving level." /></p>
                                                                                     )
                                                                                 }
 
@@ -1842,7 +1842,7 @@ export default function CheckoutOffersPanel({
                                         </p>
                                     </div>
 
-                                    {totalChanged && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" disabled={refreshFailed||addonBusy} checked={!priceReviewRequired} onChange={e=>setPriceReviewRequired(!e.target.checked)} /><T text="I have reviewed the updated total and offers." /></label>}
+                                    {totalChanged && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" disabled={refreshFailed||addonBusy} checked={!priceReviewRequired} onChange={e=>setPriceReviewRequired(!e.target.checked)} />{" "}<T text="I have reviewed the updated total and offers." /></label>}
                                     <button
                                         type="button"
                                         disabled={
@@ -1855,7 +1855,7 @@ export default function CheckoutOffersPanel({
                                             )
                                         }
                                         onClick={handleContinueToPayment}
-                                        className="
+                                        className="checkout-payment-desktop-action
                                             mt-5
                                             flex
                                             min-h-14

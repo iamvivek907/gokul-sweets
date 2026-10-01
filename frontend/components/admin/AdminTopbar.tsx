@@ -1,5 +1,7 @@
 "use client";
 
+import {LanguagePicker, T} from "@/lib/language";
+
 import {
     useRouter
 } from "next/navigation";
@@ -154,11 +156,12 @@ export default function AdminTopbar() {
                         focus-visible:ring-[#c88a20]/30
                     "
                 >
-                    Logout
+                    <T text="Logout" />
                 </button>
                 </div>
 
             </div>
+            <div className="flex justify-end px-4 pb-2 sm:px-6"><LanguagePicker /></div>
 
         </header>
     );

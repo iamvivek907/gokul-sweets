@@ -30,7 +30,7 @@ class RuntimeConfigurationTest {
             assertThat(properties.getProperty(feature)).endsWith(":true}");
         }
         for (var feature : List.of("simplified-checkout", "bilingual-storefront", "admin-preparation-board")) {
-            assertThat(properties.getProperty("gokul.features." + feature)).endsWith(":false}");
+            assertThat(properties.getProperty("gokul.features." + feature)).endsWith(":true}");
         }
         assertThat(properties.getProperty("gokul.features.customer-account-hub")).endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":true}");

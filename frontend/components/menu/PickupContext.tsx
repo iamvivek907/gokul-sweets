@@ -84,8 +84,8 @@ export default function PickupContext({check, cart = false}: {check: ReturnType<
                 setProposedDate(null);
             }} />}
         <div className="flex flex-wrap items-end justify-between gap-3">
-            <div><p className="text-xs font-semibold uppercase text-[#756763]"><T text="Pickup at" />{branch.name}</p>
-                <label className="mt-2 block text-sm font-bold"><T text="Pickup date" /><input aria-label={translate("Pickup date")} type="date" min={today} max={max} value={intent.date ?? ""}
+            <div><p className="text-xs font-semibold uppercase text-[#756763]"><T text="Pickup at" />{" "}{branch.name}</p>
+                <label className="mt-2 block text-sm font-bold"><T text="Pickup date" />{" "}<input aria-label={translate("Pickup date")} type="date" min={today} max={max} value={intent.date ?? ""}
                         onChange={event => {
                             const date = event.target.value;
                             if (date && !validPickupDate(date,indiaToday(new Date()),features.futureOrderingDays)) {setDateError("Choose today or a future date in the booking window.");return;}
@@ -107,8 +107,8 @@ export default function PickupContext({check, cart = false}: {check: ReturnType<
             : intent.date < today ? <p role="alert" className="mt-2 text-sm"><T text="That pickup date has passed. Choose a new date; your cart is saved." /></p>
             : error ? <div role="alert"><p className="mt-2 text-sm">{error}</p><button onClick={retry} className="min-h-11 underline"><T text="Try again" /></button></div>
             : !data && hasItems ? <p role="status" className="mt-2 text-sm"><T text="Checking your pickup date..." /></p>
-            : <p className="mt-2 text-xs text-[#756763]"><T text="Live preview, not a reservation." />{intent.selection ? "Quantities and this time are checked again at checkout." : "Choose a time for all items after building your cart."}</p>}
-        {check.selectionUnavailable && <p role="status" className="mt-3 text-sm text-[#7a1625]"><T text="Your saved pickup time no longer fits this selection." /><Link href="/checkout/pickup" className="underline"><T text="Choose another time" /><LinkFeedback /></Link><T text=". Your cart is unchanged." /></p>}
+            : <p className="mt-2 text-xs text-[#756763]"><T text="Live preview, not a reservation." />{" "}{intent.selection ? "Quantities and this time are checked again at checkout." : "Choose a time for all items after building your cart."}</p>}
+        {check.selectionUnavailable && <p role="status" className="mt-3 text-sm text-[#7a1625]"><T text="Your saved pickup time no longer fits this selection." />{" "}<Link href="/checkout/pickup" className="underline"><T text="Choose another time" /><LinkFeedback /></Link><T text=". Your cart is unchanged." /></p>}
         {cart && items?.some(item => !item.available) && <div role="status" className="mt-3 rounded-xl bg-[#fff0dc] p-3">
             <h3 className="font-bold"><T text="Review these items for your pickup" /></h3>
             {items.filter(item => !item.available).map(item => <p key={item.productId} className="mt-2 text-sm">

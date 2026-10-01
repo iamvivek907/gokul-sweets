@@ -109,7 +109,7 @@ export default function Header() {
 
             </div>
 
-            {features?.bilingualStorefront && <div className="mx-auto flex max-w-[1180px] justify-end px-4 pb-2"><LanguagePicker /></div>}
+            {<div className="mx-auto flex max-w-[1180px] justify-end px-4 pb-2"><LanguagePicker /></div>}
         </header>
     );
 }

@@ -1,4 +1,5 @@
 "use client";
+import {useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
@@ -51,6 +52,7 @@ export function matchesAdminRoute(pathname: string, item: Item) {
 }
 
 export default function AdminNavigation({onNavigate}: {onNavigate?: () => void}) {
+    const translate = useTranslation();
     const pathname = usePathname();
     const {profile, hasAnyPermission} = useAdminAuth();
     const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -59,7 +61,7 @@ export default function AdminNavigation({onNavigate}: {onNavigate?: () => void})
     const link = (item: Item) => <Link key={item.href} href={item.href} onClick={onNavigate}
         aria-current={matchesAdminRoute(pathname, item) ? "page" : undefined}
         className={`flex min-h-11 items-center rounded-xl px-3 text-sm ${matchesAdminRoute(pathname, item) ? "bg-[#fff1e9] font-bold text-[#7a1625]" : "text-[#756763] hover:bg-[#fffaf3]"}`}>
-        {item.label}{item.href === "/admin/approvals" && <ApprovalPendingBadge />}
+        {translate(item.label)}{item.href === "/admin/approvals" && <ApprovalPendingBadge />}
     </Link>;
     return <nav aria-label="Admin tools" className="space-y-1">
         {link({href: "/admin", label: "Dashboard", exact: true})}
@@ -73,7 +75,7 @@ export default function AdminNavigation({onNavigate}: {onNavigate?: () => void})
                 <button type="button" aria-expanded={open} aria-controls={id}
                     onClick={() => setExpanded(current => ({...current, [`${pathname}:${group.label}`]: !open}))}
                     className={`flex min-h-11 w-full items-center justify-between rounded-xl px-3 text-left text-sm font-semibold ${active ? "text-[#7a1625]" : "text-[#241715]"}`}>
-                    {group.label}<span aria-hidden="true">{open ? "-" : "+"}</span>
+                    {translate(group.label)}<span aria-hidden="true">{open ? "-" : "+"}</span>
                 </button>
                 {open && <div id={id} className="ml-3 border-l border-[#eadfd6] pl-2">{items.map(link)}</div>}
             </div>;

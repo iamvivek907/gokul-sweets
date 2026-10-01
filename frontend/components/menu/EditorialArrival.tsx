@@ -8,7 +8,6 @@ import Link from "next/link";
 import {useEffect, useState} from "react";
 import BranchSelector from "@/components/branch/BranchSelector";
 import CampaignMedia from "@/components/menu/CampaignMedia";
-import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {getActiveBranches} from "@/services/branchApi";
 import {apiClient} from "@/services/apiClient";
@@ -21,7 +20,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
     campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; occasionEnquiries?: boolean;
 }) {
     const translate = useTranslation();
-    const bilingual=useStorefrontFeatures()?.bilingualStorefront===true;
+
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [campaigns, setCampaigns] = useState<HomepageCampaign[]>([]);
@@ -89,7 +88,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
             /></div>}
             <div className={styles.scrim} aria-hidden="true" />
             <div className={styles.topbar}>
-                {bilingual&&<LanguagePicker />}
+                <LanguagePicker />
                 <div className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></div>
                 <nav aria-label="Welcome navigation">
                     <a href="#gokul-arrival-title" aria-current="page"><T text="Home" /></a>

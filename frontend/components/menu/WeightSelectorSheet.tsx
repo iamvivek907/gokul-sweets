@@ -630,7 +630,7 @@ function WeightSelectorDialog({
                             <p
                                 className="mt-0.5 text-[11px] text-[#756763]"
                             >
-                                <T text="Minimum" />{formatWeight(minimum)} · {formatWeight(step)} <T text="steps" /></p>
+                                <T text="Minimum" />{" "}{formatWeight(minimum)} · {formatWeight(step)} <T text="steps" /></p>
 
                         </div>
 

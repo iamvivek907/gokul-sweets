@@ -406,7 +406,7 @@ export default function ProductCard({
                     </span>
 
                     {refined && isWeighted && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
-                        <T text="From" />{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{formatWeight(product.minimumWeightGrams ?? 250)}
+                        <T text="From" />{" "}{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{" "}{formatWeight(product.minimumWeightGrams ?? 250)}
                     </span>}
 
 

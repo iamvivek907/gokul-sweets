@@ -526,7 +526,7 @@ function ReviewInventoryIssue({
                                 text-[#7a1625]!
                             "
                         >
-                            <T text="Call" />{branchPhone}
+                            <T text="Call" />{" "}{branchPhone}
                         </a>
                     )
                 }
@@ -2409,6 +2409,7 @@ try {
                         : (
                             <div
                                 className={`
+                                    checkout-review-desktop-action
                                     mt-5
                                     rounded-3xl
                                     border

@@ -454,7 +454,7 @@ export default function OrderDetailPage() {
                             <p className="mt-1 text-sm leading-6 text-[#756763]">{order.branchAddress}</p>
                             {trackingEnabled && order.branchPhone && (
                                 <a className="mt-3 inline-block font-bold text-[#7a1625] underline" href={`tel:${order.branchPhone.replace(/[^+\d]/g, "")}`}>
-                                    <T text="Call" />{order.branchName}: {order.branchPhone}
+                                    <T text="Call" />{" "}{order.branchName}: {order.branchPhone}
                                 </a>
                             )}
                             {trackingEnabled && (
