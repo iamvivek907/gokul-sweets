@@ -2,22 +2,25 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??"playwright");
 const browser=await chromium.launch({headless:true});
-const context=await browser.newContext({viewport:{width:390,height:844}});
+const context=await browser.newContext({viewport:{width:390,height:844},serviceWorkers:"block"});
 let box=null,branding=null,uploads=0;
+const existing={id:7,name:"Existing wedding box",dimensions:"20 × 15 × 5 cm",material:"Food-safe card",branding:"Ribbon",compartments:3,capacityPieces:8,leadDays:3,price:15,published:true,imageUrl:null,imageUrls:[],capacityGrams:500};
+let boxes=[existing],catalogueError=false,authOutage=false,authExpired=false;
 const csrf="occasion-csrf";
 const branches=[{id:1,name:"First branch",active:true},{id:2,name:"Gifting branch",active:true}];
 await context.route("**/api/**",async route=>{
  const request=route.request(),path=new URL(request.url()).pathname;let json=[];
  if(request.method()==="OPTIONS")return route.fulfill({status:204,headers:{"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Methods":"GET,POST,PUT,OPTIONS","Access-Control-Allow-Headers":"content-type,x-staff-csrf"}});
- if(path==="/api/admin/auth/me")return route.fulfill({json:{staffId:77,username:"owner",fullName:"Owner",roleName:"OWNER_ADMIN",branchIds:[1,2],permissions:["MENU_MANAGE","ORDER_VIEW"]},headers:{"X-Staff-CSRF":csrf,"Access-Control-Expose-Headers":"X-Staff-CSRF"}});
+ if(path==="/api/admin/auth/me"){if(authExpired)return route.fulfill({status:401,json:{}});if(authOutage)return route.fulfill({status:503,json:{}});return route.fulfill({json:{staffId:77,username:"owner",fullName:"Owner",roleName:"OWNER_ADMIN",branchIds:[1,2],permissions:["MENU_MANAGE","ORDER_VIEW"]},headers:{"X-Staff-CSRF":csrf,"Access-Control-Expose-Headers":"X-Staff-CSRF"}});}
  if(path==="/api/branches")json=branches;
  else if(path.endsWith("/occasion-enquiries/planning"))json={today:"2026-09-30",days:Array.from({length:7},(_,n)=>({date:`2026-10-0${n+1}`,orderCount:0,needsReview:0,committedOrders:0,products:[]}))};
  else if(path.includes("occasion-catalogue")) {
   if(request.method()!=="GET") {assert.equal(request.headers()["x-staff-csrf"],csrf);assert.ok(path.includes("/branches/2/"));}
   if(path.endsWith("/photos")){uploads++;return route.fulfill({json:{url:`https://images.example.invalid/upload-${uploads}.png`}});}
-  if(path.endsWith("/boxes")){box={...request.postDataJSON(),id:8};return route.fulfill({json:box});}
+  if(path.endsWith("/boxes")){const input=request.postDataJSON();box={...input,id:input.id??8};boxes=boxes.filter(item=>item.id!==box.id).concat(box);return route.fulfill({json:box});}
   if(path.endsWith("/branding")){branding=request.postDataJSON();return route.fulfill({status:204});}
-  json={sweets:[],boxes:box?[box]:[],branding};
+  if(catalogueError)return route.fulfill({status:503,json:{}});
+  json={sweets:[],boxes,branding};
  }
  return route.fulfill({json});
 });
@@ -30,6 +33,35 @@ try {
  await page.getByRole("combobox",{name:/^Branch/}).waitFor();
  await page.waitForFunction(()=>document.querySelector('select').value==="2");
  await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
+ await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
+ assert.equal(await page.getByLabel("Box name",{exact:false}).inputValue(),existing.name);
+ assert.equal(await page.getByLabel("Food weight capacity",{exact:true}).inputValue(),"500");
+ await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).fill("18");
+ // Focus verification must preserve mounted inputs, even if the session endpoint is down.
+ authOutage=true;const failedSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===503);
+ await page.evaluate(()=>window.dispatchEvent(new Event("focus")));
+ await failedSession;
+ await page.waitForTimeout(150);assert.match(page.url(),/occasion-enquiries/);
+ assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
+ authOutage=false;const verifiedSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===200);await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await verifiedSession;
+ await page.getByLabel("Campaign headline",{exact:false}).fill("Wedding");
+ await Promise.all([page.getByLabel("Campaign headline",{exact:false}).pressSequentially(" Special",{delay:30}),page.evaluate(()=>window.dispatchEvent(new Event("focus")))]);
+ for(let refresh=0;refresh<3;refresh++){
+  const planning=page.waitForResponse(response=>response.url().includes("occasion-enquiries/planning"));
+  await page.getByRole("button",{name:"Refresh now",exact:true}).click();await planning;await page.waitForTimeout(75);
+  assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
+  assert.equal(await page.getByLabel("Campaign headline",{exact:false}).inputValue(),"Wedding Special");
+ }
+ assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
+ assert.equal(await page.getByRole("button",{name:"Save packaging",exact:true}).evaluate(button=>button.form.checkValidity()),true);
+ await page.getByRole("button",{name:"Save packaging",exact:true}).click();
+ await page.getByText("Catalogue saved.",{exact:false}).waitFor();
+ assert.equal(box.id,7);assert.equal(box.price,18);assert.equal(boxes.length,1);
+ await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ assert.equal(await page.getByLabel("Box name",{exact:false}).inputValue(),existing.name);
+ await page.getByRole("button",{name:"New box",exact:true}).click();
  await page.getByLabel("Box name").fill("Celebration collection");
  await page.getByLabel("Dimensions",{exact:false}).fill("18 × 12 × 4 cm");
  await page.getByLabel("Food weight capacity",{exact:true}).selectOption("500");
@@ -56,5 +88,17 @@ try {
  await page.getByRole("button",{name:"Remove photo 2"}).click();
  await page.getByRole("button",{name:"Save packaging",exact:true}).click();
  await page.getByText("Catalogue saved.",{exact:false}).waitFor();assert.equal(box.imageUrls.length,1);
- console.log("PASS: per-staff branch retention, multi-photo uploads/preview/removal, CSRF/branch scope, campaign publication and mobile fit.");
+ assert.equal(boxes.length,2);assert.equal(box.id,8);
+ // A failed load must not expose a blank editor that could create a duplicate.
+ catalogueError=true;await page.reload();await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
+ await page.getByRole("button",{name:"Reload catalogue",exact:true}).waitFor();
+ assert.equal(await page.getByRole("button",{name:"Save packaging",exact:true}).count(),0);
+ catalogueError=false;await page.getByRole("button",{name:"Reload catalogue",exact:true}).click();
+ await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();
+ assert.equal(await page.getByLabel("Estimated packaging ₹ per box",{exact:false}).inputValue(),"18");
+ assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
+ assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
+ if(process.env.SCREENSHOT_DIR){for(const width of [390,1440]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/occasion-catalogue-${width}.png`,fullPage:true});}}
+ authExpired=true;const expiredSession=page.waitForResponse(response=>response.url().endsWith("/api/admin/auth/me")&&response.status()===401);await page.evaluate(()=>window.dispatchEvent(new Event("focus")));await expiredSession;await page.waitForURL("**/admin/login");
+ console.log("PASS: one editor through repeated refreshes, continuous typing/focus, session outage and real expiry; existing packaging update identity, load recovery, branch retention, photos, CSRF and mobile fit.");
 }catch(error){console.error("ADMIN BODY",await page.locator("body").innerText());throw error;}finally{await browser.close();}

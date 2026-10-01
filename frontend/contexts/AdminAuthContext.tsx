@@ -25,8 +25,8 @@ export function AdminAuthProvider({children}: {children: ReactNode}) {
     useEffect(() => {try {sessionStorage.removeItem("gokul-admin-session");} catch { /* storage disabled */ }}, []);
     const [ready, setReady] = useState(false);
     const refresh = useCallback(async () => {
-        try {setProfile(await fetchAdminProfile());}
-        catch {setProfile(null);}
+        try {const next=await fetchAdminProfile();setProfile(current=>JSON.stringify(current)===JSON.stringify(next)?current:next);}
+        catch { /* A temporary network/provider failure is not a logout. Keep mounted forms. */ }
         finally {setReady(true);}
     }, []);
     useEffect(() => {
