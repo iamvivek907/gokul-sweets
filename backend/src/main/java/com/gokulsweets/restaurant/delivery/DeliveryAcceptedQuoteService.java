@@ -37,7 +37,11 @@ public class DeliveryAcceptedQuoteService {
                        String totalAmount) {}
     public record Quote(long windowId, String serviceDate, String startsAt, String endsAt,
                         List<Line> items, String subtotal, String taxAmount, String priorityCharge,
-                        String deliveryFee, String totalAmount, String currency, String expiresAt, String token,String paymentFee,String paymentFeeTax,String paymentFeeRate) {}
+                        String deliveryFee, String totalAmount, String currency, String expiresAt, String token,String paymentFee,String paymentFeeTax,String paymentFeeRate) {
+        public Quote(long windowId,String serviceDate,String startsAt,String endsAt,List<Line> items,String subtotal,String taxAmount,String priorityCharge,String deliveryFee,String totalAmount,String currency,String expiresAt,String token) {
+            this(windowId,serviceDate,startsAt,endsAt,items,subtotal,taxAmount,priorityCharge,deliveryFee,totalAmount,currency,expiresAt,token,"0.00","0.00","0.00");
+        }
+    }
 
     @Transactional(readOnly = true)
     public Quote preview(DeliveryOrderCreationService.CreateRequest request) {
