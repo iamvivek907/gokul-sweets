@@ -199,13 +199,17 @@ class StaffOrderAlertsIntegrationTest {
         assertThatThrownBy(() -> subscriptions.subscribe(staff, cookie, input("revoked"))).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
     }
     @Test void emailRetriesAreBounded() throws Exception {
-        now(18, 5); alerts.generateReminders(); long event = latest();
-        when(email.send(eq(staff), anyString(), anyString(), anyString(), eq(event))).thenReturn(503);
-        dispatcher.dispatchBatch(); dispatcher.dispatchBatch();
-        verify(email, times(1)).send(eq(staff), anyString(), anyString(), anyString(), eq(event));
-        for (int i = 0; i < 2; i++) {jdbc.update("UPDATE staff_alert_deliveries SET next_attempt_at = CURRENT_TIMESTAMP WHERE event_id = ?", event); dispatcher.dispatchBatch();}
-        assertThat(jdbc.queryForObject("SELECT state FROM staff_alert_deliveries WHERE event_id = ? AND channel = 'EMAIL'", String.class, event)).isEqualTo("FAILED");
-        verify(email, times(3)).send(eq(staff), anyString(), anyString(), anyString(), eq(event));
+        boolean recurring = reminderProperties.isRecurringPreparationReminders();
+        reminderProperties.setRecurringPreparationReminders(false);
+        try {
+            now(18, 5); alerts.generateReminders(); long event = latest();
+            when(email.send(eq(staff), anyString(), anyString(), anyString(), eq(event))).thenReturn(503);
+            dispatcher.dispatchBatch(); dispatcher.dispatchBatch();
+            verify(email, times(1)).send(eq(staff), anyString(), anyString(), anyString(), eq(event));
+            for (int i = 0; i < 2; i++) {jdbc.update("UPDATE staff_alert_deliveries SET next_attempt_at = CURRENT_TIMESTAMP WHERE event_id = ?", event); dispatcher.dispatchBatch();}
+            assertThat(jdbc.queryForObject("SELECT state FROM staff_alert_deliveries WHERE event_id = ? AND channel = 'EMAIL'", String.class, event)).isEqualTo("FAILED");
+            verify(email, times(3)).send(eq(staff), anyString(), anyString(), anyString(), eq(event));
+        } finally { reminderProperties.setRecurringPreparationReminders(recurring); }
     }
     @Test @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void twoWorkersAcceptOneDeliveryAndSourceRollbackNeverQueuesAnAlert() throws Exception {
