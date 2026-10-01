@@ -132,3 +132,70 @@ jobs:
                   for failure in case.findall('failure'):
                       print(case.attrib.get('name'), failure.attrib.get('message'), (failure.text or '')[:6000])
           PYTEST
+
+  render-image:
+    name: Render Docker build and startup
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: gokul_test
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: restaurant_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U gokul_test -d restaurant_test"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: jdbc:postgresql://localhost:5432/restaurant_test
+      DATABASE_USERNAME: gokul_test
+      DATABASE_PASSWORD: test-only
+      R2_ACCOUNT_ID: ci-only
+      R2_ACCESS_KEY_ID: ci-only
+      R2_SECRET_ACCESS_KEY: ci-only
+      PHONEPE_CLIENT_ID: ci-only
+      PHONEPE_CLIENT_SECRET: ci-only
+      PHONEPE_REDIRECT_URL: https://ci.example.invalid/checkout
+      INVENTORY_AUTOMATION_SCHEDULER_ENABLED: 'false'
+      GOKUL_REPORTING_AUTOMATIC_REFRESH: 'false'
+      GOKUL_ENVIRONMENT_ISOLATION_ENABLED: 'false'
+      GOKUL_ENVIRONMENT_CORS_ENABLED: 'false'
+      # Test-only 32-byte key so ON-by-default staff sessions can bootstrap in CI.
+      STAFF_MFA_ENCRYPTION_KEY: 'Y2ktb25seS1ub3QtZm9yLXByb2R1Y3Rpb24tc2VjcmU='
+      PORT: '10000'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build actual deployment image without cached Gradle or Docker layers
+        run: docker build --pull --no-cache --progress=plain --tag gokul-render-ci backend
+      - name: Start deployment image and verify database-backed health
+        run: |
+          docker run --detach --name gokul-render-smoke --network host \
+            --env DATABASE_URL --env DATABASE_USERNAME --env DATABASE_PASSWORD \
+            --env R2_ACCOUNT_ID --env R2_ACCESS_KEY_ID --env R2_SECRET_ACCESS_KEY \
+            --env PHONEPE_CLIENT_ID --env PHONEPE_CLIENT_SECRET --env PHONEPE_REDIRECT_URL \
+            --env INVENTORY_AUTOMATION_SCHEDULER_ENABLED --env GOKUL_REPORTING_AUTOMATIC_REFRESH \
+            --env GOKUL_ENVIRONMENT_ISOLATION_ENABLED --env GOKUL_ENVIRONMENT_CORS_ENABLED \
+            --env STAFF_MFA_ENCRYPTION_KEY --env PORT gokul-render-ci
+          for attempt in $(seq 1 120); do
+            if [ "$(docker inspect --format '{{.State.Running}}' gokul-render-smoke)" != true ]; then
+              echo 'Deployment container exited before becoming healthy'
+              exit 1
+            fi
+            if curl --silent --show-error --fail --max-time 5 http://127.0.0.1:10000/actuator/health > /tmp/gokul-health.json; then
+              if python3 -c 'import json; assert json.load(open("/tmp/gokul-health.json"))["status"] == "UP"'; then
+                echo 'Deployment image started successfully with Flyway and PostgreSQL'
+                exit 0
+              fi
+            fi
+            sleep 2
+          done
+          echo 'Deployment image did not become healthy within the startup deadline'
+          exit 1
+      - name: Deployment container logs
+        if: always()
+        run: docker logs gokul-render-smoke 2>&1 || true
+      - name: Remove smoke-test container
+        if: always()
+        run: docker rm --force gokul-render-smoke || true
