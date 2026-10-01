@@ -1118,11 +1118,14 @@ export default function MenuScreen() {
                     </div>}
 
                 {pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
-                    <NewBranchItems branch={branch} products={allProducts} onSelect={product => {
+                    <NewBranchItems branch={branch} products={allProducts} portionGroups={phoneMenu?portionGroups:undefined} onSelect={product => {
                         setSearch("");
                         setSelectedCategoryId(product.categoryId);
+                        if(phoneMenu){setMobileCategories([product.categoryId]);setMaximumPrice(null);setPortionsOnly(false);}
+                        const group=phoneMenu?portionGroups.find(g=>g.choices.some(c=>c.productId===product.id)):null;
+                        const target=group?.choices.find(c=>allProducts.some(p=>p.id===c.productId))?.productId??product.id;
                         requestAnimationFrame(() =>
-                            document.getElementById(`gokul-product-${product.id}`)?.scrollIntoView({behavior: "smooth", block: "center"}));
+                            document.getElementById(`gokul-product-${target}`)?.scrollIntoView({behavior: "smooth", block: "center"}));
                     }} />}
 
                     {!pickupCheck.features?.contextualStorefrontV2 && !isLoading
