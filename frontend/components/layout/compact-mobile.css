@@ -10,6 +10,8 @@
  .future-storefront .gokul-customer-breadcrumbs{display:none}
  .future-storefront .gokul-editorial-menu{padding:12px!important}
  .future-storefront .gokul-branch-gallery{display:block;padding:16px;margin:0 0 12px;border-radius:18px}
+ .future-storefront .gokul-branch-intro{padding:0}
+ .future-storefront .gokul-branch-intro>p:not(.gokul-overline){display:none}
  .future-storefront .gokul-branch-intro h1{font:700 24px/1.25 system-ui,sans-serif;letter-spacing:0;margin:6px 0}
  .future-storefront .gokul-branch-intro>p:not(.gokul-overline){font-size:12px;line-height:1.5;margin:6px 0}
  .future-storefront .gokul-overline{font-size:10px;letter-spacing:.06em}

@@ -23,6 +23,7 @@ export default function MobilePaymentCancelDialog({active, busy, error, onKeep, 
         onCancel={event => {event.preventDefault(); if (!busy) onKeep();}}>
         <h2 id="mobile-cancel-title"><T text="Cancel this payment?" /></h2>
         <p><T text="We’ll check for a confirmed payment first. If it hasn’t completed, we’ll release the reservation and keep your cart ready to try again." /></p>
+        <p><T text="Close the gateway first. A payment received after cancellation enters the refund process." /></p>
         {error && <p role="alert">{translate(error)}</p>}
         <div><button type="button" disabled={busy} onClick={onKeep}><T text="Keep payment" /></button>
             <button type="button" disabled={busy} onClick={() => void onCancel()}>{busy ? translate("Checking payment…") : translate("Confirm cancellation")}</button></div>

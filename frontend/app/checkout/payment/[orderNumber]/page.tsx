@@ -1798,7 +1798,7 @@ export default function PaymentPage() {
 
         <AppShell>
             <CheckoutExperienceFrame enabled={features?.checkoutExperienceV2 === true} stage="payment">
-            <MobilePaymentCancelDialog active={confirmCancel} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
+            <MobilePaymentCancelDialog active={confirmCancel && features?.futuristicStorefrontV2 === true} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
 
             <section
                 className="
