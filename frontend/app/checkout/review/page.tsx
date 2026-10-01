@@ -1,9 +1,14 @@
 "use client";
 import {usePickupClock} from "@/hooks/usePickupClock";
 import {pickupIsFresh} from "@/lib/pickupFreshness";
+import CheckoutAdjustmentDialog from "@/components/checkout/CheckoutAdjustmentDialog";
+import {getCartSnapshot,parseCart,saveCart} from "@/lib/cartStorage";
+import {savePickupSlot} from "@/lib/checkoutStorage";
+import CheckoutMobileAction from "@/components/checkout/CheckoutMobileAction";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {formatWeight} from "@/lib/orderQuantity";
 
+import {apiClient} from "@/services/apiClient";
 import Link from "next/link";
 
 import {
@@ -258,10 +263,10 @@ function formatInventoryQuantity(
 
 function ReviewInventoryIssue({
     issue,
-    branchPhone
+    branchPhone, onAdjust
 }: {
     issue: InventoryCheckResponse;
-    branchPhone: string | null;
+    branchPhone: string | null; onAdjust:()=>void;
 }) {
 
     const unavailableItems =
@@ -540,8 +545,7 @@ function ReviewInventoryIssue({
                 }
             </div>
 
-            <Link
-                href="/cart"
+            <button type="button" onClick={onAdjust}
                 className="
                     mt-3
                     flex
@@ -555,7 +559,7 @@ function ReviewInventoryIssue({
                 "
             >
                 Adjust Cart Quantity
-            </Link>
+            </button>
         </div>
     );
 }
@@ -581,6 +585,7 @@ export default function ReviewPage() {
         Date.parse(acceptedQuote.quote.expiresAt) <= quoteClock;
     const [pickupRecovery, setPickupRecovery] = useState(false);
     const [editingPickup, setEditingPickup] = useState(false);
+    const [adjustingCheckout,setAdjustingCheckout]=useState(false);
 
     const router =
         useRouter();
@@ -922,7 +927,8 @@ try {
     quoteOrderNumber = reusablePendingOrder ? pendingOrder?.orderNumber : undefined;
     const quoteKey = JSON.stringify([quoteRequest, quoteOrderNumber]);
 
-    const inventory =
+    const ownReservationCheck = quoteOrderNumber && pendingOrder?.pickupSlotId===pickupSelection.slot.id ? await apiClient<{orderable:boolean}>(`/api/menu/pickup-addons/check?branchId=${branch.id}&orderNumber=${encodeURIComponent(quoteOrderNumber)}`,{method:"POST",body:JSON.stringify({serviceDate:pickupSelection.date,items:requestItems}),credentials:"include"}) : null;
+    const inventory = reusablePendingOrder ? null :
         await checkInventory(
             branch.id,
             {
@@ -936,7 +942,7 @@ try {
 
 
     if (
-        inventory.enforcementEnabled
+        inventory?.enforcementEnabled
         &&
         !inventory.orderable
     ) {
@@ -948,6 +954,7 @@ try {
         return;
     }
 
+    if(ownReservationCheck&&!ownReservationCheck.orderable){setOrderError("Your updated cart needs a quantity or pickup adjustment. Check the options here before continuing.");setAdjustingCheckout(true);return;}
     if (quoteEnabled) {
         if (!acceptedQuote || acceptedQuote.key !== quoteKey ||
             Date.parse(acceptedQuote.quote.expiresAt) <= Date.now()) {
@@ -1610,8 +1617,8 @@ try {
         pendingOrder.pickupSlotId ===
             pickupSelection.slot.id
         &&
-        pendingOrder.cartFingerprint ===
-            currentCartFingerprint
+        (pendingOrder.cartFingerprint ===
+            currentCartFingerprint || addonBusy)
             ? pendingOrder.orderNumber
             : null;
 
@@ -2382,13 +2389,13 @@ try {
                     && (
                         <ReviewInventoryIssue
                             issue={inventoryIssue}
-                            branchPhone={branch.phone}
+                            branchPhone={branch.phone} onAdjust={()=>setAdjustingCheckout(true)}
                         />
                     )
                 }
 
 
-                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdded={()=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);}}/>}
+                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async()=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name,customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await previewCheckoutQuote(request,number);setAcceptedQuote({key:JSON.stringify([request,number]),quote});}}/>}
                 {/* Offers + final price */}
 
                 {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
@@ -2417,7 +2424,7 @@ try {
                 {
                     preparedOrderNumber
                         ? (
-                            <CheckoutOffersPanel
+                            <CheckoutOffersPanel onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
                                 orderNumber={
                                     preparedOrderNumber
                                 }
@@ -2425,7 +2432,7 @@ try {
                         )
                         : (
                             <div
-                                className={`${accessible ? "max-sm:sticky max-sm:bottom-[env(safe-area-inset-bottom)] max-sm:z-30" : ""}
+                                className={`
                                     mt-5
                                     rounded-3xl
                                     border
@@ -2545,6 +2552,8 @@ try {
                         )
                 }
 
+                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};await previewCheckoutQuote(request,pendingOrder?.orderNumber);saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);setAcceptedQuote(null);setInventoryIssue(null);setOrderError(null);}}/>}
+                {!preparedOrderNumber && <CheckoutMobileAction label={submitting ? "Checking…" : quoteEnabled && acceptedQuote ? "Review & reserve" : "Check price & offers"} amount={acceptedQuote ? Number(acceptedQuote.quote.totalAmount) : undefined} disabled={submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
             </section>
 
             </CheckoutExperienceFrame>

@@ -1,4 +1,13 @@
 "use client";
+import CheckoutAdjustmentDialog from "./CheckoutAdjustmentDialog";
+import type {CartItem} from "@/types/cart";
+import type {PickupSelection} from "@/types/pickup";
+import CheckoutMobileAction from "./CheckoutMobileAction";
+import {usefulRebateTarget} from "@/lib/pickupAddOnRebate";
+import {getCartSnapshot,parseCart,saveCart} from "@/lib/cartStorage";
+import {getStoredBranchSnapshot} from "@/lib/branchStorage";
+import {getCustomerSnapshot,getPickupSlotSnapshot,parseCustomerDetails,parsePickupSlot,savePickupSlot} from "@/lib/checkoutStorage";
+import {previewCheckoutQuote,updatePendingCheckout} from "@/services/orderApi";
 import {apiClient} from "@/services/apiClient";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -63,6 +72,8 @@ import type {
 
 
 interface CheckoutOffersPanelProps {
+    onCartMutationBusy?: (busy:boolean)=>void;
+    onUpdateError?: (message:string)=>void;
 
     orderNumber:
         string;
@@ -126,11 +137,13 @@ function padSeconds(
 
 
 export default function CheckoutOffersPanel({
-    orderNumber
+    orderNumber, onCartMutationBusy, onUpdateError
 }: CheckoutOffersPanelProps) {
 
     const features=useStorefrontFeatures();
     const [addonBusy,setAddonBusy]=useState(false);
+    const [priceReviewRequired,setPriceReviewRequired]=useState(false);
+    const [totalChanged,setTotalChanged]=useState(false);
     const [spendTargets,setSpendTargets]=useState<AvailableRebateResponse[]>([]);
     useEffect(()=>{const c=new AbortController();apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal:c.signal}).then(setSpendTargets).catch(()=>{});return()=>c.abort();},[orderNumber]);
     const router =
@@ -184,6 +197,7 @@ export default function CheckoutOffersPanel({
             &&
             pendingOrder.cartFingerprint !==
                 currentCartFingerprint
+            && !addonBusy
         );
 
 
@@ -382,6 +396,7 @@ export default function CheckoutOffersPanel({
                         );
 
 
+                    if (controller.signal.aborted) return;
                     setOrderSummary(
                         response
                     );
@@ -551,6 +566,7 @@ export default function CheckoutOffersPanel({
 
 
     async function handleFindOffers() {
+        if(addonBusy)return;
 
         if (
             loading
@@ -683,6 +699,7 @@ export default function CheckoutOffersPanel({
             | "exclusive"
     ) {
 
+        if(addonBusy)return;
         const normalizedCode =
             code
                 .trim()
@@ -800,6 +817,7 @@ export default function CheckoutOffersPanel({
 
 
     async function handleRemove() {
+        if(addonBusy)return;
 
         if (
             removing
@@ -910,7 +928,7 @@ export default function CheckoutOffersPanel({
 
 
     function handleContinueToPayment() {
-        if(addonBusy || applyingCode || removing)return;
+        if(addonBusy || priceReviewRequired || applyingCode || removing)return;
 
         if (
             !pendingOrder
@@ -1004,6 +1022,36 @@ export default function CheckoutOffersPanel({
         );
     }
 
+
+    const [adjusting,setAdjusting]=useState(false);
+    async function refreshAfterAddition(changedItems?:CartItem[],changedPickup?:PickupSelection) {
+        setTotalChanged(true);setPriceReviewRequired(true);setAppliedRebate(null);setSuccessMessage(null);
+        const cartSnapshot=getCartSnapshot(), pickupSnapshot=getPickupSlotSnapshot(), branchSnapshot=getStoredBranchSnapshot();
+        const storedCart=parseCart(cartSnapshot),cart=changedItems?{...storedCart,items:changedItems}:storedCart,pickup=changedPickup??parsePickupSlot(pickupSnapshot),customer=parseCustomerDetails(getCustomerSnapshot());
+        const saved=parsePendingOrder(getPendingOrderSnapshot());
+        const unchanged=()=>cartSnapshot===getCartSnapshot()&&pickupSnapshot===getPickupSlotSnapshot()&&branchSnapshot===getStoredBranchSnapshot()&&parsePendingOrder(getPendingOrderSnapshot())?.orderNumber===orderNumber;
+        try {
+            if(!saved || saved.orderNumber!==orderNumber || saved.branchId!==cart.branchId || !pickup || pickup.pickupType!=="NORMAL" || !customer || !cart.items.length)throw new Error("Review your cart and pickup details before refreshing the price.");
+            const current=await getCustomerOrder(orderNumber);
+            if(current.orderStatus!=="PENDING_PAYMENT" || current.paymentStatus!==null)throw new Error("This order has a payment attempt or has changed. Review its payment status before adding items.");
+            const request={branchId:saved.branchId,pickupSlotId:pickup.slot.id,pickupType:pickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};
+            const quote=features?.acceptedCheckoutQuote?await previewCheckoutQuote(request,orderNumber):null;
+            if(!unchanged())throw new Error("Your cart or pickup changed during the price check. Review it again.");
+            const updated=await updatePendingCheckout(orderNumber,{pickupSlotId:request.pickupSlotId,pickupType:request.pickupType,items:request.items,quoteToken:quote?.token});
+            if(!unchanged() || updated.orderStatus!=="PENDING_PAYMENT")throw new Error("Your checkout changed. Review the cart before continuing.");
+            if(changedItems)saveCart(cart);if(changedPickup)savePickupSlot(changedPickup);
+            setOrderSummary({...current,pickupDate:pickup.date,pickupStartTime:pickup.slot.startTime,pickupEndTime:pickup.slot.endTime,pickupType:pickup.pickupType,items:updated.items,subtotal:updated.subtotal,taxAmount:updated.taxAmount,priorityCharge:updated.priorityCharge,convenienceFee:updated.convenienceFee,convenienceFeeTax:updated.convenienceFeeTax,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt});
+            savePendingOrder({...saved,pickupSlotId:pickup.slot.id,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(cart.items)});
+            setError(null);setErrorSource(null);
+            const [offers,targets]=await Promise.allSettled([getAvailableRebates(orderNumber),apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include"})]);
+            setRebates(offers.status==="fulfilled"?offers.value:[]);setOffersLoadedSuccessfully(offers.status==="fulfilled");
+            setSpendTargets(targets.status==="fulfilled"?targets.value:[]);
+            setSuccessMessage("Addition checked. Review the updated total and choose any available offer before payment.");
+        } catch(cause) {
+            const message=cause instanceof Error?cause.message:"Could not refresh the price. Review your cart before payment.";
+            setError(message);setErrorSource("general");onUpdateError?.(message);throw cause;
+        }
+    }
 
     const displayTotal =
         appliedRebate
@@ -1454,12 +1502,10 @@ export default function CheckoutOffersPanel({
                                                                                 </div>
 
                                                                                 {
-                                                                                    rebate.amountNeededForNextSlab !== null
-                                                                                    &&
-                                                                                    rebate.amountNeededForNextSlab > 0
+                                                                                    usefulRebateTarget([rebate]) !== null
                                                                                     && (
                                                                                         <p className="mt-3 rounded-xl bg-[#fffaf3] px-3 py-2 text-xs leading-5 text-[#756763]">
-                                                                                            Add {formatCurrency(rebate.amountNeededForNextSlab)} more
+                                                                                            Add {formatCurrency(rebate.amountNeededForNextSlab!)} more
                                                                                             to unlock the next saving level.
                                                                                         </p>
                                                                                     )
@@ -1469,7 +1515,7 @@ export default function CheckoutOffersPanel({
                                                                                     type="button"
                                                                                     disabled={
                                                                                         Boolean(
-                                                                                            applyingCode
+                                                                                            addonBusy || applyingCode
                                                                                             ||
                                                                                             removing
                                                                                         )
@@ -1522,6 +1568,7 @@ export default function CheckoutOffersPanel({
                                     }
 
 
+                                    {features?.pickupAddOns && pendingOrder && orderSummary?.pickupType==="NORMAL" && orderSummary.pickupDate && orderSummary.orderStatus==="PENDING_PAYMENT" && orderSummary.paymentStatus==null && <PickupAddOns branchId={pendingOrder.branchId} date={orderSummary.pickupDate} orderNumber={orderNumber} offers={spendTargets} disabled={loading || reservationExpired || !!applyingCode || removing} onBusy={busy=>{setAddonBusy(busy);onCartMutationBusy?.(busy);}} onAdded={()=>refreshAfterAddition()} onAdjust={()=>setAdjusting(true)}/>}
                                     <div className="mt-5 border-t border-[#eadfd6] pt-5">
                                         <p className="text-sm font-bold text-[#241715]">
                                             Have a creator or exclusive code?
@@ -1828,10 +1875,11 @@ export default function CheckoutOffersPanel({
                                         </p>
                                     </div>
 
+                                    {totalChanged && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" checked={!priceReviewRequired} onChange={e=>setPriceReviewRequired(!e.target.checked)} />I have reviewed the updated total and offers.</label>}
                                     <button
                                         type="button"
                                         disabled={
-                                            loading || addonBusy
+                                            priceReviewRequired || loading || addonBusy
                                             ||
                                             Boolean(
                                                 applyingCode
@@ -1884,7 +1932,9 @@ export default function CheckoutOffersPanel({
                         )
             }
 
-        {features?.pickupAddOns && pendingOrder && orderSummary?.pickupType==="NORMAL" && orderSummary.pickupDate && orderSummary.orderStatus==="PENDING_PAYMENT" && orderSummary.paymentStatus==null && <PickupAddOns branchId={pendingOrder.branchId} date={orderSummary.pickupDate} orderNumber={orderNumber} offers={spendTargets} disabled={loading || !!applyingCode || removing} onBusy={setAddonBusy} onAdded={()=>router.push("/checkout/review")}/>}
+            {!reservationExpired && !cartChanged && orderSummary?.paymentStatus==null && <button type="button" className="min-h-12 rounded-xl border px-4 font-semibold" disabled={addonBusy} onClick={()=>setAdjusting(true)}>Adjust quantities or pickup</button>}
+            {adjusting && pendingOrder && parsePickupSlot(getPickupSlotSnapshot()) && <CheckoutAdjustmentDialog items={items} pickup={parsePickupSlot(getPickupSlotSnapshot())!} branchId={pendingOrder.branchId} days={features?.futureOrderingDays??30} onClose={()=>setAdjusting(false)} onApply={async(changedItems,changedPickup)=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition(changedItems,changedPickup);}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}/>}
+            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={priceReviewRequired ? "Review updated total" : "Continue to payment"} amount={displayTotal} disabled={priceReviewRequired || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
         </div>
     );
 }

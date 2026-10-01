@@ -1,4 +1,5 @@
 "use client";
+import {groupMenuProducts} from "@/lib/menuGroups";
 
 import Link from "next/link";
 import BranchMenuGallery from "@/components/menu/BranchMenuGallery";
@@ -1343,6 +1344,40 @@ export default function MenuScreen() {
                                 </div>
 
 
+                                {pickupCheck.features?.contextualStorefrontV2 ? groupMenuProducts(categories, filteredProducts).map(group => <section key={group.id} id={`menu-category-${group.id}`} className="gokul-menu-category-section" aria-label={`${group.name} menu items`}>
+                                    <div className="gokul-menu-category-heading"><h3>{group.name}</h3><span>{group.products.length} {group.products.length === 1 ? "item" : "items"}</span></div>
+                                    {group.description && <p>{group.description}</p>}
+                                <ProductGrid
+                                    refined={pickupCheck.features?.contextualStorefrontV2 === true}
+                                    pickupItems={pickupCheck.items}
+                                    pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
+                                    dateAware={!!pickupCheck.features?.smartAvailability}
+                                    products={
+                                        group.products
+                                    }
+                                    ratingSummaries={
+                                        ratingSummaries
+                                    }
+                                    ratingsLoading={
+                                        ratingsLoading
+                                    }
+                                    quantities={
+                                        productQuantities
+                                    }
+                                    weights={
+                                        productWeights
+                                    }
+                                    onIncrease={
+                                        increaseQuantity
+                                    }
+                                    onDecrease={
+                                        decreaseQuantity
+                                    }
+                                    onAdd={
+                                        handleAddToCart
+                                    }
+                                />
+                                </section>) : (
                                 <ProductGrid
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
@@ -1373,6 +1408,7 @@ export default function MenuScreen() {
                                         handleAddToCart
                                     }
                                 />
+                                )}
 
                             </>
                         )}
