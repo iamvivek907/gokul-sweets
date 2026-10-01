@@ -4,6 +4,7 @@ import type {
     ReactNode
 } from "react";
 
+import ConnectionNotice from "@/components/common/ConnectionNotice";
 import Header
     from "./Header";
 
@@ -27,6 +28,7 @@ interface AppShellProps {
 
     children: ReactNode;
     showSocialPopup?: boolean;
+    showConnectionNotice?: boolean;
     editorial?: boolean;
 }
 
@@ -34,6 +36,7 @@ interface AppShellProps {
 export default function AppShell({
     children,
     showSocialPopup = true,
+    showConnectionNotice = true,
     editorial = false
 }: AppShellProps) {
     const features = useStorefrontFeatures();
@@ -60,6 +63,7 @@ export default function AppShell({
             <Header />
             <CustomerAlertRuntime />
 
+            {showConnectionNotice && <ConnectionNotice />}
             <PickupJourneyContext />
 
 

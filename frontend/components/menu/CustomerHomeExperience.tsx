@@ -1,5 +1,6 @@
 "use client";
 
+import StorefrontWelcome from "@/components/common/StorefrontWelcome";
 import Image from "next/image";
 import Link from "next/link";
 import {useEffect, useState, type ReactNode} from "react";
@@ -20,11 +21,8 @@ import styles from "./CustomerHomeExperience.module.css";
 interface Highlights {trendingProductIds: number[]; newProductIds: number[]}
 
 export default function CustomerHomeExperience({fallback}: {fallback: ReactNode}) {
-    const {features, error, retry} = useStorefrontConfiguration();
-    if (!features) return <AppShell showSocialPopup={false}>{error ? <div role="alert">
-        <p>{error}</p><button className="min-h-11 p-3 underline" onClick={retry}>Retry</button>
-        <Link href="/menu" className="min-h-11 p-3 underline">Open menu</Link></div>
-        : <p role="status">Loading storefront...</p>}</AppShell>;
+    const {features} = useStorefrontConfiguration();
+    if (!features) return <AppShell showSocialPopup={false}><StorefrontWelcome /></AppShell>;
     return features.customerHomeV2 ? <Storefront features={features} /> : fallback;
 }
 

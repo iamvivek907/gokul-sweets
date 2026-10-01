@@ -13,7 +13,10 @@ public class RestaurantBackendApplication {
 		// Legacy entity callbacks still use LocalDateTime.now() without a zone.
 		// Set the JVM business zone before Spring, scheduling and JDBC initialize.
 		TimeZone.setDefault(TimeZone.getTimeZone("Asia/Kolkata"));
-		SpringApplication.run(RestaurantBackendApplication.class, args);
+		SpringApplication application = new SpringApplication(RestaurantBackendApplication.class);
+		StartupDiagnostics.configure(application, Boolean.parseBoolean(
+				System.getenv("GOKUL_STARTUP_DIAGNOSTICS_ENABLED")));
+		application.run(args);
 	}
 
 }
