@@ -200,9 +200,7 @@ public class RebateApplicationService {
                     BigDecimal.ZERO
             );
 
-            order.setTotalAmount(
-                    order.getTotalAmount(),order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate()
-            );
+            order.setTotalAmount(amountBeforeRebate);
 
             com.gokulsweets.restaurant.order.service.PaymentFeePricing.reprice(order);
             return new AppliedRebateResponse(
