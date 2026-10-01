@@ -492,8 +492,7 @@ export const hindi: Record<string,string> = {
   "Payment pending": "भुगतान बाकी है",
   "Payment successful": "भुगतान सफल हुआ",
   "Loading your order…": "आपका ऑर्डर लोड हो रहा है…",
-  "No orders yet": "अभी कोई ऑर्डर नहीं है"
-,
+  "No orders yet": "अभी कोई ऑर्डर नहीं है",
   "Times available": "समय उपलब्ध है",
   "No matching time": "उपयुक्त समय नहीं है",
   "No matching times on this date": "इस तारीख पर उपयुक्त समय नहीं है",
@@ -501,4 +500,6 @@ export const hindi: Record<string,string> = {
   "This price is available until": "यह राशि इस समय तक मान्य है",
   "See the cancellation policy": "ऑर्डर रद्द करने के नियम देखें",
   "before paying.": "भुगतान करने से पहले।",
+  "Tax": "कर",
+  "Pickup charge": "पिकअप शुल्क",
 };
