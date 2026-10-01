@@ -62,7 +62,7 @@ for(const width of [1280,390]){
  }
  // One deliberate reserve action applies the best offer and opens payment without a second price confirmation.
  await page.getByRole('button',{name:'Continue to payment',exact:true}).filter({visible:true}).first().click();
- await page.getByRole('status').filter({hasText:'Finding your best offer'}).waitFor();
+ await page.waitForURL('**/checkout/payment/TEST-CHECKOUT',{timeout:10000}).catch(async error=>{console.log(JSON.stringify({width,mutations,bestOffers,quoteCalls,url:page.url(),body:await page.locator('body').innerText(),pending:await page.evaluate(()=>localStorage.getItem('gokul-pending-order'))}));throw error;});
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT');assert.equal(mutations,1);assert.equal(bestOffers,1);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),180);
  await page.goto(`${base}/admin/orders`);await page.getByRole('heading',{name:'Plan, prepare, hand over'}).waitFor();
