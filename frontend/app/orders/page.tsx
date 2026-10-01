@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useEffect,
@@ -73,7 +73,7 @@ const FILTERS: Array<{
 
 
 export default function OrdersPage() {
-    useLanguage();
+    const translate = useTranslation();
 
     const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
 

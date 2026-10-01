@@ -1,7 +1,7 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {usePickupClock} from "@/hooks/usePickupClock";
@@ -65,7 +65,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
 }
 
 export default function PickupContext({check, cart = false}: {check: ReturnType<typeof useDateAvailability>; cart?: boolean}) {
-    useLanguage();
+    const translate = useTranslation();
     const {features, today, branch, intent, data, items, error, hasItems, retry} = check;
     const currentCart = useCart();
     const [proposedDate, setProposedDate] = useState<string | null>(null);

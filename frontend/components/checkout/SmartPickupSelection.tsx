@@ -1,5 +1,5 @@
 "use client";
-import {translate,useLanguage,T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import {apiClient} from "@/services/apiClient";
@@ -31,7 +31,7 @@ function dateLabel(date: string) {
 export default function SmartPickupSelection({features, onFallback}: {
     features: StorefrontFeatures; onFallback: () => void;
 }) {
-    useLanguage();
+    const translate = useTranslation();
     const router = useRouter();
     const cart = useCart();
     const {branch} = useSelectedBranch();

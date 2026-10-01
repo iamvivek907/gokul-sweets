@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import {usePickupClock} from "@/hooks/usePickupClock";
@@ -271,7 +271,7 @@ function ReviewInventoryIssue({
     issue: InventoryCheckResponse;
     branchPhone: string | null; onAdjust:()=>void;
 }) {
-    useLanguage();
+    useTranslation();
 
     const unavailableItems =
         issue.items.filter(
@@ -551,7 +551,7 @@ function ReviewInventoryIssue({
 }
 
 export default function ReviewPage() {
-    useLanguage();
+    const translate = useTranslation();
 
     const storefrontFeatures = useStorefrontFeatures();
     const accessible = storefrontFeatures?.accessibleOrderingV2 === true;

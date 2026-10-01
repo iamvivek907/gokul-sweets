@@ -1,7 +1,7 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import type {ReactNode} from "react";
 import Link from "next/link";
@@ -27,7 +27,7 @@ export default function CheckoutExperienceFrame({
     children: ReactNode;
     allowBranchChange?: boolean;
 }) {
-    useLanguage();
+    const translate = useTranslation();
     const {branch} = useSelectedBranch();
     const simple=useStorefrontFeatures()?.simplifiedCheckout===true;
     const visibleStages: {key: Stage;label:string}[]=simple?[{key:"pickup",label:"Pickup"},{key:"review",label:"Review & offers"},{key:"payment",label:"Payment"}]:stages;

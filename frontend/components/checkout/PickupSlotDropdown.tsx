@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useEffect,
@@ -88,7 +88,7 @@ export default function PickupSlotDropdown({
     reservedSlotId = null,
     onSelect
 }: PickupSlotDropdownProps) {
-    useLanguage();
+    const translate = useTranslation();
 
     const [
         open,

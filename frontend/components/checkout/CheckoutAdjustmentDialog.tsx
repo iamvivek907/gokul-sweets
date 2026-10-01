@@ -1,5 +1,5 @@
 "use client";
-import {translate,useLanguage,T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import {useEffect,useRef,useState} from "react";
 import {usePickupClock} from "@/hooks/usePickupClock";
 import {indiaToday,validPickupDate,pickupIsFresh} from "@/lib/pickupFreshness";
@@ -9,7 +9,7 @@ import type {PickupSelection} from "@/types/pickup";
 import styles from "./CheckoutAdjustmentDialog.module.css";
 
 export default function CheckoutAdjustmentDialog({items,pickup,branchId,days,message,onApply,onClose}:{items:CartItem[];pickup:PickupSelection;branchId:number;days:number;message?:string;onApply:(items:CartItem[],pickup:PickupSelection)=>Promise<void>;onClose:()=>void}) {
-    useLanguage();
+    const translate = useTranslation();
  const ref=useRef<HTMLDialogElement>(null),clock=usePickupClock();
  const [draft,setDraft]=useState(items),[selection,setSelection]=useState(pickup),[date,setDate]=useState(pickup.date),[slots,setSlots]=useState<CartAvailability|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
  const today=indiaToday(new Date(clock)),max=new Date(`${today}T12:00:00+05:30`);max.setUTCDate(max.getUTCDate()+days);

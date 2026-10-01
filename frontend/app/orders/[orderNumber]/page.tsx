@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import {formatWeight} from "@/lib/orderQuantity";
 
 import {
@@ -118,7 +118,7 @@ function formatUpdatedAt(value: string): string {
 
 
 export default function OrderDetailPage() {
-    useLanguage();
+    const translate = useTranslation();
 
     const features = useStorefrontFeatures();
     const trackingEnabled = features?.truthfulOrderTracking === true;

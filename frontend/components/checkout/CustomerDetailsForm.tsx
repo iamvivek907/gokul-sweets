@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useState
@@ -60,7 +60,7 @@ export default function CustomerDetailsForm({
     verifiedPhone,
     onSubmit
 }: CustomerDetailsFormProps) {
-    useLanguage();
+    const translate = useTranslation();
 
     const [continuing,setContinuing]=useState(false);
     const [

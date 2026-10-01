@@ -1,7 +1,7 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {createPortal} from "react-dom";
@@ -85,7 +85,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 
 export default function MobileMenu() {
-    useLanguage();
+    const translate = useTranslation();
 
     const pathname =
         usePathname();

@@ -1,7 +1,7 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import {groupMenuProducts} from "@/lib/menuGroups";
 
 import Link from "next/link";
@@ -68,7 +68,7 @@ interface ProductRatingState {
 
 
 export default function MenuScreen() {
-    useLanguage();
+    const translate = useTranslation();
     const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
     const {
@@ -1565,7 +1565,7 @@ function InfoPill({
 }: {
     value: string;
 }) {
-    useLanguage();
+    useTranslation();
 
     return (
         <span
@@ -1594,7 +1594,7 @@ function MenuError({
     message: string;
     onRetry: () => void;
 }) {
-    useLanguage();
+    useTranslation();
 
     return (
         <div
@@ -1690,7 +1690,7 @@ function MenuEmptyState({
     actionLabel: string;
     actionHref: string;
 }) {
-    useLanguage();
+    useTranslation();
 
     return (
         <div

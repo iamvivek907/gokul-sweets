@@ -1,5 +1,5 @@
 "use client";
-import {translate,useLanguage} from "@/lib/language";
+import {useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 
@@ -126,7 +126,7 @@ export default function CheckoutStateCard({
     primaryAction,
     secondaryAction
 }: CheckoutStateCardProps) {
-    useLanguage();
+    const translate = useTranslation();
 
     const toneClasses =
         tone === "error"

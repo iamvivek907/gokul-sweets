@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import {useEffect, useRef, useState} from "react";
 import {apiClient} from "@/services/apiClient";
@@ -44,7 +44,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     mode?: "profile" | "checkout" | "occasion";
     onSessionChange?: (session: CustomerSession) => void;
 }) {
-    useLanguage();
+    const translate = useTranslation();
     const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
         "loading");
     const [session, setSession] = useState<CustomerSession>({authenticated: false});

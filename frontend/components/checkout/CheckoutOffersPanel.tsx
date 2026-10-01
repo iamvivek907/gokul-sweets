@@ -1,5 +1,5 @@
 "use client";
-import {translate,useLanguage,T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import CheckoutAdjustmentDialog from "./CheckoutAdjustmentDialog";
 import type {CartItem} from "@/types/cart";
 import type {PickupSelection} from "@/types/pickup";
@@ -138,7 +138,7 @@ function padSeconds(
 export default function CheckoutOffersPanel({
     orderNumber, onCartMutationBusy, onUpdateError, reviewRequired=false
 }: CheckoutOffersPanelProps) {
-    useLanguage();
+    const translate = useTranslation();
     const [navigating,setNavigating]=useState(false);
 
     const features=useStorefrontFeatures();

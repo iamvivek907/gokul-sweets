@@ -1,7 +1,7 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
@@ -22,7 +22,7 @@ export function pickupDateLabel(date: string): string {
 }
 
 export default function PickupJourneyContext() {
-    useLanguage();
+    const translate = useTranslation();
     const pathname = usePathname();
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();

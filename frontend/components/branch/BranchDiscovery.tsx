@@ -1,5 +1,5 @@
 "use client";
-import {T,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import Image from "next/image";
 import Link from "next/link";
 import {useEffect,useState} from "react";
@@ -8,7 +8,7 @@ import type {BranchDiscovery as Discovery} from "@/types/branchDiscovery";
 import type {Branch} from "@/types/branch";
 import BranchSelector from "./BranchSelector";
 export default function BranchDiscovery({branch,selected}:{branch:Branch;selected:boolean}) {
-    useLanguage();
+    useTranslation();
  const [result,setResult]=useState<{branchId:number;data:Discovery}|null>(null),[error,setError]=useState(false),[retry,setRetry]=useState(0);
  useEffect(()=>{const c=new AbortController();apiClient<Discovery>(`/api/branches/${branch.id}/discovery`,{signal:AbortSignal.any([c.signal,AbortSignal.timeout(10000)])}).then(data=>{if(!data || !Array.isArray(data.offerings) || !Array.isArray(data.topRatedItems) || !data.overallExperience || typeof data.overallExperience.average!=="number" || typeof data.overallExperience.count!=="number")throw new Error("Branch highlights are unavailable.");if(!c.signal.aborted){setResult({branchId:branch.id,data});setError(false);}}).catch(()=>{if(!c.signal.aborted)setError(true);});return()=>c.abort();},[branch.id,retry]);
  const data=result?.branchId===branch.id?result.data:null;

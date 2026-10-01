@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -314,7 +314,7 @@ function isSlotAvailable(
 
 
 export default function PickupPage() {
-    useLanguage();
+    useTranslation();
     const {features, error: configurationError, retry} = useStorefrontConfiguration();
     const [fallback, setFallback] = useState(false);
     const pending = useSyncExternalStore(subscribeToPendingOrder, getPendingOrderSnapshot, getServerPendingOrderSnapshot);
@@ -344,7 +344,7 @@ function LegacyPickupPage({
     fallbackFutureOrderingDays: number | null;
     cartSwitchPreview: boolean;
 }) {
-    useLanguage();
+    const translate = useTranslation();
     const simpleCheckout = useStorefrontFeatures()?.simplifiedCheckout === true;
     const [continuing,setContinuing] = useState(false);
     const continuingRef = useRef(false);

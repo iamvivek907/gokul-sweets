@@ -1,5 +1,5 @@
 "use client";
-import {T,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 
@@ -13,7 +13,7 @@ import BranchDetails from "@/components/branch/BranchDetails";
 import {getBranch} from "@/services/branchApi";
 
 export default function BranchMenuGallery({branch, products, activeTab, onTabChange}: {branch: Branch; products: MenuProduct[]; activeTab: "menu" | "details"; onTabChange: (tab: "menu" | "details") => void}) {
-    useLanguage();
+    useTranslation();
     const features = useStorefrontFeatures();
     const branchExperience = features?.branchExperience === true;
     const [failed, setFailed] = useState<string[]>([]);

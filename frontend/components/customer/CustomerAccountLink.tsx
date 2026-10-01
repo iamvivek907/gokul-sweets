@@ -1,5 +1,5 @@
 "use client";
-import {translate,useLanguage} from "@/lib/language";
+import {useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {useEffect, useState} from "react";
@@ -9,7 +9,7 @@ type CustomerSession = {authenticated: boolean; phone?: string; name?: string};
 
 /** Shared header entry point; session changes are announced by the profile panel. */
 export default function CustomerAccountLink() {
-    useLanguage();
+    const translate = useTranslation();
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
 
     useEffect(() => {

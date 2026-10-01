@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import {rankAddOns} from "@/lib/addOnRanking";
 import Image from "next/image";
 import {useEffect,useRef,useState} from "react";
@@ -16,7 +16,7 @@ import styles from "./PickupAddOns.module.css";
 type Suggestion={product:MenuProduct;weightGrams:number|null;portionPrice:number;portionTotal:number;reason:string};
 const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
 export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=[],onAdded,onBusy,onAdjust}:{branchId:number;date:string;orderNumber?:string;disabled:boolean;offers?:AvailableRebateResponse[];onAdded:()=>void|Promise<void>;onBusy?:(busy:boolean)=>void;onAdjust?:()=>void}) {
-    useLanguage();
+    const translate = useTranslation();
  const {items,addItem}=useCart();const locked=useRef(false);
  const [response,setResponse]=useState<{key:string;items:Suggestion[]}|null>(null);
  const [dismissed,setDismissed]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);

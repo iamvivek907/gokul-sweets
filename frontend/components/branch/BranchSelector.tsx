@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useEffect,
@@ -28,7 +28,7 @@ import type {
 function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
     branchName: string; itemCount: number; onKeep: () => void; onConfirm: () => void;
 }) {
-    useLanguage();
+    const translate = useTranslation();
     const dialogId = useId();
     const originalCart = useRef<string | null>(null);
     const [changed, setChanged] = useState(false);
@@ -51,7 +51,7 @@ function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
 
 
 export default function BranchSelector({compact = false, locationControl = false, cardBranch, destination = "menu"}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch; destination?: "menu" | "branchHome" | "occasions"}) {
-    useLanguage();
+    const translate = useTranslation();
     const router = useRouter();
     const uniqueId = useId();
     const popoverId = compact || locationControl || cardBranch ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";

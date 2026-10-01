@@ -1,14 +1,14 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 
 export default function CustomerBreadcrumbs() {
-    useLanguage();
+    const translate = useTranslation();
     const pathname = usePathname();
     const {branch} = useSelectedBranch();
     if (pathname !== "/menu" && pathname !== "/cart") return null;

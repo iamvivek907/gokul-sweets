@@ -1,7 +1,7 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import StorefrontWelcome from "@/components/common/StorefrontWelcome";
 import Image from "next/image";
@@ -24,14 +24,14 @@ import styles from "./CustomerHomeExperience.module.css";
 interface Highlights {trendingProductIds: number[]; newProductIds: number[]}
 
 export default function CustomerHomeExperience({fallback}: {fallback: ReactNode}) {
-    useLanguage();
+    useTranslation();
     const {features} = useStorefrontConfiguration();
     if (!features) return <AppShell showSocialPopup={false}><StorefrontWelcome /></AppShell>;
     return features.customerHomeV2 ? <Storefront features={features} /> : fallback;
 }
 
 function Storefront({features}: {features: StorefrontFeatures}) {
-    useLanguage();
+    const translate = useTranslation();
     const {branch} = useSelectedBranch();
     const campaignBranchId = branch?.id;
     const cart = useCart();

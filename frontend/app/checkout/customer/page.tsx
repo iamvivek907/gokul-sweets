@@ -1,7 +1,7 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
@@ -79,7 +79,7 @@ function formatTime(
 
 
 export default function CustomerPage() {
-    useLanguage();
+    const translate = useTranslation();
     const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
     const router =

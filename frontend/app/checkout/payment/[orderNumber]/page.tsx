@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
 
 import {
@@ -277,7 +277,7 @@ const paymentInitializationPromises =
  */
 
 export default function PaymentPage() {
-    useLanguage();
+    const translate = useTranslation();
     const {features, error: configurationError} = useStorefrontConfiguration();
     const paidCartRecovery = features?.paidCartRecovery;
     const paymentPollingV2 = features?.paymentPollingV2 === true;

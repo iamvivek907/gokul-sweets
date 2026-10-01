@@ -1,5 +1,5 @@
 "use client";
-import {translate,useLanguage} from "@/lib/language";
+import {useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 
@@ -77,7 +77,7 @@ const items: NavigationItem[] = [
 
 
 export default function BottomNavigation() {
-    useLanguage();
+    const translate = useTranslation();
 
     const pathname =
         usePathname();

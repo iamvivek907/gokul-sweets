@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
@@ -47,7 +47,7 @@ import type {
 
 
 export default function CartPage() {
-    useLanguage();
+    const translate = useTranslation();
     const pickupCheck = useDateAvailability();
     const features = useStorefrontFeatures();
     const online = useOnlineStatus();

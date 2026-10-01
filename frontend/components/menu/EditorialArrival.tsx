@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage,LanguagePicker} from "@/lib/language";
+import {T,LanguagePicker,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 
@@ -20,7 +20,7 @@ import styles from "./EditorialArrival.module.css";
 export default function EditorialArrival({campaignsEnabled, accessible, branchExperience = false, occasionEnquiries = false}: {
     campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; occasionEnquiries?: boolean;
 }) {
-    useLanguage();
+    const translate = useTranslation();
     const bilingual=useStorefrontFeatures()?.bilingualStorefront===true;
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);

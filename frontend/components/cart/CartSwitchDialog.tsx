@@ -1,5 +1,5 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import {useEffect, useRef, useState} from "react";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -21,7 +21,7 @@ interface Props {
 const money = (amount: number) => new Intl.NumberFormat("en-IN", {style: "currency", currency: "INR"}).format(amount);
 
 export default function CartSwitchDialog({branchId, branchName, date, items, onKeep, onSwitch}: Props) {
-    useLanguage();
+    const translate = useTranslation();
     const accessible = useStorefrontFeatures()?.accessibleOrderingV2 === true;
     const dialogRef = useRef<HTMLDivElement>(null);
     const onKeepRef = useRef(onKeep);

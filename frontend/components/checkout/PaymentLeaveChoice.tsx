@@ -1,10 +1,10 @@
 "use client";
-import {T,translate,useLanguage} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 import {useEffect,useRef,useState} from "react";
 import {useRouter} from "next/navigation";
 /** Intercept deliberate storefront navigation while money/reservations are unresolved. */
 export default function PaymentLeaveChoice({active,busy,error,onCancel}:{active:boolean;busy:boolean;error?:string|null;onCancel:()=>Promise<void>}) {
-    useLanguage();
+    const translate = useTranslation();
  const router=useRouter();const allowed=useRef(false);const [destination,setDestination]=useState<string|null>(null);
  useEffect(()=>{if(!active)return;const click=(event:MouseEvent)=>{const link=(event.target as Element)?.closest?.("a[href]") as HTMLAnchorElement|null;if(!link||allowed.current||event.defaultPrevented||event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||link.target==="_blank")return;const target=new URL(link.href);if(target.origin!==location.origin||target.pathname===location.pathname)return;event.preventDefault();event.stopImmediatePropagation();setDestination(target.pathname+target.search+target.hash);};document.addEventListener("click",click,true);return()=>{document.removeEventListener("click",click,true);};},[active]);
  if(!active||!destination)return null;
