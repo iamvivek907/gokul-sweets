@@ -28,6 +28,6 @@ public class CustomerIdentityAvailabilityController {
                 && settings.getProperty("gokul.identity.rate-limit-key", "").length() >= 32;
         enabled = enabled && settings.getProperty("gokul.identity.provider-abuse-controls-verified", Boolean.class, false);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(Map.of("enabled", enabled));
+                .body(Map.of("enabled", enabled, "guestCheckoutEnabled", settings.getProperty("gokul.checkout.guest-enabled", Boolean.class, true)));
     }
 }

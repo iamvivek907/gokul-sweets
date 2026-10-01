@@ -1,0 +1,66 @@
+/* Phone layout only. Desktop uses the existing editorial/customer styles unchanged. */
+.mobile-payment-recovery,.mobile-checkout-payment-notice{display:none}
+@media(max-width:640px){
+ .future-storefront .payment-cancel-inline{display:none}
+ .future-storefront .mobile-checkout-payment-notice{display:flex;gap:10px;align-items:center;margin:0 0 12px;padding:12px;border:1px solid #c4d4c9;border-radius:12px;background:#edf5ed;font-size:12px;line-height:1.5}
+ .mobile-checkout-payment-notice button{flex:none;min-width:44px;min-height:44px;font-size:24px}
+ .future-storefront[data-customer-route^="/checkout"] [aria-labelledby="social-follow-title"]{display:none}
+ .future-storefront .product-card-image>.product-image-fallback{font-size:0}
+ .future-storefront .product-card-image>.product-image-fallback:before{content:"G";font:32px Georgia,serif;color:#47675e}
+ .future-storefront .gokul-customer-breadcrumbs{display:none}
+ .future-storefront .gokul-editorial-menu{padding:12px!important}
+ .future-storefront .gokul-branch-gallery{display:block;padding:16px;margin:0 0 12px;border-radius:18px}
+ .future-storefront .gokul-branch-intro h1{font:700 24px/1.25 system-ui,sans-serif;letter-spacing:0;margin:6px 0}
+ .future-storefront .gokul-branch-intro>p:not(.gokul-overline){font-size:12px;line-height:1.5;margin:6px 0}
+ .future-storefront .gokul-overline{font-size:10px;letter-spacing:.06em}
+ .future-storefront .gokul-gallery-photos,.future-storefront .gokul-gallery-fallback{display:none}
+ .future-storefront .gokul-branch-meta{font-size:11px;gap:8px;margin:8px 0}
+ .future-storefront .gokul-branch-menu-cta{min-height:44px;padding:8px 12px;font-size:12px}
+ .future-storefront .gokul-branch-tabs{min-height:44px;gap:16px;margin-top:8px}
+ .future-storefront .gokul-branch-tabs :is(a,button){min-height:44px;font-size:12px;padding:4px 0}
+ .future-storefront .gokul-menu-tools{padding:12px!important;margin-top:12px;border-radius:16px}
+ .future-storefront .gokul-menu-tools>div{margin-top:8px}
+ .future-storefront .gokul-menu-tools button{min-height:44px;font-size:12px;padding:8px 12px}
+ .future-storefront #gokul-menu-items{margin-top:16px}
+ .future-storefront .gokul-menu-category-heading{margin:12px 0 8px}
+ .future-storefront .gokul-menu-category-heading h3{font:700 18px/1.3 system-ui,sans-serif}
+ .future-storefront .gokul-menu-product-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+ .future-storefront .gokul-product-card.gokul-menu-product-card{position:relative;display:flex;flex-direction:row;align-items:flex-start;min-height:178px;border-radius:16px;box-shadow:none!important}
+ .future-storefront .gokul-product-card.gokul-menu-product-card>.product-card-image{order:2;width:112px;height:104px;aspect-ratio:auto;margin:12px 12px 62px 0;border-radius:12px}
+ .future-storefront .gokul-product-card>.product-card-copy{order:1;min-width:0;padding:14px 12px;align-self:stretch}
+ .future-storefront .gokul-product-card h3{font-size:15px;line-height:1.35;margin-top:3px}
+ .future-storefront .gokul-product-card .product-card-copy>p{font-size:11px;line-height:1.4}
+ .future-storefront .gokul-product-card .product-card-rating{margin-top:6px;min-height:18px}
+ .future-storefront .gokul-product-card .product-card-purchase{min-height:0;padding-top:8px;align-items:flex-start;justify-content:flex-start;gap:3px}
+ .future-storefront .gokul-product-card .product-card-purchase>span:first-child{font-size:14px}
+ .future-storefront .gokul-product-card .product-card-controls{position:absolute;right:12px;bottom:12px;width:112px;height:44px;margin:0}
+ .future-storefront .gokul-product-card .product-card-controls button{min-height:44px;font-size:12px}
+ .future-storefront .gokul-floating-cart{width:calc(100vw - 24px);bottom:calc(5rem + env(safe-area-inset-bottom))}
+ .future-storefront .gokul-floating-cart>a{min-height:56px;padding:8px 14px;border-radius:14px;box-shadow:0 6px 18px #09272525!important}
+ .future-storefront .gokul-floating-cart>a>div:first-child>div:first-child{height:32px;width:32px}
+ .future-storefront .checkout-experience-v2{margin:8px 10px 16px;border-radius:16px;box-shadow:none}
+ .future-storefront .checkout-experience-head{padding:10px 12px}
+ .future-storefront .checkout-experience-brand{display:none}
+ .future-storefront .checkout-experience-branch{width:100%;padding:8px 10px;max-width:none}
+ .future-storefront .checkout-experience-progress{padding:8px;gap:5px}
+ .future-storefront .checkout-experience-progress :is(a,span){font-size:11px;min-height:36px;padding:8px 10px;white-space:normal}
+ .future-storefront .checkout-experience-content{padding:12px!important}
+ .future-storefront .checkout-experience-content>nav{display:none}
+ .future-storefront .checkout-experience-content h1{font:700 24px/1.3 system-ui,sans-serif!important;letter-spacing:0!important}
+ .future-storefront .checkout-experience-content h2{font-size:18px;line-height:1.35}
+ .future-storefront .checkout-experience-content>section{padding:0!important}
+ .future-storefront .gokul-pickup-options{gap:14px}
+ .future-storefront .gokul-pickup-time{min-height:72px;padding:10px}
+ .future-storefront .checkout-mobile-action-space{display:block;height:96px}
+ .future-storefront .checkout-mobile-action{position:fixed;inset:auto 0 0;z-index:45;margin:0;border-radius:0;min-height:76px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#fffaf2;color:#143936;border-top:1px solid #d9e5df;box-shadow:0 -4px 18px #14393612;gap:10px}
+ .future-storefront .checkout-mobile-action small{font-size:10px;line-height:1.4}
+ .future-storefront .checkout-mobile-action strong{font-size:18px;line-height:1.4}
+ .future-storefront .checkout-mobile-action button{min-height:48px;padding:10px 16px;background:#143936;color:#fffaf2;border-radius:12px;font-size:13px;max-width:60%}
+ .future-storefront .mobile-payment-recovery{display:block;margin:12px 0;padding:16px;border:1px solid #e7c4b6;border-radius:16px;background:#fff4ed}
+ .future-storefront .mobile-payment-recovery h2{font-size:18px;margin-bottom:8px}
+ .future-storefront .mobile-payment-recovery p{font-size:13px;line-height:1.5}
+ .future-storefront .mobile-payment-recovery button{display:block;width:100%;min-height:48px;margin-top:12px;padding:10px;background:#143936;color:#fffaf2;border-radius:12px;font-weight:700}
+ .future-storefront .mobile-payment-recovery button:disabled{opacity:.5}
+ .future-storefront[data-customer-route^="/checkout/payment"] .checkout-experience-content>section>div{border-radius:16px;padding:16px}
+ .future-storefront[data-customer-route^="/checkout"] .customer-site-footer{padding:20px 16px}
+}

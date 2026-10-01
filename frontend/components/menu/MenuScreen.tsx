@@ -1157,7 +1157,7 @@ export default function MenuScreen() {
                 <PickupContext check={pickupCheck} />
 
                 <div
-                    className="
+                    className="gokul-menu-tools
                         mt-5
                         rounded-3xl
                         border

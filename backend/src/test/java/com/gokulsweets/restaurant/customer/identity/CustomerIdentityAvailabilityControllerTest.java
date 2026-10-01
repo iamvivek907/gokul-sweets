@@ -22,6 +22,8 @@ class CustomerIdentityAvailabilityControllerTest {
         assertThat(controller.availability().getBody()).containsEntry("enabled", false);
         settings.setProperty("gokul.identity.provider-abuse-controls-verified", "true");
         assertThat(controller.availability().getBody()).containsEntry("enabled", true);
+        settings.setProperty("gokul.checkout.guest-enabled", "false");
+        assertThat(controller.availability().getBody()).containsEntry("guestCheckoutEnabled", false);
         settings.setProperty("gokul.msg91.server-authkey", "");
         assertThat(controller.availability().getBody()).containsEntry("enabled", false);
     }

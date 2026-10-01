@@ -6,6 +6,8 @@ import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -19,16 +21,54 @@ public class VerifiedOrderOwnership {
     private final EnhancementProperties features;
     private final Environment settings;
 
-    public void bindNewOrder(Long orderId, String checkoutPhone, String token) {
-        if (!features.isCustomerOtpIdentity() || token == null || !token.matches("[0-9a-f]{64}")
-                || checkoutPhone == null || !checkoutPhone.matches("[6-9][0-9]{9}")
-                || !settings.getProperty("gokul.environment-isolation.enabled", Boolean.class, false)
-                || !settings.getProperty("gokul.web.environment-cors-enabled", Boolean.class, false)) return;
+    /** Runs inside checkout's transaction before claiming an idempotency key or reserving stock. */
+    public void requireCheckoutIdentity(String checkoutPhone, String token) {
+        if (settings.getProperty("gokul.checkout.guest-enabled", Boolean.class, true)) return;
+        if (!canBind(checkoutPhone, token)) throw signInRequired();
         String environment = settings.getProperty("gokul.environment-isolation.environment", "");
-        if (!"DEV".equals(environment) && !"PROD".equals(environment)) return;
+        var subjects = jdbc.queryForList("""
+                SELECT s.verified_subject_id FROM verified_customer_sessions s
+                JOIN verified_customer_subjects v ON v.environment=s.environment AND v.id=s.verified_subject_id
+                WHERE s.environment=? AND s.token_digest=? AND s.revoked_at IS NULL AND s.expires_at>?
+                  AND v.verified_phone=? FOR SHARE OF s,v
+                """, UUID.class, environment, VerifiedCustomerSessionStore.digest(token),
+                Timestamp.from(Instant.now()), "+91" + checkoutPhone);
+        if (subjects.isEmpty()) throw signInRequired();
+    }
+
+    public void requireCheckoutReplay(Long orderId, String token) {
+        if (settings.getProperty("gokul.checkout.guest-enabled", Boolean.class, true)) return;
+        if (token == null || !token.matches("[0-9a-f]{64}")) throw signInRequired();
+        String environment = settings.getProperty("gokul.environment-isolation.environment", "");
+        boolean owned = Boolean.TRUE.equals(jdbc.queryForObject("""
+                SELECT EXISTS (SELECT 1 FROM verified_order_ownership own
+                JOIN verified_customer_sessions s ON s.environment=own.environment AND s.verified_subject_id=own.verified_subject_id
+                WHERE own.order_id=? AND own.environment=? AND s.token_digest=?
+                  AND s.revoked_at IS NULL AND s.expires_at>?)
+                """, Boolean.class, orderId, environment, VerifiedCustomerSessionStore.digest(token), Timestamp.from(Instant.now())));
+        if (!owned) throw signInRequired();
+    }
+
+    private boolean canBind(String phone, String token) {
+        String environment = settings.getProperty("gokul.environment-isolation.environment", "");
+        return features.isCustomerOtpIdentity() && token != null && token.matches("[0-9a-f]{64}")
+                && phone != null && phone.matches("[6-9][0-9]{9}")
+                && settings.getProperty("gokul.environment-isolation.enabled", Boolean.class, false)
+                && settings.getProperty("gokul.web.environment-cors-enabled", Boolean.class, false)
+                && ("DEV".equals(environment) || "PROD".equals(environment));
+    }
+
+    private ResponseStatusException signInRequired() {
+        return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Sign in with your verified phone before placing an order.");
+    }
+
+    public void bindNewOrder(Long orderId, String checkoutPhone, String token) {
+        requireCheckoutIdentity(checkoutPhone, token);
+        if (!canBind(checkoutPhone, token)) return;
+        String environment = settings.getProperty("gokul.environment-isolation.environment", "");
         // Lock the session and current subject until the enclosing order transaction commits.
         // Reverification rotates the subject and revokes old sessions under a row update lock.
-        jdbc.update("""
+        int bound = jdbc.update("""
                 WITH verified AS (
                     SELECT s.verified_subject_id
                     FROM verified_customer_sessions s
@@ -44,6 +84,7 @@ public class VerifiedOrderOwnership {
                 SELECT ?, ?, verified_subject_id, ? FROM verified
                 """, environment, VerifiedCustomerSessionStore.digest(token), Timestamp.from(Instant.now()),
                 "+91" + checkoutPhone, orderId, environment, Timestamp.from(Instant.now()));
+        if (bound != 1 && !settings.getProperty("gokul.checkout.guest-enabled", Boolean.class, true)) throw signInRequired();
     }
 
     /** A current subject sees only orders bound while that exact subject was live. */

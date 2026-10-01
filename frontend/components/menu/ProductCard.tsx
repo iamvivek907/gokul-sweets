@@ -96,7 +96,7 @@ export default function ProductCard({
     return (
         <article
             className={`
-                group
+                gokul-product-card group
                 ${refined ? "gokul-menu-product-card" : ""}
                 flex
                 min-h-32
@@ -121,7 +121,7 @@ export default function ProductCard({
             {/* ============================================================ */}
 
             <div
-                className="
+                className="product-card-image
                     relative
                     h-32
                     w-28
@@ -163,7 +163,7 @@ export default function ProductCard({
                             />
                         )
                         : (
-                            <div className="
+                            <div className="product-image-fallback
                                 flex
                                 h-full
                                 items-center
@@ -213,7 +213,7 @@ export default function ProductCard({
             {/* Product Details                                               */}
             {/* ============================================================ */}
 
-            <div className="
+            <div className="product-card-copy
                 flex
                 min-w-0
                 flex-1

@@ -3,8 +3,10 @@ import {T} from "@/lib/language";
 
 
 import Link from "next/link";
-import {useRef, useState, type FormEvent} from "react";
+import {useCallback, useRef, useState, type FormEvent} from "react";
 import {useRouter} from "next/navigation";
+import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
+import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
 import AppShell from "@/components/layout/AppShell";
 import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
 import {useCart} from "@/hooks/useCart";
@@ -37,6 +39,8 @@ export default function DeliveryCheckPage() {
     const [checked, setChecked] = useState<{request: DeliveryCartCheck; fingerprint: string} | null>(null);
     const [selectedWindowId, setSelectedWindowId] = useState<number | null>(null);
     const [addressLine, setAddressLine] = useState("");
+    const [guestAllowed, setGuestAllowed] = useState(false);
+    const [identity, setIdentity] = useState<CustomerSession | null>(null);
     const [customerName, setCustomerName] = useState("");
     const [customerPhone, setCustomerPhone] = useState("");
     const [accepted, setAccepted] = useState<{quote: DeliveryAcceptedQuote; draft: DeliveryOrderDraft; fingerprint: string} | null>(null);
@@ -47,6 +51,13 @@ export default function DeliveryCheckPage() {
     const router = useRouter();
     const cart = useCart();
 
+    const onIdentity = useCallback((session: CustomerSession) => {
+        revision.current++;
+        setAccepted(null); setCheckoutMessage(""); idempotencyKey.current = null;
+        setIdentity(session);
+        const contact = verifiedCheckoutContact(session);
+        if (contact) {setCustomerName(contact.name); setCustomerPhone(contact.phone);}
+    }, []);
     function invalidateArea() {
         revision.current++;
         setQuote(null); setChecked(null); setSelectedWindowId(null); setAccepted(null);
@@ -123,6 +134,7 @@ export default function DeliveryCheckPage() {
             checked.request.branchId !== cart.branchId || checked.fingerprint !== createCartFingerprint(cart.items)) {
             setCheckoutMessage("Your cart or delivery check changed. Check your area again."); return;
         }
+        if (!guestAllowed && !identity?.authenticated) {setCheckoutMessage("Verify your phone before continuing. Your cart is saved.");return;}
         const phone = customerPhone.replace(/\D/g, "");
         if (!/^[6-9][0-9]{9}$/.test(phone) || customerName.trim().length < 2 ||
             addressLine.trim().length < 2 || addressLine.trim().length > 300) {
@@ -146,6 +158,7 @@ export default function DeliveryCheckPage() {
 
     async function placeOrder() {
         if (!features?.deliveryCheckout || !accepted || checkoutPending) return;
+        if (!guestAllowed && !identity?.authenticated) {setCheckoutMessage("Verify your phone before placing the order.");return;}
         if (accepted.draft.quote.branchId !== cart.branchId ||
             accepted.fingerprint !== createCartFingerprint(parseCart(getCartSnapshot()).items) ||
             (parseBusinessTimestamp(accepted.quote.expiresAt).getTime() <= Date.now() && !idempotencyKey.current)) {
@@ -258,6 +271,7 @@ export default function DeliveryCheckPage() {
                             <span className={styles.step}>03 / DELIVERY CHECKOUT</span>
                             <h2 id="delivery-checkout">Choose a window, then review the price.</h2>
                             <p>Rider windows remain provisional until your order is created. All times are IST.</p>
+                            <CustomerIdentityPanel mode="checkout" onSessionChange={onIdentity} onGuestCheckoutChange={setGuestAllowed} />
                             <form onSubmit={reviewPrice}>
                                 <fieldset className={styles.windows}>
                                     <legend>Available windows</legend>
@@ -277,10 +291,10 @@ export default function DeliveryCheckPage() {
                                 <input id="delivery-name" autoComplete="name" value={customerName} required minLength={2} maxLength={150}
                                        onChange={event => {setCustomerName(event.target.value); invalidatePrice();}} />
                                 <label htmlFor="delivery-phone">Indian mobile number</label>
-                                <input id="delivery-phone" type="tel" inputMode="tel" autoComplete="tel" value={customerPhone}
+                                <input id="delivery-phone" type="tel" inputMode="tel" autoComplete="tel" value={customerPhone} readOnly={!guestAllowed}
                                        onChange={event => {setCustomerPhone(event.target.value); invalidatePrice();}}
                                        required placeholder="10-digit mobile number" />
-                                <button type="submit" disabled={checkoutPending} className={styles.action}>
+                                <button type="submit" disabled={checkoutPending || (!guestAllowed && !identity?.authenticated)} className={styles.action}>
                                     {checkoutPending ? "Checking current price..." : "Review delivery price"} <span aria-hidden="true">&rarr;</span>
                                 </button>
                             </form>
@@ -297,7 +311,7 @@ export default function DeliveryCheckPage() {
                                 <div className={styles.total}><span>Total including tax and delivery</span><strong>₹{accepted.quote.totalAmount}</strong></div>
                                 <p>Price valid until {new Intl.DateTimeFormat("en-IN", {timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit"})
                                     .format(new Date(accepted.quote.expiresAt))} IST. The final amount is checked again when you place the order.</p>
-                                <button type="button" className={styles.action} onClick={placeOrder} disabled={checkoutPending}>
+                                <button type="button" className={styles.action} onClick={placeOrder} disabled={checkoutPending || (!guestAllowed && !identity?.authenticated)}>
                                     {checkoutPending ? "Reserving delivery..." : "Confirm delivery and continue to payment"}
                                 </button>
                             </div>}
