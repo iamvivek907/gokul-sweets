@@ -12,6 +12,7 @@ import {
     useRouter
 } from "next/navigation";
 
+import CheckoutOffersPanel from "@/components/checkout/CheckoutOffersPanel";
 import AppShell
     from "@/components/layout/AppShell";
 import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
@@ -113,7 +114,7 @@ function padSeconds(
 }
 
 
-export default function OffersPage() {
+function LegacyOffersPage() {
     const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
     const router =
@@ -3081,4 +3082,11 @@ export default function OffersPage() {
         </CheckoutExperienceFrame>
         </AppShell>
     );
+}
+
+export default function OffersPage() {
+    const features=useStorefrontFeatures();
+    const params=useParams<{orderNumber:string}>();
+    if(features?.pickupAddOns) return <AppShell><CheckoutExperienceFrame enabled={features.checkoutExperienceV2} stage="offers"><section className="mx-auto w-full min-w-0 max-w-2xl px-4 pb-28 pt-5"><CheckoutOffersPanel orderNumber={params.orderNumber}/></section></CheckoutExperienceFrame></AppShell>;
+    return <LegacyOffersPage/>;
 }

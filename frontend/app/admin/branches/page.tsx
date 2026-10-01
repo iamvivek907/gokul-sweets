@@ -23,6 +23,7 @@ import {
     BranchOperationalSettings
 } from "@/components/admin/BranchOperationalSettings";
 import {DeliveryZonesSettings} from "@/components/admin/DeliveryZonesSettings";
+import BranchOfferingsEditor from "@/components/admin/BranchOfferingsEditor";
 import BranchExperienceEditor from "@/components/admin/BranchExperienceEditor";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
@@ -2214,6 +2215,7 @@ export default function AdminBranchesPage() {
                             &&
                             authorization
                             && (<>
+                                {hasPermission("BRANCH_MANAGE") && <BranchOfferingsEditor key={`offerings-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization} />}
                                 <BranchExperienceEditor key={`experience-${selectedBranch.id}`}
                                     branch={selectedBranch} authorization={authorization}
                                     allowed={hasPermission("MENU_MANAGE")}

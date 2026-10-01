@@ -5,6 +5,7 @@ import {useParams} from "next/navigation";
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
+import BranchDiscovery from "@/components/branch/BranchDiscovery";
 import BranchDetails from "@/components/branch/BranchDetails";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {getBranch} from "@/services/branchApi";
@@ -47,11 +48,11 @@ export default function BranchHomePage() {
                     {occasionEnquiries && <Link href="/occasions/requests">My requests & quotes</Link>}
                     <button type="button" aria-current={tab === "details" ? "page" : undefined} onClick={() => setTab("details")}>Branch details</button>
                 </nav>
-                {tab === "details" ? <BranchDetails branch={branch} /> : <section className="branch-home-welcome">
+                {tab === "details" ? <BranchDetails branch={branch} /> : <><BranchDiscovery branch={branch} selected={selected?.id === branch.id} /><section className="branch-home-welcome">
                     <h2>Made for your next visit.</h2><p>{branch.pickupAvailable ? "Browse what is available here, place an order and choose your pickup time at checkout." : "Explore this branch and contact us for your visit."}</p>
                     <button type="button" onClick={() => setTab("details")}>See branch details →</button>
                     {occasionEnquiries && selected?.id === branch.id && <Link className="ml-4 inline-flex min-h-11 items-center font-semibold underline" href="/occasions">Plan occasion food →</Link>}
-                </section>}
+                </section></>}
             </>}
         </article>
     </AppShell>;
