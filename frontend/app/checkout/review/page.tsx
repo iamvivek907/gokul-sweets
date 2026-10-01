@@ -745,22 +745,34 @@ export default function ReviewPage() {
      * =========================================================
      */
 
-    const [priceChecking,setPriceChecking]=useState(false);
-    const autoPriceKey=useRef("");
-    useEffect(()=>{
-        if(!storefrontFeatures?.simplifiedCheckout||!quoteEnabled||invalidBranch||!branch||!pickupSelection||!customer||!items.length||pendingOrder||!online)return;
-        const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name,customerPhone:customer.phone,items:items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};
-        const key=JSON.stringify([request,undefined]);
-        if(autoPriceKey.current===key)return;
-        let active=true;
-        const timer=window.setTimeout(()=>{
-            autoPriceKey.current=key;setPriceChecking(true);setAcceptedQuote(null);
-            void previewCheckoutQuote(request).then(quote=>{if(active)setAcceptedQuote({key,quote});})
-                .catch(()=>{if(active)setOrderError("We couldn’t check your total. Tap Check price & offers to try again.");})
-                .finally(()=>{if(active)setPriceChecking(false);});
-        },150);
-        return ()=>{active=false;window.clearTimeout(timer);if(autoPriceKey.current===key)autoPriceKey.current="";setPriceChecking(false);};
-    },[storefrontFeatures?.simplifiedCheckout,quoteEnabled,invalidBranch,branch,pickupSelection,customer,items,pendingOrder,online]);
+    const [priceChecking, setPriceChecking] = useState(false);
+    const autoPriceKey = useRef("");
+    const initialPriceKey = branch && pickupSelection && customer && items.length
+        ? JSON.stringify([{branchId: branch.id, pickupSlotId: pickupSelection.slot.id,
+            pickupType: pickupSelection.pickupType, customerName: customer.name, customerPhone: customer.phone,
+            items: items.map(item => ({productId: item.product.id,
+                quantity: item.product.saleMode === "UNIT" ? item.quantity : null, weightGrams: item.weightGrams}))}, undefined])
+        : "";
+    const pendingOrderNumber = pendingOrder?.orderNumber;
+    useEffect(() => {
+        if (!storefrontFeatures?.simplifiedCheckout || !quoteEnabled || invalidBranch || !initialPriceKey || pendingOrderNumber || !online) return;
+        if (autoPriceKey.current === initialPriceKey) return;
+        const request = JSON.parse(initialPriceKey)[0] as Parameters<typeof previewCheckoutQuote>[0];
+        let active = true;
+        const timer = window.setTimeout(() => {
+            autoPriceKey.current = initialPriceKey;
+            setPriceChecking(true); setAcceptedQuote(null);
+            void previewCheckoutQuote(request)
+                .then(quote => {if (active) setAcceptedQuote({key: initialPriceKey, quote});})
+                .catch(() => {if (active) setOrderError("We couldn’t check your total. Tap Check price & offers to try again.");})
+                .finally(() => {if (active) setPriceChecking(false);});
+        }, 150);
+        return () => {
+            active = false; window.clearTimeout(timer);
+            if (autoPriceKey.current === initialPriceKey) autoPriceKey.current = "";
+            setPriceChecking(false);
+        };
+    }, [storefrontFeatures?.simplifiedCheckout, quoteEnabled, invalidBranch, initialPriceKey, pendingOrderNumber, online]);
 
     async function handlePlaceOrder() {
         if(addonBusy || priceChecking)return;
