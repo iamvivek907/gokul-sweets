@@ -31,7 +31,7 @@ try {
  await page.getByRole("combobox",{name:/^Branch/}).selectOption("2");
  await page.reload();
  await page.getByRole("combobox",{name:/^Branch/}).waitFor();
- await page.waitForFunction(()=>document.querySelector('select').value==="2");
+ await page.getByRole("combobox",{name:/^Branch/}).locator('option[value="2"]:checked').waitFor({state:"attached"});
  await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).click();
  assert.equal(await page.getByText("Occasion sweets & packaging catalogue",{exact:true}).count(),1);
  await page.getByRole("button",{name:"Edit Existing wedding box",exact:true}).click();

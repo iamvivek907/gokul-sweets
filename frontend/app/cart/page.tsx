@@ -227,7 +227,7 @@ export default function CartPage() {
                                         text-[#756763]
                                     "
                                 >
-                                    {itemCount} {itemCount === 1 ? translate("item") : "items"} <T text="ready for review" /></p>
+                                    {itemCount} {itemCount === 1 ? translate("item") : translate("items")} <T text="ready for review" /></p>
                             )}
 
                     </div>

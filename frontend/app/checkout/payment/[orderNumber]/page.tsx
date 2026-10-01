@@ -2147,7 +2147,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                <T text="The automatic refund did not reach a successful final state. Your old order has not been restored and no" />{deliveryOrder ? "rider window" : "pickup slot"} has been re-reserved.
+                                <T text="The automatic refund did not reach a successful final state. Your old order has not been restored and no" />{" "}{deliveryOrder ? "rider window" : "pickup slot"} has been re-reserved.
                             </p>
 
 
@@ -2159,7 +2159,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                <T text="Please keep this order number for support:" />{orderNumber}
+                                <T text="Please keep this order number for support:" />{" "}{orderNumber}
                             </p>
 
                         </div>
@@ -2211,7 +2211,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                <T text="The order is no longer holding its" />{deliveryOrder ? "delivery reservation" : "pickup reservation"}<T text=". Your cart is still available." /></p>
+                                <T text="The order is no longer holding its" />{" "}{deliveryOrder ? "delivery reservation" : "pickup reservation"}<T text=". Your cart is still available." /></p>
 
 
                             <p
@@ -2273,7 +2273,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The old {deliveryOrder ? "delivery" : "pickup"} <T text="reservation has been released. Your cart is still safe, so you can choose a new" />{deliveryOrder ? "rider window" : "pickup slot"}.
+                                The old {deliveryOrder ? "delivery" : "pickup"} <T text="reservation has been released. Your cart is still safe, so you can choose a new" />{" "}{deliveryOrder ? "rider window" : "pickup slot"}.
                             </p>
 
 
@@ -2651,7 +2651,7 @@ export default function PaymentPage() {
                     }
 
                     <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout}/>
-                    {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm"><T text="Payable amount includes a convenience fee of" />{formatCurrency(feeBreakdown.fee)} <T text="(including" />{formatCurrency(feeBreakdown.tax)} <T text="fee tax)." /></p>}
+                    {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm"><T text="Payable amount includes a convenience fee of" />{" "}{formatCurrency(feeBreakdown.fee)} <T text="(including" />{" "}{formatCurrency(feeBreakdown.tax)} <T text="fee tax)." /></p>}
                     {(isPending || isFailed || isExpired) && <section aria-label="Payment recovery" className="mt-4 rounded-2xl border border-[#c4d4c9] bg-[#fffaf2] p-4 text-[#173c39]">
                         <p className="font-bold">{isPending ? translate("Need to stop this checkout?") : "Your cart is ready to try again"}</p>
                         <p className="mt-1 text-sm leading-6"><T text="Check payment and release the unpaid pickup reservation. Keep your items for another attempt." /></p>

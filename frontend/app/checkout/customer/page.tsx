@@ -762,11 +762,7 @@ export default function CustomerPage() {
                                         itemCount
                                     }
                                     {" "}
-                                    <T text="item" />{
-                                        itemCount === 1
-                                            ? ""
-                                            : "s"
-                                    }
+                                    {translate(itemCount === 1 ? "item" : "items")}
                                 </span>
 
 
@@ -875,11 +871,7 @@ export default function CustomerPage() {
                                                 - 3
                                             }
                                             {" "}
-                                            <T text="more item" />{
-                                                items.length - 3 === 1
-                                                    ? ""
-                                                    : "s"
-                                            }
+                                            {translate(items.length - 3 === 1 ? "more item" : "more items")}
                                         </p>
 
                                     )

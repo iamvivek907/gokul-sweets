@@ -257,7 +257,7 @@ export default function PickupInventoryGuard({
                             href={`tel:${branchPhone}`}
                             className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-[#7a1625] text-sm font-bold text-[#7a1625]!"
                         >
-                            <T text="Call" />{branchPhone}
+                            <T text="Call" />{" "}{branchPhone}
                         </a>
                     )}
                 </div>

@@ -124,11 +124,9 @@ export default function SmartPickupSelection({features, onFallback}: {
             }
             savePickupSlot({date, slot: slot.slot, pickupType: selection.type});
             let route="/checkout/customer";
-            if(features.simplifiedCheckout){
                 try{const config=await apiClient<{enabled:boolean}>("/api/storefront/customer-identity",{signal:AbortSignal.timeout(5000)});
                     if(config.enabled){const session=await apiClient<{authenticated:boolean;phone?:string;name?:string}>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.timeout(5000)});const contact=verifiedCheckoutContact(session);if(contact){saveCustomerDetails(contact);route="/checkout/review";}}
                 }catch{/* Identity outage keeps the guest contact step usable. */}
-            }
             router.push(route);
         } catch (error) {
             console.warn("Final pickup preview failed.", error);
@@ -148,11 +146,11 @@ export default function SmartPickupSelection({features, onFallback}: {
             }} />}
         <nav aria-label="Order progress" className="mb-5 text-sm text-[#756763]">
             <Link href="/menu"><T text="Branch & menu" /><LinkFeedback /></Link> / <Link href="/cart"><T text="Your cart" /><LinkFeedback /></Link> / <strong><T text="Pickup time" /></strong> <T text="/ Review" /></nav>
-        <p className="gokul-pickup-overline"><T text="Pickup at" />{branch?.name ?? "your branch"}</p>
+        <p className="gokul-pickup-overline"><T text="Pickup at" />{" "}{branch?.name ?? "your branch"}</p>
         <h1 className="text-3xl font-bold text-[#7a1625]"><T text="Choose when to collect" /></h1>
-        <p className="mt-2 text-sm text-[#756763]"><T text="Times are checked for your whole cart at" />{branch?.name ?? "your branch"}<T text=". Your order is reserved at checkout." /></p>
+        <p className="mt-2 text-sm text-[#756763]"><T text="Times are checked for your whole cart at" />{" "}{branch?.name ?? "your branch"}<T text=". Your order is reserved at checkout." /></p>
         {!cart.items.length ? <Link className="mt-5 block underline" href="/menu"><T text="Add items from the menu first" /><LinkFeedback /></Link>
-            : !validBranch ? <p role="alert" className="mt-5"><T text="Your cart belongs to a different branch." /><Link href="/cart" className="underline"><T text="Review your cart" /><LinkFeedback /></Link> <T text="before continuing." /></p>
+            : !validBranch ? <p role="alert" className="mt-5"><T text="Your cart belongs to a different branch." />{" "}<Link href="/cart" className="underline"><T text="Review your cart" /><LinkFeedback /></Link> <T text="before continuing." /></p>
             : <>
                 {error && <div role="alert" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
                     <p>{translate(error)}</p>
@@ -172,7 +170,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                                 setSelection({id: next.slot.slot.id, type: next.slot.normalAvailable ? "NORMAL" : "PRIORITY"});
                             }
                         }}>
-                        <T text="Next pickup for all items:" />{dateLabel(next.day.date)}, {next.slot.slot.startTime.slice(0, 5)}
+                        <T text="Next pickup for all items:" />{" "}{dateLabel(next.day.date)}, {next.slot.slot.startTime.slice(0, 5)}
                         {!next.slot.normalAvailable ? ` (priority + INR ${next.slot.slot.priorityCharge})` : ""}
                     </button>}
                     <section aria-label="Pickup dates">
@@ -228,10 +226,10 @@ export default function SmartPickupSelection({features, onFallback}: {
                         {features.checkoutExperienceV2 && timeChoiceCount > 8 && <button type="button" className="gokul-pickup-show-times" onClick={() => setShowAllTimes(value => !value)}>{showAllTimes ? "Show fewer times" : `Show all ${timeChoiceCount} times`}</button>}
                         <p id="pickup-time-help" className="mt-2 text-xs text-[#756763]"><T text="Only times that fit every item in your cart are selectable. All times are India time." /></p>
                         {unavailable.length > 0 && <details className="mt-4 rounded-xl border border-[#eadfd6] p-3">
-                            <summary className="min-h-11 cursor-pointer py-2 text-sm"><T text="Why are" />{unavailable.length} <T text="other times not available?" /></summary>
+                            <summary className="min-h-11 cursor-pointer py-2 text-sm"><T text="Why are" />{" "}{unavailable.length} <T text="other times not available?" /></summary>
                             <ul className="space-y-3 text-sm">{unavailable.map(value => <li key={value.slot.id}>
                                 <strong>{value.slot.startTime.slice(0, 5)}</strong>: {value.reason}
-                                {value.issues && value.issues.length > 1 && <span> <T text="Also:" />{value.issues.slice(1).map(item => `${item.productName}: ${item.reason}`).join(" ")}</span>}
+                                {value.issues && value.issues.length > 1 && <span> <T text="Also:" />{" "}{value.issues.slice(1).map(item => `${item.productName}: ${item.reason}`).join(" ")}</span>}
                             </li>)}</ul>
                         </details>}
                     </section>
@@ -239,8 +237,8 @@ export default function SmartPickupSelection({features, onFallback}: {
                 </div>}
                 {message && <p role="alert" className="mt-4 text-red-700">{translate(message)}</p>}
                 <div className="gokul-pickup-desktop-continue mt-6 mb-24 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd6] bg-white p-4">
-                    <Link href="/cart" className="min-h-11 py-3 text-sm underline">{cart.itemCount} <T text="items · INR" />{cart.subtotal.toFixed(2)} <T text="before tax" /><LinkFeedback /></Link>
-                    {chosen && <p className="text-sm font-semibold">{dateLabel(date)} <T text="at" />{chosen.slot.startTime.slice(0, 5)}{selection?.type === "PRIORITY" ? ` + INR ${chosen.slot.priorityCharge} priority` : ""}</p>}
+                    <Link href="/cart" className="min-h-11 py-3 text-sm underline">{cart.itemCount} <T text="items · INR" />{" "}{cart.subtotal.toFixed(2)} <T text="before tax" /><LinkFeedback /></Link>
+                    {chosen && <p className="text-sm font-semibold">{dateLabel(date)} <T text="at" />{" "}{chosen.slot.startTime.slice(0, 5)}{selection?.type === "PRIORITY" ? ` + INR ${chosen.slot.priorityCharge} priority` : ""}</p>}
                     <button disabled={!available || continuing || !data} onClick={continueCheckout}
                         className="min-h-12 rounded-xl bg-[#7a1625] px-6 font-bold text-white disabled:opacity-50">
                         {continuing ? translate("Checking...") : translate("Continue")}

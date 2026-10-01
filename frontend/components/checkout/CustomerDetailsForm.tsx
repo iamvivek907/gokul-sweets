@@ -183,7 +183,7 @@ export default function CustomerDetailsForm({
                         text-[#241715]
                     "
                 >
-                    <T text="Your name" /></label>
+                    <T text={verifiedPhone ? "Your name (optional)" : "Your name"} /></label>
 
 
                 <input
@@ -199,7 +199,7 @@ export default function CustomerDetailsForm({
                             )
                     }
                     autoComplete="name"
-                    placeholder={translate("Enter your name")}
+                    placeholder={translate(verifiedPhone ? "Optional — we will use GOKUL_GUEST" : "Enter your name")}
                     className="
                         mt-2
                         min-h-12

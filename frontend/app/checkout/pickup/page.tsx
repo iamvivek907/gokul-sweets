@@ -2,7 +2,6 @@
 import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {apiClient} from "@/services/apiClient";
 import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
 import {saveCustomerDetails} from "@/lib/checkoutStorage";
@@ -345,7 +344,6 @@ function LegacyPickupPage({
     cartSwitchPreview: boolean;
 }) {
     const translate = useTranslation();
-    const simpleCheckout = useStorefrontFeatures()?.simplifiedCheckout === true;
     const [continuing,setContinuing] = useState(false);
     const continuingRef = useRef(false);
 
@@ -1045,16 +1043,14 @@ function LegacyPickupPage({
 
         continuingRef.current=true;setContinuing(true);
         let next="/checkout/customer";
-        if(simpleCheckout){
-            try {
+        try {
                 const config=await apiClient<{enabled:boolean}>("/api/storefront/customer-identity",{signal:AbortSignal.timeout(5000)});
                 if(config.enabled){
                     const session=await apiClient<{authenticated:boolean;phone?:string;name?:string}>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.timeout(5000)});
                     const contact=verifiedCheckoutContact(session);
                     if(contact){saveCustomerDetails(contact);next="/checkout/review";}
                 }
-            }catch{/* Keep guest details available when identity cannot be confirmed. */}
-        }
+        }catch{/* Keep guest details available when identity cannot be confirmed. */}
         router.push(next);
     }
 

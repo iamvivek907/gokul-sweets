@@ -1,5 +1,7 @@
 "use client";
 
+import {LanguagePicker} from "@/lib/language";
+
 import {
     useEffect,
     type ReactNode
@@ -159,6 +161,7 @@ export default function AdminShell({
 
         return (
             <>
+                <div className="flex justify-end bg-[#fffaf3] p-4"><LanguagePicker /></div>
                 {children}
             </>
         );

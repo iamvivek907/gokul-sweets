@@ -3,11 +3,14 @@
 import {useCallback, useEffect, useRef, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {getActiveBranches} from "@/services/branchApi";
+import {useTranslation} from "@/lib/language";
 import {adminFetch} from "@/services/adminApi";
 
 /** Lives in the admin layout so navigating to an order does not silence due work. */
 export default function KitchenAlarm() {
     const {authorization, profile, hasPermission} = useAdminAuth();
+    const translate = useTranslation();
     const features = useStorefrontFeatures();
     const permitted = !!authorization && hasPermission("ORDER_VIEW") && hasPermission("ORDER_START_PREPARATION") && !!features?.adminPreparationBoard;
     const [enabled, setEnabled] = useState(false);
@@ -17,12 +20,12 @@ export default function KitchenAlarm() {
     const fresh = useRef(0);
     const revision = useRef(0);
     const check = useCallback(async (signal?: AbortSignal) => {
-        if (!permitted || !authorization) return;
+        if (!permitted || !authorization || !profile) return;
         const current = ++revision.current;
         try {
-            const response = await adminFetch("/api/admin/branches", authorization, {signal, cache: "no-store"});
-            if (!response.ok) throw new Error();
-            const branches = await response.json() as {id: number}[];
+            const activeBranches = await getActiveBranches(signal);
+            const branches = profile.roleName === "OWNER_ADMIN" ? activeBranches
+                : activeBranches.filter(branch => profile.branchIds.includes(branch.id));
             const counts = await Promise.all(branches.map(async branch => {
                 const response = await adminFetch(`/api/admin/orders/queue/counts?branchId=${branch.id}`, authorization, {signal, cache: "no-store"});
                 if (!response.ok) throw new Error();
@@ -33,14 +36,14 @@ export default function KitchenAlarm() {
             if (signal?.aborted || current !== revision.current) return;
             due.current = counts.reduce((total, count) => total + count, 0);
             fresh.current = Date.now();
-            setMessage(due.current ? `${due.current} orders need preparation. Start them in KOT to stop the alarm.` : "No orders need preparation. Alarm is watching for new work.");
+            setMessage(due.current ? `${due.current} ${translate("orders need preparation. Start them in KOT to stop the alarm.")}` : translate("No orders need preparation. Alarm is watching for new work."));
         } catch {
             if (!signal?.aborted && current === revision.current) {
                 due.current = 0; fresh.current = 0;
                 setMessage("Cannot check preparation alerts. Reconnect and refresh the orders.");
             }
         }
-    }, [permitted, authorization]);
+    }, [permitted, authorization, profile, translate]);
     useEffect(() => {
         if (!enabled || !permitted) return;
         const controller = new AbortController();
@@ -82,8 +85,8 @@ export default function KitchenAlarm() {
         <button type="button" disabled={enabled} className="min-h-11 rounded-xl bg-teal-900 px-4 font-bold text-white disabled:opacity-70" onClick={async () => {
             try {audio.current ??= new AudioContext(); await audio.current.resume(); setEnabled(true);}
             catch {setMessage("This device could not enable sound. Use staff push alerts.");}
-        }}>{enabled ? "Kitchen alarm enabled" : "Enable kitchen alarm"}</button>
-        <p role="status" className="mt-2">{message || "Enable sound once per session. It repeats for Needs preparation and Overdue until staff start the orders in KOT."}</p>
-        <p className="mt-1">Keep the PWA open for continuous sound. Locked-screen alerts use <a className="underline" href="/admin/staff-notifications">staff push settings</a>; phone sound settings apply.</p>
+        }}>{translate(enabled ? "Kitchen alarm enabled" : "Enable kitchen alarm")}</button>
+        <p role="status" className="mt-2">{translate(message || "Enable sound once per session. It repeats for Needs preparation and Overdue until staff start the orders in KOT.")}</p>
+        <p className="mt-1">{translate("Keep the PWA open for continuous sound. Locked-screen alerts use")} <a className="underline" href="/admin/staff-notifications">{translate("staff push settings")}</a>{translate("; phone sound settings apply.")}</p>
     </aside>;
 }

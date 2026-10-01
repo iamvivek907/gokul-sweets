@@ -1,6 +1,5 @@
 "use client";
 import {useCallback,useEffect,useSyncExternalStore} from "react";
-import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {hindi} from "./hindi";
 export type Language="en"|"hi";
 const KEY="gokul-language";
@@ -13,6 +12,6 @@ export function setLanguage(value:Language){language=value;try{localStorage.setI
 export function useLanguage(){return useSyncExternalStore(subscribe,snapshot,serverSnapshot);}
 export function translate(text:string|null|undefined,locale:Language="en"):string{const value=text??"";return locale==="hi"?hindi[value]??value:value;}
 export function useTranslation(){const locale=useLanguage();return useCallback((text:string|null|undefined)=>translate(text,locale),[locale]);}
-export function T({text}:{text:string}){return <>{" "}{translate(text,useLanguage())}{" "}</>;}
-export function LanguageRuntime(){const enabled=useStorefrontFeatures()?.bilingualStorefront===true;useEffect(()=>{const restore=()=>{let saved:Language="en";try{if(enabled&&localStorage.getItem(KEY)==="hi")saved="hi";}catch{}language=saved;document.documentElement.lang=saved;listeners.forEach(callback=>callback());};restore();window.addEventListener("storage",restore);return()=>window.removeEventListener("storage",restore);},[enabled]);return null;}
-export function LanguagePicker(){const locale=useLanguage();return <label className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-[#c4d4c9] bg-[#fffaf2] px-2 text-sm font-semibold text-[#173c39]"><span aria-hidden="true">अ/A</span><select aria-label="Language / भाषा" value={locale} onChange={event=>setLanguage(event.target.value as Language)} className="min-h-11 max-w-[90px] bg-transparent"><option value="en">English</option><option value="hi">हिन्दी</option></select></label>;}
+export function T({text}:{text:string}){return <>{translate(text,useLanguage())}</>;}
+export function LanguageRuntime(){useEffect(()=>{const restore=()=>{let saved:Language="en";try{if(localStorage.getItem(KEY)==="hi")saved="hi";}catch{}language=saved;document.documentElement.lang=saved;listeners.forEach(callback=>callback());};restore();window.addEventListener("storage",restore);return()=>window.removeEventListener("storage",restore);},[]);return null;}
+export function LanguagePicker(){const locale=useLanguage();return <label className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-[#c4d4c9] bg-[#fffaf2] px-3 text-sm font-semibold text-[#173c39]"><span>Language / भाषा</span><select aria-label="Language / भाषा" value={locale} onChange={event=>setLanguage(event.target.value as Language)} className="min-h-11 max-w-[90px] bg-transparent"><option value="en">English</option><option value="hi">हिन्दी</option></select></label>;}

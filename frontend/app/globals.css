@@ -213,3 +213,10 @@ a {
     display:
         none;
 }
+
+/* Native Devanagari families remain readable offline on staff PWAs. */
+html:lang(hi){--font-hindi:"Kohinoor Devanagari","Noto Sans Devanagari","Nirmala UI","Mangal",sans-serif}
+html:lang(hi) body,html:lang(hi) :is(h1,h2,h3,h4,h5,h6,p,span,small,strong,b,label,button,input,select,option,textarea,a,summary){font-family:var(--font-hindi)!important;letter-spacing:normal!important;text-transform:none;line-height:1.65}
+html:lang(hi) :is(h1,h2,h3){font-weight:700;line-height:1.45}
+html:lang(hi) :is(button,a,select){overflow-wrap:break-word}
+html:lang(hi) button{height:auto}

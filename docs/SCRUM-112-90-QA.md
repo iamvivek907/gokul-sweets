@@ -10,9 +10,9 @@
 - Enable kitchen sound once per admin session. The alarm lives across admin page navigation, checks every accessible branch every 15 seconds, and repeats chimes every 2 seconds while any order is eligible/overdue. Reading a notification does not stop it. Start all due orders in Preparing/KOT to stop it at the next successful refresh. Cancelled/ready orders no longer qualify. Multiple tabs coordinate chimes. Stale/offline checks pause sound rather than claim current state.
 - Repeated staff push events are generated every configured interval until actual preparation begins. Replacement staff notifications renotify; customer notifications continue replacing quietly. Existing dispatch permission/status/environment checks remain authoritative.
 
-## Rollout (all new server flags default OFF)
+## Rollout (checkout, Hindi and preparation board default ON)
 
-Enable on dev first:
+Deploy frontend and backend together. The first three switches below default ON; explicit environment overrides still apply. Recurring locked-screen push reminders remain opt-in:
 
 ```
 GOKUL_FEATURES_SIMPLIFIED_CHECKOUT=true
@@ -35,3 +35,5 @@ Web Audio requires a user gesture and an active browser/PWA. Reloading requires 
 - Backend integration regressions: branch authorization, grouping/paging, IST eligibility/overdue boundaries, flag-OFF behavior, repeated event deduplication and stopping when Preparing.
 - Local Gradle/browser downloads are blocked by the workspace network; CI must pass before merge.
 - Manual dev-device QA: real verified identity; guest checkout; price changes/add-ons and expired pickup; payment gateway return/close/reload; real Hindi-speaking staff usability; two staff tabs; Android installed PWA/iOS home-screen notifications; lock/DND/offline tests; preparation/KOT printer failure and concurrent staff actions. Real payment, push delivery and printer behavior are not proven by synthetic browser fixtures.
+
+PR #151 follow-up: simplified checkout and the staff preparation board now default ON (explicit environment overrides still apply). The language control is always visible and retains the saved choice independently of rollout flags. Verified contact autofill runs in both pickup experiences even when simplified checkout is explicitly disabled. Deploy frontend and backend together.

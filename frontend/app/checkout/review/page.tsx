@@ -526,7 +526,7 @@ function ReviewInventoryIssue({
                                 text-[#7a1625]!
                             "
                         >
-                            <T text="Call" />{branchPhone}
+                            <T text="Call" />{" "}{branchPhone}
                         </a>
                     )
                 }
@@ -2062,7 +2062,7 @@ try {
                                     text-[#756763]
                                 "
                             >
-                                {itemCount} {itemCount === 1 ? translate("item") : "items"}
+                                {itemCount} {translate(itemCount === 1 ? "item" : "items")}
                             </p>
 
                         </div>
@@ -2198,9 +2198,7 @@ try {
                                 }
                                 {" "}
                                 {
-                                    itemCount === 1
-                                        ? translate("item")
-                                        : "items"
+                                    translate(itemCount === 1 ? "item" : "items")
                                 }
                             </span>
 
@@ -2409,6 +2407,7 @@ try {
                         : (
                             <div
                                 className={`
+                                    checkout-review-desktop-action
                                     mt-5
                                     rounded-3xl
                                     border

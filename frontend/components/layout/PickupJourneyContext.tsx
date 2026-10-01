@@ -48,7 +48,7 @@ export default function PickupJourneyContext() {
     return <aside aria-label="Current pickup plan" className="mx-auto mt-3 w-full max-w-[1180px] px-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd6] bg-white px-4 py-3 text-sm shadow-sm">
             <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#756763]"><T text="Pickup ·" />{branch.name}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#756763]"><T text="Pickup ·" />{" "}{branch.name}</p>
                 <p className="mt-1 font-semibold text-[#241715]">
                     {mismatchedCart ? "Cart belongs to another branch — review before checkout"
                         : slot && activeSelection ? `${pickupDateLabel(activeSelection.date)} · ${formatBusinessTime(slot.startTime)}–${formatBusinessTime(slot.endTime)} IST`
@@ -59,7 +59,7 @@ export default function PickupJourneyContext() {
             <div className="flex gap-3">
                 {features.inPlaceBranchSwitch ? <BranchSelector compact /> :
                     <Link href="/" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline"><T text="Change branch" /><LinkFeedback /></Link>}
-                <Link href="/checkout/pickup" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">{slot ? translate("Change time") : "Choose time"}<LinkFeedback /></Link>
+                <Link href="/checkout/pickup" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">{slot ? translate("Change time") : translate("Choose time")}<LinkFeedback /></Link>
             </div>
         </div>
     </aside>;
