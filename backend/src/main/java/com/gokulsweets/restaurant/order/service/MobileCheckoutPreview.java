@@ -16,7 +16,7 @@ public class MobileCheckoutPreview {
  private final VerifiedOrderOwnership ownership;
  private final CheckoutQuoteService quotes;
  private final RebateEligibilityService rebates;
- public record Preview(CheckoutQuoteService.Quote quote,List<AvailableRebateResponse> offers,List<AvailableRebateResponse> spendTargets) {}
+ public record Preview(CheckoutQuoteService.Quote quote,List<AvailableRebateResponse> offers,List<AvailableRebateResponse> spendTargets,BigDecimal paymentFee,BigDecimal paymentFeeTax) {}
  @Transactional
  public Preview preview(CreateOrderRequest request,String token){
   ownership.requireVerifiedIdentity(request.customerPhone(),token);
@@ -26,6 +26,13 @@ public class MobileCheckoutPreview {
   order.setSubtotal(new BigDecimal(quote.subtotal()));order.setTaxAmount(new BigDecimal(quote.taxAmount()));order.setPriorityCharge(new BigDecimal(quote.priorityCharge()));
   order.setConvenienceFee(new BigDecimal(quote.convenienceFee()));order.setPaymentFeeRate(new BigDecimal(quote.paymentFeeRate()));
   var offers=rebates.previewDraft(order);
-  return new Preview(quote,offers,rebates.previewSpendTargets(order,offers));
+  var best=offers.stream().min(java.util.Comparator.comparing(AvailableRebateResponse::payableAfterRebate));
+  BigDecimal fee=new BigDecimal(quote.paymentFee()),feeTax=new BigDecimal(quote.paymentFeeTax());
+  if(best.isPresent()){
+   BigDecimal base=order.getSubtotal().add(order.getTaxAmount()).add(order.getPriorityCharge()).subtract(best.get().rebateAmount()).max(BigDecimal.ZERO).add(order.getConvenienceFee());
+   fee=PaymentFeePricing.fee(base,order.getPaymentFeeRate());
+   feeTax=PaymentFeePricing.tax(fee,new BigDecimal(quote.paymentFeeTaxRate()));
+  }
+  return new Preview(quote,offers,rebates.previewSpendTargets(order,offers),fee,feeTax);
  }
 }

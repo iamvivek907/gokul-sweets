@@ -7,7 +7,7 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 const branch={id:1,code:'TEST',name:'Test Gokul branch',active:true,address:'Test address',city:'Test city',phone:'9876543210',pickupAvailable:true};
 const half={id:10,name:'Paneer meal Half',categoryId:1,categoryName:'Meals',description:'Fresh paneer with rice.',price:100,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},full={...half,id:11,name:'Paneer meal Full',price:180},drink={...half,id:12,name:'Fresh drink',categoryId:2,categoryName:'Drinks',price:40};
 const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,capacity:50,remainingCapacity:50,priorityEnabled:true,priorityCharge:25};
-try{for(const scenario of ['phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed']){
+try{for(const scenario of ['phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer']){
  console.log('Scenario:',scenario);
  const width=scenario==='desktop'?1280:scenario==='boundary'?640:390;
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
@@ -17,8 +17,12 @@ try{for(const scenario of ['phone','boundary','desktop','changed-total','uncerta
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  const subtotal=()=>liveItems.reduce((sum,i)=>sum+({10:100,11:180,12:40}[i.productId]??0)*i.quantity,0);
  const payable=()=>subtotal()+(livePickup==="PRIORITY"?25:0);
- const payment=()=>({paymentId:10,orderNumber:"TEST-SINGLE",provider:"PHONEPE",paymentStatus,amount:payable()-20,currency:"INR",paymentUrl:"https://gateway.example.invalid/pay",expiresAt:new Date(Date.now()+600000).toISOString()});
- const order=()=>({id:1,orderNumber:'TEST-SINGLE',branchId:1,pickupSlotId:1,pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:livePickup,customerName:'Verified customer',customerPhone:'9876543210',orderStatus:paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',branchName:branch.name,subtotal:subtotal(),taxAmount:0,priorityCharge:livePickup==="PRIORITY"?25:0,totalAmount:payable(),items:[],reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString()});
+ const rebate=scenario==='fee-no-offer'?0:20;
+ const fee=base=>scenario.startsWith('fee-')?Math.round(base*2)/100:0;
+ const feeTax=value=>Math.round((value-value/1.18)*100)/100;
+ const finalTotal=()=>payable()-rebate+fee(payable()-rebate);
+ const payment=()=>({paymentId:10,orderNumber:"TEST-SINGLE",provider:"PHONEPE",paymentStatus,amount:finalTotal(),currency:"INR",paymentUrl:"https://gateway.example.invalid/pay",expiresAt:new Date(Date.now()+600000).toISOString()});
+ const order=()=>({id:1,orderNumber:'TEST-SINGLE',branchId:1,pickupSlotId:1,pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:livePickup,customerName:'Verified customer',customerPhone:'9876543210',orderStatus:paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',branchName:branch.name,subtotal:subtotal(),taxAmount:0,priorityCharge:livePickup==="PRIORITY"?25:0,totalAmount:payable()+fee(payable()),items:[],reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString()});
  await context.route('https://gateway.example.invalid/**',route=>route.fulfill({contentType:'text/html',body:'<h1>Secure provider checkout</h1>'}));
  await context.route('**/api/**',async route=>{
   const req=route.request(),p=new URL(req.url()).pathname;let json=[];
@@ -33,15 +37,15 @@ try{for(const scenario of ['phone','boundary','desktop','changed-total','uncerta
   else if(p==='/api/menu/portion-groups')json={version:1,groups:[{key:'paneer',title:'Paneer meal',choices:[{productId:10,label:'Half'},{productId:11,label:'Full'}]}]};
   else if(p.endsWith('/availability'))json={today:date,maximumDate:date,dates:[{date,available:true,slots:[{slot,normalAvailable:scenario!=='priority-only',priorityAvailable:true}]}]};
   else if(p==='/api/menu/pickup-addons')json=[{product:drink,weightGrams:null,portionPrice:40,portionTotal:40,reason:'Pairs well with your order'}];else if(p==='/api/menu/pickup-addons/check')json={orderable:true};
-  else if(p==='/api/orders/mobile-preview'){previews++;liveItems=req.postDataJSON().items;livePickup=req.postDataJSON().pickupType;json={quote:{token:'signed-quote',subtotal:String(subtotal()),taxAmount:'0',priorityCharge:req.postDataJSON().pickupType==='PRIORITY'?'25':'0',convenienceFee:'0',paymentFeeRate:'0',totalAmount:String(payable()),currency:'INR',items:[],expiresAt:new Date(Date.now()+600000).toISOString()},offers:[{code:'SAVE20',name:'Save 20',rebateAmount:20,payableAfterRebate:payable()-20}]};}
+  else if(p==='/api/orders/mobile-preview'){previews++;liveItems=req.postDataJSON().items;livePickup=req.postDataJSON().pickupType;json={quote:{token:'signed-quote',subtotal:String(subtotal()),taxAmount:'0',priorityCharge:req.postDataJSON().pickupType==='PRIORITY'?'25':'0',convenienceFee:'0',paymentFeeRate:scenario.startsWith('fee-')?'2':'0',paymentFee:String(fee(payable())),paymentFeeTax:String(feeTax(fee(payable()))),totalAmount:String(payable()+fee(payable())),currency:'INR',items:[],expiresAt:new Date(Date.now()+600000).toISOString()},paymentFee:fee(payable()-rebate),paymentFeeTax:feeTax(fee(payable()-rebate)),offers:rebate?[{code:'SAVE20',name:'Save 20',rebateAmount:rebate,payableAfterRebate:finalTotal()}]:[]};}
   else if(p==='/api/orders'&&req.method()==='POST'){orders.push({key:req.headers()['idempotency-key'],request:req.postDataJSON()});checkoutRequest=req.postDataJSON();if(scenario.startsWith('uncertain-')&&firstAttempt){firstAttempt=false;return route.abort('failed');}if(scenario==='uncertain-identity'&&orders.length===2){signedIn=false;return route.fulfill({status:401,json:{message:'Verify your phone'},headers});}json=order();}
   else if(p==='/api/orders/TEST-SINGLE')json=order();
   else if(p==='/api/payments/providers')json={defaultProvider:'PHONEPE',enabledProviders:['PHONEPE']};
   else if(p==='/api/payments/order/TEST-SINGLE')json={payment:payment()};
   else if(p==='/api/payments/10/refresh')json=payment();
   else if(p==='/api/payments/10/cancel-checkout'){cancels++;paymentStatus='FAILED';json=payment();}
-  else if(p==='/api/orders/TEST-SINGLE/rebate/best')json={totalAmount:payable()-20+(scenario==='changed-total'?5:0),rebateAmount:20};
-  else if(p==='/api/payments'&&req.method()==='POST'){payments++;json={paymentId:10,orderNumber:'TEST-SINGLE',provider:'PHONEPE',paymentStatus:'PENDING',amount:payable()-20,currency:'INR',paymentUrl:'https://gateway.example.invalid/pay',expiresAt:new Date(Date.now()+600000).toISOString()};}
+  else if(p==='/api/orders/TEST-SINGLE/rebate/best')json={totalAmount:finalTotal()+(scenario==='changed-total'?5:0),rebateAmount:rebate};
+  else if(p==='/api/payments'&&req.method()==='POST'){payments++;json={paymentId:10,orderNumber:'TEST-SINGLE',provider:'PHONEPE',paymentStatus:'PENDING',amount:finalTotal(),currency:'INR',paymentUrl:'https://gateway.example.invalid/pay',expiresAt:new Date(Date.now()+600000).toISOString()};}
   return route.fulfill({json,headers});
  });
  await context.addInitScript(({branch})=>{if(!localStorage.getItem('gokul-selected-branch'))localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));window.initSendOTP=options=>options.success({type:'success',accessToken:'synthetic-test-proof'});},{branch});
@@ -62,6 +66,7 @@ try{for(const scenario of ['phone','boundary','desktop','changed-total','uncerta
  assert.equal(new URL(page.url()).pathname,'/checkout/mobile');assert.equal(orders.length,0);assert.equal(payments,0);
  await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();await ready();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.find(i=>i.product.id===10).quantity),2);
  await page.getByRole('button',{name:'Add Fresh drink',exact:true}).click();await ready();
+ if(scenario.startsWith('fee-')){await page.getByText('Price details',{exact:true}).click();const line=page.locator('dl div').filter({hasText:'Online payment fee'});assert.match(await line.textContent(),/2%/);assert.match(await line.textContent(),new RegExp(`₹${fee(payable()-rebate).toFixed(2)}`));assert.match(await line.textContent(),new RegExp(`₹${feeTax(fee(payable()-rebate)).toFixed(2)}`));const breakdown=await page.locator('dl').textContent();assert.match(breakdown,new RegExp(`₹${finalTotal().toFixed(2)}`));}
  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/single-checkout-${scenario}.png`,fullPage:true});}
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);if(scenario==='stale-identity')signedIn=false;await page.getByRole('button',{name:'Pay now',exact:true}).dblclick();
  if(scenario==='stale-identity'){await page.getByRole('alert').filter({hasText:'Verify the order'}).waitFor();assert.equal(orders.length,0);assert.equal(payments,0);await page.getByRole('button',{name:'Verify with SMS',exact:true}).click();await ready();await page.getByRole('button',{name:'Pay now',exact:true}).click();await page.waitForURL('https://gateway.example.invalid/pay');assert.equal(orders.length,1);assert.equal(payments,1);}
