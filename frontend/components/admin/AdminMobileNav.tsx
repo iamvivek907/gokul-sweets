@@ -12,13 +12,14 @@ export default function AdminMobileNav() {
     useEffect(() => {
         if (!open) return;
         const previous = document.body.style.overflow;
+        const returnFocus = trigger.current;
         document.body.style.overflow = "hidden";
         panel.current?.querySelector<HTMLButtonElement>("button")?.focus();
-        return () => {document.body.style.overflow = previous; trigger.current?.focus();};
+        return () => {document.body.style.overflow = previous; returnFocus?.focus();};
     }, [open]);
     return <div className="lg:hidden">
-        <button ref={trigger} aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}
-            className="min-h-11 rounded-xl border border-[#eadfd6] px-4 font-semibold"><T text="Admin menu" /></button>
+        <button ref={trigger} type="button" aria-label="Admin menu" aria-expanded={open} aria-haspopup="dialog" onClick={() => setOpen(true)}
+            className="flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-xl border border-[#eadfd6] px-2 font-semibold sm:px-4"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg><span className="hidden sm:inline"><T text="Admin menu" /></span></button>
         {open && createPortal(<div className="fixed inset-0 z-50 bg-black/40" onClick={() => setOpen(false)}>
             <div ref={panel} role="dialog" aria-modal="true" aria-label="Admin navigation"
                 className="h-full w-[min(90vw,340px)] overflow-y-auto bg-white p-4" onClick={event => event.stopPropagation()}

@@ -75,6 +75,7 @@ for(const width of [1280,390]){
  await page.getByRole('button',{name:'Or tap to confirm',exact:true}).click();
  await page.getByRole('button',{name:'Yes, mark ready',exact:true}).click();await page.getByText(/Order marked ready/).waitFor();assert.equal(readyMoves,1);
  starts=0;readyMoves=0;await page.reload();await page.getByRole('button',{name:'Start preparation',exact:true}).waitFor();
+ for(const phoneWidth of width===390?[320,390]:[1280]){await page.setViewportSize({width:phoneWidth,height:900});for(const locale of ['hi','en']){await chooseLanguage(page,locale);const header=page.locator('header').first();assert.equal(await header.evaluate(node=>{const r=node.getBoundingClientRect();return r.height<=80&&r.width<=innerWidth;}),true,`compact admin header at ${phoneWidth}px in ${locale}`);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}}
  const thumb=page.getByRole('button',{name:'Start preparation',exact:true}),rail=thumb.locator('..');
  const box=await thumb.boundingBox(),track=await rail.boundingBox();
  async function drag(dx,dy=0){await page.mouse.move(box.x+24,box.y+24);await page.mouse.down();await page.mouse.move(box.x+24+dx,box.y+24+dy,{steps:8});await page.mouse.up();}
