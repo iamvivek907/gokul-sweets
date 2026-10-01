@@ -9,6 +9,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import java.time.*;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.*;
 
 @SpringBootTest(properties={"gokul.features.admin-preparation-board=true","gokul.notifications.staff.scheduler-enabled=false"})
 @Transactional
+@DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 class KitchenPlanningIntegrationTest {
  @Autowired KitchenPlanningService service;
  @Autowired JdbcTemplate jdbc;
@@ -32,7 +34,7 @@ class KitchenPlanningIntegrationTest {
   slot=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,'2026-10-01','18:00','18:30',100) RETURNING id",Long.class,branch);
  }
  @AfterEach void clear(){flags.setAdminPreparationBoard(true);SecurityContextHolder.clearContext();}
- void order(String status,long branchId,long slotId){jdbc.update("INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status) VALUES (?,?,?,'Test','9876543210','NORMAL',?)","KITCHEN-"+UUID.randomUUID(),branchId,slotId,status);}
+ void order(String status,long branchId,long slotId){jdbc.update("INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,reservation_expires_at) VALUES (?,?,?,'Test','9876543210','NORMAL',?,CURRENT_TIMESTAMP)","KITCHEN-"+UUID.randomUUID(),branchId,slotId,status);}
  @Test void paginatesAndGroupsAllOrdersAtTheIstPreparationBoundary(){
   for(int i=0;i<23;i++)order("CONFIRMED",branch,slot);
   order("PREPARING",branch,slot);order("READY",branch,slot);order("CANCELLED",branch,slot);order("PENDING_PAYMENT",branch,slot);
