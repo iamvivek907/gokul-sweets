@@ -10,7 +10,7 @@ public final class PaymentFeePricing {
  public static BigDecimal tax(BigDecimal fee,BigDecimal rate) {return fee.subtract(fee.multiply(new BigDecimal("100")).divide(new BigDecimal("100").add(rate==null?BigDecimal.ZERO:rate),2,RoundingMode.HALF_UP));}
  public static BigDecimal totalWithFee(Order order,BigDecimal base) {return base.add(fee(base,order.getPaymentFeeRate())).setScale(2,RoundingMode.HALF_UP);}
  public static void reprice(Order order) {
-  BigDecimal base=zero(order.getSubtotal()).add(zero(order.getTaxAmount())).add(zero(order.getPriorityCharge())).add(zero(order.getConvenienceFee())).subtract(order.getRebateDiscountAmount()==null?BigDecimal.ZERO:order.getRebateDiscountAmount()).max(BigDecimal.ZERO);
+  BigDecimal base=zero(order.getSubtotal()).add(zero(order.getTaxAmount())).add(zero(order.getPriorityCharge())).add(zero(order.getConvenienceFee())).add(zero(order.getDeliveryFee())).subtract(order.getRebateDiscountAmount()==null?BigDecimal.ZERO:order.getRebateDiscountAmount()).max(BigDecimal.ZERO);
   order.setPaymentFee(fee(base,order.getPaymentFeeRate()));order.setPaymentFeeTax(tax(order.getPaymentFee(),order.getPaymentFeeTaxRate()));order.setTotalAmount(base.add(order.getPaymentFee()).setScale(2,RoundingMode.HALF_UP));
  }
 }
