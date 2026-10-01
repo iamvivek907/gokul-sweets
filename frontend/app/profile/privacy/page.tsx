@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useState} from "react";
 import Link from "next/link";
@@ -21,7 +23,7 @@ export default function PrivacyPage() {
     return <AppShell>
         <main className="mx-auto max-w-3xl px-4 pb-24 sm:px-6">
             <Link href="/profile" className="text-sm font-semibold text-[#7a1625]">← Back to profile</Link>
-            <p className="mt-8 text-xs font-bold uppercase tracking-[0.16em] text-[#a56e2e]">Your account</p>
+            <p className="mt-8 text-xs font-bold uppercase tracking-[0.16em] text-[#a56e2e]"><T text="Your account" /></p>
             <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#241715] sm:text-4xl">Privacy and your data</h1>
             <p className="mt-3 max-w-2xl text-base leading-7 text-[#756763]">
                 Decide which optional messages and insights you allow. Your pickup orders and essential order updates work without these choices.

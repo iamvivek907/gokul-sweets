@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useEffect,
@@ -930,9 +932,7 @@ export default function AdminKotPrintPage() {
                                 uppercase
                                 leading-tight
                             "
-                        >
-                            Gokul Sweets
-                        </h1>
+                        >{" "}<T text="Gokul Sweets" />{" "}</h1>
 
 
                         <p

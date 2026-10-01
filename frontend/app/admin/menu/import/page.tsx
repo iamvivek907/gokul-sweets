@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
@@ -684,9 +686,7 @@ export default function AdminMenuImportPage() {
                                 font-semibold
                                 text-[#241715]
                             "
-                        >
-                            Branch
-                        </label>
+                        >{" "}<T text="Branch" />{" "}</label>
 
 
                         <select
@@ -762,9 +762,7 @@ export default function AdminMenuImportPage() {
                                 === 0
                                 && (
 
-                                    <option value="">
-                                        No branch available
-                                    </option>
+                                    <option value="">{" "}<T text="No branch available" />{" "}</option>
 
                                 )
                             }

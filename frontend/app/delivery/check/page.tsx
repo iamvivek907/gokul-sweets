@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link from "next/link";
 import {useRef, useState, type FormEvent} from "react";
@@ -194,7 +196,7 @@ export default function DeliveryCheckPage() {
                 <p className={styles.intro}>Tell us your area to prepare a delivery check. Pickup is still available at your selected branch.</p>
                 {!features ? <div role={error ? "alert" : "status"} className={styles.card}>
                     <p>{error ?? "Checking storefront settings..."}</p>
-                    {error && <button type="button" onClick={retry}>Try again</button>}
+                    {error && <button type="button" onClick={retry}><T text="Try again" /></button>}
                 </div> : !features.deliveryLocalityCheck ? <div className={styles.card}>
                     <h2>Delivery checks are coming soon</h2>
                     <p>You can browse the menu and order for pickup today.</p>
@@ -271,7 +273,7 @@ export default function DeliveryCheckPage() {
                                 <input id="delivery-address" autoComplete="street-address" value={addressLine} required minLength={2} maxLength={300}
                                        onChange={event => {setAddressLine(event.target.value); invalidatePrice();}}
                                        placeholder="House or flat number, street and landmark" />
-                                <label htmlFor="delivery-name">Your name</label>
+                                <label htmlFor="delivery-name"><T text="Your name" /></label>
                                 <input id="delivery-name" autoComplete="name" value={customerName} required minLength={2} maxLength={150}
                                        onChange={event => {setCustomerName(event.target.value); invalidatePrice();}} />
                                 <label htmlFor="delivery-phone">Indian mobile number</label>

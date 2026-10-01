@@ -8,7 +8,8 @@ const now=new Date('2026-10-01T06:30:00Z'),date='2026-10-01';
 const branch={id:1,code:'TEST',name:'Test branch',active:true,address:'Test address',city:'Test city',phone:'9000000000',openingTime:'08:00:00',closingTime:'23:59:00',pickupAvailable:true};
 const product={id:1,name:'Test sweet',categoryId:1,categoryName:'Sweets',description:'Test item',price:100,imageUrl:null,available:true,saleMode:'UNIT'};
 const slot={id:1,branchId:1,slotDate:date,startTime:'23:55:00',endTime:'23:59:00',active:true,remainingCapacity:100,capacity:100,priorityEnabled:false,priorityCharge:0};
-try{for(const width of [1280,390]){
+try{async function chooseLanguage(surface,locale){await surface.getByRole('button',{name:'Language / भाषा',exact:true}).click();await surface.getByRole('group',{name:'Language / भाषा',exact:true}).getByRole('button',{name:locale==='hi'?/हिन्दी/:/English/}).click();}
+for(const width of [1280,390]){
  const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();await page.clock.install({time:now});let quoteCalls=0,mutations=0,starts=0,simplified=width===1280,visual=true,gateway=false;
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  const row=(bucket)=>({orderNumber:'TEST-KITCHEN',customerName:'Test customer',fulfillmentType:'PICKUP',orderStatus:bucket==='PREPARING'?'PREPARING':'CONFIRMED',bucket,date,start:'18:00:00',end:'18:30:00',preparationAt:`${date}T17:00:00`});
@@ -38,27 +39,27 @@ try{for(const width of [1280,390]){
   return route.fulfill({json,headers});
  });
  await context.addInitScript(({branch,product})=>{window.__chimes=0;window.AudioContext=class{currentTime=0;destination={};async resume(){}async close(){}createOscillator(){return {frequency:{value:0},connect(){},start(){window.__chimes++},stop(){}}}createGain(){return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){}}}};localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:2,weightGrams:null}]}));},{branch,product});
- await page.goto(`${base}/cart`);await page.getByText(/^2 items ready for review$/).waitFor();await page.getByLabel('Language / भाषा').selectOption('hi');await page.getByText(/^2 वस्तुएँ/).waitFor();await page.getByLabel('Language / भाषा').selectOption('en');
+ await page.goto(`${base}/cart`);await page.getByText(/^2 items ready for review$/).waitFor();await chooseLanguage(page,'hi');await page.getByText(/^2 वस्तुएँ/).waitFor();await chooseLanguage(page,'en');
  await page.goto(`${base}/checkout/pickup`);await page.getByRole('group',{name:'Choose a pickup time'}).getByRole('button',{name:/23:55/}).click();await page.getByRole('button',{name:'Continue',exact:true}).filter({visible:true}).click();
  await page.waitForURL('**/checkout/review');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-customer-details')).name==='GOKUL_GUEST');
  if(width===390)await page.getByRole('button',{name:'Check price & offers',exact:true}).click();
- await page.getByRole('button',{name:/Accept price and reserve pickup|Review & reserve/}).filter({visible:true}).first().waitFor();assert.equal(quoteCalls,1);assert.equal(mutations,0);
- await page.getByLabel('Language / भाषा').selectOption('hi');await page.getByRole('button',{name:/राशि देखकर आगे बढ़ें|राशि स्वीकार करके आगे बढ़ें/}).filter({visible:true}).first().waitFor();assert.equal(await page.locator('html').getAttribute('lang'),'hi');
+ await page.getByRole('button',{name:/Accept price and reserve pickup|Review & reserve|Continue to payment/}).filter({visible:true}).first().waitFor();assert.equal(quoteCalls,1);assert.equal(mutations,0);
+ await chooseLanguage(page,'hi');await page.getByRole('button',{name:/राशि देखकर आगे बढ़ें|राशि स्वीकार करके आगे बढ़ें|भुगतान/}).filter({visible:true}).first().waitFor();assert.equal(await page.locator('html').getAttribute('lang'),'hi');
  simplified=true;await page.evaluate(()=>sessionStorage.removeItem("gokul-storefront-settings"));
- await page.reload();await page.getByRole('button',{name:/राशि देखकर आगे बढ़ें|राशि स्वीकार करके आगे बढ़ें/}).filter({visible:true}).first().waitFor();assert.equal(await page.getByLabel('Language / भाषा').inputValue(),'hi');
+ await page.reload();await page.getByRole('button',{name:/राशि देखकर आगे बढ़ें|राशि स्वीकार करके आगे बढ़ें|भुगतान/}).filter({visible:true}).first().waitFor();assert.equal(await page.locator('html').getAttribute('lang'),'hi');
  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/hindi-checkout-${width}.png`,fullPage:true});}
- await page.getByLabel('Language / भाषा').selectOption('en');
+ await chooseLanguage(page,'en');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/simple-checkout-${width}.png`,fullPage:true});}
  if(width===390){
   visual=false;await page.evaluate(()=>sessionStorage.removeItem('gokul-storefront-settings'));await page.reload();
-  await page.getByRole('button',{name:'Review & reserve',exact:true}).waitFor();assert.equal(await page.locator('.future-storefront').count(),0);
-  assert.equal(await page.getByRole('button',{name:/Accept price and reserve pickup|Review & reserve/}).count(),1,'one visible review action with both visual flags OFF');
+  await page.getByRole('button',{name:'Continue to payment',exact:true}).waitFor();assert.equal(await page.locator('.future-storefront').count(),0);
+  assert.equal(await page.getByRole('button',{name:/Accept price and reserve pickup|Review & reserve|Continue to payment/}).count(),1,'one visible review action with both visual flags OFF');
  }
  await page.goto(`${base}/admin/orders`);await page.getByRole('heading',{name:'Plan, prepare, hand over'}).waitFor();
  await page.getByRole('button',{name:/Scheduled future/}).click();await page.waitForURL('**kitchen=SCHEDULED');await page.getByText('Scheduled future',{exact:true}).last().waitFor();assert.equal(await page.getByRole('checkbox',{name:'Select TEST-KITCHEN'}).count(),0);
  await page.reload();assert.match(page.url(),/kitchen=SCHEDULED/);await page.getByRole('heading',{name:'Plan, prepare, hand over'}).waitFor();
- await page.getByLabel('Language / भाषा').selectOption('hi');await page.getByRole('heading',{name:'योजना बनाएँ, तैयार करें, सौंपें'}).waitFor();await page.getByRole('button',{name:'रसोई का अलार्म चालू करें'}).waitFor();await page.getByLabel('Language / भाषा').selectOption('en');
+ await chooseLanguage(page,'hi');await page.getByRole('heading',{name:'योजना बनाएँ, तैयार करें, सौंपें'}).waitFor();await page.getByRole('button',{name:'रसोई का अलार्म चालू करें'}).waitFor();await chooseLanguage(page,'en');
  await page.getByRole('button',{name:'Enable kitchen alarm'}).click();await page.waitForFunction(()=>window.__chimes>=6);
  await page.getByRole('button',{name:/Needs preparation/}).click();await page.getByRole('checkbox',{name:'Select TEST-KITCHEN'}).check();await page.getByRole('button',{name:'Start selected in KOT (1)'}).click();await page.getByRole('button',{name:'Confirm start'}).click();await page.getByText(/1 started · 0 skipped/).waitFor();assert.equal(starts,1);await page.getByText('No orders need preparation. Alarm is watching for new work.').waitFor();const stopped=await page.evaluate(()=>window.__chimes);await page.waitForTimeout(2500);assert.equal(await page.evaluate(()=>window.__chimes),stopped);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -67,7 +68,7 @@ try{for(const width of [1280,390]){
   visual=true;gateway=true;await page.evaluate(()=>sessionStorage.removeItem('gokul-storefront-settings'));await page.goto(`${base}/`);await page.locator('#gokul-arrival-title').waitFor();
   const topbar=page.getByRole('navigation',{name:'Welcome navigation'}).locator('..');
   for(const phoneWidth of [320,390]){await page.setViewportSize({width:phoneWidth,height:900});
-   for(const locale of ['en','hi']){await topbar.getByLabel('Language / भाषा').selectOption(locale);await page.waitForFunction(locale=>document.documentElement.lang===locale,locale);
+   for(const locale of ['en','hi']){await chooseLanguage(topbar,locale);await page.waitForFunction(locale=>document.documentElement.lang===locale,locale);
     const fits=await topbar.evaluate(node=>{const box=node.getBoundingClientRect(),rects=Array.from(node.children).map(child=>child.getBoundingClientRect());return rects.every(r=>r.left>=box.left&&r.right<=box.right&&r.top>=box.top&&r.bottom<=box.bottom)&&rects.every((r,i)=>rects.slice(i+1).every(s=>r.right<=s.left||s.right<=r.left||r.bottom<=s.top||s.bottom<=r.top));});assert.equal(fits,true,`editorial controls fit without overlap at ${phoneWidth}px in ${locale}`);
    }
   }

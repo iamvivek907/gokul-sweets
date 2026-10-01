@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {use, useCallback, useEffect, useState} from "react";
 import Link from "next/link";
@@ -36,7 +38,7 @@ export default function StaffAlertOrderPage({params}: {params: Promise<{orderNum
         : order.orderStatus === "PREPARING" ? {status: order.fulfillmentType === "DELIVERY" ? "READY_FOR_DELIVERY" : "READY_FOR_PICKUP", label: "Mark ready", permission: "ORDER_MARK_READY"} : null;
     return <main className="mx-auto max-w-4xl p-4 sm:p-8">
         <Link href="/admin/staff-notifications" className="inline-flex min-h-11 items-center text-sm font-semibold underline">Back to staff notifications</Link>
-        <h1 className="mt-2 break-all text-2xl font-bold text-[#173c39]">Order {orderNumber}</h1>
+        <h1 className="mt-2 break-all text-2xl font-bold text-[#173c39]"><T text="Order" />{" "}{orderNumber}</h1>
         {error && <p role="alert" className="mt-4 rounded-xl border border-[#c76752] bg-white p-4 text-sm">{error}</p>}
         {!order && !error && <p role="status" className="mt-4">Loading order…</p>}
         {order && <section className="mt-5 rounded-3xl border border-[#eadfd6] bg-white p-5 sm:p-7">

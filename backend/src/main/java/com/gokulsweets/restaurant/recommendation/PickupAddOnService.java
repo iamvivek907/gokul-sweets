@@ -60,8 +60,9 @@ public class PickupAddOnService {
   Order order=ownedPending(branch,request,number);
   var products=new HashMap<Long,MenuProductResponse>();
   menu.getMenu(branch).forEach(c->c.products().forEach(p->{if(p.available() && p.price().signum()>0)products.put(p.id(),p);}));
+  boolean collectTax=Boolean.TRUE.equals(jdbc.queryForObject("SELECT enabled FROM tax_collection_settings WHERE id=1",Boolean.class));
   var tax=new HashMap<Long,BigDecimal>();
-  jdbc.query("SELECT p.id,t.cgst_rate+t.sgst_rate FROM products p JOIN tax_categories t ON t.id=p.tax_category_id AND t.active WHERE p.active",(org.springframework.jdbc.core.RowCallbackHandler)rs->tax.put(rs.getLong(1),rs.getBigDecimal(2)));
+  jdbc.query("SELECT p.id,t.cgst_rate+t.sgst_rate FROM products p JOIN tax_categories t ON t.id=p.tax_category_id AND t.active WHERE p.active",(org.springframework.jdbc.core.RowCallbackHandler)rs->tax.put(rs.getLong(1),collectTax?rs.getBigDecimal(2):BigDecimal.ZERO));
   products.keySet().removeIf(id->!tax.containsKey(id));
   var cart=new HashSet<Long>();
   for(var item:request.items()) {

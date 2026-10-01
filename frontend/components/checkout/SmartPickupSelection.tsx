@@ -127,7 +127,8 @@ export default function SmartPickupSelection({features, onFallback}: {
                 try{const config=await apiClient<{enabled:boolean}>("/api/storefront/customer-identity",{signal:AbortSignal.timeout(5000)});
                     if(config.enabled){const session=await apiClient<{authenticated:boolean;phone?:string;name?:string}>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.timeout(5000)});const contact=verifiedCheckoutContact(session);if(contact){saveCustomerDetails(contact);route="/checkout/review";}}
                 }catch{/* Identity outage keeps the guest contact step usable. */}
-            router.push(route);
+            window.dispatchEvent(new Event("gokul-navigation-start"));
+        router.push(route);
         } catch (error) {
             console.warn("Final pickup preview failed.", error);
             setMessage("We couldn't check this pickup time. Your cart is saved. Try again.");

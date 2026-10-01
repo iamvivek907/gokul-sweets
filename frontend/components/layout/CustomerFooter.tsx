@@ -1,7 +1,7 @@
 "use client";
+import {T} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T} from "@/lib/language";
 
 import {useEffect, useState} from "react";
 import Link from "next/link";

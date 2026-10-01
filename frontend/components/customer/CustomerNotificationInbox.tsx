@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
@@ -59,10 +61,10 @@ export default function CustomerNotificationInbox() {
         } catch {setError("Your order can still be opened. We could not confirm the read acknowledgement; refresh the inbox when connected.");}
     }
     if (unavailable) return <section className="rounded-3xl border border-[#eadfd6] bg-white p-6">
-        <h2 className="text-xl font-semibold">Notification inbox</h2><p className="mt-2 text-sm">The inbox is not available yet. Check Order history for current updates.</p></section>;
+        <h2 className="text-xl font-semibold"><T text="Notification inbox" /></h2><p className="mt-2 text-sm">The inbox is not available yet. Check Order history for current updates.</p></section>;
     return <section className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8" aria-label="Notification inbox">
         <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold">Notification inbox {inbox && <span className="text-sm font-normal">· {inbox.unreadCount} unread</span>}</h2>
+            <h2 className="text-xl font-semibold"><T text="Notification inbox" />{" "}{inbox && <span className="text-sm font-normal">· {inbox.unreadCount} unread</span>}</h2>
             <div className="flex flex-wrap gap-2"><button type="button" disabled={busy || !inbox?.unreadCount} onClick={() => void perform(async () => {
                 const throughId = inbox?.readThrough || Math.max(0, ...(inbox?.messages.map(item => item.id) ?? []));
                 await apiClient<void>(`${base}/notifications/read-all`, {method: "PUT", credentials: "include", body: JSON.stringify({throughId})});

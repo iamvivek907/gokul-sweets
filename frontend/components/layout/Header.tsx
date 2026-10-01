@@ -1,7 +1,7 @@
 "use client";
+import {T} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
-import {T} from "@/lib/language";
 import {LanguagePicker} from "@/lib/language";
 
 import Link from "next/link";
@@ -103,13 +103,14 @@ export default function Header() {
 
                 <div className="customer-header-actions ml-auto flex shrink-0 flex-row-reverse items-center gap-3 sm:flex-row">
                     <MobileMenu />
+                    <LanguagePicker />
                     <CustomerNotificationBell />
                             <CustomerAccountLink />
                 </div>
 
             </div>
 
-            {<div className="mx-auto flex max-w-[1180px] justify-end px-4 pb-2"><LanguagePicker /></div>}
+
         </header>
     );
 }

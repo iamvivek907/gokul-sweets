@@ -67,8 +67,8 @@ export default function KitchenAlarm() {
                     await context.resume();
                     for (let i = 0; i < 3; i++) {
                         const tone = context.createOscillator(), gain = context.createGain();
-                        tone.connect(gain); gain.connect(context.destination); tone.frequency.value = 880;
-                        gain.gain.setValueAtTime(.12, context.currentTime + i * .4);
+                        tone.connect(gain); gain.connect(context.destination); tone.type = "triangle"; tone.frequency.value = i % 2 ? 1046 : 784;
+                        gain.gain.setValueAtTime(.65, context.currentTime + i * .4);
                         gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + i * .4 + .3);
                         tone.start(context.currentTime + i * .4); tone.stop(context.currentTime + i * .4 + .35);
                     }

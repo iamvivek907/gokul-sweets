@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
@@ -1148,9 +1150,7 @@ export default function AdminPrintingPage() {
                                 font-semibold
                                 text-[#241715]
                             "
-                        >
-                            Branch
-                        </label>
+                        >{" "}<T text="Branch" />{" "}</label>
 
 
                         <select
@@ -2111,8 +2111,7 @@ export default function AdminPrintingPage() {
                                     text-xs
                                     text-[#756763]
                                 "
-                            >
-                                Updated{" "}
+                            >{" "}<T text="Updated" />{" "}
                                 {
                                     lastUpdated
                                         ? lastUpdated.toLocaleTimeString(
@@ -2308,8 +2307,7 @@ export default function AdminPrintingPage() {
                                                                             text-sm
                                                                             text-[#756763]
                                                                         "
-                                                                    >
-                                                                        Order {job.orderNumber}
+                                                                    >{" "}<T text="Order" />{" "}{job.orderNumber}
                                                                     </p>
 
 
@@ -2554,9 +2552,7 @@ export default function AdminPrintingPage() {
                                         text-[#7a1625]
                                         disabled:opacity-40
                                     "
-                                >
-                                    Previous
-                                </button>
+                                >{" "}<T text="Previous" />{" "}</button>
 
 
                                 <span
@@ -2564,8 +2560,7 @@ export default function AdminPrintingPage() {
                                         text-sm
                                         text-[#756763]
                                     "
-                                >
-                                    Page{" "}
+                                >{" "}<T text="Page" />{" "}
                                     {page + 1}
                                     {" of "}
                                     {result.totalPages}
@@ -2598,9 +2593,7 @@ export default function AdminPrintingPage() {
                                         text-[#7a1625]
                                         disabled:opacity-40
                                     "
-                                >
-                                    Next
-                                </button>
+                                >{" "}<T text="Next" />{" "}</button>
 
                             </div>
 

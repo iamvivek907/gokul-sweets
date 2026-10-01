@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -67,7 +69,7 @@ export default function PickupSchedulingPage() {
 
     if (!allowed) return <p>You do not have permission to manage pickup schedules.</p>;
     return <main className="space-y-6">
-        <h1 className="text-2xl font-bold text-[#7a1625]">Pickup scheduling</h1>
+        <h1 className="text-2xl font-bold text-[#7a1625]"><T text="Pickup scheduling" /></h1>
         <p className="text-sm text-[#756763]">Generate slots using the existing branch schedule engine. Existing or overlapping slots are skipped, never overwritten.</p>
         {error && <p role="alert" className="text-red-700">{error}</p>}
         {message && <p role="status" className="text-green-800">{message}</p>}

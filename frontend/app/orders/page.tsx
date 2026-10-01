@@ -474,20 +474,14 @@ export default function OrdersPage() {
                             disabled={safePage <= 1}
                             onClick={() => setPage(value => Math.max(1, value - 1))}
                             className="min-h-10 rounded-xl border border-[#eadfd6] px-4 text-sm font-bold text-[#7a1625] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            Previous
-                        </button>
-                        <p className="text-xs font-semibold text-[#756763]">
-                            Page {safePage} of {totalPages} · {filteredOrders.length} orders
-                        </p>
+                        >{" "}<T text="Previous" />{" "}</button>
+                        <p className="text-xs font-semibold text-[#756763]">{" "}<T text="Page" />{" "}{safePage} of {totalPages} · {filteredOrders.length}{" "}<T text="orders" />{" "}</p>
                         <button
                             type="button"
                             disabled={safePage >= totalPages}
                             onClick={() => setPage(value => Math.min(totalPages, value + 1))}
                             className="min-h-10 rounded-xl border border-[#eadfd6] px-4 text-sm font-bold text-[#7a1625] disabled:cursor-not-allowed disabled:opacity-40"
-                        >
-                            Next
-                        </button>
+                        >{" "}<T text="Next" />{" "}</button>
                     </nav>
                 )}
 

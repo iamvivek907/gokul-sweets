@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link
     from "next/link";
@@ -223,9 +225,7 @@ export default function AdminMenuPage() {
                                         tracking-wide
                                         text-[#7a1625]
                                     "
-                                >
-                                    Daily operations
-                                </div>
+                                >{" "}<T text="Daily operations" />{" "}</div>
 
 
                                 <h3
@@ -449,9 +449,7 @@ export default function AdminMenuPage() {
                                         tracking-wide
                                         text-[#b87900]
                                     "
-                                >
-                                    Product images
-                                </div>
+                                >{" "}<T text="Product images" />{" "}</div>
 
 
                                 <h3

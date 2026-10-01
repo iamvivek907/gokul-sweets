@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import {preferredAdminReportBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
@@ -301,9 +303,7 @@ export default function AdminSalesReportsPage() {
                         }
                         className={INPUT_CLASS}
                     >
-                        <option value="">
-                            All branches
-                        </option>
+                        <option value="">{" "}<T text="All branches" />{" "}</option>
 
                         {
                             options?.branches.map(
@@ -538,9 +538,9 @@ export default function AdminSalesReportsPage() {
                                                 <tr className="border-b border-[#eadfd6] text-left text-xs uppercase tracking-[0.08em] text-[#756763]">
                                                     <th className="px-3 py-3">Date</th>
                                                     <th className="px-3 py-3 text-right">Revenue</th>
-                                                    <th className="px-3 py-3 text-right">Orders</th>
+                                                    <th className="px-3 py-3 text-right"><T text="Orders" /></th>
                                                     <th className="px-3 py-3 text-right">Units</th>
-                                                    <th className="px-3 py-3 text-right">Customers</th>
+                                                    <th className="px-3 py-3 text-right"><T text="Customers" /></th>
                                                 </tr>
                                             </thead>
 

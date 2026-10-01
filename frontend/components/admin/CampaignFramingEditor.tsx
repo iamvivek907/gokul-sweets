@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useRef, useState} from "react";
 import {campaignFrameStyle, type CampaignFrame} from "@/lib/campaignFraming";
@@ -66,7 +68,7 @@ export default function CampaignFramingEditor({label, file, savedUrl, mediaType,
                 // eslint-disable-next-line @next/next/no-img-element
                 : <img src={url} alt="" className={styles.media} style={campaignFrameStyle(frame)} />
                 : <div className={styles.empty}>Choose a {portrait ? "phone" : "desktop"} file to frame it here.</div>}
-            {url && <div className={styles.heroOverlay} aria-hidden="true"><small>GOKUL SWEETS &amp; RESTAURANTS</small><strong>A little joy<br />in every visit.</strong></div>}
+            {url && <div className={styles.heroOverlay} aria-hidden="true"><small>GOKUL SWEETS &amp; RESTAURANTS</small><strong><T text="A little joy" /><br /><T text="in every visit." /></strong></div>}
             {url && <span className={styles.hint}>Drag to move · Pinch to zoom</span>}
         </div>
         <div className={styles.controls}>

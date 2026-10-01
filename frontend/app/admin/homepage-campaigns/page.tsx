@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useRef, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -197,7 +199,7 @@ export default function HomepageCampaignsPage() {
 
     if (!allowed) return <p>You do not have permission to manage homepage campaigns.</p>;
     return <main className="space-y-6">
-        <h1 className="text-2xl font-bold text-[#7a1625]">Homepage campaigns</h1>
+        <h1 className="text-2xl font-bold text-[#7a1625]"><T text="Homepage campaigns" /></h1>
         <p className="text-sm text-[#756763]">Choose your artwork and preview it here. Save privately or publish when ready. Files upload only when you save or publish.</p>
         {error && <p role="alert" className="text-red-700">{error}</p>}
         {message && <p role="status" className="text-green-800">{message}</p>}
@@ -217,7 +219,7 @@ export default function HomepageCampaignsPage() {
                 </SettingField>)}
                 <SettingField label="Button destination" help="Send customers to an existing page. External links are not supported." htmlFor="campaign-target">
                     <select id="campaign-target" value={form.ctaTarget} onChange={event => setForm({...form, ctaTarget: event.target.value})} className="min-h-11 w-full rounded-xl border px-3">
-                        <option value="">No button</option><option value="/menu">Menu</option><option value="/cart">Cart</option><option value="/about">About us</option>
+                        <option value="">No button</option><option value="/menu"><T text="Menu" /></option><option value="/cart"><T text="Cart" /></option><option value="/about">About us</option>
                     </select>
                 </SettingField>
                 {controlled && <>
@@ -286,7 +288,7 @@ export default function HomepageCampaignsPage() {
             className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#eadfd6] bg-white p-4">
             <div><h2 className="font-bold">{campaign.title}</h2><p className="text-sm">{campaign.type} · Priority {campaign.displayOrder} · {campaign.active ? "Active (schedule applies)" : "Inactive"}</p>
                 <p className="text-xs text-[#756763]">{toIndiaDateTimeInput(campaign.startAt) || "Immediate"} to {toIndiaDateTimeInput(campaign.endAt) || "No end"} (India time)</p></div>
-            <button disabled={busy} onClick={() => edit(campaign)} className="min-h-11 rounded-xl border px-4">Edit</button>
+            <button disabled={busy} onClick={() => edit(campaign)} className="min-h-11 rounded-xl border px-4"><T text="Edit" /></button>
         </article>)}</div>
     </main>;
 }

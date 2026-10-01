@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
@@ -83,9 +84,10 @@ export default function StaffNotificationsPage() {
         {!settings && !error && <p role="status" className="mt-5">Loading staff alerts…</p>}
         {settings && !settings.enabled && <p className="mt-5 rounded-2xl border bg-white p-5">Staff alerts are not enabled yet. Use the preparation queue.</p>}
         {settings?.enabled && <>
-            <details className="mt-6 rounded-3xl border border-[#eadfd6] bg-white p-5 sm:p-6" aria-label="Staff push settings">
+            <details open className="mt-6 rounded-3xl border border-[#eadfd6] bg-white p-5 sm:p-6" aria-label="Staff push settings">
                 <summary className="cursor-pointer text-lg font-bold">Notification delivery settings</summary>
                 <h2 className="mt-3 font-bold">Get alerts when the portal is closed</h2>
+                <p className="mt-3 rounded-xl bg-[#e7f0e9] p-4 text-sm"><T text="For iPhone banners: open the installed app, enable staff push here, then allow Notifications, Banners and Sounds in iPhone Settings. Focus or Silent mode can suppress alerts."/></p>
                 <p className="mt-2 text-sm leading-6">Register each staff browser separately. Alerts stop after logout or session expiry (staff sign-in lasts up to 8 hours). Browser permission, device mute and OS settings control delivery and sound. On iOS/iPadOS 16.4+, use the installed Home Screen app.</p>
                 <p className="mt-2 text-sm">Order references and branch timing may appear on your lock screen.</p>
                 {!supported && <p className="mt-3 text-sm">Push is unsupported here. This inbox and the preparation queue remain available.</p>}

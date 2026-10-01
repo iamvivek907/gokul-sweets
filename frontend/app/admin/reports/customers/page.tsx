@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link
     from "next/link";
@@ -593,8 +595,7 @@ export default function AdminCustomerReportsPage() {
                                 && (
                                     <div className="mt-5 flex items-center justify-between gap-3">
 
-                                        <p className="text-sm text-[#756763]">
-                                            Page {report.customers.page + 1} of {report.customers.totalPages} · {number(report.customers.totalElements)} customers
+                                        <p className="text-sm text-[#756763]">{" "}<T text="Page" />{" "}{report.customers.page + 1} of {report.customers.totalPages} · {number(report.customers.totalElements)} customers
                                         </p>
 
 
@@ -616,9 +617,7 @@ export default function AdminCustomerReportsPage() {
                                                         )
                                                 }
                                                 className={PAGE_BUTTON}
-                                            >
-                                                Previous
-                                            </button>
+                                            >{" "}<T text="Previous" />{" "}</button>
 
 
                                             <button
@@ -635,9 +634,7 @@ export default function AdminCustomerReportsPage() {
                                                         )
                                                 }
                                                 className={PAGE_BUTTON}
-                                            >
-                                                Next
-                                            </button>
+                                            >{" "}<T text="Next" />{" "}</button>
 
                                         </div>
 

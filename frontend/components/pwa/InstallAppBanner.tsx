@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useState
@@ -221,9 +223,7 @@ export default function InstallAppBanner() {
                                     {" "}
                                     Tap
                                     {" "}
-                                    <strong>
-                                        Add
-                                    </strong>.
+                                    <strong>{" "}<T text="Add" />{" "}</strong>.
                                 </div>
 
                             </div>

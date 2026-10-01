@@ -180,6 +180,7 @@ export default function CustomerPage() {
         );
 
 
+        window.dispatchEvent(new Event("gokul-navigation-start"));
         router.push(
             "/checkout/review"
         );

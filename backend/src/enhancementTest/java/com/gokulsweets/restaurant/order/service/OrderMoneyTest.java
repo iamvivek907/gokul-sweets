@@ -40,4 +40,20 @@ class OrderMoneyTest {
         assertThat(result.items().get(1).taxAmount()).isEqualByComparingTo("3.75");
         assertThat(result.totalAmount()).isEqualByComparingTo("236.25");
     }
+    @Test void administratorTaxSwitchLeavesTaxRatesAndUnitPricesIntact() {
+        var settings=org.mockito.Mockito.mock(com.gokulsweets.restaurant.tax.TaxCollectionSettings.class);
+        org.mockito.Mockito.when(settings.enabled()).thenReturn(false);
+        var tax=new TaxCategory();tax.setCgstRate(new BigDecimal("2.5"));tax.setSgstRate(new BigDecimal("2.5"));
+        var product=new Product();product.setBasePrice(new BigDecimal("100"));product.setTaxCategory(tax);
+        var branch=new Branch();branch.setId(1L);branch.setPickupConvenienceFee(new BigDecimal("10"));branch.setPickupConvenienceFeeTaxRate(new BigDecimal("5"));
+        var slot=new PickupSlot();slot.setId(1L);
+        var service=new OrderCalculationService();service.setTaxSettings(settings);
+        var order=service.calculate(new ValidatedOrderData(branch,slot,PickupType.NORMAL,List.of(
+            new ValidatedOrderItem(product,new BranchProduct(),ProductSaleMode.UNIT,1,null))));
+        assertThat(order.items().getFirst().taxAmount()).isZero();
+        assertThat(order.totalTax()).isZero();assertThat(order.convenienceFeeTax()).isZero();
+        assertThat(order.totalAmount()).isEqualByComparingTo("110.00");
+        org.mockito.Mockito.verify(settings).enabled();
+    }
+
 }

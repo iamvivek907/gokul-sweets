@@ -130,7 +130,7 @@ export default function AdminTopbar() {
                 </div>
 
 
-                <div className="flex shrink-0 items-center gap-3"><StaffNotificationBell />
+                <div className="flex shrink-0 items-center gap-3"><LanguagePicker /><StaffNotificationBell />
                 <button
                     type="button"
                     onClick={
@@ -161,7 +161,7 @@ export default function AdminTopbar() {
                 </div>
 
             </div>
-            <div className="flex justify-end px-4 pb-2 sm:px-6"><LanguagePicker /></div>
+
 
         </header>
     );

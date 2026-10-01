@@ -325,12 +325,10 @@ export default function PickupPage() {
     </AppShell>;
     // Unauthenticated previews must not add back another order's private holds. Owned checkout edits keep their existing flow.
     if (features?.smartPickupSelection && !fallback && !parsePendingOrder(pending)) {
-        return <>{configurationError && <p role="status" className="p-3 text-center text-sm">{configurationError} Keeping your pickup layout.
-            <button onClick={retry} className="min-h-11 px-3 underline"><T text="Retry settings" /></button></p>}
+        return <>{configurationError && <p role="status" className="p-3 text-center text-sm">{configurationError}{" "}<T text="Keeping your pickup layout." />{" "}<button onClick={retry} className="min-h-11 px-3 underline"><T text="Retry settings" /></button></p>}
             <SmartPickupSelection features={features} onFallback={() => setFallback(true)} /></>;
     }
-    return <>{features?.smartPickupSelection && parsePendingOrder(pending) && <p className="p-4 text-center text-sm">
-        Editing a reserved order: your existing pickup selector keeps its held stock.</p>}<LegacyPickupPage fallbackToday={features?.today ?? null} fallbackFutureOrderingDays={features?.futureOrderingDays ?? null}
+    return <>{features?.smartPickupSelection && parsePendingOrder(pending) && <p className="p-4 text-center text-sm">{" "}<T text="Editing a reserved order: your existing pickup selector keeps its held stock." /></p>}<LegacyPickupPage fallbackToday={features?.today ?? null} fallbackFutureOrderingDays={features?.futureOrderingDays ?? null}
         cartSwitchPreview={!!features?.cartSwitchPreview} /></>;
 }
 
@@ -1051,6 +1049,7 @@ function LegacyPickupPage({
                     if(contact){saveCustomerDetails(contact);next="/checkout/review";}
                 }
         }catch{/* Keep guest details available when identity cannot be confirmed. */}
+        window.dispatchEvent(new Event("gokul-navigation-start"));
         router.push(next);
     }
 

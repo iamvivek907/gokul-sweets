@@ -99,8 +99,8 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
             </div>
             <div className={styles.heroCopy}>
                 <p>GOKUL SWEETS &amp; RESTAURANTS</p>
-                <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
-                <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
+                <h1 id="gokul-arrival-title"><T text="A little joy" /><br /><T text="in every visit." /></h1>
+                <span><T text="Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch." /></span>
                 <div className={styles.actions}>
                     <Link href="/branches" className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
                     <Link href={occasionEnquiries ? "/occasions" : "/branches"}><T text="Plan an occasion" /><LinkFeedback /></Link>

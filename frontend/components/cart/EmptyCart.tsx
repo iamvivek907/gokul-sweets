@@ -1,5 +1,5 @@
-import LinkFeedback from "@/components/common/LinkFeedback";
 import {T} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
 import Link
     from "next/link";
 

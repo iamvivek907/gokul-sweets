@@ -1,5 +1,5 @@
 "use client";
-import {useCallback,useEffect,useSyncExternalStore} from "react";
+import {useCallback,useEffect,useRef,useState,useSyncExternalStore} from "react";
 import {hindi} from "./hindi";
 export type Language="en"|"hi";
 const KEY="gokul-language";
@@ -14,4 +14,8 @@ export function translate(text:string|null|undefined,locale:Language="en"):strin
 export function useTranslation(){const locale=useLanguage();return useCallback((text:string|null|undefined)=>translate(text,locale),[locale]);}
 export function T({text}:{text:string}){return <>{translate(text,useLanguage())}</>;}
 export function LanguageRuntime(){useEffect(()=>{const restore=()=>{let saved:Language="en";try{if(localStorage.getItem(KEY)==="hi")saved="hi";}catch{}language=saved;document.documentElement.lang=saved;listeners.forEach(callback=>callback());};restore();window.addEventListener("storage",restore);return()=>window.removeEventListener("storage",restore);},[]);return null;}
-export function LanguagePicker(){const locale=useLanguage();return <label className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-[#c4d4c9] bg-[#fffaf2] px-3 text-sm font-semibold text-[#173c39]"><span>Language / भाषा</span><select aria-label="Language / भाषा" value={locale} onChange={event=>setLanguage(event.target.value as Language)} className="min-h-11 max-w-[90px] bg-transparent"><option value="en">English</option><option value="hi">हिन्दी</option></select></label>;}
+export function LanguagePicker(){
+ const locale=useLanguage(),[open,setOpen]=useState(false);const container=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null);
+ useEffect(()=>{if(!open)return;const close=(event:PointerEvent)=>{if(!container.current?.contains(event.target as Node))setOpen(false);};const escape=(event:KeyboardEvent)=>{if(event.key==="Escape"){setOpen(false);trigger.current?.focus();}};document.addEventListener("pointerdown",close);document.addEventListener("keydown",escape);return()=>{document.removeEventListener("pointerdown",close);document.removeEventListener("keydown",escape);};},[open]);
+ return <div ref={container} className="language-control"><button ref={trigger} type="button" aria-label="Language / भाषा" aria-expanded={open} aria-controls="language-options" onClick={()=>setOpen(!open)} className="language-trigger"><span aria-hidden="true">अ/A</span><span>{locale==="hi"?"हिन्दी":"EN"}</span></button>{open&&<div id="language-options" className="language-popover" role="group" aria-label="Language / भाषा"><strong>Choose language · भाषा चुनें</strong>{([['en','English','Order with ease'],['hi','हिन्दी','अपनी भाषा में ऑर्डर करें']] as const).map(([code,label,hint])=><button key={code} type="button" aria-pressed={locale===code} onClick={()=>{setLanguage(code);setOpen(false);trigger.current?.focus();}}><span><b>{label}</b><small>{hint}</small></span><span aria-hidden="true">{locale===code?'✓':'→'}</span></button>)}</div>}</div>;
+}

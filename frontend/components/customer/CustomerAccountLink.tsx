@@ -33,7 +33,7 @@ export default function CustomerAccountLink() {
     const phone = session.authenticated ? session.phone : undefined;
     const label = session.authenticated ? session.name?.trim() || (phone ? `•••• ${phone.slice(-4)}` : "Account") : "Log in";
     return <Link href="/profile" className="customer-account-link max-w-[10rem] shrink-0 truncate rounded-full border border-[#d8c6ba] px-3 py-2 text-sm font-semibold text-[#173c39]"
-        aria-label={session.authenticated ? `Open profile for ${label}` : translate("Log in to your account")}>
-        {label}
+        aria-label={session.authenticated ? `Open profile for ${session.authenticated ? label : translate(label)}` : translate("Log in to your account")}>
+        {session.authenticated ? label : translate(label)}
     </Link>;
 }

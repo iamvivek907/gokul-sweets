@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import KitchenBoard from "@/components/admin/KitchenBoard";
 import {formatWeight} from "@/lib/orderQuantity";
 
@@ -2558,9 +2560,7 @@ export default function AdminOrdersPage() {
                                     tracking-[0.16em]
                                     text-[#c88a20]
                                 "
-                            >
-                                Daily operations
-                            </p>
+                            >{" "}<T text="Daily operations" />{" "}</p>
 
 
                             <h1
@@ -2573,9 +2573,7 @@ export default function AdminOrdersPage() {
 
                                     sm:text-4xl
                                 "
-                            >
-                                Live Orders
-                            </h1>
+                            >{" "}<T text="Live Orders" />{" "}</h1>
 
 
                             <p
@@ -2586,9 +2584,7 @@ export default function AdminOrdersPage() {
                                     leading-6
                                     text-[#756763]
                                 "
-                            >
-                                Monitor customer pickup and delivery orders as they move through preparation.
-                            </p>
+                            >{" "}<T text="Monitor customer pickup and delivery orders as they move through preparation." />{" "}</p>
 
                         </div>
 
@@ -2611,9 +2607,7 @@ export default function AdminOrdersPage() {
                                     font-semibold
                                     text-[#241715]
                                 "
-                            >
-                                Branch
-                            </label>
+                            >{" "}<T text="Branch" />{" "}</label>
 
 
                             <select
@@ -2694,9 +2688,7 @@ export default function AdminOrdersPage() {
                                     === 0
                                     && (
 
-                                        <option value="">
-                                            No branch available
-                                        </option>
+                                        <option value="">{" "}<T text="No branch available" />{" "}</option>
 
                                     )
                                 }
@@ -2834,8 +2826,7 @@ export default function AdminOrdersPage() {
                                                     text-xs
                                                     text-[#756763]
                                                 "
-                                            >
-                                                Last updated:{" "}
+                                            >{" "}<T text="Last updated:" />{" "}
 
                                                 <span
                                                     className="
@@ -2901,7 +2892,7 @@ export default function AdminOrdersPage() {
                     }
 
 
-                    {useKitchenBoard && selectedBranchId!==null && authorization!==null && <KitchenBoard key={selectedBranchId} branchId={selectedBranchId} authorization={authorization} canStart={canStartPreparation} onView={openOrderDetail} onChanged={()=>{void refreshPreparationQueue();void refreshOrders();}}/>}
+                    {useKitchenBoard && selectedBranchId!==null && authorization!==null && <KitchenBoard key={selectedBranchId} branchId={selectedBranchId} authorization={authorization} canStart={canStartPreparation} canReady={hasPermission("ORDER_MARK_READY")} onView={openOrderDetail} onChanged={()=>{void refreshPreparationQueue();void refreshOrders();}}/>}
                     {/* OPERATIONAL PREPARATION QUEUE */}
 
                     {!useKitchenBoard && <>
@@ -2950,9 +2941,7 @@ export default function AdminOrdersPage() {
                                             tracking-[0.14em]
                                             text-[#c88a20]
                                         "
-                                    >
-                                        Kitchen operations
-                                    </p>
+                                    >{" "}<T text="Kitchen operations" />{" "}</p>
 
 
                                     <h2
@@ -2964,9 +2953,7 @@ export default function AdminOrdersPage() {
 
                                             sm:text-2xl
                                         "
-                                    >
-                                        Preparation Queue
-                                    </h2>
+                                    >{" "}<T text="Preparation Queue" />{" "}</h2>
 
 
                                     <p
@@ -3396,9 +3383,7 @@ export default function AdminOrdersPage() {
                                                     disabled:cursor-not-allowed
                                                     disabled:opacity-40
                                                 "
-                                            >
-                                                Clear selection
-                                            </button>
+                                            >{" "}<T text="Clear selection" />{" "}</button>
 
                                         </div>
 
@@ -3934,8 +3919,7 @@ export default function AdminOrdersPage() {
                                         text-sm
                                         text-[#756763]
                                     "
-                                >
-                                    Page{" "}
+                                >{" "}<T text="Page" />{" "}
 
                                     <strong
                                         className="
@@ -4015,9 +3999,7 @@ export default function AdminOrdersPage() {
                                             disabled:cursor-not-allowed
                                             disabled:opacity-40
                                         "
-                                    >
-                                        Previous
-                                    </button>
+                                    >{" "}<T text="Previous" />{" "}</button>
 
 
                                     <button
@@ -4057,9 +4039,7 @@ export default function AdminOrdersPage() {
                                             disabled:cursor-not-allowed
                                             disabled:opacity-40
                                         "
-                                    >
-                                        Next
-                                    </button>
+                                    >{" "}<T text="Next" />{" "}</button>
 
                                 </div>
 
@@ -5070,9 +5050,7 @@ function OrderDetailDrawer({
                                     tracking-[0.14em]
                                     text-[#c88a20]
                                 "
-                            >
-                                Order details
-                            </p>
+                            >{" "}<T text="Order details" />{" "}</p>
 
 
                             <h2

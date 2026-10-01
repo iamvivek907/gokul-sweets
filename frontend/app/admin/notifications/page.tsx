@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useRef, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -114,7 +116,7 @@ export default function OffersPage() {
 
     if (!canView && !canManage) return <p>You do not have permission to view or manage offers.</p>;
     return <main className="space-y-6 p-4 sm:p-6">
-        <div><h1 className="text-2xl font-bold text-[#7a1625]">Offers</h1>
+        <div><h1 className="text-2xl font-bold text-[#7a1625]"><T text="Offers" /></h1>
             <p className="mt-2 text-sm text-[#756763]">Create discounts for the existing checkout offer system. Publishing an offer does not send a notification or change product taxes.</p></div>
         {error && <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{error}
             <button disabled={busy} className="ml-3 min-h-11 underline" onClick={() => {setError(""); setReload(value => value + 1);}}>Refresh offers</button></div>}
@@ -133,7 +135,7 @@ export default function OffersPage() {
                 </SettingField>
                 <SettingField label="Branch" help="Only an owner can create an all-branches offer." htmlFor="offer-branch">
                     <select id="offer-branch" required value={form.branchId} onChange={e => setForm({...form, branchId: e.target.value})} className={inputClass}>
-                        <option value="">Choose branch</option>{owner && <option value="all">All branches</option>}
+                        <option value="">Choose branch</option>{owner && <option value="all"><T text="All branches" /></option>}
                         {permittedBranches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
                         {editing && form.branchId !== "all" && !permittedBranches.some(branch => String(branch.id) === form.branchId)
                             && <option value={form.branchId}>Existing branch #{form.branchId}</option>}
@@ -201,7 +203,7 @@ export default function OffersPage() {
                 <div><h2 className="font-bold">{offer.name} <span className="font-mono text-sm">({offer.code})</span></h2>
                     <p className="text-sm">{offer.active ? "Enabled" : "Disabled"} · {offer.branchName ?? "All branches"} · {offer.visibility === "PUBLIC" ? "Public" : "Code only"}</p></div>
                 {canManage && (owner || (offer.branchId !== null && profile?.branchIds.includes(offer.branchId))) && <div className="flex gap-2">
-                    <button disabled={busy} className="min-h-11 rounded-xl border px-4" onClick={() => edit(offer)}>Edit</button>
+                    <button disabled={busy} className="min-h-11 rounded-xl border px-4" onClick={() => edit(offer)}><T text="Edit" /></button>
                     <button disabled={busy} className="min-h-11 rounded-xl border px-4" onClick={() => toggle(offer)}>{offer.active ? "Deactivate" : "Activate"}</button>
                 </div>}
             </div>

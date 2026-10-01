@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import BrandAbout from "@/components/brand/BrandAbout";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
@@ -239,7 +241,7 @@ export default function AboutPage() {
             <div className="mx-auto w-full max-w-6xl pb-12">
                 {features?.brandCareers ? <BrandAbout/> : <section className="overflow-hidden rounded-3xl border border-[#eadfd6] bg-white shadow-[0_8px_30px_rgba(60,30,20,0.08)]">
                     <div className="bg-linear-to-br from-[#fff4e5] via-[#fffaf3] to-[#f6dfad]/40 px-6 py-9 sm:px-9 sm:py-12">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]">Our story</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]"><T text="Our story" /></p>
                         <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#7a1625] sm:text-5xl">More than sweets.<br />It&apos;s a feeling.</h1>
                         <p className="mt-4 max-w-2xl text-sm leading-7 text-[#756763] sm:text-base">Gokul Sweets prepares fresh sweets, savouries and food for moments shared with family and friends. Choose your favourites, pay securely and collect your order from your selected branch.</p>
                         <div className="mt-6 flex flex-wrap gap-3">
@@ -275,8 +277,8 @@ export default function AboutPage() {
                 <section className="mt-8 rounded-3xl bg-[#7a1625] p-6 text-white sm:p-8">
                     <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#f6dfad]">Stay connected</p>
-                            <h2 className="mt-1 text-2xl font-extrabold">Follow Gokul Sweets</h2>
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#f6dfad]"><T text="Stay connected" /></p>
+                            <h2 className="mt-1 text-2xl font-extrabold"><T text="Follow Gokul Sweets" /></h2>
                             <p className="mt-2 text-sm leading-6 text-white/80">Discover festive specials, new products and updates from our shops.</p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[440px]">

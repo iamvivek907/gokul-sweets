@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 import Link from "next/link";
 
@@ -699,9 +701,7 @@ export default function ImageManagementPage() {
                         <label
                             htmlFor="image-branch"
                             className="mb-2 block text-sm font-semibold text-slate-900"
-                        >
-                            Branch
-                        </label>
+                        >{" "}<T text="Branch" />{" "}</label>
 
 
                         <select
@@ -756,9 +756,7 @@ export default function ImageManagementPage() {
                                 === 0
                                 && (
 
-                                    <option value="">
-                                        No branch available
-                                    </option>
+                                    <option value="">{" "}<T text="No branch available" />{" "}</option>
 
                                 )
                             }
@@ -962,9 +960,7 @@ export default function ImageManagementPage() {
 
                                 <div>
 
-                                    <h2 className="font-semibold text-amber-900">
-                                        No branch available
-                                    </h2>
+                                    <h2 className="font-semibold text-amber-900">{" "}<T text="No branch available" />{" "}</h2>
 
 
                                     <p className="mt-1 text-sm text-amber-800">
@@ -1603,9 +1599,7 @@ function ProductImageCard({
                                     sm:py-2.5
                                     sm:text-sm
                                 "
-                            >
-                                Remove
-                            </button>
+                            >{" "}<T text="Remove" />{" "}</button>
 
                         )
                     }
@@ -2695,9 +2689,7 @@ function ImageUploadModal({
 
                             sm:w-auto
                         "
-                    >
-                        Cancel
-                    </button>
+                    >{" "}<T text="Cancel" />{" "}</button>
 
 
                     <button

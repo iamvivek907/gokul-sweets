@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link
     from "next/link";
@@ -1084,9 +1086,7 @@ export default function MyPayrollPage() {
                                                                                                 )
                                                                                         }
                                                                                         className={SECONDARY_BUTTON_CLASS}
-                                                                                    >
-                                                                                        Edit
-                                                                                    </button>
+                                                                                    >{" "}<T text="Edit" />{" "}</button>
 
                                                                                     <button
                                                                                         type="button"
@@ -1129,9 +1129,7 @@ export default function MyPayrollPage() {
                                                                                 font-semibold
                                                                                 text-red-700
                                                                             "
-                                                                        >
-                                                                            Cancel
-                                                                        </button>
+                                                                        >{" "}<T text="Cancel" />{" "}</button>
 
                                                                     </div>
 

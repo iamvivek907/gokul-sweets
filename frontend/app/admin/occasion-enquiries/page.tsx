@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useState, useRef} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -113,7 +115,7 @@ export default function OccasionEnquiriesPage() {
         <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="text-3xl font-bold">Occasion food enquiries</h1><p className="mt-2 text-sm text-stone-600">Daily bulk planning & customer requests{refreshedAt?` · updated ${refreshedAt} IST`:""}</p></div><button type="button" onClick={()=>setRefresh(value=>value+1)} className="min-h-11 rounded-xl border bg-white px-4">Refresh now</button></div>
         <p>Review a request before quoting. A quote is not a confirmed booking. When dedicated bulk production is enabled, approving a pickup quote automatically creates its production plan; the deposit commits it. Daily online stock is unchanged.</p>
         {notice && <p role="status" className="rounded-xl bg-amber-50 p-3">{notice}</p>}
-        <label className="block">Branch <select value={branchId ?? ""} onChange={event => {const id=Number(event.target.value);setBranchId(id);setRequests([]);setWeek(null);setServiceDate("");setWeekFrom("");setPages(1);setOpenRequest(null);if(profile)rememberAdminBranchId(profile.staffId,id);}} className="ml-3 rounded-lg border p-2">
+        <label className="block"><T text="Branch" />{" "}<select value={branchId ?? ""} onChange={event => {const id=Number(event.target.value);setBranchId(id);setRequests([]);setWeek(null);setServiceDate("");setWeekFrom("");setPages(1);setOpenRequest(null);if(profile)rememberAdminBranchId(profile.staffId,id);}} className="ml-3 rounded-lg border p-2">
             {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
         </select></label>
         {branchId && authorization && hasPermission("MENU_MANAGE") && <OccasionCatalogueEditor key={`catalogue-${branchId}`} branchId={branchId} authorization={authorization} />}
@@ -132,7 +134,7 @@ export default function OccasionEnquiriesPage() {
             <PackingPlanView groups={enquiry.packingGroups} items={enquiry.items} />
             {enquiry.gift && <div className="rounded-xl bg-amber-50 p-4 text-sm"><strong>{enquiry.gift.boxCount} boxes · {enquiry.gift.box.name}</strong><p>{enquiry.gift.box.dimensions} · {enquiry.gift.box.material} · {enquiry.gift.box.compartments} compartments · {enquiry.gift.box.capacityPieces} pieces maximum</p><p>{enquiry.gift.box.branding}</p><p>Packaging estimate: {enquiry.gift.packagingEstimate == null ? "Needs review" : `₹${enquiry.gift.packagingEstimate}`}. Approved packaging included in item totals: {enquiry.gift.approvedPackagingTotal == null ? "Awaiting review" : `₹${enquiry.gift.approvedPackagingTotal}`}.</p>{enquiry.gift.recipe.map(line => <p key={line.productId}>{enquiry.items.find(item => item.productId === line.productId)?.productName}: {line.pieces} per box × {enquiry.gift!.boxCount} boxes = {line.pieces * enquiry.gift!.boxCount} pieces</p>)}</div>}
             {enquiry.pricedLines?.length > 0 && <details className="rounded-xl border p-3"><summary className="cursor-pointer text-sm font-semibold">Item prices & tax breakdown</summary><ul className="mt-3 text-sm">{enquiry.pricedLines.map(line => <li key={line.productId}>
-                {line.productName}: ₹{line.grossAmount} inclusive (base ₹{line.subtotal}, tax ₹{line.taxAmount} at {line.cgstRate}% CGST + {line.sgstRate}% SGST)
+                {line.productName}: ₹{line.grossAmount} inclusive (base ₹{line.subtotal}, tax ₹{line.taxAmount}{" "}<T text="at" />{" "}{line.cgstRate}% CGST + {line.sgstRate}% SGST)
             </li>)}</ul></details>}
             {enquiry.orderNumber && <p>Operational order: {enquiry.orderNumber}</p>}
             {enquiry.quotedAmount != null && <p>{enquiry.estimated&&!enquiry.packingFinalizedAt?"Estimated":"Final quoted"} ₹{enquiry.quotedAmount}; deposit ₹{enquiry.depositAmount}; paid ₹{enquiry.paidAmount}.

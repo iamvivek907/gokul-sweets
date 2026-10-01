@@ -20,6 +20,11 @@ import java.util.List;
 @Slf4j
 public class OrderCalculationService {
 
+    private com.gokulsweets.restaurant.tax.TaxCollectionSettings taxSettings;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setTaxSettings(com.gokulsweets.restaurant.tax.TaxCollectionSettings settings) { this.taxSettings = settings; }
+    private boolean taxEnabled() { return taxSettings == null || taxSettings.enabled(); }
+
     private static final int MONEY_SCALE = 2;
     private static final RoundingMode ROUNDING_MODE = RoundingMode.HALF_UP;
     private static final BigDecimal ONE_HUNDRED = new BigDecimal("100");
@@ -36,25 +41,26 @@ public class OrderCalculationService {
         );
 
         BigDecimal fee=validatedOrder.pickupType()==PickupType.NORMAL ? money(validatedOrder.branch().getPickupConvenienceFee()) : money(BigDecimal.ZERO);
-        BigDecimal rate=validatedOrder.branch().getPickupConvenienceFeeTaxRate();
+        boolean collectTax=taxEnabled();
+        BigDecimal rate=collectTax?validatedOrder.branch().getPickupConvenienceFeeTaxRate():BigDecimal.ZERO;
         BigDecimal feeTax=fee.subtract(fee.multiply(ONE_HUNDRED).divide(ONE_HUNDRED.add(rate),MONEY_SCALE,ROUNDING_MODE));
-        return calculateItems(validatedOrder.items(),determinePriorityCharge(validatedOrder),fee,feeTax,validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupFeeVersion():0);
+        return calculateItems(validatedOrder.items(),determinePriorityCharge(validatedOrder),fee,feeTax,validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupFeeVersion():0,collectTax);
     }
 
     /** Delivery uses the same accepted branch prices, weights and taxes, with no pickup priority charge. */
     public OrderCalculationResult calculateDelivery(List<ValidatedOrderItem> items) {
         if (items == null || items.isEmpty() || items.size() > 50)
             throw new IllegalArgumentException("Select between 1 and 50 delivery items.");
-        return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0);
+        return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0,taxEnabled());
     }
 
-    private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge,BigDecimal fee,BigDecimal feeTax,long feeVersion) {
+    private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge,BigDecimal fee,BigDecimal feeTax,long feeVersion,boolean collectTax) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
         List<CalculatedOrderItem> calculatedItems = new ArrayList<>();
 
         for (ValidatedOrderItem validatedItem : items) {
-            CalculatedOrderItem item = calculateItem(validatedItem);
+            CalculatedOrderItem item = calculateItem(validatedItem,collectTax);
             calculatedItems.add(item);
             subtotal = subtotal.add(lineSubtotal(item));
             totalTax = totalTax.add(item.taxAmount());
@@ -84,7 +90,7 @@ public class OrderCalculationService {
         );
     }
 
-    private CalculatedOrderItem calculateItem(ValidatedOrderItem validatedItem) {
+    private CalculatedOrderItem calculateItem(ValidatedOrderItem validatedItem,boolean collectTax) {
 
         BranchProduct branchProduct = validatedItem.branchProduct();
         BigDecimal unitPrice = money(
@@ -103,7 +109,7 @@ public class OrderCalculationService {
                         .setScale(MONEY_SCALE, ROUNDING_MODE);
 
         BigDecimal taxRate =
-                determineTaxRate(validatedItem.product().getTaxCategory());
+                collectTax ? determineTaxRate(validatedItem.product().getTaxCategory()) : money(BigDecimal.ZERO);
 
         BigDecimal taxAmount =
                 lineSubtotal

@@ -15,7 +15,9 @@ test('translated fragments preserve punctuation and inline values',()=>{
  assert.equal(renderToStaticMarkup(fee),'(including ₹5 fee tax).');
 });
 test('Hindi translates plural items, no-slot CTA and staff preparation actions',()=>{
- for(const text of ['items','Choose time','Needs preparation','Enable kitchen alarm','Your name (optional)'])assert.notEqual(translate(text,'hi'),text);
+ for(const text of ['items','Choose time','Needs preparation','Enable kitchen alarm','Your name (optional)','All your Gokul moments, together.','The best available offer is applied automatically. Add a little extra below if you like, then continue to payment.'])assert.notEqual(translate(text,'hi'),text);
  assert.equal(translate('items','hi'),'वस्तुएँ');
  assert.equal(translate('Choose time','hi'),'समय चुनें');
+ assert.match(translate('All your Gokul moments, together.','hi'),/ऑर्डर/);
+ assert.match(translate('The best available offer is applied automatically. Add a little extra below if you like, then continue to payment.','hi'),/छूट/);
 });

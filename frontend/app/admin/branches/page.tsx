@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import PickupFeeSettings from "@/components/admin/PickupFeeSettings";
 
 import {
@@ -1147,9 +1149,7 @@ export default function AdminBranchesPage() {
                                             font-bold
                                             text-[#241715]
                                         "
-                                    >
-                                        Branches
-                                    </h2>
+                                    >{" "}<T text="Branches" />{" "}</h2>
 
 
                                     <p
@@ -2058,8 +2058,7 @@ export default function AdminBranchesPage() {
                                                             text-xs
                                                             text-[#756763]
                                                         "
-                                                    >
-                                                        Last updated:{" "}
+                                                    >{" "}<T text="Last updated:" />{" "}
                                                         <span
                                                             className="
                                                                 font-semibold
@@ -2193,9 +2192,7 @@ export default function AdminBranchesPage() {
 
                                                             disabled:opacity-50
                                                         "
-                                                    >
-                                                        Cancel
-                                                    </button>
+                                                    >{" "}<T text="Cancel" />{" "}</button>
 
                                                 )
                                             }
