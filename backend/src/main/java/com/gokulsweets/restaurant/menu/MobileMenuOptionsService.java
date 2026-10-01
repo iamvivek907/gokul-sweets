@@ -35,7 +35,9 @@ public class MobileMenuOptionsService {
  private Snapshot read(long id){
   var versions=jdbc.queryForList("SELECT version FROM mobile_menu_config WHERE branch_id=?",Long.class,id);
   var groups=jdbc.query("SELECT group_key,title FROM mobile_menu_groups WHERE branch_id=? ORDER BY position",(rs,n)->new Group(rs.getString(1),rs.getString(2),List.of()),id);
-  var complete=groups.stream().map(g->new Group(g.key(),g.title(),jdbc.query("SELECT product_id,label FROM mobile_menu_choices WHERE branch_id=? AND group_key=? ORDER BY position",(rs,n)->new Choice(rs.getLong(1),rs.getString(2)),id,g.key()))).toList();
+  Map<String,List<Choice>> choices=new HashMap<>();
+  jdbc.query("SELECT group_key,product_id,label FROM mobile_menu_choices WHERE branch_id=? ORDER BY group_key,position",(org.springframework.jdbc.core.RowCallbackHandler) rs->choices.computeIfAbsent(rs.getString(1),key->new ArrayList<>()).add(new Choice(rs.getLong(2),rs.getString(3))),id);
+  var complete=groups.stream().map(g->new Group(g.key(),g.title(),List.copyOf(choices.getOrDefault(g.key(),List.of())))).toList();
   return new Snapshot(versions.isEmpty()?0:versions.getFirst(),complete);
  }
  @Transactional

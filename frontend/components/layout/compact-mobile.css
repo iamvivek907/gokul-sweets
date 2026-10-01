@@ -69,7 +69,7 @@
 
 @media (max-width:640px){
  .future-storefront .mobile-portion-choices{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
- .future-storefront .mobile-portion-choices label{display:flex;align-items:center;gap:4px;border:1px solid #ddc5b8;border-radius:8px;padding:6px;font-size:11px;min-height:36px;background:white}
+ .future-storefront .mobile-portion-choices label{display:flex;align-items:center;gap:4px;border:1px solid #ddc5b8;border-radius:8px;padding:6px;font-size:11px;min-height:44px;background:white}
  .future-storefront .mobile-portion-choices label.selected{border-color:#7a1625;background:#fff0e7}
  .future-storefront .mobile-menu-filters{margin:8px 0}
  .future-storefront .mobile-menu-filters summary{font-weight:700;padding:10px;border:1px solid #ead7c9;border-radius:10px}
@@ -86,7 +86,7 @@
  .future-storefront .mobile-cart-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid #f2e7df}
  .future-storefront .mobile-cart-row:last-child{border-bottom:0}.future-storefront .mobile-cart-row strong{font-size:14px}
  .future-storefront .mobile-quantity{display:flex;align-items:center;gap:10px;border:1px solid #d4b4a5;border-radius:9px;flex-shrink:0}
- .future-storefront .mobile-quantity button{min-width:36px;min-height:40px;color:#7a1625;font-weight:800}
+ .future-storefront .mobile-quantity button{min-width:44px;min-height:44px;color:#7a1625;font-weight:800}
  .future-storefront .mobile-checkout details{margin-top:8px}.future-storefront .mobile-checkout summary{padding:8px 0;color:#7a1625;font-weight:650}
  .future-storefront .mobile-pickup-options{max-height:220px;overflow:auto;display:grid;gap:6px}.future-storefront .mobile-pickup-options label{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid #e8d7c9;border-radius:8px}
  .future-storefront .mobile-checkout dl>div{display:flex;justify-content:space-between;padding:5px 0}
@@ -94,5 +94,8 @@
  .future-storefront .mobile-checkout-pay{position:fixed;bottom:0;left:0;right:0;z-index:70;display:flex;justify-content:space-between;align-items:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#fffaf3;border-top:1px solid #ead7c9;box-shadow:0 -4px 18px #4a102516}
  .future-storefront .mobile-checkout-pay small,.future-storefront .mobile-checkout-pay strong{display:block}.future-storefront .mobile-checkout-pay strong{font-size:20px}
  .future-storefront .mobile-checkout-pay button{background:#7a1625;color:white;border-radius:12px;padding:12px 24px;min-height:48px;font-weight:750}
+ .future-storefront .mobile-checkout a{display:inline-flex;align-items:center;min-height:44px}
+ .future-storefront .mobile-menu-filters :is(button,select,summary,label){min-height:44px}
+ .future-storefront .mobile-pickup-options label{min-height:44px}
  .future-storefront .mobile-checkout button:disabled{opacity:.5;cursor:not-allowed}
 }

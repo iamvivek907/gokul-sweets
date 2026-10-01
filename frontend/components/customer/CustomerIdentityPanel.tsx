@@ -40,7 +40,8 @@ async function loadWidget(): Promise<Msg91Window> {
     return sdk;
 }
 
-export default function CustomerIdentityPanel({mode = "profile", onSessionChange, onGuestCheckoutChange}: {
+export default function CustomerIdentityPanel({mode = "profile", onSessionChange, onGuestCheckoutChange,sessionRevision=0}: {
+    sessionRevision?: number;
     mode?: "profile" | "checkout" | "occasion" | "mobileCheckout";
     onSessionChange?: (session: CustomerSession) => void;
     onGuestCheckoutChange?: (allowed: boolean) => void;
@@ -77,7 +78,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
             }
         })();
         return () => {alive.current = false;};
-    }, [onSessionChange, onGuestCheckoutChange, revision]);
+    }, [onSessionChange, onGuestCheckoutChange, revision,sessionRevision]);
 
     useEffect(() => {
         if (mode !== "checkout" || availability !== "ready" || session.authenticated || promptDismissed) return;
