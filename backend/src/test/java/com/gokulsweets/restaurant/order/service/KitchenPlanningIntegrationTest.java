@@ -37,7 +37,7 @@ class KitchenPlanningIntegrationTest {
  void order(String status,long branchId,long slotId){jdbc.update("INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,reservation_expires_at) VALUES (?,?,?,'Test','9876543210','NORMAL',?,CURRENT_TIMESTAMP)","KITCHEN-"+UUID.randomUUID(),branchId,slotId,status);}
  @Test void paginatesAndGroupsAllOrdersAtTheIstPreparationBoundary(){
   for(int i=0;i<23;i++)order("CONFIRMED",branch,slot);
-  order("PREPARING",branch,slot);order("READY",branch,slot);order("CANCELLED",branch,slot);order("PENDING_PAYMENT",branch,slot);
+  order("PREPARING",branch,slot);order("READY_FOR_PICKUP",branch,slot);order("CANCELLED",branch,slot);order("PENDING_PAYMENT",branch,slot);
   var first=service.get(branch,KitchenPlanningService.Filter.ELIGIBLE,LocalDate.of(2026,10,1),null,0);
   assertThat(first.total()).isEqualTo(23);assertThat(first.orders()).hasSize(20);assertThat(first.slots()).hasSize(1);
   assertThat(first.slots().getFirst().total()).isEqualTo(25);assertThat(first.counts().get("PREPARING")).isEqualTo(1);
@@ -56,7 +56,7 @@ class KitchenPlanningIntegrationTest {
  }
  @Test void excludesOtherBranchOrdersAndHonoursTimeFilter(){
   long other=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Other kitchen') RETURNING id",Long.class,"KITCHEN-"+UUID.randomUUID());
-  order("CONFIRMED",branch,slot);order("READY",other,slot);
+  order("CONFIRMED",branch,slot);order("READY_FOR_PICKUP",other,slot);
   var result=service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(18,0),0);
   assertThat(result.total()).isEqualTo(1);verify(staff).requireBranchAccess(branch);
   assertThat(service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(19,0),0).orders()).isEmpty();

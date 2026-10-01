@@ -40,11 +40,11 @@ public class KitchenPlanningService {
           FROM orders o LEFT JOIN pickup_slots s ON s.id=o.pickup_slot_id
           LEFT JOIN delivery_capacity_windows w ON w.id=o.delivery_window_id
           LEFT JOIN delivery_zones z ON z.id=w.zone_id AND z.branch_id=o.branch_id
-          WHERE o.branch_id=? AND o.order_status IN ('CONFIRMED','PREPARING','READY')
+          WHERE o.branch_id=? AND o.order_status IN ('CONFIRMED','PREPARING','READY_FOR_PICKUP','READY_FOR_DELIVERY')
             AND (o.fulfillment_type<>'DELIVERY' OR z.id IS NOT NULL)
         ), planned AS (
           SELECT *, service_date+starts_at-(lead*INTERVAL '1 minute') preparation_at,
-            CASE WHEN order_status='PREPARING' THEN 'PREPARING' WHEN order_status='READY' THEN 'READY'
+            CASE WHEN order_status='PREPARING' THEN 'PREPARING' WHEN order_status IN ('READY_FOR_PICKUP','READY_FOR_DELIVERY') THEN 'READY'
             WHEN service_date+starts_at<=? THEN 'OVERDUE'
             WHEN service_date+starts_at-(lead*INTERVAL '1 minute')<=? THEN 'ELIGIBLE' ELSE 'SCHEDULED' END bucket
           FROM timed WHERE service_date IS NOT NULL AND starts_at IS NOT NULL
@@ -58,7 +58,7 @@ public class KitchenPlanningService {
         staff.requireBranchAccess(branchId);
         var now=clock.now();
         var params=new ArrayList<Object>(List.of(windows.getDeliveryLeadMinutes(),windows.getPriorityLeadMinutes(),windows.getAdminOverrideLeadMinutes(),windows.getNormalLeadMinutes(),branchId,Timestamp.valueOf(now),Timestamp.valueOf(now)));
-        var slots=jdbc.query(BASE+"SELECT service_date,starts_at,ends_at,fulfillment_type,COUNT(*) FILTER(WHERE order_status='CONFIRMED'),COUNT(*) FILTER(WHERE order_status='PREPARING'),COUNT(*) FILTER(WHERE order_status='READY'),COUNT(*) FROM planned GROUP BY service_date,starts_at,ends_at,fulfillment_type ORDER BY service_date,starts_at,fulfillment_type",
+        var slots=jdbc.query(BASE+"SELECT service_date,starts_at,ends_at,fulfillment_type,COUNT(*) FILTER(WHERE order_status='CONFIRMED'),COUNT(*) FILTER(WHERE order_status='PREPARING'),COUNT(*) FILTER(WHERE order_status IN ('READY_FOR_PICKUP','READY_FOR_DELIVERY')),COUNT(*) FROM planned GROUP BY service_date,starts_at,ends_at,fulfillment_type ORDER BY service_date,starts_at,fulfillment_type",
             (rs,n)->new Slot(rs.getObject(1,LocalDate.class),rs.getObject(2,LocalTime.class),rs.getObject(3,LocalTime.class),rs.getString(4),rs.getLong(5),rs.getLong(6),rs.getLong(7),rs.getLong(8)),params.toArray());
         String scope=" WHERE 1=1";
         if(date!=null){scope+=" AND service_date=?";params.add(date);}
