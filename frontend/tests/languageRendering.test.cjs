@@ -21,3 +21,10 @@ test('Hindi translates plural items, no-slot CTA and staff preparation actions',
  assert.match(translate('All your Gokul moments, together.','hi'),/ऑर्डर/);
  assert.match(translate('The best available offer is applied automatically. Add a little extra below if you like, then continue to payment.','hi'),/छूट/);
 });
+
+test('Hindi localizes dynamic add-on and kitchen copy while preserving the product name',()=>{
+ assert.equal(translate('Often ordered with Kaju Katli','hi'),'Kaju Katli के साथ खूब पसंद किया जाता है');
+ assert.match(translate('Laddu added. Review your updated price and offer before payment.','hi'),/^Laddu जोड़/);
+ assert.equal(translate('2 started · 1 skipped. ','hi'),'2 ऑर्डर की तैयारी शुरू हुई · 1 ऑर्डर छोड़ दिए गए। ');
+ assert.equal(translate('Often ordered with Kaju Katli','en'),'Often ordered with Kaju Katli');
+});
