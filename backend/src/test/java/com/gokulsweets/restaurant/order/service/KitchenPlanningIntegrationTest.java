@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,11 +23,11 @@ class KitchenPlanningIntegrationTest {
  @Autowired JdbcTemplate jdbc;
  @Autowired EnhancementProperties flags;
  @MockitoBean StaffAuthorizationService staff;
- @MockitoBean ApplicationClock clock;
+ @MockitoSpyBean ApplicationClock clock;
  long branch,slot;
  @BeforeEach void setup(){
   SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken("test","test","ORDER_VIEW"));
-  when(clock.now()).thenReturn(LocalDateTime.of(2026,10,1,17,0));
+  doReturn(LocalDateTime.of(2026,10,1,17,0)).when(clock).now();
   branch=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Kitchen test') RETURNING id",Long.class,"KITCHEN-"+UUID.randomUUID());
   slot=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,'2026-10-01','18:00','18:30',100) RETURNING id",Long.class,branch);
  }
@@ -39,9 +40,9 @@ class KitchenPlanningIntegrationTest {
   assertThat(first.total()).isEqualTo(23);assertThat(first.orders()).hasSize(20);assertThat(first.slots()).hasSize(1);
   assertThat(first.slots().getFirst().total()).isEqualTo(25);assertThat(first.counts().get("PREPARING")).isEqualTo(1);
   assertThat(service.get(branch,KitchenPlanningService.Filter.ELIGIBLE,null,null,1).orders()).hasSize(3);
-  when(clock.now()).thenReturn(LocalDateTime.of(2026,10,1,16,59));
+  doReturn(LocalDateTime.of(2026,10,1,16,59)).when(clock).now();
   assertThat(service.get(branch,KitchenPlanningService.Filter.SCHEDULED,null,null,0).total()).isEqualTo(23);
-  when(clock.now()).thenReturn(LocalDateTime.of(2026,10,1,18,0));
+  doReturn(LocalDateTime.of(2026,10,1,18,0)).when(clock).now();
   assertThat(service.get(branch,KitchenPlanningService.Filter.OVERDUE,null,null,0).total()).isEqualTo(23);
  }
  @Test void permissionFlagAndInputChecksRunBeforeQueries(){
