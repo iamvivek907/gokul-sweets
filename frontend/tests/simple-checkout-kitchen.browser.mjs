@@ -11,7 +11,7 @@ const slot={id:1,branchId:1,slotDate:date,startTime:'23:55:00',endTime:'23:59:00
 try{async function chooseLanguage(surface,locale){await surface.getByRole('button',{name:'Language / भाषा',exact:true}).click();await surface.getByRole('group',{name:'Language / भाषा',exact:true}).getByRole('button',{name:locale==='hi'?/हिन्दी/:/English/}).click();}
 for(const width of [1280,390]){
  const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();await page.clock.install({time:now});let quoteCalls=0,mutations=0,starts=0,readyMoves=0,bestOffers=0,simplified=width===1280,visual=true,gateway=false;
- const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));let authenticated=false;
  const row=(bucket)=>({orderNumber:'TEST-KITCHEN',customerName:'Test customer',fulfillmentType:'PICKUP',orderStatus:readyMoves?'READY_FOR_PICKUP':starts?'PREPARING':'CONFIRMED',bucket,date,start:'18:00:00',end:'18:30:00',preparationAt:`${date}T17:00:00`});
  await context.route('**/api/**',async route=>{
   const req=route.request(),u=new URL(req.url()),p=u.pathname,headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,PATCH,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key,x-staff-csrf'};
@@ -31,7 +31,7 @@ for(const width of [1280,390]){
   else if(p==='/api/orders/TEST-CHECKOUT/rebate/best'){bestOffers++;assert.equal(req.method(),'POST');await new Promise(resolve=>setTimeout(resolve,500));if(width===390)return route.fulfill({status:503,json:{message:'Offer service unavailable'},headers});json={orderNumber:'TEST-CHECKOUT',rebateCode:'BEST',rebateName:'Best offer',rebateAmount:20,amountBeforeRebate:200,totalAmount:180};}
   else if(p==='/api/orders/TEST-CHECKOUT')json={id:11,orderNumber:'TEST-CHECKOUT',orderStatus:'PENDING_PAYMENT',paymentStatus:null,branchId:1,branchName:branch.name,pickupSlotId:1,pickupDate:date,pickupStartTime:slot.startTime,pickupEndTime:slot.endTime,pickupType:'NORMAL',customerName:'GOKUL_GUEST',customerPhone:'9876543210',subtotal:200,taxAmount:0,priorityCharge:0,totalAmount:width===390?200:180,reservationExpiresAt:`${date}T23:59:00`,items:[{id:1,productId:1,productName:product.name,saleMode:'UNIT',quantity:2,weightGrams:null,unitPrice:100,taxRate:0,taxAmount:0,lineTotal:200}]};
   else if(p==='/api/payments'){mutations++;json={};}
-  else if(p==='/api/admin/auth/me')return route.fulfill({json:{staffId:1,username:'test',fullName:'Test staff',roleName:width===1280?'OWNER_ADMIN':'KITCHEN_STAFF',branchIds:[1],permissions:['ORDER_VIEW','ORDER_START_PREPARATION','ORDER_MARK_READY']},headers:{...headers,'X-Staff-CSRF':'test-csrf','Access-Control-Expose-Headers':'X-Staff-CSRF'}});
+  else if(p==='/api/admin/auth/me'){if(!authenticated)return route.fulfill({status:401,json:{message:'Sign in required'},headers});return route.fulfill({json:{staffId:1,username:'test',fullName:'Test staff',roleName:width===1280?'OWNER_ADMIN':'KITCHEN_STAFF',branchIds:[1],permissions:['ORDER_VIEW','ORDER_START_PREPARATION','ORDER_MARK_READY']},headers:{...headers,'X-Staff-CSRF':'test-csrf','Access-Control-Expose-Headers':'X-Staff-CSRF'}});}
   else if(p==='/api/admin/orders/planning'){
    const filter=u.searchParams.get('filter');json={orders:[row(readyMoves?'READY':starts?'PREPARING':filter==='SCHEDULED'?'SCHEDULED':'ELIGIBLE')],slots:[{date,start:'18:00:00',end:'18:30:00',fulfillmentType:'PICKUP',waiting:starts?0:1,preparing:starts?1:0,ready:0,total:1}],counts:{ALL:1,OVERDUE:0,ELIGIBLE:starts?0:1,SCHEDULED:1,PREPARING:starts?1:0,READY:0},page:0,total:1,generatedAt:`${date}T17:01:00`};
   }else if(p==='/api/admin/orders/planning/alerts'){json={needsPreparation:starts?0:1,readyOverdue:0};}
@@ -44,6 +44,13 @@ for(const width of [1280,390]){
   return route.fulfill({json,headers});
  });
  await context.addInitScript(({branch,product})=>{window.__chimes=0;window.AudioContext=class{currentTime=0;destination={};async resume(){}async close(){}createOscillator(){return {frequency:{value:0},connect(){},start(){window.__chimes++},stop(){}}}createGain(){return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){}}}};localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:2,weightGrams:null}]}));},{branch,product});
+ await page.goto(`${base}/admin/login`);await page.getByRole('heading',{name:'Gokul Sweets Admin'}).waitFor();
+ assert.equal(await page.getByRole('button',{name:'Language / भाषा',exact:true}).count(),1);
+ await chooseLanguage(page,'hi');assert.equal(await page.locator('html').getAttribute('lang'),'hi');
+ await page.reload();await page.getByRole('button',{name:'Language / भाषा',exact:true}).waitFor();
+ await page.waitForFunction(()=>document.documentElement.lang==='hi');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await chooseLanguage(page,'en');authenticated=true;
  await page.goto(`${base}/cart`);await page.getByText(/^2 items ready for review$/).waitFor();await chooseLanguage(page,'hi');await page.getByText(/^2 वस्तुएँ/).waitFor();await chooseLanguage(page,'en');
  await page.goto(`${base}/checkout/pickup`);await page.getByRole('group',{name:'Choose a pickup time'}).getByRole('button',{name:/23:55/}).click();await page.getByRole('button',{name:'Continue',exact:true}).filter({visible:true}).click();
  await page.waitForURL('**/checkout/review');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-customer-details')).name==='GOKUL_GUEST');

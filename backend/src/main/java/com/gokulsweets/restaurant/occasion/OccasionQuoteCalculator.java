@@ -166,6 +166,8 @@ public class OccasionQuoteCalculator {
     public OccasionEnquiryService.Summary approve(ConsentEnvironment env,long branchId,UUID id,String staff,Input input) {
         // Re-read authoritative rates/tax under the request lock. Preview alone never reserves stock.
         jdbc.query("SELECT id FROM occasion_enquiries WHERE id=? AND environment=? AND branch_id=? FOR UPDATE",rs->{return null;},id,env.name(),branchId);
+        // Owner updates wait until both the calculation snapshot and persisted quote lines are saved.
+        taxCollection.lockForQuoteApproval();
         Calculation result=preview(env,branchId,id,input);
         if(input.expectedTotal()==null || input.expectedTotal().compareTo(result.total())!=0)
             throw new ResponseStatusException(HttpStatus.CONFLICT,"Rates or quantities changed. Calculate and review the quote again before sending.");

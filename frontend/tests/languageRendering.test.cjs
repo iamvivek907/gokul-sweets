@@ -28,3 +28,14 @@ test('Hindi localizes dynamic add-on and kitchen copy while preserving the produ
  assert.equal(translate('2 started · 1 skipped. ','hi'),'2 ऑर्डर की तैयारी शुरू हुई · 1 ऑर्डर छोड़ दिए गए। ');
  assert.equal(translate('Often ordered with Kaju Katli','en'),'Often ordered with Kaju Katli');
 });
+
+test('inline navigation feedback stays visual while the shared announcer handles speech',()=>{
+ const {default:LinkFeedback}=load('components/common/LinkFeedback.tsx',{
+  'next/link':{useLinkStatus:()=>({pending:true})},
+  '@/lib/language':{useTranslation:()=>text=>text}
+ });
+ const markup=renderToStaticMarkup(React.createElement(LinkFeedback));
+ assert.match(markup,/^<span aria-hidden="true"/);
+ assert.match(markup,/Opening…/);
+ assert.doesNotMatch(markup,/role="status"|aria-live=/);
+});

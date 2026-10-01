@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 @Service
 @RequiredArgsConstructor
@@ -11,6 +12,11 @@ public class TaxCollectionSettings {
     private final JdbcTemplate jdbc;
     public boolean enabled() {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT enabled FROM tax_collection_settings WHERE id=1", Boolean.class));
+    }
+    /** Keep every tax-setting read in quote approval consistent until its transaction completes. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void lockForQuoteApproval() {
+        jdbc.queryForObject("SELECT enabled FROM tax_collection_settings WHERE id=1 FOR SHARE", Boolean.class);
     }
     @Transactional
     public boolean save(boolean enabled, long staffId) {
