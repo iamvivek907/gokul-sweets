@@ -148,9 +148,6 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U gokul_test -d restaurant_test"
           --health-interval 10s --health-timeout 5s --health-retries 10
-    defaults:
-      run:
-        working-directory: backend
     env:
       DATABASE_URL: jdbc:postgresql://localhost:5432/restaurant_test
       DATABASE_USERNAME: gokul_test
