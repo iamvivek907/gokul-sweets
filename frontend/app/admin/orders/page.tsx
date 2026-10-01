@@ -1,4 +1,5 @@
 "use client";
+import KitchenBoard from "@/components/admin/KitchenBoard";
 import {formatWeight} from "@/lib/orderQuantity";
 
 import {
@@ -509,6 +510,7 @@ function getTransitionLabel(
 
 
 export default function AdminOrdersPage() {
+    const useKitchenBoard=useStorefrontFeatures()?.adminPreparationBoard===true;
 
     const {
         profile,
@@ -2899,8 +2901,10 @@ export default function AdminOrdersPage() {
                     }
 
 
+                    {useKitchenBoard && selectedBranchId!==null && authorization!==null && <KitchenBoard key={selectedBranchId} branchId={selectedBranchId} authorization={authorization} canStart={canStartPreparation} onView={openOrderDetail} onChanged={()=>{void refreshPreparationQueue();void refreshOrders();}}/>}
                     {/* OPERATIONAL PREPARATION QUEUE */}
 
+                    {!useKitchenBoard && <>
                     <section
                         className="
                             mt-6
@@ -3547,6 +3551,7 @@ export default function AdminOrdersPage() {
                     </section>
 
 
+                    </>}
                     {/* GENERAL ORDERS */}
 
                     <div

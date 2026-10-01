@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {useEffect, useState} from "react";
 import {availabilityItems, checkCartAvailability, type CartAvailability} from "@/services/availabilityApi";
@@ -40,11 +41,11 @@ export default function ReviewPickupRecovery({branchId, items, today, days, reje
 
     return <section aria-label="Choose another pickup time" className="mt-4 rounded-2xl border border-[#e8d2af] bg-[#fff8eb] p-4">
         <h3 className="font-bold text-[#241715]">{mode === "all" ? "Change your pickup time" : "Choose another pickup time"}</h3>
-        <p className="mt-1 text-sm text-[#756763]">Your cart and details are saved. Pick a time that works for everything in your order.</p>
-        {!result && !error && <p role="status" className="mt-3 text-sm">Finding available times…</p>}
+        <p className="mt-1 text-sm text-[#756763]"><T text="Your cart and details are saved. Pick a time that works for everything in your order." /></p>
+        {!result && !error && <p role="status" className="mt-3 text-sm"><T text="Finding available times…" /></p>}
         {error && <button type="button" className="mt-3 min-h-11 font-semibold text-[#7a1625] underline"
-            onClick={() => {setError(false); setRevision(value => value + 1);}}>Try finding times again</button>}
-        {result && !choices.length && <p className="mt-3 text-sm">No other times are available for this cart right now. Try another date or contact the branch.</p>}
+            onClick={() => {setError(false); setRevision(value => value + 1);}}><T text="Try finding times again" /></button>}
+        {result && !choices.length && <p className="mt-3 text-sm"><T text="No other times are available for this cart right now. Try another date or contact the branch." /></p>}
         {choices.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{choices.slice(0, 6).map(choice => {
             const label = new Intl.DateTimeFormat("en-IN", {weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Kolkata"})
                 .format(new Date(`${choice.date}T00:00:00+05:30`));
@@ -53,6 +54,6 @@ export default function ReviewPickupRecovery({branchId, items, today, days, reje
                 {label} · {choice.slot.slot.startTime.slice(0, 5)}{!choice.slot.normalAvailable ? " · Priority" : ""}
             </button>;
         })}</div>}
-        <a href="/checkout/pickup" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#7a1625] underline">See all pickup times</a>
+        <a href="/checkout/pickup" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-[#7a1625] underline"><T text="See all pickup times" /></a>
     </section>;
 }

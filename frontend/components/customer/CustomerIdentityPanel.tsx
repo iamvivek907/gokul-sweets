@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 
 import {useEffect, useRef, useState} from "react";
 import {apiClient} from "@/services/apiClient";
@@ -43,6 +44,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     mode?: "profile" | "checkout" | "occasion";
     onSessionChange?: (session: CustomerSession) => void;
 }) {
+    const translate = useTranslation();
     const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
         "loading");
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
@@ -82,11 +84,11 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         return () => window.removeEventListener("keydown", onEscape);
     }, [mode, availability, session.authenticated, promptDismissed]);
 
-    if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status">Checking phone verification…</p>;
+    if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status"><T text="Checking phone verification…" /></p>;
     if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" ? null : <section
         className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"
-        aria-label="Phone verification">
-        <h2 className="text-xl font-semibold text-[#241715]">Phone verification is unavailable</h2>
+        aria-label={translate("Phone verification")}>
+        <h2 className="text-xl font-semibold text-[#241715]"><T text="Phone verification is unavailable" /></h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
             {availability === "error"
                 ? "We could not check verification right now. Please try again later. You can still place a pickup order as a guest."
@@ -195,7 +197,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         {session.authenticated ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f4faf4] p-4" aria-label="Verified pickup contact">
             <div><p className="text-sm font-semibold text-[#245b38]">Signed in · phone verified</p>
                 <p className="mt-1 text-xs text-[#465a4a]">Your account details are filled in below.</p></div>
-            <Link href="/profile" className="text-sm font-semibold text-[#7a1625] underline">Account</Link>
+            <Link href="/profile" className="text-sm font-semibold text-[#7a1625] underline"><T text="Account" /></Link>
         </div> : <div className="mb-5 rounded-2xl border border-[#eadfd6] p-4">
             <p className="text-sm font-semibold text-[#241715]">Checking out as a guest?</p>
             <p className="mt-1 text-xs text-[#756763]">Sign in to fill your verified number automatically.</p>
@@ -207,13 +209,13 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
                 <p className="mt-2 text-sm leading-6 text-[#756763]">Verify your number to fill your pickup details. You can also continue as a guest.</p>
                 <button ref={promptButton} type="button" disabled={busy} onClick={() => {void start();}}
                     className="mt-6 min-h-12 w-full rounded-xl bg-[#7a1625] px-5 font-semibold text-white disabled:opacity-50">{busy ? "Please wait…" : "Verify with SMS"}</button>
-                <button type="button" onClick={() => setPromptDismissed(true)} className="mt-3 min-h-11 w-full rounded-xl border border-[#eadfd6] font-semibold text-[#241715]">Continue as guest</button>
+                <button type="button" onClick={() => setPromptDismissed(true)} className="mt-3 min-h-11 w-full rounded-xl border border-[#eadfd6] font-semibold text-[#241715]"><T text="Continue as guest" /></button>
                 {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
             </div>
         </div>}
     </>;
 
-    return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Phone verification">
+    return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label={translate("Phone verification")}>
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">Your account</p>
         <h2 className="mt-2 text-xl font-semibold text-[#241715]">{session.authenticated ? "Account details" : "Verify your phone"}</h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
@@ -224,12 +226,12 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
             Verified phone: <span className="select-text">{session.phone}</span>
         </p>}
         {session.authenticated && <div className="mt-4">
-            <label htmlFor="customer-display-name" className="block text-sm font-semibold text-[#241715]">Your name</label>
+            <label htmlFor="customer-display-name" className="block text-sm font-semibold text-[#241715]"><T text="Your name" /></label>
             <div className="mt-2 flex flex-wrap items-center gap-2">
                 <input id="customer-display-name" type="text" autoComplete="name" maxLength={80} value={nameDraft}
                     onChange={event => setNameDraft(event.target.value)}
                     className="min-h-11 min-w-0 flex-1 rounded-xl border border-[#d8c6ba] bg-white px-3 text-base text-[#241715]"
-                    placeholder="Enter your name" />
+                    placeholder={translate("Enter your name")} />
                 <button type="button" disabled={busy || nameDraft.trim() === (session.name ?? "")}
                     onClick={() => {void saveName();}}
                     className="min-h-11 rounded-full border border-[#d8c6ba] px-4 text-sm font-semibold disabled:opacity-50">Save name</button>

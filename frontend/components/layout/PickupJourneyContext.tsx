@@ -1,4 +1,7 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
@@ -19,6 +22,7 @@ export function pickupDateLabel(date: string): string {
 }
 
 export default function PickupJourneyContext() {
+    const translate = useTranslation();
     const pathname = usePathname();
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();
@@ -44,18 +48,18 @@ export default function PickupJourneyContext() {
     return <aside aria-label="Current pickup plan" className="mx-auto mt-3 w-full max-w-[1180px] px-4 sm:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd6] bg-white px-4 py-3 text-sm shadow-sm">
             <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#756763]">Pickup · {branch.name}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#756763]"><T text="Pickup ·" />{branch.name}</p>
                 <p className="mt-1 font-semibold text-[#241715]">
                     {mismatchedCart ? "Cart belongs to another branch — review before checkout"
                         : slot && activeSelection ? `${pickupDateLabel(activeSelection.date)} · ${formatBusinessTime(slot.startTime)}–${formatBusinessTime(slot.endTime)} IST`
                         : displayedDate ? `${pickupDateLabel(displayedDate)} · Time not chosen` : "Choose a pickup time at checkout"}
                 </p>
-                {slot && activeSelection && <p className="mt-1 text-xs text-[#756763]">{activeSelection.pickupType === "PRIORITY" ? "Priority" : "Normal"} · Time is checked again at checkout</p>}
+                {slot && activeSelection && <p className="mt-1 text-xs text-[#756763]">{activeSelection.pickupType === "PRIORITY" ? translate("Priority") : translate("Normal")} <T text="· Time is checked again at checkout" /></p>}
             </div>
             <div className="flex gap-3">
                 {features.inPlaceBranchSwitch ? <BranchSelector compact /> :
-                    <Link href="/" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">Change branch</Link>}
-                <Link href="/checkout/pickup" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">{slot ? "Change time" : "Choose time"}</Link>
+                    <Link href="/" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline"><T text="Change branch" /><LinkFeedback /></Link>}
+                <Link href="/checkout/pickup" className="inline-flex min-h-11 items-center font-semibold text-[#7a1625] underline">{slot ? translate("Change time") : "Choose time"}<LinkFeedback /></Link>
             </div>
         </div>
     </aside>;

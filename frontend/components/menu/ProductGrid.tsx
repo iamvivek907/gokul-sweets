@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import ProductCard
     from "@/components/menu/ProductCard";
@@ -95,8 +96,7 @@ export default function ProductGrid({
                         font-bold
                     "
                 >
-                    No items found
-                </h3>
+                    <T text="No items found" /></h3>
 
                 <p
                     className="
@@ -105,8 +105,7 @@ export default function ProductGrid({
                         text-[#756763]
                     "
                 >
-                    Try another category or search term.
-                </p>
+                    <T text="Try another category or search term." /></p>
 
             </div>
         );

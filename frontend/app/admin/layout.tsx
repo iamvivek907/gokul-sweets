@@ -1,3 +1,4 @@
+import KitchenAlarm from "@/components/admin/KitchenAlarm";
 import type {
     ReactNode
 } from "react";
@@ -21,6 +22,7 @@ export default function AdminLayout({
 
             <AdminShell>
 
+                <KitchenAlarm />
                 {children}
 
             </AdminShell>

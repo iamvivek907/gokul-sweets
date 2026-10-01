@@ -103,6 +103,10 @@ public class EnhancementProperties {
 
     /** Aligns legacy LocalDateTime entity timestamps with Asia/Kolkata. */
     private boolean istTimeFixEnabled = true;
+    /** SCRUM-112 / SCRUM-90: staged usability rollout. */
+    private boolean simplifiedCheckout;
+    private boolean bilingualStorefront;
+    private boolean adminPreparationBoard;
 
     @Min(1) @Max(60)
     private int futureOrderingDays = 30;

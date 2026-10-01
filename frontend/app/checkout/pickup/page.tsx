@@ -1,4 +1,11 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {apiClient} from "@/services/apiClient";
+import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
+import {saveCustomerDetails} from "@/lib/checkoutStorage";
 
 import Link from "next/link";
 import SmartPickupSelection from "@/components/checkout/SmartPickupSelection";
@@ -10,6 +17,7 @@ import {formatBusinessTime, parseBusinessTimestamp} from "@/lib/businessTime";
 import {
     useEffect,
     useMemo,
+    useRef,
     useState,
     useSyncExternalStore
 } from "react";
@@ -306,19 +314,20 @@ function isSlotAvailable(
 
 
 export default function PickupPage() {
+    useTranslation();
     const {features, error: configurationError, retry} = useStorefrontConfiguration();
     const [fallback, setFallback] = useState(false);
     const pending = useSyncExternalStore(subscribeToPendingOrder, getPendingOrderSnapshot, getServerPendingOrderSnapshot);
     if (!features && !fallback) return <AppShell showSocialPopup={false}>
         {configurationError ? <div role="alert"><p>{configurationError}</p>
-            <button className="min-h-11 p-3 underline" onClick={retry}>Retry settings</button>
-            <button className="min-h-11 p-3 underline" onClick={() => setFallback(true)}>Use standard pickup selection</button></div>
-            : <p role="status">Loading pickup options...</p>}
+            <button className="min-h-11 p-3 underline" onClick={retry}><T text="Retry settings" /></button>
+            <button className="min-h-11 p-3 underline" onClick={() => setFallback(true)}><T text="Use standard pickup selection" /></button></div>
+            : <p role="status"><T text="Loading pickup options..." /></p>}
     </AppShell>;
     // Unauthenticated previews must not add back another order's private holds. Owned checkout edits keep their existing flow.
     if (features?.smartPickupSelection && !fallback && !parsePendingOrder(pending)) {
         return <>{configurationError && <p role="status" className="p-3 text-center text-sm">{configurationError} Keeping your pickup layout.
-            <button onClick={retry} className="min-h-11 px-3 underline">Retry settings</button></p>}
+            <button onClick={retry} className="min-h-11 px-3 underline"><T text="Retry settings" /></button></p>}
             <SmartPickupSelection features={features} onFallback={() => setFallback(true)} /></>;
     }
     return <>{features?.smartPickupSelection && parsePendingOrder(pending) && <p className="p-4 text-center text-sm">
@@ -335,6 +344,11 @@ function LegacyPickupPage({
     fallbackFutureOrderingDays: number | null;
     cartSwitchPreview: boolean;
 }) {
+    const translate = useTranslation();
+    const simpleCheckout = useStorefrontFeatures()?.simplifiedCheckout === true;
+    const [continuing,setContinuing] = useState(false);
+    const continuingRef = useRef(false);
+
 
     const router =
         useRouter();
@@ -998,7 +1012,8 @@ function LegacyPickupPage({
      * CONTINUE
      * =========================================================
      */
-    function handleContinue() {
+    async function handleContinue() {
+        if(continuingRef.current)return;
 
         if (
             !selectedSlot
@@ -1009,7 +1024,7 @@ function LegacyPickupPage({
         ) {
 
             setValidationError(
-                "Select a pickup date and an available pickup time before continuing."
+                translate("Select a pickup date and an available pickup time before continuing.")
             );
 
             return;
@@ -1028,9 +1043,19 @@ function LegacyPickupPage({
         });
 
 
-        router.push(
-            "/checkout/customer"
-        );
+        continuingRef.current=true;setContinuing(true);
+        let next="/checkout/customer";
+        if(simpleCheckout){
+            try {
+                const config=await apiClient<{enabled:boolean}>("/api/storefront/customer-identity",{signal:AbortSignal.timeout(5000)});
+                if(config.enabled){
+                    const session=await apiClient<{authenticated:boolean;phone?:string;name?:string}>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.timeout(5000)});
+                    const contact=verifiedCheckoutContact(session);
+                    if(contact){saveCustomerDetails(contact);next="/checkout/review";}
+                }
+            }catch{/* Keep guest details available when identity cannot be confirmed. */}
+        }
+        router.push(next);
     }
 
 
@@ -1052,11 +1077,11 @@ function LegacyPickupPage({
                 >
 
                     <CheckoutStateCard
-                        title="Your cart is empty"
+                        title={translate("Your cart is empty")}
                         message="Add items to your cart before choosing a pickup time."
                         primaryAction={{
                             label:
-                                "Explore Menu",
+                                translate("Explore Menu"),
 
                             href:
                                 "/menu"
@@ -1100,14 +1125,14 @@ function LegacyPickupPage({
                         detail="Choose the cart's branch again before selecting a pickup slot. Your cart items will stay available."
                         primaryAction={{
                             label:
-                                "Select Branch",
+                                translate("Select Branch"),
 
                             href:
                                 "/"
                         }}
                         secondaryAction={{
                             label:
-                                "Return to Cart",
+                                translate("Return to Cart"),
 
                             href:
                                 "/cart"
@@ -1159,8 +1184,7 @@ function LegacyPickupPage({
                             text-[#c88a20]
                         "
                     >
-                        Checkout
-                    </p>
+                        <T text="Checkout" /></p>
 
 
                     <h1
@@ -1172,8 +1196,7 @@ function LegacyPickupPage({
                             text-[#241715]
                         "
                     >
-                        Choose pickup
-                    </h1>
+                        <T text="Choose pickup" /></h1>
 
 
                     <p
@@ -1183,9 +1206,7 @@ function LegacyPickupPage({
                             text-[#756763]
                         "
                     >
-                        Pick the date and time that works best for you.
-                        Available capacity updates automatically.
-                    </p>
+                        <T text="Pick the date and time that works best for you. Available capacity updates automatically." /></p>
 
                 </div>
 
@@ -1210,8 +1231,7 @@ function LegacyPickupPage({
                             text-[#c88a20]
                         "
                     >
-                        Pickup from
-                    </p>
+                        <T text="Pickup from" /></p>
 
 
                     <p
@@ -1269,8 +1289,7 @@ function LegacyPickupPage({
                                     text-green-700
                                 "
                             >
-                                Currently reserved for you
-                            </p>
+                                <T text="Currently reserved for you" /></p>
 
 
                             <p
@@ -1312,10 +1331,7 @@ function LegacyPickupPage({
                                     text-green-800
                                 "
                             >
-                                Keep this time or choose another available
-                                time below. Your current reservation remains
-                                safe until the change succeeds.
-                            </p>
+                                <T text="Keep this time or choose another available time below. Your current reservation remains safe until the change succeeds." /></p>
 
                         </div>
 
@@ -1349,8 +1365,7 @@ function LegacyPickupPage({
                                 text-[#241715]
                             "
                         >
-                            Pickup date
-                        </label>
+                            <T text="Pickup date" /></label>
 
 
                         <input
@@ -1436,8 +1451,7 @@ function LegacyPickupPage({
                                 text-[#241715]
                             "
                         >
-                            Pickup time
-                        </label>
+                            <T text="Pickup time" /></label>
 
 
                         <p
@@ -1448,8 +1462,7 @@ function LegacyPickupPage({
                                 text-[#756763]
                             "
                         >
-                            Open the list and choose the most convenient available time.
-                        </p>
+                            <T text="Open the list and choose the most convenient available time." /></p>
 
 
                         {
@@ -1492,8 +1505,7 @@ function LegacyPickupPage({
                                             text-red-700
                                         "
                                     >
-                                        Unable to load pickup times
-                                    </p>
+                                        <T text="Unable to load pickup times" /></p>
 
 
                                     <p
@@ -1503,7 +1515,7 @@ function LegacyPickupPage({
                                             text-red-600
                                         "
                                     >
-                                        {error}
+                                        {translate(error)}
                                     </p>
 
 
@@ -1519,8 +1531,7 @@ function LegacyPickupPage({
                                             text-[#7a1625]
                                         "
                                     >
-                                        Try again
-                                    </button>
+                                        <T text="Try again" /></button>
 
                                 </div>
 
@@ -1546,9 +1557,7 @@ function LegacyPickupPage({
                                         text-[#756763]
                                     "
                                 >
-                                    No pickup times available
-                                    for this date.
-                                </div>
+                                    <T text="No pickup times available for this date." /></div>
 
                             )
                         }
@@ -1620,8 +1629,7 @@ function LegacyPickupPage({
                                                 text-[#c88a20]
                                             "
                                         >
-                                            Selected time
-                                        </p>
+                                            <T text="Selected time" /></p>
 
 
                                         <p
@@ -1691,8 +1699,7 @@ function LegacyPickupPage({
                                                             .priorityRemainingCapacity
                                                     }
                                                     {" "}
-                                                    priority left
-                                                </p>
+                                                    <T text="priority left" /></p>
 
                                             )
                                         }
@@ -1720,7 +1727,7 @@ function LegacyPickupPage({
                                                 text-[#756763]
                                             "
                                         >
-                                            Priority pickup available for{" "}
+                                            <T text="Priority pickup available for" />{" "}
                                             <strong
                                                 className="
                                                     text-[#7a1625]
@@ -1734,8 +1741,7 @@ function LegacyPickupPage({
                                                 }
                                             </strong>
                                             {" "}
-                                            extra.
-                                        </div>
+                                            <T text="extra." /></div>
 
                                     )
                                 }
@@ -1759,8 +1765,7 @@ function LegacyPickupPage({
                                             text-[#756763]
                                         "
                                     >
-                                        Pickup type
-                                    </p>
+                                        <T text="Pickup type" /></p>
 
 
                                     <div
@@ -1835,8 +1840,7 @@ function LegacyPickupPage({
                                                             text-[#241715]
                                                         "
                                                     >
-                                                        Normal Pickup
-                                                    </p>
+                                                        <T text="Normal Pickup" /></p>
 
 
                                                     <p
@@ -1847,8 +1851,7 @@ function LegacyPickupPage({
                                                             text-[#756763]
                                                         "
                                                     >
-                                                        Included in your order.
-                                                    </p>
+                                                        <T text="Included in your order." /></p>
 
                                                 </div>
 
@@ -1872,8 +1875,7 @@ function LegacyPickupPage({
                                                                     text-[#756763]
                                                                 "
                                                             >
-                                                                Full
-                                                            </span>
+                                                                <T text="Full" /></span>
                                                         )
                                                         : selectedPickupType === "NORMAL"
                                                             ? (
@@ -2012,8 +2014,7 @@ function LegacyPickupPage({
                                                                 text-[#241715]
                                                             "
                                                         >
-                                                            Priority Pickup
-                                                        </p>
+                                                            <T text="Priority Pickup" /></p>
 
 
                                                         {
@@ -2047,8 +2048,7 @@ function LegacyPickupPage({
                                                             text-[#756763]
                                                         "
                                                     >
-                                                        Uses priority pickup capacity.
-                                                    </p>
+                                                        <T text="Uses priority pickup capacity." /></p>
 
                                                 </div>
 
@@ -2076,8 +2076,7 @@ function LegacyPickupPage({
                                                                     text-[#756763]
                                                                 "
                                                             >
-                                                                Full
-                                                            </span>
+                                                                <T text="Full" /></span>
                                                         )
                                                         : selectedPickupType === "PRIORITY"
                                                             ? (
@@ -2180,7 +2179,7 @@ function LegacyPickupPage({
                             {itemCount}{" "}
                             {
                                 itemCount === 1
-                                    ? "item"
+                                    ? translate("item")
                                     : "items"
                             }
                         </span>
@@ -2232,7 +2231,7 @@ function LegacyPickupPage({
                     <button
                         type="button"
                         disabled={
-                            !selectedSlot
+                            continuing || !selectedSlot
                             ||
                             !selectedPickupType
                         }
@@ -2262,7 +2261,7 @@ function LegacyPickupPage({
                         {
                             selectedSlot
                             && selectedPickupType
-                                ? "Continue"
+                                ? continuing ? translate("Opening checkout…") : translate("Continue")
                                 : selectedSlot
                                     ? "Select Pickup Type"
                                     : "Select a Pickup Time"
@@ -2283,8 +2282,7 @@ function LegacyPickupPage({
                             text-[#7a1625]
                         "
                     >
-                        Back to Cart
-                    </Link>
+                        <T text="Back to Cart" /><LinkFeedback /></Link>
 
                 </div>
 

@@ -1,4 +1,8 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T} from "@/lib/language";
+import {LanguagePicker} from "@/lib/language";
 
 import Link from "next/link";
 import {usePathname} from "next/navigation";
@@ -53,8 +57,8 @@ export default function Header() {
 
                 {futuristic ? <Link href="/" className="future-brand" aria-label="Gokul Sweets · Home">
                     <span className="future-brand-mark" aria-hidden="true">G</span>
-                    <span>Gokul Sweets<small>FRESH FOR YOUR MOMENTS</small></span>
-                </Link> : <Link href="/" aria-label="Gokul Sweets · Home"
+                    <span><T text="Gokul Sweets" /><small><T text="FRESH FOR YOUR MOMENTS" /></small></span>
+                <LinkFeedback /></Link> : <Link href="/" aria-label="Gokul Sweets · Home"
                     className="
                         min-w-0
                     "
@@ -69,8 +73,7 @@ export default function Header() {
                             sm:text-xs
                         "
                     >
-                        Fresh sweets. Happier moments.
-                    </p>
+                        <T text="Fresh sweets. Happier moments." /></p>
 
 
                     <h1
@@ -83,10 +86,9 @@ export default function Header() {
                             sm:text-xl
                         "
                     >
-                        Gokul Sweets
-                    </h1>
+                        <T text="Gokul Sweets" /></h1>
 
-                </Link>}
+                <LinkFeedback /></Link>}
 
 
                 {futuristic && pathname !== "/branches" && !pathname.startsWith("/checkout/") && <div className="future-branch-control">
@@ -94,19 +96,20 @@ export default function Header() {
                         ? <BranchSelector locationControl />
                         : <Link href="/cart" className="gokul-location-control future-branch-review" aria-label="Review cart before changing branch">
                             <span className="gokul-location-pin" aria-hidden="true">●</span>
-                            <span className="gokul-location-name"><small>PICKUP BRANCH</small><strong>{branch?.name ?? "Choose branch"}</strong></span>
+                            <span className="gokul-location-name"><small><T text="PICKUP BRANCH" /></small><strong>{branch?.name ?? "Choose branch"}</strong></span>
                             <span className="gokul-location-chevron" aria-hidden="true">⌄</span>
-                        </Link>}
+                        <LinkFeedback /></Link>}
                 </div>}
 
                 <div className="customer-header-actions ml-auto flex shrink-0 flex-row-reverse items-center gap-3 sm:flex-row">
                     <MobileMenu />
                     <CustomerNotificationBell />
-                    <CustomerAccountLink />
+                            <CustomerAccountLink />
                 </div>
 
             </div>
 
+            {features?.bilingualStorefront && <div className="mx-auto flex max-w-[1180px] justify-end px-4 pb-2"><LanguagePicker /></div>}
         </header>
     );
 }

@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 import {formatWeight} from "@/lib/orderQuantity";
 
 import {
@@ -117,6 +118,7 @@ function formatUpdatedAt(value: string): string {
 
 
 export default function OrderDetailPage() {
+    const translate = useTranslation();
 
     const features = useStorefrontFeatures();
     const trackingEnabled = features?.truthfulOrderTracking === true;
@@ -316,15 +318,14 @@ export default function OrderDetailPage() {
                                 onClick={() => router.push("/orders")}
                                 className="min-h-11 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#7a1625]"
                             >
-                                My Orders
-                            </button>
+                                <T text="My Orders" /></button>
                             <button
                                 type="button"
                                 disabled={refreshing}
                                 onClick={() => void handleRefresh()}
                                 className="min-h-11 flex-1 rounded-xl bg-[#7a1625] font-bold text-white! disabled:opacity-50"
                             >
-                                {refreshing ? "Trying again..." : "Try again"}
+                                {refreshing ? "Trying again..." : translate("Try again")}
                             </button>
                         </div>
                     </div>
@@ -382,7 +383,7 @@ export default function OrderDetailPage() {
 
                     <div className={`mt-5 rounded-2xl border p-4 ${getStatusClasses(status.tone)}`}>
                         {order.orderStatus === "CONFIRMED" && order.paymentStatus === "PAID" &&
-                            <p className="mb-2 flex items-center gap-3 text-xl font-bold text-green-800"><span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-green-700 text-white">✓</span> Confirmed</p>}
+                            <p className="mb-2 flex items-center gap-3 text-xl font-bold text-green-800"><span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-green-700 text-white">✓</span> <T text="Confirmed" /></p>}
                         <p className="font-bold">{status.label}</p>
                         <p className="mt-1 text-sm leading-6">{status.message}</p>
                     </div>
@@ -448,12 +449,12 @@ export default function OrderDetailPage() {
 
                     <div className="mt-7 grid gap-4 border-t border-[#eadfd6] pt-6 sm:grid-cols-2">
                         <div className="rounded-2xl bg-[#fffaf3] p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Preparing at" : "Pickup from"}</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Preparing at" : translate("Pickup from")}</p>
                             <p className="mt-2 font-bold text-[#241715]">{order.branchName}</p>
                             <p className="mt-1 text-sm leading-6 text-[#756763]">{order.branchAddress}</p>
                             {trackingEnabled && order.branchPhone && (
                                 <a className="mt-3 inline-block font-bold text-[#7a1625] underline" href={`tel:${order.branchPhone.replace(/[^+\d]/g, "")}`}>
-                                    Call {order.branchName}: {order.branchPhone}
+                                    <T text="Call" />{order.branchName}: {order.branchPhone}
                                 </a>
                             )}
                             {trackingEnabled && (
@@ -461,7 +462,7 @@ export default function OrderDetailPage() {
                             )}
                         </div>
                         <div className="rounded-2xl bg-[#fffaf3] p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Delivery window" : "Pickup time"}</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Delivery window" : translate("Pickup time")}</p>
                             {order.fulfillmentType === "DELIVERY" ? <>
                                 <p className="mt-2 font-bold text-[#241715]">{order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Confirming window"}</p>
                                 <p className="mt-1 text-sm text-[#756763]">{order.deliveryStartTime && order.deliveryEndTime ? `${formatOrderTime(order.deliveryStartTime)} – ${formatOrderTime(order.deliveryEndTime)} IST` : "Window pending"}</p>
@@ -469,13 +470,13 @@ export default function OrderDetailPage() {
                             </> : <>
                                 <p className="mt-2 font-bold text-[#241715]">{order.pickupDate ? formatOrderDate(order.pickupDate) : "Pickup time pending"}</p>
                                 <p className="mt-1 text-sm text-[#756763]">{order.pickupStartTime && order.pickupEndTime ? `${formatOrderTime(order.pickupStartTime)} – ${formatOrderTime(order.pickupEndTime)}` : "Time pending"}</p>
-                                <p className="mt-2 text-xs font-semibold text-[#7a1625]">{order.pickupType === "PRIORITY" ? "Priority pickup" : "Normal pickup"}</p>
+                                <p className="mt-2 text-xs font-semibold text-[#7a1625]">{order.pickupType === "PRIORITY" ? translate("Priority pickup") : translate("Normal pickup")}</p>
                             </>}
                         </div>
                     </div>
 
                     <div className="mt-7 border-t border-[#eadfd6] pt-6">
-                        <h2 className="text-lg font-bold text-[#241715]">Items</h2>
+                        <h2 className="text-lg font-bold text-[#241715]"><T text="Items" /></h2>
                         <div className="mt-3 divide-y divide-[#eadfd6]">
                             {order.items.map(item => (
                                 <div key={item.id} className="flex items-start justify-between gap-4 py-4">

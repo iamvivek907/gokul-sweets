@@ -1,4 +1,7 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T} from "@/lib/language";
 
 import Link from "next/link";
 
@@ -138,8 +141,7 @@ export default function FloatingCartButton({
                                 text-white!
                             "
                         >
-                            View Cart
-                        </p>
+                            <T text="View Cart" /></p>
 
                     </div>
 
@@ -178,7 +180,7 @@ export default function FloatingCartButton({
 
                 </div>
 
-            </Link>
+            <LinkFeedback /></Link>
 
         </div>
     );

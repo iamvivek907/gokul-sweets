@@ -1,6 +1,10 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
+import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
 import {formatBusinessTime} from "@/lib/businessTime";
 
 import {
@@ -75,6 +79,7 @@ function formatTime(
 
 
 export default function CustomerPage() {
+    const translate = useTranslation();
     const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
     const router =
@@ -157,7 +162,7 @@ export default function CustomerPage() {
 
     const verifiedPhone = identity?.authenticated ? identity.phone ?? null : null;
     const checkoutCustomer = identity?.authenticated
-        ? {name: identity.name?.trim() || existingCustomer?.name || "", phone: verifiedPhone ?? ""}
+        ? verifiedCheckoutContact(identity)
         : existingCustomer;
 
     /*
@@ -201,11 +206,11 @@ export default function CustomerPage() {
                 >
 
                     <CheckoutStateCard
-                        title="Your cart is empty"
+                        title={translate("Your cart is empty")}
                         message="Add items before entering pickup details."
                         primaryAction={{
                             label:
-                                "Explore Menu",
+                                translate("Explore Menu"),
 
                             href:
                                 "/menu"
@@ -249,14 +254,14 @@ export default function CustomerPage() {
                         detail="Your cart is safe. Select the correct branch, then continue checkout."
                         primaryAction={{
                             label:
-                                "Select Branch",
+                                translate("Select Branch"),
 
                             href:
                                 "/"
                         }}
                         secondaryAction={{
                             label:
-                                "Return to Cart",
+                                translate("Return to Cart"),
 
                             href:
                                 "/cart"
@@ -300,7 +305,7 @@ export default function CustomerPage() {
                         }}
                         secondaryAction={{
                             label:
-                                "Return to Cart",
+                                translate("Return to Cart"),
 
                             href:
                                 "/cart"
@@ -360,8 +365,7 @@ export default function CustomerPage() {
                                 text-[#756763]
                             "
                         >
-                            Pickup
-                        </span>
+                            <T text="Pickup" /></span>
 
 
                         <span
@@ -379,8 +383,7 @@ export default function CustomerPage() {
                                 text-[#7a1625]
                             "
                         >
-                            Your details
-                        </span>
+                            <T text="Your details" /></span>
 
 
                         <span
@@ -398,8 +401,7 @@ export default function CustomerPage() {
                                 text-[#756763]
                             "
                         >
-                            Review
-                        </span>
+                            <T text="Review" /></span>
 
                     </div>
 
@@ -414,8 +416,7 @@ export default function CustomerPage() {
                             text-[#c88a20]
                         "
                     >
-                        Checkout
-                    </p>
+                        <T text="Checkout" /></p>
 
 
                     <h1
@@ -428,8 +429,7 @@ export default function CustomerPage() {
                             sm:text-4xl
                         "
                     >
-                        Who&apos;s picking up?
-                    </h1>
+                        <T text="Who's picking up?" /></h1>
 
 
                     <p
@@ -441,9 +441,7 @@ export default function CustomerPage() {
                             text-[#756763]
                         "
                     >
-                        Enter the name and mobile number we should use for
-                        pickup identification and order updates.
-                    </p>
+                        <T text="Enter the name and mobile number we should use for pickup identification and order updates." /></p>
 
                 </div>
 
@@ -490,8 +488,7 @@ export default function CustomerPage() {
                                     text-[#241715]
                                 "
                             >
-                                Pickup contact
-                            </p>
+                                <T text="Pickup contact" /></p>
 
 
                             <p
@@ -502,8 +499,7 @@ export default function CustomerPage() {
                                     text-[#756763]
                                 "
                             >
-                                We&apos;ll use these details for pickup and order updates. Sign in to fill your verified contact, or continue as a guest.
-                            </p>
+                                <T text="We'll use these details for pickup and order updates. Sign in to fill your verified contact, or continue as a guest." /></p>
 
                         </div>
 
@@ -574,8 +570,7 @@ export default function CustomerPage() {
                                             text-[#c88a20]
                                         "
                                     >
-                                        Pickup from
-                                    </p>
+                                        <T text="Pickup from" /></p>
 
 
                                     <p
@@ -626,8 +621,7 @@ export default function CustomerPage() {
                                         hover:underline
                                     "
                                 >
-                                    Change
-                                </Link>
+                                    <T text="Change" /><LinkFeedback /></Link>
 
                             </div>
 
@@ -666,8 +660,7 @@ export default function CustomerPage() {
                                             text-[#c88a20]
                                         "
                                     >
-                                        Pickup time
-                                    </p>
+                                        <T text="Pickup time" /></p>
 
 
                                     <p
@@ -703,8 +696,8 @@ export default function CustomerPage() {
                                     >
                                         {
                                             pickupSlot.pickupType === "PRIORITY"
-                                                ? "Priority pickup"
-                                                : "Normal pickup"
+                                                ? translate("Priority pickup")
+                                                : translate("Normal pickup")
                                         }
                                     </p>
 
@@ -719,8 +712,7 @@ export default function CustomerPage() {
                                         text-[#7a1625]
                                     "
                                 >
-                                    Change
-                                </Link>
+                                    <T text="Change" /><LinkFeedback /></Link>
 
                             </div>
 
@@ -748,8 +740,7 @@ export default function CustomerPage() {
                                     text-[#c88a20]
                                 "
                             >
-                                Order summary
-                            </p>
+                                <T text="Order summary" /></p>
 
 
                             <div
@@ -771,8 +762,7 @@ export default function CustomerPage() {
                                         itemCount
                                     }
                                     {" "}
-                                    item
-                                    {
+                                    <T text="item" />{
                                         itemCount === 1
                                             ? ""
                                             : "s"
@@ -885,8 +875,7 @@ export default function CustomerPage() {
                                                 - 3
                                             }
                                             {" "}
-                                            more item
-                                            {
+                                            <T text="more item" />{
                                                 items.length - 3 === 1
                                                     ? ""
                                                     : "s"
@@ -918,8 +907,7 @@ export default function CustomerPage() {
                         hover:underline
                     "
                 >
-                    ← Back to Pickup Time
-                </Link>
+                    <T text="← Back to Pickup Time" /><LinkFeedback /></Link>
 
             </section>
 

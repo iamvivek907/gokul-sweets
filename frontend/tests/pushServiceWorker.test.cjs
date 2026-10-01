@@ -51,6 +51,7 @@ test('staff push has a distinct event namespace and safe exact admin destination
         runtime.listeners.push({data: {json: () => payload}, waitUntil(value) {pending = value;}}); await pending;
     }
     assert.equal(runtime.shown.length, 2);
+    assert.equal(runtime.shown[1].renotify, true); assert.equal(runtime.shown[1].requireInteraction, true);
     assert.equal(runtime.shown[1].title, 'Preparation is due'); assert.equal(runtime.shown[1].data.staff, true);
     runtime.listeners.notificationclick({notification: {data: runtime.shown[1].data, close() {}}, waitUntil(value) {pending = value;}}); await pending;
     assert.deepEqual(runtime.opened, ['https://dev.gokulsweets.in/admin/orders/GS-44']);

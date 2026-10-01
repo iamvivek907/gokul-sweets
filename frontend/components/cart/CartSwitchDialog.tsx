@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 
 import {useEffect, useRef, useState} from "react";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -20,6 +21,7 @@ interface Props {
 const money = (amount: number) => new Intl.NumberFormat("en-IN", {style: "currency", currency: "INR"}).format(amount);
 
 export default function CartSwitchDialog({branchId, branchName, date, items, onKeep, onSwitch}: Props) {
+    const translate = useTranslation();
     const accessible = useStorefrontFeatures()?.accessibleOrderingV2 === true;
     const dialogRef = useRef<HTMLDivElement>(null);
     const onKeepRef = useRef(onKeep);
@@ -93,13 +95,13 @@ export default function CartSwitchDialog({branchId, branchName, date, items, onK
     return <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Review cart before switching" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4">
         <div className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
             <h2 className="text-xl font-bold">Review your cart for {branchName}</h2>
-            <p className="mt-2 text-sm text-[#756763]">Pickup date: {date} (India time). Nothing changes until you confirm.</p>
+            <p className="mt-2 text-sm text-[#756763]"><T text="Pickup date:" />{date} (India time). Nothing changes until you confirm.</p>
             {!preview && !error && <p role="status" className="mt-4">Checking menu, stock and pickup times...</p>}
             {preview && <>
                 <ul className="mt-4 divide-y divide-[#eadfd6]">
                     {preview.lines.map((line, index) => <li key={`${line.item.product.id}-${index}`} className="py-3 text-sm">
                         <p className="font-semibold">{line.item.product.name} · {line.item.product.saleMode === "WEIGHT" ? `${line.item.weightGrams} g` : `${line.item.quantity} pcs`}</p>
-                        <p>Price: {money(line.item.product.price)} → {line.proposed ? money(line.proposed.price) : "Not offered"}{line.item.product.saleMode === "WEIGHT" ? "/kg" : " each"}</p>
+                        <p>Price: {money(line.item.product.price)} → {line.proposed ? money(line.proposed.price) : "Not offered"}{line.item.product.saleMode === "WEIGHT" ? translate("/kg") : " each"}</p>
                         <p className={line.orderable ? "text-green-700" : "text-[#7a1625]"}>
                             {line.orderable ? "Available for this date" : line.reason}</p>
                         {!line.orderable && line.availableQuantity !== null && <p>Available quantity: {line.availableQuantity} {line.item.product.saleMode === "WEIGHT" ? "g" : "pcs"}</p>}
@@ -107,15 +109,15 @@ export default function CartSwitchDialog({branchId, branchName, date, items, onK
                 </ul>
                 <p className="mt-3 text-sm">Pickup times with capacity: {preview.availableSlots}</p>
                 <p className="mt-2 font-semibold">Item subtotal: {money(preview.oldSubtotal)} → {preview.newSubtotal === null ? "Cannot quote until conflicts are resolved" : money(preview.newSubtotal)}</p>
-                <p className="mt-1 text-xs text-[#756763]">Taxes and any priority pickup charge depend on the time you choose at checkout. Review the final amount before paying.</p>
-                {preview.conflicts && <p className="mt-2 text-sm font-semibold text-[#7a1625]">The cart stays saved. Unavailable lines need attention before checkout.</p>}
+                <p className="mt-1 text-xs text-[#756763]"><T text="Taxes and any priority pickup charge depend on the time you choose at checkout. Review the final amount before paying." /></p>
+                {preview.conflicts && <p className="mt-2 text-sm font-semibold text-[#7a1625]"><T text="The cart stays saved. Unavailable lines need attention before checkout." /></p>}
             </>}
             {error && <p role="alert" className="mt-3 text-sm text-[#7a1625]">{error}</p>}
             <div className="mt-5 flex flex-wrap gap-3">
-                <button type="button" disabled={accessible && busy} onClick={onKeep} className="min-h-11 rounded-xl border px-4 font-semibold">Keep current selection</button>
+                <button type="button" disabled={accessible && busy} onClick={onKeep} className="min-h-11 rounded-xl border px-4 font-semibold"><T text="Keep current selection" /></button>
                 <button type="button" disabled={!preview || busy} onClick={() => void confirm()}
                     className="min-h-11 rounded-xl bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-50">{busy ? "Rechecking..." : "Accept and switch"}</button>
-                {error && <button type="button" onClick={onKeep} className="min-h-11 px-2 underline">Close and retry</button>}
+                {error && <button type="button" onClick={onKeep} className="min-h-11 px-2 underline"><T text="Close and retry" /></button>}
             </div>
         </div>
     </div>;

@@ -1,4 +1,7 @@
 "use client";
+import {useTranslation} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
 
 import Link from "next/link";
 
@@ -123,6 +126,7 @@ export default function CheckoutStateCard({
     primaryAction,
     secondaryAction
 }: CheckoutStateCardProps) {
+    const translate = useTranslation();
 
     const toneClasses =
         tone === "error"
@@ -176,7 +180,7 @@ export default function CheckoutStateCard({
                     text-[#241715]
                 "
             >
-                {title}
+                {translate(title)}
             </h1>
 
 
@@ -190,7 +194,7 @@ export default function CheckoutStateCard({
                     text-[#756763]
                 "
             >
-                {message}
+                {translate(message)}
             </p>
 
 
@@ -210,7 +214,7 @@ export default function CheckoutStateCard({
                             ${toneClasses}
                         `}
                     >
-                        {detail}
+                        {translate(detail)}
                     </div>
 
                 )
@@ -243,9 +247,9 @@ export default function CheckoutStateCard({
                         "
                     >
                         {
-                            primaryAction.label
+                            translate(primaryAction.label)
                         }
-                    </Link>
+                    <LinkFeedback /></Link>
 
                 )
             }
@@ -272,9 +276,9 @@ export default function CheckoutStateCard({
                         "
                     >
                         {
-                            secondaryAction.label
+                            translate(secondaryAction.label)
                         }
-                    </Link>
+                    <LinkFeedback /></Link>
 
                 )
             }

@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useEffect,
@@ -115,6 +116,7 @@ function padSeconds(
 
 
 function LegacyOffersPage() {
+    const translate = useTranslation();
     const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
     const router =
@@ -932,7 +934,7 @@ function LegacyOffersPage() {
         ) {
 
             setError(
-                "Your pickup reservation has expired. Please choose a pickup slot again."
+                translate("Your pickup reservation has expired. Please choose a pickup slot again.")
             );
 
             return;
@@ -1022,8 +1024,7 @@ function LegacyOffersPage() {
                                 text-[#241715]
                             "
                         >
-                            Checkout not found
-                        </h1>
+                            <T text="Checkout not found" /></h1>
 
 
                         <p
@@ -1034,9 +1035,7 @@ function LegacyOffersPage() {
                                 text-[#756763]
                             "
                         >
-                            We could not find the pending
-                            order for this checkout.
-                        </p>
+                            <T text="We could not find the pending order for this checkout." /></p>
 
 
                         <button
@@ -1057,8 +1056,7 @@ function LegacyOffersPage() {
                                 text-white
                             "
                         >
-                            Return to Cart
-                        </button>
+                            <T text="Return to Cart" /></button>
 
                     </div>
 
@@ -1120,8 +1118,7 @@ function LegacyOffersPage() {
                                 text-[#241715]
                             "
                         >
-                            Pickup reservation expired
-                        </h1>
+                            <T text="Pickup reservation expired" /></h1>
 
 
                         <p
@@ -1132,12 +1129,7 @@ function LegacyOffersPage() {
                                 text-[#756763]
                             "
                         >
-                            The reserved checkout time has ended.
-                            Your cart is still safe. We are making
-                            sure the old pickup reservation has
-                            been released before you choose a new
-                            slot.
-                        </p>
+                            <T text="The reserved checkout time has ended. Your cart is still safe. We are making sure the old pickup reservation has been released before you choose a new slot." /></p>
 
 
                         <div
@@ -1156,9 +1148,7 @@ function LegacyOffersPage() {
                                     text-red-700
                                 "
                             >
-                                Your cart and customer details
-                                are still available.
-                            </p>
+                                <T text="Your cart and customer details are still available." /></p>
 
 
                             <p
@@ -1169,9 +1159,7 @@ function LegacyOffersPage() {
                                     text-red-600
                                 "
                             >
-                                You do not need to add your items
-                                or enter your details again.
-                            </p>
+                                <T text="You do not need to add your items or enter your details again." /></p>
 
                         </div>
 
@@ -1215,9 +1203,7 @@ function LegacyOffersPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Releasing expired pickup
-                                        reservation...
-                                    </p>
+                                        <T text="Releasing expired pickup reservation..." /></p>
 
                                 </div>
 
@@ -1247,9 +1233,7 @@ function LegacyOffersPage() {
                                             text-green-700
                                         "
                                     >
-                                        The old pickup reservation
-                                        has been released.
-                                    </p>
+                                        <T text="The old pickup reservation has been released." /></p>
 
                                 </div>
 
@@ -1340,8 +1324,7 @@ function LegacyOffersPage() {
                                 text-[#7a1625]
                             "
                         >
-                            Return to Cart
-                        </button>
+                            <T text="Return to Cart" /></button>
 
                     </div>
 
@@ -1409,8 +1392,7 @@ function LegacyOffersPage() {
                                         text-[#7a1625]
                                     "
                                 >
-                                    Pickup reserved
-                                </p>
+                                    <T text="Pickup reserved" /></p>
 
 
                                 <p
@@ -1420,8 +1402,7 @@ function LegacyOffersPage() {
                                         text-[#756763]
                                     "
                                 >
-                                    Time remaining
-                                </p>
+                                    <T text="Time remaining" /></p>
 
                             </div>
 
@@ -1482,8 +1463,7 @@ function LegacyOffersPage() {
                                 text-[#241715]
                             "
                         >
-                            Your cart has been updated
-                        </h1>
+                            <T text="Your cart has been updated" /></h1>
 
 
                         <p
@@ -1494,11 +1474,7 @@ function LegacyOffersPage() {
                                 text-[#756763]
                             "
                         >
-                            Your pickup reservation is still
-                            being held. Continue checkout so
-                            we can update this same order with
-                            your latest cart.
-                        </p>
+                            <T text="Your pickup reservation is still being held. Continue checkout so we can update this same order with your latest cart." /></p>
 
 
                         <div
@@ -1519,9 +1495,7 @@ function LegacyOffersPage() {
                                     text-[#756763]
                                 "
                             >
-                                The reservation timer does not
-                                restart when you add items.
-                            </p>
+                                <T text="The reservation timer does not restart when you add items." /></p>
 
                         </div>
 
@@ -1545,8 +1519,7 @@ function LegacyOffersPage() {
                                 text-white
                             "
                         >
-                            Continue from Cart
-                        </button>
+                            <T text="Continue from Cart" /></button>
 
                     </div>
 
@@ -1604,8 +1577,7 @@ function LegacyOffersPage() {
                                     text-[#7a1625]
                                 "
                             >
-                                Pickup reserved
-                            </span>
+                                <T text="Pickup reserved" /></span>
 
 
                             <span
@@ -1663,8 +1635,7 @@ function LegacyOffersPage() {
                                 text-[#756763]
                             "
                         >
-                            Finding your best offers...
-                        </p>
+                            <T text="Finding your best offers..." /></p>
 
                     </div>
 
@@ -1744,8 +1715,7 @@ function LegacyOffersPage() {
                                     }
                                 `}
                             >
-                                Pickup slot reserved
-                            </p>
+                                <T text="Pickup slot reserved" /></p>
 
 
                             <p
@@ -1756,9 +1726,7 @@ function LegacyOffersPage() {
                                     text-[#756763]
                                 "
                             >
-                                Complete checkout before
-                                your reservation expires.
-                            </p>
+                                <T text="Complete checkout before your reservation expires." /></p>
 
                         </div>
 
@@ -1802,8 +1770,7 @@ function LegacyOffersPage() {
                                     text-[#756763]
                                 "
                             >
-                                remaining
-                            </p>
+                                <T text="remaining" /></p>
 
                         </div>
 
@@ -1826,9 +1793,7 @@ function LegacyOffersPage() {
                                     text-red-700
                                 "
                             >
-                                Hurry — less than 5 minutes
-                                remain to complete checkout.
-                            </p>
+                                <T text="Hurry — less than 5 minutes remain to complete checkout." /></p>
 
                         )
                     }
@@ -1853,8 +1818,7 @@ function LegacyOffersPage() {
                             text-[#c88a20]
                         "
                     >
-                        Checkout
-                    </p>
+                        <T text="Checkout" /></p>
 
 
                     <h1
@@ -1866,8 +1830,7 @@ function LegacyOffersPage() {
                             text-[#241715]
                         "
                     >
-                        Offers & savings
-                    </h1>
+                        <T text="Offers & savings" /></h1>
 
 
                     <p
@@ -1878,9 +1841,7 @@ function LegacyOffersPage() {
                             text-[#756763]
                         "
                     >
-                        Choose an eligible offer or add
-                        more items before payment.
-                    </p>
+                        <T text="Choose an eligible offer or add more items before payment." /></p>
 
                 </div>
 
@@ -1917,8 +1878,7 @@ function LegacyOffersPage() {
                                     text-[#c88a20]
                                 "
                             >
-                                Your order
-                            </p>
+                                <T text="Your order" /></p>
 
 
                             <p
@@ -1981,8 +1941,7 @@ function LegacyOffersPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Order amount
-                                    </span>
+                                        <T text="Order amount" /></span>
 
 
                                     <span
@@ -2017,8 +1976,7 @@ function LegacyOffersPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Offer saving
-                                    </span>
+                                        <T text="Offer saving" /></span>
 
 
                                     <span
@@ -2083,8 +2041,7 @@ function LegacyOffersPage() {
                                             text-green-700
                                         "
                                     >
-                                        Offer applied
-                                    </p>
+                                        <T text="Offer applied" /></p>
 
 
                                     <h2
@@ -2138,7 +2095,7 @@ function LegacyOffersPage() {
                                             text-green-700
                                         "
                                     >
-                                        You saved{" "}
+                                        <T text="You saved" />{" "}
                                         {
                                             formatCurrency(
                                                 appliedRebate
@@ -2237,8 +2194,7 @@ function LegacyOffersPage() {
                                     text-red-700
                                 "
                             >
-                                Unable to continue
-                            </p>
+                                <T text="Unable to continue" /></p>
 
 
                             <p
@@ -2271,8 +2227,7 @@ function LegacyOffersPage() {
                                             text-[#7a1625]
                                         "
                                     >
-                                        Try checking offers again
-                                    </button>
+                                        <T text="Try checking offers again" /></button>
 
                                 )
                             }
@@ -2312,8 +2267,7 @@ function LegacyOffersPage() {
                                     text-[#c88a20]
                                 "
                             >
-                                Available now
-                            </p>
+                                <T text="Available now" /></p>
 
 
                             <h2
@@ -2324,8 +2278,7 @@ function LegacyOffersPage() {
                                     text-[#241715]
                                 "
                             >
-                                Your eligible offers
-                            </h2>
+                                <T text="Your eligible offers" /></h2>
 
                         </div>
 
@@ -2398,8 +2351,7 @@ function LegacyOffersPage() {
                                         text-[#241715]
                                     "
                                 >
-                                    No eligible offers right now
-                                </h3>
+                                    <T text="No eligible offers right now" /></h3>
 
 
                                 <p
@@ -2410,9 +2362,7 @@ function LegacyOffersPage() {
                                         text-[#756763]
                                     "
                                 >
-                                    You can still continue
-                                    normally to payment.
-                                </p>
+                                    <T text="You can still continue normally to payment." /></p>
 
                             </div>
 
@@ -2528,8 +2478,7 @@ function LegacyOffersPage() {
                                                                                 text-green-700
                                                                             "
                                                                         >
-                                                                            Best saving
-                                                                        </span>
+                                                                            <T text="Best saving" /></span>
 
                                                                     )
                                                                 }
@@ -2552,8 +2501,7 @@ function LegacyOffersPage() {
                                                                                 text-green-700
                                                                             "
                                                                         >
-                                                                            Applied
-                                                                        </span>
+                                                                            <T text="Applied" /></span>
 
                                                                     )
                                                                 }
@@ -2629,8 +2577,7 @@ function LegacyOffersPage() {
                                                                     text-[#756763]
                                                                 "
                                                             >
-                                                                Save
-                                                            </p>
+                                                                <T text="Save" /></p>
 
 
                                                             <p
@@ -2677,8 +2624,7 @@ function LegacyOffersPage() {
                                                                     text-[#756763]
                                                                 "
                                                             >
-                                                                Pay after offer
-                                                            </span>
+                                                                <T text="Pay after offer" /></span>
 
 
                                                             <span
@@ -2709,7 +2655,7 @@ function LegacyOffersPage() {
                                                                         text-[#756763]
                                                                     "
                                                                 >
-                                                                    Minimum order{" "}
+                                                                    <T text="Minimum order" />{" "}
                                                                     {
                                                                         formatCurrency(
                                                                             rebate.minimumOrderAmount
@@ -2733,7 +2679,7 @@ function LegacyOffersPage() {
                                                                         text-[#756763]
                                                                     "
                                                                 >
-                                                                    Maximum saving{" "}
+                                                                    <T text="Maximum saving" />{" "}
                                                                     {
                                                                         formatCurrency(
                                                                             rebate.maximumDiscountAmount
@@ -2776,20 +2722,19 @@ function LegacyOffersPage() {
                                                                             text-[#7a1625]
                                                                         "
                                                                     >
-                                                                        Add{" "}
+                                                                        <T text="Add" />{" "}
                                                                         {
                                                                             formatCurrency(
                                                                                 rebate.amountNeededForNextSlab
                                                                             )
                                                                         }{" "}
-                                                                        more to unlock{" "}
+                                                                        <T text="more to unlock" />{" "}
                                                                         {
                                                                             formatCurrency(
                                                                                 rebate.nextSlabRebateAmount
                                                                             )
                                                                         }{" "}
-                                                                        savings.
-                                                                    </p>
+                                                                        <T text="savings." /></p>
 
 
                                                                     {
@@ -2804,7 +2749,7 @@ function LegacyOffersPage() {
                                                                                     text-[#756763]
                                                                                 "
                                                                             >
-                                                                                Next reward unlocks at{" "}
+                                                                                <T text="Next reward unlocks at" />{" "}
                                                                                 {
                                                                                     formatCurrency(
                                                                                         rebate.nextSlabMinimumOrderAmount
@@ -2847,8 +2792,7 @@ function LegacyOffersPage() {
                                                                             disabled:opacity-60
                                                                         "
                                                                     >
-                                                                        Add items to unlock offer
-                                                                    </button>
+                                                                        <T text="Add items to unlock offer" /></button>
 
                                                                 </div>
 
@@ -2877,8 +2821,7 @@ function LegacyOffersPage() {
                                                                     text-green-700
                                                                 "
                                                             >
-                                                                ✓ Applied
-                                                            </button>
+                                                                <T text="✓ Applied" /></button>
 
                                                         )
                                                         : (
@@ -2968,8 +2911,7 @@ function LegacyOffersPage() {
                                     text-[#756763]
                                 "
                             >
-                                Amount to pay
-                            </p>
+                                <T text="Amount to pay" /></p>
 
 
                             {
@@ -2984,8 +2926,7 @@ function LegacyOffersPage() {
                                             text-green-700
                                         "
                                     >
-                                        Offer saving applied
-                                    </p>
+                                        <T text="Offer saving applied" /></p>
 
                                 )
                             }
@@ -3035,8 +2976,7 @@ function LegacyOffersPage() {
                             disabled:opacity-60
                         "
                     >
-                        Continue to Payment
-                    </button>
+                        <T text="Continue to Payment" /></button>
 
 
                     {
@@ -3052,9 +2992,7 @@ function LegacyOffersPage() {
                                     text-[#756763]
                                 "
                             >
-                                You can continue without applying
-                                an offer.
-                            </p>
+                                <T text="You can continue without applying an offer." /></p>
 
                         )
                     }
@@ -3072,10 +3010,7 @@ function LegacyOffersPage() {
                         text-[#756763]
                     "
                 >
-                    Your pickup reservation stays active while
-                    you review offers or add items. The timer
-                    does not restart when the cart changes.
-                </p>
+                    <T text="Your pickup reservation stays active while you review offers or add items. The timer does not restart when the cart changes." /></p>
 
             </section>
 
@@ -3085,6 +3020,7 @@ function LegacyOffersPage() {
 }
 
 export default function OffersPage() {
+    useTranslation();
     const features=useStorefrontFeatures();
     const params=useParams<{orderNumber:string}>();
     if(features?.pickupAddOns) return <AppShell><CheckoutExperienceFrame enabled={features.checkoutExperienceV2} stage="offers"><section className="mx-auto w-full min-w-0 max-w-2xl px-4 pb-28 pt-5"><CheckoutOffersPanel orderNumber={params.orderNumber}/></section></CheckoutExperienceFrame></AppShell>;

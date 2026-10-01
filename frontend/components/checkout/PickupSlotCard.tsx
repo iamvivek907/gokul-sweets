@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import type {
     PickupSlot
@@ -177,8 +178,7 @@ export default function PickupSlotCard({
                                         text-white
                                     "
                                 >
-                                    Priority available
-                                </span>
+                                    <T text="Priority available" /></span>
 
                             )
                         }
@@ -223,15 +223,14 @@ export default function PickupSlotCard({
                                         slot.remainingCapacity
                                     }
                                     {" "}
-                                    normal{" "}
+                                    <T text="normal" />{" "}
                                     {
                                         slot.remainingCapacity === 1
                                             ? "slot"
                                             : "slots"
                                     }
                                     {" "}
-                                    remaining
-                                </p>
+                                    <T text="remaining" /></p>
 
 
                                 {
@@ -248,15 +247,14 @@ export default function PickupSlotCard({
                                                 slot.priorityRemainingCapacity
                                             }
                                             {" "}
-                                            priority{" "}
+                                            <T text="priority" />{" "}
                                             {
                                                 slot.priorityRemainingCapacity === 1
                                                     ? "slot"
                                                     : "slots"
                                             }
                                             {" "}
-                                            remaining
-                                        </p>
+                                            <T text="remaining" /></p>
 
                                     )
                                 }
@@ -309,8 +307,7 @@ export default function PickupSlotCard({
                                     text-[#4b7a44]
                                 "
                             >
-                                Normal pickup
-                            </p>
+                                <T text="Normal pickup" /></p>
 
                         )
                     }

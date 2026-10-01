@@ -114,7 +114,8 @@ public class StaffOrderAlerts {
                             record(order, "PREPARATION_DUE", "ORDER_START_PREPARATION", due,
                                     "Time to start preparation", "The preparation window is open. Start preparation for pickup/service at " + TIME.format(pickup) + " IST.");
                     }
-                    if (!now.isBefore(pickup) && now.isBefore(pickup.plusDays(1))) {
+                    if (!now.isBefore(pickup) && (now.isBefore(pickup.plusDays(1))
+                            || properties.isRecurringPreparationReminders() && order.getOrderStatus() == OrderStatus.CONFIRMED)) {
                         boolean waiting = order.getOrderStatus() == OrderStatus.CONFIRMED;
                         record(order, waiting ? "PREPARATION_OVERDUE" : "READY_OVERDUE",
                                 waiting ? "ORDER_START_PREPARATION" : "ORDER_MARK_READY", pickup,
@@ -135,8 +136,17 @@ public class StaffOrderAlerts {
                 INSERT INTO staff_order_alerts(environment, event_key, order_id, branch_id, kind, required_permission,
                   title, message, scheduled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(environment, event_key) DO NOTHING
-                """, scope(), order.getId() + ":" + kind + ":" + scheduled, order.getId(), order.getBranch().getId(), kind,
+                """, scope(), reminderKey(order.getId(),kind,scheduled), order.getId(), order.getBranch().getId(), kind,
                 permission, title, "Order " + order.getOrderNumber() + " · " + order.getBranch().getName() + ". " + message, Timestamp.valueOf(scheduled));
+    }
+    String reminderKey(long orderId,String kind,LocalDateTime scheduled) {
+        String key=orderId+":"+kind+":"+scheduled;
+        if(properties.isRecurringPreparationReminders() && List.of("PREPARATION_DUE","PREPARATION_OVERDUE").contains(kind)) {
+            int minutes=Math.max(2,Math.min(30,properties.getRepeatMinutes()));
+            long elapsed=Math.max(0,java.time.Duration.between(scheduled,now()).toMinutes());
+            key+=":repeat:"+(elapsed/minutes);
+        }
+        return key;
     }
     private PreparationEligibility schedule(Order order) {
         // Evaluate a snapshot so a PREPARING entity is never mutated back to CONFIRMED.
@@ -160,7 +170,7 @@ public class StaffOrderAlerts {
                 case "PREPARATION_DUE" -> order.getOrderStatus() == OrderStatus.CONFIRMED && plan.eligibleAt().equals(event.scheduledAt())
                     && !now.isBefore(plan.eligibleAt()) && now.isBefore(plan.pickupAt());
                 case "PREPARATION_OVERDUE" -> order.getOrderStatus() == OrderStatus.CONFIRMED && plan.pickupAt().equals(event.scheduledAt())
-                    && !now.isBefore(plan.pickupAt()) && now.isBefore(plan.pickupAt().plusDays(1));
+                    && !now.isBefore(plan.pickupAt()) && (properties.isRecurringPreparationReminders() || now.isBefore(plan.pickupAt().plusDays(1)));
                 case "READY_OVERDUE" -> order.getOrderStatus() == OrderStatus.PREPARING && plan.pickupAt().equals(event.scheduledAt())
                     && !now.isBefore(plan.pickupAt()) && now.isBefore(plan.pickupAt().plusDays(1));
                 default -> false;

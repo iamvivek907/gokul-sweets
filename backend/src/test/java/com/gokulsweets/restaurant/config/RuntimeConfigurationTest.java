@@ -22,11 +22,15 @@ class RuntimeConfigurationTest {
                 .filter(key -> key.startsWith("gokul.features."))
                 .filter(key -> !key.endsWith("future-ordering-days"))
                 .filter(key -> !key.endsWith("branch-experience"))
+                .filter(key -> !List.of("gokul.features.simplified-checkout", "gokul.features.bilingual-storefront", "gokul.features.admin-preparation-board").contains(key))
                 .toList();
         assertThat(properties.getProperty("gokul.notifications.staff.email-enabled")).endsWith(":true}");
         assertThat(enabledFeatures).hasSizeGreaterThan(30);
         for (var feature : enabledFeatures) {
             assertThat(properties.getProperty(feature)).endsWith(":true}");
+        }
+        for (var feature : List.of("simplified-checkout", "bilingual-storefront", "admin-preparation-board")) {
+            assertThat(properties.getProperty("gokul.features." + feature)).endsWith(":false}");
         }
         assertThat(properties.getProperty("gokul.features.customer-account-hub")).endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":true}");

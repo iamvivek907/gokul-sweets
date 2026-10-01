@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {useEffect, useState} from "react";
 import {useRouter} from "next/navigation";
@@ -49,19 +50,19 @@ export default function BranchConflictReview({branchId, items, removeItem, clear
 
     const unavailable = result?.preview.lines.filter(line => !line.orderable) ?? [];
     return <section aria-label="Review cart for selected branch" className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm">
-        <h2 className="font-bold">Review items for this branch</h2>
-        <p className="mt-1">Your original cart is saved. Checkout is paused until you confirm the items for this branch.</p>
-        {!result && !error && <p role="status" className="mt-2">Checking menu and stock...</p>}
+        <h2 className="font-bold"><T text="Review items for this branch" /></h2>
+        <p className="mt-1"><T text="Your original cart is saved. Checkout is paused until you confirm the items for this branch." /></p>
+        {!result && !error && <p role="status" className="mt-2"><T text="Checking menu and stock..." /></p>}
         {result && <ul className="mt-3 space-y-2">{result.preview.lines.map(line =>
             <li key={line.item.product.id} className="rounded-lg bg-white p-3">
                 <strong>{line.item.product.name}</strong> — {line.orderable ? "Available" : line.reason ?? "Unavailable"}
-                {!line.orderable && <button type="button" className="ml-3 font-bold text-[#7a1625] underline" onClick={() => removeItem(line.item.product.id)}>Remove</button>}
+                {!line.orderable && <button type="button" className="ml-3 font-bold text-[#7a1625] underline" onClick={() => removeItem(line.item.product.id)}><T text="Remove" /></button>}
             </li>)}</ul>}
-        {result?.preview.availableSlots === 0 && <p className="mt-2 font-semibold">No pickup time has capacity for this date. Choose another date.</p>}
+        {result?.preview.availableSlots === 0 && <p className="mt-2 font-semibold"><T text="No pickup time has capacity for this date. Choose another date." /></p>}
         {error && <p role="alert" className="mt-2 text-red-700">{error}</p>}
         <div className="mt-4 flex flex-wrap gap-4">
             {result && result.preview.lines.some(line => line.orderable) && <button type="button" disabled={busy || result.preview.availableSlots === 0} onClick={() => void applyAvailableItems()} className="min-h-11 rounded-lg bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-50">{unavailable.length ? "Use available items" : "Confirm this branch"}</button>}
-            {result && unavailable.length === result.preview.lines.length && <button type="button" onClick={() => {if (window.confirm("Clear the original cart and browse this branch's menu?")) {clearCart(); router.push("/menu");}}} className="min-h-11 font-bold text-[#7a1625] underline">Clear cart and choose again</button>}
+            {result && unavailable.length === result.preview.lines.length && <button type="button" onClick={() => {if (window.confirm("Clear the original cart and browse this branch's menu?")) {clearCart(); router.push("/menu");}}} className="min-h-11 font-bold text-[#7a1625] underline"><T text="Clear cart and choose again" /></button>}
         </div>
     </section>;
 }

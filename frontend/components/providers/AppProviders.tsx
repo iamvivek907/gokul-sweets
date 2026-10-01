@@ -1,4 +1,5 @@
 "use client";
+import {LanguageRuntime} from "@/lib/language";
 
 import type {
     ReactNode
@@ -24,6 +25,7 @@ export default function AppProviders({
 
     return (
         <>
+            <LanguageRuntime />
             <ServiceWorkerRegistration />
 
             <OfflineBanner />

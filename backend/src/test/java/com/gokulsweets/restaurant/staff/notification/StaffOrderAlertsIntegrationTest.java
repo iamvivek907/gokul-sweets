@@ -240,4 +240,22 @@ class StaffOrderAlertsIntegrationTest {
             jdbc.update("DELETE FROM branches WHERE id IN (?, ?)", branch, otherBranch);
         });
     }
+    @Autowired StaffAlertProperties reminderProperties;
+    @Test void recurringDueNotificationsDeduplicateAndStopAfterPreparationStarts() {
+        reminderProperties.setRecurringPreparationReminders(true);
+        reminderProperties.setRepeatMinutes(2);
+        try {
+            doReturn(LocalDateTime.of(2026,10,1,17,0)).when(alerts).now();
+            alerts.generateReminders();alerts.generateReminders();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_order_alerts WHERE order_id=? AND kind='PREPARATION_DUE'",Long.class,order)).isEqualTo(1);
+            doReturn(LocalDateTime.of(2026,10,1,17,2)).when(alerts).now();
+            alerts.generateReminders();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_order_alerts WHERE order_id=? AND kind='PREPARATION_DUE'",Long.class,order)).isEqualTo(2);
+            doReturn(LocalDateTime.of(2026,10,3,18,0)).when(alerts).now();alerts.generateReminders();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_order_alerts WHERE order_id=? AND kind='PREPARATION_OVERDUE'",Long.class,order)).isEqualTo(1);
+            jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?",order);entities.clear();
+            doReturn(LocalDateTime.of(2026,10,1,17,4)).when(alerts).now();alerts.generateReminders();
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_order_alerts WHERE order_id=? AND kind='PREPARATION_DUE'",Long.class,order)).isEqualTo(2);
+        } finally {reminderProperties.setRecurringPreparationReminders(false);}
+    }
 }

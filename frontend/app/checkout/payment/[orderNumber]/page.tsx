@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
 
 import {
@@ -276,6 +277,7 @@ const paymentInitializationPromises =
  */
 
 export default function PaymentPage() {
+    const translate = useTranslation();
     const {features, error: configurationError} = useStorefrontConfiguration();
     const paidCartRecovery = features?.paidCartRecovery;
     const paymentPollingV2 = features?.paymentPollingV2 === true;
@@ -1554,8 +1556,7 @@ export default function PaymentPage() {
                                 text-[#241715]
                             "
                         >
-                            Preparing secure payment...
-                        </p>
+                            <T text="Preparing secure payment..." /></p>
 
 
                         <p
@@ -1566,9 +1567,7 @@ export default function PaymentPage() {
                                 text-[#756763]
                             "
                         >
-                            We are checking the latest order
-                            and payment status with the backend.
-                        </p>
+                            <T text="We are checking the latest order and payment status with the backend." /></p>
 
                     </div>
 
@@ -1630,8 +1629,7 @@ export default function PaymentPage() {
                                 text-[#241715]
                             "
                         >
-                            Payment could not be prepared
-                        </h1>
+                            <T text="Payment could not be prepared" /></h1>
 
 
                         <p
@@ -1642,8 +1640,7 @@ export default function PaymentPage() {
                                 text-[#756763]
                             "
                         >
-                            Your cart has not been cleared.
-                        </p>
+                            <T text="Your cart has not been cleared." /></p>
 
 
                         {
@@ -1669,7 +1666,7 @@ export default function PaymentPage() {
                                             text-red-700
                                         "
                                     >
-                                        {error}
+                                        {translate(error)}
                                     </p>
 
                                 </div>
@@ -1699,8 +1696,7 @@ export default function PaymentPage() {
                                 text-[#241715]
                             "
                         >
-                            Check My Orders
-                        </button>
+                            <T text="Check My Orders" /></button>
 
 
                         <button
@@ -1720,8 +1716,7 @@ export default function PaymentPage() {
                                 text-[#7a1625]
                             "
                         >
-                            Return to Cart
-                        </button>
+                            <T text="Return to Cart" /></button>
 
                     </div>
 
@@ -1828,8 +1823,7 @@ export default function PaymentPage() {
                             text-[#c88a20]
                         "
                     >
-                        Secure checkout
-                    </p>
+                        <T text="Secure checkout" /></p>
 
 
                     <h1
@@ -1841,8 +1835,7 @@ export default function PaymentPage() {
                             text-[#241715]
                         "
                     >
-                        Payment
-                    </h1>
+                        <T text="Payment" /></h1>
 
 
                     <p
@@ -1853,7 +1846,7 @@ export default function PaymentPage() {
                             text-[#756763]
                         "
                     >
-                        Order{" "}
+                        <T text="Order" />{" "}
                         <span
                             className="
                                 font-semibold
@@ -1891,9 +1884,7 @@ export default function PaymentPage() {
                                     text-amber-800
                                 "
                             >
-                                Your cart changed after this
-                                payment was prepared.
-                            </p>
+                                <T text="Your cart changed after this payment was prepared." /></p>
 
 
                             <p
@@ -1904,11 +1895,7 @@ export default function PaymentPage() {
                                     text-amber-700
                                 "
                             >
-                                Do not pay this stale checkout.
-                                Return to the cart and continue
-                                checkout so the backend can
-                                validate the current items.
-                            </p>
+                                <T text="Do not pay this stale checkout. Return to the cart and continue checkout so the backend can validate the current items." /></p>
 
                         </div>
 
@@ -1938,8 +1925,7 @@ export default function PaymentPage() {
                                     text-blue-800
                                 "
                             >
-                                Existing PhonePe payment found
-                            </p>
+                                <T text="Existing PhonePe payment found" /></p>
 
 
                             <p
@@ -1950,13 +1936,7 @@ export default function PaymentPage() {
                                     text-blue-700
                                 "
                             >
-                                We recovered the payment from the
-                                backend. The browser no longer has
-                                the original checkout link, so we
-                                will continue checking the existing
-                                PhonePe payment instead of creating
-                                a duplicate payment.
-                            </p>
+                                <T text="We recovered the payment from the backend. The browser no longer has the original checkout link, so we will continue checking the existing PhonePe payment instead of creating a duplicate payment." /></p>
 
                         </div>
 
@@ -2013,8 +1993,7 @@ export default function PaymentPage() {
                                             text-amber-900
                                         "
                                     >
-                                        Refund in progress
-                                    </h2>
+                                        <T text="Refund in progress" /></h2>
 
 
                                     <p
@@ -2050,10 +2029,7 @@ export default function PaymentPage() {
                                             text-amber-700
                                         "
                                     >
-                                        This page checks our backend
-                                        automatically. You can also
-                                        check again manually.
-                                    </p>
+                                        <T text="This page checks our backend automatically. You can also check again manually." /></p>
 
                                 </div>
 
@@ -2097,8 +2073,7 @@ export default function PaymentPage() {
                                     text-green-800
                                 "
                             >
-                                Refund completed
-                            </h2>
+                                <T text="Refund completed" /></h2>
 
 
                             <p
@@ -2161,8 +2136,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Refund needs attention
-                            </h2>
+                                <T text="Refund needs attention" /></h2>
 
 
                             <p
@@ -2173,10 +2147,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The automatic refund did not reach
-                                a successful final state. Your old
-                                order has not been restored and no
-                                {deliveryOrder ? "rider window" : "pickup slot"} has been re-reserved.
+                                <T text="The automatic refund did not reach a successful final state. Your old order has not been restored and no" />{deliveryOrder ? "rider window" : "pickup slot"} has been re-reserved.
                             </p>
 
 
@@ -2188,8 +2159,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Please keep this order number for
-                                support: {orderNumber}
+                                <T text="Please keep this order number for support:" />{orderNumber}
                             </p>
 
                         </div>
@@ -2230,8 +2200,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Payment failed
-                            </h2>
+                                <T text="Payment failed" /></h2>
 
 
                             <p
@@ -2242,10 +2211,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The order is no longer holding its
-                                {deliveryOrder ? "delivery reservation" : "pickup reservation"}. Your cart is
-                                still available.
-                            </p>
+                                <T text="The order is no longer holding its" />{deliveryOrder ? "delivery reservation" : "pickup reservation"}<T text=". Your cart is still available." /></p>
 
 
                             <p
@@ -2256,11 +2222,7 @@ export default function PaymentPage() {
                                     text-red-600
                                 "
                             >
-                                If the payment provider later reports that money
-                                was actually captured, the backend
-                                automatically starts the refund
-                                reconciliation flow.
-                            </p>
+                                <T text="If the payment provider later reports that money was actually captured, the backend automatically starts the refund reconciliation flow." /></p>
 
                         </div>
 
@@ -2300,8 +2262,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Payment time expired
-                            </h2>
+                                <T text="Payment time expired" /></h2>
 
 
                             <p
@@ -2312,9 +2273,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The old {deliveryOrder ? "delivery" : "pickup"} reservation has been
-                                released. Your cart is still safe,
-                                so you can choose a new {deliveryOrder ? "rider window" : "pickup slot"}.
+                                The old {deliveryOrder ? "delivery" : "pickup"} <T text="reservation has been released. Your cart is still safe, so you can choose a new" />{deliveryOrder ? "rider window" : "pickup slot"}.
                             </p>
 
 
@@ -2326,12 +2285,7 @@ export default function PaymentPage() {
                                     text-red-600
                                 "
                             >
-                                If the payment provider later reports a captured
-                                payment, the backend will move it
-                                into automatic refund reconciliation
-                                instead of confirming this expired
-                                order.
-                            </p>
+                                <T text="If the payment provider later reports a captured payment, the backend will move it into automatic refund reconciliation instead of confirming this expired order." /></p>
 
                         </div>
 
@@ -2370,8 +2324,7 @@ export default function PaymentPage() {
                                     text-[#c88a20]
                                 "
                             >
-                                Amount
-                            </p>
+                                <T text="Amount" /></p>
 
 
                             <p
@@ -2443,8 +2396,7 @@ export default function PaymentPage() {
                                     text-[#756763]
                                 "
                             >
-                                Payment status
-                            </span>
+                                <T text="Payment status" /></span>
 
 
                             <span
@@ -2485,8 +2437,7 @@ export default function PaymentPage() {
                                     text-[#756763]
                                 "
                             >
-                                Payment ID
-                            </span>
+                                <T text="Payment ID" /></span>
 
 
                             <span
@@ -2523,8 +2474,7 @@ export default function PaymentPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Provider transaction
-                                    </span>
+                                        <T text="Provider transaction" /></span>
 
 
                                     <span
@@ -2569,8 +2519,7 @@ export default function PaymentPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Payment deadline
-                                    </span>
+                                        <T text="Payment deadline" /></span>
 
 
                                     <span
@@ -2620,7 +2569,7 @@ export default function PaymentPage() {
                                     {
                                         phonePeStatusOnly
                                             ? "Your existing PhonePe payment is being checked."
-                                            : "Closing the payment window does not cancel your order immediately."
+                                            : translate("Closing the payment window does not cancel your order immediately.")
                                     }
                                 </p>
 
@@ -2639,7 +2588,7 @@ export default function PaymentPage() {
                                                 ? "A payment attempt already exists. If you paid on another device, choose Check Payment Status below."
                                                 : "This payment is still being checked. You can safely leave and return to this order.")
                                             : (paymentPollingV2 && !gatewayOpened
-                                                ? "Ready when you are. Tap Pay to open secure checkout."
+                                                ? translate("Ready when you are. Tap Pay to open secure checkout.")
                                                 : "You can safely leave this page and return later. We'll show your order once the payment is confirmed.")
                                     }
                                 </p>
@@ -2692,7 +2641,7 @@ export default function PaymentPage() {
                                 {
                                     openingPayment
                                         ? "Opening payment..."
-                                        : `${gatewayOpened ? "Retry payment" : "Pay"} ${formatCurrency(
+                                        : `${gatewayOpened ? translate("Retry payment") : translate("Pay")} ${formatCurrency(
                                             payment.amount
                                         )}`
                                 }
@@ -2701,21 +2650,19 @@ export default function PaymentPage() {
                         )
                     }
 
-                    <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={error} onCancel={cancelCheckout}/>
-                    {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm">Payable amount includes a convenience fee of {formatCurrency(feeBreakdown.fee)} (including {formatCurrency(feeBreakdown.tax)} fee tax).</p>}
+                    <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout}/>
+                    {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm"><T text="Payable amount includes a convenience fee of" />{formatCurrency(feeBreakdown.fee)} <T text="(including" />{formatCurrency(feeBreakdown.tax)} <T text="fee tax)." /></p>}
                     {(isPending || isFailed || isExpired) && <section aria-label="Payment recovery" className="mt-4 rounded-2xl border border-[#c4d4c9] bg-[#fffaf2] p-4 text-[#173c39]">
-                        <p className="font-bold">{isPending ? "Need to stop this checkout?" : "Your cart is ready to try again"}</p>
-                        <p className="mt-1 text-sm leading-6">Check payment and release the unpaid pickup reservation. Keep your items for another attempt.</p>
-                        {confirmCancel ? <div className="mt-3"><p className="text-sm">Close the gateway first. A payment received after cancellation enters the refund process.</p>
-                            <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={()=>void cancelCheckout()} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white disabled:opacity-50">{cancelling ? "Checking payment…" : "Cancel order & keep cart"}</button>
-                            <button type="button" disabled={cancelling} onClick={()=>setConfirmCancel(false)} className="min-h-11 rounded-xl border px-4 font-bold">Continue payment</button></div></div>
-                            : <button type="button" disabled={openingPayment || refreshing} onClick={()=>setConfirmCancel(true)} className="mt-3 min-h-11 rounded-xl border border-[#c4d4c9] bg-white px-4 font-bold">{isPending ? "Cancel this order" : "Check & retry checkout"}</button>}
+                        <p className="font-bold">{isPending ? translate("Need to stop this checkout?") : "Your cart is ready to try again"}</p>
+                        <p className="mt-1 text-sm leading-6"><T text="Check payment and release the unpaid pickup reservation. Keep your items for another attempt." /></p>
+                        {confirmCancel ? <div className="mt-3"><p className="text-sm"><T text="Close the gateway first. A payment received after cancellation enters the refund process." /></p>
+                            <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={()=>void cancelCheckout()} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white disabled:opacity-50">{cancelling ? translate("Checking payment…") : translate("Cancel order & keep cart")}</button>
+                            <button type="button" disabled={cancelling} onClick={()=>setConfirmCancel(false)} className="min-h-11 rounded-xl border px-4 font-bold"><T text="Continue payment" /></button></div></div>
+                            : <button type="button" disabled={openingPayment || refreshing} onClick={()=>setConfirmCancel(true)} className="mt-3 min-h-11 rounded-xl border border-[#c4d4c9] bg-white px-4 font-bold">{isPending ? translate("Cancel this order") : translate("Check & retry checkout")}</button>}
                     </section>}
                     {paymentPollingV2 && isPending && paymentDeadlineReached &&
                         <p role="status" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                            This payment window has closed. Please check its status before starting a new checkout.
-                            If you paid, it may take a little longer to confirm.
-                        </p>}
+                            <T text="This payment window has closed. Please check its status before starting a new checkout. If you paid, it may take a little longer to confirm." /></p>}
 
                     {paymentPollingV2 && pollingNotice && isPending &&
                         <p role="status" className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
@@ -2772,7 +2719,7 @@ export default function PaymentPage() {
                                         ? "Checking latest status..."
                                         : isRefundPending
                                             ? "Check Refund Status"
-                                            : "Check Payment Status"
+                                            : translate("Check Payment Status")
                                 }
                             </button>
 
@@ -2846,8 +2793,7 @@ export default function PaymentPage() {
                                     text-[#7a1625]
                                 "
                             >
-                                View Order Details
-                            </button>
+                                <T text="View Order Details" /></button>
 
                         )
                     }
@@ -2876,8 +2822,7 @@ export default function PaymentPage() {
                                     text-white
                                 "
                             >
-                                Return to Cart
-                            </button>
+                                <T text="Return to Cart" /></button>
 
                         )
                     }
@@ -2905,8 +2850,7 @@ export default function PaymentPage() {
                                         text-red-800
                                     "
                                 >
-                                    Do not retry the old payment.
-                                </p>
+                                    <T text="Do not retry the old payment." /></p>
 
 
                                 <p
@@ -2952,7 +2896,7 @@ export default function PaymentPage() {
                                         text-red-700
                                     "
                                 >
-                                    {error}
+                                    {translate(error)}
                                 </p>
 
                             </div>
@@ -2972,12 +2916,7 @@ export default function PaymentPage() {
                         text-[#756763]
                     "
                 >
-                    Your order is confirmed only after
-                    our backend verifies a successful
-                    payment. Closing or going back
-                    from the payment window does not directly cancel
-                    the order.
-                </p>
+                    <T text="Your order is confirmed only after our backend verifies a successful payment. Closing or going back from the payment window does not directly cancel the order." /></p>
 
             </section>
 

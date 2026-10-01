@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useState
@@ -59,7 +60,9 @@ export default function CustomerDetailsForm({
     verifiedPhone,
     onSubmit
 }: CustomerDetailsFormProps) {
+    const translate = useTranslation();
 
+    const [continuing,setContinuing]=useState(false);
     const [
         name,
         setName
@@ -94,10 +97,11 @@ export default function CustomerDetailsForm({
     ) {
 
         event.preventDefault();
+        if(continuing)return;
 
 
         const normalizedName =
-            name.trim();
+            name.trim() || (verifiedPhone ? "GOKUL_GUEST" : "");
 
 
         const normalizedPhone =
@@ -145,6 +149,7 @@ export default function CustomerDetailsForm({
         }
 
 
+        setContinuing(true);
         onSubmit(
             {
                 name:
@@ -178,8 +183,7 @@ export default function CustomerDetailsForm({
                         text-[#241715]
                     "
                 >
-                    Your name
-                </label>
+                    <T text="Your name" /></label>
 
 
                 <input
@@ -195,7 +199,7 @@ export default function CustomerDetailsForm({
                             )
                     }
                     autoComplete="name"
-                    placeholder="Enter your name"
+                    placeholder={translate("Enter your name")}
                     className="
                         mt-2
                         min-h-12
@@ -251,8 +255,7 @@ export default function CustomerDetailsForm({
                         text-[#241715]
                     "
                 >
-                    Mobile number
-                </label>
+                    <T text="Mobile number" /></label>
 
 
                 <div
@@ -314,7 +317,7 @@ export default function CustomerDetailsForm({
                             }
                         }
                         autoComplete="tel"
-                        placeholder="Enter 10-digit mobile number"
+                        placeholder={translate("Enter 10-digit mobile number")}
                         className="
                             min-h-12
                             min-w-0
@@ -358,7 +361,7 @@ export default function CustomerDetailsForm({
                         text-[#756763]
                     "
                 >
-                    {verifiedPhone ? "Your verified number is used for order updates and pickup identification." : "We’ll use this number for order updates and pickup identification."}
+                    {verifiedPhone ? translate("Your verified number is used for order updates and pickup identification.") : translate("We’ll use this number for order updates and pickup identification.")}
                 </p>
 
             </div>
@@ -366,6 +369,7 @@ export default function CustomerDetailsForm({
 
             <button
                 type="submit"
+                disabled={continuing}
                 className="
                     flex
                     min-h-12
@@ -381,8 +385,7 @@ export default function CustomerDetailsForm({
                     active:scale-[0.98]
                 "
             >
-                Continue to Review
-            </button>
+                {continuing?translate("Opening…"):<T text="Continue to Review" />}</button>
 
         </form>
     );

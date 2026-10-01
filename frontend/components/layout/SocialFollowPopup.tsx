@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {
     useEffect,
@@ -174,8 +175,7 @@ export default function SocialFollowPopup() {
                         text-[#c88a20]
                     "
                 >
-                    Stay connected
-                </p>
+                    <T text="Stay connected" /></p>
 
 
                 <h2
@@ -189,8 +189,7 @@ export default function SocialFollowPopup() {
                         text-[#241715]
                     "
                 >
-                    Follow Gokul Sweets
-                </h2>
+                    <T text="Follow Gokul Sweets" /></h2>
 
 
                 <p
@@ -201,9 +200,7 @@ export default function SocialFollowPopup() {
                         text-[#756763]
                     "
                 >
-                    See new sweets, festive specials and
-                    shop updates on our social pages.
-                </p>
+                    <T text="See new sweets, festive specials and shop updates on our social pages." /></p>
 
 
                 <div
@@ -305,8 +302,7 @@ export default function SocialFollowPopup() {
                         hover:text-[#241715]
                     "
                 >
-                    Not now
-                </button>
+                    <T text="Not now" /></button>
 
             </div>
 
