@@ -641,6 +641,52 @@ class OccasionCommitmentIntegrationTest {
         }finally{features.setOccasionEnquiries(enabled);}
     }
 
+    @Test
+    void taxDisabledOccasionQuoteKeepsZeroRatesThroughApprovalAndPacking() {
+        boolean bulk=features.isOccasionBulkProduction(), enabled=features.isOccasionEnquiries();
+        try {
+            features.setOccasionBulkProduction(true);features.setOccasionEnquiries(true);
+            var f=paidDeposit();
+            jdbc.update("UPDATE occasion_enquiries SET status='REQUESTED',paid_amount=0 WHERE id=?",f.enquiry());
+            var rates=java.util.List.of(new OccasionQuoteCalculator.Rate(f.product(),null,null,null));
+            var input=new OccasionQuoteCalculator.Input(rates,new BigDecimal("25"),null,true,
+                java.time.LocalTime.of(10,0),"Final invoice after packing",true,java.util.List.of(),null);
+            jdbc.update("UPDATE tax_collection_settings SET enabled=true WHERE id=1");
+            assertThat(calculator.preview(ConsentEnvironment.DEV,f.branch(),f.enquiry(),input).foodTax()).isEqualByComparingTo("50");
+            jdbc.update("UPDATE tax_collection_settings SET enabled=false WHERE id=1");
+            var preview=calculator.preview(ConsentEnvironment.DEV,f.branch(),f.enquiry(),input);
+            assertThat(preview.foodTax()).isEqualByComparingTo("0");
+            assertThat(preview.total()).isEqualByComparingTo("1000");
+            assertThat(preview.deposit()).isEqualByComparingTo("250");
+            assertThat(preview.balance()).isEqualByComparingTo("750");
+            assertThat(preview.lines().getFirst().cgstRate()).isEqualByComparingTo("0");
+            assertThat(preview.lines().getFirst().sgstRate()).isEqualByComparingTo("0");
+            var accepted=new OccasionQuoteCalculator.Input(rates,new BigDecimal("25"),null,true,
+                java.time.LocalTime.of(10,0),input.terms(),true,java.util.List.of(),preview.total());
+            jdbc.update("UPDATE tax_collection_settings SET enabled=true WHERE id=1");
+            assertThatThrownBy(()->calculator.approve(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",accepted)).hasMessageContaining("review");
+            jdbc.update("UPDATE tax_collection_settings SET enabled=false WHERE id=1");
+            var approved=calculator.approve(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",accepted);
+            assertThat(approved.quotedAmount()).isEqualByComparingTo("1000");
+            assertThat(approved.pricedLines().getFirst().taxAmount()).isEqualByComparingTo("0");
+            assertThat(approved.calculation().foodTax()).isEqualByComparingTo("0");
+            // A later owner setting or product tax edit cannot change an accepted quote's frozen rates.
+            jdbc.update("UPDATE tax_collection_settings SET enabled=true WHERE id=1");
+            jdbc.update("UPDATE tax_categories SET cgst_rate=9,sgst_rate=9 WHERE id=(SELECT tax_category_id FROM products WHERE id=?)",f.product());
+            jdbc.update("UPDATE occasion_enquiries SET status='PAID',paid_amount=deposit_amount WHERE id=?",f.enquiry());
+            jdbc.update("UPDATE occasion_production_allocations SET state='COMMITTED' WHERE enquiry_id=?",f.enquiry());
+            var today=LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+            jdbc.update("UPDATE occasion_enquiries SET service_date=? WHERE id=?",Date.valueOf(today),f.enquiry());
+            jdbc.update("UPDATE pickup_slots SET slot_date=?,start_time='23:00',end_time='23:59:59' WHERE id=?",Date.valueOf(today),approved.pickupSlotId());
+            var finalized=packing.finalizePacking(ConsentEnvironment.DEV,f.branch(),f.enquiry(),"manager",
+                new OccasionPackingFinalizer.Input(java.util.List.of(new OccasionPackingFinalizer.Packed(f.product(),new BigDecimal("10"))),0,true));
+            assertThat(finalized.quotedAmount()).isEqualByComparingTo("1000");
+            assertThat(finalized.calculation().foodTax()).isEqualByComparingTo("0");
+            assertThat(finalized.pricedLines().getFirst().taxAmount()).isEqualByComparingTo("0");
+            assertThat(jdbc.queryForObject("SELECT cgst_rate FROM tax_categories WHERE id=(SELECT tax_category_id FROM products WHERE id=?)",BigDecimal.class,f.product())).isEqualByComparingTo("9");
+        } finally {features.setOccasionBulkProduction(bulk);features.setOccasionEnquiries(enabled);}
+    }
+
     private Fixture paidDeposit() {
         UUID suffix = UUID.randomUUID();
         long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Occasion test') RETURNING id",

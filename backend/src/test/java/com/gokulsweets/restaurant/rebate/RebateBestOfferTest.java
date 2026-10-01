@@ -57,4 +57,16 @@ class RebateBestOfferTest {
         assertThatThrownBy(() -> service.applyBest("TEST")).isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(eligibility,rebates);
     }
+    @Test void choosesLowestPayableFromMultipleEligibleOffers() {
+        var order=order("115"); var best=offer("30","85");
+        var smaller=new AvailableRebateResponse(2L,"SMALL","Small offer",null,RebateScope.GENERAL,RebateType.FIXED_AMOUNT,
+                new BigDecimal("10"),new BigDecimal("105"),null,null,null,null,null);
+        when(eligibility.getAvailableRebates("TEST")).thenReturn(List.of(smaller,best));
+        when(eligibility.getEligibleRebate(order,"BEST")).thenReturn(best);
+        var rebate=new Rebate();rebate.setId(1L);rebate.setCode("BEST");rebate.setName("Best offer");
+        when(rebates.findById(1L)).thenReturn(Optional.of(rebate));
+        var result=service.applyBest("TEST");
+        assertThat(result.rebateCode()).isEqualTo("BEST");assertThat(result.totalAmount()).isEqualByComparingTo("85");
+        verify(eligibility,never()).getEligibleRebate(order,"SMALL");
+    }
 }

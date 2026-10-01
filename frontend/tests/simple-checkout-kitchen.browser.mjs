@@ -28,7 +28,8 @@ for(const width of [1280,390]){
    quoteCalls++;assert.equal(req.postDataJSON().customerName,'GOKUL_GUEST');assert.equal(req.postDataJSON().customerPhone,'9876543210');await new Promise(resolve=>setTimeout(resolve,500));
    json={token:'test',items:[],subtotal:'200',taxAmount:'0',priorityCharge:'0',convenienceFee:'0',convenienceFeeTax:'0',totalAmount:'200',currency:'INR',expiresAt:new Date(now.getTime()+300000).toISOString()};
   }else if(p==='/api/orders'&&req.method()==='POST'){mutations++;assert.equal(req.postDataJSON().customerName,'GOKUL_GUEST');json={id:11,orderNumber:'TEST-CHECKOUT',orderStatus:'PENDING_PAYMENT',branchId:1,pickupSlotId:1,totalAmount:200,reservationExpiresAt:`${date}T23:59:00`,createdAt:`${date}T12:00:00`};}
-  else if(p==='/api/orders/TEST-CHECKOUT/rebate/best'){bestOffers++;assert.equal(req.method(),'POST');await new Promise(resolve=>setTimeout(resolve,500));json={orderNumber:'TEST-CHECKOUT',rebateCode:'BEST',rebateName:'Best offer',rebateAmount:20,amountBeforeRebate:200,totalAmount:180};}
+  else if(p==='/api/orders/TEST-CHECKOUT/rebate/best'){bestOffers++;assert.equal(req.method(),'POST');await new Promise(resolve=>setTimeout(resolve,500));if(width===390)return route.fulfill({status:503,json:{message:'Offer service unavailable'},headers});json={orderNumber:'TEST-CHECKOUT',rebateCode:'BEST',rebateName:'Best offer',rebateAmount:20,amountBeforeRebate:200,totalAmount:180};}
+  else if(p==='/api/orders/TEST-CHECKOUT')json={id:11,orderNumber:'TEST-CHECKOUT',orderStatus:'PENDING_PAYMENT',paymentStatus:null,branchId:1,branchName:branch.name,pickupSlotId:1,pickupDate:date,pickupStartTime:slot.startTime,pickupEndTime:slot.endTime,pickupType:'NORMAL',customerName:'GOKUL_GUEST',customerPhone:'9876543210',subtotal:200,taxAmount:0,priorityCharge:0,totalAmount:width===390?200:180,reservationExpiresAt:`${date}T23:59:00`,items:[{id:1,productId:1,productName:product.name,saleMode:'UNIT',quantity:2,weightGrams:null,unitPrice:100,taxRate:0,taxAmount:0,lineTotal:200}]};
   else if(p==='/api/payments'){mutations++;json={};}
   else if(p==='/api/admin/auth/me')return route.fulfill({json:{staffId:1,username:'test',fullName:'Test staff',roleName:width===1280?'OWNER_ADMIN':'KITCHEN_STAFF',branchIds:[1],permissions:['ORDER_VIEW','ORDER_START_PREPARATION','ORDER_MARK_READY']},headers:{...headers,'X-Staff-CSRF':'test-csrf','Access-Control-Expose-Headers':'X-Staff-CSRF'}});
   else if(p==='/api/admin/orders/planning'){
@@ -63,9 +64,16 @@ for(const width of [1280,390]){
  if(visual)assert.equal(await page.locator('.checkout-experience-head').getByRole('button',{name:'Change branch',exact:true}).evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)','branch switch stays legible on the dark checkout header');
  // One deliberate reserve action applies the best offer and opens payment without a second price confirmation.
  await page.getByRole('button',{name:'Continue to payment',exact:true}).filter({visible:true}).first().click();
+ if(width===390){
+  await page.getByText('Your pickup is reserved. Choose an offer below or continue to payment.',{exact:true}).waitFor();
+  assert.match(page.url(),/checkout\/review$/);assert.equal(mutations,1);assert.equal(bestOffers,1);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),200);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
+  await page.getByRole('button',{name:/^Continue to [Pp]ayment$/,exact:true}).filter({visible:true}).first().click();
+ }
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT',{timeout:10000}).catch(async error=>{console.log(JSON.stringify({width,mutations,bestOffers,quoteCalls,url:page.url(),body:await page.locator('body').innerText(),pending:await page.evaluate(()=>localStorage.getItem('gokul-pending-order'))}));throw error;});
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT');assert.equal(mutations,1);assert.equal(bestOffers,1);
- assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),180);
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),width===390?200:180);
  await page.goto(`${base}/admin/orders`);await page.getByRole('heading',{name:'Plan, prepare, hand over'}).waitFor();
  await page.getByRole('button',{name:/Scheduled future/}).click();await page.waitForURL('**kitchen=SCHEDULED');await page.getByText('Scheduled future',{exact:true}).last().waitFor();assert.equal(await page.getByRole('checkbox',{name:'Select TEST-KITCHEN'}).count(),0);
  await page.reload();assert.match(page.url(),/kitchen=SCHEDULED/);await page.getByRole('heading',{name:'Plan, prepare, hand over'}).waitFor();
@@ -78,14 +86,21 @@ for(const width of [1280,390]){
  starts=0;readyMoves=0;await page.reload();await page.getByRole('button',{name:'Start preparation',exact:true}).waitFor();
  for(const phoneWidth of width===390?[320,390]:[1280]){await page.setViewportSize({width:phoneWidth,height:900});for(const locale of ['hi','en']){await chooseLanguage(page,locale);const header=page.locator('header').first();assert.equal(await header.evaluate(node=>{const r=node.getBoundingClientRect();return r.height<=80&&r.width<=innerWidth;}),true,`compact admin header at ${phoneWidth}px in ${locale}`);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}}
  const thumb=page.getByRole('button',{name:'Start preparation',exact:true}),rail=thumb.locator('..');
- const box=await thumb.boundingBox(),track=await rail.boundingBox();
- async function drag(dx,dy=0){await page.mouse.move(box.x+24,box.y+24);await page.mouse.down();await page.mouse.move(box.x+24+dx,box.y+24+dy,{steps:8});await page.mouse.up();}
+ async function drag(dx,dy=0){
+  // Confirmations and focus can scroll the page. Measure the current thumb for every gesture,
+  // after its reset animation, rather than reusing coordinates from before those interactions.
+  await thumb.scrollIntoViewIfNeeded();
+  await page.waitForFunction(node=>new DOMMatrixReadOnly(getComputedStyle(node).transform).m41===0,await thumb.elementHandle());
+  const box=await thumb.boundingBox(),track=await rail.boundingBox();
+  const distance=dx==='full'?track.width-56:dx;
+  await page.mouse.move(box.x+24,box.y+24);await page.mouse.down();await page.mouse.move(box.x+24+distance,box.y+24+dy,{steps:8});await page.mouse.up();
+ }
  await drag(30);await drag(30,90);assert.equal(starts,0,'short swipes and scroll gestures do not submit');
  await page.getByRole('button',{name:'Or tap to confirm',exact:true}).click();await page.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(starts,0);
  await thumb.focus();await page.keyboard.press('Enter');await page.getByRole('group',{name:'Confirm order action'}).waitFor();await page.getByRole('button',{name:'Cancel',exact:true}).click();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/kitchen-swipe-${width}.png`,fullPage:true});
- await drag(track.width-56);await page.getByText(/Preparation started. KOT created./).waitFor();assert.equal(starts,1,'full swipe sends exactly one start');
+ await drag('full');await page.getByText(/Preparation started. KOT created./).waitFor();assert.equal(starts,1,'full swipe sends exactly one start');
  const readyThumb=page.getByRole('button',{name:'Mark ready',exact:true});await readyThumb.waitFor();
  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/kitchen-ready-swipe-${width}.png`,fullPage:true});
  assert.deepEqual(errors,[]);

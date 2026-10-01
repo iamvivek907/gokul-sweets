@@ -677,7 +677,7 @@ Object.assign(hindi, {
   "Confirm": "हाँ, करें",
   "Cancel": "रहने दें",
   "Tax collection": "टैक्स लागू करें",
-  "Apply configured product tax to new pickup and delivery orders. Turning this off keeps the tax rates saved for later.": "नए ऑर्डर पर सेव की हुई टैक्स दरें लगाएँ। बंद करने पर दरें सेव रहेंगी, लेकिन नया टैक्स नहीं लगेगा।",
+  "Apply tax to new pickup, delivery, add-on and occasion bookings, including pickup convenience-fee tax. Turning this off keeps the tax rates saved for later.": "नए पिकअप, डिलीवरी, अतिरिक्त सामान और समारोह की बुकिंग पर टैक्स लगाएँ। इसमें पिकअप सुविधा शुल्क का टैक्स भी शामिल है। बंद करने पर नया टैक्स नहीं लगेगा, लेकिन दरें आगे के लिए सेव रहेंगी।",
   "Tax ON · tap to turn off": "टैक्स चालू · बंद करने के लिए दबाएँ",
   "Tax OFF · tap to turn on": "टैक्स बंद · चालू करने के लिए दबाएँ",
   "Existing paid orders and accepted occasion quotations are unchanged.": "पुराने भुगतान वाले ऑर्डर और मंज़ूर समारोह की कीमतें नहीं बदलेंगी।",

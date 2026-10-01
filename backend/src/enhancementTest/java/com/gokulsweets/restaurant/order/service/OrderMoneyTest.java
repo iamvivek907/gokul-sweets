@@ -54,7 +54,10 @@ class OrderMoneyTest {
         assertThat(order.taxAmount()).isZero();assertThat(order.convenienceFeeTax()).isZero();
         assertThat(order.convenienceFeeTaxRate()).isZero();
         assertThat(order.totalAmount()).isEqualByComparingTo("110.00");
-        org.mockito.Mockito.verify(settings).enabled();
+        var delivery=service.calculateDelivery(List.of(new ValidatedOrderItem(product,new BranchProduct(),ProductSaleMode.UNIT,1,null)));
+        assertThat(delivery.taxAmount()).isZero();assertThat(delivery.items().getFirst().taxRate()).isZero();
+        assertThat(delivery.totalAmount()).isEqualByComparingTo("100");
+        org.mockito.Mockito.verify(settings,org.mockito.Mockito.times(2)).enabled();
     }
 
 }

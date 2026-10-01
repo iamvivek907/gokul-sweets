@@ -21,6 +21,7 @@ public class OccasionQuoteCalculator {
     private final OccasionEnquiryService enquiries;
     private final Clock clock;
     private final com.gokulsweets.restaurant.config.EnhancementProperties features;
+    private final com.gokulsweets.restaurant.tax.TaxCollectionSettings taxCollection;
     private static final ZoneId IST=ZoneId.of("Asia/Kolkata");
     public record Rate(@Positive long productId,@DecimalMin("0.01") @Digits(integer=8,fraction=2) BigDecimal unitPrice,
                        @DecimalMin("0.001") @Digits(integer=6,fraction=3) BigDecimal pieceGrams, @DecimalMin("0.001") @Digits(integer=8,fraction=3) BigDecimal estimatedKg, @DecimalMin("0") @DecimalMax("99") BigDecimal rebatePercent) {
@@ -94,6 +95,7 @@ public class OccasionQuoteCalculator {
         for(Extra extra:extras) packaging=packaging.add(money(extra.priceIncludingTax().multiply(BigDecimal.valueOf(extra.quantity()))));
         if(input.estimated() && (request.fulfilment()!=OccasionEnquiryService.Fulfilment.PICKUP || input.depositPercent().compareTo(new BigDecimal("100"))>=0))
             invalid("Measured-at-packing estimates need pickup and a part advance, so the final balance can be reviewed before collection.");
+        boolean collectTax=taxCollection.enabled();
         List<Line> lines=new ArrayList<>(); BigDecimal base=BigDecimal.ZERO, tax=BigDecimal.ZERO;
         for(var source:sources) {
             Rate rate=input.rates().stream().filter(x->x.productId()==source.id()).findFirst().orElse(null);
@@ -118,10 +120,12 @@ public class OccasionQuoteCalculator {
             BigDecimal originalBase=money(price.multiply(source.weight()?production.movePointLeft(3):production));
             BigDecimal rebate=percent(rate.rebatePercent());
             BigDecimal foodBase=discounted(originalBase,rebate,bulkRebate);
-            BigDecimal foodTax=money(foodBase.multiply(source.cgst().add(source.sgst())).movePointLeft(2));
+            BigDecimal cgst=collectTax?source.cgst():BigDecimal.ZERO;
+            BigDecimal sgst=collectTax?source.sgst():BigDecimal.ZERO;
+            BigDecimal foodTax=money(foodBase.multiply(cgst.add(sgst)).movePointLeft(2));
             base=base.add(foodBase);tax=tax.add(foodTax);
             lines.add(new Line(source.id(),source.name(),source.weight()?"GRAM":"PIECE",source.quantity(),source.requestedUnit(),
-                price,piece,production,source.cgst(),source.sgst(),foodBase,foodTax,BigDecimal.ZERO.setScale(2),foodBase.add(foodTax),rebate,originalBase,originalBase.subtract(foodBase),source.supplementalGrams()));
+                price,piece,production,cgst,sgst,foodBase,foodTax,BigDecimal.ZERO.setScale(2),foodBase.add(foodTax),rebate,originalBase,originalBase.subtract(foodBase),source.supplementalGrams()));
         }
         BigDecimal foodTotal=base.add(tax);
         if(foodTotal.signum()<=0) invalid("Food total must be positive.");
