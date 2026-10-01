@@ -33,9 +33,13 @@ class DeliveryOrderPreparationServiceTest {
         var branches = mock(BranchRepository.class);
         var validation = mock(OrderValidationService.class);
         var calculation = new OrderCalculationService();
+        var taxSetting=mock(com.gokulsweets.restaurant.tax.TaxCollectionSettings.class);
+        when(taxSetting.enabled()).thenReturn(true,false);
+        calculation.setTaxSettings(taxSetting);
         var service = new DeliveryOrderPreparationService(flags, capacity, branches, validation, calculation, new DeliveryEconomicsService(flags, java.time.Clock.system(java.time.ZoneId.of("Asia/Kolkata"))));
         var branch = new Branch();
         branch.setId(7L);
+        branch.setOnlinePaymentFeeEnabled(true);branch.setOnlinePaymentFeeRate(new BigDecimal("2.00"));branch.setOnlinePaymentFeeTaxRate(new BigDecimal("18.00"));
         var product = new Product();
         product.setId(8L);
         product.setBasePrice(new BigDecimal("1000.00"));
@@ -63,7 +67,9 @@ class DeliveryOrderPreparationServiceTest {
         assertThat(prepared.price().subtotal()).isEqualByComparingTo("400.00");
         assertThat(prepared.price().taxAmount()).isEqualByComparingTo("20.00");
         assertThat(prepared.price().priorityCharge()).isEqualByComparingTo("0.00");
-        assertThat(prepared.price().totalAmount()).isEqualByComparingTo("420.00");
+        assertThat(prepared.price().totalAmount()).isEqualByComparingTo("428.40");
+        assertThat(prepared.price().paymentFeeTax()).isEqualByComparingTo("1.28");
+        verify(taxSetting,times(1)).enabled();
         assertThat(prepared.validated().pickupSlot()).isNull();
         assertThatThrownBy(() -> service.prepare(request, 26L)).hasMessageContaining("unavailable");
         verify(validation, times(1)).validateCart(7L, cart);

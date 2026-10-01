@@ -48,14 +48,16 @@ public class OrderCalculationService {
     }
 
     /** Delivery uses the same accepted branch prices, weights and taxes, with no pickup priority charge. */
-    public OrderCalculationResult calculateDelivery(List<ValidatedOrderItem> items) {
+    public boolean collectingTax() { return taxEnabled(); }
+    public OrderCalculationResult calculateDelivery(List<ValidatedOrderItem> items) { return calculateDelivery(items,taxEnabled()); }
+    public OrderCalculationResult calculateDelivery(List<ValidatedOrderItem> items,boolean collectTax) {
         if (items == null || items.isEmpty() || items.size() > 50)
             throw new IllegalArgumentException("Select between 1 and 50 delivery items.");
-        return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0,taxEnabled(),money(BigDecimal.ZERO));
+        return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0,collectTax,money(BigDecimal.ZERO));
     }
 
     public OrderCalculationResult withPaymentFee(OrderCalculationResult price,com.gokulsweets.restaurant.branch.Branch branch,BigDecimal extraBase) {return withPaymentFee(price,branch,extraBase,taxEnabled());}
-    private OrderCalculationResult withPaymentFee(OrderCalculationResult price,com.gokulsweets.restaurant.branch.Branch branch,BigDecimal extraBase,boolean collectTax) {
+    public OrderCalculationResult withPaymentFee(OrderCalculationResult price,com.gokulsweets.restaurant.branch.Branch branch,BigDecimal extraBase,boolean collectTax) {
         BigDecimal rate=money(branch.isOnlinePaymentFeeEnabled()?branch.getOnlinePaymentFeeRate():BigDecimal.ZERO);
         BigDecimal taxRate=money(collectTax?branch.getOnlinePaymentFeeTaxRate():BigDecimal.ZERO);
         BigDecimal paymentFee=PaymentFeePricing.fee(price.totalAmount().add(extraBase),rate);
