@@ -12,9 +12,6 @@ import {apiClient} from "@/services/apiClient";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
-import Link
-    from "next/link";
-
 import {
     useEffect,
     useMemo,

@@ -9,14 +9,14 @@ import styles from "./CheckoutAdjustmentDialog.module.css";
 
 export default function CheckoutAdjustmentDialog({items,pickup,branchId,days,message,onApply,onClose}:{items:CartItem[];pickup:PickupSelection;branchId:number;days:number;message?:string;onApply:(items:CartItem[],pickup:PickupSelection)=>Promise<void>;onClose:()=>void}) {
  const ref=useRef<HTMLDialogElement>(null),clock=usePickupClock();
- const [draft,setDraft]=useState(items),[selection,setSelection]=useState(pickup),[date,setDate]=useState(pickup.date),[slots,setSlots]=useState<CartAvailability|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false);
+ const [draft,setDraft]=useState(items),[selection,setSelection]=useState(pickup),[date,setDate]=useState(pickup.date),[slots,setSlots]=useState<CartAvailability|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[revision,setRevision]=useState(0);
  const today=indiaToday(new Date(clock)),max=new Date(`${today}T12:00:00+05:30`);max.setUTCDate(max.getUTCDate()+days);
  const key=JSON.stringify(availabilityItems(draft));
  useEffect(()=>{ref.current?.showModal();},[]);
  useEffect(()=>{if(!validPickupDate(date,today,days))return;const controller=new AbortController();
   checkCartAvailability(branchId,date,1,JSON.parse(key),controller.signal).then(result=>{if(!controller.signal.aborted)setSlots(result);}).catch(()=>{if(!controller.signal.aborted)setError("We couldn’t refresh available times. Retry the check before continuing.");});
   return ()=>controller.abort();
- },[branchId,date,today,days,key]);
+ },[branchId,date,today,days,key,revision]);
  async function apply(){if(busy)return;setError("");
   if(!draft.length){setError("Keep at least one item, or cancel your order using the order actions.");return;}
   if(!validPickupDate(date,today,days)||selection.date!==date||!pickupIsFresh(selection,new Date())){setError("Choose a current available pickup time.");return;}
@@ -31,6 +31,7 @@ export default function CheckoutAdjustmentDialog({items,pickup,branchId,days,mes
   <label>Pickup date<input type="date" min={today} max={indiaToday(max)} value={date} disabled={busy} onChange={event=>{const value=event.target.value;if(!validPickupDate(value,today,days)){setError("Choose a pickup date within the available India dates.");return;}setDate(value);setSlots(null);setError("");}}/></label>
   <label>Pickup time<select aria-label="Adjustment pickup time" disabled={busy} value={selection.date===date?String(selection.slot.id):""} onChange={event=>{const choice=slots?.dates.find(d=>d.date===date)?.slots.find(s=>String(s.slot.id)===event.target.value);if(choice&&choice.normalAvailable)setSelection({date,slot:choice.slot,pickupType:"NORMAL"});}}><option value="">Choose an available time</option>{date===pickup.date&&<option value={pickup.slot.id}>{pickup.slot.startTime.slice(0,5)} · current pickup (rechecked)</option>}{slots?.dates.find(d=>d.date===date)?.slots.filter(s=>s.normalAvailable&&s.slot.id!==pickup.slot.id).map(s=><option key={s.slot.id} value={s.slot.id}>{s.slot.startTime.slice(0,5)}–{s.slot.endTime.slice(0,5)}</option>)}</select></label>
   {error&&<p role="alert" className={styles.error}>{error}</p>}
+  <button type="button" disabled={busy} onClick={()=>{setError("");setRevision(value=>value+1);}}>Refresh available times</button>
   <div className={styles.actions}><button type="button" disabled={busy} onClick={onClose}>Keep current pickup</button><button type="button" disabled={busy} onClick={()=>void apply()}>{busy?"Checking changes…":"Check & apply changes"}</button></div>
  </dialog>;
 }
