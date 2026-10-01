@@ -391,7 +391,7 @@ public class OrderService {
          */
         order.setConvenienceFee(calculation.convenienceFee());
         order.setConvenienceFeeTax(calculation.convenienceFeeTax());
-        order.setConvenienceFeeTaxRate(order.getPickupType()==PickupType.NORMAL ? order.getBranch().getPickupConvenienceFeeTaxRate() : BigDecimal.ZERO);
+        order.setConvenienceFeeTaxRate(calculation.convenienceFeeTaxRate());
         order.setPriorityCharge(
                 calculation.priorityCharge()
         );
@@ -745,7 +745,7 @@ public class OrderService {
 
         order.setConvenienceFee(calculation.convenienceFee());
         order.setConvenienceFeeTax(calculation.convenienceFeeTax());
-        order.setConvenienceFeeTaxRate(order.getPickupType()==PickupType.NORMAL ? order.getBranch().getPickupConvenienceFeeTaxRate() : BigDecimal.ZERO);
+        order.setConvenienceFeeTaxRate(calculation.convenienceFeeTaxRate());
         order.setPriorityCharge(
                 calculation.priorityCharge()
         );

@@ -44,6 +44,13 @@ export async function getAvailableRebates(
     );
 }
 
+/** The backend locks the order, preserves stronger selected offers and revalidates eligibility. */
+export async function applyBestRebate(orderNumber: string): Promise<AppliedRebateResponse> {
+    return apiClient<AppliedRebateResponse>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate/best`, {
+        method: "POST", credentials: "include", signal: AbortSignal.timeout(10_000)
+    });
+}
+
 
 /*
  * =========================================================

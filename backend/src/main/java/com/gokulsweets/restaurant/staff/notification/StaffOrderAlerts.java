@@ -172,7 +172,7 @@ public class StaffOrderAlerts {
                 case "PREPARATION_OVERDUE" -> order.getOrderStatus() == OrderStatus.CONFIRMED && plan.pickupAt().equals(event.scheduledAt())
                     && !now.isBefore(plan.pickupAt()) && (properties.isRecurringPreparationReminders() || now.isBefore(plan.pickupAt().plusDays(1)));
                 case "READY_OVERDUE" -> order.getOrderStatus() == OrderStatus.PREPARING && plan.pickupAt().equals(event.scheduledAt())
-                    && !now.isBefore(plan.pickupAt()) && now.isBefore(plan.pickupAt().plusDays(1));
+                    && !now.isBefore(plan.pickupAt()) && (properties.isRecurringPreparationReminders() || now.isBefore(plan.pickupAt().plusDays(1)));
                 default -> false;
             };
         } catch (IllegalStateException incomplete) {return false;}

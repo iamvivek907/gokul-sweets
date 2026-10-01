@@ -710,3 +710,21 @@ Object.assign(hindi, {
 });
 
 Object.assign(hindi,{"For iPhone banners: open the installed app, enable staff push here, then allow Notifications, Banners and Sounds in iPhone Settings. Focus or Silent mode can suppress alerts.":"iPhone पर बैनर के लिए: इंस्टॉल किया ऐप खोलें और यहाँ फोन की सूचनाएँ चालू करें। फिर iPhone सेटिंग्स में इस ऐप के Notifications, Banners और Sounds चालू करें। Focus या साइलेंट मोड में आवाज़ रुक सकती है।"});
+
+Object.assign(hindi, {
+ "Finding your best offer and opening payment…": "आपके लिए सबसे अच्छी छूट लगा रहे हैं। अब भुगतान करें…",
+ "Updating order…": "ऑर्डर आगे बढ़ा रहे हैं…",
+ "Start preparation": "तैयारी शुरू करें",
+ "Mark ready": "ऑर्डर तैयार है",
+ "Or tap to confirm": "या यहाँ दबाकर पुष्टि करें",
+ "Confirm order action": "ऑर्डर आगे बढ़ाने की पुष्टि",
+ "Start preparation and create KOT?": "तैयारी शुरू करके रसोई की पर्ची बनाएँ?",
+ "Is this order packed and ready?": "क्या ऑर्डर पैक हो गया है और देने के लिए तैयार है?",
+ "Yes, start KOT": "हाँ, तैयारी शुरू करें",
+ "Yes, mark ready": "हाँ, ऑर्डर तैयार है",
+ "orders are overdue for ready": "ऑर्डर समय से पीछे हैं — तैयार करें",
+ "Start KOT or mark the completed orders ready to stop the alarm.": "अलार्म रोकने के लिए तैयारी शुरू करें या पूरा ऑर्डर तैयार चिह्नित करें।",
+ "No orders need action. Alarm is watching for new work.": "अभी कोई काम बाकी नहीं है। नया काम आते ही अलार्म बजेगा।",
+ "Enable sound once per session. It repeats until waiting orders enter KOT and overdue preparing orders are marked ready.": "ऐप खोलने पर एक बार आवाज़ चालू करें। तैयारी शुरू करने और देर से तैयार हो रहे ऑर्डर पूरे करने तक अलार्म बजता रहेगा।",
+ "IST": "भारतीय समय"
+});

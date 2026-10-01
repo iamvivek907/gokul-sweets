@@ -11,7 +11,7 @@ import CheckoutMobileAction from "@/components/checkout/CheckoutMobileAction";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {formatWeight} from "@/lib/orderQuantity";
 
-import {getAvailableRebates,applyRebate} from "@/services/rebateApi";
+import {applyBestRebate} from "@/services/rebateApi";
 import {apiClient} from "@/services/apiClient";
 import Link from "next/link";
 
@@ -777,11 +777,19 @@ export default function ReviewPage() {
 
     async function openPaymentWithBestOffer(orderNumber:string) {
         if (!storefrontFeatures?.simplifiedCheckout) return;
-        // The server checks eligibility and calculates every saving. Never increase a total here.
+        // The server applies the best offer atomically; this never initiates or charges a payment.
+        const cartSnapshot = getCartSnapshot(), pickupSnapshot = getPickupSlotSnapshot();
+        const reserved = parsePendingOrder(getPendingOrderSnapshot());
         try {
-            const offers=await getAvailableRebates(orderNumber);
-            const best=offers.filter(offer=>offer.rebateAmount>0).sort((a,b)=>b.rebateAmount-a.rebateAmount)[0];
-            if(best){const applied=await applyRebate(orderNumber,best.code);const pending=parsePendingOrder(getPendingOrderSnapshot());if(pending?.orderNumber===orderNumber)savePendingOrder({...pending,totalAmount:applied.totalAmount});}
+            const applied = await applyBestRebate(orderNumber);
+            const pending = parsePendingOrder(getPendingOrderSnapshot());
+            if (pending?.orderNumber !== orderNumber || pending.cartFingerprint !== reserved?.cartFingerprint ||
+                cartSnapshot !== getCartSnapshot() || pickupSnapshot !== getPickupSlotSnapshot()) {
+                setOrderError("Your cart or pickup changed in another tab. Review it before payment.");
+                return;
+            }
+            savePendingOrder({...pending, totalAmount: applied.totalAmount});
+            window.dispatchEvent(new Event("gokul-navigation-start"));
             router.push(`/checkout/payment/${encodeURIComponent(orderNumber)}`);
         } catch {
             setOrderError("Your pickup is reserved. Choose an offer below or continue to payment.");
@@ -2409,7 +2417,7 @@ try {
                 {
                     preparedOrderNumber
                         ? (
-                            <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
+                            submitting && storefrontFeatures?.simplifiedCheckout ? <p role="status" className="my-4 rounded-2xl bg-[#e7f0e9] p-5 text-[#143936]"><T text="Finding your best offer and opening payment…" /></p> : <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
                                 orderNumber={
                                     preparedOrderNumber
                                 }

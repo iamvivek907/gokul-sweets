@@ -200,7 +200,7 @@ class StaffOrderAlertsIntegrationTest {
     }
     @Test void emailRetriesAreBounded() throws Exception {
         boolean recurring = reminderProperties.isRecurringPreparationReminders();
-        reminderProperties.setRecurringPreparationReminders(false);
+        reminderProperties.setRecurringPreparationReminders(true);
         try {
             now(18, 5); alerts.generateReminders(); long event = latest();
             when(email.send(eq(staff), anyString(), anyString(), anyString(), eq(event))).thenReturn(503);
@@ -245,7 +245,31 @@ class StaffOrderAlertsIntegrationTest {
         });
     }
     @Autowired StaffAlertProperties reminderProperties;
+    @Test void lateFirstOverdueReminderEscalatesOnceEvenWithRecurringPush() throws Exception {
+        boolean recurring=reminderProperties.isRecurringPreparationReminders();
+        reminderProperties.setRecurringPreparationReminders(true);
+        try {
+            now(18,5);alerts.generateReminders();long first=latest();
+            dispatcher.dispatchBatch();
+            now(18,7);alerts.generateReminders();dispatcher.dispatchBatch();
+            verify(email,times(1)).send(eq(staff),anyString(),anyString(),eq(number),eq(first));
+            verify(email,times(1)).send(anyLong(),anyString(),anyString(),anyString(),anyLong());
+        } finally {reminderProperties.setRecurringPreparationReminders(recurring);}
+    }
+    @Test void preparingOverdueRemainsActionableAfterADayUntilMarkedReady() {
+        boolean recurring=reminderProperties.isRecurringPreparationReminders();
+        reminderProperties.setRecurringPreparationReminders(true);
+        try {
+            status("PREPARING");
+            doReturn(LocalDateTime.of(2026,10,3,18,0)).when(alerts).now();alerts.generateReminders();
+            var event=alerts.page(staff,null).messages().getFirst().event();
+            assertThat(event.kind()).isEqualTo("READY_OVERDUE");assertThat(alerts.actionable(event)).isTrue();
+            status("READY_FOR_PICKUP");assertThat(alerts.actionable(event)).isFalse();
+        } finally {reminderProperties.setRecurringPreparationReminders(recurring);}
+    }
     @Test void recurringDueNotificationsDeduplicateAndStopAfterPreparationStarts() {
+        boolean recurring=reminderProperties.isRecurringPreparationReminders();
+        int minutes=reminderProperties.getRepeatMinutes();
         reminderProperties.setRecurringPreparationReminders(true);
         reminderProperties.setRepeatMinutes(2);
         try {
@@ -260,6 +284,6 @@ class StaffOrderAlertsIntegrationTest {
             jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?",order);entities.clear();
             doReturn(LocalDateTime.of(2026,10,1,17,4)).when(alerts).now();alerts.generateReminders();
             assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM staff_order_alerts WHERE order_id=? AND kind='PREPARATION_DUE'",Long.class,order)).isEqualTo(2);
-        } finally {reminderProperties.setRecurringPreparationReminders(false);}
+        } finally {reminderProperties.setRecurringPreparationReminders(recurring);reminderProperties.setRepeatMinutes(minutes);}
     }
 }

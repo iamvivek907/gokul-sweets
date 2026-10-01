@@ -20,7 +20,7 @@ const fields = [
 const path = "/api/admin/tax-categories";
 
 export default function TaxCategoriesPage() {
-    const {authorization, hasPermission} = useAdminAuth();
+    const {authorization, hasPermission, profile} = useAdminAuth();
     const [items, setItems] = useState<TaxCategory[]>([]);
     const [form, setForm] = useState(empty);
     const [editing, setEditing] = useState<number | null>(null);
@@ -73,7 +73,7 @@ export default function TaxCategoriesPage() {
     if (!allowed) return <p>You do not have permission to manage tax categories.</p>;
     return <main className="space-y-6">
         <h1 className="text-2xl font-bold text-[#7a1625]"><T text="Tax categories" /></h1>
-        {authorization && <TaxCollectionControl authorization={authorization}/>}
+        {authorization && profile?.roleName === "OWNER_ADMIN" && <TaxCollectionControl authorization={authorization}/>}
         <p className="text-sm text-[#756763]">Manage product taxes. Deactivation prevents new checkout for products still assigned to this category. Reassign those products first. Saved order taxes remain unchanged.</p>
         {error && <p role="alert" className="text-red-700">{error}</p>}
         {message && <p role="status" className="text-green-800">{message}</p>}

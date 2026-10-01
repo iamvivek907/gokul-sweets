@@ -52,6 +52,7 @@ class OrderMoneyTest {
             new ValidatedOrderItem(product,new BranchProduct(),ProductSaleMode.UNIT,1,null))));
         assertThat(order.items().getFirst().taxAmount()).isZero();
         assertThat(order.taxAmount()).isZero();assertThat(order.convenienceFeeTax()).isZero();
+        assertThat(order.convenienceFeeTaxRate()).isZero();
         assertThat(order.totalAmount()).isEqualByComparingTo("110.00");
         org.mockito.Mockito.verify(settings).enabled();
     }

@@ -77,6 +77,12 @@ public class RebateCustomerController {
         );
     }
 
+    @PostMapping("/{orderNumber}/rebate/best")
+    public AppliedRebateResponse applyBestRebate(@PathVariable String orderNumber, HttpServletRequest request) {
+        orderAccess.requireOrder(orderNumber, request);
+        return rebateApplicationService.applyBest(orderNumber);
+    }
+
     @DeleteMapping(
             "/{orderNumber}/rebate"
     )

@@ -3,3 +3,5 @@
 .confirm::backdrop{background:#0008}
 
 .rowActions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.rowActions>button{flex-shrink:0}@media(max-width:640px){.rowActions{width:100%;justify-content:space-between}}
+
+@media(max-width:640px){.rowActions{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}.rowActions>button{justify-self:start}.rows article{gap:14px}.header h2{font-size:1.5rem}}

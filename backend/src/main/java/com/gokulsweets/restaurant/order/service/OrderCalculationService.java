@@ -42,19 +42,19 @@ public class OrderCalculationService {
 
         BigDecimal fee=validatedOrder.pickupType()==PickupType.NORMAL ? money(validatedOrder.branch().getPickupConvenienceFee()) : money(BigDecimal.ZERO);
         boolean collectTax=taxEnabled();
-        BigDecimal rate=collectTax?validatedOrder.branch().getPickupConvenienceFeeTaxRate():BigDecimal.ZERO;
+        BigDecimal rate=collectTax && validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupConvenienceFeeTaxRate():BigDecimal.ZERO;
         BigDecimal feeTax=fee.subtract(fee.multiply(ONE_HUNDRED).divide(ONE_HUNDRED.add(rate),MONEY_SCALE,ROUNDING_MODE));
-        return calculateItems(validatedOrder.items(),determinePriorityCharge(validatedOrder),fee,feeTax,validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupFeeVersion():0,collectTax);
+        return calculateItems(validatedOrder.items(),determinePriorityCharge(validatedOrder),fee,feeTax,validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupFeeVersion():0,collectTax,money(rate));
     }
 
     /** Delivery uses the same accepted branch prices, weights and taxes, with no pickup priority charge. */
     public OrderCalculationResult calculateDelivery(List<ValidatedOrderItem> items) {
         if (items == null || items.isEmpty() || items.size() > 50)
             throw new IllegalArgumentException("Select between 1 and 50 delivery items.");
-        return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0,taxEnabled());
+        return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0,taxEnabled(),money(BigDecimal.ZERO));
     }
 
-    private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge,BigDecimal fee,BigDecimal feeTax,long feeVersion,boolean collectTax) {
+    private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge,BigDecimal fee,BigDecimal feeTax,long feeVersion,boolean collectTax,BigDecimal feeTaxRate) {
         BigDecimal subtotal = BigDecimal.ZERO;
         BigDecimal totalTax = BigDecimal.ZERO;
         List<CalculatedOrderItem> calculatedItems = new ArrayList<>();
@@ -77,7 +77,7 @@ public class OrderCalculationService {
                 subtotal,
                 totalTax,
                 priorityCharge,
-                totalAmount,feeVersion
+                totalAmount
         );
 
         return new OrderCalculationResult(
@@ -86,7 +86,7 @@ public class OrderCalculationService {
                 totalTax,
                 priorityCharge,
                 fee,feeTax,
-                totalAmount,feeVersion
+                totalAmount,feeVersion,feeTaxRate
         );
     }
 

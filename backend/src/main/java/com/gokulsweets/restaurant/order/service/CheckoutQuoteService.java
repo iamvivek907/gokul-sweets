@@ -102,7 +102,7 @@ public class CheckoutQuoteService {
                 .append(item.unitPrice()).append(':').append(item.taxRate()).append(':')
                 .append(item.taxAmount()).append(':').append(item.lineTotal()).append(';'));
         return value.append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
-                .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).toString();
+                .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).append('|').append(amounts.convenienceFeeTaxRate()).toString();
     }
 
     private String sign(String message) {
