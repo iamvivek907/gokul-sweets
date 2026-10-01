@@ -99,7 +99,7 @@ public class AdminOrderController {
         log.debug("Admin order status update requested: orderNumber={}, targetStatus={}",
                 orderNumber, request.status());
         return ResponseEntity.ok(
-                lifecycleCoordinator.transitionStatus(orderNumber, request.status())
+                lifecycleCoordinator.transitionStatus(orderNumber, request.status(), request.pickupCode())
         );
     }
 
@@ -114,13 +114,16 @@ public class AdminOrderController {
         );
     }
 
+    public record PickupCodeInput(String pickupCode) {}
+
     @PostMapping("/{orderNumber}/collect-late")
     public ResponseEntity<AdminOrderDetailResponse> collectLateOrder(
-            @PathVariable String orderNumber
+            @PathVariable String orderNumber,
+            @RequestBody(required=false) PickupCodeInput input
     ) {
         log.info("Admin late pickup requested: orderNumber={}", orderNumber);
         return ResponseEntity.ok(
-                lifecycleCoordinator.collectLateOrder(orderNumber)
+                lifecycleCoordinator.collectLateOrder(orderNumber,input==null?null:input.pickupCode())
         );
     }
 }

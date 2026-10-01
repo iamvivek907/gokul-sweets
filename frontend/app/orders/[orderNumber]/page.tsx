@@ -1,4 +1,5 @@
 "use client";
+import PickupCodeCard from "@/components/order/PickupCodeCard";
 import {T,useTranslation} from "@/lib/language";
 import {formatWeight} from "@/lib/orderQuantity";
 
@@ -354,6 +355,7 @@ export default function OrderDetailPage() {
     return (
         <AppShell>
             <NotificationReadOnOpen orderNumber={orderNumber} />
+            {order.paymentStatus==="PAID" && order.fulfillmentType!=="DELIVERY" && ["CONFIRMED","PREPARING","READY_FOR_PICKUP","PICKUP_WINDOW_EXPIRED"].includes(order.orderStatus) && <div className="mx-auto w-full max-w-3xl px-4 sm:px-6"><PickupCodeCard orderNumber={orderNumber}/></div>}
             <section className="mx-auto w-full max-w-3xl px-4 pb-28 pt-5 sm:px-6 sm:pt-7">
 
                 <button
@@ -505,6 +507,7 @@ export default function OrderDetailPage() {
                             <span><T text="Tax" /></span>
                             <span className="font-semibold text-[#241715]">{formatOrderCurrency(order.taxAmount)}</span>
                         </div>
+                        {(order.paymentFee??0)>0&&<div className="mt-2 flex justify-between text-sm"><span><T text="Online payment fee" /> ({order.paymentFeeRate}%)<small className="block"><T text="Includes" /> {formatOrderCurrency(order.paymentFeeTax??0)} <T text="fee tax" /></small></span><span>{formatOrderCurrency(order.paymentFee??0)}</span></div>}
                         {(order.convenienceFee ?? 0)>0 && <div className="mt-2 flex justify-between text-sm"><span><T text="Convenience fee" />{" "}<small className="block"><T text="Includes" />{" "}{formatOrderCurrency(order.convenienceFeeTax??0)}{" "}<T text="fee tax" /></small></span><span>{formatOrderCurrency(order.convenienceFee ?? 0)}</span></div>}
                         {order.priorityCharge > 0 && (
                             <div className="mt-2 flex justify-between text-sm text-[#756763]">

@@ -732,3 +732,28 @@ Object.assign(hindi, {
 Object.assign(hindi,{"Check your pickup and items. Add something extra if you like, then continue to payment. We’ll apply your best available offer.":"समय और सामान देख लें। चाहें तो कुछ और जोड़ें, फिर भुगतान करें। आपके लिए सबसे अच्छी छूट हम लगा देंगे।"});
 
 Object.assign(hindi, {"Suggested add-ons": "सुझाए गए अतिरिक्त सामान"});
+
+Object.assign(hindi, {
+ "Swipe to hand over":"सौंपने के लिए स्वाइप करें",
+ "Verify pickup code":"पिकअप कोड जाँचें",
+ "Continue to pickup code verification?":"पिकअप कोड की जाँच जारी रखें?",
+ "Enter pickup code":"पिकअप कोड डालें",
+ "Pickup code":"पिकअप कोड",
+ "Your pickup code":"आपका पिकअप कोड",
+ "Confirm pickup":"पिकअप की पुष्टि करें",
+ "Verifying…":"जाँच हो रही है…",
+ "Loading pickup code…":"पिकअप कोड लोड हो रहा है…",
+ "Ask the customer for the four-digit code shown on their order. Confirm before handing over the food.":"ग्राहक से उनके ऑर्डर पर दिख रहा चार अंकों का कोड पूछें। सामान सौंपने से पहले पुष्टि करें।",
+ "Share these four digits with staff when collecting your order. Keep this code private until handover.":"ऑर्डर लेते समय ये चार अंक कर्मचारी को बताएँ। सामान लेने तक यह कोड निजी रखें।",
+ "Incorrect pickup code. Check the four digits with the customer.":"पिकअप कोड गलत है। ग्राहक से चारों अंक जाँच लें।",
+ "Too many incorrect pickup codes. Try again in 15 minutes.":"कई बार गलत पिकअप कोड डाला गया है। 15 मिनट बाद दोबारा कोशिश करें।",
+ "Online payment fee":"ऑनलाइन भुगतान शुल्क",
+ "Online payment fee settings":"ऑनलाइन भुगतान शुल्क की सेटिंग",
+ "Enable online payment fee":"ऑनलाइन भुगतान शुल्क चालू करें",
+ "Payment fee (%)":"भुगतान शुल्क (%)",
+ "Payment fee tax rate (%)":"भुगतान शुल्क पर कर (%)",
+ "Save payment fee":"भुगतान शुल्क सहेजें",
+ "Provider terms and fee tax treatment have been reviewed":"भुगतान सेवा की शर्तें और शुल्क पर कर की समीक्षा हो चुकी है",
+ "Example: 2% on ₹1,000 adds ₹20. The global tax-off setting also turns off this fee’s tax component.":"उदाहरण: ₹1,000 पर 2% शुल्क ₹20 जोड़ता है। सभी कर बंद करने की सेटिंग इस शुल्क का कर भी बंद करती है।",
+ "A separate percentage charge on the payable amount after discounts, including convenience or delivery charges. The percentage includes fee tax; it is shown before payment. Off or 0% means no charge.":"छूट के बाद देय राशि पर अलग प्रतिशत शुल्क, जिसमें सुविधा या डिलीवरी शुल्क भी शामिल हैं। प्रतिशत में शुल्क का कर शामिल है; यह भुगतान से पहले दिखता है। बंद या 0% होने पर कोई शुल्क नहीं लगता।"
+});

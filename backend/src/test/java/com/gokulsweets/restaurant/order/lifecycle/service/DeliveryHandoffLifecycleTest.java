@@ -30,7 +30,7 @@ class DeliveryHandoffLifecycleTest {
     private final DeliveryRiderHoldService riders = mock(DeliveryRiderHoldService.class);
     private final OrderInventoryLifecycleService inventory = mock(OrderInventoryLifecycleService.class);
     private final AdminOrderLifecycleCoordinator coordinator = new AdminOrderLifecycleCoordinator(
-            orders, payments, workflow, queries, staff, pickup, riders, inventory, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
+            orders, payments, workflow, queries, staff, pickup, riders, inventory, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class),mock(com.gokulsweets.restaurant.order.service.PickupCodeService.class));
 
     @Test
     void inventoryIsFulfilledOnDeliveredButNotOnDispatchAndRetriesAreIdempotent() {

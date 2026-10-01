@@ -1,4 +1,5 @@
 "use client";
+import PickupHandoverAction from "@/components/admin/PickupHandoverAction";
 import {T} from "@/lib/language";
 
 
@@ -49,6 +50,7 @@ export default function StaffAlertOrderPage({params}: {params: Promise<{orderNum
             <ul className="mt-5 space-y-2">{order.items.map((item, index) => <li key={index} className="rounded-xl bg-[#fffaf2] p-3 text-sm"><strong>{item.productName}</strong> · {item.saleMode === "WEIGHT" ? `${(item.weightGrams ?? 0) / 1000} kg` : `${item.quantity} units`}</li>)}</ul>
             <p className="mt-4 text-sm leading-6 text-[#756763]">Start preparation only when its window opens. Mark ready only after preparation is complete. Existing eligibility, inventory and bulk-readiness checks still apply.</p>
             <div className="mt-4 flex flex-wrap gap-3">
+                {order.orderStatus === "READY_FOR_PICKUP" && authorization && hasPermission("ORDER_MARK_PICKED_UP") && <PickupHandoverAction orderNumber={orderNumber} authorization={authorization} disabled={busy} onCompleted={load} />}
                 {next && authorization && hasPermission(next.permission) && <button type="button" disabled={busy} onClick={() => void perform(() => updateAdminOrderStatus(orderNumber, {status: next.status}, authorization))} className="min-h-11 rounded-xl bg-[#173c39] px-4 text-sm font-bold text-white disabled:opacity-50">{next.label}</button>}
                 <button type="button" disabled={busy} onClick={() => void load().catch(() => setError("Could not refresh this order. Check your connection."))} className="min-h-11 rounded-xl border px-4 text-sm">Refresh order</button>
                 <Link href="/admin/orders" onClick={() => {if (profile) rememberAdminBranchId(profile.staffId, order.branchId);}} className="flex min-h-11 items-center rounded-xl border px-4 text-sm">Open branch queue</Link>

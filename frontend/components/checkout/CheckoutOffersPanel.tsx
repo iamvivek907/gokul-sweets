@@ -769,6 +769,9 @@ export default function CheckoutOffersPanel({
                         ? {
                             ...current,
 
+                            paymentFee:response.paymentFee??current.paymentFee,
+                            paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax,
+                            paymentFeeRate:response.paymentFeeRate??current.paymentFeeRate,
                             totalAmount:
                                 response.totalAmount
                         }
@@ -884,6 +887,9 @@ export default function CheckoutOffersPanel({
                         ? {
                             ...current,
 
+                            paymentFee:response.paymentFee??current.paymentFee,
+                            paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax,
+                            paymentFeeRate:response.paymentFeeRate??current.paymentFeeRate,
                             totalAmount:
                                 response.totalAmount
                         }
@@ -1043,7 +1049,7 @@ export default function CheckoutOffersPanel({
             const updated=await updatePendingCheckout(orderNumber,{pickupSlotId:request.pickupSlotId,pickupType:request.pickupType,items:request.items,quoteToken:quote?.token});
             if(!unchanged() || updated.orderStatus!=="PENDING_PAYMENT")throw new Error("Your checkout changed. Review the cart before continuing.");
             if(changedItems)saveCart(cart);if(changedPickup)savePickupSlot(changedPickup);
-            setOrderSummary({...current,pickupDate:pickup.date,pickupStartTime:pickup.slot.startTime,pickupEndTime:pickup.slot.endTime,pickupType:pickup.pickupType,items:updated.items,subtotal:updated.subtotal,taxAmount:updated.taxAmount,priorityCharge:updated.priorityCharge,convenienceFee:updated.convenienceFee,convenienceFeeTax:updated.convenienceFeeTax,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt});
+            setOrderSummary({...current,pickupDate:pickup.date,pickupStartTime:pickup.slot.startTime,pickupEndTime:pickup.slot.endTime,pickupType:pickup.pickupType,items:updated.items,subtotal:updated.subtotal,taxAmount:updated.taxAmount,priorityCharge:updated.priorityCharge,convenienceFee:updated.convenienceFee,convenienceFeeTax:updated.convenienceFeeTax,paymentFee:updated.paymentFee,paymentFeeTax:updated.paymentFeeTax,paymentFeeRate:updated.paymentFeeRate,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt});
             savePendingOrder({...saved,pickupSlotId:pickup.slot.id,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(cart.items)});
             setRefreshFailed(false);setError(null);setErrorSource(null);
             const [offers,targets]=await Promise.allSettled([getAvailableRebates(orderNumber),apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include"})]);
@@ -1795,6 +1801,7 @@ export default function CheckoutOffersPanel({
                                                     </span>
                                                 </div>
 
+                                                {(orderSummary.paymentFee??0)>0&&<div className="flex justify-between gap-4"><span><T text="Online payment fee" /> ({orderSummary.paymentFeeRate}%, <T text="tax included" />)</span><span>{formatCurrency(orderSummary.paymentFee??0)}</span></div>}
                                                 {(orderSummary.convenienceFee ?? 0)>0 && <div className="flex justify-between gap-4"><span><T text="Convenience fee (tax included)" /></span><span>{formatCurrency(orderSummary.convenienceFee ?? 0)}</span></div>}
                                                 {
                                                     orderSummary.priorityCharge >

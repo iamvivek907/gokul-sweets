@@ -389,6 +389,10 @@ public class OrderService {
          *
          * This includes any changed priority charge.
          */
+        order.setPaymentFee(calculation.paymentFee());
+        order.setPaymentFeeTax(calculation.paymentFeeTax());
+        order.setPaymentFeeRate(calculation.paymentFeeRate());
+        order.setPaymentFeeTaxRate(calculation.paymentFeeTaxRate());
         order.setConvenienceFee(calculation.convenienceFee());
         order.setConvenienceFeeTax(calculation.convenienceFeeTax());
         order.setConvenienceFeeTaxRate(calculation.convenienceFeeTaxRate());
@@ -743,6 +747,10 @@ public class OrderService {
                 validatedOrder.pickupType()
         );
 
+        order.setPaymentFee(calculation.paymentFee());
+        order.setPaymentFeeTax(calculation.paymentFeeTax());
+        order.setPaymentFeeRate(calculation.paymentFeeRate());
+        order.setPaymentFeeTaxRate(calculation.paymentFeeTaxRate());
         order.setConvenienceFee(calculation.convenienceFee());
         order.setConvenienceFeeTax(calculation.convenienceFeeTax());
         order.setConvenienceFeeTaxRate(calculation.convenienceFeeTaxRate());
@@ -896,6 +904,7 @@ public class OrderService {
                 order.getPriorityCharge(),
                 order.getConvenienceFee(),
                 order.getConvenienceFeeTax(),
+                order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate(),
 
                 order.getSubtotal(),
 

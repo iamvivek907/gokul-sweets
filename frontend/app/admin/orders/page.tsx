@@ -2,6 +2,7 @@
 import {T} from "@/lib/language";
 
 import KitchenBoard from "@/components/admin/KitchenBoard";
+import PickupHandoverAction from "@/components/admin/PickupHandoverAction";
 import {formatWeight} from "@/lib/orderQuantity";
 
 import {
@@ -2892,7 +2893,7 @@ export default function AdminOrdersPage() {
                     }
 
 
-                    {useKitchenBoard && selectedBranchId!==null && authorization!==null && <KitchenBoard key={selectedBranchId} branchId={selectedBranchId} authorization={authorization} canStart={canStartPreparation} canReady={hasPermission("ORDER_MARK_READY")} onView={openOrderDetail} onChanged={()=>{void refreshPreparationQueue();void refreshOrders();}}/>}
+                    {useKitchenBoard && selectedBranchId!==null && authorization!==null && <KitchenBoard key={selectedBranchId} branchId={selectedBranchId} authorization={authorization} canStart={canStartPreparation} canReady={hasPermission("ORDER_MARK_READY")} canPickup={hasPermission("ORDER_MARK_PICKED_UP")} onView={openOrderDetail} onChanged={()=>{void refreshPreparationQueue();void refreshOrders();}}/>}
                     {/* OPERATIONAL PREPARATION QUEUE */}
 
                     {!useKitchenBoard && <>
@@ -5718,6 +5719,7 @@ function OrderDetailDrawer({
                                                 </p>
 
 
+                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction orderNumber={order.orderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
                                                 <button
                                                     type="button"
                                                     disabled={
@@ -5755,6 +5757,7 @@ function OrderDetailDrawer({
                                                             : actionLabel
                                                     }
                                                 </button>
+                                                )}
 
                                             </div>
 

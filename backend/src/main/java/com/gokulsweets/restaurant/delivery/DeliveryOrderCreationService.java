@@ -78,6 +78,7 @@ public class DeliveryOrderCreationService {
         order.setCustomerContact(contacts.resolveGuestContact(normalizedPhone, request.customerName()));
         order.setSubtotal(prepared.price().subtotal());
         order.setTaxAmount(prepared.price().taxAmount());
+        order.setPaymentFee(prepared.price().paymentFee());order.setPaymentFeeTax(prepared.price().paymentFeeTax());order.setPaymentFeeRate(prepared.price().paymentFeeRate());order.setPaymentFeeTaxRate(prepared.price().paymentFeeTaxRate());
         order.setPriorityCharge(prepared.price().priorityCharge());
         order.setDeliveryFee(prepared.economics().fee());
         order.setTotalAmount(prepared.price().totalAmount().add(prepared.economics().fee()));

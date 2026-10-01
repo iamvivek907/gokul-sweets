@@ -41,7 +41,7 @@ public class DeliveryOrderPreparationService {
         var price = calculation.calculateDelivery(items);
         var assessment = economics.assess(price);
         if (!assessment.viable()) throw new IllegalStateException(assessment.alternative());
-        return new Prepared(validated, price, selected, assessment);
+        return new Prepared(validated, calculation.withPaymentFee(price,branch,assessment.fee()), selected, assessment);
     }
 
     public record Prepared(ValidatedOrderData validated, OrderCalculationResult price,

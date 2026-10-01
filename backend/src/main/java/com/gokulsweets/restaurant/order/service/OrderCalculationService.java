@@ -44,7 +44,7 @@ public class OrderCalculationService {
         boolean collectTax=taxEnabled();
         BigDecimal rate=collectTax && validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupConvenienceFeeTaxRate():BigDecimal.ZERO;
         BigDecimal feeTax=fee.subtract(fee.multiply(ONE_HUNDRED).divide(ONE_HUNDRED.add(rate),MONEY_SCALE,ROUNDING_MODE));
-        return calculateItems(validatedOrder.items(),determinePriorityCharge(validatedOrder),fee,feeTax,validatedOrder.pickupType()==PickupType.NORMAL?validatedOrder.branch().getPickupFeeVersion():0,collectTax,money(rate));
+        return withPaymentFee(calculateItems(validatedOrder.items(),determinePriorityCharge(validatedOrder),fee,feeTax,validatedOrder.branch().getPickupFeeVersion(),collectTax,money(rate)),validatedOrder.branch(),BigDecimal.ZERO,collectTax);
     }
 
     /** Delivery uses the same accepted branch prices, weights and taxes, with no pickup priority charge. */
@@ -52,6 +52,14 @@ public class OrderCalculationService {
         if (items == null || items.isEmpty() || items.size() > 50)
             throw new IllegalArgumentException("Select between 1 and 50 delivery items.");
         return calculateItems(items,money(BigDecimal.ZERO),money(BigDecimal.ZERO),money(BigDecimal.ZERO),0,taxEnabled(),money(BigDecimal.ZERO));
+    }
+
+    public OrderCalculationResult withPaymentFee(OrderCalculationResult price,com.gokulsweets.restaurant.branch.Branch branch,BigDecimal extraBase) {return withPaymentFee(price,branch,extraBase,taxEnabled());}
+    private OrderCalculationResult withPaymentFee(OrderCalculationResult price,com.gokulsweets.restaurant.branch.Branch branch,BigDecimal extraBase,boolean collectTax) {
+        BigDecimal rate=money(branch.isOnlinePaymentFeeEnabled()?branch.getOnlinePaymentFeeRate():BigDecimal.ZERO);
+        BigDecimal taxRate=money(collectTax?branch.getOnlinePaymentFeeTaxRate():BigDecimal.ZERO);
+        BigDecimal paymentFee=PaymentFeePricing.fee(price.totalAmount().add(extraBase),rate);
+        return new OrderCalculationResult(price.items(),price.subtotal(),price.taxAmount(),price.priorityCharge(),price.convenienceFee(),price.convenienceFeeTax(),price.totalAmount().add(paymentFee),branch.getPickupFeeVersion(),price.convenienceFeeTaxRate(),paymentFee,PaymentFeePricing.tax(paymentFee,taxRate),rate,taxRate);
     }
 
     private OrderCalculationResult calculateItems(List<ValidatedOrderItem> items, BigDecimal priorityCharge,BigDecimal fee,BigDecimal feeTax,long feeVersion,boolean collectTax,BigDecimal feeTaxRate) {

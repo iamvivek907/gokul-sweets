@@ -34,7 +34,7 @@ public class CheckoutQuoteService {
     public record Line(String name, String unitPrice, String taxRate, String taxAmount, String total) {}
     public record Quote(List<Line> items, String subtotal, String taxAmount,
                         String priorityCharge, String convenienceFee, String convenienceFeeTax, String totalAmount, String currency,
-                        String expiresAt, String token) {}
+                        String expiresAt, String token,String paymentFee,String paymentFeeTax,String paymentFeeRate) {}
 
     @Transactional(readOnly = true)
     public Quote preview(CreateOrderRequest request, String pendingOrderNumber) {
@@ -62,7 +62,7 @@ public class CheckoutQuoteService {
                         item.taxAmount().toPlainString(), item.lineTotal().toPlainString())).toList(),
                 amounts.subtotal().toPlainString(), amounts.taxAmount().toPlainString(),
                 amounts.priorityCharge().toPlainString(), amounts.convenienceFee().toPlainString(), amounts.convenienceFeeTax().toPlainString(), amounts.totalAmount().toPlainString(),
-                "INR", Instant.ofEpochSecond(expiry).toString(), token);
+                "INR", Instant.ofEpochSecond(expiry).toString(), token,amounts.paymentFee().toPlainString(),amounts.paymentFeeTax().toPlainString(),amounts.paymentFeeRate().toPlainString());
     }
 
     public void accept(CreateOrderRequest request, String orderNumber,
@@ -102,7 +102,7 @@ public class CheckoutQuoteService {
                 .append(item.unitPrice()).append(':').append(item.taxRate()).append(':')
                 .append(item.taxAmount()).append(':').append(item.lineTotal()).append(';'));
         return value.append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
-                .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).append('|').append(amounts.convenienceFeeTaxRate()).toString();
+                .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).append('|').append(amounts.convenienceFeeTaxRate()).append('|').append(amounts.paymentFee()).append('|').append(amounts.paymentFeeTax()).append('|').append(amounts.paymentFeeRate()).append('|').append(amounts.paymentFeeTaxRate()).toString();
     }
 
     private String sign(String message) {

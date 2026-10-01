@@ -50,6 +50,9 @@ export interface CheckoutQuote {
     priorityCharge: string;
     convenienceFee?: string;
     convenienceFeeTax?: string;
+    paymentFee?: string;
+    paymentFeeTax?: string;
+    paymentFeeRate?: string;
     totalAmount: string;
     currency: string;
     expiresAt: string;
@@ -93,6 +96,9 @@ export interface OrderResponse {
     priorityCharge: number;
     convenienceFee?: number;
     convenienceFeeTax?: number;
+    paymentFee?: number;
+    paymentFeeTax?: number;
+    paymentFeeRate?: number;
     subtotal: number;
     taxAmount: number;
     totalAmount: number;
@@ -136,6 +142,9 @@ export interface CustomerOrderResponse {
     priorityCharge: number;
     convenienceFee?: number;
     convenienceFeeTax?: number;
+    paymentFee?: number;
+    paymentFeeTax?: number;
+    paymentFeeRate?: number;
     totalAmount: number;
     reservationExpiresAt: string;
     createdAt: string;

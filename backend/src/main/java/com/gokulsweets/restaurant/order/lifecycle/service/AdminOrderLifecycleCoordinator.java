@@ -47,16 +47,17 @@ public class AdminOrderLifecycleCoordinator {
     private final DeliveryRiderHoldService deliveryRiderHolds;
     private final OrderInventoryLifecycleService inventoryLifecycleService;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
+    private final com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
 
     @Transactional
     public AdminOrderDetailResponse transitionStatus(
             String orderNumber,
             OrderStatus targetStatus
-    ) {
-        AdminOrderDetailResponse response = workflowService.transitionStatus(
-                orderNumber,
-                targetStatus
-        );
+    ) { return transitionStatus(orderNumber,targetStatus,null); }
+
+    @Transactional
+    public AdminOrderDetailResponse transitionStatus(String orderNumber,OrderStatus targetStatus,String pickupCode) {
+        AdminOrderDetailResponse response = workflowService.transitionStatus(orderNumber,targetStatus,pickupCode);
 
         if (targetStatus == OrderStatus.PICKED_UP || targetStatus == OrderStatus.DELIVERED) {
             inventoryLifecycleService.fulfilOrderInventory(
@@ -122,7 +123,10 @@ public class AdminOrderLifecycleCoordinator {
     }
 
     @Transactional
-    public AdminOrderDetailResponse collectLateOrder(String orderNumber) {
+    public AdminOrderDetailResponse collectLateOrder(String orderNumber) { return collectLateOrder(orderNumber,null); }
+
+    @Transactional
+    public AdminOrderDetailResponse collectLateOrder(String orderNumber,String pickupCode) {
         Order order = orderRepository.findForUpdate(orderNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Order does not exist."));
 
@@ -143,6 +147,7 @@ public class AdminOrderLifecycleCoordinator {
             );
         }
 
+        pickupCodes.verifyAndConsume(order,pickupCode);
         inventoryLifecycleService.fulfilOrderInventory(orderNumber, currentActor());
         order.setOrderStatus(OrderStatus.PICKED_UP);
         orderRepository.saveAndFlush(order);

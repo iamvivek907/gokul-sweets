@@ -30,6 +30,9 @@ export interface DeliveryAcceptedQuote {
     taxAmount: string;
     priorityCharge: string;
     deliveryFee: string;
+    paymentFee?: string;
+    paymentFeeTax?: string;
+    paymentFeeRate?: string;
     totalAmount: string;
     currency: string;
     expiresAt: string;

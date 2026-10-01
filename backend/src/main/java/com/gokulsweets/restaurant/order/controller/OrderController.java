@@ -40,6 +40,13 @@ public class OrderController {
     private final CheckoutQuoteService checkoutQuoteService;
     private final TrustedCheckoutIdentity checkoutIdentity;
     private final VerifiedOrderAccess orderAccess;
+    private final com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
+
+    @GetMapping("/{orderNumber}/pickup-code")
+    public com.gokulsweets.restaurant.order.service.PickupCodeService.CustomerCode pickupCode(@PathVariable String orderNumber,HttpServletRequest request) {
+        orderAccess.requirePickupCode(orderNumber,request);
+        return pickupCodes.customerCode(orderNumber);
+    }
 
     @PostMapping("/quote")
     public CheckoutQuoteService.Quote previewQuote(@Valid @RequestBody CreateOrderRequest request) {

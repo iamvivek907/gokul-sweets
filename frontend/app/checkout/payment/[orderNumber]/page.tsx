@@ -1306,8 +1306,8 @@ export default function PaymentPage() {
      * =========================================================
      */
 
-    const [feeBreakdown,setFeeBreakdown]=useState<{fee:number;tax:number}|null>(null);
-    useEffect(()=>{let alive=true;getCustomerOrder(orderNumber).then(order=>{if(alive)setFeeBreakdown({fee:order.convenienceFee??0,tax:order.convenienceFeeTax??0});}).catch(()=>{});return()=>{alive=false;};},[orderNumber]);
+    const [feeBreakdown,setFeeBreakdown]=useState<{fee:number;tax:number;paymentFee:number;paymentTax:number;paymentRate:number}|null>(null);
+    useEffect(()=>{let alive=true;getCustomerOrder(orderNumber).then(order=>{if(alive)setFeeBreakdown({fee:order.convenienceFee??0,tax:order.convenienceFeeTax??0,paymentFee:order.paymentFee??0,paymentTax:order.paymentFeeTax??0,paymentRate:order.paymentFeeRate??0});}).catch(()=>{});return()=>{alive=false;};},[orderNumber]);
     const [cancelling,setCancelling]=useState(false);
     const [confirmCancel,setConfirmCancel]=useState(false);
     async function cancelCheckout() {
@@ -2651,6 +2651,7 @@ export default function PaymentPage() {
                     }
 
                     <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout}/>
+                    {feeBreakdown&&feeBreakdown.paymentFee>0&&<p className="mt-4 rounded-xl border p-3 text-sm"><T text="Online payment fee" /> ({feeBreakdown.paymentRate}%): {formatCurrency(feeBreakdown.paymentFee)} · <T text="Includes" /> {formatCurrency(feeBreakdown.paymentTax)} <T text="fee tax" /></p>}
                     {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm"><T text="Payable amount includes a convenience fee of" />{" "}{formatCurrency(feeBreakdown.fee)} <T text="(including" />{" "}{formatCurrency(feeBreakdown.tax)} <T text="fee tax)." /></p>}
                     {(isPending || isFailed || isExpired) && <section aria-label="Payment recovery" className="mt-4 rounded-2xl border border-[#c4d4c9] bg-[#fffaf2] p-4 text-[#173c39]">
                         <p className="font-bold">{isPending ? translate("Need to stop this checkout?") : "Your cart is ready to try again"}</p>

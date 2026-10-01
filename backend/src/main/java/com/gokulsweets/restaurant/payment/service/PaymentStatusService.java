@@ -55,6 +55,10 @@ public class PaymentStatusService {
     // MARK PAID
     // =========================================================
 
+    private com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setPickupCodes(com.gokulsweets.restaurant.order.service.PickupCodeService codes) { this.pickupCodes=codes; }
+
     @Transactional
     public void markPaid(
             Long paymentId,
@@ -363,6 +367,7 @@ public class PaymentStatusService {
 
         orderRepository.flush();
         paymentRepository.flush();
+        if(pickupCodes!=null)pickupCodes.issueForPaidPayment(paymentId);
         notifications.paymentChanged(paymentId);
         staffAlerts.paymentConfirmed(paymentId);
 

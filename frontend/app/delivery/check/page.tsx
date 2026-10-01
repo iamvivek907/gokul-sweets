@@ -293,6 +293,7 @@ export default function DeliveryCheckPage() {
                                 <div className={styles.total}><span>Food before tax</span><strong>₹{accepted.quote.subtotal}</strong></div>
                                 <div className={styles.total}><span>Food tax</span><strong>₹{accepted.quote.taxAmount}</strong></div>
                                 <div className={styles.total}><span>Delivery fee</span><strong>₹{accepted.quote.deliveryFee}</strong></div>
+                                {Number(accepted.quote.paymentFee??0)>0&&<div className={styles.total}><span>Online payment fee ({accepted.quote.paymentFeeRate}%, tax included)</span><strong>₹{accepted.quote.paymentFee}</strong></div>}
                                 <div className={styles.total}><span>Total including tax and delivery</span><strong>₹{accepted.quote.totalAmount}</strong></div>
                                 <p>Price valid until {new Intl.DateTimeFormat("en-IN", {timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit"})
                                     .format(new Date(accepted.quote.expiresAt))} IST. The final amount is checked again when you place the order.</p>

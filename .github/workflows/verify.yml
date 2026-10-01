@@ -67,6 +67,7 @@ jobs:
           node tests/occasion-admin.browser.mjs
           node tests/occasion-operations.browser.mjs
           node tests/occasion-planning.browser.mjs
+          node tests/pickup-code-payment-fee.browser.mjs
           mkdir -p /tmp/gokul-scrum111-layouts
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/brand-careers.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/storefront-reconnect.browser.mjs
