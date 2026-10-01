@@ -2,13 +2,14 @@
 import {T} from "@/lib/language";
 
 import Image from "next/image";
-import {useState} from "react";
+import {useState,type ReactNode} from "react";
 
 import type { MenuProduct } from "@/types/menu";
 import type { ProductRatingSummary } from "@/types/review";
 
 
 interface ProductCardProps {
+    portionOptions?: ReactNode;
     refined?: boolean;
     unavailableForPickup?: boolean;
     product: MenuProduct;
@@ -59,6 +60,7 @@ function formatWeight(
 
 
 export default function ProductCard({
+    portionOptions,
     refined = false,
     unavailableForPickup = false,
     product,
@@ -96,7 +98,7 @@ export default function ProductCard({
     return (
         <article
             className={`
-                group
+                gokul-product-card group
                 ${refined ? "gokul-menu-product-card" : ""}
                 flex
                 min-h-32
@@ -121,7 +123,7 @@ export default function ProductCard({
             {/* ============================================================ */}
 
             <div
-                className="
+                className="product-card-image
                     relative
                     h-32
                     w-28
@@ -163,7 +165,7 @@ export default function ProductCard({
                             />
                         )
                         : (
-                            <div className="
+                            <div className="product-image-fallback
                                 flex
                                 h-full
                                 items-center
@@ -213,7 +215,7 @@ export default function ProductCard({
             {/* Product Details                                               */}
             {/* ============================================================ */}
 
-            <div className="
+            <div className="product-card-copy
                 flex
                 min-w-0
                 flex-1
@@ -363,6 +365,7 @@ export default function ProductCard({
                 </div>
 
 
+                {portionOptions}
                 {/* Price + Add */}
 
                 <div className={`

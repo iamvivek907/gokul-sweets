@@ -7,6 +7,7 @@ import {pickupIsFresh} from "@/lib/pickupFreshness";
 import CheckoutAdjustmentDialog from "@/components/checkout/CheckoutAdjustmentDialog";
 import {getCartSnapshot,parseCart,saveCart} from "@/lib/cartStorage";
 import {savePickupSlot} from "@/lib/checkoutStorage";
+import CheckoutPaymentNotice from "@/components/checkout/CheckoutPaymentNotice";
 import CheckoutMobileAction from "@/components/checkout/CheckoutMobileAction";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {formatWeight} from "@/lib/orderQuantity";
@@ -938,7 +939,14 @@ setInventoryIssue(null);
 setPickupRecovery(false);
 
 try {
-
+    const identityPolicy = await apiClient<{guestCheckoutEnabled?: boolean}>("/api/storefront/customer-identity", {signal: AbortSignal.timeout(5000)});
+    if (identityPolicy.guestCheckoutEnabled === false) {
+        const session = await apiClient<{authenticated: boolean; phone?: string}>("/api/customer/identity/me", {credentials: "include", signal: AbortSignal.timeout(5000)});
+        if (!session.authenticated || session.phone?.replace(/\D/g, "").slice(-10) !== customerPhone) {
+            router.push("/checkout/customer");
+            return;
+        }
+    }
     // Resolve the browser's pending-order hint before binding a signed quote.
     // An expired order must never supply a quote token for a new order.
     let reusablePendingOrder = false;
@@ -1650,6 +1658,7 @@ try {
     return (
         <AppShell>
             <CheckoutExperienceFrame enabled={storefrontFeatures?.checkoutExperienceV2 === true} stage="review" allowBranchChange>
+                <CheckoutPaymentNotice />
 
             <section
                 className="

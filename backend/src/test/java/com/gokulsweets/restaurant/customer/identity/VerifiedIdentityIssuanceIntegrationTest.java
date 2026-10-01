@@ -132,4 +132,53 @@ class VerifiedIdentityIssuanceIntegrationTest {
                 WHERE environment = 'DEV' AND new_subject_id IN (?, ?)
                 """, Long.class, continuedSubject, newSubject)).isEqualTo(2L);
     }
+    @Test
+    void guestDisabledCheckoutRequiresLivePhoneMatchedIdentityAndOwnedReplay() {
+        var features = new com.gokulsweets.restaurant.config.EnhancementProperties();
+        features.setCustomerOtpIdentity(true);
+        var settings = new org.springframework.mock.env.MockEnvironment()
+                .withProperty("gokul.checkout.guest-enabled", "false")
+                .withProperty("gokul.environment-isolation.enabled", "true")
+                .withProperty("gokul.web.environment-cors-enabled", "true")
+                .withProperty("gokul.environment-isolation.environment", "DEV");
+        var ownership = new VerifiedOrderOwnership(jdbc, features, settings);
+        var now = Instant.now();
+        var current = issuance.issue(ConsentEnvironment.DEV, "checkout-" + java.util.UUID.randomUUID(),
+                "+919876543210", now);
+        var other = issuance.issue(ConsentEnvironment.DEV, "other-" + java.util.UUID.randomUUID(),
+                "+919123456789", now);
+        var marker = java.util.UUID.randomUUID().toString().substring(0, 8);
+        var branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Checkout test') RETURNING id",
+                Long.class, "CHECKOUT-" + marker);
+        var slot = jdbc.queryForObject("""
+                INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity)
+                VALUES (?, CURRENT_DATE, '10:00', '10:30', 2) RETURNING id
+                """, Long.class, branch);
+        var order = jdbc.queryForObject("""
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name,
+                    customer_phone, pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Checkout customer', '9876543210', 'NORMAL', 'PENDING_PAYMENT', CURRENT_TIMESTAMP)
+                RETURNING id
+                """, Long.class, "GKS-CHECKOUT-" + marker, branch, slot);
+
+        assertThatThrownBy(() -> ownership.requireCheckoutIdentity("9876543210", null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> ownership.bindNewOrder(order, "9123456789", current.token()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM verified_order_ownership WHERE order_id=?",
+                Integer.class, order)).isZero();
+        ownership.requireCheckoutIdentity("9876543210", current.token());
+        ownership.bindNewOrder(order, "9876543210", current.token());
+        ownership.requireCheckoutReplay(order, current.token());
+        assertThatThrownBy(() -> ownership.requireCheckoutReplay(order, other.token()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+
+        jdbc.update("UPDATE verified_customer_sessions SET issued_at=CURRENT_TIMESTAMP - INTERVAL '2 seconds', expires_at=CURRENT_TIMESTAMP - INTERVAL '1 second' WHERE token_digest=?",
+                VerifiedCustomerSessionStore.digest(current.token()));
+        assertThatThrownBy(() -> ownership.requireCheckoutIdentity("9876543210", current.token()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> ownership.requireCheckoutReplay(order, current.token()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
 }

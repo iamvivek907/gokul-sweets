@@ -90,6 +90,7 @@ public class OrderService {
             String idempotencyKey,
             String identityToken
     ) {
+        verifiedOrderOwnership.requireCheckoutIdentity(request.customerPhone(), identityToken);
 
         String requestHash =
                 orderIdempotencyService
@@ -118,6 +119,7 @@ public class OrderService {
             Order existingOrder =
                     claim.existingOrder();
 
+            verifiedOrderOwnership.requireCheckoutReplay(existingOrder.getId(), identityToken);
             log.info(
                     "Duplicate order request resolved idempotently: orderId={}, orderNumber={}",
                     existingOrder.getId(),

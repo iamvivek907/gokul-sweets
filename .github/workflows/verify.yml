@@ -71,6 +71,8 @@ jobs:
           mkdir -p /tmp/gokul-scrum111-layouts
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/brand-careers.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/storefront-reconnect.browser.mjs
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/compact-mobile-checkout.browser.mjs
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-single-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/branch-discovery.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/simple-checkout-kitchen.browser.mjs
 

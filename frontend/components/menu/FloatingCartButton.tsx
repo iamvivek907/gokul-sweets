@@ -4,6 +4,8 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 
 
 import Link from "next/link";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useState, useEffect} from "react";
 
 
 interface FloatingCartButtonProps {
@@ -41,6 +43,16 @@ export default function FloatingCartButton({
     total
 }: FloatingCartButtonProps) {
 
+    const features = useStorefrontFeatures();
+    const [mobile, setMobile] = useState(false);
+    useEffect(() => {
+        const media = window.matchMedia("(max-width: 640px)");
+        const update = () => setMobile(media.matches);
+        update(); media.addEventListener("change", update);
+        return () => media.removeEventListener("change", update);
+    }, []);
+    const quick = mobile && features?.simplifiedCheckout;
+    const consolidated=quick&&features?.checkoutExperienceV2&&features.acceptedCheckoutQuote;
     if (
         itemCount <= 0
     ) {
@@ -63,7 +75,7 @@ export default function FloatingCartButton({
         >
 
             <Link
-                href="/cart"
+                href={consolidated ? "/checkout/mobile" : quick ? "/checkout/pickup" : "/cart"}
                 className="
                     flex
                     min-h-16
@@ -141,7 +153,7 @@ export default function FloatingCartButton({
                                 text-white!
                             "
                         >
-                            <T text="View Cart" /></p>
+                            <T text={consolidated ? "Continue" : quick ? "Choose pickup" : "View Cart"} /></p>
 
                     </div>
 

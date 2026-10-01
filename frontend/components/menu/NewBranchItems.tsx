@@ -1,5 +1,6 @@
 "use client";
 
+import {mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import Image from "next/image";
 import {useEffect, useRef, useState} from "react";
 import {apiClient} from "@/services/apiClient";
@@ -11,7 +12,8 @@ interface Highlights {
     latestProductIds: number[];
 }
 
-export default function NewBranchItems({branch, products, onSelect}: {
+export default function NewBranchItems({branch, products, onSelect,portionGroups}: {
+    portionGroups?: PortionGroup[];
     branch: Branch;
     products: MenuProduct[];
     onSelect: (product: MenuProduct) => void;
@@ -54,7 +56,7 @@ export default function NewBranchItems({branch, products, onSelect}: {
             </div>
         </div>
         <div className={styles.row} ref={row}>
-            {shownItems.map(product => <button type="button" key={product.id} className={styles.item}
+            {mobileMenuRows(shownItems,portionGroups??[]).map(row => {const product=row.group?{...row.product,name:row.group.title}:row.product;return <button type="button" key={product.id} className={styles.item}
                 onClick={() => onSelect(product)} aria-label={`View ${product.name} on the menu`}>
                 <span className={styles.photo}>
                     {product.imageUrl && !failedPhotos.includes(product.imageUrl)
@@ -63,7 +65,7 @@ export default function NewBranchItems({branch, products, onSelect}: {
                         : <span className={styles.fallback} aria-hidden="true">G</span>}
                 </span>
                 <span className={styles.name}>{product.name}</span>
-            </button>)}
+            </button>;})}
         </div>
     </section>;
 }

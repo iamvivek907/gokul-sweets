@@ -6,6 +6,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -17,6 +18,15 @@ class VerifiedOrderOwnershipTest {
             .withProperty("gokul.web.environment-cors-enabled", "true")
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final VerifiedOrderOwnership ownership = new VerifiedOrderOwnership(jdbc, features, settings);
+
+    @Test void draftOffersRequireVerificationEvenWhenGuestCheckoutIsEnabled() {
+        settings.setProperty("gokul.checkout.guest-enabled", "true"); features.setCustomerOtpIdentity(true);
+        assertThatThrownBy(() -> ownership.requireVerifiedIdentity("9876543210", null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> ownership.requireVerifiedIdentity("9876543210", "a".repeat(64)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
 
     @Test
     void guestAndDisabledIdentityNeverAttemptOwnership() {
@@ -46,5 +56,41 @@ class VerifiedOrderOwnershipTest {
         assertThat(ownership.orderNumbers("PROD", second)).isEmpty();
         verify(jdbc).query(contains("ownership.verified_subject_id = ?"),
                 any(org.springframework.jdbc.core.RowMapper.class), eq("DEV"), eq(first));
+    }
+
+    @Test void guestOffRejectsMissingMalformedAndUnavailableIdentityBeforeAnyDatabaseWrite() {
+        settings.setProperty("gokul.checkout.guest-enabled", "false");
+        assertThatThrownBy(() -> ownership.requireCheckoutIdentity("9876543210", null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        features.setCustomerOtpIdentity(true);
+        assertThatThrownBy(() -> ownership.requireCheckoutIdentity("9876543210", "invalid"))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        settings.setProperty("gokul.environment-isolation.enabled", "false");
+        assertThatThrownBy(() -> ownership.requireCheckoutIdentity("9876543210", "a".repeat(64)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verifyNoInteractions(jdbc);
+    }
+
+    @Test void guestOffRequiresLivePhoneMatchedSessionAndSuccessfulOwnerBinding() {
+        features.setCustomerOtpIdentity(true); settings.setProperty("gokul.checkout.guest-enabled", "false");
+        assertThatThrownBy(() -> ownership.requireCheckoutIdentity("9876543210", "a".repeat(64)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+        when(jdbc.queryForList(anyString(), eq(java.util.UUID.class), eq("DEV"), any(byte[].class), any(), eq("+919876543210")))
+                .thenReturn(java.util.List.of(java.util.UUID.randomUUID()));
+        assertThatThrownBy(() -> ownership.bindNewOrder(3L, "9876543210", "a".repeat(64)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        when(jdbc.update(anyString(), eq("DEV"), any(byte[].class), any(), eq("+919876543210"), eq(3L), eq("DEV"), any())).thenReturn(1);
+        ownership.bindNewOrder(3L, "9876543210", "a".repeat(64));
+        assertThatThrownBy(() -> ownership.requireCheckoutIdentity("9123456789", "a".repeat(64)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
+    @Test void guestOffIdempotentReplayRequiresTheCurrentOrdersOwner() {
+        settings.setProperty("gokul.checkout.guest-enabled", "false");
+        assertThatThrownBy(() -> ownership.requireCheckoutReplay(3L, "a".repeat(64)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(3L), eq("DEV"), any(byte[].class), any())).thenReturn(true);
+        ownership.requireCheckoutReplay(3L, "a".repeat(64));
     }
 }

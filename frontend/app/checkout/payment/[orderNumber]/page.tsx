@@ -18,6 +18,7 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import MobilePaymentCancelDialog from "@/components/checkout/MobilePaymentCancelDialog";
 import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
 import ConfirmedPickupContext from "@/components/order/ConfirmedPickupContext";
 import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
@@ -1318,7 +1319,7 @@ export default function PaymentPage() {
             applyPaymentResult(result);
             if(result.paymentStatus==="EXPIRED" || result.paymentStatus==="FAILED") {
                 clearPendingPayment();clearPendingOrder();clearPaymentGatewayVisit(payment.orderNumber);
-                router.push(deliveryOrder ? "/delivery/check" : "/checkout/review");
+                router.push(deliveryOrder ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`);
             } else {setConfirmCancel(false);setError("Payment was already confirmed. View this order before starting another checkout.");}
         } catch(error) {setError(error instanceof Error ? error.message : "Could not check payment. Your order is unchanged; try again.");}
         finally {setCancelling(false);}
@@ -1797,6 +1798,7 @@ export default function PaymentPage() {
 
         <AppShell>
             <CheckoutExperienceFrame enabled={features?.checkoutExperienceV2 === true} stage="payment">
+            <MobilePaymentCancelDialog active={confirmCancel && (features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true)} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
 
             <section
                 className="
@@ -1807,6 +1809,11 @@ export default function PaymentPage() {
             >
 
                 {!deliveryOrder && <ConfirmedPickupContext orderNumber={orderNumber} />}
+                {(isFailed || isExpired) && <section className="mobile-payment-recovery" aria-label="Retry your order">
+                    <h2><T text="Payment didn’t complete" /></h2>
+                    <p><T text="Your cart is saved. We’ll check the payment before opening a fresh checkout." /></p>
+                    <button type="button" disabled={cancelling || refreshing || openingPayment} onClick={() => void cancelCheckout()}>{cancelling ? translate("Checking payment…") : translate("Retry checkout")}</button>
+                </section>}
 
                 <div
                     className="
@@ -2656,7 +2663,7 @@ export default function PaymentPage() {
                     {(isPending || isFailed || isExpired) && <section aria-label="Payment recovery" className="mt-4 rounded-2xl border border-[#c4d4c9] bg-[#fffaf2] p-4 text-[#173c39]">
                         <p className="font-bold">{isPending ? translate("Need to stop this checkout?") : "Your cart is ready to try again"}</p>
                         <p className="mt-1 text-sm leading-6"><T text="Check payment and release the unpaid pickup reservation. Keep your items for another attempt." /></p>
-                        {confirmCancel ? <div className="mt-3"><p className="text-sm"><T text="Close the gateway first. A payment received after cancellation enters the refund process." /></p>
+                        {confirmCancel ? <div className="payment-cancel-inline mt-3"><p className="text-sm"><T text="Close the gateway first. A payment received after cancellation enters the refund process." /></p>
                             <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={()=>void cancelCheckout()} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white disabled:opacity-50">{cancelling ? translate("Checking payment…") : translate("Cancel order & keep cart")}</button>
                             <button type="button" disabled={cancelling} onClick={()=>setConfirmCancel(false)} className="min-h-11 rounded-xl border px-4 font-bold"><T text="Continue payment" /></button></div></div>
                             : <button type="button" disabled={openingPayment || refreshing} onClick={()=>setConfirmCancel(true)} className="mt-3 min-h-11 rounded-xl border border-[#c4d4c9] bg-white px-4 font-bold">{isPending ? translate("Cancel this order") : translate("Check & retry checkout")}</button>}

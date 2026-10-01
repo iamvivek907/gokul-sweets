@@ -1,5 +1,6 @@
 "use client";
 
+import {usePathname} from "next/navigation";
 import type {
     ReactNode
 } from "react";
@@ -22,6 +23,7 @@ import CustomerAlertRuntime from "@/components/customer/CustomerAlertRuntime";
 import "./futuristic-storefront.css";
 import "./editorial-storefront.css";
 import "./customer-journey.css";
+import "./compact-mobile.css";
 
 
 interface AppShellProps {
@@ -39,11 +41,13 @@ export default function AppShell({
     showConnectionNotice = true,
     editorial = false
 }: AppShellProps) {
+    const pathname = usePathname();
     const features = useStorefrontFeatures();
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
 
     return (
         <div
+            data-customer-route={pathname}
             className={`
                 app-container
                 ${futuristic ? "future-storefront" : ""}

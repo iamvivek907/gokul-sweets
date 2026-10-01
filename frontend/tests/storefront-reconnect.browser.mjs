@@ -29,7 +29,9 @@ try {
   unavailable=false;await page.clock.fastForward(16000);await page.getByRole('heading',{name:/Your favourites, ready when you are/}).waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-reconnect-cart-sentinel')),'retained');assert.equal(writes,0);
   // A real uncontrolled customer input remains mounted through failed settings and recovery.
-  await page.goto(`${base}/careers`);await page.getByLabel('Full name').fill('Preserved customer input');
+  await page.goto(`${base}/careers`);
+  if(width<=640){await page.locator('.gokul-mobile-launch').waitFor({state:'visible'});await page.clock.fastForward(2600);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});}
+  await page.getByLabel('Full name').fill('Preserved customer input');
   unavailable=true;await page.clock.fastForward(61000);await page.getByText('Online ordering is taking longer to connect.',{exact:true}).waitFor();assert.equal(await page.getByLabel('Full name').inputValue(),'Preserved customer input');
   unavailable=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByText('Online ordering is taking longer to connect.',{exact:true}).waitFor({state:'hidden'});assert.equal(await page.getByLabel('Full name').inputValue(),'Preserved customer input');
   await context.close();

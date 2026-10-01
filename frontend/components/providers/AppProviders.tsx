@@ -1,4 +1,5 @@
 "use client";
+import MobileBrandLaunch from "@/components/common/MobileBrandLaunch";
 import NavigationFeedback from "@/components/common/NavigationFeedback";
 import {LanguageRuntime} from "@/lib/language";
 
@@ -27,6 +28,7 @@ export default function AppProviders({
     return (
         <>
             <LanguageRuntime />
+            <MobileBrandLaunch />
             <NavigationFeedback />
             <ServiceWorkerRegistration />
 

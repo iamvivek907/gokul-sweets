@@ -40,14 +40,18 @@ async function loadWidget(): Promise<Msg91Window> {
     return sdk;
 }
 
-export default function CustomerIdentityPanel({mode = "profile", onSessionChange}: {
-    mode?: "profile" | "checkout" | "occasion";
+export default function CustomerIdentityPanel({mode = "profile", onSessionChange, onGuestCheckoutChange,sessionRevision=0}: {
+    sessionRevision?: number;
+    mode?: "profile" | "checkout" | "occasion" | "mobileCheckout";
     onSessionChange?: (session: CustomerSession) => void;
+    onGuestCheckoutChange?: (allowed: boolean) => void;
 }) {
     const translate = useTranslation();
     const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
         "loading");
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
+    const [guestAllowed, setGuestAllowed] = useState(true);
+    const [revision, setRevision] = useState(0);
     const [busy, setBusy] = useState(false);
     const [promptDismissed, setPromptDismissed] = useState(false);
     const promptButton = useRef<HTMLButtonElement>(null);
@@ -61,18 +65,20 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         alive.current = true;
         void (async () => {
             try {
-                const config = await apiClient<{enabled: boolean}>("/api/storefront/customer-identity");
+                const config = await apiClient<{enabled: boolean; guestCheckoutEnabled?: boolean}>("/api/storefront/customer-identity", {signal: AbortSignal.timeout(5000)});
                 if (!alive.current) return;
+                setGuestAllowed(config.guestCheckoutEnabled !== false);
+                onGuestCheckoutChange?.(config.guestCheckoutEnabled !== false);
                 if (!config.enabled) {setAvailability("disabled"); onSessionChange?.({authenticated: false}); return;}
                 const session = await apiClient<CustomerSession>(
-                    "/api/customer/identity/me", {credentials: "include"});
+                    "/api/customer/identity/me", {credentials: "include", signal: AbortSignal.timeout(5000)});
                 if (alive.current) {setSession(session); setNameDraft(session.name ?? ""); onSessionChange?.(session); setAvailability("ready");}
             } catch {
-                if (alive.current) {setAvailability("error"); onSessionChange?.({authenticated: false});}
+                if (alive.current) {setAvailability("error"); setGuestAllowed(false); onGuestCheckoutChange?.(false); onSessionChange?.({authenticated: false});}
             }
         })();
         return () => {alive.current = false;};
-    }, [onSessionChange]);
+    }, [onSessionChange, onGuestCheckoutChange, revision,sessionRevision]);
 
     useEffect(() => {
         if (mode !== "checkout" || availability !== "ready" || session.authenticated || promptDismissed) return;
@@ -85,15 +91,16 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     }, [mode, availability, session.authenticated, promptDismissed]);
 
     if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status"><T text="Checking phone verification…" /></p>;
-    if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" ? null : <section
+    if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" && guestAllowed ? null : <section
         className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"
         aria-label={translate("Phone verification")}>
         <h2 className="text-xl font-semibold text-[#241715]"><T text="Phone verification is unavailable" /></h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
-            {availability === "error"
+            {!guestAllowed ? translate("Sign-in is needed to place an order. Your cart is saved. Please try verification again shortly.") : availability === "error"
                 ? "We could not check verification right now. Please try again later. You can still place a pickup order as a guest."
                 : "SMS sign-in is not enabled for this storefront yet. You can still place a pickup order as a guest."}
         </p>
+        <button type="button" className="mt-3 min-h-11 underline" onClick={() => setRevision(value => value + 1)}><T text="Try again" /></button>
     </section>;
 
     async function start() {
@@ -147,7 +154,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         } catch (failure) {
             setError(failure instanceof ApiError && failure.status === 429
                 ? "Too many verification attempts. Please wait up to an hour before trying again."
-                : "Verification is unavailable right now. You can continue as a guest.");
+                : guestAllowed ? "Verification is unavailable right now. You can continue as a guest." : translate("Verification is unavailable right now. Your cart is saved; try again."));
             setBusy(false);
         }
     }
@@ -193,6 +200,20 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
 
     if (mode === "occasion" && session.authenticated) return <div className="flex flex-wrap items-center justify-between gap-3" aria-label="Verified occasion contact"><div><p className="font-semibold text-[#245b38]"><T text="✓ Phone verified" /></p><p className="mt-1 text-sm">{session.name || "Your Gokul account"} · {session.phone}</p></div><Link href="/profile" className="text-sm underline"><T text="Manage account" /></Link></div>;
 
+    if (mode === "checkout" && !guestAllowed && !session.authenticated) return <section className="checkout-required-signin rounded-2xl border border-[#d9e5df] bg-white p-5" aria-label={translate("Sign in to checkout")}>
+        <h2 className="text-xl font-bold"><T text="Verify your phone to continue" /></h2>
+        <p className="mt-2 text-sm leading-6"><T text="Your cart stays saved. Sign in once to fill your contact details and keep your orders together." /></p>
+        <button type="button" disabled={busy} onClick={() => {void start();}} className="mt-4 min-h-12 w-full rounded-xl bg-[#143936] px-5 font-bold text-white disabled:opacity-50">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>
+        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
+    </section>;
+
+    if (mode === "mobileCheckout") return <section className="mobile-checkout-section" aria-label={translate("Phone verification")}>
+        <h2><T text={session.authenticated ? "Phone verified" : "Verify your phone"} /></h2>
+        <p>{session.authenticated ? session.phone : translate("Verify your phone to place orders and see your pickup code.")}</p>
+        {!session.authenticated && <button type="button" disabled={busy} onClick={() => void start()} className="mt-2 min-h-11 rounded-xl bg-[#7a1625] px-4 text-white">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>}
+        {error && <p role="alert">{translate(error)}</p>}
+    </section>;
+
     if (mode === "checkout") return <>
         {session.authenticated ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f4faf4] p-4" aria-label="Verified pickup contact">
             <div><p className="text-sm font-semibold text-[#245b38]">Signed in · phone verified</p>
@@ -220,7 +241,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         <h2 className="mt-2 text-xl font-semibold text-[#241715]">{session.authenticated ? "Account details" : "Verify your phone"}</h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
             {session.authenticated ? "Update the name shown on your account or manage your sign-in."
-                : "Optional verification helps secure your account. You can still place a pickup order as a guest."}
+                : guestAllowed ? "Optional verification helps secure your account. You can still place a pickup order as a guest." : translate("Verify your phone to place orders and see your pickup code.")}
         </p>
         {session.authenticated && session.phone && <p className="mt-2 text-sm font-semibold text-[#241715]">
             Verified phone: <span className="select-text">{session.phone}</span>

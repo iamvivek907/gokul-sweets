@@ -45,12 +45,14 @@ public class DeliveryOrderCreationService {
         if (!flags.deliveryCheckoutReady())
             throw new IllegalStateException("Delivery order creation is disabled.");
         validate(request);
+        ownership.requireCheckoutIdentity(request.customerPhone(), identityToken);
         String fingerprint = fingerprint(request);
         var claim = idempotency.claim(idempotencyKey, fingerprint);
         if (!claim.newRequest()) {
             Order existing = claim.existingOrder();
             if (existing.getFulfillmentType() != FulfillmentType.DELIVERY)
                 throw new IllegalStateException("This idempotency key belongs to a pickup order.");
+            ownership.requireCheckoutReplay(existing.getId(), identityToken);
             return response(existing);
         }
 

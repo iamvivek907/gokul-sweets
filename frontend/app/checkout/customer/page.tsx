@@ -8,6 +8,7 @@ import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
 import {formatBusinessTime} from "@/lib/businessTime";
 
 import {
+    useEffect,
     useMemo,
     useState,
     useSyncExternalStore
@@ -85,6 +86,7 @@ export default function CustomerPage() {
     const router =
         useRouter();
 
+    const [guestAllowed, setGuestAllowed] = useState(false);
     const [identity, setIdentity] = useState<CustomerSession | null>(null);
 
 
@@ -165,6 +167,14 @@ export default function CustomerPage() {
         ? verifiedCheckoutContact(identity)
         : existingCustomer;
 
+    useEffect(() => {
+        const contact = identity?.authenticated ? verifiedCheckoutContact(identity) : null;
+        if (!contact || !checkoutExperienceV2 || !window.matchMedia("(max-width: 640px)").matches
+                || isEmpty || !pickupSlot || branch?.id !== branchId) return;
+        saveCustomerDetails(contact);
+        router.replace("/checkout/review");
+    }, [identity, checkoutExperienceV2, isEmpty, pickupSlot, branch?.id, branchId, router]);
+
     /*
      * =========================================================
      * CUSTOMER SUBMIT
@@ -175,6 +185,7 @@ export default function CustomerPage() {
             CustomerDetails
     ) {
 
+        if (!guestAllowed && !verifiedPhone) return;
         saveCustomerDetails(
             customer
         );
@@ -500,14 +511,14 @@ export default function CustomerPage() {
                                     text-[#756763]
                                 "
                             >
-                                <T text="We'll use these details for pickup and order updates. Sign in to fill your verified contact, or continue as a guest." /></p>
+                                <T text={guestAllowed ? "We'll use these details for pickup and order updates. Sign in to fill your verified contact, or continue as a guest." : "Sign in to fill your verified contact details and continue to payment."} /></p>
 
                         </div>
 
 
-                        <CustomerIdentityPanel mode="checkout" onSessionChange={setIdentity} />
+                        <CustomerIdentityPanel mode="checkout" onSessionChange={setIdentity} onGuestCheckoutChange={setGuestAllowed} />
 
-                        <CustomerDetailsForm
+                        {(guestAllowed || verifiedPhone) && <CustomerDetailsForm
                             key={identity?.authenticated ? `verified:${identity.phone}:${identity.name ?? ""}` : "guest"}
                             initialValue={
                                 checkoutCustomer
@@ -516,7 +527,7 @@ export default function CustomerPage() {
                             onSubmit={
                                 handleCustomerSubmit
                             }
-                        />
+                        />}
 
                     </div>
 
