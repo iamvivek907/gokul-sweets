@@ -15,7 +15,7 @@ class OrderPickupCodeControllerTest {
         var access = mock(VerifiedOrderAccess.class);
         var codes = mock(PickupCodeService.class);
         var controller = new OrderController(mock(OrderService.class), mock(OrderQueryService.class),
-                mock(CheckoutQuoteService.class), mock(TrustedCheckoutIdentity.class), access, codes);
+                mock(CheckoutQuoteService.class), mock(TrustedCheckoutIdentity.class), access, codes, mock(MobileCheckoutPreview.class));
         var request = new MockHttpServletRequest();
         when(codes.customerCode("ORDER-1")).thenReturn(new PickupCodeService.CustomerCode("0042"),
                 new PickupCodeService.CustomerCode(null));

@@ -77,6 +77,12 @@ public class RebateEligibilityService {
             );
         }
 
+        return previewDraft(order);
+    }
+
+    /** Prices a validated draft without creating an order or claiming an offer. */
+    @Transactional(readOnly=true)
+    public List<AvailableRebateResponse> previewDraft(Order order) {
         BigDecimal eligibleAmount =
                 calculateEligibleAmount(order);
 
@@ -137,7 +143,7 @@ public class RebateEligibilityService {
 
         log.debug(
                 "Available rebates calculated: orderNumber={}, candidateCount={}, eligibleCount={}",
-                orderNumber,
+                order.getOrderNumber(),
                 candidates.size(),
                 available.size()
         );
@@ -150,6 +156,11 @@ public class RebateEligibilityService {
     public List<AvailableRebateResponse> getSpendTargets(String orderNumber) {
         var available=getAvailableRebates(orderNumber); // also enforces unpaid/order lifecycle
         var order=orderRepository.findDetailedByOrderNumber(orderNumber).orElseThrow();
+        return previewSpendTargets(order,available);
+    }
+
+    @Transactional(readOnly=true)
+    public List<AvailableRebateResponse> previewSpendTargets(Order order,List<AvailableRebateResponse> available) {
         if(order.getPickupType()!=com.gokulsweets.restaurant.order.enums.PickupType.NORMAL || order.getFulfillmentType()!=com.gokulsweets.restaurant.order.enums.FulfillmentType.PICKUP)return List.of();
         var eligible=calculateEligibleAmount(order);
         var baseline=available.stream().map(AvailableRebateResponse::rebateAmount).max(BigDecimal::compareTo).orElse(BigDecimal.ZERO).max(defaultZero(order.getRebateDiscountAmount()));

@@ -1,6 +1,8 @@
 "use client";
 import {T} from "@/lib/language";
 
+import MobilePortionCard from "./MobilePortionCard";
+import {mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import ProductCard
     from "@/components/menu/ProductCard";
 import type {ItemAvailability} from "@/services/availabilityApi";
@@ -17,6 +19,7 @@ import type {
 
 
 interface ProductGridProps {
+    portionGroups?: PortionGroup[];
     refined?: boolean;
     pickupItems?: ItemAvailability[];
     pickupChecking?: boolean;
@@ -49,6 +52,7 @@ interface ProductGridProps {
 
 
 export default function ProductGrid({
+    portionGroups,
     refined = false,
     products,
     ratingSummaries,
@@ -115,7 +119,9 @@ export default function ProductGrid({
     return (
         <div className={dateAware ? styles.products : undefined}>
             <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
-                {products.map(product => {
+                {mobileMenuRows(products,portionGroups??[]).map(row => {
+                    const product=row.product;
+                    if(row.group&&row.products)return <div key={row.group.key} id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware}/></div>;
                     const pickup = pickupItems?.find(item => item.productId === product.id);
                     const unavailable = dateAware && pickup?.available === false;
                     return (

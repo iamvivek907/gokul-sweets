@@ -1,6 +1,11 @@
 "use client";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
+import {apiClient} from "@/services/apiClient";
+import {matchesMobileFilters,type PortionGroup} from "@/lib/mobileMenu";
+import MobileMenuFilters from "./MobileMenuFilters";
 import {T,useTranslation} from "@/lib/language";
 import {groupMenuProducts} from "@/lib/menuGroups";
 
@@ -662,6 +667,15 @@ export default function MenuScreen() {
         );
 
 
+    const phone=usePhoneViewport();
+    const mobileFeatures=useStorefrontFeatures();
+    const phoneMenu=phone===true&&(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true;
+    const [mobileCategories,setMobileCategories]=useState<number[]|null>(null);
+    const [maximumPrice,setMaximumPrice]=useState<number|null>(null);
+    const [portionsOnly,setPortionsOnly]=useState(false);
+    const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
+    const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
+    useEffect(()=>{if(!phoneMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[phoneMenu,branch]);
     const filteredProducts =
         useMemo(
             () => {
@@ -675,7 +689,7 @@ export default function MenuScreen() {
                 return allProducts.filter(
                     product => {
 
-                        const categoryMatch =
+                        const categoryMatch = phoneMenu&&mobileCategories!==null ? !mobileCategories.length||mobileCategories.includes(product.categoryId) :
                             effectiveCategoryId
                             === null
                             ||
@@ -703,6 +717,7 @@ export default function MenuScreen() {
                             categoryMatch
                             &&
                             searchMatch
+                            && (!phoneMenu||matchesMobileFilters(product,null,maximumPrice,portionsOnly,portionGroups))
                         );
                     }
                 );
@@ -710,7 +725,7 @@ export default function MenuScreen() {
             [
                 allProducts,
                 effectiveCategoryId,
-                search
+                search,phoneMenu,mobileCategories,maximumPrice,portionsOnly,portionGroups
             ]
         );
 
@@ -718,7 +733,7 @@ export default function MenuScreen() {
     const hasActiveFilters =
         search.trim().length > 0
         ||
-        effectiveCategoryId !== null;
+        (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
     const pickupCheck = useDateAvailability(filteredProducts);
 
@@ -834,6 +849,7 @@ export default function MenuScreen() {
 
 
     function clearFilters() {
+        setMobileCategories([]); setMaximumPrice(null); setPortionsOnly(false);
 
         setSearch(
             ""
@@ -1192,7 +1208,7 @@ export default function MenuScreen() {
                                 "
                             >
 
-                                <CategoryTabs
+                                {phoneMenu?<MobileMenuFilters categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={setMobileCategories} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly}/>:<CategoryTabs
                                     categories={
                                         categories
                                     }
@@ -1202,7 +1218,7 @@ export default function MenuScreen() {
                                     onSelect={
                                         setSelectedCategoryId
                                     }
-                                />
+                                />}
 
                             </div>
                         )}
@@ -1285,7 +1301,7 @@ export default function MenuScreen() {
                                             "
                                         >
                                             {
-                                                selectedCategory
+                                                phoneMenu&&mobileCategories!==null ? mobileCategories.map(id=>categories.find(c=>c.id===id)?.name).filter(Boolean).join(" + ")||translate("All items") : selectedCategory
                                                     ? selectedCategory.name
                                                     : translate("All items")
                                             }
@@ -1343,6 +1359,7 @@ export default function MenuScreen() {
                                     <div className="gokul-menu-category-heading"><h3>{group.name}</h3><span>{group.products.length} {group.products.length === 1 ? translate("item") : "items"}</span></div>
                                     {group.description && <p>{group.description}</p>}
                                 <ProductGrid
+                                    portionGroups={phoneMenu?portionGroups:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
                                     pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
@@ -1374,6 +1391,7 @@ export default function MenuScreen() {
                                 />
                                 </section>) : (
                                 <ProductGrid
+                                    portionGroups={phoneMenu?portionGroups:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
                                     pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}

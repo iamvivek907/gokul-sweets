@@ -51,7 +51,8 @@ export default function FloatingCartButton({
         update(); media.addEventListener("change", update);
         return () => media.removeEventListener("change", update);
     }, []);
-    const quick = mobile && features?.simplifiedCheckout && features?.checkoutExperienceV2;
+    const quick = mobile && features?.simplifiedCheckout;
+    const consolidated=quick&&features?.checkoutExperienceV2&&features.acceptedCheckoutQuote;
     if (
         itemCount <= 0
     ) {
@@ -74,7 +75,7 @@ export default function FloatingCartButton({
         >
 
             <Link
-                href={quick ? "/checkout/pickup" : "/cart"}
+                href={consolidated ? "/checkout/mobile" : quick ? "/checkout/pickup" : "/cart"}
                 className="
                     flex
                     min-h-16
@@ -152,7 +153,7 @@ export default function FloatingCartButton({
                                 text-white!
                             "
                         >
-                            <T text={quick ? "Choose pickup" : "View Cart"} /></p>
+                            <T text={consolidated ? "Continue" : quick ? "Choose pickup" : "View Cart"} /></p>
 
                     </div>
 

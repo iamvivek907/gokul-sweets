@@ -55,6 +55,13 @@ class DeliveryRebatePricingTest {
         return rebate;
     }
 
+    @Test void draftPreviewDoesNotCreateAnOrderAndUsesTheSameFeeRules() {
+        var order=order("2", "0"); order.setId(null); order.setOrderNumber(null); rebate();
+        clearInvocations(orders, payments);
+        assertThat(eligibility.previewDraft(order).getFirst().payableAfterRebate()).isEqualByComparingTo("147.90");
+        verifyNoInteractions(orders, payments);
+    }
+
     @Test void deliveryPreviewApplyAndRemovePreserveChargeWithInclusivePercentageFee() {
         var order = order("2", "18"); rebate();
         var preview = eligibility.getAvailableRebates("DELIVERY-TEST").getFirst();

@@ -1,0 +1,31 @@
+"use client";
+import Link from "next/link";
+import {useEffect,useState} from "react";
+import {useAdminAuth} from "@/contexts/AdminAuthContext";
+import {apiClient} from "@/services/apiClient";
+import {adminFetch} from "@/services/adminApi";
+import {getAdminBranchMenu} from "@/services/adminMenuApi";
+import {preferredAdminBranchId,rememberAdminBranchId} from "@/lib/adminBranchSelection";
+import type {AdminBranchProduct} from "@/types/adminMenu";
+import type {PortionGroup} from "@/lib/mobileMenu";
+type Snapshot={version:number;groups:PortionGroup[]};
+export default function PortionOptionsPage(){
+ const {profile,authorization,hasPermission}=useAdminAuth();
+ const [branches,setBranches]=useState<{id:number;name:string}[]>([]),[branchId,setBranchId]=useState<number|null>(null);
+ const [snapshot,setSnapshot]=useState<Snapshot|null>(null),[products,setProducts]=useState<AdminBranchProduct[]>([]);
+ const [error,setError]=useState(""),[busy,setBusy]=useState(false),[notice,setNotice]=useState(""),[revision,setRevision]=useState(0);
+ const allowed=hasPermission("MENU_MANAGE");
+ useEffect(()=>{if(!profile||!allowed)return;const controller=new AbortController();void apiClient<{id:number;name:string;active:boolean}[]>("/api/branches",{signal:controller.signal}).then(all=>{const values=all.filter(b=>b.active&&(profile.roleName==="OWNER_ADMIN"||profile.branchIds.includes(b.id)));setBranches(values);setBranchId(preferredAdminBranchId(profile.staffId,values));}).catch(()=>{if(!controller.signal.aborted)setError("Unable to load branches.");});return()=>controller.abort();},[profile,allowed]);
+ useEffect(()=>{if(!branchId||!authorization||!allowed)return;const controller=new AbortController();let alive=true;
+  void (async()=>{try{const response=await adminFetch(`/api/admin/branches/${branchId}/menu/portion-groups`,authorization,{signal:controller.signal});if(!response.ok)throw new Error("Unable to load portion options for this branch.");const value:Snapshot=await response.json();const menu=await getAdminBranchMenu(branchId,authorization,controller.signal);if(alive){setSnapshot(value);setProducts(menu);}}catch(e){if(alive)setError(e instanceof Error?e.message:"Unable to load options.");}})();return()=>{alive=false;controller.abort();};
+ },[branchId,authorization,allowed,revision]);
+ function update(index:number,group:PortionGroup){setSnapshot(value=>value?{...value,groups:value.groups.map((g,i)=>i===index?group:g)}:null);}
+ async function save(){if(!snapshot||!branchId||!authorization||busy)return;setBusy(true);setError("");setNotice("");try{const response=await adminFetch(`/api/admin/branches/${branchId}/menu/portion-groups`,authorization,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(snapshot)});if(!response.ok){const value=await response.json().catch(()=>({}));throw new Error(response.status===409?"Another staff member changed these options. Reload before saving.":value.message??"Check each group: use 2–6 distinct piece-based products from the same category and branch.");}setSnapshot(await response.json());setNotice("Portion choices saved. They appear together on mobile; desktop keeps separate menu items.");}catch(e){setError(e instanceof Error?e.message:"Unable to save options.");}finally{setBusy(false);}}
+ if(!profile)return <p className="p-6">Sign in to manage portion options.</p>;
+ if(!allowed)return <p className="p-6">Menu management permission is required.</p>;
+ return <main className="mx-auto max-w-4xl p-5"><Link href="/admin/menu">← Menu management</Link><h1 className="mt-4 text-3xl font-bold">Mobile portion choices</h1><p className="my-3">Put Half and Full choices in one mobile card. Link the existing menu items here; each keeps its own branch price and stock. Use Live Menu to change prices or availability.</p><label>Branch <select className="border p-2" value={branchId??""} disabled={busy} onChange={e=>{const id=Number(e.target.value);setSnapshot(null);setError("");setNotice("");setBranchId(id);rememberAdminBranchId(profile.staffId,id);}}>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label>
+ {error&&<p role="alert" className="my-4 text-red-800">{error}</p>}{notice&&<p role="status" className="my-4">{notice}</p>}
+ <button type="button" className="m-3 underline" disabled={busy} onClick={()=>{setSnapshot(null);setError("");setNotice("");setRevision(v=>v+1);}}>Reload saved options</button>
+ {snapshot&&<><fieldset disabled={busy}>{snapshot.groups.map((group,index)=><section className="my-4 rounded-xl border bg-white p-4" key={group.key}><label>Card name <input className="w-full border p-2" maxLength={100} value={group.title} onChange={e=>update(index,{...group,title:e.target.value})}/></label>{group.choices.map((choice,i)=><div className="my-3 grid gap-2 sm:grid-cols-2" key={i}><label>Portion label <input className="w-full border p-2" maxLength={30} value={choice.label} onChange={e=>update(index,{...group,choices:group.choices.map((c,j)=>j===i?{...c,label:e.target.value}:c)})}/></label><label>Menu item <select className="w-full border p-2" value={choice.productId||""} onChange={e=>update(index,{...group,choices:group.choices.map((c,j)=>j===i?{...c,productId:Number(e.target.value)}:c)})}><option value="">Choose item</option>{products.map(p=><option key={p.productId} value={p.productId}>{p.productName} · ₹{p.effectivePrice} · {p.available?"Available":"Unavailable"}</option>)}</select></label></div>)}<button type="button" className="underline text-red-800" onClick={()=>setSnapshot({...snapshot,groups:snapshot.groups.filter((_,i)=>i!==index)})}>Remove group</button></section>)}<button type="button" className="my-3 rounded-lg border p-3" disabled={snapshot.groups.length>=40} onClick={()=>setSnapshot({...snapshot,groups:[...snapshot.groups,{key:crypto.randomUUID(),title:"",choices:[{productId:0,label:"Half"},{productId:0,label:"Full"}]}]})}>+ Add portion group</button></fieldset><button type="button" disabled={busy} onClick={()=>void save()} className="ml-3 rounded-lg bg-[#7a1625] p-3 text-white">{busy?"Saving…":"Save portion choices"}</button><Link href="/admin/menu/live" className="ml-3 underline">Edit prices and availability</Link></>}
+ </main>;
+}

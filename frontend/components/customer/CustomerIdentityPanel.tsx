@@ -41,7 +41,7 @@ async function loadWidget(): Promise<Msg91Window> {
 }
 
 export default function CustomerIdentityPanel({mode = "profile", onSessionChange, onGuestCheckoutChange}: {
-    mode?: "profile" | "checkout" | "occasion";
+    mode?: "profile" | "checkout" | "occasion" | "mobileCheckout";
     onSessionChange?: (session: CustomerSession) => void;
     onGuestCheckoutChange?: (allowed: boolean) => void;
 }) {
@@ -204,6 +204,13 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         <p className="mt-2 text-sm leading-6"><T text="Your cart stays saved. Sign in once to fill your contact details and keep your orders together." /></p>
         <button type="button" disabled={busy} onClick={() => {void start();}} className="mt-4 min-h-12 w-full rounded-xl bg-[#143936] px-5 font-bold text-white disabled:opacity-50">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>
         {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
+    </section>;
+
+    if (mode === "mobileCheckout") return <section className="mobile-checkout-section" aria-label={translate("Phone verification")}>
+        <h2><T text={session.authenticated ? "Phone verified" : "Verify your phone"} /></h2>
+        <p>{session.authenticated ? session.phone : translate("Verify your phone to place orders and see your pickup code.")}</p>
+        {!session.authenticated && <button type="button" disabled={busy} onClick={() => void start()} className="mt-2 min-h-11 rounded-xl bg-[#7a1625] px-4 text-white">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>}
+        {error && <p role="alert">{translate(error)}</p>}
     </section>;
 
     if (mode === "checkout") return <>

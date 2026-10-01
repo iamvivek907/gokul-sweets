@@ -2,13 +2,14 @@
 import {T} from "@/lib/language";
 
 import Image from "next/image";
-import {useState} from "react";
+import {useState,type ReactNode} from "react";
 
 import type { MenuProduct } from "@/types/menu";
 import type { ProductRatingSummary } from "@/types/review";
 
 
 interface ProductCardProps {
+    portionOptions?: ReactNode;
     refined?: boolean;
     unavailableForPickup?: boolean;
     product: MenuProduct;
@@ -59,6 +60,7 @@ function formatWeight(
 
 
 export default function ProductCard({
+    portionOptions,
     refined = false,
     unavailableForPickup = false,
     product,
@@ -363,6 +365,7 @@ export default function ProductCard({
                 </div>
 
 
+                {portionOptions}
                 {/* Price + Add */}
 
                 <div className={`

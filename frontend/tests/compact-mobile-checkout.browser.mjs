@@ -4,7 +4,7 @@ import {mkdir} from 'node:fs/promises';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 try {
- for(const width of [390,640,1280]) {
+ for(const [width,checkout,futuristic,contextual] of [[390,true,true,true],[640,true,true,true],[1280,true,true,true],[390,true,false,true],[390,false,true,false],[390,false,true,true]]) {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
   const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
   const branch={id:1,code:'TEST',name:'Test Gokul branch',active:true,address:'Test address',city:'Test city',phone:'9876543210',pickupAvailable:true};
@@ -16,7 +16,7 @@ try {
   await context.route('**/api/**',async route=>{
    const req=route.request(),p=new URL(req.url()).pathname,headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};let json=[];
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
-   if(p==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,simplifiedCheckout:true,smartPickupSelection:true,smartAvailability:true,authoritativePickupCommitment:true,acceptedCheckoutQuote:true,persistentPickupContext:true,cartSwitchPreview:true,inPlaceBranchSwitch:true,accessibleOrderingV2:true,paymentPollingV2:true,paidCartRecovery:true,futureOrderingDays:30,today:date};
+   if(p==='/api/storefront/features')json={futuristicStorefrontV2:futuristic,checkoutExperienceV2:checkout,contextualStorefrontV2:contextual,simplifiedCheckout:true,smartPickupSelection:true,smartAvailability:true,authoritativePickupCommitment:true,acceptedCheckoutQuote:true,persistentPickupContext:true,cartSwitchPreview:true,inPlaceBranchSwitch:true,accessibleOrderingV2:true,paymentPollingV2:true,paidCartRecovery:true,futureOrderingDays:30,today:date};
    else if(p==='/api/storefront/customer-identity'){if(identityDown)return route.fulfill({status:503,json:{message:'Try again'},headers});json={enabled:true,guestCheckoutEnabled:false};}
    else if(p==='/api/customer/identity/me')json={authenticated:signedIn,...(signedIn?{phone:'+919876543210',name:'Verified customer'}:{})};
    else if(p==='/api/customer/identity/start')json={};
@@ -45,9 +45,10 @@ try {
   const launch=page.locator('.gokul-mobile-launch');
   if(width<=640){await launch.waitFor({state:'visible'});if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/mobile-launch-${width}.png`});}await launch.waitFor({state:'hidden'});assert.ok(Date.now()-started<6000,'launch ends independently of optional data');}
   else assert.equal(await launch.isVisible(),false);
-  await page.locator('.gokul-menu-product-card').first().waitFor();
-  assert.equal(await page.locator('.gokul-menu-product-grid').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),width<=640?1:4);
-  const action=page.locator('.gokul-floating-cart a');assert.equal(await action.getAttribute('href'),width<=640?'/checkout/pickup':'/cart');
+  await page.locator('.gokul-product-card').first().waitFor();
+  if(contextual)assert.equal(await page.locator('.gokul-menu-product-grid').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),width<=640?1:4);
+  else assert.equal(await page.locator('.product-card-controls').first().evaluate(e=>getComputedStyle(e).position),'relative');
+  const action=page.locator('.gokul-floating-cart a');assert.equal(await action.getAttribute('href'),width<=640?(checkout?'/checkout/mobile':'/checkout/pickup'):'/cart');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/compact-menu-${width}.png`,fullPage:true});
   await page.goto(`${base}/checkout/customer`);await launch.waitFor({state:'hidden'});
   await page.getByRole('heading',{name:'Verify your phone to continue',exact:true}).waitFor();
@@ -57,7 +58,7 @@ try {
   await page.getByText('Sign-in is needed to place an order. Your cart is saved. Please try verification again shortly.',{exact:true}).waitFor();
   assert.equal(await page.locator('form').count(),0);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
   identityDown=false;await page.reload();await launch.waitFor({state:'hidden'});await page.getByRole('button',{name:'Verify with SMS',exact:true}).click();
-  if(width<=640){await page.waitForURL('**/checkout/review');assert.equal(await launch.isVisible(),false,'client navigation does not restart launch');}
+  if(width<=640&&checkout){await page.waitForURL('**/checkout/review');assert.equal(await launch.isVisible(),false,'client navigation does not restart launch');}
   else {await page.getByText('Signed in · phone verified',{exact:true}).waitFor();assert.equal(new URL(page.url()).pathname,'/checkout/customer');}
   assert.equal(signedIn,true);
   if(width<=640){
@@ -69,6 +70,7 @@ try {
    await cancel.getByRole('alert').filter({hasText:'Provider check unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/checkout/payment/TEST-MOBILE');assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
    cancelError=false;await cancel.getByRole('button',{name:'Confirm cancellation',exact:true}).click();
    await page.waitForURL('**/checkout/review?paymentRecovery=failed');await page.getByText('Ready to try again',{exact:true}).waitFor();assert.equal(cancels,2);assert.equal(mutations,0);
+   if(!checkout){await page.locator('.checkout-mobile-action').waitFor();assert.notEqual(await page.locator('.checkout-mobile-action').evaluate(e=>getComputedStyle(e).position),'fixed');assert.equal(await page.locator('.customer-bottom-navigation').isVisible(),true);}
   }
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await context.close();

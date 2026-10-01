@@ -49,6 +49,13 @@ public class OrderController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(pickupCodes.customerCode(orderNumber));
     }
 
+    private final com.gokulsweets.restaurant.order.service.MobileCheckoutPreview mobilePreview;
+
+    @PostMapping("/mobile-preview")
+    public com.gokulsweets.restaurant.order.service.MobileCheckoutPreview.Preview mobilePreview(@Valid @RequestBody CreateOrderRequest request,HttpServletRequest servletRequest) {
+        return mobilePreview.preview(request,checkoutIdentity.token(servletRequest));
+    }
+
     @PostMapping("/quote")
     public CheckoutQuoteService.Quote previewQuote(@Valid @RequestBody CreateOrderRequest request) {
         return checkoutQuoteService.preview(request, null);

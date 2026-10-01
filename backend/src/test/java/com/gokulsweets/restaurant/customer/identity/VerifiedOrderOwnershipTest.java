@@ -19,6 +19,15 @@ class VerifiedOrderOwnershipTest {
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final VerifiedOrderOwnership ownership = new VerifiedOrderOwnership(jdbc, features, settings);
 
+    @Test void draftOffersRequireVerificationEvenWhenGuestCheckoutIsEnabled() {
+        settings.setProperty("gokul.checkout.guest-enabled", "true"); features.setCustomerOtpIdentity(true);
+        assertThatThrownBy(() -> ownership.requireVerifiedIdentity("9876543210", null))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> ownership.requireVerifiedIdentity("9876543210", "a".repeat(64)))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verify(jdbc, never()).update(anyString(), any(Object[].class));
+    }
+
     @Test
     void guestAndDisabledIdentityNeverAttemptOwnership() {
         ownership.bindNewOrder(3L, "9876543210", null);

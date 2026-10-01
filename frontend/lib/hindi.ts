@@ -1,4 +1,15 @@
 export const hindi: Record<string,string> = {
+  "Filters":"फ़िल्टर", "Price up to":"अधिकतम मूल्य", "Any price":"कोई भी मूल्य", "Portion choices":"आधा / पूरा विकल्प",
+  "Add more":"और जोड़ें", "Change pickup":"पिकअप बदलें", "Offers & total":"छूट और कुल राशि",
+  "Phone verified":"मोबाइल की पुष्टि हो गई", "Best available offer applied automatically":"सबसे अच्छी उपलब्ध छूट अपने आप लगी",
+  "Your current menu price":"वर्तमान मेन्यू मूल्य", "Price details":"राशि का विवरण",
+  "Total to pay":"भुगतान की कुल राशि", "Pay now":"अभी भुगतान करें", "Opening payment…":"भुगतान खुल रहा है…",
+  "Continue your existing order":"मौजूदा ऑर्डर जारी रखें",
+  "Your order is already reserved. Check its payment status before starting another checkout.":"आपका ऑर्डर आरक्षित है। नया चेकआउट शुरू करने से पहले उसकी भुगतान स्थिति देखें।",
+  "Choose the matching branch before checking out.":"चेकआउट से पहले कार्ट वाली शाखा चुनें।",
+  "Payment wasn’t completed. Your cart is saved; review it and try again.":"भुगतान पूरा नहीं हुआ। आपका कार्ट सुरक्षित है; जाँचकर फिर कोशिश करें।",
+  "This checkout is saved for a safe retry. Its items and pickup are locked until the order is recovered.":"सुरक्षित पुनः प्रयास के लिए चेकआउट सेव है। ऑर्डर की पुष्टि तक वस्तुएँ और पिकअप नहीं बदल सकते।",
+
   "Cancel this payment?": "यह भुगतान रद्द करें?",
   "Keep payment": "भुगतान जारी रखें",
   "Confirm cancellation": "रद्द करने की पुष्टि करें",

@@ -24,6 +24,11 @@ public class VerifiedOrderOwnership {
     /** Runs inside checkout's transaction before claiming an idempotency key or reserving stock. */
     public void requireCheckoutIdentity(String checkoutPhone, String token) {
         if (settings.getProperty("gokul.checkout.guest-enabled", Boolean.class, true)) return;
+        requireVerifiedIdentity(checkoutPhone, token);
+    }
+
+    /** Customer-specific draft offers always require a real verified session. */
+    public void requireVerifiedIdentity(String checkoutPhone, String token) {
         if (!canBind(checkoutPhone, token)) throw signInRequired();
         String environment = settings.getProperty("gokul.environment-isolation.environment", "");
         var subjects = jdbc.queryForList("""
