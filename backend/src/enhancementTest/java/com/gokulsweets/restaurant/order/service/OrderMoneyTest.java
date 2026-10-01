@@ -51,7 +51,7 @@ class OrderMoneyTest {
         var order=service.calculate(new ValidatedOrderData(branch,slot,PickupType.NORMAL,List.of(
             new ValidatedOrderItem(product,new BranchProduct(),ProductSaleMode.UNIT,1,null))));
         assertThat(order.items().getFirst().taxAmount()).isZero();
-        assertThat(order.totalTax()).isZero();assertThat(order.convenienceFeeTax()).isZero();
+        assertThat(order.taxAmount()).isZero();assertThat(order.convenienceFeeTax()).isZero();
         assertThat(order.totalAmount()).isEqualByComparingTo("110.00");
         org.mockito.Mockito.verify(settings).enabled();
     }
