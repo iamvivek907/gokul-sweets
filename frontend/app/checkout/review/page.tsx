@@ -2198,9 +2198,7 @@ try {
                                 }
                                 {" "}
                                 {
-                                    itemCount === 1
-                                        ? translate("item")
-                                        : "items"
+                                    translate(itemCount === 1 ? "item" : "items")
                                 }
                             </span>
 
