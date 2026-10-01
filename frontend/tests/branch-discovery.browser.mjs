@@ -12,7 +12,7 @@ try {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
   const expires=new Date(Date.now()+14*60000).toISOString(),date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
   const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',capacity:50,bookedCount:1,remainingCapacity:49,priorityCapacity:0,priorityBookedCount:0,remainingPriorityCapacity:0,priorityCharge:0,active:true};
-  let quoteFailure=true;
+  let quoteFailure=true,visual=true;
   let updated=false,quoteCalls=0,updateCalls=0,checkCalls=0,paymentCalls=0,version=0,conflict=false;
   const line=p=>({id:p.id,productId:p.id,productName:p.name,saleMode:'UNIT',quantity:1,weightGrams:null,unitPrice:p.price,taxRate:5,taxAmount:p.price*.05,lineTotal:p.price*1.05});
   const order=()=>({id:1,orderNumber:'GKS-SYNTHETIC',branchId:1,pickupSlotId:1,branchName:branch.name,branchAddress:branch.address,pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',fulfillmentType:'PICKUP',customerName:'Test customer',maskedCustomerPhone:'******0000',orderStatus:'PENDING_PAYMENT',paymentStatus:null,items:updated?[line(main),line(addon)]:[line(main)],subtotal:updated?480:340,taxAmount:updated?24:17,priorityCharge:0,convenienceFee:5,convenienceFeeTax:0,totalAmount:updated?509:362,reservationExpiresAt:expires,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()});
@@ -20,7 +20,7 @@ try {
   await context.route('**/api/**',async route=>{
    const req=route.request(),u=new URL(req.url()),p=u.pathname;let json=[];
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:{...headers,'Access-Control-Allow-Methods':'GET,POST,PUT,DELETE,OPTIONS','Access-Control-Allow-Headers':'content-type,x-staff-csrf,if-match'}});
-   if(p==='/api/storefront/features')json={futuristicStorefrontV2:true,contextualStorefrontV2:true,branchExperience:true,pickupAddOns:true,acceptedCheckoutQuote:true,checkoutExperienceV2:true,futureOrderingDays:30,today:date};
+   if(p==='/api/storefront/features')json={futuristicStorefrontV2:visual,contextualStorefrontV2:true,branchExperience:true,pickupAddOns:true,acceptedCheckoutQuote:true,checkoutExperienceV2:visual,futureOrderingDays:30,today:date};
    else if(p==='/api/branches')json=[branch];
    else if(p==='/api/branches/1')json=branch;
    else if(p==='/api/branches/1/discovery')json={offerings:[{title:'Configured branch speciality',description:'A published description supplied by the branch.'}],overallExperience:{average:4.3,count:12},topRatedItems:[{productId:2,name:addon.name,imageUrl:null,categoryId:1,average:4.6,count:7,review:{comment:'Carefully packed and a pleasant pickup experience.',overallRating:5}}]};
@@ -72,6 +72,14 @@ try {
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);assert.equal(updateCalls,1);assert.equal(paymentCalls,0);
   await page.getByRole('button',{name:'Keep current pickup',exact:true}).click();assert.equal(new URL(page.url()).pathname,'/checkout/review');
   await page.goto(`${base}/checkout/offers/GKS-SYNTHETIC`);await page.getByRole('button',{name:'Adjust quantities or pickup',exact:true}).waitFor();await page.getByRole('button',{name:'Adjust quantities or pickup',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'Keep current pickup',exact:true}).click();
+  if(width===390){
+   visual=false;await page.evaluate(()=>sessionStorage.removeItem('gokul-storefront-settings'));
+   for(const route of ['/checkout/review','/checkout/offers/GKS-SYNTHETIC']){
+    await page.goto(`${base}${route}`);await page.getByRole('button',{name:/^(Continue to payment|Review updated total)$/i}).waitFor();
+    assert.equal(await page.locator('.future-storefront').count(),0);
+    assert.equal(await page.getByRole('button',{name:/^(Continue to payment|Review updated total)$/i}).count(),1,'only one visible payment action with both visual flags OFF');
+   }
+  }
   await page.goto(`${base}/admin/branches`);await page.getByRole('button',{name:/Test Gokul branch/}).first().click();await page.getByLabel('Offering 1 title',{exact:true}).fill('Updated draft');conflict=true;await page.getByRole('button',{name:'Save offerings draft'}).click();await page.getByRole('alert').filter({hasText:'changed'}).waitFor();assert.equal(version,0);
   await context.close();
  }

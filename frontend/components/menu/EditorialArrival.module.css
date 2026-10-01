@@ -65,3 +65,6 @@
 @media(max-width:900px){.branchGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.heroCopy{width:78%}}
 @media(max-width:700px){.hero{min-height:100dvh;background-position:64% center}.scrim{background:linear-gradient(0deg,#092725eb,#0d302c9c 77%,#0d302b6b)}.topbar{padding:1.2rem}.logo{font-size:2rem}.topbar nav{gap:0}.topbar nav a:last-child{padding:.65rem;font-size:.75rem}.heroCopy{width:100%;margin:4rem 0 0;padding:7rem 1.4rem 6rem}.heroCopy h1{font-size:clamp(3.2rem,12vw,5rem)}.heroCopy>span{font-size:1rem}.actions{flex-direction:row;flex-wrap:wrap}.actions a{padding:.85rem 1.15rem}.branchGrid{grid-template-columns:1fr}.branchCard{min-height:310px}.branches{padding:3.5rem 1.2rem}}
 @media(max-width:700px){.branchGrid:has(.branchCard:nth-child(2):last-child){grid-template-columns:1fr}}
+
+/* Keep the language control, brand and order link inside narrow hero headers. */
+@media(max-width:700px){.topbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:1rem .75rem}.topbar>label{grid-column:1/-1;justify-self:end;max-width:100%}.logo{min-width:0;font-size:clamp(1.5rem,6vw,2rem)}.logo span{letter-spacing:.12em;overflow-wrap:anywhere}.topbar nav{min-width:0}.heroCopy{padding-top:10rem}}
