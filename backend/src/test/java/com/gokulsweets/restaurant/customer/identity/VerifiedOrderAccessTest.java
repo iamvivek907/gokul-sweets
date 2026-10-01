@@ -18,6 +18,21 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class VerifiedOrderAccessTest {
+    @Test void pickupCodeRequiresOwnerSessionEvenWhenLegacyReadsArePublic() {
+        var flags=new EnhancementProperties();
+        var settings=new MockEnvironment().withProperty("gokul.environment-isolation.environment","DEV");
+        var connection=mock(IdentityClientConnection.class);
+        doThrow(new IllegalStateException("No customer connection")).when(connection).resolve(any());
+        var sessions=mock(VerifiedCustomerSessionStore.class);
+        var ownership=mock(VerifiedOrderOwnership.class);
+        var cors=new WebCorsProperties();
+        var access=new VerifiedOrderAccess(flags,settings,cors,connection,sessions,ownership,mock(JdbcTemplate.class));
+        var request=new MockHttpServletRequest();
+        assertThat(access.mayRead("KNOWN-ORDER",request)).isTrue();
+        assertThatThrownBy(()->access.requirePickupCode("KNOWN-ORDER",request)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        verifyNoInteractions(ownership);
+    }
+
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final VerifiedCustomerSessionStore sessions = mock(VerifiedCustomerSessionStore.class);
     private final VerifiedOrderOwnership ownership = mock(VerifiedOrderOwnership.class);

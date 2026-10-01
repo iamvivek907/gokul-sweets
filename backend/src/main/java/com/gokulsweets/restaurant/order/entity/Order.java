@@ -62,6 +62,11 @@ import java.util.List;
 @Getter
 @Setter
 public class Order {
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFee=BigDecimal.ZERO;
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFeeTax=BigDecimal.ZERO;
+    @Column(nullable=false,precision=5,scale=2) private BigDecimal paymentFeeRate=BigDecimal.ZERO;
+    @Column(nullable=false,precision=5,scale=2) private BigDecimal paymentFeeTaxRate=BigDecimal.ZERO;
+
     @Column(nullable=false, precision=10, scale=2)
     private BigDecimal convenienceFee = BigDecimal.ZERO;
     @Column(nullable=false, precision=10, scale=2)

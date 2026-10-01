@@ -19,6 +19,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class OccasionOrderFinalizer {
     private final JdbcTemplate jdbc;
+    private final com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
     private final com.gokulsweets.restaurant.customer.CustomerContactService contacts;
     private final VerifiedCustomerPhoneLookup customers;
     private final OrderNumberGenerator orderNumbers;
@@ -79,7 +80,7 @@ public class OccasionOrderFinalizer {
                 FROM occasion_payment_attempts WHERE enquiry_id = ? AND status = 'PAID'
                 """, orderId, enquiryId);
         jdbc.update("UPDATE occasion_enquiries SET order_id = ? WHERE id = ?", orderId, enquiryId);
-        jdbc.query("SELECT id FROM payments WHERE order_id = ? AND payment_status = 'PAID'", (rs, row) -> rs.getLong(1), orderId).forEach(staffAlerts::paymentConfirmed);
+        jdbc.query("SELECT id FROM payments WHERE order_id = ? AND payment_status = 'PAID'", (rs, row) -> rs.getLong(1), orderId).forEach(paymentId->{pickupCodes.issueForPaidPayment(paymentId);staffAlerts.paymentConfirmed(paymentId);});
         return number;
     }
 

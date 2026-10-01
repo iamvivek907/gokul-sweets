@@ -2401,6 +2401,7 @@ try {
                             </p>
                         ))}
                         <p className="mt-3 text-sm"><T text="Items" /> ₹{acceptedQuote.quote.subtotal} · <T text="Tax" /> ₹{acceptedQuote.quote.taxAmount} · <T text="Pickup charge" /> ₹{acceptedQuote.quote.priorityCharge}</p>
+                        {Number(acceptedQuote.quote.paymentFee??0)>0&&<p className="mt-2 text-sm"><T text="Online payment fee" /> ({acceptedQuote.quote.paymentFeeRate}%) ₹{acceptedQuote.quote.paymentFee} · <T text="Includes" /> ₹{acceptedQuote.quote.paymentFeeTax} <T text="fee tax" /></p>}
                         {Number(acceptedQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm"><T text="Convenience fee ₹" />{acceptedQuote.quote.convenienceFee}{" "}<T text="(includes ₹" />{acceptedQuote.quote.convenienceFeeTax}{" "}<T text="tax)" /></p>}
                         <p className="mt-2 font-bold"><T text="Total before optional offers" /> ₹{acceptedQuote.quote.totalAmount}</p>
                         {!quoteExpired && <p className="mt-2 text-xs"><T text="This price is available until" /> {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy"><T text="See the cancellation policy" /><LinkFeedback /></Link> <T text="before paying." /></p>}

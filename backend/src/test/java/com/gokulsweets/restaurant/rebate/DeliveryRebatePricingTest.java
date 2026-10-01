@@ -1,0 +1,98 @@
+package com.gokulsweets.restaurant.rebate;
+
+import com.gokulsweets.restaurant.branch.Branch;
+import com.gokulsweets.restaurant.order.entity.Order;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.repository.OrderRepository;
+import com.gokulsweets.restaurant.order.service.PaymentFeePricing;
+import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
+import com.gokulsweets.restaurant.rebate.dto.ApplyRebateRequest;
+import org.junit.jupiter.api.Test;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+class DeliveryRebatePricingTest {
+    final OrderRepository orders = mock(OrderRepository.class);
+    final PaymentRepository payments = mock(PaymentRepository.class);
+    final RebateRepository rebates = mock(RebateRepository.class);
+    final RebateEligibilityService eligibility = new RebateEligibilityService(orders, payments, rebates,
+            mock(RebateSlabRepository.class), mock(RebateCustomerRepository.class), mock(RebateRedemptionRepository.class));
+    final RebateApplicationService application = new RebateApplicationService(orders, rebates, payments, eligibility);
+
+    BigDecimal n(String value) { return new BigDecimal(value); }
+
+    Order order(String rate, String taxRate) {
+        var order = new Order();
+        order.setId(1L); order.setOrderNumber("DELIVERY-TEST");
+        order.setOrderStatus(OrderStatus.PENDING_PAYMENT); order.setFulfillmentType(FulfillmentType.DELIVERY);
+        var branch = new Branch(); branch.setId(2L); order.setBranch(branch);
+        order.setSubtotal(n("100")); order.setTaxAmount(n("5")); order.setPriorityCharge(n("0"));
+        order.setConvenienceFee(n("10")); order.setDeliveryFee(n("50"));
+        order.setPaymentFeeRate(n(rate)); order.setPaymentFeeTaxRate(n(taxRate));
+        PaymentFeePricing.reprice(order);
+        when(orders.findForUpdate("DELIVERY-TEST")).thenReturn(Optional.of(order));
+        when(orders.findDetailedByOrderNumber("DELIVERY-TEST")).thenReturn(Optional.of(order));
+        return order;
+    }
+
+    Rebate rebate() {
+        var rebate = new Rebate(); rebate.setId(3L); rebate.setCode("SAVE20"); rebate.setName("Save 20");
+        rebate.setScope(RebateScope.GENERAL); rebate.setRebateType(RebateType.FIXED_AMOUNT); rebate.setRebateValue(n("20"));
+        var now = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
+        rebate.setValidFrom(now.minusDays(1)); rebate.setValidUntil(now.plusDays(1));
+        when(rebates.findByCodeIgnoreCase("SAVE20")).thenReturn(Optional.of(rebate));
+        when(rebates.findById(3L)).thenReturn(Optional.of(rebate));
+        when(rebates.findActivePublicCandidates(eq(2L), any())).thenReturn(List.of(rebate));
+        return rebate;
+    }
+
+    @Test void deliveryPreviewApplyAndRemovePreserveChargeWithInclusivePercentageFee() {
+        var order = order("2", "18"); rebate();
+        var preview = eligibility.getAvailableRebates("DELIVERY-TEST").getFirst();
+        assertThat(preview.payableAfterRebate()).isEqualByComparingTo("147.90");
+        var applied = application.apply("DELIVERY-TEST", new ApplyRebateRequest("SAVE20"));
+        assertThat(applied.totalAmount()).isEqualByComparingTo(preview.payableAfterRebate());
+        assertThat(applied.paymentFee()).isEqualByComparingTo("2.90");
+        assertThat(applied.paymentFeeTax()).isEqualByComparingTo("0.44");
+        assertThat(applied.amountBeforeRebate()).isEqualByComparingTo("165");
+        assertThat(application.apply("DELIVERY-TEST", new ApplyRebateRequest("SAVE20")).totalAmount()).isEqualByComparingTo("147.90");
+        var removed = application.remove("DELIVERY-TEST");
+        assertThat(removed.totalAmount()).isEqualByComparingTo("168.30");
+        assertThat(removed.paymentFee()).isEqualByComparingTo("3.30");
+        assertThat(removed.paymentFeeTax()).isEqualByComparingTo("0.50");
+        assertThat(application.remove("DELIVERY-TEST").totalAmount()).isEqualByComparingTo("168.30");
+        assertThat(order.getDeliveryFee()).isEqualByComparingTo("50");
+    }
+
+    @Test void disabledPaymentFeeStillRetainsDeliveryAndDoesNotEarnRebateThresholds() {
+        var order = order("0", "0"); var rebate = rebate();
+        assertThat(eligibility.getAvailableRebates("DELIVERY-TEST").getFirst().payableAfterRebate()).isEqualByComparingTo("145");
+        assertThat(application.apply("DELIVERY-TEST", new ApplyRebateRequest("SAVE20")).totalAmount()).isEqualByComparingTo("145");
+        assertThat(application.remove("DELIVERY-TEST").totalAmount()).isEqualByComparingTo("165");
+        rebate.setMinimumOrderAmount(n("120"));
+        assertThat(eligibility.getAvailableRebates("DELIVERY-TEST")).isEmpty();
+        assertThat(order.getPaymentFee()).isEqualByComparingTo("0");
+    }
+
+    @Test void invalidOfferRemovalPreservesDeliveryAndTaxOffSnapshot() {
+        var order = order("2", "0"); var rebate = rebate();
+        var applied = application.apply("DELIVERY-TEST", new ApplyRebateRequest("SAVE20"));
+        assertThat(applied.totalAmount()).isEqualByComparingTo("147.90");
+        assertThat(applied.paymentFeeTax()).isEqualByComparingTo("0");
+        rebate.setActive(false);
+        assertThatThrownBy(() -> application.revalidateAppliedRebateBeforePayment(order))
+                .hasMessageContaining("Please review the updated order total");
+        assertThat(order.getTotalAmount()).isEqualByComparingTo("168.30");
+        assertThat(order.getDeliveryFee()).isEqualByComparingTo("50");
+        assertThat(order.getPaymentFeeTax()).isEqualByComparingTo("0");
+    }
+}

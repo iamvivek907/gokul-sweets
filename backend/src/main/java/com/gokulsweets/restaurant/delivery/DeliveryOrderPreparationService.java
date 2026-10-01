@@ -38,10 +38,11 @@ public class DeliveryOrderPreparationService {
         if (items.size() != request.items().size() || items.stream().anyMatch(Objects::isNull))
             throw new IllegalArgumentException("Review the items in your delivery cart.");
         var validated = new ValidatedOrderData(branch, null, null, items);
-        var price = calculation.calculateDelivery(items);
+        boolean collectTax=calculation.collectingTax();
+        var price = calculation.calculateDelivery(items,collectTax);
         var assessment = economics.assess(price);
         if (!assessment.viable()) throw new IllegalStateException(assessment.alternative());
-        return new Prepared(validated, price, selected, assessment);
+        return new Prepared(validated, calculation.withPaymentFee(price,branch,assessment.fee(),collectTax), selected, assessment);
     }
 
     public record Prepared(ValidatedOrderData validated, OrderCalculationResult price,

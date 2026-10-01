@@ -72,6 +72,19 @@ public class VerifiedOrderAccess {
                 .orElse(false);
     }
 
+    /** Pickup secrets require an actual owner session even when legacy order reads are public. */
+    public void requirePickupCode(String orderNumber,HttpServletRequest request) {
+        String configured=settings.getProperty("gokul.environment-isolation.environment","");
+        ConsentEnvironment environment;
+        try {environment=ConsentEnvironment.valueOf(configured);}catch(IllegalArgumentException e){throw new ResponseStatusException(HttpStatus.NOT_FOUND);}
+        try {
+            if(!connection.resolve(request).secure()||!cors.effectiveAllowedOrigins(settings).contains(request.getHeader(HttpHeaders.ORIGIN)))throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }catch(IllegalStateException e){throw new ResponseStatusException(HttpStatus.NOT_FOUND);}
+        String token=request.getCookies()==null?null:Arrays.stream(request.getCookies()).filter(c->"__Host-gokul-customer".equals(c.getName())).map(jakarta.servlet.http.Cookie::getValue).findFirst().orElse(null);
+        boolean owns=sessions.subject(environment,token,Instant.now()).map(subject->ownership.owns(environment.name(),subject,orderNumber)).orElse(false);
+        if(!owns)throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    }
+
     private boolean active() {
         return features.isCustomerOtpIdentity()
                 && settings.getProperty("gokul.identity.protect-legacy-routes", Boolean.class, false)

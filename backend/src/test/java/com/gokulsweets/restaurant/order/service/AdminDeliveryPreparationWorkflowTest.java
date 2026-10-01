@@ -29,7 +29,7 @@ class AdminDeliveryPreparationWorkflowTest {
     private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch = mock(com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService.class);
     private final com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService bulkReadiness = mock(com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService.class);
     private final AdminOrderWorkflowService workflow = new AdminOrderWorkflowService(
-            orders, queries, staff, kots, eligibility, dispatch, bulkReadiness, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
+            orders, queries, staff, kots, eligibility, dispatch, bulkReadiness, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class),mock(PickupCodeService.class));
     private Order order;
 
     @BeforeEach
@@ -42,7 +42,7 @@ class AdminDeliveryPreparationWorkflowTest {
         var branch = new Branch();
         branch.setId(7L);
         order.setBranch(branch);
-        when(orders.findByOrderNumber(order.getOrderNumber())).thenReturn(Optional.of(order));
+        when(orders.findForUpdate(order.getOrderNumber())).thenReturn(Optional.of(order));
     }
 
     @Test

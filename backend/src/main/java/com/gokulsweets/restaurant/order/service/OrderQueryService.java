@@ -86,6 +86,7 @@ public class OrderQueryService {
                 order.getPriorityCharge(),
                 order.getConvenienceFee(),
                 order.getConvenienceFeeTax(),
+                order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate(),
                 order.getTotalAmount(),
                 order.getReservationExpiresAt(),
                 order.getCreatedAt(),

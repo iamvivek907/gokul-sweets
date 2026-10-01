@@ -66,6 +66,7 @@ public class AdminOrderWorkflowService {
     private final com.gokulsweets.restaurant.delivery.DeliveryDispatchPilotService dispatch;
     private final com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService bulkReadiness;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
+    private final PickupCodeService pickupCodes;
 
 
     /*
@@ -74,17 +75,18 @@ public class AdminOrderWorkflowService {
      * =========================================================
      */
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
     public AdminOrderDetailResponse transitionStatus(
             String orderNumber,
             OrderStatus targetStatus
-    ) {
+    ) { return transitionStatus(orderNumber,targetStatus,null); }
+
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
+    public AdminOrderDetailResponse transitionStatus(String orderNumber,OrderStatus targetStatus,String pickupCode) {
 
         Order order =
                 orderRepository
-                        .findByOrderNumber(
-                                orderNumber
-                        )
+                        .findForUpdate(orderNumber)
                         .orElseThrow(() -> {
 
                             log.warn(
@@ -120,6 +122,7 @@ public class AdminOrderWorkflowService {
                         targetStatus
         ) {
 
+            if(targetStatus==OrderStatus.PICKED_UP)staffAuthorizationService.requirePermission(PermissionName.ORDER_MARK_PICKED_UP);
             log.debug(
                     "Ignoring duplicate admin order transition: orderNumber={}, status={}",
                     orderNumber,
@@ -186,6 +189,7 @@ public class AdminOrderWorkflowService {
                 currentStatus,
                 targetStatus
         );
+        if(targetStatus==OrderStatus.PICKED_UP)pickupCodes.verifyAndConsume(order,pickupCode);
         if (targetStatus == OrderStatus.READY_FOR_PICKUP) bulkReadiness.requireReady(order.getId());
         if (order.getFulfillmentType() == FulfillmentType.DELIVERY
                 && targetStatus == OrderStatus.OUT_FOR_DELIVERY)

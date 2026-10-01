@@ -8,6 +8,8 @@ public record AdminOrderStatusUpdateRequest(
         @NotNull(
                 message = "Order status is required."
         )
-        OrderStatus status
+        OrderStatus status,
+        String pickupCode
 ) {
+    public AdminOrderStatusUpdateRequest(OrderStatus status) {this(status,null);}
 }

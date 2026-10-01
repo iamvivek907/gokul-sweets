@@ -12,8 +12,12 @@ public record OrderCalculationResult(
         BigDecimal convenienceFeeTax,
         BigDecimal totalAmount,
         long feeConfigurationVersion,
-        BigDecimal convenienceFeeTaxRate
+        BigDecimal convenienceFeeTaxRate,
+        BigDecimal paymentFee,BigDecimal paymentFeeTax,BigDecimal paymentFeeRate,BigDecimal paymentFeeTaxRate
 ) {
+    public OrderCalculationResult(List<CalculatedOrderItem> items,BigDecimal subtotal,BigDecimal taxAmount,BigDecimal priorityCharge,BigDecimal convenienceFee,BigDecimal convenienceFeeTax,BigDecimal totalAmount,long feeConfigurationVersion,BigDecimal convenienceFeeTaxRate) {
+        this(items,subtotal,taxAmount,priorityCharge,convenienceFee,convenienceFeeTax,totalAmount,feeConfigurationVersion,convenienceFeeTaxRate,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO);
+    }
     public OrderCalculationResult(List<CalculatedOrderItem> items,BigDecimal subtotal,BigDecimal taxAmount,BigDecimal priorityCharge,BigDecimal convenienceFee,BigDecimal convenienceFeeTax,BigDecimal totalAmount,long feeConfigurationVersion) {
         this(items,subtotal,taxAmount,priorityCharge,convenienceFee,convenienceFeeTax,totalAmount,feeConfigurationVersion,BigDecimal.ZERO);
     }

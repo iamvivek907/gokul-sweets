@@ -2,7 +2,7 @@
 import {useId, useRef, useState, type PointerEvent} from "react";
 import {useTranslation} from "@/lib/language";
 import styles from "./SwipeOrderAction.module.css";
-type Props = {label: string; action: "start" | "ready"; busy: boolean; disabled: boolean; onComplete: () => void | Promise<void>};
+type Props = {label: string; action: "start" | "ready" | "pickup"; busy: boolean; disabled: boolean; onComplete: () => void | Promise<void>};
 
 /** Vertical scrolling, cancellation and a short swipe never submit an order action. */
 export default function SwipeOrderAction({label, action, busy, disabled, onComplete}: Props) {
@@ -30,7 +30,7 @@ export default function SwipeOrderAction({label, action, busy, disabled, onCompl
             <span className={styles.label}>{translate(busy || sending ? "Updating order…" : label)}</span>
             <span className={styles.chevrons} aria-hidden="true">››</span>
             <button type="button" className={styles.thumb} disabled={unavailable}
-                aria-label={translate(action === "start" ? "Start preparation" : "Mark ready")}
+                aria-label={translate(action === "start" ? "Start preparation" : action === "pickup" ? "Verify pickup code" : "Mark ready")}
                 aria-expanded={confirm} aria-controls={confirm ? id : undefined}
                 style={{transform: `translateX(${distance}px)`}}
                 onClick={event => { if (event.detail === 0 && !unavailable) setConfirm(true); }}
@@ -62,8 +62,8 @@ export default function SwipeOrderAction({label, action, busy, disabled, onCompl
         <button type="button" className={styles.alternative} disabled={unavailable} aria-expanded={confirm}
             aria-controls={confirm ? id : undefined} onClick={() => setConfirm(!confirm)}>{translate("Or tap to confirm")}</button>
         {confirm && <div id={id} className={styles.confirm} role="group" aria-label={translate("Confirm order action")}>
-            <p>{translate(action === "start" ? "Start preparation and create KOT?" : "Is this order packed and ready?")}</p>
-            <div><button type="button" disabled={unavailable} onClick={() => void complete()}>{translate(action === "start" ? "Yes, start KOT" : "Yes, mark ready")}</button>
+            <p>{translate(action === "start" ? "Start preparation and create KOT?" : action === "pickup" ? "Continue to pickup code verification?" : "Is this order packed and ready?")}</p>
+            <div><button type="button" disabled={unavailable} onClick={() => void complete()}>{translate(action === "start" ? "Yes, start KOT" : action === "pickup" ? "Enter pickup code" : "Yes, mark ready")}</button>
                 <button type="button" disabled={busy || sending} onClick={() => setConfirm(false)}>{translate("Cancel")}</button></div>
         </div>}
     </div>;

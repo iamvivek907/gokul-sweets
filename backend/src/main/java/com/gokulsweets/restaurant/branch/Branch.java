@@ -13,6 +13,10 @@ import java.time.LocalTime;
 @Getter
 @Setter
 public class Branch {
+    @Column(nullable=false) private boolean onlinePaymentFeeEnabled=false;
+    @Column(nullable=false,precision=5,scale=2) private BigDecimal onlinePaymentFeeRate=BigDecimal.ZERO;
+    @Column(nullable=false,precision=5,scale=2) private BigDecimal onlinePaymentFeeTaxRate=BigDecimal.ZERO;
+
     @Column(nullable=false, precision=10, scale=2)
     private BigDecimal pickupConvenienceFee = BigDecimal.ZERO;
     @Column(nullable=false, precision=5, scale=2)

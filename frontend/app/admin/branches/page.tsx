@@ -2,6 +2,7 @@
 import {T} from "@/lib/language";
 
 import PickupFeeSettings from "@/components/admin/PickupFeeSettings";
+import OnlinePaymentFeeSettings from "@/components/admin/OnlinePaymentFeeSettings";
 
 import {
     useCallback,
@@ -2227,6 +2228,7 @@ export default function AdminBranchesPage() {
                                     <p className="mt-2 text-sm">Customer-facing service labels show only supported, enabled services. Future booking settings will appear here when the service can accept bookings.</p>
                                 </section>
                                 <PickupFeeSettings key={`fee-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization}/>
+                                <OnlinePaymentFeeSettings key={`payment-fee-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization}/>
                                 <BranchOperationalSettings
                                     key={
                                         selectedBranch.id

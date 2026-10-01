@@ -334,6 +334,7 @@ export interface AdminOrderDetail {
  */
 
 export interface AdminOrderStatusUpdateRequest {
+    pickupCode?: string;
 
     status: OrderStatus;
 }

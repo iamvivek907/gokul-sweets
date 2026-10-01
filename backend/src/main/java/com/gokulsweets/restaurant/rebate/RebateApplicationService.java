@@ -46,7 +46,7 @@ public class RebateApplicationService {
         if (best.isEmpty()) {
             return new AppliedRebateResponse(orderNumber, order.getRebateCode(),
                     order.getRebate() == null ? null : order.getRebate().getName(),
-                    defaultZero(order.getRebateDiscountAmount()), calculateAmountBeforeRebate(order), currentTotal);
+                    defaultZero(order.getRebateDiscountAmount()), calculateAmountBeforeRebate(order), currentTotal,order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate());
         }
         var applied = apply(orderNumber, new ApplyRebateRequest(best.get().code()));
         if (applied.totalAmount().compareTo(currentTotal) > 0) {
@@ -140,6 +140,7 @@ public class RebateApplicationService {
                 newTotal
         );
 
+        com.gokulsweets.restaurant.order.service.PaymentFeePricing.reprice(order);
         orderRepository.save(order);
 
         log.info(
@@ -157,7 +158,7 @@ public class RebateApplicationService {
                 rebate.getName(),
                 rebateAmount,
                 amountBeforeRebate,
-                newTotal
+                order.getTotalAmount(),order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate()
         );
     }
 
@@ -199,17 +200,16 @@ public class RebateApplicationService {
                     BigDecimal.ZERO
             );
 
-            order.setTotalAmount(
-                    amountBeforeRebate
-            );
+            order.setTotalAmount(amountBeforeRebate);
 
+            com.gokulsweets.restaurant.order.service.PaymentFeePricing.reprice(order);
             return new AppliedRebateResponse(
                     order.getOrderNumber(),
                     null,
                     null,
                     BigDecimal.ZERO,
                     amountBeforeRebate,
-                    amountBeforeRebate
+                    order.getTotalAmount(),order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate()
             );
         }
 
@@ -228,6 +228,7 @@ public class RebateApplicationService {
                 amountBeforeRebate
         );
 
+        com.gokulsweets.restaurant.order.service.PaymentFeePricing.reprice(order);
         orderRepository.save(order);
 
         log.info(
@@ -243,7 +244,7 @@ public class RebateApplicationService {
                 null,
                 BigDecimal.ZERO,
                 amountBeforeRebate,
-                amountBeforeRebate
+                order.getTotalAmount(),order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate()
         );
     }
 
@@ -295,6 +296,7 @@ public class RebateApplicationService {
                         )
                 )
                 .add(defaultZero(order.getConvenienceFee()))
+                .add(defaultZero(order.getDeliveryFee()))
                 .setScale(
                         2,
                         RoundingMode.HALF_UP
@@ -380,12 +382,13 @@ public class RebateApplicationService {
                 amountBeforeRebate
         );
 
+        com.gokulsweets.restaurant.order.service.PaymentFeePricing.reprice(order);
         orderRepository.save(order);
 
         log.info(
                 "Invalid rebate removed before payment: orderNumber={}, restoredTotal={}",
                 order.getOrderNumber(),
-                amountBeforeRebate
+                order.getTotalAmount(),order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate()
         );
     }
 }

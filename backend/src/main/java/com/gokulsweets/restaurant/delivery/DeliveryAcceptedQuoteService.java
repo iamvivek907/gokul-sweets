@@ -37,7 +37,11 @@ public class DeliveryAcceptedQuoteService {
                        String totalAmount) {}
     public record Quote(long windowId, String serviceDate, String startsAt, String endsAt,
                         List<Line> items, String subtotal, String taxAmount, String priorityCharge,
-                        String deliveryFee, String totalAmount, String currency, String expiresAt, String token) {}
+                        String deliveryFee, String totalAmount, String currency, String expiresAt, String token,String paymentFee,String paymentFeeTax,String paymentFeeRate) {
+        public Quote(long windowId,String serviceDate,String startsAt,String endsAt,List<Line> items,String subtotal,String taxAmount,String priorityCharge,String deliveryFee,String totalAmount,String currency,String expiresAt,String token) {
+            this(windowId,serviceDate,startsAt,endsAt,items,subtotal,taxAmount,priorityCharge,deliveryFee,totalAmount,currency,expiresAt,token,"0.00","0.00","0.00");
+        }
+    }
 
     @Transactional(readOnly = true)
     public Quote preview(DeliveryOrderCreationService.CreateRequest request) {
@@ -54,7 +58,7 @@ public class DeliveryAcceptedQuoteService {
                         item.taxRate().toPlainString(), item.taxAmount().toPlainString(),
                         item.lineTotal().toPlainString())).toList(), price.subtotal().toPlainString(),
                 price.taxAmount().toPlainString(), price.priorityCharge().toPlainString(), prepared.economics().fee().toPlainString(),
-                price.totalAmount().add(prepared.economics().fee()).toPlainString(), "INR", Instant.ofEpochSecond(expiry).toString(), token);
+                price.totalAmount().add(prepared.economics().fee()).toPlainString(), "INR", Instant.ofEpochSecond(expiry).toString(), token,price.paymentFee().toPlainString(),price.paymentFeeTax().toPlainString(),price.paymentFeeRate().toPlainString());
     }
 
     public void accept(DeliveryOrderCreationService.CreateRequest request, OrderCalculationResult price,
@@ -113,6 +117,7 @@ public class DeliveryAcceptedQuoteService {
         append(value, price.taxAmount().toPlainString());
         append(value, price.priorityCharge().toPlainString());
         append(value, price.totalAmount().toPlainString());
+        append(value,price.paymentFee().toPlainString());append(value,price.paymentFeeTax().toPlainString());append(value,price.paymentFeeRate().toPlainString());append(value,price.paymentFeeTaxRate().toPlainString());append(value,String.valueOf(price.feeConfigurationVersion()));
         append(value, economics.version());
         append(value, economics.fee().toPlainString());
         append(value, economics.contribution().toPlainString());

@@ -41,6 +41,13 @@ class CheckoutQuoteServiceTest {
     }
 
     @Test
+    void paymentPercentageTaxTreatmentAndConfigurationVersionAreBoundToAcceptedQuote() {
+        var quote=service.preview(request,null);
+        var changed=new OrderCalculationResult(amounts.items(),amounts.subtotal(),amounts.taxAmount(),amounts.priorityCharge(),amounts.convenienceFee(),amounts.convenienceFeeTax(),amounts.totalAmount(),7L,amounts.convenienceFeeTaxRate(),new BigDecimal("0.00"),new BigDecimal("0.00"),new BigDecimal("2.00"),new BigDecimal("18.00"));
+        assertThatThrownBy(()->service.accept(request,null,changed,quote.token())).isInstanceOf(IllegalStateException.class).hasMessageContaining("changed");
+    }
+
+    @Test
     void acceptsOnlyTheExactUnexpiredQuote() {
         var quote = service.preview(request, null);
         assertThat(quote.totalAmount()).isEqualTo("105.00");

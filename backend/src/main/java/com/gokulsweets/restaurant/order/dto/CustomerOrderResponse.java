@@ -44,6 +44,9 @@ public record CustomerOrderResponse(
         BigDecimal priorityCharge,
         BigDecimal convenienceFee,
         BigDecimal convenienceFeeTax,
+        BigDecimal paymentFee,
+        BigDecimal paymentFeeTax,
+        BigDecimal paymentFeeRate,
 
         BigDecimal totalAmount,
 
