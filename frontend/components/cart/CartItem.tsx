@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 import {formatWeight as readableWeight} from "@/lib/orderQuantity";
 
 import Image
@@ -119,7 +120,7 @@ export default function CartItem({
             "
         >
             <button type="button" className="gokul-cart-swipe-delete" aria-label={`Delete ${product.name} from cart`}
-                onClick={() => onRemove(product.id)}>Delete</button>
+                onClick={() => onRemove(product.id)}><T text="Delete" /></button>
             <div className={`gokul-cart-swipe-content ${revealed ? "is-revealed" : ""}`} onTouchStart={event => {
                 touchStart.current = {x: event.touches[0].clientX, y: event.touches[0].clientY};
             }} onTouchEnd={event => {
@@ -269,7 +270,7 @@ export default function CartItem({
                             "
                         >
                             <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M9 7V4h6v3m3 0-1 13H7L6 7m4 4v5m4-5v5" /></svg>
-                            <span className="sr-only">Remove</span>
+                            <span className="sr-only"><T text="Remove" /></span>
                         </button>
 
                     </div>
@@ -406,8 +407,7 @@ export default function CartItem({
                                         text-[#7a1625]
                                     "
                                 >
-                                    Change
-                                </span>
+                                    <T text="Change" /></span>
 
                             </button>
                         )
@@ -476,8 +476,7 @@ export default function CartItem({
                             text-[#756763]
                         "
                     >
-                        Item total
-                    </p>
+                        <T text="Item total" /></p>
 
 
                     <p

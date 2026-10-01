@@ -1,4 +1,7 @@
 "use client";
+import {T,translate,useLanguage} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
@@ -44,6 +47,7 @@ import type {
 
 
 export default function CartPage() {
+    useLanguage();
     const pickupCheck = useDateAvailability();
     const features = useStorefrontFeatures();
     const online = useOnlineStatus();
@@ -198,8 +202,7 @@ export default function CartPage() {
                                 text-[#c88a20]
                             "
                         >
-                            Your pickup order
-                        </p>
+                            <T text="Your pickup order" /></p>
 
 
                         <h1
@@ -212,8 +215,7 @@ export default function CartPage() {
                                 sm:text-4xl
                             "
                         >
-                            Cart
-                        </h1>
+                            <T text="Cart" /></h1>
 
 
                         {!isEmpty
@@ -225,8 +227,7 @@ export default function CartPage() {
                                         text-[#756763]
                                     "
                                 >
-                                    {itemCount} {itemCount === 1 ? "item" : "items"} ready for review
-                                </p>
+                                    {itemCount} {itemCount === 1 ? translate("item") : "items"} <T text="ready for review" /></p>
                             )}
 
                     </div>
@@ -253,8 +254,7 @@ export default function CartPage() {
                                     active:scale-[0.98]
                                 "
                             >
-                                Clear cart
-                            </button>
+                                <T text="Clear cart" /></button>
                         )}
 
                 </div>
@@ -319,8 +319,7 @@ export default function CartPage() {
                                                 text-[#c88a20]
                                             "
                                         >
-                                            Selected pickup branch
-                                        </p>
+                                            <T text="Selected pickup branch" /></p>
 
 
                                         <p
@@ -368,8 +367,7 @@ export default function CartPage() {
                                             hover:underline
                                         "
                                     >
-                                        Change
-                                    </Link>}
+                                        <T text="Change" /><LinkFeedback /></Link>}
 
                                 </div>
 
@@ -393,8 +391,7 @@ export default function CartPage() {
                                                     text-[#7a1625]
                                                 "
                                             >
-                                                Cart branch mismatch
-                                            </p>
+                                                <T text="Cart branch mismatch" /></p>
 
 
                                             <p
@@ -405,10 +402,7 @@ export default function CartPage() {
                                                     text-[#756763]
                                                 "
                                             >
-                                                These cart items belong to another pickup branch.
-                                                Select the matching branch before continuing, or clear
-                                                the cart and start a new order from this branch.
-                                            </p>
+                                                <T text="These cart items belong to another pickup branch. Select the matching branch before continuing, or clear the cart and start a new order from this branch." /></p>
 
                                         </div>
                                     )}
@@ -474,8 +468,7 @@ export default function CartPage() {
                                             hover:underline
                                         "
                                     >
-                                        ← Add more items
-                                    </Link>
+                                        <T text="← Add more items" /><LinkFeedback /></Link>
 
                                 </div>
 
@@ -512,13 +505,13 @@ export default function CartPage() {
 
             </section>
 
-            {features?.accessibleOrderingV2 === true && !online && !isEmpty && <p role="alert" className="mx-auto max-w-[1180px] px-4 pb-3 text-sm text-[#7a1625]">Your cart is saved. Reconnect before choosing a pickup time.</p>}
+            {features?.accessibleOrderingV2 === true && !online && !isEmpty && <p role="alert" className="mx-auto max-w-[1180px] px-4 pb-3 text-sm text-[#7a1625]"><T text="Your cart is saved. Reconnect before choosing a pickup time." /></p>}
 
             {features?.accessibleOrderingV2 === true && !isEmpty && <div className="fixed inset-x-0 bottom-[env(safe-area-inset-bottom)] z-40 border-t border-[#eadfd6] bg-white p-3 shadow-[0_-6px_20px_rgba(60,30,20,0.12)] lg:hidden">
                 <div className="mx-auto flex max-w-lg items-center gap-3">
                     <p className="min-w-0 flex-1 text-sm font-semibold text-[#241715]">{!online ? "Reconnect to continue" : !cartMatchesSelectedBranch ? "Choose your cart’s shop" : `${itemCount} items · ${new Intl.NumberFormat("en-IN", {style: "currency", currency: "INR", maximumFractionDigits: 2}).format(subtotal)} estimate`}</p>
                     <button type="button" disabled={!cartMatchesSelectedBranch || !online} onClick={handleContinue}
-                        className="min-h-12 rounded-xl bg-[#7a1625] px-4 font-bold text-white disabled:opacity-50">Choose pickup</button>
+                        className="min-h-12 rounded-xl bg-[#7a1625] px-4 font-bold text-white disabled:opacity-50"><T text="Choose pickup" /></button>
                 </div>
             </div>}
 

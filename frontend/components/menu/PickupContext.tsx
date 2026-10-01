@@ -1,4 +1,7 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T,translate,useLanguage} from "@/lib/language";
 
 import Link from "next/link";
 import {usePickupClock} from "@/hooks/usePickupClock";
@@ -62,6 +65,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
 }
 
 export default function PickupContext({check, cart = false}: {check: ReturnType<typeof useDateAvailability>; cart?: boolean}) {
+    useLanguage();
     const {features, today, branch, intent, data, items, error, hasItems, retry} = check;
     const currentCart = useCart();
     const [proposedDate, setProposedDate] = useState<string | null>(null);
@@ -80,9 +84,8 @@ export default function PickupContext({check, cart = false}: {check: ReturnType<
                 setProposedDate(null);
             }} />}
         <div className="flex flex-wrap items-end justify-between gap-3">
-            <div><p className="text-xs font-semibold uppercase text-[#756763]">Pickup at {branch.name}</p>
-                <label className="mt-2 block text-sm font-bold">Pickup date
-                    <input aria-label="Pickup date" type="date" min={today} max={max} value={intent.date ?? ""}
+            <div><p className="text-xs font-semibold uppercase text-[#756763]"><T text="Pickup at" />{branch.name}</p>
+                <label className="mt-2 block text-sm font-bold"><T text="Pickup date" /><input aria-label={translate("Pickup date")} type="date" min={today} max={max} value={intent.date ?? ""}
                         onChange={event => {
                             const date = event.target.value;
                             if (date && !validPickupDate(date,indiaToday(new Date()),features.futureOrderingDays)) {setDateError("Choose today or a future date in the booking window.");return;}
@@ -96,24 +99,24 @@ export default function PickupContext({check, cart = false}: {check: ReturnType<
                         className="ml-3 min-h-11 rounded-xl border border-[#eadfd6] px-3" />
                 </label></div>
             {intent.selection && <Link href="/checkout/pickup" className="min-h-11 py-3 text-sm underline">
-                {intent.selection.slot.startTime.slice(0, 5)} pickup · Change time</Link>}
+                {intent.selection.slot.startTime.slice(0, 5)} <T text="pickup · Change time" /><LinkFeedback /></Link>}
         </div>
         {dateError && <p role="alert" className="mt-2 text-sm text-red-700">{dateError}</p>}
-        {intent.expired && <p role="status" className="mt-2 text-sm">Your previous pickup has passed. Choose a new date; your cart is saved.</p>}
-        {!intent.date ? <p className="mt-2 text-sm text-[#756763]">Choose pickup to check availability. Browse and build your cart first if you prefer.</p>
-            : intent.date < today ? <p role="alert" className="mt-2 text-sm">That pickup date has passed. Choose a new date; your cart is saved.</p>
-            : error ? <div role="alert"><p className="mt-2 text-sm">{error}</p><button onClick={retry} className="min-h-11 underline">Try again</button></div>
-            : !data && hasItems ? <p role="status" className="mt-2 text-sm">Checking your pickup date...</p>
-            : <p className="mt-2 text-xs text-[#756763]">Live preview, not a reservation. {intent.selection ? "Quantities and this time are checked again at checkout." : "Choose a time for all items after building your cart."}</p>}
-        {check.selectionUnavailable && <p role="status" className="mt-3 text-sm text-[#7a1625]">Your saved pickup time no longer fits this selection. <Link href="/checkout/pickup" className="underline">Choose another time</Link>. Your cart is unchanged.</p>}
+        {intent.expired && <p role="status" className="mt-2 text-sm"><T text="Your previous pickup has passed. Choose a new date; your cart is saved." /></p>}
+        {!intent.date ? <p className="mt-2 text-sm text-[#756763]"><T text="Choose pickup to check availability. Browse and build your cart first if you prefer." /></p>
+            : intent.date < today ? <p role="alert" className="mt-2 text-sm"><T text="That pickup date has passed. Choose a new date; your cart is saved." /></p>
+            : error ? <div role="alert"><p className="mt-2 text-sm">{error}</p><button onClick={retry} className="min-h-11 underline"><T text="Try again" /></button></div>
+            : !data && hasItems ? <p role="status" className="mt-2 text-sm"><T text="Checking your pickup date..." /></p>
+            : <p className="mt-2 text-xs text-[#756763]"><T text="Live preview, not a reservation." />{intent.selection ? "Quantities and this time are checked again at checkout." : "Choose a time for all items after building your cart."}</p>}
+        {check.selectionUnavailable && <p role="status" className="mt-3 text-sm text-[#7a1625]"><T text="Your saved pickup time no longer fits this selection." /><Link href="/checkout/pickup" className="underline"><T text="Choose another time" /><LinkFeedback /></Link><T text=". Your cart is unchanged." /></p>}
         {cart && items?.some(item => !item.available) && <div role="status" className="mt-3 rounded-xl bg-[#fff0dc] p-3">
-            <h3 className="font-bold">Review these items for your pickup</h3>
+            <h3 className="font-bold"><T text="Review these items for your pickup" /></h3>
             {items.filter(item => !item.available).map(item => <p key={item.productId} className="mt-2 text-sm">
                 <strong>{item.productName}</strong>: {item.reason}
                 {item.code === "QUANTITY_TOO_LARGE" && ` Up to ${item.availableQuantity} ${item.unit === "GRAM" ? "g" : "pieces"} remain.`}
             </p>)}
-            <p className="mt-2 text-sm">Edit quantities or remove items below, or keep your cart and find another pickup.</p>
-            <Link href="/checkout/pickup" className="inline-flex min-h-11 items-center font-semibold underline">Find a time for all items</Link>
+            <p className="mt-2 text-sm"><T text="Edit quantities or remove items below, or keep your cart and find another pickup." /></p>
+            <Link href="/checkout/pickup" className="inline-flex min-h-11 items-center font-semibold underline"><T text="Find a time for all items" /><LinkFeedback /></Link>
         </div>}
     </section>;
 }

@@ -1,0 +1,54 @@
+"use client";
+import {useCallback,useEffect,useRef,useState} from "react";
+import {adminFetch} from "@/services/adminApi";
+import {startSelectedAdminOrders} from "@/services/adminOrdersApi";
+import {formatBusinessTimestamp} from "@/lib/businessTime";
+import {useRouter,usePathname,useSearchParams} from "next/navigation";
+import styles from "./KitchenBoard.module.css";
+
+type Row={orderNumber:string;customerName:string;fulfillmentType:string;orderStatus:string;bucket:string;date:string;start:string;end:string;preparationAt:string};
+type Slot={date:string;start:string;end:string;fulfillmentType:string;waiting:number;preparing:number;ready:number;total:number};
+type Plan={orders:Row[];slots:Slot[];counts:Record<string,number>;page:number;total:number;generatedAt:string};
+const tabs=[['ALL','All orders'],['OVERDUE','Overdue'],['ELIGIBLE','Needs preparation'],['SCHEDULED','Scheduled future'],['PREPARING','Preparing'],['READY','Ready']];
+export default function KitchenBoard({branchId,authorization,canStart,onView,onChanged}:{branchId:number;authorization:string;canStart:boolean;onView:(number:string)=>void;onChanged:()=>void}) {
+ const router=useRouter(),pathname=usePathname(),search=useSearchParams();
+ const filter=tabs.some(([key])=>key===search.get('kitchen'))?search.get('kitchen')!:'ALL';
+ const date=search.get('prepDate')??'',time=search.get('prepTime')??'';
+ const page=Math.max(0,Number(search.get('prepPage'))||0);
+ const [plan,setPlan]=useState<Plan|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[selected,setSelected]=useState<string[]>([]),[busy,setBusy]=useState(false),[confirm,setConfirm]=useState(false),[result,setResult]=useState('');
+ const request=useRef(0),busyRef=useRef(false),confirmation=useRef<HTMLDialogElement>(null);
+ const refresh=useCallback(async(signal?:AbortSignal)=>{
+  const revision=++request.current;
+  const query=new URLSearchParams({branchId:String(branchId),filter,page:String(page)});if(date)query.set('date',date);if(time&&date)query.set('start',time);
+  try{const response=await adminFetch(`/api/admin/orders/planning?${query}`,authorization,{signal,cache:'no-store'});
+   if(!response.ok)throw new Error('Could not refresh the kitchen plan. Retry before starting orders.');
+   const next=await response.json() as Plan;
+   if(revision!==request.current||signal?.aborted)return;
+   setPlan(next);setError('');setSelected(current=>current.filter(number=>next.orders.some(row=>row.orderNumber===number&&['ELIGIBLE','OVERDUE'].includes(row.bucket))));
+   const counts=await adminFetch(`/api/admin/orders/queue/counts?branchId=${branchId}`,authorization,{signal,cache:'no-store'});
+   if(!counts.ok)throw new Error('Could not check preparation alerts.');
+   const total=await counts.json();if(revision===request.current&&!signal?.aborted){if(!Number.isFinite(total.actionableTotal))throw new Error("Invalid preparation counts.");}
+  }catch(cause){if(signal?.aborted)return;if(revision===request.current){setError(cause instanceof Error?cause.message:'Could not load kitchen plan.');}}
+  finally{if(revision===request.current&&!signal?.aborted)setLoading(false);}
+ },[branchId,authorization,filter,page,date,time]);
+ useEffect(()=>{const controller=new AbortController();const initial=window.setTimeout(()=>{setLoading(true);setPlan(null);setSelected([]);void refresh(controller.signal);},0);
+  const check=()=>{if(document.visibilityState==='visible'&&navigator.onLine&&!busyRef.current)void refresh(controller.signal);};
+  const timer=window.setInterval(check,15000);window.addEventListener('online',check);document.addEventListener('visibilitychange',check);
+  return()=>{controller.abort();clearTimeout(initial);clearInterval(timer);window.removeEventListener('online',check);document.removeEventListener('visibilitychange',check);};
+ },[refresh]);
+ useEffect(()=>{if(confirm)confirmation.current?.showModal();},[confirm]);
+ function navigate(changes:Record<string,string>){const params=new URLSearchParams(search.toString());params.set('prepPage','0');for(const [key,value]of Object.entries(changes)){if(value)params.set(key,value);else params.delete(key);}router.replace(`${pathname}?${params}`,{scroll:false});}
+ async function start(){if(busyRef.current||!canStart||!selected.length)return;busyRef.current=true;setBusy(true);setError('');try{const response=await startSelectedAdminOrders({branchId,orderNumbers:selected},authorization);setResult(`${response.started} started · ${response.skipped} skipped. ${response.results.filter(item=>item.result!=='STARTED').map(item=>`${item.orderNumber}: ${item.message}`).join(' ')}`);setSelected([]);setConfirm(false);window.dispatchEvent(new Event("gokul-kitchen-changed"));await refresh();onChanged();}catch(cause){setError(cause instanceof Error?cause.message:'Could not start. Refresh and check the orders.');}finally{busyRef.current=false;setBusy(false);}}
+ const dates=Array.from(new Set(plan?.slots.map(slot=>slot.date)??[]));
+ return <section className={styles.board} aria-label="Kitchen preparation planning">
+  <header className={styles.header}><div><small>KITCHEN OPERATIONS · IST</small><h2>Plan, prepare, hand over</h2><p>Tap a status, then choose a date or pickup time. Future orders stay scheduled until preparation opens.</p></div><button disabled={busy||loading} onClick={()=>void refresh()}>Refresh plan</button></header>
+  <nav className={styles.tabs} aria-label="Preparation status">{tabs.map(([key,label])=><button key={key} aria-pressed={filter===key} className={filter===key?styles.active:''} onClick={()=>navigate({kitchen:key})}>{label}<strong>{plan?.counts[key]??'—'}</strong></button>)}</nav>
+  <div className={styles.filters}><label>Service date<select value={date} onChange={event=>navigate({prepDate:event.target.value,prepTime:''})}><option value="">All dates</option>{dates.map(value=><option key={value} value={value}>{value}</option>)}{date&&!dates.includes(date)&&<option value={date}>{date}</option>}</select></label><label>Pickup / delivery time<select value={time} disabled={!date} onChange={event=>navigate({prepTime:event.target.value})}><option value="">All times</option>{Array.from(new Set(plan?.slots.filter(slot=>slot.date===date).map(slot=>slot.start)??[])).map(value=><option key={value}>{value}</option>)}</select></label><button onClick={()=>navigate({kitchen:'ALL',prepDate:'',prepTime:''})}>Show all</button></div>
+  <div className={styles.timeline} aria-label="Workload by date and service time">{plan?.slots.filter(slot=>!date||slot.date===date).map(slot=><button key={`${slot.date}:${slot.start}:${slot.fulfillmentType}`} onClick={()=>navigate({prepDate:slot.date,prepTime:slot.start,kitchen:'ALL'})}><small>{slot.date} · {slot.fulfillmentType==='DELIVERY'?'Delivery':'Pickup'}</small><strong>{slot.start.slice(0,5)}–{slot.end.slice(0,5)}</strong><b>{slot.total} orders</b><span>{slot.waiting} waiting · {slot.preparing} preparing · {slot.ready} ready</span></button>)}</div>
+  {canStart&&<div className={styles.actions}><button disabled={busy||loading||!!error||!selected.length} onClick={()=>setConfirm(true)}>Start selected in KOT ({selected.length})</button><button disabled={busy||loading||!!error} onClick={()=>setSelected(plan?.orders.filter(row=>['ELIGIBLE','OVERDUE'].includes(row.bucket)).map(row=>row.orderNumber)??[])}>Select eligible on this page</button><button disabled={busy} onClick={()=>setSelected([])}>Clear selection</button></div>}
+  {error&&<p role="alert" className={styles.error}>{error}</p>}{result&&<p role="status">{result}</p>}
+  {loading?<p role="status">Loading your kitchen plan…</p>:!plan?.orders.length?<p className={styles.empty}>No orders in this view. Choose another status or service date.</p>:<div className={styles.rows}>{plan.orders.map(row=><article key={row.orderNumber}><div>{canStart&&['ELIGIBLE','OVERDUE'].includes(row.bucket)&&<input type="checkbox" aria-label={`Select ${row.orderNumber}`} checked={selected.includes(row.orderNumber)} disabled={busy||!!error} onChange={event=>setSelected(current=>event.target.checked?[...current,row.orderNumber]:current.filter(number=>number!==row.orderNumber))}/>}<span className={styles.badge}>{tabs.find(([key])=>key===row.bucket)?.[1]}</span><h3>{row.customerName}</h3><small>{row.orderNumber}</small></div><div><strong>{row.date} · {row.start.slice(0,5)}–{row.end.slice(0,5)} IST</strong><p>Preparation opens {formatBusinessTimestamp(row.preparationAt,{dateStyle:"medium",timeStyle:"short"})}</p></div><button onClick={()=>onView(row.orderNumber)}>View order</button></article>)}</div>}
+  <footer className={styles.actions}><button disabled={page===0||loading} onClick={()=>navigate({prepPage:String(page-1)})}>Previous</button><span>Page {page+1} · {plan?.total??0} matching orders · 20 per page</span><button disabled={loading||(page+1)*20>=(plan?.total??0)} onClick={()=>navigate({prepPage:String(page+1)})}>Next</button><small>Updated {plan?formatBusinessTimestamp(plan.generatedAt,{timeStyle:"short"}):'—'}</small></footer>
+  {confirm&&<dialog ref={confirmation} onCancel={event=>{event.preventDefault();if(!busy)setConfirm(false);}} className={styles.confirm} aria-labelledby="kitchen-confirm"><h3 id="kitchen-confirm">Start {selected.length} orders in KOT?</h3><p>{selected.join(', ')}</p><p>Each order is checked again. Future, cancelled or already-started orders are skipped.</p><button disabled={busy} onClick={()=>setConfirm(false)}>Keep current status</button><button disabled={busy} onClick={()=>void start()}>{busy?'Starting…':'Confirm start'}</button></dialog>}
+ </section>;
+}

@@ -1,4 +1,7 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T,translate,useLanguage} from "@/lib/language";
 import {groupMenuProducts} from "@/lib/menuGroups";
 
 import Link from "next/link";
@@ -65,6 +68,7 @@ interface ProductRatingState {
 
 
 export default function MenuScreen() {
+    useLanguage();
     const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
     const {
@@ -895,8 +899,7 @@ export default function MenuScreen() {
                             text-[#c88a20]
                         "
                     >
-                        Pickup location required
-                    </p>
+                        <T text="Pickup location required" /></p>
 
 
                     <h1
@@ -908,8 +911,7 @@ export default function MenuScreen() {
                             text-[#241715]
                         "
                     >
-                        Select your pickup branch
-                    </h1>
+                        <T text="Select your pickup branch" /></h1>
 
 
                     <p
@@ -922,9 +924,7 @@ export default function MenuScreen() {
                             text-[#756763]
                         "
                     >
-                        Your branch determines which products,
-                        prices and pickup options are available.
-                    </p>
+                        <T text="Your branch determines which products, prices and pickup options are available." /></p>
 
 
                     <Link
@@ -947,8 +947,7 @@ export default function MenuScreen() {
                             active:scale-[0.98]
                         "
                     >
-                        Choose Branch
-                    </Link>
+                        <T text="Choose Branch" /><LinkFeedback /></Link>
 
                 </div>
 
@@ -1013,8 +1012,7 @@ export default function MenuScreen() {
                                     text-[#c88a20]
                                 "
                             >
-                                Freshly prepared
-                            </p>
+                                <T text="Freshly prepared" /></p>
 
 
                             <h1
@@ -1070,8 +1068,7 @@ export default function MenuScreen() {
                                     text-[#c88a20]
                                 "
                             >
-                                Pickup branch
-                            </p>
+                                <T text="Pickup branch" /></p>
 
 
                             <p
@@ -1098,8 +1095,7 @@ export default function MenuScreen() {
                                     hover:underline
                                 "
                             >
-                                Change branch
-                            </Link>
+                                <T text="Change branch" /><LinkFeedback /></Link>
 
                         </div>}
 
@@ -1133,7 +1129,7 @@ export default function MenuScreen() {
                                     value={
                                         `${allProducts.length} ${
                                             allProducts.length === 1
-                                                ? "item"
+                                                ? translate("item")
                                                 : "items"
                                         }`
                                     }
@@ -1251,7 +1247,7 @@ export default function MenuScreen() {
                             <MenuEmptyState
                                 title="Menu is not available yet"
                                 description={`There are currently no menu items available for ${branch.name}. Please check again shortly or choose another branch.`}
-                                actionLabel="Change branch"
+                                actionLabel={translate("Change branch")}
                                 actionHref="/"
                             />
                         )}
@@ -1291,7 +1287,7 @@ export default function MenuScreen() {
                                             {
                                                 selectedCategory
                                                     ? selectedCategory.name
-                                                    : "All items"
+                                                    : translate("All items")
                                             }
                                         </p>
 
@@ -1313,7 +1309,7 @@ export default function MenuScreen() {
                                                     }`
                                                     : `${filteredProducts.length} ${
                                                         filteredProducts.length === 1
-                                                            ? "item"
+                                                            ? translate("item")
                                                             : "items"
                                                     } on the menu`
                                             }
@@ -1337,15 +1333,14 @@ export default function MenuScreen() {
                                                     hover:underline
                                                 "
                                             >
-                                                Clear filters
-                                            </button>
+                                                <T text="Clear filters" /></button>
                                         )}
 
                                 </div>
 
 
                                 {pickupCheck.features?.contextualStorefrontV2 ? groupMenuProducts(categories, filteredProducts).map(group => <section key={group.id} id={`menu-category-${group.id}`} className="gokul-menu-category-section" aria-label={`${group.name} menu items`}>
-                                    <div className="gokul-menu-category-heading"><h3>{group.name}</h3><span>{group.products.length} {group.products.length === 1 ? "item" : "items"}</span></div>
+                                    <div className="gokul-menu-category-heading"><h3>{group.name}</h3><span>{group.products.length} {group.products.length === 1 ? translate("item") : "items"}</span></div>
                                     {group.description && <p>{group.description}</p>}
                                 <ProductGrid
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
@@ -1460,8 +1455,7 @@ export default function MenuScreen() {
                                         text-[#241715]
                                     "
                                 >
-                                    No matching items
-                                </h2>
+                                    <T text="No matching items" /></h2>
 
 
                                 <p
@@ -1474,9 +1468,7 @@ export default function MenuScreen() {
                                         text-[#756763]
                                     "
                                 >
-                                    Try another search or category
-                                    to see more of the menu.
-                                </p>
+                                    <T text="Try another search or category to see more of the menu." /></p>
 
 
                                 <button
@@ -1501,8 +1493,7 @@ export default function MenuScreen() {
                                         active:scale-[0.98]
                                     "
                                 >
-                                    Show all items
-                                </button>
+                                    <T text="Show all items" /></button>
 
                             </div>
                         )}
@@ -1574,6 +1565,7 @@ function InfoPill({
 }: {
     value: string;
 }) {
+    useLanguage();
 
     return (
         <span
@@ -1602,6 +1594,7 @@ function MenuError({
     message: string;
     onRetry: () => void;
 }) {
+    useLanguage();
 
     return (
         <div
@@ -1642,8 +1635,7 @@ function MenuError({
                     text-[#241715]
                 "
             >
-                Unable to load menu
-            </h2>
+                <T text="Unable to load menu" /></h2>
 
 
             <p
@@ -1680,8 +1672,7 @@ function MenuError({
                     active:scale-[0.98]
                 "
             >
-                Try again
-            </button>
+                <T text="Try again" /></button>
 
         </div>
     );
@@ -1699,6 +1690,7 @@ function MenuEmptyState({
     actionLabel: string;
     actionHref: string;
 }) {
+    useLanguage();
 
     return (
         <div
@@ -1780,7 +1772,7 @@ function MenuEmptyState({
                 "
             >
                 {actionLabel}
-            </Link>
+            <LinkFeedback /></Link>
 
         </div>
     );

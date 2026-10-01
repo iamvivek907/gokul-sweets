@@ -24,5 +24,5 @@ test('the home route keeps the entrance when the gateway is enabled', () => {
     assert.match(home, /shouldShowIntentGateway\(features\.preHomeIntentGateway, false\)/);
     assert.doesNotMatch(home, /hasChosenEntryIntent|sessionStorage|Boolean\(branch\)/);
     const arrival = fs.readFileSync(path.join(__dirname, '../components/menu/EditorialArrival.tsx'), 'utf8');
-    assert.match(arrival, /href="#gokul-arrival-title" aria-current="page">Home<\/a>/);
+    assert.match(arrival, /href="#gokul-arrival-title" aria-current="page">(?:Home|<T text="Home" \/>)<\/a>/);
 });

@@ -36,6 +36,9 @@ export interface StorefrontFeatures {
     notificationAlerts: boolean;
     brandCareers: boolean;
     pickupAddOns: boolean;
+    simplifiedCheckout: boolean;
+    bilingualStorefront: boolean;
+    adminPreparationBoard: boolean;
     futureOrderingDays: number;
     today: string;
 }

@@ -1,4 +1,5 @@
 "use client";
+import {T,translate,useLanguage} from "@/lib/language";
 
 import {
     useEffect,
@@ -27,6 +28,7 @@ import type {
 function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
     branchName: string; itemCount: number; onKeep: () => void; onConfirm: () => void;
 }) {
+    useLanguage();
     const dialogId = useId();
     const originalCart = useRef<string | null>(null);
     const [changed, setChanged] = useState(false);
@@ -38,7 +40,7 @@ function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
     }, [dialogId]);
     return <dialog id={dialogId} aria-labelledby={`${dialogId}-title`} onCancel={onKeep} className="m-auto w-[calc(100vw-2rem)] max-w-md rounded-2xl border border-[#d9e5df] bg-white p-5 text-[#172e2c] shadow-xl backdrop:bg-black/60">
         <h2 id={`${dialogId}-title`} className="text-xl font-bold">Start at {branchName}?</h2>
-        <p className="mt-3 text-sm leading-6">Your current cart has {itemCount} {itemCount === 1 ? "item" : "items"} from another branch. Switching will clear that cart and open {branchName} with an empty cart. Your placed orders are unaffected.</p>
+        <p className="mt-3 text-sm leading-6">Your current cart has {itemCount} {itemCount === 1 ? translate("item") : "items"} from another branch. Switching will clear that cart and open {branchName} with an empty cart. Your placed orders are unaffected.</p>
         {changed && <p role="alert" className="mt-3 text-sm text-red-700">Your cart changed. Close this review and choose the branch again.</p>}
         <div className="mt-5 flex flex-wrap gap-3">
             <button type="button" onClick={onKeep} className="min-h-11 rounded-xl border px-4 font-semibold">Keep my cart</button>
@@ -49,6 +51,7 @@ function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
 
 
 export default function BranchSelector({compact = false, locationControl = false, cardBranch, destination = "menu"}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch; destination?: "menu" | "branchHome" | "occasions"}) {
+    useLanguage();
     const router = useRouter();
     const uniqueId = useId();
     const popoverId = compact || locationControl || cardBranch ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
@@ -260,7 +263,7 @@ export default function BranchSelector({compact = false, locationControl = false
             {cardBranch ? <button type="button" className="gokul-branch-card-action"
                 aria-label={`Explore ${cardBranch.name} menu and pickup choices`}
                 onClick={() => handleSelectBranch(cardBranch)}>
-                <span className="gokul-branch-card-action-label">Explore this branch</span>
+                <span className="gokul-branch-card-action-label"><T text="Explore this branch" /></span>
             </button> : <button
                 type="button"
                 popoverTarget={popoverId}
@@ -280,9 +283,9 @@ export default function BranchSelector({compact = false, locationControl = false
 
                 {locationControl ? <>
                     <span className="gokul-location-pin" aria-hidden="true">●</span>
-                    <span className="gokul-location-name"><small>PICKUP BRANCH</small><strong>{branch?.name ?? "Choose branch"}</strong></span>
+                    <span className="gokul-location-name"><small><T text="PICKUP BRANCH" /></small><strong>{branch?.name ?? "Choose branch"}</strong></span>
                     <span className="gokul-location-chevron" aria-hidden="true">⌄</span>
-                </> : compact ? "Change branch" : <>
+                </> : compact ? translate("Change branch") : <>
 
                 <div
                     className="
@@ -302,8 +305,7 @@ export default function BranchSelector({compact = false, locationControl = false
                                 text-[#756763]
                             "
                         >
-                            Pickup from
-                        </p>
+                            <T text="Pickup from" /></p>
 
 
                         <p
@@ -348,7 +350,7 @@ export default function BranchSelector({compact = false, locationControl = false
                     >
                         {
                             branch
-                                ? "Change"
+                                ? translate("Change")
                                 : "Select"
                         }
                     </span>
@@ -408,8 +410,7 @@ export default function BranchSelector({compact = false, locationControl = false
                             text-[#241715]
                         "
                     >
-                        Select Branch
-                    </h2>
+                        <T text="Select Branch" /></h2>
 
                 </div>
 
@@ -483,8 +484,7 @@ export default function BranchSelector({compact = false, locationControl = false
                                     text-white!
                                 "
                             >
-                                Try again
-                            </button>
+                                <T text="Try again" /></button>
 
                         </div>
 

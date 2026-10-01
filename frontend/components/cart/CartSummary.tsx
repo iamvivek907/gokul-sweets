@@ -1,3 +1,4 @@
+import {T} from "@/lib/language";
 interface CartSummaryProps {
     refined?: boolean;
 
@@ -66,8 +67,7 @@ export default function CartSummary({
                     text-[#c88a20]
                 "
             >
-                Checkout
-            </p>
+                <T text="Checkout" /></p>
 
 
             <h2
@@ -104,8 +104,7 @@ export default function CartSummary({
                             text-[#756763]
                         "
                     >
-                        Items
-                    </span>
+                        <T text="Items" /></span>
 
 
                     <span
@@ -209,8 +208,7 @@ export default function CartSummary({
                             text-[#7a1625]
                         "
                     >
-                        Select the pickup branch associated with this cart to continue.
-                    </p>
+                        <T text="Select the pickup branch associated with this cart to continue." /></p>
                 )}
 
 
@@ -245,8 +243,7 @@ export default function CartSummary({
                     disabled:active:scale-100
                 "
             >
-                Continue to Pickup Time
-            </button>
+                <T text="Continue to Pickup Time" /></button>
 
 
             <p
@@ -258,8 +255,7 @@ export default function CartSummary({
                     text-[#756763]
                 "
             >
-                You can still review your order before payment.
-            </p>
+                <T text="You can still review your order before payment." /></p>
 
         </div>
     );

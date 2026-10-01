@@ -69,6 +69,7 @@ jobs:
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/brand-careers.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/storefront-reconnect.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/branch-discovery.browser.mjs
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/simple-checkout-kitchen.browser.mjs
 
       - name: Upload SCRUM-111 layout evidence
         if: always()

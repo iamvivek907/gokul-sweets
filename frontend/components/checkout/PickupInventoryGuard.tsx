@@ -1,4 +1,7 @@
 "use client";
+import {T} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
 
 import Link from "next/link";
 import {useEffect, useMemo, useState} from "react";
@@ -152,8 +155,7 @@ export default function PickupInventoryGuard({
     if (isChecking) {
         return (
             <div className="mt-4 rounded-2xl border border-[#eadfd6] bg-white p-4 text-sm text-[#756763]">
-                Checking product availability for this date…
-            </div>
+                <T text="Checking product availability for this date…" /></div>
         );
     }
 
@@ -161,8 +163,7 @@ export default function PickupInventoryGuard({
         return (
             <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
                 <p className="font-bold">
-                    Availability could not be confirmed
-                </p>
+                    <T text="Availability could not be confirmed" /></p>
 
                 <p className="mt-1">
                     {currentError}
@@ -192,8 +193,7 @@ export default function PickupInventoryGuard({
     return (
         <div className="mt-4 rounded-3xl border border-amber-200 bg-[#fff8e8] p-5">
             <p className="text-base font-extrabold text-[#7a1625]">
-                Some items need your attention
-            </p>
+                <T text="Some items need your attention" /></p>
 
             <div className="mt-3 space-y-3">
                 {unavailable.map(item => (
@@ -206,12 +206,12 @@ export default function PickupInventoryGuard({
                         </p>
 
                         <p className="mt-1 text-[#756763]">
-                            Requested:{" "}
+                            <T text="Requested:" />{" "}
                             {formatQuantity(
                                 item.requestedQuantity,
                                 item.inventoryUnit
                             )}{" "}
-                            · Available:{" "}
+                            <T text="· Available:" />{" "}
                             {formatQuantity(
                                 item.availableQuantity,
                                 item.inventoryUnit
@@ -237,34 +237,27 @@ export default function PickupInventoryGuard({
                     }
                     className="mt-4 min-h-12 w-full rounded-xl bg-[#7a1625] px-5 text-sm font-bold text-white!"
                 >
-                    Choose{" "}
+                    <T text="Choose" />{" "}
                     {formatDate(
                         currentResult.suggestedDate
                     )}{" "}
-                    instead
-                </button>
+                    <T text="instead" /></button>
             )}
 
             {currentResult.callBranchRecommended && (
                 <div className="mt-4 rounded-2xl border border-[#eadfd6] bg-white p-4">
                     <p className="text-sm font-bold text-[#241715]">
-                        Planning a large order?
-                    </p>
+                        <T text="Planning a large order?" /></p>
 
                     <p className="mt-1 text-sm leading-6 text-[#756763]">
-                        No online date within the current
-                        booking window can confirm the
-                        complete quantity. Please call the
-                        branch so the team can check
-                        production capacity.
-                    </p>
+                        <T text="No online date within the current booking window can confirm the complete quantity. Please call the branch so the team can check production capacity." /></p>
 
                     {branchPhone && (
                         <a
                             href={`tel:${branchPhone}`}
                             className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-[#7a1625] text-sm font-bold text-[#7a1625]!"
                         >
-                            Call {branchPhone}
+                            <T text="Call" />{branchPhone}
                         </a>
                     )}
                 </div>
@@ -274,8 +267,7 @@ export default function PickupInventoryGuard({
                 href="/cart"
                 className="mt-3 flex min-h-11 w-full items-center justify-center text-sm font-bold text-[#7a1625]!"
             >
-                Adjust cart quantities
-            </Link>
+                <T text="Adjust cart quantities" /><LinkFeedback /></Link>
         </div>
     );
 }

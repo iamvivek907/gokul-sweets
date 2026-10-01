@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import Image from "next/image";
 import {useState} from "react";
@@ -354,8 +355,7 @@ export default function ProductCard({
                                         </span>
 
                                         <span>
-                                            New · No ratings yet
-                                        </span>
+                                            <T text="New · No ratings yet" /></span>
                                     </div>
                                 )
                     }
@@ -400,14 +400,13 @@ export default function ProductCard({
 
                                     sm:text-xs
                                 ">
-                                    /kg
-                                </span>
+                                    <T text="/kg" /></span>
                             )
                         }
                     </span>
 
                     {refined && isWeighted && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
-                        From {formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} for {formatWeight(product.minimumWeightGrams ?? 250)}
+                        <T text="From" />{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{formatWeight(product.minimumWeightGrams ?? 250)}
                     </span>}
 
 
@@ -476,8 +475,7 @@ export default function ProductCard({
                                 }
                             `}
                         >
-                            ADD
-                        </button>
+                            <T text="ADD" /></button>
 
 
                         {/* Quantity */}
@@ -598,8 +596,7 @@ export default function ProductCard({
                                                 tracking-[0.08em]
                                                 text-white/80
                                             ">
-                                                Change
-                                            </span>
+                                                <T text="Change" /></span>
                                         </button>
                                     )
                                     : (

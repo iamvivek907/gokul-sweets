@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import type {
     MenuCategory
@@ -57,8 +58,7 @@ export default function CategoryTabs({
                     }
                 `}
             >
-                All
-            </button>
+                <T text="All" /></button>
 
 
             {categories.map(

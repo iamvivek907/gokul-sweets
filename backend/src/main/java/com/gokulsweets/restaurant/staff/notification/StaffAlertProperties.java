@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 @Getter @Setter
 public class StaffAlertProperties {
     private boolean schedulerEnabled = true;
+    private boolean recurringPreparationReminders;
+    private int repeatMinutes = 2;
     private int reminderMinutes = 10;
     private int escalationMinutes = 5;
     private boolean emailEnabled;

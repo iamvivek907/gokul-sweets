@@ -1,4 +1,7 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T,translate,useLanguage} from "@/lib/language";
 
 import Link from "next/link";
 import {createPortal} from "react-dom";
@@ -82,6 +85,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 
 export default function MobileMenu() {
+    useLanguage();
 
     const pathname =
         usePathname();
@@ -226,7 +230,7 @@ export default function MobileMenu() {
                 aria-label={
                     open
                         ? "Close menu"
-                        : "Open menu"
+                        : translate("Open menu")
                 }
                 aria-expanded={
                     open
@@ -261,8 +265,7 @@ export default function MobileMenu() {
                 <span
                     className="sr-only"
                 >
-                    Menu
-                </span>
+                    <T text="Menu" /></span>
 
 
                 <span
@@ -448,8 +451,7 @@ export default function MobileMenu() {
                                 text-[#7a1625]
                             "
                         >
-                            Gokul Sweets
-                        </p>
+                            <T text="Gokul Sweets" /></p>
 
 
                         <p
@@ -462,8 +464,7 @@ export default function MobileMenu() {
                                 text-[#c88a20]
                             "
                         >
-                            Tradition tastes better
-                        </p>
+                            <T text="Tradition tastes better" /></p>
 
                     </div>
 
@@ -512,7 +513,7 @@ export default function MobileMenu() {
                     >
 
                         {
-                            [...MENU_ITEMS, ...(features?.occasionEnquiries ? [{label: "Occasions & gifting", href: "/occasions", description: "Plan bulk sweets and celebration gift boxes"}] : [])].map(
+                            [...MENU_ITEMS, ...(features?.occasionEnquiries ? [{label: translate("Occasions & gifting"), href: "/occasions", description: "Plan bulk sweets and celebration gift boxes"}] : [])].map(
                                 item => {
 
                                     const active =
@@ -594,8 +595,7 @@ export default function MobileMenu() {
                                                         text-[#7a1625]
                                                     "
                                                 >
-                                                    Soon
-                                                </span>
+                                                    <T text="Soon" /></span>
 
                                             </div>
                                         );
@@ -723,7 +723,7 @@ export default function MobileMenu() {
 
                                             </div>
 
-                                        </Link>
+                                        <LinkFeedback /></Link>
                                     );
                                 }
                             )
@@ -733,8 +733,8 @@ export default function MobileMenu() {
 
                     {staffAccess && <Link href="/admin" onClick={closeMenu}
                         className="mt-5 flex min-h-14 items-center justify-between rounded-2xl border border-[#d9e5df] bg-[#edf5ef] px-4 py-3 font-bold text-[#143936]">
-                        <span>Staff dashboard</span><span aria-hidden="true">›</span>
-                    </Link>}
+                        <span><T text="Staff dashboard" /></span><span aria-hidden="true">›</span>
+                    <LinkFeedback /></Link>}
 
 
                     <div
@@ -757,8 +757,7 @@ export default function MobileMenu() {
                                 text-[#c88a20]
                             "
                         >
-                            Follow us
-                        </p>
+                            <T text="Follow us" /></p>
 
 
                         <p
@@ -769,9 +768,7 @@ export default function MobileMenu() {
                                 text-[#756763]
                             "
                         >
-                            New sweets, festive specials and
-                            shop updates.
-                        </p>
+                            <T text="New sweets, festive specials and shop updates." /></p>
 
 
                         <div
@@ -858,9 +855,7 @@ export default function MobileMenu() {
                             text-[#756763]
                         "
                     >
-                        Online orders are prepared for pickup
-                        from your selected branch.
-                    </p>
+                        <T text="Online orders are prepared for pickup from your selected branch." /></p>
 
                 </div>
 

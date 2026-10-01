@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {
     useEffect,
@@ -515,8 +516,7 @@ function WeightSelectorDialog({
                         <p
                             className="text-xs font-semibold uppercase tracking-[0.12em] text-[#c88a20]"
                         >
-                            Choose quantity
-                        </p>
+                            <T text="Choose quantity" /></p>
 
 
                         <h2
@@ -564,8 +564,7 @@ function WeightSelectorDialog({
                     <p
                         className="text-xs font-bold text-[#241715]"
                     >
-                        Quick select
-                    </p>
+                        <T text="Quick select" /></p>
 
 
                     <div
@@ -625,15 +624,13 @@ function WeightSelectorDialog({
                                 }
                                 className="text-xs font-bold text-[#241715]"
                             >
-                                Enter exact quantity
-                            </label>
+                                <T text="Enter exact quantity" /></label>
 
 
                             <p
                                 className="mt-0.5 text-[11px] text-[#756763]"
                             >
-                                Minimum {formatWeight(minimum)} · {formatWeight(step)} steps
-                            </p>
+                                <T text="Minimum" />{formatWeight(minimum)} · {formatWeight(step)} <T text="steps" /></p>
 
                         </div>
 
@@ -807,8 +804,7 @@ function WeightSelectorDialog({
                         <p
                             className="text-xs text-[#756763]"
                         >
-                            Estimated price
-                        </p>
+                            <T text="Estimated price" /></p>
 
 
                         <p
@@ -863,8 +859,7 @@ function WeightSelectorDialog({
                 <p
                     className="mt-3 text-center text-[11px] leading-4 text-[#756763]"
                 >
-                    Final amount is calculated by Gokul Sweets using the selected weight.
-                </p>
+                    <T text="Final amount is calculated by Gokul Sweets using the selected weight." /></p>
 
             </section>
 

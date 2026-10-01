@@ -1,4 +1,5 @@
 "use client";
+import {T,translate,useLanguage} from "@/lib/language";
 
 import {
     useEffect,
@@ -72,6 +73,7 @@ const FILTERS: Array<{
 
 
 export default function OrdersPage() {
+    useLanguage();
 
     const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
 
@@ -291,8 +293,7 @@ export default function OrdersPage() {
                             Order history
                         </p>
                         <h1 className="mt-2 text-3xl font-bold tracking-tight text-[#241715] sm:text-4xl">
-                            My Orders
-                        </h1>
+                            <T text="My Orders" /></h1>
                         <p className="mt-2 max-w-xl text-sm leading-6 text-[#756763]">
                             {branch ? `Orders from ${branch.name}. Your Profile shows orders from every branch.`
                                 : "Select a branch to see its orders. Your Profile shows orders from every branch."}
@@ -306,7 +307,7 @@ export default function OrdersPage() {
                             onClick={() => setReloadVersion(value => value + 1)}
                             className="min-h-11 rounded-xl border border-[#eadfd6] bg-white px-5 text-sm font-bold text-[#7a1625] disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            {loading ? "Refreshing..." : "Refresh"}
+                            {loading ? "Refreshing..." : translate("Refresh")}
                         </button>
                     )}
                 </div>
@@ -368,14 +369,13 @@ export default function OrdersPage() {
                             onClick={() => setReloadVersion(value => value + 1)}
                             className="mt-4 text-sm font-bold text-[#7a1625]"
                         >
-                            Try again
-                        </button>
+                            <T text="Try again" /></button>
                     </div>
                 )}
 
                 {!loading && !hasOrders && !currentHistory?.error && (
                     <div className="mt-8 rounded-3xl border border-[#eadfd6] bg-white px-6 py-16 text-center">
-                        <h2 className="text-xl font-bold text-[#241715]">No orders yet</h2>
+                        <h2 className="text-xl font-bold text-[#241715]"><T text="No orders yet" /></h2>
                         <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#756763]">
                             {branch ? `No orders from ${branch.name} yet. Visit Profile to see orders from all branches.`
                                 : "Choose a branch to see its orders. Visit Profile for all branches."}
@@ -421,7 +421,7 @@ export default function OrdersPage() {
                                     >
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
-                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#756763]">Order</p>
+                                                <p className="text-[10px] font-bold uppercase tracking-wide text-[#756763]"><T text="Order" /></p>
                                                 <p className="mt-1 break-all text-sm font-bold text-[#241715]">{order.orderNumber}</p>
                                             </div>
                                             <span className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold ${getStatusClasses(status.tone)}`}>
@@ -438,7 +438,7 @@ export default function OrdersPage() {
 
                                         <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl bg-[#fffaf3] p-4 text-sm">
                                             <div>
-                                                <p className="text-xs text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}</p>
+                                                <p className="text-xs text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Delivery" : translate("Pickup")}</p>
                                                 <p className="mt-1 font-semibold text-[#241715]">{order.fulfillmentType === "DELIVERY" ? order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending" : order.pickupDate ? formatOrderDate(order.pickupDate) : "Time pending"}</p>
                                                 <p className="mt-1 text-xs text-[#756763]">
                                                     {order.fulfillmentType === "DELIVERY"

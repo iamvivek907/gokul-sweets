@@ -1,4 +1,7 @@
 "use client";
+import {T,translate,useLanguage} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
 import {usePickupClock} from "@/hooks/usePickupClock";
 import {pickupIsFresh} from "@/lib/pickupFreshness";
 import CheckoutAdjustmentDialog from "@/components/checkout/CheckoutAdjustmentDialog";
@@ -268,6 +271,7 @@ function ReviewInventoryIssue({
     issue: InventoryCheckResponse;
     branchPhone: string | null; onAdjust:()=>void;
 }) {
+    useLanguage();
 
     const unavailableItems =
         issue.items.filter(
@@ -298,8 +302,7 @@ function ReviewInventoryIssue({
                     text-[#c88a20]
                 "
             >
-                Quantity confirmation required
-            </p>
+                <T text="Quantity confirmation required" /></p>
 
             <h2
                 className="
@@ -309,9 +312,7 @@ function ReviewInventoryIssue({
                     text-[#7a1625]
                 "
             >
-                We cannot confirm the complete order
-                for this pickup date
-            </h2>
+                <T text="We cannot confirm the complete order for this pickup date" /></h2>
 
             <p
                 className="
@@ -321,9 +322,7 @@ function ReviewInventoryIssue({
                     text-[#756763]
                 "
             >
-                Some products need more preparation or
-                stock than is currently available online.
-            </p>
+                <T text="Some products need more preparation or stock than is currently available online." /></p>
 
             <div
                 className="
@@ -368,8 +367,7 @@ function ReviewInventoryIssue({
                                 >
                                     <div>
                                         <p className="text-xs text-[#756763]">
-                                            You requested
-                                        </p>
+                                            <T text="You requested" /></p>
 
                                         <p className="mt-1 font-bold text-[#241715]">
                                             {
@@ -383,8 +381,7 @@ function ReviewInventoryIssue({
 
                                     <div>
                                         <p className="text-xs text-[#756763]">
-                                            Available online
-                                        </p>
+                                            <T text="Available online" /></p>
 
                                         <p className="mt-1 font-bold text-[#7a1625]">
                                             {
@@ -405,11 +402,7 @@ function ReviewInventoryIssue({
                                         text-[#756763]
                                     "
                                 >
-                                    Please reduce the quantity,
-                                    choose another date, or contact
-                                    the branch for a large-order
-                                    confirmation.
-                                </p>
+                                    <T text="Please reduce the quantity, choose another date, or contact the branch for a large-order confirmation." /></p>
                             </div>
                         )
                     )
@@ -436,8 +429,7 @@ function ReviewInventoryIssue({
                                 text-green-800
                             "
                         >
-                            Earliest available date
-                        </p>
+                            <T text="Earliest available date" /></p>
 
                         <p
                             className="
@@ -477,8 +469,7 @@ function ReviewInventoryIssue({
                                 text-white!
                             "
                         >
-                            Choose This Pickup Date
-                        </Link>
+                            <T text="Choose This Pickup Date" /><LinkFeedback /></Link>
                     </div>
                 )
             }
@@ -500,8 +491,7 @@ function ReviewInventoryIssue({
                         text-[#241715]
                     "
                 >
-                    Need this quantity specially prepared?
-                </p>
+                    <T text="Need this quantity specially prepared?" /></p>
 
                 <p
                     className="
@@ -511,10 +501,7 @@ function ReviewInventoryIssue({
                         text-[#756763]
                     "
                 >
-                    Please call the selected branch. Our team
-                    can check production capacity and confirm
-                    whether this large order can be prepared.
-                </p>
+                    <T text="Please call the selected branch. Our team can check production capacity and confirm whether this large order can be prepared." /></p>
 
                 {
                     branchPhone
@@ -539,7 +526,7 @@ function ReviewInventoryIssue({
                                 text-[#7a1625]!
                             "
                         >
-                            Call {branchPhone}
+                            <T text="Call" />{branchPhone}
                         </a>
                     )
                 }
@@ -558,13 +545,13 @@ function ReviewInventoryIssue({
                     text-[#7a1625]!
                 "
             >
-                Adjust Cart Quantity
-            </button>
+                <T text="Adjust Cart Quantity" /></button>
         </div>
     );
 }
 
 export default function ReviewPage() {
+    useLanguage();
 
     const storefrontFeatures = useStorefrontFeatures();
     const accessible = storefrontFeatures?.accessibleOrderingV2 === true;
@@ -758,8 +745,25 @@ export default function ReviewPage() {
      * =========================================================
      */
 
+    const [priceChecking,setPriceChecking]=useState(false);
+    const autoPriceKey=useRef("");
+    useEffect(()=>{
+        if(!storefrontFeatures?.simplifiedCheckout||!quoteEnabled||invalidBranch||!branch||!pickupSelection||!customer||!items.length||pendingOrder||!online)return;
+        const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name,customerPhone:customer.phone,items:items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};
+        const key=JSON.stringify([request,undefined]);
+        if(autoPriceKey.current===key)return;
+        let active=true;
+        const timer=window.setTimeout(()=>{
+            autoPriceKey.current=key;setPriceChecking(true);setAcceptedQuote(null);
+            void previewCheckoutQuote(request).then(quote=>{if(active)setAcceptedQuote({key,quote});})
+                .catch(()=>{if(active)setOrderError("We couldn’t check your total. Tap Check price & offers to try again.");})
+                .finally(()=>{if(active)setPriceChecking(false);});
+        },150);
+        return ()=>{active=false;window.clearTimeout(timer);if(autoPriceKey.current===key)autoPriceKey.current="";setPriceChecking(false);};
+    },[storefrontFeatures?.simplifiedCheckout,quoteEnabled,invalidBranch,branch,pickupSelection,customer,items,pendingOrder,online]);
+
     async function handlePlaceOrder() {
-        if(addonBusy)return;
+        if(addonBusy || priceChecking)return;
 
         if (accessible && !online) {
             setOrderError("You're offline. Your cart and pickup details are saved. Reconnect, then check your final price again.");
@@ -790,7 +794,7 @@ export default function ReviewPage() {
         if (!pickupSelection) {
 
             setOrderError(
-                "Please select a pickup date and time."
+                translate("Please select a pickup date and time.")
             );
 
             return;
@@ -800,7 +804,7 @@ export default function ReviewPage() {
         if (!customer) {
 
             setOrderError(
-                "Please enter your customer details."
+                translate("Please enter your customer details.")
             );
 
             return;
@@ -831,7 +835,7 @@ export default function ReviewPage() {
         ) {
 
             setOrderError(
-                "Please enter a valid 10-digit Indian mobile number."
+                translate("Please enter a valid 10-digit Indian mobile number.")
             );
 
             return;
@@ -847,7 +851,7 @@ export default function ReviewPage() {
         ) {
 
             setOrderError(
-                "Please enter a valid customer name."
+                translate("Please enter a valid customer name.")
             );
 
             return;
@@ -1280,8 +1284,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Your cart is empty
-                        </h1>
+                            <T text="Your cart is empty" /></h1>
 
 
                         <p
@@ -1291,9 +1294,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Add some items before reviewing
-                            your order.
-                        </p>
+                            <T text="Add some items before reviewing your order." /></p>
 
 
                         <Link
@@ -1311,8 +1312,7 @@ try {
                                 text-white
                             "
                         >
-                            Explore Menu
-                        </Link>
+                            <T text="Explore Menu" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1370,8 +1370,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Branch mismatch
-                        </h1>
+                            <T text="Branch mismatch" /></h1>
 
 
                         <p
@@ -1381,9 +1380,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Please select the branch
-                            associated with your cart.
-                        </p>
+                            <T text="Please select the branch associated with your cart." /></p>
 
 
                         <Link
@@ -1401,8 +1398,7 @@ try {
                                 text-white
                             "
                         >
-                            Select Branch
-                        </Link>
+                            <T text="Select Branch" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1460,8 +1456,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Pickup time required
-                        </h1>
+                            <T text="Pickup time required" /></h1>
 
 
                         <p
@@ -1471,9 +1466,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Select a pickup date and time
-                            before reviewing your order.
-                        </p>
+                            <T text="Select a pickup date and time before reviewing your order." /></p>
 
 
                         <Link
@@ -1491,8 +1484,7 @@ try {
                                 text-white
                             "
                         >
-                            Choose Pickup
-                        </Link>
+                            <T text="Choose Pickup" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1550,8 +1542,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Customer details required
-                        </h1>
+                            <T text="Customer details required" /></h1>
 
 
                         <p
@@ -1561,9 +1552,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Enter your name and phone number
-                            before reviewing your order.
-                        </p>
+                            <T text="Enter your name and phone number before reviewing your order." /></p>
 
 
                         <Link
@@ -1581,8 +1570,7 @@ try {
                                 text-white
                             "
                         >
-                            Enter Details
-                        </Link>
+                            <T text="Enter Details" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1671,8 +1659,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Pickup
-                        </span>
+                            <T text="Pickup" /></span>
 
 
                         <span
@@ -1690,8 +1677,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Your details
-                        </span>
+                            <T text="Your details" /></span>
 
 
                         <span
@@ -1709,8 +1695,7 @@ try {
                                 text-[#7a1625]
                             "
                         >
-                            Review & offers
-                        </span>
+                            <T text="Review & offers" /></span>
 
                     </div>
 
@@ -1725,8 +1710,7 @@ try {
                             text-[#c88a20]
                         "
                     >
-                        Almost there
-                    </p>
+                        <T text="Almost there" /></p>
 
 
                     <h1
@@ -1739,8 +1723,7 @@ try {
                             sm:text-4xl
                         "
                     >
-                        Review your pickup order
-                    </h1>
+                        <T text="Review your pickup order" /></h1>
 
 
                     <p
@@ -1752,10 +1735,7 @@ try {
                             text-[#756763]
                         "
                     >
-                        Check your pickup time, contact details and items.
-                        Then check eligible offers or enter an exclusive code
-                        without leaving this page.
-                    </p>
+                        <T text="Check your pickup time, contact details and items. Then check eligible offers or enter an exclusive code without leaving this page." /></p>
 
                 </div>
 
@@ -1794,8 +1774,7 @@ try {
                                     text-[#c88a20]
                                 "
                             >
-                                Pickup details
-                            </p>
+                                <T text="Pickup details" /></p>
 
 
                             <p
@@ -1863,8 +1842,8 @@ try {
                                 >
                                     {
                                         priorityPickup
-                                            ? "Priority Pickup"
-                                            : "Normal Pickup"
+                                            ? translate("Priority Pickup")
+                                            : translate("Normal Pickup")
                                     }
                                 </span>
 
@@ -1893,9 +1872,7 @@ try {
                                                 text-[#756763]
                                             "
                                         >
-                                            Normal capacity is full
-                                            for this pickup time.
-                                        </p>
+                                            <T text="Normal capacity is full for this pickup time." /></p>
 
 
                                         <p
@@ -1906,7 +1883,7 @@ try {
                                                 text-[#7a1625]
                                             "
                                         >
-                                            Priority charge:{" "}
+                                            <T text="Priority charge:" />{" "}
                                             {
                                                 formatCurrency(
                                                     selectedSlot
@@ -1929,12 +1906,11 @@ try {
                             ? <button type="button" onClick={() => setAdjustingCheckout(true)}
                                 aria-expanded={adjustingCheckout}
                                 className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-[#7a1625] hover:bg-[#fff0dc]">
-                                Change time
-                            </button>
+                                <T text="Change time" /></button>
                             : <Link href="/checkout/pickup"
                                 className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-[#7a1625] transition hover:bg-[#fff0dc]">
-                                {inPlaceBranchSwitch ? "Change time" : "Change"}
-                            </Link>}
+                                {inPlaceBranchSwitch ? translate("Change time") : translate("Change")}
+                            <LinkFeedback /></Link>}
                         </div>
 
                     </div>
@@ -1977,8 +1953,7 @@ try {
                                     text-[#c88a20]
                                 "
                             >
-                                Pickup contact
-                            </p>
+                                <T text="Pickup contact" /></p>
 
 
                             <p
@@ -2019,8 +1994,7 @@ try {
                                 hover:bg-[#fff0dc]
                             "
                         >
-                            Change
-                        </Link>
+                            <T text="Change" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -2066,8 +2040,7 @@ try {
                                     text-[#c88a20]
                                 "
                             >
-                                Your order
-                            </p>
+                                <T text="Your order" /></p>
 
 
                             <p
@@ -2077,7 +2050,7 @@ try {
                                     text-[#756763]
                                 "
                             >
-                                {itemCount} {itemCount === 1 ? "item" : "items"}
+                                {itemCount} {itemCount === 1 ? translate("item") : "items"}
                             </p>
 
                         </div>
@@ -2096,8 +2069,7 @@ try {
                                 hover:bg-[#fff0dc]
                             "
                         >
-                            Edit
-                        </button>
+                            <T text="Edit" /></button>
 
                     </div>
 
@@ -2215,7 +2187,7 @@ try {
                                 {" "}
                                 {
                                     itemCount === 1
-                                        ? "item"
+                                        ? translate("item")
                                         : "items"
                                 }
                             </span>
@@ -2260,8 +2232,7 @@ try {
                                             text-[#756763]
                                         "
                                     >
-                                        Priority pickup
-                                    </span>
+                                        <T text="Priority pickup" /></span>
 
 
                                     <span
@@ -2304,8 +2275,7 @@ try {
                                     text-[#241715]
                                 "
                             >
-                                No surprises at payment
-                            </p>
+                                <T text="No surprises at payment" /></p>
 
 
                             <p
@@ -2316,9 +2286,7 @@ try {
                                     text-[#756763]
                                 "
                             >
-                                See item prices, GST, any pickup charge and
-                                your savings together before you pay.
-                            </p>
+                                <T text="See item prices, GST, any pickup charge and your savings together before you pay." /></p>
 
                         </div>
 
@@ -2379,8 +2347,7 @@ try {
 
 
                 {accessible && !online && <div role="alert" className="mt-4 rounded-xl border border-[#c88a20] bg-[#fff4e5] p-4 text-sm">
-                    You&apos;re offline. Your cart is saved. Reconnect and check your final price again before continuing.
-                </div>}
+                    <T text="You're offline. Your cart is saved. Reconnect and check your final price again before continuing." /></div>}
 
                 {
                     inventoryIssue
@@ -2398,10 +2365,9 @@ try {
 
                 {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
                     <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-white p-4" role="status">
-                        <p className="font-bold">Your price, before offers</p>
+                        <p className="font-bold"><T text="Your price, before offers" /></p>
                         {quoteExpired && <p className="mt-2 rounded-xl bg-[#fff4e5] p-3 text-sm" role="status">
-                            This price needs refreshing. Your cart and pickup details are saved.
-                        </p>}
+                            <T text="This price needs refreshing. Your cart and pickup details are saved." /></p>}
                         {quoteNotice && <p className="mt-2 rounded-xl bg-[#fff4e5] p-3 text-sm" role="alert">
                             {quoteNotice.oldTotal === quoteNotice.newTotal
                                 ? "Your price has been refreshed. Please review it once more before continuing."
@@ -2412,10 +2378,10 @@ try {
                                 {line.name}: ₹{line.total} (unit ₹{line.unitPrice}, tax {line.taxRate}%)
                             </p>
                         ))}
-                        <p className="mt-3 text-sm">Items ₹{acceptedQuote.quote.subtotal} · Tax ₹{acceptedQuote.quote.taxAmount} · Pickup charge ₹{acceptedQuote.quote.priorityCharge}</p>
+                        <p className="mt-3 text-sm"><T text="Items" /> ₹{acceptedQuote.quote.subtotal} · <T text="Tax" /> ₹{acceptedQuote.quote.taxAmount} · <T text="Pickup charge" /> ₹{acceptedQuote.quote.priorityCharge}</p>
                         {Number(acceptedQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm">Convenience fee ₹{acceptedQuote.quote.convenienceFee} (includes ₹{acceptedQuote.quote.convenienceFeeTax} tax)</p>}
-                        <p className="mt-2 font-bold">Total before optional offers ₹{acceptedQuote.quote.totalAmount}</p>
-                        {!quoteExpired && <p className="mt-2 text-xs">This price is available until {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy">See the cancellation policy</Link> before paying.</p>}
+                        <p className="mt-2 font-bold"><T text="Total before optional offers" /> ₹{acceptedQuote.quote.totalAmount}</p>
+                        {!quoteExpired && <p className="mt-2 text-xs"><T text="This price is available until" /> {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy"><T text="See the cancellation policy" /><LinkFeedback /></Link> <T text="before paying." /></p>}
                     </div>
                 )}
 
@@ -2454,8 +2420,7 @@ try {
                                             text-[#241715]
                                         "
                                     >
-                                        Check your final price
-                                    </p>
+                                        <T text="Check your final price" /></p>
 
 
                                     <p
@@ -2466,9 +2431,7 @@ try {
                                             text-[#756763]
                                         "
                                     >
-                                        Review your total, then explore any available
-                                        offers before paying.
-                                    </p>
+                                        <T text="Review your total, then explore any available offers before paying." /></p>
 
                                 </div>
 
@@ -2476,7 +2439,7 @@ try {
                                 <button
                                     type="button"
                                     disabled={
-                                        submitting || addonBusy || pickupRecovery || (accessible && !online)
+                                        priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)
                                     }
                                     onClick={
                                         handlePlaceOrder
@@ -2507,13 +2470,13 @@ try {
                                     "
                                 >
                                     {
-                                        submitting
-                                            ? "Preparing your order..."
+                                        priceChecking || submitting
+                                            ? translate("Preparing your order...")
                                             : quoteExpired
-                                                ? "Refresh your total"
+                                                ? translate("Refresh your total")
                                             : quoteEnabled && acceptedQuote
-                                                ? "Accept price and reserve pickup"
-                                                : "Check Final Price & Offers"
+                                                ? translate("Accept price and reserve pickup")
+                                                : translate("Check Final Price & Offers")
                                     }
                                 </button>
 
@@ -2543,15 +2506,14 @@ try {
                                         disabled:opacity-50
                                     "
                                 >
-                                    ← Back to Cart
-                                </button>
+                                    <T text="← Back to Cart" /></button>
 
                             </div>
                         )
                 }
 
-                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=await previewCheckoutQuote(request,number);if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quoteEnabled?quote.token:undefined}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated?null:{key:JSON.stringify([request,number]),quote});setInventoryIssue(null);setOrderError(null);}}/>}
-                {!preparedOrderNumber && <CheckoutMobileAction label={submitting ? "Checking…" : quoteEnabled && acceptedQuote ? "Review & reserve" : "Check price & offers"} amount={acceptedQuote ? Number(acceptedQuote.quote.totalAmount) : undefined} disabled={submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
+                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated||!quote?null:{key:JSON.stringify([request,number]),quote});setInventoryIssue(null);setOrderError(null);}}/>}
+                {!preparedOrderNumber && <CheckoutMobileAction label={priceChecking ? translate("Checking your total…") : submitting ? translate("Checking…") : quoteEnabled && acceptedQuote ? translate("Review & reserve") : translate("Check price & offers")} amount={acceptedQuote ? Number(acceptedQuote.quote.totalAmount) : undefined} disabled={priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
             </section>
 
             </CheckoutExperienceFrame>

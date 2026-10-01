@@ -1,10 +1,14 @@
 "use client";
+import {T,translate,useLanguage,LanguagePicker} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
 
 import Image from "next/image";
 import Link from "next/link";
 import {useEffect, useState} from "react";
 import BranchSelector from "@/components/branch/BranchSelector";
 import CampaignMedia from "@/components/menu/CampaignMedia";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {getActiveBranches} from "@/services/branchApi";
 import {apiClient} from "@/services/apiClient";
@@ -16,6 +20,8 @@ import styles from "./EditorialArrival.module.css";
 export default function EditorialArrival({campaignsEnabled, accessible, branchExperience = false, occasionEnquiries = false}: {
     campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; occasionEnquiries?: boolean;
 }) {
+    useLanguage();
+    const bilingual=useStorefrontFeatures()?.bilingualStorefront===true;
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [campaigns, setCampaigns] = useState<HomepageCampaign[]>([]);
@@ -83,12 +89,13 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
             /></div>}
             <div className={styles.scrim} aria-hidden="true" />
             <div className={styles.topbar}>
+                {bilingual&&<LanguagePicker />}
                 <div className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></div>
                 <nav aria-label="Welcome navigation">
-                    <a href="#gokul-arrival-title" aria-current="page">Home</a>
-                    <Link href="/about">Our story</Link>
-                    <a href="#gokul-branches">Our branches</a>
-                    <Link href="/branches" className={styles.orderFood}>Order food</Link>
+                    <a href="#gokul-arrival-title" aria-current="page"><T text="Home" /></a>
+                    <Link href="/about"><T text="Our story" /><LinkFeedback /></Link>
+                    <a href="#gokul-branches"><T text="Our branches" /></a>
+                    <Link href="/branches" className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
                 </nav>
             </div>
             <div className={styles.heroCopy}>
@@ -96,8 +103,8 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <h1 id="gokul-arrival-title">A little joy<br />in every visit.</h1>
                 <span>Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch.</span>
                 <div className={styles.actions}>
-                    <Link href="/branches" className={styles.orderFood}>Order food</Link>
-                    <Link href={occasionEnquiries ? "/occasions" : "/branches"}>Plan an occasion</Link>
+                    <Link href="/branches" className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
+                    <Link href={occasionEnquiries ? "/occasions" : "/branches"}><T text="Plan an occasion" /><LinkFeedback /></Link>
                 </div>
             </div>
             <a className={styles.scrollCue} href="#gokul-branches" onClick={event => {
@@ -107,14 +114,14 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 target.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
                 window.history.replaceState(null, "", "#gokul-branches");
             }}>
-                <span className={styles.scrollCueText}>Scroll to explore</span>
+                <span className={styles.scrollCueText}><T text="Scroll to explore" /></span>
                 <span className={styles.scrollCueIcon} aria-hidden="true"><span /></span>
             </a>
         </section>
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
-                <span>OUR BRANCHES</span><h2>Your next visit starts here.</h2>
-                <p>Choose a Gokul branch near you to see its live menu and pickup choices.</p>
+                <span><T text="OUR BRANCHES" /></span><h2><T text="Your next visit starts here." /></h2>
+                <p><T text="Choose a Gokul branch near you to see its live menu and pickup choices." /></p>
             </div>
             <div className={styles.branchGrid}>
                 {branches.map(item => <article className={styles.branchCard} key={item.id}>
@@ -126,14 +133,14 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                             fill sizes="(max-width: 700px) 100vw, 50vw" className={styles.branchPhoto} />}
                     <div className={styles.branchCopy}>
                         <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
-                        <p>{branchExperience ? item.description || item.city || item.address || "Explore this branch" : item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
+                        <p>{branchExperience ? item.description || item.city || item.address || translate("Explore this branch") : item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
                         {branchExperience && <p>{item.pickupAvailable ? "Order for pickup" : "Online pickup unavailable"}</p>}
-                        <span className={styles.cardPrompt}>Explore this branch</span>
+                        <span className={styles.cardPrompt}><T text="Explore this branch" /></span>
                     </div>
                     <BranchSelector cardBranch={item} destination={branchExperience ? "branchHome" : "menu"} />
                 </article>)}
             </div>
-            {!branches.length && <p className={styles.branchFallback}>Branch details will appear here when available. You can still explore the menu.</p>}
+            {!branches.length && <p className={styles.branchFallback}><T text="Branch details will appear here when available. You can still explore the menu." /></p>}
         </section>
     </div>;
 }

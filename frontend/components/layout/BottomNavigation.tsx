@@ -1,4 +1,7 @@
 "use client";
+import {translate,useLanguage} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
 
 import Link
     from "next/link";
@@ -74,6 +77,7 @@ const items: NavigationItem[] = [
 
 
 export default function BottomNavigation() {
+    useLanguage();
 
     const pathname =
         usePathname();
@@ -266,10 +270,10 @@ export default function BottomNavigation() {
                                             leading-none
                                         "
                                     >
-                                        {item.label}
+                                        {translate(item.label)}
                                     </span>
 
-                                </Link>
+                                <LinkFeedback /></Link>
                             );
                         }
                     )
