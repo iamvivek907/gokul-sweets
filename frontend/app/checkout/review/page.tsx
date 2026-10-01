@@ -2062,7 +2062,7 @@ try {
                                     text-[#756763]
                                 "
                             >
-                                {itemCount} {itemCount === 1 ? translate("item") : "items"}
+                                {itemCount} {translate(itemCount === 1 ? "item" : "items")}
                             </p>
 
                         </div>
