@@ -72,6 +72,7 @@ import type {
 
 
 interface CheckoutOffersPanelProps {
+    reviewRequired?:boolean;
     onCartMutationBusy?: (busy:boolean)=>void;
     onUpdateError?: (message:string)=>void;
 
@@ -137,13 +138,13 @@ function padSeconds(
 
 
 export default function CheckoutOffersPanel({
-    orderNumber, onCartMutationBusy, onUpdateError
+    orderNumber, onCartMutationBusy, onUpdateError, reviewRequired=false
 }: CheckoutOffersPanelProps) {
 
     const features=useStorefrontFeatures();
     const [addonBusy,setAddonBusy]=useState(false);
-    const [priceReviewRequired,setPriceReviewRequired]=useState(false);
-    const [totalChanged,setTotalChanged]=useState(false);
+    const [priceReviewRequired,setPriceReviewRequired]=useState(reviewRequired);
+    const [totalChanged,setTotalChanged]=useState(reviewRequired);
     const [spendTargets,setSpendTargets]=useState<AvailableRebateResponse[]>([]);
     useEffect(()=>{const c=new AbortController();apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal:c.signal}).then(setSpendTargets).catch(()=>{});return()=>c.abort();},[orderNumber]);
     const router =
@@ -1252,8 +1253,7 @@ export default function CheckoutOffersPanel({
                                     order can be updated before payment.
                                 </p>
 
-                                <Link
-                                    href="/cart"
+                                <button type="button" onClick={()=>setAdjusting(true)}
                                     className="
                                         mt-4
                                         inline-flex
@@ -1264,8 +1264,8 @@ export default function CheckoutOffersPanel({
                                         text-[#7a1625]
                                     "
                                 >
-                                    Review Cart →
-                                </Link>
+                                    Review changes here
+                                </button>
                             </div>
                         )
                         : (
@@ -1911,8 +1911,8 @@ export default function CheckoutOffersPanel({
                                         Continue to Payment
                                     </button>
 
-                                    <Link
-                                        href="/cart"
+                                    <button type="button" disabled={addonBusy} onClick={()=>setAdjusting(true)}
+
                                         className="
                                             mt-3
                                             flex
@@ -1924,15 +1924,14 @@ export default function CheckoutOffersPanel({
                                             text-[#7a1625]
                                         "
                                     >
-                                        Add or change items
-                                    </Link>
+                                        Adjust quantities or pickup
+                                    </button>
                                 </div>
 
                             </>
                         )
             }
 
-            {!reservationExpired && !cartChanged && orderSummary?.paymentStatus==null && <button type="button" className="min-h-12 rounded-xl border px-4 font-semibold" disabled={addonBusy} onClick={()=>setAdjusting(true)}>Adjust quantities or pickup</button>}
             {adjusting && pendingOrder && parsePickupSlot(getPickupSlotSnapshot()) && <CheckoutAdjustmentDialog items={items} pickup={parsePickupSlot(getPickupSlotSnapshot())!} branchId={pendingOrder.branchId} days={features?.futureOrderingDays??30} onClose={()=>setAdjusting(false)} onApply={async(changedItems,changedPickup)=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition(changedItems,changedPickup);}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}/>}
             {!reservationExpired && !cartChanged && <CheckoutMobileAction label={priceReviewRequired ? "Review updated total" : "Continue to payment"} amount={displayTotal} disabled={priceReviewRequired || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
         </div>

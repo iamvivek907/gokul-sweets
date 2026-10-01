@@ -46,6 +46,7 @@ try {
    return route.fulfill({json,headers});
   });
   await context.addInitScript(({branch,main,slot,date,expires})=>{
+   if(localStorage.getItem('gokul-cart'))return;
    localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:main,quantity:1,weightGrams:null}]}));
    localStorage.setItem('gokul-customer-details',JSON.stringify({name:'Test customer',phone:'9000000000'}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));
    localStorage.setItem('gokul-pending-order',JSON.stringify({orderId:1,orderNumber:'GKS-SYNTHETIC',orderStatus:'PENDING_PAYMENT',branchId:1,pickupSlotId:1,totalAmount:362,reservationExpiresAt:expires,createdAt:new Date().toISOString(),cartFingerprint:'1:UNIT:1:-'}));
@@ -61,7 +62,7 @@ try {
   await page.getByRole('button',{name:'Add Test sweet',exact:true}).click();await page.getByText('We couldn’t complete this addition.',{exact:false}).waitFor();
   assert.equal(new URL(page.url()).pathname,'/checkout/review');assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
   await page.getByRole('button',{name:'Adjust quantities or pickup here',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'Keep current pickup',exact:true}).click();quoteFailure=false;
-  await page.getByRole('button',{name:'Add Test sweet',exact:true}).click();await page.getByRole('checkbox',{name:'I have reviewed the updated total and offers.'}).waitFor();
+  await page.getByRole('button',{name:'Add Test sweet',exact:true}).click();await page.getByText('Addition checked. Review the updated total and choose any available offer before payment.',{exact:true}).waitFor();await page.getByRole('checkbox',{name:'I have reviewed the updated total and offers.'}).waitFor();
   assert.equal(checkCalls,2);assert.equal(quoteCalls,2);assert.equal(updateCalls,1);assert.equal(paymentCalls,0);assert.equal(await page.getByRole('button',{name:'Continue to Payment',exact:true}).isDisabled(),true);
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).reservationExpiresAt),expires);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),509);
   await page.getByRole('checkbox',{name:'I have reviewed the updated total and offers.'}).check();assert.equal(await page.getByRole('button',{name:'Continue to Payment',exact:true}).isEnabled(),true);
@@ -70,6 +71,7 @@ try {
   await page.getByRole('button',{name:'Check & apply changes',exact:true}).click();await page.getByRole('dialog').getByRole('alert').filter({hasText:'Pickup availability changed'}).waitFor();
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);assert.equal(updateCalls,1);assert.equal(paymentCalls,0);
   await page.getByRole('button',{name:'Keep current pickup',exact:true}).click();assert.equal(new URL(page.url()).pathname,'/checkout/review');
+  await page.goto(`${base}/checkout/offers/GKS-SYNTHETIC`);await page.getByRole('button',{name:'Adjust quantities or pickup',exact:true}).waitFor();await page.getByRole('button',{name:'Adjust quantities or pickup',exact:true}).click();await page.getByRole('dialog').waitFor();await page.getByRole('button',{name:'Keep current pickup',exact:true}).click();
   await page.goto(`${base}/admin/branches`);await page.getByRole('button',{name:/Test Gokul branch/}).first().click();await page.getByLabel('Offering 1 title',{exact:true}).fill('Updated draft');conflict=true;await page.getByRole('button',{name:'Save offerings draft'}).click();await page.getByRole('alert').filter({hasText:'changed'}).waitFor();assert.equal(version,0);
   await context.close();
  }

@@ -586,6 +586,7 @@ export default function ReviewPage() {
     const [pickupRecovery, setPickupRecovery] = useState(false);
     const [editingPickup, setEditingPickup] = useState(false);
     const [adjustingCheckout,setAdjustingCheckout]=useState(false);
+    const [priceRevision,setPriceRevision]=useState(0);
 
     const router =
         useRouter();
@@ -947,10 +948,8 @@ try {
         !inventory.orderable
     ) {
 
-        setInventoryIssue(
-            inventory
-        );
-
+        setInventoryIssue(inventory);
+        setAdjustingCheckout(true);
         return;
     }
 
@@ -1210,7 +1209,7 @@ try {
             // A slot can cease to fit the cart between the initial preview and reservation.
             // Offer newly checked times here, while keeping all checkout fields intact.
             if (exception instanceof Error && /preparation time|ready later|later pickup|pickup time is no longer available/i.test(exception.message)) {
-                setPickupRecovery(true);
+                setPickupRecovery(true);setAdjustingCheckout(true);
             }
 
             console.error(
@@ -1927,10 +1926,10 @@ try {
                         <div className="flex flex-wrap items-center justify-end gap-2">
                             {inPlaceBranchSwitch && !storefrontFeatures?.checkoutExperienceV2 && <BranchSelector compact />}
                         {storefrontFeatures?.checkoutExperienceV2
-                            ? <button type="button" onClick={() => setEditingPickup(value => !value)}
-                                aria-expanded={editingPickup}
+                            ? <button type="button" onClick={() => setAdjustingCheckout(true)}
+                                aria-expanded={adjustingCheckout}
                                 className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-[#7a1625] hover:bg-[#fff0dc]">
-                                {editingPickup ? "Keep this time" : "Change time"}
+                                Change time
                             </button>
                             : <Link href="/checkout/pickup"
                                 className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-[#7a1625] transition hover:bg-[#fff0dc]">
@@ -2084,8 +2083,7 @@ try {
                         </div>
 
 
-                        <Link
-                            href="/cart"
+                        <button type="button" onClick={()=>setAdjustingCheckout(true)}
                             className="
                                 shrink-0
                                 rounded-lg
@@ -2099,7 +2097,7 @@ try {
                             "
                         >
                             Edit
-                        </Link>
+                        </button>
 
                     </div>
 
@@ -2424,7 +2422,7 @@ try {
                 {
                     preparedOrderNumber
                         ? (
-                            <CheckoutOffersPanel onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
+                            <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
                                 orderNumber={
                                     preparedOrderNumber
                                 }
@@ -2552,7 +2550,7 @@ try {
                         )
                 }
 
-                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};await previewCheckoutQuote(request,pendingOrder?.orderNumber);saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);setAcceptedQuote(null);setInventoryIssue(null);setOrderError(null);}}/>}
+                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=await previewCheckoutQuote(request,number);if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quoteEnabled?quote.token:undefined}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated?null:{key:JSON.stringify([request,number]),quote});setInventoryIssue(null);setOrderError(null);}}/>}
                 {!preparedOrderNumber && <CheckoutMobileAction label={submitting ? "Checking…" : quoteEnabled && acceptedQuote ? "Review & reserve" : "Check price & offers"} amount={acceptedQuote ? Number(acceptedQuote.quote.totalAmount) : undefined} disabled={submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
             </section>
 
