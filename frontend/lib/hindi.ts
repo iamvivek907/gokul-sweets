@@ -730,3 +730,5 @@ Object.assign(hindi, {
 });
 
 Object.assign(hindi,{"Check your pickup and items. Add something extra if you like, then continue to payment. We’ll apply your best available offer.":"समय और सामान देख लें। चाहें तो कुछ और जोड़ें, फिर भुगतान करें। आपके लिए सबसे अच्छी छूट हम लगा देंगे।"});
+
+Object.assign(hindi, {"Suggested add-ons": "सुझाए गए अतिरिक्त सामान"});

@@ -88,14 +88,14 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
             /></div>}
             <div className={styles.scrim} aria-hidden="true" />
             <div className={styles.topbar}>
-                <LanguagePicker />
-                <div className={styles.logo}>Gokul <span>SWEETS &amp; RESTAURANTS</span></div>
+                <Link href="/" className={styles.logo} aria-label="Gokul Sweets · Home">Gokul <span>SWEETS &amp; RESTAURANTS</span></Link>
                 <nav aria-label="Welcome navigation">
                     <a href="#gokul-arrival-title" aria-current="page"><T text="Home" /></a>
                     <Link href="/about"><T text="Our story" /><LinkFeedback /></Link>
                     <a href="#gokul-branches"><T text="Our branches" /></a>
                     <Link href="/branches" className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
                 </nav>
+                <LanguagePicker />
             </div>
             <div className={styles.heroCopy}>
                 <p>GOKUL SWEETS &amp; RESTAURANTS</p>
