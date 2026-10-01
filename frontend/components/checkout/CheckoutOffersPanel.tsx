@@ -142,6 +142,7 @@ export default function CheckoutOffersPanel({
     const [addonBusy,setAddonBusy]=useState(false);
     const [priceReviewRequired,setPriceReviewRequired]=useState(reviewRequired);
     const [totalChanged,setTotalChanged]=useState(reviewRequired);
+    const [refreshFailed,setRefreshFailed]=useState(false);
     const [spendTargets,setSpendTargets]=useState<AvailableRebateResponse[]>([]);
     useEffect(()=>{const c=new AbortController();apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal:c.signal}).then(setSpendTargets).catch(()=>{});return()=>c.abort();},[orderNumber]);
     const router =
@@ -926,7 +927,7 @@ export default function CheckoutOffersPanel({
 
 
     function handleContinueToPayment() {
-        if(addonBusy || priceReviewRequired || applyingCode || removing)return;
+        if(addonBusy || priceReviewRequired || refreshFailed || applyingCode || removing)return;
 
         if (
             !pendingOrder
@@ -1040,14 +1041,14 @@ export default function CheckoutOffersPanel({
             if(changedItems)saveCart(cart);if(changedPickup)savePickupSlot(changedPickup);
             setOrderSummary({...current,pickupDate:pickup.date,pickupStartTime:pickup.slot.startTime,pickupEndTime:pickup.slot.endTime,pickupType:pickup.pickupType,items:updated.items,subtotal:updated.subtotal,taxAmount:updated.taxAmount,priorityCharge:updated.priorityCharge,convenienceFee:updated.convenienceFee,convenienceFeeTax:updated.convenienceFeeTax,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt});
             savePendingOrder({...saved,pickupSlotId:pickup.slot.id,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(cart.items)});
-            setError(null);setErrorSource(null);
+            setRefreshFailed(false);setError(null);setErrorSource(null);
             const [offers,targets]=await Promise.allSettled([getAvailableRebates(orderNumber),apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include"})]);
             setRebates(offers.status==="fulfilled"?offers.value:[]);setOffersLoadedSuccessfully(offers.status==="fulfilled");
             setSpendTargets(targets.status==="fulfilled"?targets.value:[]);
             setSuccessMessage("Addition checked. Review the updated total and choose any available offer before payment.");
         } catch(cause) {
             const message=cause instanceof Error?cause.message:"Could not refresh the price. Review your cart before payment.";
-            setError(message);setErrorSource("general");onUpdateError?.(message);throw cause;
+            setRefreshFailed(true);setRebates([]);setSpendTargets([]);setOffersLoadedSuccessfully(false);setError(message);setErrorSource("general");onUpdateError?.(message);throw cause;
         }
     }
 
@@ -1872,11 +1873,11 @@ export default function CheckoutOffersPanel({
                                         </p>
                                     </div>
 
-                                    {totalChanged && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" checked={!priceReviewRequired} onChange={e=>setPriceReviewRequired(!e.target.checked)} />I have reviewed the updated total and offers.</label>}
+                                    {totalChanged && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" disabled={refreshFailed||addonBusy} checked={!priceReviewRequired} onChange={e=>setPriceReviewRequired(!e.target.checked)} />I have reviewed the updated total and offers.</label>}
                                     <button
                                         type="button"
                                         disabled={
-                                            priceReviewRequired || loading || addonBusy
+                                            priceReviewRequired || refreshFailed || loading || addonBusy
                                             ||
                                             Boolean(
                                                 applyingCode
@@ -1929,8 +1930,9 @@ export default function CheckoutOffersPanel({
                         )
             }
 
+            {refreshFailed && !reservationExpired && <button type="button" disabled={addonBusy} className="min-h-12 rounded-xl border px-4 font-semibold" onClick={async()=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition();}catch{/* The current-screen error already explains how to retry. */}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}>Recheck current cart and total</button>}
             {adjusting && pendingOrder && parsePickupSlot(getPickupSlotSnapshot()) && <CheckoutAdjustmentDialog items={items} pickup={parsePickupSlot(getPickupSlotSnapshot())!} branchId={pendingOrder.branchId} days={features?.futureOrderingDays??30} onClose={()=>setAdjusting(false)} onApply={async(changedItems,changedPickup)=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition(changedItems,changedPickup);}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}/>}
-            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={priceReviewRequired ? "Review updated total" : "Continue to payment"} amount={displayTotal} disabled={priceReviewRequired || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
+            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={priceReviewRequired ? "Review updated total" : "Continue to payment"} amount={displayTotal} disabled={priceReviewRequired || refreshFailed || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
         </div>
     );
 }
