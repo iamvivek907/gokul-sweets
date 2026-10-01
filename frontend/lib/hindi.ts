@@ -728,3 +728,5 @@ Object.assign(hindi, {
  "Enable sound once per session. It repeats until waiting orders enter KOT and overdue preparing orders are marked ready.": "ऐप खोलने पर एक बार आवाज़ चालू करें। तैयारी शुरू करने और देर से तैयार हो रहे ऑर्डर पूरे करने तक अलार्म बजता रहेगा।",
  "IST": "भारतीय समय"
 });
+
+Object.assign(hindi,{"Check your pickup and items. Add something extra if you like, then continue to payment. We’ll apply your best available offer.":"समय और सामान देख लें। चाहें तो कुछ और जोड़ें, फिर भुगतान करें। आपके लिए सबसे अच्छी छूट हम लगा देंगे।"});

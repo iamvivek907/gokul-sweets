@@ -60,6 +60,7 @@ for(const width of [1280,390]){
   await page.getByRole('button',{name:'Continue to payment',exact:true}).waitFor();assert.equal(await page.locator('.future-storefront').count(),0);
   assert.equal(await page.getByRole('button',{name:/Accept price and reserve pickup|Review & reserve|Continue to payment/}).count(),1,'one visible review action with both visual flags OFF');
  }
+ if(visual)assert.equal(await page.locator('.checkout-experience-head').getByRole('button',{name:'Change branch',exact:true}).evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)','branch switch stays legible on the dark checkout header');
  // One deliberate reserve action applies the best offer and opens payment without a second price confirmation.
  await page.getByRole('button',{name:'Continue to payment',exact:true}).filter({visible:true}).first().click();
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT',{timeout:10000}).catch(async error=>{console.log(JSON.stringify({width,mutations,bestOffers,quoteCalls,url:page.url(),body:await page.locator('body').innerText(),pending:await page.evaluate(()=>localStorage.getItem('gokul-pending-order'))}));throw error;});

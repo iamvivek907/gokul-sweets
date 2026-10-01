@@ -1674,15 +1674,7 @@ try {
                 >
 
                     <div
-                        className="
-                            flex
-                            items-center
-                            gap-2
-                            text-[11px]
-                            font-semibold
-                            uppercase
-                            tracking-[0.12em]
-                        "
+                        className={storefrontFeatures?.simplifiedCheckout ? "hidden" : "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]"}
                     >
 
                         <span
@@ -1766,7 +1758,7 @@ try {
                             text-[#756763]
                         "
                     >
-                        <T text="Check your pickup time, contact details and items. Then check eligible offers or enter an exclusive code without leaving this page." /></p>
+                        <T text={storefrontFeatures?.simplifiedCheckout ? "Check your pickup and items. Add something extra if you like, then continue to payment. We’ll apply your best available offer." : "Check your pickup time, contact details and items. Then check eligible offers or enter an exclusive code without leaving this page."} /></p>
 
                 </div>
 
