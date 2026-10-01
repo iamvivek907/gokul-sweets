@@ -115,7 +115,7 @@ public class StaffOrderAlerts {
                                     "Time to start preparation", "The preparation window is open. Start preparation for pickup/service at " + TIME.format(pickup) + " IST.");
                     }
                     if (!now.isBefore(pickup) && (now.isBefore(pickup.plusDays(1))
-                            || properties.isRecurringPreparationReminders() && order.getOrderStatus() == OrderStatus.CONFIRMED)) {
+                            || properties.isRecurringPreparationReminders())) {
                         boolean waiting = order.getOrderStatus() == OrderStatus.CONFIRMED;
                         record(order, waiting ? "PREPARATION_OVERDUE" : "READY_OVERDUE",
                                 waiting ? "ORDER_START_PREPARATION" : "ORDER_MARK_READY", pickup,
@@ -141,7 +141,7 @@ public class StaffOrderAlerts {
     }
     String reminderKey(long orderId,String kind,LocalDateTime scheduled) {
         String key=orderId+":"+kind+":"+scheduled;
-        if(properties.isRecurringPreparationReminders() && List.of("PREPARATION_DUE","PREPARATION_OVERDUE").contains(kind)) {
+        if(properties.isRecurringPreparationReminders() && List.of("PREPARATION_DUE","PREPARATION_OVERDUE","READY_OVERDUE").contains(kind)) {
             int minutes=Math.max(2,Math.min(30,properties.getRepeatMinutes()));
             long elapsed=Math.max(0,java.time.Duration.between(scheduled,now()).toMinutes());
             key+=":repeat:"+(elapsed/minutes);
@@ -172,7 +172,7 @@ public class StaffOrderAlerts {
                 case "PREPARATION_OVERDUE" -> order.getOrderStatus() == OrderStatus.CONFIRMED && plan.pickupAt().equals(event.scheduledAt())
                     && !now.isBefore(plan.pickupAt()) && (properties.isRecurringPreparationReminders() || now.isBefore(plan.pickupAt().plusDays(1)));
                 case "READY_OVERDUE" -> order.getOrderStatus() == OrderStatus.PREPARING && plan.pickupAt().equals(event.scheduledAt())
-                    && !now.isBefore(plan.pickupAt()) && now.isBefore(plan.pickupAt().plusDays(1));
+                    && !now.isBefore(plan.pickupAt()) && (properties.isRecurringPreparationReminders() || now.isBefore(plan.pickupAt().plusDays(1)));
                 default -> false;
             };
         } catch (IllegalStateException incomplete) {return false;}

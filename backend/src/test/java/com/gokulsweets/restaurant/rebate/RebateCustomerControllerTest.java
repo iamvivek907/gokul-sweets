@@ -26,6 +26,8 @@ class RebateCustomerControllerTest {
                 .isInstanceOf(ResponseStatusException.class);
         assertThatThrownBy(() -> controller.removeRebate("GKS-FOREIGN", request))
                 .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> controller.applyBestRebate("GKS-FOREIGN", request))
+                .isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(eligibility, application);
     }
 }

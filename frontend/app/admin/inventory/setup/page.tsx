@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useCallback,
@@ -960,9 +962,7 @@ export default function AdminInventoryPage() {
                     <div className="flex flex-col items-stretch gap-3">
                         <InventoryHelp context="SETUP" />
                         <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">
-                            Branch
-                            <select
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">{" "}<T text="Branch" />{" "}<select
                                 value={branchId ?? ""}
                                 onChange={event => {
                                     const next = Number(event.target.value);
@@ -977,9 +977,7 @@ export default function AdminInventoryPage() {
                                 ))}
                             </select>
                         </label>
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">
-                            Pickup date
-                            <input
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">{" "}<T text="Pickup date" />{" "}<input
                                 type="date"
                                 min={todayInIndia()}
                                 value={serviceDate}
@@ -1052,13 +1050,11 @@ export default function AdminInventoryPage() {
                             <option value="NOT_CONFIGURED">Not configured</option>
                             <option value="DRAFT">Draft</option>
                             <option value="APPROVED">Approved</option>
-                            <option value="READY">Ready</option>
+                            <option value="READY"><T text="Ready" /></option>
                             <option value="DELAYED">Delayed</option>
                             <option value="UNAVAILABLE">Unavailable</option>
                         </select>
-                        <button type="button" onClick={refresh} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-bold text-[#7a1625]">
-                            Refresh
-                        </button>
+                        <button type="button" onClick={refresh} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-bold text-[#7a1625]">{" "}<T text="Refresh" />{" "}</button>
                     </div>
 
                     {selected.size > 0 && canManage && (
@@ -1134,7 +1130,7 @@ export default function AdminInventoryPage() {
 
                                 <div className="sticky bottom-0 flex flex-wrap justify-end gap-3 border-t border-[#eadfd6] bg-white px-5 py-4 sm:px-6">
                                     <button type="button" onClick={() => { resetPolicyForm(); setPolicyEditorMessage("Form reset to safe defaults. Saved data is unchanged until you save."); }} disabled={saving} className="min-h-11 px-3 text-sm font-semibold text-[#756763] disabled:opacity-50">Reset form</button>
-                                    <button type="button" onClick={closeConfiguration} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] bg-white px-5 text-sm font-bold text-[#7a1625] disabled:opacity-50">Cancel</button>
+                                    <button type="button" onClick={closeConfiguration} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] bg-white px-5 text-sm font-bold text-[#7a1625] disabled:opacity-50"><T text="Cancel" /></button>
                                     <button type="button" onClick={savePolicies} disabled={saving} className="min-h-11 rounded-xl border border-[#7a1625] bg-white px-5 text-sm font-bold text-[#7a1625] disabled:opacity-50">{editorItem ? "Save policy only" : bulkPolicyGroupIndex + 1 < bulkPolicyGroups.length ? "Save group & continue" : "Save policy & enter quantities"}</button>
                                     {editorItem && <button type="button" onClick={saveItemAndMakeAvailable} disabled={saving} className="min-h-11 rounded-xl bg-[#7a1625] px-6 text-sm font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Save & make available"}</button>}
                                 </div>
@@ -1207,7 +1203,7 @@ export default function AdminInventoryPage() {
 
                                 <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] bg-white px-5 py-4 sm:px-6">
                                     <p className="text-xs text-[#756763]">The complete batch is validated and saved in one backend transaction.</p>
-                                    <div className="flex gap-3"><button type="button" onClick={() => setShowBulkQuantityPanel(false)} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] px-5 text-sm font-bold text-[#756763] disabled:opacity-50">Back</button><button type="button" onClick={confirmBulkQuantities} disabled={saving} className="min-h-11 rounded-xl bg-[#7a1625] px-6 text-sm font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Confirm bulk update"}</button></div>
+                                    <div className="flex gap-3"><button type="button" onClick={() => setShowBulkQuantityPanel(false)} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] px-5 text-sm font-bold text-[#756763] disabled:opacity-50"><T text="Back" /></button><button type="button" onClick={confirmBulkQuantities} disabled={saving} className="min-h-11 rounded-xl bg-[#7a1625] px-6 text-sm font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Confirm bulk update"}</button></div>
                                 </div>
                             </div>
                         </div>
@@ -1256,8 +1252,8 @@ export default function AdminInventoryPage() {
 
                 {catalogue && catalogue.totalPages > 1 && (
                     <div className="flex items-center justify-between border-t border-[#eadfd6] p-5 text-sm">
-                        <span className="text-[#756763]">Page {catalogue.page + 1} of {catalogue.totalPages} · {catalogue.totalElements} products</span>
-                        <div className="flex gap-2"><button type="button" disabled={page === 0} onClick={() => setPage(value => value - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Previous</button><button type="button" disabled={page + 1 >= catalogue.totalPages} onClick={() => setPage(value => value + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Next</button></div>
+                        <span className="text-[#756763]"><T text="Page" />{" "}{catalogue.page + 1} of {catalogue.totalPages} · {catalogue.totalElements} products</span>
+                        <div className="flex gap-2"><button type="button" disabled={page === 0} onClick={() => setPage(value => value - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40"><T text="Previous" /></button><button type="button" disabled={page + 1 >= catalogue.totalPages} onClick={() => setPage(value => value + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40"><T text="Next" /></button></div>
                     </div>
                 )}
             </section>

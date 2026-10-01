@@ -11,6 +11,8 @@ import CheckoutMobileAction from "@/components/checkout/CheckoutMobileAction";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {formatWeight} from "@/lib/orderQuantity";
 
+import {checkoutQuoteKey} from "@/lib/checkoutQuoteKey";
+import {applyBestRebate} from "@/services/rebateApi";
 import {apiClient} from "@/services/apiClient";
 import Link from "next/link";
 
@@ -749,7 +751,7 @@ export default function ReviewPage() {
     const autoPriceKey = useRef("");
     const initialPriceKey = branch && pickupSelection && customer && items.length
         ? JSON.stringify([{branchId: branch.id, pickupSlotId: pickupSelection.slot.id,
-            pickupType: pickupSelection.pickupType, customerName: customer.name, customerPhone: customer.phone,
+            pickupType: pickupSelection.pickupType, customerName: customer.name.trim()||"GOKUL_GUEST", customerPhone: customer.phone,
             items: items.map(item => ({productId: item.product.id,
                 quantity: item.product.saleMode === "UNIT" ? item.quantity : null, weightGrams: item.weightGrams}))}, undefined])
         : "";
@@ -763,7 +765,7 @@ export default function ReviewPage() {
             autoPriceKey.current = initialPriceKey;
             setPriceChecking(true); setAcceptedQuote(null);
             void previewCheckoutQuote(request)
-                .then(quote => {if (active) setAcceptedQuote({key: initialPriceKey, quote});})
+                .then(quote => {if (active) setAcceptedQuote({key: checkoutQuoteKey(request), quote});})
                 .catch(() => {if (active) setOrderError("We couldn’t check your total. Tap Check price & offers to try again.");})
                 .finally(() => {if (active) setPriceChecking(false);});
         }, 150);
@@ -773,6 +775,27 @@ export default function ReviewPage() {
             setPriceChecking(false);
         };
     }, [storefrontFeatures?.simplifiedCheckout, quoteEnabled, invalidBranch, initialPriceKey, pendingOrderNumber, online]);
+
+    async function openPaymentWithBestOffer(orderNumber:string) {
+        if (!storefrontFeatures?.simplifiedCheckout) return;
+        // The server applies the best offer atomically; this never initiates or charges a payment.
+        const cartSnapshot = getCartSnapshot(), pickupSnapshot = getPickupSlotSnapshot();
+        const reserved = parsePendingOrder(getPendingOrderSnapshot());
+        try {
+            const applied = await applyBestRebate(orderNumber);
+            const pending = parsePendingOrder(getPendingOrderSnapshot());
+            if (pending?.orderNumber !== orderNumber || pending.cartFingerprint !== reserved?.cartFingerprint ||
+                cartSnapshot !== getCartSnapshot() || pickupSnapshot !== getPickupSlotSnapshot()) {
+                setOrderError("Your cart or pickup changed in another tab. Review it before payment.");
+                return;
+            }
+            savePendingOrder({...pending, totalAmount: applied.totalAmount});
+            window.dispatchEvent(new Event("gokul-navigation-start"));
+            router.push(`/checkout/payment/${encodeURIComponent(orderNumber)}`);
+        } catch {
+            setOrderError("Your pickup is reserved. Choose an offer below or continue to payment.");
+        }
+    }
 
     async function handlePlaceOrder() {
         if(addonBusy || priceChecking)return;
@@ -855,7 +878,7 @@ export default function ReviewPage() {
 
 
         const customerName =
-            customer.name.trim();
+            customer.name.trim() || "GOKUL_GUEST";
 
 
         if (
@@ -942,7 +965,7 @@ try {
     }
 
     quoteOrderNumber = reusablePendingOrder ? pendingOrder?.orderNumber : undefined;
-    const quoteKey = JSON.stringify([quoteRequest, quoteOrderNumber]);
+    const quoteKey = checkoutQuoteKey(quoteRequest, quoteOrderNumber);
 
     const ownReservationCheck = quoteOrderNumber && pendingOrder?.pickupSlotId===pickupSelection.slot.id ? await apiClient<{orderable:boolean}>(`/api/menu/pickup-addons/check?branchId=${branch.id}&orderNumber=${encodeURIComponent(quoteOrderNumber)}`,{method:"POST",body:JSON.stringify({serviceDate:pickupSelection.date,items:requestItems}),credentials:"include"}) : null;
     const inventory = reusablePendingOrder ? null :
@@ -1065,9 +1088,7 @@ try {
                                 items
                             )
                     });
-
-
-
+                    await openPaymentWithBestOffer(response.orderNumber);
                     return;
             }
 
@@ -1169,9 +1190,7 @@ try {
                             items
                         )
                 });
-
-
-
+                await openPaymentWithBestOffer(response.orderNumber);
                 return;
             }
 
@@ -1209,7 +1228,7 @@ try {
                         }
                     }
                     const refreshed = await previewCheckoutQuote(quoteRequest, refreshOrderNumber);
-                    const refreshedKey = JSON.stringify([quoteRequest, refreshOrderNumber]);
+                    const refreshedKey = checkoutQuoteKey(quoteRequest, refreshOrderNumber);
                     setAcceptedQuote({key: refreshedKey, quote: refreshed});
                     setQuoteNotice(acceptedQuote?.key === refreshedKey
                         ? {oldTotal: acceptedQuote.quote.totalAmount, newTotal: refreshed.totalAmount} : null);
@@ -1655,15 +1674,7 @@ try {
                 >
 
                     <div
-                        className="
-                            flex
-                            items-center
-                            gap-2
-                            text-[11px]
-                            font-semibold
-                            uppercase
-                            tracking-[0.12em]
-                        "
+                        className={storefrontFeatures?.simplifiedCheckout ? "hidden" : "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]"}
                     >
 
                         <span
@@ -1747,7 +1758,7 @@ try {
                             text-[#756763]
                         "
                     >
-                        <T text="Check your pickup time, contact details and items. Then check eligible offers or enter an exclusive code without leaving this page." /></p>
+                        <T text={storefrontFeatures?.simplifiedCheckout ? "Check your pickup and items. Add something extra if you like, then continue to payment. We’ll apply your best available offer." : "Check your pickup time, contact details and items. Then check eligible offers or enter an exclusive code without leaving this page."} /></p>
 
                 </div>
 
@@ -2370,9 +2381,10 @@ try {
                 }
 
 
-                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async()=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name,customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await previewCheckoutQuote(request,number);setAcceptedQuote({key:JSON.stringify([request,number]),quote});}}/>}
+                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async()=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await previewCheckoutQuote(request,number);setAcceptedQuote({key:checkoutQuoteKey(request,number),quote});}}/>}
                 {/* Offers + final price */}
 
+                {storefrontFeatures?.simplifiedCheckout && !preparedOrderNumber && <p className="my-4 rounded-xl bg-[#e7f0e9] p-4 text-sm text-[#143936]"><T text="The best available offer is applied automatically. Add a little extra below if you like, then continue to payment."/></p>}
                 {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
                     <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-white p-4" role="status">
                         <p className="font-bold"><T text="Your price, before offers" /></p>
@@ -2385,11 +2397,11 @@ try {
                         </p>}
                         {acceptedQuote.quote.items.map((line, index) => (
                             <p className="mt-2 text-sm" key={`${line.name}-${index}`}>
-                                {line.name}: ₹{line.total} (unit ₹{line.unitPrice}, tax {line.taxRate}%)
+                                {line.name}: ₹{line.total}{" "}<T text="(unit ₹" />{line.unitPrice}<T text=", tax" />{" "}{line.taxRate}%)
                             </p>
                         ))}
                         <p className="mt-3 text-sm"><T text="Items" /> ₹{acceptedQuote.quote.subtotal} · <T text="Tax" /> ₹{acceptedQuote.quote.taxAmount} · <T text="Pickup charge" /> ₹{acceptedQuote.quote.priorityCharge}</p>
-                        {Number(acceptedQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm">Convenience fee ₹{acceptedQuote.quote.convenienceFee} (includes ₹{acceptedQuote.quote.convenienceFeeTax} tax)</p>}
+                        {Number(acceptedQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm"><T text="Convenience fee ₹" />{acceptedQuote.quote.convenienceFee}{" "}<T text="(includes ₹" />{acceptedQuote.quote.convenienceFeeTax}{" "}<T text="tax)" /></p>}
                         <p className="mt-2 font-bold"><T text="Total before optional offers" /> ₹{acceptedQuote.quote.totalAmount}</p>
                         {!quoteExpired && <p className="mt-2 text-xs"><T text="This price is available until" /> {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy"><T text="See the cancellation policy" /><LinkFeedback /></Link> <T text="before paying." /></p>}
                     </div>
@@ -2398,7 +2410,7 @@ try {
                 {
                     preparedOrderNumber
                         ? (
-                            <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
+                            submitting && storefrontFeatures?.simplifiedCheckout ? <p role="status" className="my-4 rounded-2xl bg-[#e7f0e9] p-5 text-[#143936]"><T text="Finding your best offer and opening payment…" /></p> : <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
                                 orderNumber={
                                     preparedOrderNumber
                                 }
@@ -2486,7 +2498,7 @@ try {
                                             : quoteExpired
                                                 ? translate("Refresh your total")
                                             : quoteEnabled && acceptedQuote
-                                                ? translate("Accept price and reserve pickup")
+                                                ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Accept price and reserve pickup")
                                                 : translate("Check Final Price & Offers")
                                     }
                                 </button>
@@ -2523,8 +2535,8 @@ try {
                         )
                 }
 
-                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated||!quote?null:{key:JSON.stringify([request,number]),quote});setInventoryIssue(null);setOrderError(null);}}/>}
-                {!preparedOrderNumber && <CheckoutMobileAction label={priceChecking ? translate("Checking your total…") : submitting ? translate("Checking…") : quoteEnabled && acceptedQuote ? translate("Review & reserve") : translate("Check price & offers")} amount={acceptedQuote ? Number(acceptedQuote.quote.totalAmount) : undefined} disabled={priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
+                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated||!quote?null:{key:checkoutQuoteKey(request,number),quote});setInventoryIssue(null);setOrderError(null);}}/>}
+                {!preparedOrderNumber && <CheckoutMobileAction label={priceChecking ? translate("Checking your total…") : submitting ? translate("Checking…") : quoteEnabled && acceptedQuote ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Review & reserve") : translate("Check price & offers")} amount={acceptedQuote ? Number(acceptedQuote.quote.totalAmount) : undefined} disabled={priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
             </section>
 
             </CheckoutExperienceFrame>

@@ -15,7 +15,27 @@ test('translated fragments preserve punctuation and inline values',()=>{
  assert.equal(renderToStaticMarkup(fee),'(including ₹5 fee tax).');
 });
 test('Hindi translates plural items, no-slot CTA and staff preparation actions',()=>{
- for(const text of ['items','Choose time','Needs preparation','Enable kitchen alarm','Your name (optional)'])assert.notEqual(translate(text,'hi'),text);
+ for(const text of ['items','Choose time','Needs preparation','Enable kitchen alarm','Your name (optional)','All your Gokul moments, together.','The best available offer is applied automatically. Add a little extra below if you like, then continue to payment.'])assert.notEqual(translate(text,'hi'),text);
  assert.equal(translate('items','hi'),'वस्तुएँ');
  assert.equal(translate('Choose time','hi'),'समय चुनें');
+ assert.match(translate('All your Gokul moments, together.','hi'),/ऑर्डर/);
+ assert.match(translate('The best available offer is applied automatically. Add a little extra below if you like, then continue to payment.','hi'),/छूट/);
+});
+
+test('Hindi localizes dynamic add-on and kitchen copy while preserving the product name',()=>{
+ assert.equal(translate('Often ordered with Kaju Katli','hi'),'Kaju Katli के साथ खूब पसंद किया जाता है');
+ assert.match(translate('Laddu added. Review your updated price and offer before payment.','hi'),/^Laddu जोड़/);
+ assert.equal(translate('2 started · 1 skipped. ','hi'),'2 ऑर्डर की तैयारी शुरू हुई · 1 ऑर्डर छोड़ दिए गए। ');
+ assert.equal(translate('Often ordered with Kaju Katli','en'),'Often ordered with Kaju Katli');
+});
+
+test('inline navigation feedback stays visual while the shared announcer handles speech',()=>{
+ const {default:LinkFeedback}=load('components/common/LinkFeedback.tsx',{
+  'next/link':{useLinkStatus:()=>({pending:true})},
+  '@/lib/language':{useTranslation:()=>text=>text}
+ });
+ const markup=renderToStaticMarkup(React.createElement(LinkFeedback));
+ assert.match(markup,/^<span aria-hidden="true"/);
+ assert.match(markup,/Opening…/);
+ assert.doesNotMatch(markup,/role="status"|aria-live=/);
 });

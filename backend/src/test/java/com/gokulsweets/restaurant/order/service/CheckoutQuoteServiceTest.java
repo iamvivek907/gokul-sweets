@@ -60,6 +60,7 @@ class CheckoutQuoteServiceTest {
     @Test
     void feeAndFeeTaxChangesInvalidateTheAcceptedPriceEvenWhenPayableIsUnchanged() {
         var quote=service.preview(request,null);
+        assertThatThrownBy(()->service.accept(request,null,new OrderCalculationResult(List.of(),amounts.subtotal(),amounts.taxAmount(),amounts.priorityCharge(),BigDecimal.ZERO,BigDecimal.ZERO,amounts.totalAmount(),0,new BigDecimal("5")),quote.token())).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(()->service.accept(request,null,new OrderCalculationResult(List.of(),amounts.subtotal(),amounts.taxAmount(),amounts.priorityCharge(),BigDecimal.ZERO,BigDecimal.ZERO,amounts.totalAmount(),1),quote.token())).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(()->service.accept(request,null,new OrderCalculationResult(List.of(),amounts.subtotal(),amounts.taxAmount(),amounts.priorityCharge(),new BigDecimal("5.00"),new BigDecimal("0.24"),new BigDecimal("110.00")),quote.token())).isInstanceOf(IllegalStateException.class);
         assertThatThrownBy(()->service.accept(request,null,new OrderCalculationResult(List.of(),amounts.subtotal(),amounts.taxAmount(),amounts.priorityCharge(),BigDecimal.ZERO,new BigDecimal("0.01"),amounts.totalAmount()),quote.token())).isInstanceOf(IllegalStateException.class);

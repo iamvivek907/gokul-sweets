@@ -1,3 +1,5 @@
+
+import {T} from "@/lib/language";
 import Link from "next/link";
 
 import AppShell from "@/components/layout/AppShell";
@@ -233,9 +235,7 @@ function LegacyHome() {
                                     hover:bg-[#f2d28d]
                                     active:scale-[0.98]
                                 "
-                            >
-                                Explore Menu
-                            </Link>
+                            >{" "}<T text="Explore Menu" />{" "}</Link>
 
 
                             <a

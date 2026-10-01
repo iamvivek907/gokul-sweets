@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useEffect,
@@ -343,9 +345,7 @@ export default function AdminProductionPage() {
                     </div>
 
                     <div className="mt-6 grid gap-4 md:grid-cols-3">
-                        <label className="text-sm font-semibold text-[#241715]">
-                            Branch
-                            <select
+                        <label className="text-sm font-semibold text-[#241715]">{" "}<T text="Branch" />{" "}<select
                                 value={branchId ?? ""}
                                 onChange={event => {
                                     const next = Number(event.target.value);
@@ -554,9 +554,7 @@ export default function AdminProductionPage() {
                                 onClick={() => setActionState(null)}
                                 disabled={saving}
                                 className="min-h-12 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#756763]"
-                            >
-                                Cancel
-                            </button>
+                            >{" "}<T text="Cancel" />{" "}</button>
                             <button
                                 type="button"
                                 onClick={submitAction}

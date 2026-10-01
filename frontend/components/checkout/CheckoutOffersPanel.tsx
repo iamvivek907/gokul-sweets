@@ -1243,10 +1243,7 @@ export default function CheckoutOffersPanel({
                                 <p className="font-bold text-[#7a1625]">
                                     <T text="Your cart has changed" /></p>
 
-                                <p className="mt-2 text-sm leading-6 text-[#756763]">
-                                    Review the cart again so this same pending
-                                    order can be updated before payment.
-                                </p>
+                                <p className="mt-2 text-sm leading-6 text-[#756763]">{" "}<T text="Review the cart again so this same pending order can be updated before payment." />{" "}</p>
 
                                 <button type="button" onClick={()=>setAdjusting(true)}
                                     className="

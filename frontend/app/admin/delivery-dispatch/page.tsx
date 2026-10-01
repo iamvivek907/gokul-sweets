@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useCallback, useEffect, useState} from "react";
 import Link from "next/link";
@@ -50,13 +52,13 @@ export default function DeliveryDispatchPage() {
     }
     if (!hasPermission("ORDER_VIEW")) return <p>Delivery dispatch access is unavailable.</p>;
     return <main className="mx-auto max-w-6xl space-y-5 p-5">
-        <h1 className="text-2xl font-bold">Delivery dispatch</h1>
+        <h1 className="text-2xl font-bold"><T text="Delivery dispatch" /></h1>
         <p className="text-sm">Pilot rider assignments are limited to one order per rider and window. Window times are IST.</p>
-        <label className="block">Branch <select className="ml-2 rounded border p-2" value={activeBranch ?? ""}
+        <label className="block"><T text="Branch" />{" "}<select className="ml-2 rounded border p-2" value={activeBranch ?? ""}
             onChange={event => {const next = Number(event.target.value); setBranchId(next); if (profile) rememberAdminBranchId(profile.staffId, next);}}>
             {profile?.branchIds.map(id => <option key={id} value={id}>{id}</option>)}
         </select></label>
-        <button type="button" className="rounded border px-3 py-2" onClick={() => refresh().catch(error => setMessage(String(error)))}>Refresh</button>
+        <button type="button" className="rounded border px-3 py-2" onClick={() => refresh().catch(error => setMessage(String(error)))}><T text="Refresh" /></button>
         {message && <p role="status">{message}</p>}
         {hasPermission("BRANCH_MANAGE") && <form className="flex flex-wrap gap-2" onSubmit={event => {
             event.preventDefault(); if (!newRider.trim()) return;

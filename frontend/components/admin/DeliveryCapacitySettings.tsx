@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useState, type FormEvent} from "react";
 import {listDeliveryWindows, saveDeliveryWindow, type DeliveryWindow} from "@/services/adminDeliveryCapacityApi";
@@ -46,7 +48,7 @@ export function DeliveryCapacitySettings({branchId, zoneId, authorization}: {bra
             {window.serviceDate} · {window.startsAt.slice(0, 5)}–{window.endsAt.slice(0, 5)} · {window.paused ? "Paused" : `${window.reservedCount}/${window.riderCapacity} reserved`}
         </button>)}</div>
         <form onSubmit={save} className="mt-4 grid gap-3 sm:grid-cols-2">
-            <label className="text-sm">Service date<input className="mt-1 min-h-11 w-full rounded-lg border p-2" type="date" required value={date}
+            <label className="text-sm"><T text="Service date" /><input className="mt-1 min-h-11 w-full rounded-lg border p-2" type="date" required value={date}
                 onChange={event => setDate(event.target.value)} /></label>
             <label className="text-sm">Rider capacity<input className="mt-1 min-h-11 w-full rounded-lg border p-2" type="number" min={1} max={1000} required value={capacity}
                 onChange={event => setCapacity(Number(event.target.value))} /></label>

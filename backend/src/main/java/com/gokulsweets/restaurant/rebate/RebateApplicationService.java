@@ -33,6 +33,29 @@ public class RebateApplicationService {
     // APPLY
     // =========================================================
 
+    /** Automatic selection is atomic with payment creation and never replaces a stronger selected offer. */
+    @Transactional
+    public AppliedRebateResponse applyBest(String orderNumber) {
+        Order order = orderRepository.findForUpdate(orderNumber)
+                .orElseThrow(() -> new IllegalArgumentException("Order does not exist."));
+        validateOrderMutable(order);
+        BigDecimal currentTotal = order.getTotalAmount();
+        var best = rebateEligibilityService.getAvailableRebates(orderNumber).stream()
+                .filter(offer -> offer.rebateAmount().signum() > 0 && offer.payableAfterRebate().compareTo(currentTotal) < 0)
+                .min(java.util.Comparator.comparing(AvailableRebateResponse::payableAfterRebate));
+        if (best.isEmpty()) {
+            return new AppliedRebateResponse(orderNumber, order.getRebateCode(),
+                    order.getRebate() == null ? null : order.getRebate().getName(),
+                    defaultZero(order.getRebateDiscountAmount()), calculateAmountBeforeRebate(order), currentTotal);
+        }
+        var applied = apply(orderNumber, new ApplyRebateRequest(best.get().code()));
+        if (applied.totalAmount().compareTo(currentTotal) > 0) {
+            // Configuration may change between discovery and revalidation; rollback rather than raise the customer's price.
+            throw new IllegalStateException("This offer changed. Review the available offers before payment.");
+        }
+        return applied;
+    }
+
     @Transactional
     public AppliedRebateResponse apply(
             String orderNumber,

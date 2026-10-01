@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import {preferredAdminReportBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
@@ -327,9 +329,7 @@ export default function AdminBusinessInsightsPage() {
                         }
                         className={INPUT_CLASS}
                     >
-                        <option value="">
-                            All branches
-                        </option>
+                        <option value="">{" "}<T text="All branches" />{" "}</option>
 
                         {
                             options?.branches.map(

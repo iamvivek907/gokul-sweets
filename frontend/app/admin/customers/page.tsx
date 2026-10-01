@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link
     from "next/link";
@@ -260,9 +262,7 @@ export default function AdminCustomersPage() {
                             tracking-[0.16em]
                             text-[#c88a20]
                         "
-                    >
-                        Customers
-                    </p>
+                    >{" "}<T text="Customers" />{" "}</p>
 
 
                     <h1
@@ -574,9 +574,7 @@ export default function AdminCustomersPage() {
                                                         Status
                                                     </th>
 
-                                                    <th className="px-5 py-3 text-right">
-                                                        Orders
-                                                    </th>
+                                                    <th className="px-5 py-3 text-right">{" "}<T text="Orders" />{" "}</th>
 
                                                     <th className="px-5 py-3 text-right">
                                                         Purchases
@@ -651,8 +649,7 @@ export default function AdminCustomersPage() {
                             "
                         >
 
-                            <p className="text-sm text-[#756763]">
-                                Page {result.page + 1} of {result.totalPages}
+                            <p className="text-sm text-[#756763]">{" "}<T text="Page" />{" "}{result.page + 1} of {result.totalPages}
                             </p>
 
 
@@ -676,9 +673,7 @@ export default function AdminCustomersPage() {
                                             )
                                     }
                                     className={PAGE_BUTTON_CLASS}
-                                >
-                                    Previous
-                                </button>
+                                >{" "}<T text="Previous" />{" "}</button>
 
 
                                 <button
@@ -697,9 +692,7 @@ export default function AdminCustomersPage() {
                                             )
                                     }
                                     className={PAGE_BUTTON_CLASS}
-                                >
-                                    Next
-                                </button>
+                                >{" "}<T text="Next" />{" "}</button>
 
                             </div>
 

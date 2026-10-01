@@ -212,3 +212,6 @@ html:has(.app-container),body:has(.app-container){width:100%;max-width:100%;over
 
 /* The shared sticky bar owns the primary checkout action on phones. */
 @media(max-width:640px){.checkout-review-desktop-action{display:none}.checkout-payment-desktop-action{display:none}.future-storefront .checkout-experience-content{padding:1rem .5rem}.future-storefront .checkout-experience-content>section{padding:.75rem!important}.future-storefront .checkout-experience-content section>div{max-width:100%}}
+
+/* Keep the branch trigger legible over the dark checkout header. Scope to the trigger, so popover options retain their own surface colours. */
+.future-storefront .page-content .checkout-experience-head .checkout-experience-branch > div > button{color:white!important}

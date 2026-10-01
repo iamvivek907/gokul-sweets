@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useCallback, useEffect, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -56,11 +58,11 @@ export default function AdminPrivacyRequestsPage() {
     return <main className="mx-auto max-w-5xl space-y-5 p-4 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
             <div><p className="text-xs font-bold uppercase tracking-widest text-[#a56e2e]">Customer privacy</p>
-                <h1 className="mt-1 text-2xl font-bold text-[#241715]">Privacy requests</h1>
+                <h1 className="mt-1 text-2xl font-bold text-[#241715]"><T text="Privacy requests" /></h1>
                 <p className="mt-2 max-w-2xl text-sm text-[#756763]">Review request metadata only. These actions do not export, erase or complete a request; follow the approved privacy process before fulfillment.</p>
             </div>
             <button type="button" disabled={loading} onClick={() => {void load(authorization, page);}}
-                className="min-h-11 rounded-xl border border-[#eadfd6] bg-white px-4 font-semibold text-[#7a1625] disabled:opacity-50">Refresh</button>
+                className="min-h-11 rounded-xl border border-[#eadfd6] bg-white px-4 font-semibold text-[#7a1625] disabled:opacity-50"><T text="Refresh" /></button>
         </div>
         {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">{error}</p>}
         {loading ? <p className="p-5">Loading requests…</p> : entries.length === 0
@@ -82,9 +84,9 @@ export default function AdminPrivacyRequestsPage() {
                 </div>
             </article>)}</div>}
         <nav aria-label="Privacy request pages" className="flex items-center gap-4">
-            <button type="button" disabled={loading || page === 0} onClick={() => setPage(value => value - 1)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 disabled:opacity-50">Previous</button>
-            <span className="text-sm">Page {page + 1}</span>
-            <button type="button" disabled={loading || entries.length < 50 || page >= 1000} onClick={() => setPage(value => value + 1)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 disabled:opacity-50">Next</button>
+            <button type="button" disabled={loading || page === 0} onClick={() => setPage(value => value - 1)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 disabled:opacity-50"><T text="Previous" /></button>
+            <span className="text-sm"><T text="Page" />{" "}{page + 1}</span>
+            <button type="button" disabled={loading || entries.length < 50 || page >= 1000} onClick={() => setPage(value => value + 1)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 disabled:opacity-50"><T text="Next" /></button>
         </nav>
     </main>;
 }

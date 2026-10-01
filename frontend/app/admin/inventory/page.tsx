@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link from "next/link";
 
@@ -83,9 +85,7 @@ export default function AdminInventoryHomePage() {
 
                     <div className="mt-2 flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
                         <div>
-                            <h1 className="text-3xl font-bold text-[#241715] sm:text-4xl">
-                                Inventory
-                            </h1>
+                            <h1 className="text-3xl font-bold text-[#241715] sm:text-4xl">{" "}<T text="Inventory" />{" "}</h1>
                             <p className="mt-3 max-w-3xl text-sm leading-6 text-[#756763] sm:text-base">
                                 Plan what can be sold online, automate safe daily allocations,
                                 and manage what must be prepared or reconciled at each branch.

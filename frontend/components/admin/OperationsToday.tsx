@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 import {useEffect,useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
@@ -25,10 +27,10 @@ export default function OperationsToday() {
     const snapshot=loaded?.branchId===branchId?loaded.data:null;
     return <section className="rounded-2xl border border-[#d9e5df] bg-[#f4f8f5] p-5 sm:p-6" aria-label="Today at a glance">
         <div className="flex flex-wrap items-start justify-between gap-4"><div><h2 className="text-xl font-bold">Today at a glance</h2><p className="mt-1 text-sm text-[#526762]">Orders scheduled for today at this branch · India time.{snapshot&&` ${snapshot.today}`}</p></div>
-            <label className="text-sm font-semibold">Branch<select className="ml-2 min-h-11 rounded-xl border bg-white p-2" value={branchId??""} onChange={event=>{const id=Number(event.target.value);setBranchId(id);if(profile)rememberAdminBranchId(profile.staffId,id);}}>{branches.map(branch=><option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label></div>
-        {error&&<p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-red-800">{error} <button onClick={()=>setVersion(current=>current+1)} className="min-h-11 underline">Retry</button></p>}
+            <label className="text-sm font-semibold"><T text="Branch" /><select className="ml-2 min-h-11 rounded-xl border bg-white p-2" value={branchId??""} onChange={event=>{const id=Number(event.target.value);setBranchId(id);if(profile)rememberAdminBranchId(profile.staffId,id);}}>{branches.map(branch=><option key={branch.id} value={branch.id}>{branch.name}</option>)}</select></label></div>
+        {error&&<p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-red-800">{error} <button onClick={()=>setVersion(current=>current+1)} className="min-h-11 underline"><T text="Retry" /></button></p>}
         {!snapshot&&!error&&<p role="status" className="mt-4">Loading operational summary…</p>}
         {snapshot&&<><div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">{[["Orders due today",snapshot.orders],["Preparing",snapshot.preparing],["Ready for pickup",snapshot.ready],["Completed today",snapshot.completed]].map(([label,value])=><div key={label} className="rounded-xl border bg-white p-4"><p className="text-sm text-[#526762]">{label}</p><p className="mt-2 text-3xl font-bold">{Number(value).toLocaleString("en-IN")}</p></div>)}</div>
-        <p className="mt-3 text-xs text-[#526762]">Updated {new Date(snapshot.updatedAt).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour:"numeric",minute:"2-digit"})} IST · refreshes every 30 seconds. Unpaid and cancelled orders are excluded.</p></>}
+        <p className="mt-3 text-xs text-[#526762]"><T text="Updated" />{" "}{new Date(snapshot.updatedAt).toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour:"numeric",minute:"2-digit"})} IST · refreshes every 30 seconds. Unpaid and cancelled orders are excluded.</p></>}
     </section>;
 }

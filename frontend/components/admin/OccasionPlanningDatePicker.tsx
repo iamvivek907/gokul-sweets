@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useRef, useState} from "react";
 import {adminFetch} from "@/services/adminApi";
@@ -73,7 +75,7 @@ function MonthGrid({month, date, min, max, branchId, authorization, refreshKey, 
                 </select></div>
             <button type="button" aria-label="Next calendar month" disabled={next > max.slice(0, 7)} onClick={() => onMonth(next)} className="min-h-11 rounded-lg border px-3 disabled:opacity-30">→</button>
         </div>
-        {error && <p role="alert" className="mb-3 text-sm text-red-800">{error} <button type="button" onClick={() => setRetry(value => value + 1)} className="underline">Retry</button></p>}
+        {error && <p role="alert" className="mb-3 text-sm text-red-800">{error} <button type="button" onClick={() => setRetry(value => value + 1)} className="underline"><T text="Retry" /></button></p>}
         {!data && !error && <p role="status" className="mb-3 text-sm">Loading order counts…</p>}
         {data && <><div className="grid grid-cols-7 gap-1 text-center text-xs text-stone-600">{["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map(day => <span key={day} className="py-2">{day}</span>)}</div>
             <div className="grid grid-cols-7 gap-1">{Array.from({length: first.getUTCDay()}, (_, n) => <span key={`blank-${n}`} />)}
@@ -81,7 +83,7 @@ function MonthGrid({month, date, min, max, branchId, authorization, refreshKey, 
                     aria-label={`${prettyDate(day.date)} · ${day.orderCount} orders · ${day.needsReview} awaiting quote · ${day.committedOrders} paid bookings`}
                     aria-pressed={date === day.date} onClick={() => onDate(day.date)}
                     className={`flex min-h-16 flex-col items-center justify-center rounded-lg border text-sm disabled:opacity-30 ${date === day.date ? "border-[#173c39] bg-[#173c39] text-white" : day.orderCount > 0 ? "border-[#b5cfc3] bg-[#eef6f1] text-[#173c39]" : "border-stone-100 text-stone-600 hover:bg-stone-50"}`}>
-                    <span className="font-semibold">{Number(day.date.slice(8))}</span><span className="mt-1 text-[10px] sm:text-xs">{day.orderCount} <span className="sr-only sm:not-sr-only">orders</span></span>
+                    <span className="font-semibold">{Number(day.date.slice(8))}</span><span className="mt-1 text-[10px] sm:text-xs">{day.orderCount} <span className="sr-only sm:not-sr-only"><T text="orders" /></span></span>
                 </button>)}</div>
             <p className="mt-3 text-xs text-stone-600">Green dates have bookings or requests · India time. Cancelled and completed requests remain available in the date’s order history.</p></>}
     </>;

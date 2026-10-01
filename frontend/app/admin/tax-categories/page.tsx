@@ -1,5 +1,8 @@
 "use client";
+import {T} from "@/lib/language";
 
+
+import TaxCollectionControl from "@/components/admin/TaxCollectionControl";
 import {useEffect, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {SettingField, SettingToggle} from "@/components/admin/BranchOperationalSettings";
@@ -17,7 +20,7 @@ const fields = [
 const path = "/api/admin/tax-categories";
 
 export default function TaxCategoriesPage() {
-    const {authorization, hasPermission} = useAdminAuth();
+    const {authorization, hasPermission, profile} = useAdminAuth();
     const [items, setItems] = useState<TaxCategory[]>([]);
     const [form, setForm] = useState(empty);
     const [editing, setEditing] = useState<number | null>(null);
@@ -69,7 +72,8 @@ export default function TaxCategoriesPage() {
 
     if (!allowed) return <p>You do not have permission to manage tax categories.</p>;
     return <main className="space-y-6">
-        <h1 className="text-2xl font-bold text-[#7a1625]">Tax categories</h1>
+        <h1 className="text-2xl font-bold text-[#7a1625]"><T text="Tax categories" /></h1>
+        {authorization && profile?.roleName === "OWNER_ADMIN" && <TaxCollectionControl authorization={authorization}/>}
         <p className="text-sm text-[#756763]">Manage product taxes. Deactivation prevents new checkout for products still assigned to this category. Reassign those products first. Saved order taxes remain unchanged.</p>
         {error && <p role="alert" className="text-red-700">{error}</p>}
         {message && <p role="status" className="text-green-800">{message}</p>}
@@ -88,7 +92,7 @@ export default function TaxCategoriesPage() {
                     checked={form.active} disabled={busy} onChange={active => setForm({...form, active})} />
                 <div className="flex gap-3">
                     <button className="min-h-11 rounded-xl bg-[#7a1625] px-5 font-bold text-white">{busy ? "Saving..." : "Save category"}</button>
-                    {editing && <button type="button" onClick={() => {setEditing(null); setForm(empty);}} className="min-h-11 px-4">Cancel</button>}
+                    {editing && <button type="button" onClick={() => {setEditing(null); setForm(empty);}} className="min-h-11 px-4"><T text="Cancel" /></button>}
                 </div>
             </fieldset>
         </form>
@@ -98,7 +102,7 @@ export default function TaxCategoriesPage() {
             <div><h2 className="font-bold">{item.name} ({item.code})</h2>
                 <p className="text-sm">CGST {item.cgstRate}% + SGST {item.sgstRate}% | IGST {item.igstRate}% | {item.active ? "Active" : "Inactive"}</p></div>
             <div className="flex gap-2">
-                <button disabled={busy} onClick={() => {setEditing(item.id); setForm({...item, hsnSacCode: item.hsnSacCode ?? ""});}} className="min-h-11 rounded-xl border px-4">Edit</button>
+                <button disabled={busy} onClick={() => {setEditing(item.id); setForm({...item, hsnSacCode: item.hsnSacCode ?? ""});}} className="min-h-11 rounded-xl border px-4"><T text="Edit" /></button>
                 <button disabled={busy} onClick={() => toggle(item)} className="min-h-11 rounded-xl border px-4">{item.active ? "Deactivate" : "Activate"}</button>
             </div>
         </article>)}</div>

@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link from "next/link";
 import {businessDateOffset} from "@/lib/businessTime";
@@ -278,9 +280,7 @@ export default function InventoryAutomationPage() {
                     </div>
 
                     <div className="mt-6 grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-                        <label className="text-sm font-semibold text-[#241715]">
-                            Branch
-                            <select
+                        <label className="text-sm font-semibold text-[#241715]">{" "}<T text="Branch" />{" "}<select
                                 value={branchId ?? ""}
                                 onChange={event => {
                                     const next = Number(event.target.value);
@@ -295,9 +295,7 @@ export default function InventoryAutomationPage() {
                             </select>
                         </label>
                         <div className="grid grid-cols-2 gap-3">
-                            <label className="text-sm font-semibold text-[#241715]">
-                                From
-                                <input type="date" value={fromDate} min={indiaDate()}
+                            <label className="text-sm font-semibold text-[#241715]">{" "}<T text="From" />{" "}<input type="date" value={fromDate} min={indiaDate()}
                                     onChange={event => {
                                         const next = event.target.value;
                                         setFromDate(next);
@@ -437,7 +435,7 @@ function RunExplanation({branchId, runId, authorization}: {branchId: number; run
     return <details className="md:col-span-4" onToggle={event => {if (event.currentTarget.open) void load();}}>
         <summary className="min-h-11 cursor-pointer py-2 underline">View product/date outcomes and skipped reasons</summary>
         {loading && <p role="status">Loading run details...</p>}
-        {error && <p role="alert">{error} <button onClick={load} className="min-h-11 underline">Retry</button></p>}
+        {error && <p role="alert">{error} <button onClick={load} className="min-h-11 underline"><T text="Retry" /></button></p>}
         {rows?.map((row, index) => <p key={index} className="mt-2 rounded-lg bg-[#fffaf3] p-3"><strong>{row.productName}</strong> · {row.outcome} · {row.dates} date(s), {row.firstDate} to {row.lastDate}<br />{row.message}</p>)}
     </details>;
 }
@@ -516,7 +514,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                                 <input value={window.name} onChange={event => updateWindow(index, {name: event.target.value})} className={formControlClass} placeholder="Festival name" />
                                 <input type="date" value={window.startDate} onChange={event => updateWindow(index, {startDate: event.target.value})} className={formControlClass} />
                                 <input type="date" value={window.endDate} onChange={event => updateWindow(index, {endDate: event.target.value})} className={formControlClass} />
-                                <button type="button" onClick={() => update("windows", draft.windows.filter((_, current) => current !== index))} className="px-3 text-sm font-bold text-red-600">Remove</button>
+                                <button type="button" onClick={() => update("windows", draft.windows.filter((_, current) => current !== index))} className="px-3 text-sm font-bold text-red-600"><T text="Remove" /></button>
                             </div>
                         ))}</div>
                     </div>
@@ -526,7 +524,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                     <label className="flex items-center gap-3 rounded-xl border border-[#eadfd6] p-4 text-sm font-semibold text-[#241715]"><input type="checkbox" checked={draft.forecastEnabled} onChange={event => update("forecastEnabled", event.target.checked)} /> <span className="inline-flex items-center gap-1.5">Forecast enabled <InventoryInfo helpKey="forecastEnabled" /></span></label>
                     <label className="flex items-center gap-3 rounded-xl border border-[#eadfd6] p-4 text-sm font-semibold text-[#241715]"><input type="checkbox" checked={draft.active} onChange={event => update("active", event.target.checked)} /> <span className="inline-flex items-center gap-1.5">Automation active <InventoryInfo helpKey="automationActive" /></span></label>
                 </div>
-                <div className="mt-6 flex gap-3"><button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#756763]">Cancel</button><button type="button" onClick={onSave} disabled={saving || draft.availableDaysMask === 0} className="min-h-12 flex-[1.5] rounded-xl bg-[#7a1625] font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Save rule"}</button></div>
+                <div className="mt-6 flex gap-3"><button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#756763]"><T text="Cancel" /></button><button type="button" onClick={onSave} disabled={saving || draft.availableDaysMask === 0} className="min-h-12 flex-[1.5] rounded-xl bg-[#7a1625] font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Save rule"}</button></div>
             </div>
         </div>
     );

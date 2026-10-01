@@ -1,6 +1,6 @@
 "use client";
 
-import {LanguagePicker} from "@/lib/language";
+
 
 import {
     useEffect,
@@ -21,6 +21,7 @@ import AdminSidebar
 
 import AdminTopbar
     from "@/components/admin/AdminTopbar";
+import {LanguagePicker} from "@/lib/language";
 
 
 export default function AdminShell({
@@ -161,7 +162,7 @@ export default function AdminShell({
 
         return (
             <>
-                <div className="flex justify-end bg-[#fffaf3] p-4"><LanguagePicker /></div>
+                <div className="absolute right-4 top-4 z-20"><LanguagePicker /></div>
                 {children}
             </>
         );

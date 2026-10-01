@@ -235,6 +235,7 @@ public class OccasionEnquiryService {
             if(giftJson!=null) jdbc.update("UPDATE occasion_enquiries SET packaging_snapshot=jsonb_set(packaging_snapshot,'{approvedPackagingTotal}',to_jsonb(?::numeric)) WHERE id=?",quote.packagingTotal(),id);
         }
         jdbc.update("DELETE FROM occasion_quote_lines WHERE enquiry_id = ?", id);
+        boolean collectTax=Boolean.TRUE.equals(jdbc.queryForObject("SELECT enabled FROM tax_collection_settings WHERE id=1",Boolean.class));
         for (QuoteLine line : quote.lines()) {
             var tax = jdbc.query("""
                     SELECT tc.cgst_rate, tc.sgst_rate, tc.hsn_sac_code,
@@ -261,6 +262,7 @@ public class OccasionEnquiryService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Approve a whole-gram production quantity for piece-based weight sweets before quoting. Unit sweets must retain the requested piece count.");
             jdbc.update("UPDATE occasion_enquiry_items SET approved_quantity=?,approved_unit=? WHERE enquiry_id=? AND product_id=?",
                 production, weight ? "GRAM" : "PIECE", id, line.productId());
+            if(!collectTax){tax[0]=BigDecimal.ZERO;tax[1]=BigDecimal.ZERO;}
             BigDecimal rate = ((BigDecimal) tax[0]).add((BigDecimal) tax[1]);
             BigDecimal subtotal = line.grossAmount().divide(BigDecimal.ONE.add(rate.movePointLeft(2)),
                     2, RoundingMode.HALF_UP);

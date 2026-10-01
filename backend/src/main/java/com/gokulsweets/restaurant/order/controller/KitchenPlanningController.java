@@ -7,6 +7,7 @@ import java.time.*;
 @RequestMapping("/api/admin/orders/planning")
 public class KitchenPlanningController {
  private final KitchenPlanningService planning;
+ @GetMapping("/alerts") public KitchenPlanningService.AlertCounts alerts(@RequestParam long branchId){return planning.alerts(branchId);}
  @GetMapping public KitchenPlanningService.Plan get(@RequestParam long branchId,
   @RequestParam(defaultValue="ALL") KitchenPlanningService.Filter filter,
   @RequestParam(required=false) LocalDate date,@RequestParam(required=false) LocalTime start,

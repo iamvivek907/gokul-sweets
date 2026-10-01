@@ -12,7 +12,8 @@ export default function KitchenAlarm() {
     const {authorization, profile, hasPermission} = useAdminAuth();
     const translate = useTranslation();
     const features = useStorefrontFeatures();
-    const permitted = !!authorization && hasPermission("ORDER_VIEW") && hasPermission("ORDER_START_PREPARATION") && !!features?.adminPreparationBoard;
+    const canStart = hasPermission("ORDER_START_PREPARATION"), canReady = hasPermission("ORDER_MARK_READY");
+    const permitted = !!authorization && hasPermission("ORDER_VIEW") && (canStart || canReady) && !!features?.adminPreparationBoard;
     const [enabled, setEnabled] = useState(false);
     const [message, setMessage] = useState("");
     const audio = useRef<AudioContext | null>(null);
@@ -27,23 +28,25 @@ export default function KitchenAlarm() {
             const branches = profile.roleName === "OWNER_ADMIN" ? activeBranches
                 : activeBranches.filter(branch => profile.branchIds.includes(branch.id));
             const counts = await Promise.all(branches.map(async branch => {
-                const response = await adminFetch(`/api/admin/orders/queue/counts?branchId=${branch.id}`, authorization, {signal, cache: "no-store"});
+                const response = await adminFetch(`/api/admin/orders/planning/alerts?branchId=${branch.id}`, authorization, {signal, cache: "no-store"});
                 if (!response.ok) throw new Error();
                 const value = await response.json();
-                if (!Number.isFinite(value.actionableTotal)) throw new Error();
-                return value.actionableTotal as number;
+                if (![value.needsPreparation, value.readyOverdue].every(count => Number.isSafeInteger(count) && count >= 0)) throw new Error();
+                return {waiting: canStart ? value.needsPreparation as number : 0, ready: canReady ? value.readyOverdue as number : 0};
             }));
             if (signal?.aborted || current !== revision.current) return;
-            due.current = counts.reduce((total, count) => total + count, 0);
+            const waiting = counts.reduce((total, count) => total + count.waiting, 0);
+            const ready = counts.reduce((total, count) => total + count.ready, 0);
+            due.current = waiting + ready;
             fresh.current = Date.now();
-            setMessage(due.current ? `${due.current} ${translate("orders need preparation. Start them in KOT to stop the alarm.")}` : translate("No orders need preparation. Alarm is watching for new work."));
+            setMessage(due.current ? [waiting ? `${waiting} ${translate("orders need preparation")}` : "", ready ? `${ready} ${translate("orders are overdue for ready")}` : ""].filter(Boolean).join(" · ") + ". " + translate("Start KOT or mark the completed orders ready to stop the alarm.") : translate("No orders need action. Alarm is watching for new work."));
         } catch {
             if (!signal?.aborted && current === revision.current) {
                 due.current = 0; fresh.current = 0;
                 setMessage("Cannot check preparation alerts. Reconnect and refresh the orders.");
             }
         }
-    }, [permitted, authorization, profile, translate]);
+    }, [permitted, authorization, profile, translate, canStart, canReady]);
     useEffect(() => {
         if (!enabled || !permitted) return;
         const controller = new AbortController();
@@ -67,8 +70,8 @@ export default function KitchenAlarm() {
                     await context.resume();
                     for (let i = 0; i < 3; i++) {
                         const tone = context.createOscillator(), gain = context.createGain();
-                        tone.connect(gain); gain.connect(context.destination); tone.frequency.value = 880;
-                        gain.gain.setValueAtTime(.12, context.currentTime + i * .4);
+                        tone.connect(gain); gain.connect(context.destination); tone.type = "triangle"; tone.frequency.value = i % 2 ? 1046 : 784;
+                        gain.gain.setValueAtTime(.65, context.currentTime + i * .4);
                         gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + i * .4 + .3);
                         tone.start(context.currentTime + i * .4); tone.stop(context.currentTime + i * .4 + .35);
                     }
@@ -86,7 +89,7 @@ export default function KitchenAlarm() {
             try {audio.current ??= new AudioContext(); await audio.current.resume(); setEnabled(true);}
             catch {setMessage("This device could not enable sound. Use staff push alerts.");}
         }}>{translate(enabled ? "Kitchen alarm enabled" : "Enable kitchen alarm")}</button>
-        <p role="status" className="mt-2">{translate(message || "Enable sound once per session. It repeats for Needs preparation and Overdue until staff start the orders in KOT.")}</p>
+        <p role="status" className="mt-2">{translate(message || "Enable sound once per session. It repeats until waiting orders enter KOT and overdue preparing orders are marked ready.")}</p>
         <p className="mt-1">{translate("Keep the PWA open for continuous sound. Locked-screen alerts use")} <a className="underline" href="/admin/staff-notifications">{translate("staff push settings")}</a>{translate("; phone sound settings apply.")}</p>
     </aside>;
 }

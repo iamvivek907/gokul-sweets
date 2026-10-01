@@ -191,7 +191,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         }
     }
 
-    if (mode === "occasion" && session.authenticated) return <div className="flex flex-wrap items-center justify-between gap-3" aria-label="Verified occasion contact"><div><p className="font-semibold text-[#245b38]">✓ Phone verified</p><p className="mt-1 text-sm">{session.name || "Your Gokul account"} · {session.phone}</p></div><Link href="/profile" className="text-sm underline">Manage account</Link></div>;
+    if (mode === "occasion" && session.authenticated) return <div className="flex flex-wrap items-center justify-between gap-3" aria-label="Verified occasion contact"><div><p className="font-semibold text-[#245b38]"><T text="✓ Phone verified" /></p><p className="mt-1 text-sm">{session.name || "Your Gokul account"} · {session.phone}</p></div><Link href="/profile" className="text-sm underline"><T text="Manage account" /></Link></div>;
 
     if (mode === "checkout") return <>
         {session.authenticated ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f4faf4] p-4" aria-label="Verified pickup contact">
@@ -216,7 +216,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     </>;
 
     return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label={translate("Phone verification")}>
-        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">Your account</p>
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]"><T text="Your account" /></p>
         <h2 className="mt-2 text-xl font-semibold text-[#241715]">{session.authenticated ? "Account details" : "Verify your phone"}</h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
             {session.authenticated ? "Update the name shown on your account or manage your sign-in."
@@ -234,7 +234,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
                     placeholder={translate("Enter your name")} />
                 <button type="button" disabled={busy || nameDraft.trim() === (session.name ?? "")}
                     onClick={() => {void saveName();}}
-                    className="min-h-11 rounded-full border border-[#d8c6ba] px-4 text-sm font-semibold disabled:opacity-50">Save name</button>
+                    className="min-h-11 rounded-full border border-[#d8c6ba] px-4 text-sm font-semibold disabled:opacity-50"><T text="Save name" /></button>
             </div>
             {nameError && <p role="alert" className="mt-2 text-sm text-[#9e2732]">{nameError}</p>}
         </div>}

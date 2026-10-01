@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {useEffect, useState} from "react";
 import {useParams} from "next/navigation";
@@ -42,11 +44,11 @@ export default function BranchHomePage() {
                     </div>
                 </header>
                 <nav className="gokul-branch-tabs" aria-label="Branch pages">
-                    <button type="button" aria-current={tab === "home" ? "page" : undefined} onClick={() => setTab("home")}>Home</button>
-                    {selected?.id === branch.id ? <Link href="/menu">Menu</Link> : <BranchSelector cardBranch={branch} destination="menu" />}
-                    {occasionEnquiries && (selected?.id === branch.id ? <Link href="/occasions">Occasions & gifting</Link> : <BranchSelector cardBranch={branch} destination="occasions" />)}
+                    <button type="button" aria-current={tab === "home" ? "page" : undefined} onClick={() => setTab("home")}><T text="Home" /></button>
+                    {selected?.id === branch.id ? <Link href="/menu"><T text="Menu" /></Link> : <BranchSelector cardBranch={branch} destination="menu" />}
+                    {occasionEnquiries && (selected?.id === branch.id ? <Link href="/occasions"><T text="Occasions & gifting" /></Link> : <BranchSelector cardBranch={branch} destination="occasions" />)}
                     {occasionEnquiries && <Link href="/occasions/requests">My requests & quotes</Link>}
-                    <button type="button" aria-current={tab === "details" ? "page" : undefined} onClick={() => setTab("details")}>Branch details</button>
+                    <button type="button" aria-current={tab === "details" ? "page" : undefined} onClick={() => setTab("details")}><T text="Branch details" /></button>
                 </nav>
                 {tab === "details" ? <BranchDetails branch={branch} /> : <><BranchDiscovery branch={branch} selected={selected?.id === branch.id} /><section className="branch-home-welcome">
                     <h2>Made for your next visit.</h2><p>{branch.pickupAvailable ? "Browse what is available here, place an order and choose your pickup time at checkout." : "Explore this branch and contact us for your visit."}</p>

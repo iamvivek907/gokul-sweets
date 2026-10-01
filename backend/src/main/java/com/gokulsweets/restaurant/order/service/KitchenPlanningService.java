@@ -29,6 +29,7 @@ public class KitchenPlanningService {
     public record Slot(LocalDate date, LocalTime start, LocalTime end, String fulfillmentType,
                        long waiting, long preparing, long ready, long total) {}
     public record Plan(List<Row> orders, List<Slot> slots, Map<String,Long> counts, int page, long total, LocalDateTime generatedAt) {}
+    public record AlertCounts(long needsPreparation, long readyOverdue) {}
     private static final String BASE="""
         WITH timed AS (
           SELECT o.id,o.order_number,o.customer_name,o.fulfillment_type,o.order_status,
@@ -44,8 +45,9 @@ public class KitchenPlanningService {
             AND (o.fulfillment_type<>'DELIVERY' OR z.id IS NOT NULL)
         ), planned AS (
           SELECT *, service_date+starts_at-(lead*INTERVAL '1 minute') preparation_at,
-            CASE WHEN order_status='PREPARING' THEN 'PREPARING' WHEN order_status IN ('READY_FOR_PICKUP','READY_FOR_DELIVERY') THEN 'READY'
+            CASE WHEN order_status IN ('READY_FOR_PICKUP','READY_FOR_DELIVERY') THEN 'READY'
             WHEN service_date+starts_at<=? THEN 'OVERDUE'
+            WHEN order_status='PREPARING' THEN 'PREPARING'
             WHEN service_date+starts_at-(lead*INTERVAL '1 minute')<=? THEN 'ELIGIBLE' ELSE 'SCHEDULED' END bucket
           FROM timed WHERE service_date IS NOT NULL AND starts_at IS NOT NULL
         )
@@ -71,5 +73,20 @@ public class KitchenPlanningService {
         var rows=jdbc.query(BASE+"SELECT order_number,customer_name,fulfillment_type,order_status,bucket,service_date,starts_at,ends_at,preparation_at FROM planned"+scope+" ORDER BY service_date,starts_at,id LIMIT ? OFFSET ?",
             (rs,n)->new Row(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getObject(6,LocalDate.class),rs.getObject(7,LocalTime.class),rs.getObject(8,LocalTime.class),rs.getObject(9,LocalDateTime.class)),params.toArray());
         return new Plan(rows,slots,counts,page,total,now);
+    }
+
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    @Transactional(readOnly=true)
+    public AlertCounts alerts(long branchId) {
+        if (!flags.isAdminPreparationBoard()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        if (branchId <= 0) throw new IllegalArgumentException("Choose a valid branch.");
+        staff.requireBranchAccess(branchId);
+        var now = Timestamp.valueOf(clock.now());
+        return jdbc.queryForObject(BASE + """
+            SELECT COUNT(*) FILTER(WHERE order_status='CONFIRMED' AND bucket IN ('ELIGIBLE','OVERDUE')),
+                   COUNT(*) FILTER(WHERE order_status='PREPARING' AND bucket='OVERDUE') FROM planned
+            """, (rs, row) -> new AlertCounts(rs.getLong(1), rs.getLong(2)),
+            windows.getDeliveryLeadMinutes(), windows.getPriorityLeadMinutes(), windows.getAdminOverrideLeadMinutes(),
+            windows.getNormalLeadMinutes(), branchId, now, now);
     }
 }

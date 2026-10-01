@@ -45,13 +45,30 @@ class KitchenPlanningIntegrationTest {
   doReturn(LocalDateTime.of(2026,10,1,16,59)).when(clock).now();
   assertThat(service.get(branch,KitchenPlanningService.Filter.SCHEDULED,null,null,0).total()).isEqualTo(23);
   doReturn(LocalDateTime.of(2026,10,1,18,0)).when(clock).now();
-  assertThat(service.get(branch,KitchenPlanningService.Filter.OVERDUE,null,null,0).total()).isEqualTo(23);
+  assertThat(service.get(branch,KitchenPlanningService.Filter.OVERDUE,null,null,0).total()).isEqualTo(24);
+ }
+ @Test void alarmCountsOnlyActionableOrdersInTheAuthorizedBranch(){
+  order("CONFIRMED",branch,slot);order("PREPARING",branch,slot);order("READY_FOR_PICKUP",branch,slot);
+  long other=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Other alarm') RETURNING id",Long.class,"ALARM-"+UUID.randomUUID());
+  order("CONFIRMED",other,slot);
+  doReturn(LocalDateTime.of(2026,10,1,16,59)).when(clock).now();
+  assertThat(service.alerts(branch)).isEqualTo(new KitchenPlanningService.AlertCounts(0,0));
+  doReturn(LocalDateTime.of(2026,10,1,17,0)).when(clock).now();
+  assertThat(service.alerts(branch)).isEqualTo(new KitchenPlanningService.AlertCounts(1,0));
+  doReturn(LocalDateTime.of(2026,10,1,18,0)).when(clock).now();
+  assertThat(service.alerts(branch)).isEqualTo(new KitchenPlanningService.AlertCounts(1,1));
+  var overdue=service.get(branch,KitchenPlanningService.Filter.OVERDUE,null,null,0);
+  assertThat(overdue.orders()).anyMatch(row->row.orderStatus().equals("PREPARING"));
+  jdbc.update("UPDATE orders SET order_status='READY_FOR_PICKUP' WHERE branch_id=?",branch);
+  assertThat(service.alerts(branch)).isEqualTo(new KitchenPlanningService.AlertCounts(0,0));
  }
  @Test void permissionFlagAndInputChecksRunBeforeQueries(){
   doThrow(new IllegalStateException("Other branch")).when(staff).requireBranchAccess(999L);
   assertThatThrownBy(()->service.get(999,KitchenPlanningService.Filter.ALL,null,null,0)).hasMessage("Other branch");
   assertThatThrownBy(()->service.get(branch,KitchenPlanningService.Filter.ALL,null,LocalTime.NOON,0)).isInstanceOf(IllegalArgumentException.class);
+  assertThatThrownBy(()->service.alerts(999)).hasMessage("Other branch");
   flags.setAdminPreparationBoard(false);
+  assertThatThrownBy(()->service.alerts(branch)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
   assertThatThrownBy(()->service.get(branch,KitchenPlanningService.Filter.ALL,null,null,0)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
  }
  @Test void excludesOtherBranchOrdersAndHonoursTimeFilter(){

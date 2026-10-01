@@ -1,4 +1,5 @@
 "use client";
+import NavigationFeedback from "@/components/common/NavigationFeedback";
 import {LanguageRuntime} from "@/lib/language";
 
 import type {
@@ -26,6 +27,7 @@ export default function AppProviders({
     return (
         <>
             <LanguageRuntime />
+            <NavigationFeedback />
             <ServiceWorkerRegistration />
 
             <OfflineBanner />

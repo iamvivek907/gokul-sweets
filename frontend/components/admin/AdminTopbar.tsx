@@ -1,6 +1,6 @@
 "use client";
 
-import {LanguagePicker, T} from "@/lib/language";
+import {LanguagePicker, T, useTranslation} from "@/lib/language";
 
 import {
     useRouter
@@ -16,6 +16,7 @@ import AdminMobileNav
 
 
 export default function AdminTopbar() {
+    const translate = useTranslation();
 
     const router =
         useRouter();
@@ -58,8 +59,8 @@ export default function AdminTopbar() {
                     min-h-16
                     items-center
                     justify-between
-                    gap-3
-                    px-4
+                    gap-2
+                    px-3
 
                     sm:px-6
                 "
@@ -70,7 +71,7 @@ export default function AdminTopbar() {
                         flex
                         min-w-0
                         items-center
-                        gap-3
+                        gap-2
                     "
                 >
 
@@ -83,6 +84,7 @@ export default function AdminTopbar() {
                         "
                     >
 
+                        <p className="text-sm font-bold sm:hidden">Gokul</p>
                         <p
                             className="
                                 text-xs
@@ -91,7 +93,7 @@ export default function AdminTopbar() {
                                 tracking-wide
                                 text-[#c88a20]
 
-                                lg:hidden
+                                hidden sm:block lg:hidden
                             "
                         >
                             Gokul Sweets Admin
@@ -100,6 +102,7 @@ export default function AdminTopbar() {
 
                         <p
                             className="
+                                hidden sm:block
                                 truncate
                                 text-sm
                                 font-semibold
@@ -114,6 +117,7 @@ export default function AdminTopbar() {
 
                         <p
                             className="
+                                hidden sm:block
                                 mt-0.5
                                 truncate
                                 text-xs
@@ -130,20 +134,22 @@ export default function AdminTopbar() {
                 </div>
 
 
-                <div className="flex shrink-0 items-center gap-3"><StaffNotificationBell />
+                <div className="flex shrink-0 items-center gap-1 sm:gap-3"><LanguagePicker /><StaffNotificationBell />
                 <button
                     type="button"
+                    aria-label={translate("Logout")}
                     onClick={
                         handleLogout
                     }
                     className="
-                        min-h-10
+                        flex items-center justify-center gap-2
+                        min-h-11 min-w-11
                         shrink-0
                         rounded-xl
                         border
                         border-[#eadfd6]
                         bg-white
-                        px-4
+                        px-2 sm:px-4
                         text-sm
                         font-semibold
                         text-[#7a1625]
@@ -156,12 +162,12 @@ export default function AdminTopbar() {
                         focus-visible:ring-[#c88a20]/30
                     "
                 >
-                    <T text="Logout" />
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M9 4H5v16h4M13 8l4 4-4 4M9 12h11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg><span className="hidden sm:inline"><T text="Logout" /></span>
                 </button>
                 </div>
 
             </div>
-            <div className="flex justify-end px-4 pb-2 sm:px-6"><LanguagePicker /></div>
+
 
         </header>
     );

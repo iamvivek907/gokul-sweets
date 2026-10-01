@@ -378,7 +378,7 @@ self.addEventListener("push", event => {
         const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
         const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
         await self.registration.showNotification(title, {
-            body, badge: "/notification-badge.svg",
+            body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
             icon: "/icon-192.png", tag: `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: staff, requireInteraction: staff,
             data: {url: destination, staff}
         });
