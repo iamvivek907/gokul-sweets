@@ -38,7 +38,7 @@ try{for(const width of [1280,390]){
   return route.fulfill({json,headers});
  });
  await context.addInitScript(({branch,product})=>{window.__chimes=0;window.AudioContext=class{currentTime=0;destination={};async resume(){}async close(){}createOscillator(){return {frequency:{value:0},connect(){},start(){window.__chimes++},stop(){}}}createGain(){return {gain:{setValueAtTime(){},exponentialRampToValueAtTime(){}},connect(){}}}};localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:2,weightGrams:null}]}));},{branch,product});
- await page.goto(`${base}/cart`);await page.getByLabel('Language / भाषा').selectOption('hi');await page.getByText(/^2 वस्तुएँ/).waitFor();await page.getByLabel('Language / भाषा').selectOption('en');
+ await page.goto(`${base}/cart`);await page.getByText(/^2 items ready for review$/).waitFor();await page.getByLabel('Language / भाषा').selectOption('hi');await page.getByText(/^2 वस्तुएँ/).waitFor();await page.getByLabel('Language / भाषा').selectOption('en');
  await page.goto(`${base}/checkout/pickup`);await page.getByRole('group',{name:'Choose a pickup time'}).getByRole('button',{name:/23:55/}).click();await page.getByRole('button',{name:'Continue',exact:true}).filter({visible:true}).click();
  await page.waitForURL('**/checkout/review');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-customer-details')).name==='GOKUL_GUEST');
  if(width===390)await page.getByRole('button',{name:'Check price & offers',exact:true}).click();
