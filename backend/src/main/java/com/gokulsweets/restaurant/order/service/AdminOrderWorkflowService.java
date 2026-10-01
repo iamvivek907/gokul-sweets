@@ -75,13 +75,13 @@ public class AdminOrderWorkflowService {
      * =========================================================
      */
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
     public AdminOrderDetailResponse transitionStatus(
             String orderNumber,
             OrderStatus targetStatus
     ) { return transitionStatus(orderNumber,targetStatus,null); }
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
     public AdminOrderDetailResponse transitionStatus(String orderNumber,OrderStatus targetStatus,String pickupCode) {
 
         Order order =

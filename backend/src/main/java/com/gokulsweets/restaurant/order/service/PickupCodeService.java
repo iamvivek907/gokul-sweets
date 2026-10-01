@@ -41,7 +41,7 @@ public class PickupCodeService {
         if(order.getFulfillmentType()==FulfillmentType.DELIVERY||!(order.getOrderStatus()==OrderStatus.READY_FOR_PICKUP||order.getOrderStatus()==OrderStatus.PICKUP_WINDOW_EXPIRED))throw new IllegalStateException("Only a ready pickup order can be handed over.");
         if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM orders o WHERE o.id=? AND EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='PAID') AND (SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.order_id=o.id AND p.payment_status='PAID')>=o.total_amount)",Boolean.class,order.getId())))throw new IllegalStateException("Payment must be confirmed before pickup.");
         String error=attempts.check(order.getId(),code);
-        if(error!=null)throw new IllegalArgumentException(error);
+        if(error!=null)throw new PickupCodeRejectedException(error);
         if(jdbc.update("UPDATE order_pickup_codes SET consumed_at=CURRENT_TIMESTAMP WHERE order_id=? AND consumed_at IS NULL",order.getId())!=1)throw new IllegalStateException("This pickup code has already been used.");
     }
 }

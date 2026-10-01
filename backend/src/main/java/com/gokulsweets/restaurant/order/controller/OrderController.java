@@ -16,6 +16,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,9 +44,9 @@ public class OrderController {
     private final com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
 
     @GetMapping("/{orderNumber}/pickup-code")
-    public com.gokulsweets.restaurant.order.service.PickupCodeService.CustomerCode pickupCode(@PathVariable String orderNumber,HttpServletRequest request) {
+    public ResponseEntity<com.gokulsweets.restaurant.order.service.PickupCodeService.CustomerCode> pickupCode(@PathVariable String orderNumber,HttpServletRequest request) {
         orderAccess.requirePickupCode(orderNumber,request);
-        return pickupCodes.customerCode(orderNumber);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(pickupCodes.customerCode(orderNumber));
     }
 
     @PostMapping("/quote")

@@ -10,6 +10,7 @@ import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.order.service.AdminOrderQueryService;
 import com.gokulsweets.restaurant.order.service.AdminOrderWorkflowService;
+import com.gokulsweets.restaurant.order.service.PickupCodeRejectedException;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
 import com.gokulsweets.restaurant.pickup.service.PickupSlotReservationService;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
@@ -49,13 +50,13 @@ public class AdminOrderLifecycleCoordinator {
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
     private final com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
     public AdminOrderDetailResponse transitionStatus(
             String orderNumber,
             OrderStatus targetStatus
     ) { return transitionStatus(orderNumber,targetStatus,null); }
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
     public AdminOrderDetailResponse transitionStatus(String orderNumber,OrderStatus targetStatus,String pickupCode) {
         AdminOrderDetailResponse response = workflowService.transitionStatus(orderNumber,targetStatus,pickupCode);
 
@@ -122,10 +123,10 @@ public class AdminOrderLifecycleCoordinator {
         return queryService.getOrder(orderNumber);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
     public AdminOrderDetailResponse collectLateOrder(String orderNumber) { return collectLateOrder(orderNumber,null); }
 
-    @Transactional
+    @Transactional(noRollbackFor = PickupCodeRejectedException.class)
     public AdminOrderDetailResponse collectLateOrder(String orderNumber,String pickupCode) {
         Order order = orderRepository.findForUpdate(orderNumber)
                 .orElseThrow(() -> new IllegalArgumentException("Order does not exist."));

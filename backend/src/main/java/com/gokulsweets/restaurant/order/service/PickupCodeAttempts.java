@@ -9,11 +9,11 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 
-/** Failed guesses survive rollback of the order transition and are shared by all staff. */
+/** Attempts share the locked order transaction; rejected guesses commit before any handover writes. */
 @Service @RequiredArgsConstructor
 public class PickupCodeAttempts {
     private final JdbcTemplate jdbc;
-    @Transactional(propagation=Propagation.REQUIRES_NEW)
+    @Transactional(propagation=Propagation.REQUIRED)
     public String check(long orderId, String submitted) {
         var rows=jdbc.query("SELECT code,failed_attempts,locked_until,consumed_at FROM order_pickup_codes WHERE order_id=? FOR UPDATE",
             (rs,n)->new Object[]{rs.getString(1),rs.getInt(2),rs.getTimestamp(3),rs.getTimestamp(4)},orderId);
