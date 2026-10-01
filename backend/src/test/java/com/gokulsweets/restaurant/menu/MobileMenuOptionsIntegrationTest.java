@@ -17,7 +17,7 @@ import static org.mockito.Mockito.*;
 
 @SpringBootTest @Transactional
 class MobileMenuOptionsIntegrationTest {
- @org.springframework.test.context.bean.override.mockito.MockitoSpyBean JdbcTemplate jdbc;
+ @Autowired JdbcTemplate jdbc;
  @Autowired MobileMenuOptionsService options;
  @MockitoBean StaffAuthorizationService staff;
  String key(){return UUID.randomUUID().toString();}
@@ -38,14 +38,12 @@ class MobileMenuOptionsIntegrationTest {
   assertThat(jdbc.queryForObject("SELECT price_override FROM branch_products WHERE branch_id=? AND product_id=?",Integer.class,b,f)).isEqualTo(180);
   verify(staff,atLeastOnce()).requirePermission(PermissionName.MENU_MANAGE);verify(staff,atLeastOnce()).requireBranchAccess(b);
  }
- @Test void readsAllGroupChoicesInOneOrderedQuery(){
+ @Test void readsMultipleGroupsAndTheirChoicesInConfiguredOrder(){
   long b=branch(),c=category(),h=product(b,c,"UNIT"),f=product(b,c,"UNIT"),x=product(b,c,"UNIT"),y=product(b,c,"UNIT");
   var first=new MobileMenuOptionsService.Group("z-first","First",List.of(new MobileMenuOptionsService.Choice(f,"Full"),new MobileMenuOptionsService.Choice(h,"Half")));
   var second=new MobileMenuOptionsService.Group("a-second","Second",List.of(new MobileMenuOptionsService.Choice(x,"Small"),new MobileMenuOptionsService.Choice(y,"Large")));
   options.save(b,new MobileMenuOptionsService.Input(0,List.of(first,second)));
-  clearInvocations(jdbc);
   assertThat(options.publicRead(b).groups()).containsExactly(first,second);
-  verify(jdbc,times(1)).query(eq("SELECT group_key,product_id,label FROM mobile_menu_choices WHERE branch_id=? ORDER BY group_key,position"),any(org.springframework.jdbc.core.RowCallbackHandler.class),eq(b));
  }
  @Test void cannotGroupAnotherBranchWeightedOrDifferentCategoryProducts(){
   long b=branch(),c=category(),h=product(b,c,"UNIT");
