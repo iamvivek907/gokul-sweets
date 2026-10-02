@@ -48,7 +48,7 @@ export default function MobileOrderDetail({order, status, refreshing, onRefresh,
         </section>
         {order.branchFssaiLicenceNumber && <p className="mobile-order-licence">Gokul Sweets · FSSAI {order.branchFssaiLicenceNumber}</p>}
         {completed && <div id="order-review"><OrderReviewCard orderNumber={order.orderNumber} /></div>}
-        <div className="mobile-order-actions">{paid && <button type="button" disabled={downloading} onClick={() => void invoice()}>{downloading ? "Downloading…" : "Download invoice"}</button>}{!paid && ["FAILED", "EXPIRED"].includes(order.paymentStatus ?? "") && <Link href="/checkout/mobile">Retry checkout</Link>}<button type="button" disabled={refreshing} onClick={onRefresh}>{refreshing ? "Refreshing…" : "Refresh status"}</button></div>
+        <div className="mobile-order-actions">{order.paymentStatus === "PENDING" && <Link href={`/checkout/payment/${encodeURIComponent(order.orderNumber)}`}>Continue payment</Link>}{paid && <button type="button" disabled={downloading} onClick={() => void invoice()}>{downloading ? "Downloading…" : "Download invoice"}</button>}{!paid && ["FAILED", "EXPIRED"].includes(order.paymentStatus ?? "") && <Link href="/checkout/mobile">Retry checkout</Link>}<button type="button" disabled={refreshing} onClick={onRefresh}>{refreshing ? "Refreshing…" : "Refresh status"}</button></div>
         {invoiceError && <p role="alert">{invoiceError}</p>}<p className="mobile-order-licence">Updated {formatBusinessTimestamp(order.updatedAt, {day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})} IST</p>
     </section>;
 }

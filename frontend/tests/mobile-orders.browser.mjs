@@ -53,9 +53,10 @@ try {
   await page.locator(compact?'.mobile-order-card':'article').first().waitFor();
   assert.equal(await page.locator('.mobile-order-card').count(),compact?1:0);
   if(compact){await page.getByRole('link',{name:'View order TEST-ORDER →',exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'← My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
-  if(width<=640&&enabled&&paymentStatus!=='PENDING'){
+  if(width<=640&&enabled){
    await page.goto(`${base}/checkout/payment/TEST-ORDER`);assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false);
    if(paymentStatus==='PAID'){await page.waitForURL('**/orders/TEST-ORDER');await page.locator('.mobile-order-detail').waitFor();}
+   else if(paymentStatus==='PENDING'){await page.getByRole('heading',{name:'Checking your payment…',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Payment',exact:true}).count(),0);await page.getByRole('button',{name:'Check Payment Status',exact:true}).waitFor();}
    else {await page.getByRole('heading',{name:'Payment didn’t complete',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Payment',exact:true}).count(),0);await page.getByRole('link',{name:'View order',exact:true}).click();await page.locator('.mobile-order-detail').waitFor();}
   }
   assert.equal(mutations,0,'viewing/downloading an order never creates or cancels a payment');
