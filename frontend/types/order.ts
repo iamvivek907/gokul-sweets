@@ -118,7 +118,7 @@ export interface CustomerOrderResponse {
     orderStatus: OrderStatus;
     paymentStatus: PaymentStatus | null;
     branchName: string;
-    branchAddress: string;
+    branchAddress: string | null;
     branchFssaiLicenceNumber?: string | null;
     branchPhone?: string | null;
     estimatedReadyAt?: string | null;

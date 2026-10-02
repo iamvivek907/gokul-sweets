@@ -12,7 +12,8 @@ export async function downloadOrderInvoice(order: CustomerOrderResponse): Promis
     if (order.paymentStatus !== "PAID") throw new Error("Invoice is available after payment confirmation.");
     await document.fonts.ready;
     const money = (amount: number) => `INR ${Number(amount).toFixed(2)}`;
-    const lines = ["GOKUL SWEETS", "Order invoice", order.orderNumber, order.branchName, order.branchAddress,
+    const lines = ["GOKUL SWEETS", "Order invoice", order.orderNumber, order.branchName,
+        ...(order.branchAddress ? [order.branchAddress] : []),
         ...(order.branchPhone ? [`Contact: ${order.branchPhone}`] : []),
         ...(order.branchFssaiLicenceNumber ? [`FSSAI: ${order.branchFssaiLicenceNumber}`] : []),
         `Placed: ${formatBusinessTimestamp(order.createdAt, {day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"})} IST`,

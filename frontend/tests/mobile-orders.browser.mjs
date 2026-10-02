@@ -9,7 +9,9 @@ try {
  for (const [width,enabled,paymentStatus,fulfillment='PICKUP'] of [[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY']]) {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
   const order={orderNumber:'TEST-ORDER',branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
-  if(width===640){order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
+  // Customer responses may have no branch address; both forms must still download a paid invoice.
+  if(width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP')order.branchAddress=null;
+  if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
   if(fulfillment==='DELIVERY'){Object.assign(order,{fulfillmentType:'DELIVERY',pickupDate:null,pickupStartTime:null,pickupEndTime:null,pickupType:null,deliveryDate:date,deliveryStartTime:'18:00:00',deliveryEndTime:'19:00:00',deliveryAddressLine:'12 Main Road',deliveryLocality:'Test locality',deliveryPostalCode:'226001',deliveryFee:30,totalAmount:122});}
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   let mutations=0,cancels=0,cancelError=true,failRefresh=false,refreshes=0;
@@ -49,6 +51,9 @@ try {
     const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Download invoice',exact:true}).click();
     const download=await downloadPromise;assert.equal(download.suggestedFilename(),'Gokul-TEST-ORDER-invoice.pdf');
     const data=await readFile(await download.path());assert.equal(data.subarray(0,8).toString(),'%PDF-1.4');assert.ok(data.includes(Buffer.from('/Type /Page')));
+    const invoiceText=await page.evaluate(()=>window.invoiceText);
+    assert.ok(invoiceText.includes(branch.name));assert.ok(invoiceText.includes(`PAID TOTAL: INR ${order.totalAmount.toFixed(2)}`));
+    if(!order.branchAddress)assert.equal(invoiceText.some(line=>line==='null'||line==='undefined'),false,'missing address is omitted from invoice');
     if(fulfillment==='DELIVERY')assert.ok((await page.evaluate(()=>window.invoiceText)).includes('Delivery fee: INR 30.00'));
     if(width===640)assert.ok(data.includes(Buffer.from('/Count 3')),'large invoices paginate');
     if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await download.saveAs(`${process.env.SCREENSHOT_DIR}/order-invoice.pdf`);}
