@@ -5,6 +5,7 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
+    useEffect,
     useState
 } from "react";
 
@@ -39,6 +40,7 @@ import {
     useSelectedBranch
 } from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {useOnlineStatus} from "@/hooks/useOnlineStatus";
 
 import type {
@@ -47,6 +49,14 @@ import type {
 
 
 export default function CartPage() {
+    const phone=usePhoneViewport(),features=useStorefrontFeatures(),router=useRouter();
+    const compact=phone===true&&features?.simplifiedCheckout===true&&features.checkoutExperienceV2&&features.acceptedCheckoutQuote;
+    useEffect(()=>{if(compact)router.replace("/checkout/mobile");},[compact,router]);
+    if(phone===null||phone===true&&!features||compact)return <AppShell showSocialPopup={false}><p role="status" className="p-6"><T text="Loading checkout…" /></p></AppShell>;
+    return <CartContent/>;
+}
+
+function CartContent() {
     const translate = useTranslation();
     const pickupCheck = useDateAvailability();
     const features = useStorefrontFeatures();

@@ -15,6 +15,8 @@ import {
 import AppShell
     from "@/components/layout/AppShell";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
+import Link from "next/link";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 
@@ -75,7 +77,10 @@ const FILTERS: Array<{
 export default function OrdersPage() {
     const translate = useTranslation();
 
-    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
+    const phone = usePhoneViewport();
+    const features = useStorefrontFeatures();
+    const compact = phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote;
+    const trackingEnabled = features?.truthfulOrderTracking === true;
 
     const router = useRouter();
     const {branch} = useSelectedBranch();
@@ -285,7 +290,7 @@ export default function OrdersPage() {
 
     return (
         <AppShell>
-            <section className="mx-auto w-full max-w-5xl px-4 pb-28 pt-5 sm:px-6 sm:pt-7">
+            <section className={`${compact ? "mobile-orders-list " : ""}mx-auto w-full max-w-5xl px-4 pb-28 pt-5 sm:px-6 sm:pt-7`}>
 
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
                     <div>
@@ -414,6 +419,14 @@ export default function OrdersPage() {
                             {monthOrders.map(order => {
                                 const status = getOrderStatusPresentation(order.orderStatus, order.fulfillmentType);
 
+                                if (compact) return <article className="mobile-order-card" key={order.orderNumber}>
+                                    <div><strong>{order.branchName}</strong><Link href="/menu">View menu</Link></div>
+                                    <p>{formatBusinessTimestamp(order.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST</p>
+                                    <p>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} · {order.pickupDate ? formatOrderDate(order.pickupDate) : order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending"}</p>
+                                    <div><span className={getStatusClasses(status.tone)}>{status.label}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
+                                    {trackingEnabled && order.delayReportedAt && <p>Ready time updated — open for details.</p>}
+                                    <Link className="mobile-order-open" href={`/orders/${encodeURIComponent(order.orderNumber)}`}>View order {order.orderNumber} →</Link>
+                                </article>;
                                 return (
                                     <article
                                         key={order.orderNumber}

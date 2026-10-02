@@ -43,7 +43,7 @@ try {
   },{branch,product,slot,date});
   const started=Date.now();await page.goto(`${base}/menu`);
   const launch=page.locator('.gokul-mobile-launch');
-  if(width<=640){await launch.waitFor({state:'visible'});if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/mobile-launch-${width}.png`});}await launch.waitFor({state:'hidden'});assert.ok(Date.now()-started<6000,'launch ends independently of optional data');}
+  if(width<=640){await launch.waitFor({state:'visible'});assert.equal(await launch.getByRole('button').count(),0,'launch requires no tap');if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/mobile-launch-${width}.png`});}await launch.waitFor({state:'hidden'});assert.ok(Date.now()-started<6000,'launch ends independently of optional data');}
   else assert.equal(await launch.isVisible(),false);
   await page.locator('.gokul-product-card').first().waitFor();
   if(contextual)assert.equal(await page.locator('.gokul-menu-product-grid').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),width<=640?1:4);

@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {T,useTranslation} from "@/lib/language";
 import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
 
@@ -285,6 +287,7 @@ export default function PaymentPage() {
 
     const router =
         useRouter();
+    const phone = usePhoneViewport();
 
 
     const params =
@@ -1508,6 +1511,10 @@ export default function PaymentPage() {
      * =========================================================
      */
 
+    if (phone && (loading || payment?.paymentStatus === "PAID") && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
+        <div className="mobile-payment-verifying" role="status" aria-live="polite"><span aria-hidden="true">G</span><h1><T text="Checking your payment…" /></h1><p><T text="Please keep this page open." /></p><div aria-hidden="true" /></div>
+    </AppShell>;
+
     if (
         loading
     ) {
@@ -1793,6 +1800,15 @@ export default function PaymentPage() {
      * PAGE
      * =========================================================
      */
+
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote && (isFailed || isExpired)) return <AppShell showSocialPopup={false}>
+        <section className="mobile-order-detail"><nav><Link href="/orders">← My orders</Link><Link href="/menu">View menu</Link></nav>
+        <header><h1><T text="Payment didn’t complete" /></h1><p>{orderNumber}</p></header>
+        <section className="mobile-order-panel"><p><T text="Your cart is saved. We’ll check the payment before opening a fresh checkout." /></p><p>Payment: {payment.paymentStatus}</p><strong>{formatCurrency(payment.amount)}</strong></section>
+        {error && <p role="alert">{translate(error)}</p>}
+        <div className="mobile-order-actions"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={() => void cancelCheckout()}>{cancelling ? translate("Checking payment…") : translate("Retry checkout")}</button><Link href={`/orders/${encodeURIComponent(orderNumber)}`}>View order</Link></div>
+        </section>
+    </AppShell>;
 
     return (
 
