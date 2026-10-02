@@ -1318,11 +1318,12 @@ export default function PaymentPage() {
         if(!payment || cancelling || openingPayment || refreshing) return;
         setCancelling(true);setError(null);
         try {
+            const recoveryOrder=await getCustomerOrder(payment.orderNumber);
             const result=await cancelPaymentCheckout(payment.paymentId);
             applyPaymentResult(result);
             if(result.paymentStatus==="EXPIRED" || result.paymentStatus==="FAILED") {
                 clearPendingPayment();clearPendingOrder();clearPaymentGatewayVisit(payment.orderNumber);
-                router.push(deliveryOrder ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`);
+                router.push(recoveryOrder.fulfillmentType === "DELIVERY" ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`);
             } else {setConfirmCancel(false);setError("Payment was already confirmed. View this order before starting another checkout.");}
         } catch(error) {setError(error instanceof Error ? error.message : "Could not check payment. Your order is unchanged; try again.");}
         finally {setCancelling(false);}

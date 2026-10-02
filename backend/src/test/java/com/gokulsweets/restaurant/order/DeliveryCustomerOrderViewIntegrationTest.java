@@ -48,7 +48,10 @@ class DeliveryCustomerOrderViewIntegrationTest {
                         'DELIVERY', ?, ?, '12 Main Road', 'Hazratganj', '226001')
                 """, orderNumber, branch, window, hold);
 
+        jdbc.update("UPDATE orders SET subtotal=100, delivery_fee=30, total_amount=110 WHERE order_number=?", orderNumber);
         var detail = orders.getCustomerOrder(orderNumber);
+        assertThat(detail.deliveryFee()).isEqualByComparingTo("30");
+        assertThat(detail.totalAmount()).isEqualByComparingTo("110");
         assertThat(detail.fulfillmentType()).isEqualTo(FulfillmentType.DELIVERY);
         assertThat(detail.pickupDate()).isNull();
         assertThat(detail.pickupType()).isNull();

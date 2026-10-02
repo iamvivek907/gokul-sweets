@@ -55,6 +55,11 @@ export default function MobileCheckout(){
  const [availability,setAvailability]=useState<{key:string;value:CartAvailability}|null>(null);
  const [availabilityError,setAvailabilityError]=useState<{key:string;message:string}|null>(null);
  const [revision,setRevision]=useState(0);
+ const [pickupValidating,setPickupValidating]=useState(false);
+ const pickupCheck=useRef<AbortController|null>(null);
+ const mounted=useRef(true);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;pickupCheck.current?.abort();};},[]);
+ useEffect(()=>()=>{pickupCheck.current?.abort();},[availabilityKey]);
  const [pickupPopup,setPickupPopup]=useState<string|null>(null);
  const [chosen,setChosen]=useState<PickupSelection|null>(null);
  const [price,setPrice]=useState<{key:string;value:Preview}|null>(null);
@@ -70,7 +75,7 @@ export default function MobileCheckout(){
  const [selecting,setSelecting]=useState(false);
  const [selection,setSelection]=useState<{branchId:number|null;ids:number[]}>({branchId:null,ids:[]});
  const selected=selection.branchId===cart.branchId?selection.ids.filter(id=>cart.items.some(item=>item.product.id===id)):[];
- const editingLocked=frozen||addOnBusy;
+ const editingLocked=frozen||addOnBusy||pickupValidating;
  const hadItems=useRef(false);
  useEffect(()=>{
   if(!attemptLoaded||busy||addOnBusy||attempt||pending)return;
@@ -86,6 +91,22 @@ export default function MobileCheckout(){
   if(items.length)saveCart({branchId:current.branchId,items});else clearStoredCart();
   setSelection({branchId:cart.branchId,ids:selected.filter(id=>!remove.has(id))});
  }
+
+ async function confirmPickup(selection:PickupSelection):Promise<boolean>{
+  if(editingLocked||pickupCheck.current||!branch)return false;
+  const savedCart=getCartSnapshot(),savedBranch=getStoredBranchSnapshot();
+  const controller=new AbortController();pickupCheck.current=controller;setPickupValidating(true);
+  try{
+   const fresh=await checkCartAvailability(branch.id,selection.date,1,availabilityItems(parseCart(savedCart).items),AbortSignal.any([controller.signal,AbortSignal.timeout(15000)]));
+   if(!mounted.current||controller.signal.aborted||getCartSnapshot()!==savedCart||getStoredBranchSnapshot()!==savedBranch||getPendingOrderSnapshot()||locked.current||sessionStorage.getItem(ATTEMPT))return false;
+   if(validAvailability)setAvailability({key:availabilityKey,value:{...validAvailability,dates:validAvailability.dates.map(day=>fresh.dates.find(updated=>updated.date===day.date)??day)}});
+   const available=pickupOptions(fresh).find(option=>option.date===selection.date&&option.slot.id===selection.slot.id&&option.pickupType===selection.pickupType);
+   if(!available)return false;
+   setChosen(available);savePickupSlot(available);setPickupPopup(null);return true;
+  }catch{throw new Error("We couldn’t confirm this pickup time. Your previous pickup is saved. Please try again.");}
+  finally{if(pickupCheck.current===controller)pickupCheck.current=null;if(mounted.current)setPickupValidating(false);}
+ }
+ function closePickup(){pickupCheck.current?.abort();setPickupPopup(null);}
 
  useEffect(()=>{
   if(!attemptLoaded||!branch||cart.branchId!==branch.id||!cart.items.length||pending||attempt)return;
@@ -172,11 +193,11 @@ export default function MobileCheckout(){
   <section className="mobile-checkout-section"><h2><T text="Pickup" /></h2>{validAvailability&&chosen?<><p><strong>{pickupLabel(chosen)}</strong></p><button className="mobile-change-pickup" type="button" disabled={editingLocked} onClick={()=>setPickupPopup(availabilityKey)}><T text="Change pickup" /></button></>:<p role="status">{availabilityError?.key===availabilityKey?availabilityError.message:validAvailability?"No pickup slots fit this cart. Change quantities or try another date from the pickup selector.":attempt?`${attempt.request.pickupType} pickup saved for retry. Your original pickup will be recovered with the order.`:"Checking the earliest available pickup…"}</p>}{validAvailability&&!chosen&&<Link href="/checkout/pickup"><T text="Choose pickup" /></Link>}{availabilityError?.key===availabilityKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
   <CustomerIdentityPanel mode="mobileCheckout" sessionRevision={identityRevision} onSessionChange={onSession}/>
   <section className="mobile-checkout-section"><h2><T text="Offers & total" /></h2>{preview?<><p>{best?<><strong>{best.name}</strong> · <T text="Best available offer applied automatically" /> · −{money(best.rebateAmount)}</>:<T text="Your current menu price" />}</p><details><summary><T text="Price details" /></summary><dl><div><dt><T text="Items" /></dt><dd>{money(Number(preview.quote.subtotal))}</dd></div><div><dt><T text="Tax" /></dt><dd>{money(Number(preview.quote.taxAmount))}</dd></div><div><dt><T text="Priority pickup" /></dt><dd>{money(Number(preview.quote.priorityCharge??0))}</dd></div><div><dt><T text="Convenience fee" /></dt><dd>{money(Number(preview.quote.convenienceFee??0))}</dd></div><div><dt><T text="Online payment fee" /> ({preview.quote.paymentFeeRate??0}%)</dt><dd>{money(Number(preview.paymentFee??preview.quote.paymentFee??0))} · <T text="Includes" /> {money(Number(preview.paymentFeeTax??preview.quote.paymentFeeTax??0))} <T text="fee tax" /></dd></div>{best&&<div><dt>{best.name}</dt><dd>−{money(best.rebateAmount)}</dd></div>}<div><dt><T text="Total" /></dt><dd>{money(total!)}</dd></div></dl></details></>:<p role="status">{priceError?.key===priceKey?priceError.message:contact?"Checking prices and your best offer…":"Verify your phone here to see your final total and eligible offers."}</p>}{priceError?.key===priceKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
-  {features?.pickupAddOns&&branch&&chosen&&validAvailability&&!attempt&&<PickupAddOns branchId={branch.id} date={chosen.date} disabled={busy||addOnBusy} offers={[...(preview?.offers??[]),...(preview?.spendTargets??[])]} onAdded={()=>{}} onBusy={setAddOnBusy}/>}
+  {features?.pickupAddOns&&branch&&chosen&&validAvailability&&!attempt&&<PickupAddOns branchId={branch.id} date={chosen.date} disabled={busy||addOnBusy||pickupValidating} offers={[...(preview?.offers??[]),...(preview?.spendTargets??[])]} onAdded={()=>{}} onBusy={setAddOnBusy}/>}
   </>}
-  {pickupPopup===availabilityKey&&validAvailability&&!pending&&!attempt&&<MobilePickupDialog dates={validAvailability.dates} options={pickupOptions(validAvailability)} chosen={chosen} disabled={editingLocked} onClose={()=>setPickupPopup(null)} onConfirm={selection=>{if(editingLocked)return false;const available=pickupOptions(validAvailability).find(option=>option.slot.id===selection.slot.id&&option.pickupType===selection.pickupType);if(!available)return false;setChosen(available);savePickupSlot(available);setPickupPopup(null);return true;}}/>}
+  {pickupPopup===availabilityKey&&validAvailability&&!pending&&!attempt&&<MobilePickupDialog dates={validAvailability.dates} options={pickupOptions(validAvailability)} chosen={chosen} disabled={editingLocked} onClose={closePickup} onConfirm={confirmPickup}/>}
   {error&&<p role="alert" className="mobile-checkout-error">{error}</p>}
   {attempt&&<p role="status"><T text="This checkout is saved for a safe retry. Its items and pickup are locked until the order is recovered." /></p>}
-  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
+  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||pickupValidating||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
  </div>;
 }

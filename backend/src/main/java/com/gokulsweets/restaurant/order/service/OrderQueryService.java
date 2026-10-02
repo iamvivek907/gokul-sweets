@@ -102,7 +102,8 @@ public class OrderQueryService {
                 order.getDeliveryAddressLine(),
                 order.getDeliveryLocality(),
                 order.getDeliveryPostalCode(),
-                order.getBranch().getFssaiLicenceNumber()
+                order.getBranch().getFssaiLicenceNumber(),
+                order.getDeliveryFee()
         );
     }
 

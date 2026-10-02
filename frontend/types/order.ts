@@ -113,6 +113,7 @@ export interface OrderResponse {
 
 
 export interface CustomerOrderResponse {
+    deliveryFee?: number;
     orderNumber: string;
     orderStatus: OrderStatus;
     paymentStatus: PaymentStatus | null;

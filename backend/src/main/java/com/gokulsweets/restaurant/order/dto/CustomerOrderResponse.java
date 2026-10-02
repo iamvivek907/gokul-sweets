@@ -67,6 +67,7 @@ public record CustomerOrderResponse(
         String deliveryAddressLine,
         String deliveryLocality,
         String deliveryPostalCode,
-        String branchFssaiLicenceNumber
+        String branchFssaiLicenceNumber,
+        BigDecimal deliveryFee
 ) {
 }

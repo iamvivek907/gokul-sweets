@@ -4,7 +4,7 @@ import {formatBusinessTimestamp} from "./businessTime";
 
 export function orderDiscount(order: CustomerOrderResponse): number {
     return Math.max(0, Math.round((Number(order.subtotal) + Number(order.taxAmount) + Number(order.priorityCharge)
-        + Number(order.convenienceFee ?? 0) + Number(order.paymentFee ?? 0) - Number(order.totalAmount)) * 100) / 100);
+        + Number(order.convenienceFee ?? 0) + Number(order.paymentFee ?? 0) + Number(order.deliveryFee ?? 0) - Number(order.totalAmount)) * 100) / 100);
 }
 
 /** Uses the already-authorized, persisted order amounts; never a cart or checkout estimate. */
@@ -22,6 +22,7 @@ export async function downloadOrderInvoice(order: CustomerOrderResponse): Promis
         `Subtotal: ${money(order.subtotal)}`, ...(order.taxAmount > 0 ? [`Item tax: ${money(order.taxAmount)}`] : []),
         ...((order.convenienceFee ?? 0) > 0 ? [`Convenience fee: ${money(order.convenienceFee ?? 0)} (includes ${money(order.convenienceFeeTax ?? 0)} tax)`] : []),
         ...((order.paymentFee ?? 0) > 0 ? [`Online payment fee: ${money(order.paymentFee ?? 0)} (includes ${money(order.paymentFeeTax ?? 0)} tax)`] : []),
+        ...((order.deliveryFee ?? 0) > 0 ? [`Delivery fee: ${money(order.deliveryFee ?? 0)}`] : []),
         ...(order.priorityCharge > 0 ? [`Priority charge: ${money(order.priorityCharge)}`] : []),
         ...(orderDiscount(order) > 0 ? [`Offer savings: -${money(orderDiscount(order))}`] : []),
         `PAID TOTAL: ${money(order.totalAmount)}`, "Payment confirmed", "Generated from your recorded order. Retain for your records."];

@@ -84,12 +84,22 @@ export async function warmMenu(branchId: number): Promise<void> {
         }
     } catch {if (warmedMenus.get(branchId) === entry) warmedMenus.delete(branchId);}
 }
+// Abort this consumer promptly without cancelling the shared launch request.
+function waitForWarmMenu(request: Promise<MenuCategory[]>, signal?: AbortSignal): Promise<MenuCategory[]> {
+    if (!signal) return request;
+    if (signal.aborted) return Promise.reject(signal.reason ?? new DOMException("Request aborted", "AbortError"));
+    return new Promise((resolve, reject) => {
+        const abort = () => {signal.removeEventListener("abort", abort); reject(signal.reason ?? new DOMException("Request aborted", "AbortError"));};
+        signal.addEventListener("abort", abort, {once: true});
+        request.then(value => {signal.removeEventListener("abort", abort); resolve(value);}, error => {signal.removeEventListener("abort", abort); reject(error);});
+    });
+}
 export async function getMenu(branchId: number, signal?: AbortSignal): Promise<MenuCategory[]> {
     const warm = warmedMenus.get(branchId);
     warmedMenus.delete(branchId);
     if (warm && Date.now() - warm.started < 15_000) {
         try {
-            const result = await warm.request;
+            const result = await waitForWarmMenu(warm.request, signal);
             if (signal?.aborted) throw new DOMException("Request aborted", "AbortError");
             return result;
         } catch (error) {if (signal?.aborted) throw error;}
