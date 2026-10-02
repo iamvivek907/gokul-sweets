@@ -64,3 +64,10 @@ CREATE TABLE loyalty_admin_audit (
 );
 
 ALTER TABLE orders ADD COLUMN rebate_manual_selection BOOLEAN NOT NULL DEFAULT FALSE;
+-- Accepted quotes and pending checkouts bind the earning policy and catalogue revision.
+ALTER TABLE loyalty_rewards ADD COLUMN version BIGINT NOT NULL DEFAULT 1;
+ALTER TABLE orders ADD COLUMN loyalty_earning_rupees_per_coin NUMERIC(12,2) NOT NULL DEFAULT 10 CHECK(loyalty_earning_rupees_per_coin>0);
+ALTER TABLE orders ADD COLUMN loyalty_qualifying_minimum NUMERIC(12,2) NOT NULL DEFAULT 149;
+ALTER TABLE orders ADD COLUMN loyalty_welcome_coins INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN loyalty_expiry_days INTEGER NOT NULL DEFAULT 180 CHECK(loyalty_expiry_days BETWEEN 1 AND 180);
+ALTER TABLE loyalty_ledger ADD COLUMN expiry_days INTEGER NOT NULL DEFAULT 180 CHECK(expiry_days BETWEEN 1 AND 180);

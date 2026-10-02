@@ -17,10 +17,11 @@ public class LoyaltyCheckoutService {
  @Transactional
  public Checkout read(String number){var order=orders.findForUpdate(number).orElseThrow();return new Checkout(loyalty.orderWallet(order),order.getLoyaltyRewardCode(),order.getLoyaltyCoins(),order.getLoyaltyDiscount(),null);}
  @Transactional
- public Checkout select(String number,String code){
+ public Checkout select(String number,String code,String policyVersion){
   var order=orders.findForUpdate(number).orElseThrow();
   if(order.getOrderStatus()!=OrderStatus.PENDING_PAYMENT||payments.existsByOrderId(order.getId()))throw new IllegalStateException("Rewards cannot change after payment starts.");
   if(!loyalty.enabled())throw new IllegalStateException("Rewards are currently unavailable.");
+  if(code!=null&&!code.isBlank())loyalty.verifyPolicy(policyVersion);
   loyalty.remove(order);rebates.remove(number);loyalty.reserve(order,code);orders.saveAndFlush(order);
   var offer=rebates.applyBest(number);
   return new Checkout(loyalty.orderWallet(order),order.getLoyaltyRewardCode(),order.getLoyaltyCoins(),order.getLoyaltyDiscount(),offer);

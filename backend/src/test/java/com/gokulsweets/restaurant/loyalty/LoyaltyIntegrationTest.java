@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest
 class LoyaltyIntegrationTest {
  @Autowired LoyaltyService loyalty;
+ @Autowired LoyaltyCheckoutService checkout;
+ @Autowired LoyaltyProperties rules;
  @Autowired JdbcTemplate jdbc;
  @Autowired EnhancementProperties flags;
  @Autowired PlatformTransactionManager manager;
@@ -37,7 +39,7 @@ class LoyaltyIntegrationTest {
   jdbc.update("INSERT INTO loyalty_lots(ledger_id,remaining) VALUES (?,?)",ledger,coins);
  }
  private Order order(String status,boolean enrolled){
-  long id=jdbc.queryForObject("INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,subtotal,tax_amount,total_amount,loyalty_enrolled,loyalty_eligible_subtotal) VALUES (?,?,?,'Customer','9876543210','NORMAL',?,149,8,167,?,149) RETURNING id",Long.class,"GKS-LOY-"+UUID.randomUUID(),branch,slot,status,enrolled);
+  long id=jdbc.queryForObject("INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,subtotal,tax_amount,total_amount,loyalty_enrolled,loyalty_eligible_subtotal,reservation_expires_at) VALUES (?,?,?,'Customer','9876543210','NORMAL',?,149,8,167,?,149,CURRENT_TIMESTAMP+INTERVAL '15 minutes') RETURNING id",Long.class,"GKS-LOY-"+UUID.randomUUID(),branch,slot,status,enrolled);
   jdbc.update("INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id) VALUES (?,'DEV',?)",id,subject);
   var order=new Order();order.setId(id);order.setOrderNumber("GKS-"+id);order.setOrderStatus(OrderStatus.valueOf(status));order.setSubtotal(new BigDecimal("149"));order.setTaxAmount(new BigDecimal("8"));order.setConvenienceFee(BigDecimal.TEN);order.setPaymentFeeRate(new BigDecimal("2"));
   var item=new OrderItem();var product=new Product();product.setId(999999L);item.setProduct(product);item.setLineTotal(new BigDecimal("149"));item.setTaxAmount(BigDecimal.ZERO);order.getItems().add(item);return order;
@@ -70,6 +72,35 @@ class LoyaltyIntegrationTest {
   var historical=order("PICKED_UP",false);paid(historical.getId(),"PAID");loyalty.reconcile(historical.getId());
   var unpaid=order("PICKED_UP",true);loyalty.reconcile(unpaid.getId());assertThat(loyalty.wallet("DEV",subject,null).balance()).isZero();
   flags.setGokulRewards(false);assertThatThrownBy(()->loyalty.reserve(order("PENDING_PAYMENT",false),"SWEET_5")).hasMessageContaining("unavailable");
+ }
+ @Test void staleWalletCannotAcceptAChangedCoinCost(){
+  grant(100);var pending=order("PENDING_PAYMENT",true);String number=jdbc.queryForObject("SELECT order_number FROM orders WHERE id=?",String.class,pending.getId());String version=loyalty.wallet("DEV",subject,new BigDecimal("149")).policyVersion();
+  var before=jdbc.queryForMap("SELECT coins,version FROM loyalty_rewards WHERE code='SWEET_5'");
+  try{
+   jdbc.update("UPDATE loyalty_rewards SET coins=31,version=version+1 WHERE code='SWEET_5'");
+   assertThatThrownBy(()->checkout.select(number,"SWEET_5",version)).hasMessageContaining("changed");
+   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_holds WHERE order_id=?",Integer.class,pending.getId())).isZero();
+   assertThat(loyalty.wallet("DEV",subject,null).balance()).isEqualTo(100);
+   loyalty.verifyPolicy(loyalty.wallet("DEV",subject,null).policyVersion());
+  }finally{jdbc.update("UPDATE loyalty_rewards SET coins=?,version=? WHERE code='SWEET_5'",before.get("coins"),before.get("version"));}
+ }
+ @Test void rolloutOffStillCreditsEnrolledOrdersWithTheirPromisedRules(){
+  var order=order("PICKED_UP",true);paid(order.getId(),"PAID");
+  flags.setGokulRewards(false);loyalty.reconcile(order.getId());loyalty.reconcile(order.getId());
+  assertThat(jdbc.queryForObject("SELECT SUM(coins)::integer FROM loyalty_ledger WHERE subject_id=? AND kind='EARNED'",Integer.class,subject)).isEqualTo(14);
+  assertThat(jdbc.queryForObject("SELECT expiry_days FROM loyalty_ledger WHERE subject_id=? AND kind='EARNED'",Integer.class,subject)).isEqualTo(180);
+ }
+ @Test void configurationChangesDoNotRewriteEnrolledEarningOrExpiry(){
+  var order=order("CONFIRMED",true);paid(order.getId(),"PAID");
+  var divisor=rules.getRupeesPerCoin();var minimum=rules.getQualifyingSubtotal();int expiry=rules.getExpiryDays(),welcome=rules.getWelcomeCoins();
+  try{
+   rules.setRupeesPerCoin(new BigDecimal("20"));rules.setQualifyingSubtotal(new BigDecimal("200"));rules.setExpiryDays(30);rules.setWelcomeCoins(15);
+   assertThat(loyalty.wallet("DEV",subject,null).pendingCoins()).isEqualTo(14);
+   jdbc.update("UPDATE orders SET order_status='PICKED_UP' WHERE id=?",order.getId());loyalty.reconcile(order.getId());
+   assertThat(loyalty.wallet("DEV",subject,null).balance()).isEqualTo(14);
+   assertThat(loyalty.wallet("DEV",subject,null).completedOrders()).isEqualTo(1);
+   assertThat(jdbc.queryForObject("SELECT expiry_days FROM loyalty_ledger WHERE subject_id=? AND kind='EARNED'",Integer.class,subject)).isEqualTo(180);
+  }finally{rules.setRupeesPerCoin(divisor);rules.setQualifyingSubtotal(minimum);rules.setExpiryDays(expiry);rules.setWelcomeCoins(welcome);}
  }
  @Test void hundredConcurrentSpendsCannotOverdrawOneWallet() throws Exception {
   grant(1000);var orders=new ArrayList<Order>();for(int i=0;i<100;i++)orders.add(order("PENDING_PAYMENT",true));

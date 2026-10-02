@@ -23,8 +23,9 @@ class CheckoutQuoteServiceTest {
     private final EnhancementProperties features = new EnhancementProperties();
     private final OrderValidationService validation = mock(OrderValidationService.class);
     private final OrderCalculationService calculation = mock(OrderCalculationService.class);
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty=mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class);
     private final CheckoutQuoteService service = new CheckoutQuoteService(features, validation,
-            calculation, mock(OrderRepository.class));
+            calculation, mock(OrderRepository.class),loyalty);
     private final CreateOrderRequest request = new CreateOrderRequest(1L, 2L, "Customer", "9876543210",
             PickupType.NORMAL, List.of(new CreateOrderItemRequest(3L, 1, null)));
     private final OrderCalculationResult amounts = new OrderCalculationResult(List.of(),
@@ -45,6 +46,15 @@ class CheckoutQuoteServiceTest {
         var quote=service.preview(request,null);
         var changed=new OrderCalculationResult(amounts.items(),amounts.subtotal(),amounts.taxAmount(),amounts.priorityCharge(),amounts.convenienceFee(),amounts.convenienceFeeTax(),amounts.totalAmount(),7L,amounts.convenienceFeeTaxRate(),new BigDecimal("0.00"),new BigDecimal("0.00"),new BigDecimal("2.00"),new BigDecimal("18.00"));
         assertThatThrownBy(()->service.accept(request,null,changed,quote.token())).isInstanceOf(IllegalStateException.class).hasMessageContaining("changed");
+    }
+
+    @Test
+    void changedRewardPolicyInvalidatesQuoteEvenWhenRupeeTotalIsUnchanged() {
+        when(loyalty.policyVersion()).thenReturn("coins-30");
+        var quote = service.preview(request, null);
+        when(loyalty.policyVersion()).thenReturn("coins-31");
+        assertThatThrownBy(() -> service.accept(request, null, amounts, quote.token()))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("changed");
     }
 
     @Test

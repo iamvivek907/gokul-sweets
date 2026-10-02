@@ -8,7 +8,6 @@ import org.springframework.stereotype.Component;
 public class LoyaltyReconciler {
  private final JdbcTemplate jdbc;
  private final LoyaltyService loyalty;
- private final LoyaltyProperties rules;
  @Scheduled(fixedDelayString="${gokul.loyalty.reconcile-delay-ms:15000}")
  public void reconcile(){
   var ids=jdbc.queryForList("""
@@ -25,7 +24,7 @@ public class LoyaltyReconciler {
    ORDER BY o.id LIMIT 500
    """,Long.class);
   for(long id:ids)loyalty.reconcile(id);
-  var expiring=jdbc.queryForList("SELECT DISTINCT l.environment,l.subject_id FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id WHERE p.remaining>0 AND GREATEST(l.expires_at,a.last_qualifying_activity+(?*INTERVAL '1 day'))<=CURRENT_TIMESTAMP LIMIT 500",rules.getExpiryDays());
+  var expiring=jdbc.queryForList("SELECT DISTINCT l.environment,l.subject_id FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id WHERE p.remaining>0 AND GREATEST(l.expires_at,a.last_qualifying_activity+(l.expiry_days*INTERVAL '1 day'))<=CURRENT_TIMESTAMP LIMIT 500");
   for(var account:expiring)loyalty.expireAccount((String)account.get("environment"),(java.util.UUID)account.get("subject_id"));
  }
 }

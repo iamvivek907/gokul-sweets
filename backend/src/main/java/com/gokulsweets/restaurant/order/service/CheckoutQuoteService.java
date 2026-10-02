@@ -27,6 +27,7 @@ public class CheckoutQuoteService {
     private final OrderValidationService validation;
     private final OrderCalculationService calculation;
     private final OrderRepository orders;
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
 
     @Value("${checkout.quote-signing-key:}")
     private String signingKey;
@@ -101,7 +102,7 @@ public class CheckoutQuoteService {
         amounts.items().forEach(item -> value.append(item.product().getId()).append(':')
                 .append(item.unitPrice()).append(':').append(item.taxRate()).append(':')
                 .append(item.taxAmount()).append(':').append(item.lineTotal()).append(';'));
-        return value.append("|reward:").append(request.rewardCode()).append("|offer:").append(request.offerCode()).append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
+        return value.append("|loyalty-policy:").append(loyalty.policyVersion()).append("|reward:").append(request.rewardCode()).append("|offer:").append(request.offerCode()).append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
                 .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).append('|').append(amounts.convenienceFeeTaxRate()).append('|').append(amounts.paymentFee()).append('|').append(amounts.paymentFeeTax()).append('|').append(amounts.paymentFeeRate()).append('|').append(amounts.paymentFeeTaxRate()).toString();
     }
 

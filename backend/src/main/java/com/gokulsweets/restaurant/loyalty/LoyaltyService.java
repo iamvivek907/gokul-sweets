@@ -24,11 +24,17 @@ public class LoyaltyService {
  private final Clock inventoryClock;
  public record Reward(String code,String name,int coins,BigDecimal discount,BigDecimal minimumSubtotal,boolean eligible,String unavailableReason) {}
  public record Entry(long id,String kind,int coins,String reason,String orderNumber,Instant createdAt,Instant expiresAt) {}
- public record Wallet(int balance,int debt,int pendingCoins,int completedOrders,List<Reward> rewards,List<Entry> history,Instant nextExpiry,BigDecimal maximumRedemptionPercent,String terms) {}
- public record Selection(String rewardCode) {}
+ public record Wallet(int balance,int debt,int pendingCoins,int completedOrders,List<Reward> rewards,List<Entry> history,Instant nextExpiry,BigDecimal maximumRedemptionPercent,String terms,String policyVersion) {}
+ public record Selection(String rewardCode,String policyVersion) {}
  private record Lot(long id,int remaining,Instant expiry,Long origin) { Lot(long id,int remaining,Instant expiry){this(id,remaining,expiry,null);} }
  private record Owner(String environment,UUID subject) {}
  public boolean enabled(){return features.rewardsReady();}
+ public String policyVersion(){
+  if(!enabled())return "OFF";
+  String policy=jdbc.queryForList("SELECT code,version,coins,discount,minimum_subtotal,active FROM loyalty_rewards ORDER BY code FOR SHARE").toString()+jdbc.queryForList("SELECT product_id FROM loyalty_excluded_products ORDER BY product_id").toString()+jdbc.queryForList("SELECT code FROM loyalty_excluded_rebates ORDER BY code").toString()+"|"+rules.getRupeesPerCoin()+"|"+rules.getRedemptionPercent()+"|"+rules.getExpiryDays()+"|"+rules.getQualifyingSubtotal()+"|"+rules.getWelcomeCoins();
+  try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+ }
+ public void verifyPolicy(String version){if(version==null||!policyVersion().equals(version))throw invalid("Reward rules changed. Refresh your earned coins before selecting a reward.");}
  private Instant now(){return inventoryClock.instant();}
  private Timestamp timestamp(Instant value){return value==null?null:Timestamp.from(value);}
  private ResponseStatusException invalid(String message){return new ResponseStatusException(HttpStatus.CONFLICT,message);}
@@ -38,19 +44,21 @@ public class LoyaltyService {
  }
  private List<Lot> lots(String environment,UUID subject){
   return jdbc.query("""
-   SELECT l.id,p.remaining,GREATEST(l.expires_at,a.last_qualifying_activity + (? * INTERVAL '1 day')) AS expires_at,l.source_credit_id FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id
+   SELECT l.id,p.remaining,GREATEST(l.expires_at,a.last_qualifying_activity + (l.expiry_days * INTERVAL '1 day')) AS expires_at,l.source_credit_id FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id
    WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at NULLS LAST,l.id
-   """,(rs,row)->new Lot(rs.getLong(1),rs.getInt(2),rs.getTimestamp(3)==null?null:rs.getTimestamp(3).toInstant(),(Long)rs.getObject(4)),rules.getExpiryDays(),environment,subject);
+   """,(rs,row)->new Lot(rs.getLong(1),rs.getInt(2),rs.getTimestamp(3)==null?null:rs.getTimestamp(3).toInstant(),(Long)rs.getObject(4)),environment,subject);
  }
  private int signedBalance(String environment,UUID subject){
   return jdbc.queryForObject("SELECT COALESCE(SUM(coins),0)::integer FROM loyalty_ledger WHERE environment=? AND subject_id=?",Integer.class,environment,subject);
  }
  private long append(String environment,UUID subject,String key,String kind,int coins,Long orderId,String reason,Instant expiry){return append(environment,subject,key,kind,coins,orderId,reason,expiry,null);}
- private long append(String environment,UUID subject,String key,String kind,int coins,Long orderId,String reason,Instant expiry,Long origin){
+ private long append(String environment,UUID subject,String key,String kind,int coins,Long orderId,String reason,Instant expiry,Long origin){return append(environment,subject,key,kind,coins,orderId,reason,expiry,origin,rules.getExpiryDays());}
+ private long append(String environment,UUID subject,String key,String kind,int coins,Long orderId,String reason,Instant expiry,Long origin,int expiryDays){
+  int days=origin==null?expiryDays:jdbc.queryForObject("SELECT expiry_days FROM loyalty_ledger WHERE id=?",Integer.class,origin);
   var ids=jdbc.query("""
-   INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,order_id,reason,expires_at,created_at,source_credit_id)
-   VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO NOTHING RETURNING id
-   """,(rs,row)->rs.getLong(1),environment,subject,key,kind,coins,orderId,reason,timestamp(expiry),timestamp(now()),origin);
+   INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,order_id,reason,expires_at,created_at,source_credit_id,expiry_days)
+   VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO NOTHING RETURNING id
+   """,(rs,row)->rs.getLong(1),environment,subject,key,kind,coins,orderId,reason,timestamp(expiry),timestamp(now()),origin,days);
   if(ids.isEmpty())return 0;
   long id=ids.getFirst();
   if(coins>0)jdbc.update("INSERT INTO loyalty_lots(ledger_id,remaining) VALUES (?,?)",id,Math.min(coins,Math.max(0,signedBalance(environment,subject))));
@@ -89,14 +97,14 @@ public class LoyaltyService {
   int completed=jdbc.queryForObject("SELECT COUNT(*)::integer FROM loyalty_qualifying_orders WHERE environment=? AND subject_id=? AND NOT reversed",Integer.class,environment,subject);
   var expiry=lots(environment,subject).stream().map(Lot::expiry).filter(Objects::nonNull).min(Instant::compareTo).orElse(null);
   int pending=jdbc.queryForObject("""
-   SELECT COALESCE(SUM(FLOOR(GREATEST(o.loyalty_eligible_subtotal-o.loyalty_discount-COALESCE(o.rebate_discount_amount,0),0)/?)),0)::integer
+   SELECT COALESCE(SUM(FLOOR(GREATEST(o.loyalty_eligible_subtotal-o.loyalty_discount-COALESCE(o.rebate_discount_amount,0),0)/o.loyalty_earning_rupees_per_coin)),0)::integer
    FROM orders o JOIN verified_order_ownership own ON own.order_id=o.id
    WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     AND o.order_status NOT IN ('PICKED_UP','DELIVERED','CANCELLED','PAYMENT_FAILED')
     AND NOT EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status IN ('REFUNDED','REFUND_PENDING'))
-   """,Integer.class,rules.getRupeesPerCoin(),environment,subject);
+   """,Integer.class,environment,subject);
   return new Wallet(balance,Math.max(0,-signed),pending,completed,catalogue(balance,subtotal),history,expiry,rules.getRedemptionPercent(),
-   "Earn 1 coin per ₹"+rules.getRupeesPerCoin()+" of eligible products after paid pickup/delivery completion. Tax and fees earn no coins. One reward and one coupon per order; rewards apply first, up to "+rules.getRedemptionPercent()+"% of product subtotal. Coins expire "+rules.getExpiryDays()+" days after your last qualifying completed order. Refunds reverse earned coins; spent reversed coins offset future earnings. No historical-order credits.");
+   "Earn 1 coin per ₹"+rules.getRupeesPerCoin()+" of eligible products after paid pickup/delivery completion. Tax and fees earn no coins. One reward and one coupon per order; rewards apply first, up to "+rules.getRedemptionPercent()+"% of product subtotal. Coins expire "+rules.getExpiryDays()+" days after your last qualifying completed order. Refunds reverse earned coins; spent reversed coins offset future earnings. No historical-order credits.",policyVersion());
  }
  @Transactional
  public Reward preview(String environment,UUID subject,BigDecimal subtotal,String code){
@@ -116,6 +124,9 @@ public class LoyaltyService {
   }
   var owner=owner(order.getId());
   if(owner==null){if(code!=null&&!code.isBlank())throw invalid("Sign in to use earned coins.");return;}
+  if(!order.isLoyaltyEnrolled()){
+   order.setLoyaltyEarningRupeesPerCoin(rules.getRupeesPerCoin());order.setLoyaltyQualifyingMinimum(rules.getQualifyingSubtotal());order.setLoyaltyWelcomeCoins(rules.getWelcomeCoins());order.setLoyaltyExpiryDays(rules.getExpiryDays());
+  }
   order.setLoyaltyEnrolled(true);order.setLoyaltyEligibleSubtotal(eligibleSubtotal(order));
   if(code==null||code.isBlank())return;
   lock(owner.environment(),owner.subject());expire(owner.environment(),owner.subject());
@@ -153,7 +164,7 @@ public class LoyaltyService {
  public Wallet orderWallet(Order order){
   var owner=owner(order.getId());if(owner==null)throw new ResponseStatusException(HttpStatus.UNAUTHORIZED,"Verified owner sign-in required.");
   var wallet=wallet(owner.environment(),owner.subject(),order.getLoyaltyEligibleSubtotal());
-  return new Wallet(wallet.balance(),wallet.debt(),wallet.pendingCoins(),wallet.completedOrders(),catalogue(wallet.balance()+order.getLoyaltyCoins(),order.getLoyaltyEligibleSubtotal()),wallet.history(),wallet.nextExpiry(),wallet.maximumRedemptionPercent(),wallet.terms());
+  return new Wallet(wallet.balance(),wallet.debt(),wallet.pendingCoins(),wallet.completedOrders(),catalogue(wallet.balance()+order.getLoyaltyCoins(),order.getLoyaltyEligibleSubtotal()),wallet.history(),wallet.nextExpiry(),wallet.maximumRedemptionPercent(),wallet.terms(),wallet.policyVersion());
  }
  /** Payment totals must never use a released/expired hold, even after rollout is disabled. */
  @Transactional
@@ -164,7 +175,7 @@ public class LoyaltyService {
   boolean eligible=Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_rewards r WHERE r.code=? AND r.active AND r.coins=? AND r.discount=? AND r.minimum_subtotal<=?)",Boolean.class,order.getLoyaltyRewardCode(),order.getLoyaltyCoins(),order.getLoyaltyDiscount(),order.getLoyaltyEligibleSubtotal()));
   if(!eligible||order.getLoyaltyDiscount().compareTo(cap(order.getLoyaltyEligibleSubtotal()))>0)throw invalid("Your reward eligibility changed. Review the reward before payment.");
   var owner=owner(order.getId());
-  boolean expired=Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_hold_lots h JOIN loyalty_ledger l ON l.id=h.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id JOIN loyalty_holds hold ON hold.order_id=h.order_id AND hold.generation=h.generation WHERE h.order_id=? AND hold.state='RESERVED' AND GREATEST(l.expires_at,a.last_qualifying_activity+(?*INTERVAL '1 day'))<=?)",Boolean.class,order.getId(),rules.getExpiryDays(),timestamp(now())));
+  boolean expired=Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_hold_lots h JOIN loyalty_ledger l ON l.id=h.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id JOIN loyalty_holds hold ON hold.order_id=h.order_id AND hold.generation=h.generation WHERE h.order_id=? AND hold.state='RESERVED' AND GREATEST(l.expires_at,a.last_qualifying_activity+(l.expiry_days*INTERVAL '1 day'))<=?)",Boolean.class,order.getId(),timestamp(now())));
   if(owner==null||expired)throw invalid("Your reserved coins expired. Review checkout without this reward.");
 
  }
@@ -191,7 +202,7 @@ public class LoyaltyService {
   var owner=owner(orderId);if(owner==null)return;
   lock(owner.environment(),owner.subject());expire(owner.environment(),owner.subject());
   var rows=jdbc.queryForList("""
-   SELECT o.order_status,o.subtotal,o.loyalty_discount,o.rebate_discount_amount,o.loyalty_enrolled,o.loyalty_eligible_subtotal,o.loyalty_test_order,o.rebate_code,
+   SELECT o.order_status,o.subtotal,o.loyalty_discount,o.rebate_discount_amount,o.loyalty_enrolled,o.loyalty_eligible_subtotal,o.loyalty_test_order,o.rebate_code,o.loyalty_earning_rupees_per_coin,o.loyalty_qualifying_minimum,o.loyalty_welcome_coins,o.loyalty_expiry_days,
     EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='PAID') AS paid,
     EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='REFUNDED') AS refunded
    FROM orders o WHERE o.id=?
@@ -218,21 +229,23 @@ public class LoyaltyService {
    {append(owner.environment(),owner.subject(),"reverse:"+orderId,"REVERSED",-earned,orderId,"Earned coins reversed after cancellation/refund",null);consumeLots(owner.environment(),owner.subject(),earned,null,0);}
    return;
   }
-  if(!enabled()||!Boolean.TRUE.equals(row.get("loyalty_enrolled"))||!paid||!("PICKED_UP".equals(status)||"DELIVERED".equals(status)))return;
+  if(!Boolean.TRUE.equals(row.get("loyalty_enrolled"))||!paid||!("PICKED_UP".equals(status)||"DELIVERED".equals(status)))return;
   BigDecimal subtotal=(BigDecimal)row.get("subtotal"),discount=(BigDecimal)row.get("loyalty_discount"),coupon=(BigDecimal)row.get("rebate_discount_amount");
   BigDecimal eligibleBase=((BigDecimal)row.get("loyalty_eligible_subtotal")).subtract(discount).max(BigDecimal.ZERO);
   BigDecimal afterReward=subtotal.subtract(discount).max(BigDecimal.ZERO);
   BigDecimal allocatedCoupon=afterReward.signum()==0?BigDecimal.ZERO:(coupon==null?BigDecimal.ZERO:coupon).multiply(eligibleBase).divide(afterReward,2,RoundingMode.HALF_UP);
   BigDecimal eligible=eligibleBase.subtract(allocatedCoupon).max(BigDecimal.ZERO);
   if(Boolean.TRUE.equals(row.get("loyalty_test_order"))||Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_excluded_rebates WHERE code=?)",Boolean.class,row.get("rebate_code"))))eligible=BigDecimal.ZERO;
-  int earned=eligible.divideToIntegralValue(rules.getRupeesPerCoin()).intValueExact();
-  if(!exists(owner.environment(),owner.subject(),"earned:"+orderId)&&eligible.compareTo(rules.getQualifyingSubtotal())>=0)
+  BigDecimal divisor=(BigDecimal)row.get("loyalty_earning_rupees_per_coin"),minimum=(BigDecimal)row.get("loyalty_qualifying_minimum");
+  int welcome=(Integer)row.get("loyalty_welcome_coins"),expiryDays=(Integer)row.get("loyalty_expiry_days");
+  int earned=eligible.divideToIntegralValue(divisor).intValueExact();
+  if(!exists(owner.environment(),owner.subject(),"earned:"+orderId)&&eligible.compareTo(minimum)>=0)
    {
     jdbc.update("INSERT INTO loyalty_qualifying_orders(order_id,environment,subject_id,eligible_subtotal,completed_at) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",orderId,owner.environment(),owner.subject(),eligible,timestamp(now()));
     jdbc.update("UPDATE loyalty_accounts SET last_qualifying_activity=? WHERE environment=? AND subject_id=?",timestamp(now()),owner.environment(),owner.subject());
    }
-  append(owner.environment(),owner.subject(),"earned:"+orderId,"EARNED",earned,orderId,"Paid completed order: eligible product spend ₹"+eligible,now().plus(Duration.ofDays(rules.getExpiryDays())));
-  if(rules.getWelcomeCoins()>0&&eligible.compareTo(rules.getQualifyingSubtotal())>=0&&!exists(owner.environment(),owner.subject(),"welcome"))
-   append(owner.environment(),owner.subject(),"welcome","WELCOME",rules.getWelcomeCoins(),orderId,"First qualifying completed order welcome bonus",now().plus(Duration.ofDays(rules.getExpiryDays())));
+  append(owner.environment(),owner.subject(),"earned:"+orderId,"EARNED",earned,orderId,"Paid completed order: eligible product spend ₹"+eligible,now().plus(Duration.ofDays(expiryDays)),null,expiryDays);
+  if(welcome>0&&eligible.compareTo(minimum)>=0&&!exists(owner.environment(),owner.subject(),"welcome"))
+   append(owner.environment(),owner.subject(),"welcome","WELCOME",welcome,orderId,"First qualifying completed order welcome bonus",now().plus(Duration.ofDays(expiryDays)),null,expiryDays);
  }
 }

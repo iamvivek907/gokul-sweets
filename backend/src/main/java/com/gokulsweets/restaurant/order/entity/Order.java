@@ -64,6 +64,10 @@ import java.util.List;
 public class Order {
     @Column(nullable=false) private boolean rebateManualSelection;
     @Column(nullable=false) private boolean loyaltyEnrolled;
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyEarningRupeesPerCoin=new BigDecimal("10");
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyQualifyingMinimum=new BigDecimal("149");
+    @Column(nullable=false) private int loyaltyWelcomeCoins;
+    @Column(nullable=false) private int loyaltyExpiryDays=180;
     @Column(nullable=false) private boolean loyaltyTestOrder;
     @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyEligibleSubtotal=BigDecimal.ZERO;
     @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyDiscount=BigDecimal.ZERO;
