@@ -21,7 +21,10 @@ import {markPaymentGatewayOpened} from "@/lib/paymentGatewayVisit";
 import {openPaymentCheckout} from "@/lib/paymentCheckout";
 import {createOrder} from "@/services/orderApi";
 import {createPayment} from "@/services/paymentApi";
-import {applyBestRebate} from "@/services/rebateApi";
+import RewardPicker from "./RewardPicker";
+import OfferChoiceDialog from "./OfferChoiceDialog";
+import type {RewardWallet} from "@/services/loyaltyApi";
+import {applyRebate,applyBestRebate} from "@/services/rebateApi";
 import {apiClient,ApiError} from "@/services/apiClient";
 import {formatWeight} from "@/lib/orderQuantity";
 import {T} from "@/lib/language";
@@ -32,8 +35,8 @@ import type {PickupSelection} from "@/types/pickup";
 const quoteExpired=(expiresAt:string)=>Date.parse(expiresAt)<=Date.now();
 const ATTEMPT="gokul-mobile-order-attempt";
 const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(n);
-type Attempt={request:CreateOrderRequest;key:string;cart:string;branch:string;pickup:string;expected:number};
-type Preview={quote:CheckoutQuote;offers:AvailableRebateResponse[];spendTargets?:AvailableRebateResponse[];paymentFee?:number;paymentFeeTax?:number};
+type Attempt={offerCode?:string|null;request:CreateOrderRequest;key:string;cart:string;branch:string;pickup:string;expected:number};
+type Preview={quote:CheckoutQuote;offers:AvailableRebateResponse[];spendTargets?:AvailableRebateResponse[];paymentFee?:number;paymentFeeTax?:number;rewards?:RewardWallet|null;rewardDiscount?:number;totalBeforeOffer?:number;selectedOffer?:AvailableRebateResponse|null};
 
 function pickupOptions(value:CartAvailability):PickupSelection[]{
  return value.dates.flatMap(d=>d.slots.filter(s=>s.slot.active&&Date.parse(`${d.date}T${s.slot.startTime}+05:30`)>Date.now()).flatMap(s=>[...(s.normalAvailable?[{date:d.date,slot:s.slot,pickupType:"NORMAL" as const}]:[]),...(s.priorityAvailable&&s.slot.priorityEnabled?[{date:d.date,slot:s.slot,pickupType:"PRIORITY" as const}]:[])]));
@@ -45,6 +48,7 @@ export default function MobileCheckout(){
  const pendingValue=useSyncExternalStore(subscribeToPendingOrder,getPendingOrderSnapshot,getServerPendingOrderSnapshot);
  const pending=parsePendingOrder(pendingValue);
  const [session,setSession]=useState<CustomerSession>({authenticated:false});
+ const [rewardCode,setRewardCode]=useState<string|null>(null),[offerCode,setOfferCode]=useState<string|null>(null),[offerPopup,setOfferPopup]=useState(false),[savingsBusy,setSavingsBusy]=useState(false);
  const [identityRevision,setIdentityRevision]=useState(0);
  const contact=useMemo(()=>verifiedCheckoutContact(session),[session]);
  const onSession=useCallback((value:CustomerSession)=>{setSession(value);const c=verifiedCheckoutContact(value);if(c)saveCustomerDetails(c);},[]);
@@ -75,7 +79,7 @@ export default function MobileCheckout(){
  const [selecting,setSelecting]=useState(false);
  const [selection,setSelection]=useState<{branchId:number|null;ids:number[]}>({branchId:null,ids:[]});
  const selected=selection.branchId===cart.branchId?selection.ids.filter(id=>cart.items.some(item=>item.product.id===id)):[];
- const editingLocked=frozen||addOnBusy||pickupValidating;
+ const editingLocked=frozen||addOnBusy||pickupValidating||savingsBusy;
  const hadItems=useRef(false);
  useEffect(()=>{
   if(!attemptLoaded||busy||addOnBusy||attempt||pending)return;
@@ -121,8 +125,8 @@ export default function MobileCheckout(){
  },[branch,cart.branchId,cart.items.length,itemsKey,startDate,features?.futureOrderingDays,availabilityKey,revision,pendingValue,attempt,pending,attemptLoaded]);
  const validAvailability=availability?.key===availabilityKey?availability.value:null;
  const request=useMemo<CreateOrderRequest|null>(()=>branch&&contact&&chosen&&validAvailability?{
-  branchId:branch.id,pickupSlotId:chosen.slot.id,pickupType:chosen.pickupType,customerName:contact.name,customerPhone:contact.phone,items:JSON.parse(itemsKey)
- }:null,[branch,contact,chosen,validAvailability,itemsKey]);
+  branchId:branch.id,pickupSlotId:chosen.slot.id,pickupType:chosen.pickupType,customerName:contact.name,customerPhone:contact.phone,items:JSON.parse(itemsKey),...(rewardCode?{rewardCode}:{}),...(offerCode?{offerCode}:{})
+ }:null,[branch,contact,chosen,validAvailability,itemsKey,rewardCode,offerCode]);
  const priceKey=JSON.stringify(request);
  useEffect(()=>{if(!request||pending||attempt)return;const controller=new AbortController();
   void apiClient<Preview>("/api/orders/mobile-preview",{method:"POST",body:priceKey,credentials:"include",signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])})
@@ -130,11 +134,25 @@ export default function MobileCheckout(){
   return()=>controller.abort();
  },[priceKey,request,pendingValue,pending,attempt,revision]);
  const preview=price?.key===priceKey?price.value:null;
- const best=preview?.offers.reduce<AvailableRebateResponse|null>((best,offer)=>!best||offer.payableAfterRebate<best.payableAfterRebate?offer:best,null);
- const total=best?best.payableAfterRebate:preview?Number(preview.quote.totalAmount):null;
+ const best=preview?.selectedOffer??preview?.offers.reduce<AvailableRebateResponse|null>((best,offer)=>!best||offer.payableAfterRebate<best.payableAfterRebate?offer:best,null);
+ const total=best?best.payableAfterRebate:preview?Number(preview.totalBeforeOffer??preview.quote.totalAmount):null;
  useEffect(()=>{if(!preview||attempt||pending)return;const timeout=setTimeout(()=>setRevision(v=>v+1),Math.max(100,Date.parse(preview.quote.expiresAt)-Date.now()));return()=>clearTimeout(timeout);},[preview,attempt,pendingValue,pending]);
+ async function changeSavings(next:{rewardCode?:string|null;offerCode?:string|null}){
+  if(!request||editingLocked)throw new Error("Wait for your current checkout to finish checking.");
+  const cartSnapshot=getCartSnapshot(),branchSnapshot=getStoredBranchSnapshot(),pickupSnapshot=getPickupSlotSnapshot();
+  setSavingsBusy(true);setError("");
+  const updated={...request,...next};
+  // Rewards change coupon eligibility; restore automatic selection unless a code is explicitly chosen.
+  if("rewardCode" in next)updated.offerCode=null;
+  try{
+   const value=await apiClient<Preview>("/api/orders/mobile-preview",{method:"POST",credentials:"include",body:JSON.stringify(updated),signal:AbortSignal.timeout(15000)});
+   if(cartSnapshot!==getCartSnapshot()||branchSnapshot!==getStoredBranchSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your checkout changed elsewhere. Review it before applying savings.");
+   const canonical={...updated};if(!canonical.rewardCode)delete canonical.rewardCode;if(!canonical.offerCode)delete canonical.offerCode;
+   setRewardCode(updated.rewardCode??null);setOfferCode(updated.offerCode??null);setPrice({key:JSON.stringify(canonical),value});
+  }finally{setSavingsBusy(false);}
+ }
  async function pay(){
-  if(locked.current||addOnBusy||pending)return;
+  if(locked.current||addOnBusy||savingsBusy||pending)return;
   const saved=attempt;
   if(!saved&&(!request||!preview||total===null||quoteExpired(preview.quote.expiresAt))){setRevision(v=>v+1);setError("Checking your current price before payment. Please review the refreshed total.");return;}
   locked.current=true;setBusy(true);setError("");
@@ -143,7 +161,7 @@ export default function MobileCheckout(){
    const current=verifiedCheckoutContact(await apiClient<CustomerSession>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.timeout(5000)}));
    const expectedPhone=saved?.request.customerPhone??request!.customerPhone;
    if(!current||current.phone!==expectedPhone){setSession({authenticated:false});setIdentityRevision(v=>v+1);throw new Error("Verify the order’s phone number before payment. Your cart is saved.");}
-   const value=saved??{request:{...request!,quoteToken:preview!.quote.token},key:crypto.randomUUID(),cart:getCartSnapshot(),branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot(),expected:total!};
+   const value=saved??{request:{...request!,quoteToken:preview!.quote.token},key:crypto.randomUUID(),cart:getCartSnapshot(),branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot(),expected:total!,offerCode};
    if(!saved&&(value.cart!==getCartSnapshot()||value.branch!==getStoredBranchSnapshot()||value.pickup!==getPickupSlotSnapshot()))throw new Error("Your cart, branch or pickup changed elsewhere. Review the saved checkout before payment.");
    sessionStorage.setItem(ATTEMPT,JSON.stringify(value));setAttempt(value);
    postingOrder=true;const order=await createOrder(value.request,value.key,AbortSignal.timeout(20000));orderCreated=true;
@@ -153,7 +171,7 @@ export default function MobileCheckout(){
    localStorage.setItem(`gokul-mobile-checkout:${order.orderNumber}`,"1");
    if(order.orderStatus!=="PENDING_PAYMENT") {router.replace(`/orders/${encodeURIComponent(order.orderNumber)}`);return;}
    if(value.cart!==getCartSnapshot()||value.branch!==getStoredBranchSnapshot()||value.pickup!==getPickupSlotSnapshot())throw new Error("Your checkout changed elsewhere. Review the existing order before payment.");
-   const applied=await applyBestRebate(order.orderNumber);
+   const applied=value.offerCode?await applyRebate(order.orderNumber,value.offerCode):await applyBestRebate(order.orderNumber);
    savePendingOrder({orderId:order.id,orderNumber:order.orderNumber,orderStatus:order.orderStatus,branchId:order.branchId,pickupSlotId:order.pickupSlotId,totalAmount:applied.totalAmount,reservationExpiresAt:order.reservationExpiresAt,createdAt:order.createdAt,cartFingerprint:fingerprint});
    if(value.cart!==getCartSnapshot()||value.branch!==getStoredBranchSnapshot()||value.pickup!==getPickupSlotSnapshot())throw new Error("Your checkout changed elsewhere. Review the existing order before payment.");
    if(Math.abs(applied.totalAmount-value.expected)>0.009)throw new Error("Your total changed after the final offer check. Review the existing order’s updated total before paying.");
@@ -192,12 +210,14 @@ export default function MobileCheckout(){
   {pending?<section className="mobile-checkout-section"><h2><T text="Continue your existing order" /></h2><p><T text="Your order is already reserved. Check its payment status before starting another checkout." /></p><Link href={`/checkout/payment/${encodeURIComponent(pending.orderNumber)}`}><T text="Continue payment" /></Link></section>:<>
   <section className="mobile-checkout-section"><h2><T text="Pickup" /></h2>{validAvailability&&chosen?<><p><strong>{pickupLabel(chosen)}</strong></p><button className="mobile-change-pickup" type="button" disabled={editingLocked} onClick={()=>setPickupPopup(availabilityKey)}><T text="Change pickup" /></button></>:<p role="status">{availabilityError?.key===availabilityKey?availabilityError.message:validAvailability?"No pickup slots fit this cart. Change quantities or try another date from the pickup selector.":attempt?`${attempt.request.pickupType} pickup saved for retry. Your original pickup will be recovered with the order.`:"Checking the earliest available pickup…"}</p>}{validAvailability&&!chosen&&<Link href="/checkout/pickup"><T text="Choose pickup" /></Link>}{availabilityError?.key===availabilityKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
   <CustomerIdentityPanel mode="mobileCheckout" sessionRevision={identityRevision} onSessionChange={onSession}/>
-  <section className="mobile-checkout-section"><h2><T text="Offers & total" /></h2>{preview?<><p>{best?<><strong>{best.name}</strong> · <T text="Best available offer applied automatically" /> · −{money(best.rebateAmount)}</>:<T text="Your current menu price" />}</p><details><summary><T text="Price details" /></summary><dl><div><dt><T text="Items" /></dt><dd>{money(Number(preview.quote.subtotal))}</dd></div><div><dt><T text="Tax" /></dt><dd>{money(Number(preview.quote.taxAmount))}</dd></div><div><dt><T text="Priority pickup" /></dt><dd>{money(Number(preview.quote.priorityCharge??0))}</dd></div><div><dt><T text="Convenience fee" /></dt><dd>{money(Number(preview.quote.convenienceFee??0))}</dd></div><div><dt><T text="Online payment fee" /> ({preview.quote.paymentFeeRate??0}%)</dt><dd>{money(Number(preview.paymentFee??preview.quote.paymentFee??0))} · <T text="Includes" /> {money(Number(preview.paymentFeeTax??preview.quote.paymentFeeTax??0))} <T text="fee tax" /></dd></div>{best&&<div><dt>{best.name}</dt><dd>−{money(best.rebateAmount)}</dd></div>}<div><dt><T text="Total" /></dt><dd>{money(total!)}</dd></div></dl></details></>:<p role="status">{priceError?.key===priceKey?priceError.message:contact?"Checking prices and your best offer…":"Verify your phone here to see your final total and eligible offers."}</p>}{priceError?.key===priceKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
+  {features?.gokulRewards&&preview?.rewards&&<RewardPicker wallet={preview.rewards} selected={rewardCode} discount={Number(preview.rewardDiscount??0)} busy={editingLocked} onSelect={code=>void changeSavings({rewardCode:code}).catch(failure=>setError(failure instanceof Error?failure.message:"Rewards could not be checked. Try again."))}/>}
+  <section className="mobile-checkout-section" aria-busy={savingsBusy}><h2><T text="Offers & total" /></h2>{preview?<><p>{best?<><strong>{best.name}</strong> · <T text={offerCode?"Your selected offer":"Best available offer applied automatically"} /> · −{money(best.rebateAmount)}</>:<T text="Your current menu price" />}</p>{<button className="checkout-change-offer" type="button" disabled={editingLocked} onClick={()=>setOfferPopup(true)}><T text={preview.offers.length?"Change offer":"Add offer code"} /></button>}{savingsBusy&&<p role="status"><T text="Verifying savings…" /></p>}<details><summary><T text="Price details" /></summary><dl><div><dt><T text="Items" /></dt><dd>{money(Number(preview.quote.subtotal))}</dd></div><div><dt><T text="Tax" /></dt><dd>{money(Number(preview.quote.taxAmount))}</dd></div><div><dt><T text="Priority pickup" /></dt><dd>{money(Number(preview.quote.priorityCharge??0))}</dd></div><div><dt><T text="Convenience fee" /></dt><dd>{money(Number(preview.quote.convenienceFee??0))}</dd></div><div><dt><T text="Online payment fee" /> ({preview.quote.paymentFeeRate??0}%)</dt><dd>{money(Number(preview.paymentFee??preview.quote.paymentFee??0))} · <T text="Includes" /> {money(Number(preview.paymentFeeTax??preview.quote.paymentFeeTax??0))} <T text="fee tax" /></dd></div>{Number(preview.rewardDiscount??0)>0&&<div><dt><T text="Reward savings" /></dt><dd>−{money(Number(preview.rewardDiscount))}</dd></div>}{best&&<div><dt>{best.name}</dt><dd>−{money(best.rebateAmount)}</dd></div>}<div><dt><T text="Total" /></dt><dd>{money(total!)}</dd></div></dl></details></>:<p role="status">{priceError?.key===priceKey?priceError.message:contact?"Checking prices and your best offer…":"Verify your phone here to see your final total and eligible offers."}</p>}{priceError?.key===priceKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
   {features?.pickupAddOns&&branch&&chosen&&validAvailability&&!attempt&&<PickupAddOns branchId={branch.id} date={chosen.date} disabled={busy||addOnBusy||pickupValidating} offers={[...(preview?.offers??[]),...(preview?.spendTargets??[])]} onAdded={()=>{}} onBusy={setAddOnBusy}/>}
   </>}
+  {offerPopup&&preview&&<OfferChoiceDialog offers={preview.offers} selected={best?.code??null} onApply={code=>changeSavings({offerCode:code})} onClose={()=>setOfferPopup(false)}/> }
   {pickupPopup===availabilityKey&&validAvailability&&!pending&&!attempt&&<MobilePickupDialog dates={validAvailability.dates} options={pickupOptions(validAvailability)} chosen={chosen} disabled={editingLocked} onClose={closePickup} onConfirm={confirmPickup}/>}
   {error&&<p role="alert" className="mobile-checkout-error">{error}</p>}
   {attempt&&<p role="status"><T text="This checkout is saved for a safe retry. Its items and pickup are locked until the order is recovered." /></p>}
-  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||pickupValidating||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
+  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||pickupValidating||savingsBusy||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
  </div>;
 }

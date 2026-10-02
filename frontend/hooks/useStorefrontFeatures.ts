@@ -33,6 +33,7 @@ export interface StorefrontFeatures {
     deliveryCheckout: boolean;
     customerAccountHub: boolean;
     notificationInbox: boolean;
+    gokulRewards?: boolean;
     notificationAlerts: boolean;
     brandCareers: boolean;
     pickupAddOns: boolean;

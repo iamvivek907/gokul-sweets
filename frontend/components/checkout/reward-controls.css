@@ -1,0 +1,21 @@
+/* SCRUM-38 savings controls; inherit the existing customer shell. */
+.future-storefront .checkout-rewards{min-width:0;border:1px solid var(--future-border,#dfdfd6);border-radius:20px;background:#fffaf2;padding:18px;margin-bottom:18px;color:#172e2c}
+.future-storefront .checkout-savings-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.future-storefront .checkout-savings-heading h2{font-size:1rem;font-weight:700}
+.future-storefront .checkout-savings-heading p{font-size:.82rem;margin-top:4px}
+.future-storefront .checkout-rewards button,.future-storefront .checkout-offer-dialog button,.future-storefront .checkout-change-offer{min-height:44px;border:1px solid #d7dcd3;border-radius:14px;padding:8px 14px;font-weight:600}
+.future-storefront .checkout-reward-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}
+.future-storefront .checkout-reward-choices button{text-align:left;display:flex;flex-direction:column;gap:4px;white-space:normal}
+.future-storefront .checkout-reward-choices button[aria-pressed=true]{border-color:#143936;background:#edf4ed}
+.future-storefront .checkout-reward-choices button:disabled:not([aria-pressed=true]){opacity:.65}
+.future-storefront .checkout-reward-choices span,.future-storefront .checkout-reward-choices small{font-size:.75rem}
+.future-storefront .checkout-rewards details{font-size:.8rem;line-height:1.6}
+.future-storefront .checkout-offer-dialog{width:min(92vw,480px);max-height:80dvh;padding:0;border:1px solid #dfdfd6;border-radius:24px;color:#172e2c;background:#fffaf2;overflow:auto}
+.future-storefront .checkout-offer-dialog::backdrop{background:rgb(9 39 37 / .55)}
+.future-storefront .checkout-offer-dialog>div{padding:20px}
+.future-storefront .checkout-offer-dialog header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;font-weight:700}
+.future-storefront .checkout-offer-list{display:grid;gap:10px;margin-top:16px}
+.future-storefront .checkout-offer-list article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;border:1px solid #e5e3db;border-radius:16px;background:white}
+.future-storefront .checkout-offer-list article>div{min-width:0;overflow-wrap:anywhere}
+.future-storefront .checkout-offer-list small{display:block;font-size:.75rem;margin:4px 0}
+@media(max-width:640px){.future-storefront .checkout-rewards{padding:14px;border-radius:16px}.future-storefront .checkout-offer-dialog>div{padding:16px}}

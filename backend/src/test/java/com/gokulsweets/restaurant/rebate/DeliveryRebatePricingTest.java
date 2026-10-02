@@ -102,4 +102,23 @@ class DeliveryRebatePricingTest {
         assertThat(order.getDeliveryFee()).isEqualByComparingTo("50");
         assertThat(order.getPaymentFeeTax()).isEqualByComparingTo("0");
     }
+
+    @Test void rewardsApplyBeforeCouponMinimumAndNeverDiscountFees() {
+        var order=order("2","0");order.setSubtotal(n("150"));order.setLoyaltyEnrolled(true);order.setLoyaltyDiscount(n("5"));PaymentFeePricing.reprice(order);
+        var rebate=rebate();rebate.setMinimumOrderAmount(n("150"));
+        assertThat(eligibility.getAvailableRebates("DELIVERY-TEST")).isEmpty();
+        assertThatThrownBy(()->application.apply("DELIVERY-TEST",new ApplyRebateRequest("SAVE20"))).hasMessageContaining("minimum");
+        rebate.setMinimumOrderAmount(n("145"));
+        assertThat(eligibility.getAvailableRebates("DELIVERY-TEST").getFirst().payableAfterRebate()).isEqualByComparingTo("193.80");
+        assertThat(application.apply("DELIVERY-TEST",new ApplyRebateRequest("SAVE20")).totalAmount()).isEqualByComparingTo("193.80");
+        assertThat(application.remove("DELIVERY-TEST").totalAmount()).isEqualByComparingTo("214.20");
+        assertThat(order.getLoyaltyDiscount()).isEqualByComparingTo("5");
+    }
+    @Test void evenLargeCouponCannotConsumeTaxConvenienceOrDeliveryFees() {
+        var order=order("2","0");order.setSubtotal(n("150"));order.setLoyaltyEnrolled(true);order.setLoyaltyDiscount(n("5"));PaymentFeePricing.reprice(order);
+        rebate().setRebateValue(n("1000"));
+        var applied=application.apply("DELIVERY-TEST",new ApplyRebateRequest("SAVE20"));
+        assertThat(applied.rebateAmount()).isEqualByComparingTo("145");
+        assertThat(applied.totalAmount()).isEqualByComparingTo("66.30");
+    }
 }

@@ -41,6 +41,14 @@ public class VerifiedOrderOwnership {
         if (subjects.isEmpty()) throw signInRequired();
     }
 
+    public record Subject(String environment,UUID id) {}
+    public Subject verifiedSubject(String phone,String token) {
+        requireVerifiedIdentity(phone,token);
+        String environment=settings.getProperty("gokul.environment-isolation.environment", "");
+        UUID id=jdbc.queryForObject("SELECT verified_subject_id FROM verified_customer_sessions WHERE environment=? AND token_digest=? AND revoked_at IS NULL AND expires_at>?",UUID.class,environment,VerifiedCustomerSessionStore.digest(token),Timestamp.from(Instant.now()));
+        return new Subject(environment,id);
+    }
+
     public void requireCheckoutReplay(Long orderId, String token) {
         if (settings.getProperty("gokul.checkout.guest-enabled", Boolean.class, true)) return;
         if (token == null || !token.matches("[0-9a-f]{64}")) throw signInRequired();

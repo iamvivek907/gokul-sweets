@@ -103,7 +103,7 @@ public class OrderQueryService {
                 order.getDeliveryLocality(),
                 order.getDeliveryPostalCode(),
                 order.getBranch().getFssaiLicenceNumber(),
-                order.getDeliveryFee()
+                order.getDeliveryFee(),order.getLoyaltyDiscount(),order.getLoyaltyCoins(),order.getLoyaltyRewardCode(),order.getRebateDiscountAmount()
         );
     }
 

@@ -1,4 +1,5 @@
 "use client";
+import CustomerRewards from "./CustomerRewards";
 import {T} from "@/lib/language";
 
 import {formatWeight} from "@/lib/orderQuantity";
@@ -227,7 +228,9 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 </div>
             </div>
         </header>
+        {features?.gokulRewards?<CustomerRewards/>:<>
         <section className="mobile-profile-rewards" aria-label="Rewards"><div><T text="Rewards" /><strong><T text="Coming soon" /></strong></div><p><T text="Earned points are not available yet. A balance will appear here when the rewards programme is launched." /></p></section>
+        </>}
         <div className="account-layout mt-6">
             <nav className="account-navigation" aria-label="Profile sections">
                 {([['badges', 'Badges'], ['orders', 'Order history'], ['favourites', 'Favourites'],

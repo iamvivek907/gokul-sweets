@@ -33,7 +33,7 @@ class PaymentStatusLateSuccessTest {
         var slots = mock(PickupSlotReservationService.class);
         var commitments = mock(OrderInventoryCommitmentService.class);
         var holds = mock(OrderInventoryReservationService.class);
-        var service = new PaymentStatusService(repository, mock(OrderRepository.class), slots,
+        var service = new PaymentStatusService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),repository, mock(OrderRepository.class), slots,
                 mock(RebateRedemptionService.class), commitments, holds,
                 new PaymentReconciliationPolicy(new EnhancementProperties()), mock(DeliveryRiderHoldService.class), mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class), mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
         var order = new Order();
@@ -56,7 +56,7 @@ class PaymentStatusLateSuccessTest {
         var holds = mock(OrderInventoryReservationService.class);
         var features = new EnhancementProperties();
         features.setPaymentReconciliationV2(true);
-        var service = new PaymentStatusService(repository, orders, slots, redemptions,
+        var service = new PaymentStatusService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),repository, orders, slots, redemptions,
                 commitments, holds, new PaymentReconciliationPolicy(features), mock(DeliveryRiderHoldService.class), mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class), mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
 
         var order = new Order();
@@ -96,7 +96,7 @@ class PaymentStatusLateSuccessTest {
         var inventory = mock(OrderInventoryCommitmentService.class);
         var riders = mock(DeliveryRiderHoldService.class);
         when(riders.commit("server-issued-hold")).thenReturn(true);
-        var service = new PaymentStatusService(payments, orders, slots,
+        var service = new PaymentStatusService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),payments, orders, slots,
                 mock(RebateRedemptionService.class), inventory, mock(OrderInventoryReservationService.class),
                 new PaymentReconciliationPolicy(new EnhancementProperties()), riders, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class), mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
         var order = new Order();
@@ -130,7 +130,7 @@ class PaymentStatusLateSuccessTest {
         when(payments.findById(26L)).thenReturn(Optional.of(payment(order, PaymentStatus.PENDING)));
         when(payments.transitionStatus(26L, PaymentStatus.PENDING, PaymentStatus.FAILED)).thenReturn(1);
         when(riders.release("server-issued-hold")).thenReturn(true);
-        var service = new PaymentStatusService(payments, mock(OrderRepository.class), pickup,
+        var service = new PaymentStatusService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),payments, mock(OrderRepository.class), pickup,
                 mock(RebateRedemptionService.class), mock(OrderInventoryCommitmentService.class), inventory,
                 new PaymentReconciliationPolicy(new EnhancementProperties()), riders, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class), mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
 
@@ -153,7 +153,7 @@ class PaymentStatusLateSuccessTest {
         order.setOrderStatus(OrderStatus.DELIVERED);
         order.setFulfillmentType(FulfillmentType.DELIVERY);
         when(payments.findById(27L)).thenReturn(Optional.of(payment(order, PaymentStatus.PAID)));
-        var service = new PaymentStatusService(payments, mock(OrderRepository.class), pickup,
+        var service = new PaymentStatusService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),payments, mock(OrderRepository.class), pickup,
                 mock(RebateRedemptionService.class), mock(OrderInventoryCommitmentService.class), inventory,
                 new PaymentReconciliationPolicy(new EnhancementProperties()), riders, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class), mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
 

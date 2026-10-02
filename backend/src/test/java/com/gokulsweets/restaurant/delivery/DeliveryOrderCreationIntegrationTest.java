@@ -117,7 +117,7 @@ class DeliveryOrderCreationIntegrationTest {
         var ownership = mock(VerifiedOrderOwnership.class);
         var accepted = new DeliveryAcceptedQuoteService(flags, preparation, ist);
         ReflectionTestUtils.setField(accepted, "signingKey", "delivery-quote-test-signing-key-at-least-32-characters");
-        var service = new DeliveryOrderCreationService(flags, preparation, accepted, rider, inventory,
+        var service = new DeliveryOrderCreationService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),flags, preparation, accepted, rider, inventory,
                 idempotency, orders, jdbc, numbers, contacts, ownership, ist);
         var draft = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
                 "Customer", "9999999999", "12 Main Road", null);

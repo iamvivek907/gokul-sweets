@@ -50,7 +50,7 @@ public class StorefrontFeaturesController {
                 properties.isCustomerAccountHub() && properties.isCustomerOtpIdentity(),
                 properties.isNotificationInbox() && properties.isCustomerOtpIdentity(),
                 properties.isNotificationAlerts() && properties.isNotificationInbox() && properties.isCustomerOtpIdentity(),
-                properties.isBrandCareers(), properties.isPickupAddOns(), properties.isSimplifiedCheckout(), properties.isBilingualStorefront(), properties.isAdminPreparationBoard(), properties.getFutureOrderingDays(), LocalDate.now(inventoryClock));
+                properties.rewardsReady(), properties.isBrandCareers(), properties.isPickupAddOns(), properties.isSimplifiedCheckout(), properties.isBilingualStorefront(), properties.isAdminPreparationBoard(), properties.getFutureOrderingDays(), LocalDate.now(inventoryClock));
     }
 
     public record Features(boolean smartAvailability, boolean smartPickupSelection,
@@ -68,5 +68,5 @@ public class StorefrontFeaturesController {
                            boolean paymentPollingV2, boolean deliveryLocalityCheck, boolean deliveryZones,
                            boolean deliveryCapacity, boolean deliveryAddressBoundaries,
                            boolean deliveryCheckout, boolean customerAccountHub,
-                           boolean notificationInbox, boolean notificationAlerts, boolean brandCareers, boolean pickupAddOns, boolean simplifiedCheckout, boolean bilingualStorefront, boolean adminPreparationBoard, int futureOrderingDays, LocalDate today) {}
+                           boolean notificationInbox, boolean notificationAlerts, boolean gokulRewards, boolean brandCareers, boolean pickupAddOns, boolean simplifiedCheckout, boolean bilingualStorefront, boolean adminPreparationBoard, int futureOrderingDays, LocalDate today) {}
 }

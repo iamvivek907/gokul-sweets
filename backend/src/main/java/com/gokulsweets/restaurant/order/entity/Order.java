@@ -62,6 +62,13 @@ import java.util.List;
 @Getter
 @Setter
 public class Order {
+    @Column(nullable=false) private boolean rebateManualSelection;
+    @Column(nullable=false) private boolean loyaltyEnrolled;
+    @Column(nullable=false) private boolean loyaltyTestOrder;
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyEligibleSubtotal=BigDecimal.ZERO;
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyDiscount=BigDecimal.ZERO;
+    @Column(length=40) private String loyaltyRewardCode;
+    @Column(nullable=false) private int loyaltyCoins;
     @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFee=BigDecimal.ZERO;
     @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFeeTax=BigDecimal.ZERO;
     @Column(nullable=false,precision=5,scale=2) private BigDecimal paymentFeeRate=BigDecimal.ZERO;

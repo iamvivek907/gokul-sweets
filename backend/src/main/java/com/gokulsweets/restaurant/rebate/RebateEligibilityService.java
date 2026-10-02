@@ -549,13 +549,14 @@ public class RebateEligibilityService {
     // =========================================================
 
     private AvailableRebateResponse withFee(AvailableRebateResponse r,Order order) {
-        return new AvailableRebateResponse(r.rebateId(),r.code(),r.name(),r.description(),r.scope(),r.rebateType(),r.rebateAmount(),com.gokulsweets.restaurant.order.service.PaymentFeePricing.totalWithFee(order,r.payableAfterRebate().add(defaultZero(order.getConvenienceFee())).add(defaultZero(order.getDeliveryFee()))),r.minimumOrderAmount(),r.maximumDiscountAmount(),r.nextSlabMinimumOrderAmount(),r.nextSlabRebateAmount(),r.amountNeededForNextSlab());
+        return new AvailableRebateResponse(r.rebateId(),r.code(),r.name(),r.description(),r.scope(),r.rebateType(),r.rebateAmount(),com.gokulsweets.restaurant.order.service.PaymentFeePricing.totalWithFee(order,r.payableAfterRebate().add(order.isLoyaltyEnrolled()?defaultZero(order.getTaxAmount()).add(defaultZero(order.getPriorityCharge())):BigDecimal.ZERO).add(defaultZero(order.getConvenienceFee())).add(defaultZero(order.getDeliveryFee()))),r.minimumOrderAmount(),r.maximumDiscountAmount(),r.nextSlabMinimumOrderAmount(),r.nextSlabRebateAmount(),r.amountNeededForNextSlab());
     }
 
     private BigDecimal calculateEligibleAmount(
             Order order
     ) {
 
+        if(order.isLoyaltyEnrolled()) return money(defaultZero(order.getSubtotal()).subtract(defaultZero(order.getLoyaltyDiscount())).max(BigDecimal.ZERO));
         BigDecimal amount =
                 defaultZero(
                         order.getSubtotal()

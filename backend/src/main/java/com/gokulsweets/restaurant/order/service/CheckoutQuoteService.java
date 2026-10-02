@@ -101,7 +101,7 @@ public class CheckoutQuoteService {
         amounts.items().forEach(item -> value.append(item.product().getId()).append(':')
                 .append(item.unitPrice()).append(':').append(item.taxRate()).append(':')
                 .append(item.taxAmount()).append(':').append(item.lineTotal()).append(';'));
-        return value.append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
+        return value.append("|reward:").append(request.rewardCode()).append("|offer:").append(request.offerCode()).append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
                 .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).append('|').append(amounts.convenienceFeeTaxRate()).append('|').append(amounts.paymentFee()).append('|').append(amounts.paymentFeeTax()).append('|').append(amounts.paymentFeeRate()).append('|').append(amounts.paymentFeeTaxRate()).toString();
     }
 

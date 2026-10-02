@@ -40,6 +40,7 @@ public class RebateApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("Order does not exist."));
         validateOrderMutable(order);
         BigDecimal currentTotal = order.getTotalAmount();
+        if(order.isRebateManualSelection()) return new AppliedRebateResponse(orderNumber,order.getRebateCode(),order.getRebate()==null?null:order.getRebate().getName(),defaultZero(order.getRebateDiscountAmount()),calculateAmountBeforeRebate(order),currentTotal,order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate());
         var best = rebateEligibilityService.getAvailableRebates(orderNumber).stream()
                 .filter(offer -> offer.rebateAmount().signum() > 0 && offer.payableAfterRebate().compareTo(currentTotal) < 0)
                 .min(java.util.Comparator.comparing(AvailableRebateResponse::payableAfterRebate));
@@ -48,7 +49,7 @@ public class RebateApplicationService {
                     order.getRebate() == null ? null : order.getRebate().getName(),
                     defaultZero(order.getRebateDiscountAmount()), calculateAmountBeforeRebate(order), currentTotal,order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate());
         }
-        var applied = apply(orderNumber, new ApplyRebateRequest(best.get().code()));
+        var applied = applySnapshot(orderNumber, new ApplyRebateRequest(best.get().code()),false);
         if (applied.totalAmount().compareTo(currentTotal) > 0) {
             // Configuration may change between discovery and revalidation; rollback rather than raise the customer's price.
             throw new IllegalStateException("This offer changed. Review the available offers before payment.");
@@ -60,7 +61,9 @@ public class RebateApplicationService {
     public AppliedRebateResponse apply(
             String orderNumber,
             ApplyRebateRequest request
-    ) {
+    ) {return applySnapshot(orderNumber,request,true);}
+
+    private AppliedRebateResponse applySnapshot(String orderNumber,ApplyRebateRequest request,boolean manual) {
 
         Order order =
                 orderRepository
@@ -128,6 +131,7 @@ public class RebateApplicationService {
                 rebate
         );
 
+        order.setRebateManualSelection(manual);
         order.setRebateCode(
                 rebate.getCode()
         );
@@ -183,6 +187,7 @@ public class RebateApplicationService {
                         );
 
         validateOrderMutable(order);
+        order.setRebateManualSelection(false);
 
         BigDecimal amountBeforeRebate =
                 calculateAmountBeforeRebate(
@@ -297,6 +302,7 @@ public class RebateApplicationService {
                 )
                 .add(defaultZero(order.getConvenienceFee()))
                 .add(defaultZero(order.getDeliveryFee()))
+                .subtract(defaultZero(order.getLoyaltyDiscount()))
                 .setScale(
                         2,
                         RoundingMode.HALF_UP

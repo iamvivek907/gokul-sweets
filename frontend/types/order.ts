@@ -41,6 +41,8 @@ export interface CreateOrderRequest {
     pickupType: PickupType;
     items: CreateOrderItemRequest[];
     quoteToken?: string;
+    rewardCode?: string | null;
+    offerCode?: string | null;
 }
 
 export interface CheckoutQuote {
@@ -113,6 +115,10 @@ export interface OrderResponse {
 
 
 export interface CustomerOrderResponse {
+    loyaltyDiscount?: number;
+    loyaltyCoins?: number;
+    loyaltyRewardCode?: string | null;
+    rebateDiscountAmount?: number;
     deliveryFee?: number;
     orderNumber: string;
     orderStatus: OrderStatus;

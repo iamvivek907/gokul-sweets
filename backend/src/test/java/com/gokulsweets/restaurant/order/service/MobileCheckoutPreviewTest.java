@@ -12,7 +12,7 @@ class MobileCheckoutPreviewTest {
  final VerifiedOrderOwnership ownership=mock(VerifiedOrderOwnership.class);
  final CheckoutQuoteService quotes=mock(CheckoutQuoteService.class);
  final RebateEligibilityService rebates=mock(RebateEligibilityService.class);
- final MobileCheckoutPreview preview=new MobileCheckoutPreview(ownership,quotes,rebates);
+ final MobileCheckoutPreview preview=new MobileCheckoutPreview(ownership,quotes,rebates,mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class));
  final CreateOrderRequest request=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of());
  @Test void identityMustBeCheckedBeforePricing(){
   doThrow(new IllegalArgumentException("Verify phone")).when(ownership).requireVerifiedIdentity("9876543210","expired");

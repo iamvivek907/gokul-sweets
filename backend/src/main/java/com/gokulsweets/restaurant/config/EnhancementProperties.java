@@ -69,6 +69,10 @@ public class EnhancementProperties {
     private boolean customerAccountHub;
     /** SCRUM-39: durable verified-customer inbox; OFF until lifecycle and customer QA. */
     private boolean notificationInbox;
+    /** SCRUM-38: funded verified-customer ledger; OFF until finance and provider QA. */
+    private boolean gokulRewards;
+
+    public boolean rewardsReady() { return gokulRewards && customerOtpIdentity && acceptedCheckoutQuote; }
     /** SCRUM-40: optional browser push and user-controlled in-page sound. */
     private boolean notificationAlerts;
     private boolean staffOrderAlerts;

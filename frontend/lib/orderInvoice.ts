@@ -24,7 +24,8 @@ export async function downloadOrderInvoice(order: CustomerOrderResponse): Promis
         ...((order.paymentFee ?? 0) > 0 ? [`Online payment fee: ${money(order.paymentFee ?? 0)} (includes ${money(order.paymentFeeTax ?? 0)} tax)`] : []),
         ...((order.deliveryFee ?? 0) > 0 ? [`Delivery fee: ${money(order.deliveryFee ?? 0)}`] : []),
         ...(order.priorityCharge > 0 ? [`Priority charge: ${money(order.priorityCharge)}`] : []),
-        ...(orderDiscount(order) > 0 ? [`Offer savings: -${money(orderDiscount(order))}`] : []),
+        ...((order.loyaltyDiscount??0)>0 ? [`Reward savings (${order.loyaltyCoins??0} coins): -${money(order.loyaltyDiscount??0)}`] : []),
+        ...(orderDiscount(order)-(order.loyaltyDiscount??0) > 0 ? [`Offer savings: -${money(orderDiscount(order)-(order.loyaltyDiscount??0))}`] : []),
         `PAID TOTAL: ${money(order.totalAmount)}`, "Payment confirmed", "Generated from your recorded order. Retain for your records."];
     const {createInvoicePdf} = await import("./orderInvoicePdf");
     const data = await createInvoicePdf(lines, order.orderNumber);
