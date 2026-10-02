@@ -1834,6 +1834,13 @@ export default function CheckoutOffersPanel({
                                                     )
                                                 }
 
+                                                {(orderSummary.loyaltyDiscount ?? 0) > 0 && (
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="text-green-700"><T text="Reward saving" /></span>
+                                                        <span className="font-bold text-green-700">-{formatCurrency(orderSummary.loyaltyDiscount ?? 0)}</span>
+                                                    </div>
+                                                )}
+
                                                 {
                                                     appliedRebate
                                                     && (
