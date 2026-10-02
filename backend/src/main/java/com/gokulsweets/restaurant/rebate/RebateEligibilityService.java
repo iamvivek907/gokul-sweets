@@ -625,6 +625,16 @@ public class RebateEligibilityService {
                 );
     }
 
+    /** An ineligible saved choice is expected during reward changes, not a failed transaction. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<AvailableRebateResponse> findEligibleRebate(Order order, String code) {
+        try {
+            return java.util.Optional.of(getEligibleRebate(order, code));
+        } catch (IllegalArgumentException | IllegalStateException ineligible) {
+            return java.util.Optional.empty();
+        }
+    }
+
     @Transactional(readOnly = true)
     public AvailableRebateResponse getEligibleRebate(
             Order order,

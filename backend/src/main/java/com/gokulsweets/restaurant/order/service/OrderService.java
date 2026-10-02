@@ -575,6 +575,7 @@ public class OrderService {
     private void clearAppliedRebate(
             Order order
     ) {
+        order.setRebateManualSelection(false);
 
         if (
                 order.getRebate()

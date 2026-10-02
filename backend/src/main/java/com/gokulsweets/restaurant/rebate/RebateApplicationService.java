@@ -40,7 +40,8 @@ public class RebateApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("Order does not exist."));
         validateOrderMutable(order);
         BigDecimal currentTotal = order.getTotalAmount();
-        if(order.isRebateManualSelection()) return new AppliedRebateResponse(orderNumber,order.getRebateCode(),order.getRebate()==null?null:order.getRebate().getName(),defaultZero(order.getRebateDiscountAmount()),calculateAmountBeforeRebate(order),currentTotal,order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate());
+        if(order.isRebateManualSelection() && order.getRebateCode()!=null && order.getRebate()!=null) return new AppliedRebateResponse(orderNumber,order.getRebateCode(),order.getRebate()==null?null:order.getRebate().getName(),defaultZero(order.getRebateDiscountAmount()),calculateAmountBeforeRebate(order),currentTotal,order.getPaymentFee(),order.getPaymentFeeTax(),order.getPaymentFeeRate());
+        if(order.getRebateCode()==null || order.getRebate()==null) order.setRebateManualSelection(false);
         var best = rebateEligibilityService.getAvailableRebates(orderNumber).stream()
                 .filter(offer -> offer.rebateAmount().signum() > 0 && offer.payableAfterRebate().compareTo(currentTotal) < 0)
                 .min(java.util.Comparator.comparing(AvailableRebateResponse::payableAfterRebate));
@@ -55,6 +56,17 @@ public class RebateApplicationService {
             throw new IllegalStateException("This offer changed. Review the available offers before payment.");
         }
         return applied;
+    }
+
+    @Transactional
+    public AppliedRebateResponse reapplyManualOrBest(String number, String manualCode) {
+        Order order = orderRepository.findForUpdate(number).orElseThrow();
+        validateOrderMutable(order);
+        if (manualCode != null && !manualCode.isBlank()
+                && rebateEligibilityService.findEligibleRebate(order, manualCode).isPresent()) {
+            return applySnapshot(number, new ApplyRebateRequest(manualCode), true);
+        }
+        return applyBest(number);
     }
 
     @Transactional
@@ -377,6 +389,7 @@ public class RebateApplicationService {
                         order
                 );
 
+        order.setRebateManualSelection(false);
         order.setRebate(null);
         order.setRebateCode(null);
 

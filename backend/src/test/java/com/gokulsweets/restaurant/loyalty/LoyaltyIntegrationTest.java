@@ -21,6 +21,7 @@ class LoyaltyIntegrationTest {
  @Autowired LoyaltyService loyalty;
  @Autowired LoyaltyCheckoutService checkout;
  @Autowired LoyaltyProperties rules;
+ @Autowired com.gokulsweets.restaurant.rebate.RebateEligibilityService couponEligibility;
  @Autowired JdbcTemplate jdbc;
  @Autowired EnhancementProperties flags;
  @Autowired PlatformTransactionManager manager;
@@ -101,6 +102,47 @@ class LoyaltyIntegrationTest {
    assertThat(loyalty.wallet("DEV",subject,null).completedOrders()).isEqualTo(1);
    assertThat(jdbc.queryForObject("SELECT expiry_days FROM loyalty_ledger WHERE subject_id=? AND kind='EARNED'",Integer.class,subject)).isEqualTo(180);
   }finally{rules.setRupeesPerCoin(divisor);rules.setQualifyingSubtotal(minimum);rules.setExpiryDays(expiry);rules.setWelcomeCoins(welcome);}
+ }
+ @Test void pendingAndCompletionUseTheSamePaidEligibilityAndProportionalCouponRules(){
+  var unpaid=order("CONFIRMED",true);
+  var belowMinimum=order("CONFIRMED",true);paid(belowMinimum.getId(),"PAID");
+  jdbc.update("UPDATE orders SET subtotal=100,loyalty_eligible_subtotal=100 WHERE id=?",belowMinimum.getId());
+  var testOrder=order("CONFIRMED",true);paid(testOrder.getId(),"PAID");jdbc.update("UPDATE orders SET loyalty_test_order=TRUE WHERE id=?",testOrder.getId());
+  var excluded=order("CONFIRMED",true);paid(excluded.getId(),"PAID");String code="NO-EARN-"+subject;
+  jdbc.update("INSERT INTO loyalty_excluded_rebates(code) VALUES (?)",code);jdbc.update("UPDATE orders SET rebate_code=? WHERE id=?",code,excluded.getId());
+  var eligible=order("CONFIRMED",true);paid(eligible.getId(),"PAID");
+  jdbc.update("UPDATE orders SET subtotal=400,loyalty_eligible_subtotal=200,rebate_discount_amount=80 WHERE id=?",eligible.getId());
+  try{
+   assertThat(loyalty.wallet("DEV",subject,null).pendingCoins()).isEqualTo(16);
+   for(var completed:List.of(belowMinimum,testOrder,excluded,eligible)){
+    jdbc.update("UPDATE orders SET order_status='PICKED_UP' WHERE id=?",completed.getId());loyalty.reconcile(completed.getId());loyalty.reconcile(completed.getId());
+   }
+   assertThat(loyalty.wallet("DEV",subject,null).balance()).isEqualTo(16);
+   assertThat(loyalty.wallet("DEV",subject,null).pendingCoins()).isZero();
+   assertThat(loyalty.wallet("DEV",subject,null).completedOrders()).isEqualTo(1);
+   assertThat(jdbc.queryForObject("SELECT coins FROM loyalty_ledger WHERE order_id=? AND kind='EARNED'",Integer.class,belowMinimum.getId())).isZero();
+   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=? AND kind='EARNED'",Integer.class,belowMinimum.getId())).isEqualTo(1);
+  }finally{jdbc.update("DELETE FROM loyalty_excluded_rebates WHERE code=?",code);}
+ }
+ @Test void newProductExclusionInvalidatesExistingRewardBeforePayment(){
+  grant(100);var order=order("PENDING_PAYMENT",true);loyalty.reserve(order,"SWEET_5");loyalty.verifyPayment(order);
+  long category=jdbc.queryForObject("INSERT INTO categories(name) VALUES (?) RETURNING id",Long.class,"Rewards exclusion "+subject);
+  long product=jdbc.queryForObject("INSERT INTO products(name,category_id,sale_mode,base_price) VALUES (?, ?, 'UNIT',149) RETURNING id",Long.class,"Excluded reward product "+subject,category);
+  order.getItems().getFirst().getProduct().setId(product);
+  jdbc.update("INSERT INTO loyalty_excluded_products(product_id) VALUES (?)",product);
+  try{
+   flags.setGokulRewards(false);
+   assertThatThrownBy(()->loyalty.verifyPayment(order)).hasMessageContaining("eligibility changed");
+   assertThat(jdbc.queryForObject("SELECT state FROM loyalty_holds WHERE order_id=?",String.class,order.getId())).isEqualTo("RESERVED");
+  }finally{jdbc.update("DELETE FROM loyalty_excluded_products WHERE product_id=?",product);}
+ }
+ @Test void anIneligibleSavedCouponDoesNotMarkRewardChangeTransactionRollbackOnly(){
+  var order=order("PENDING_PAYMENT",true);
+  new TransactionTemplate(manager).executeWithoutResult(tx->{
+   assertThat(couponEligibility.findEligibleRebate(order,"MISSING-"+subject)).isEmpty();
+   jdbc.update("UPDATE orders SET customer_name='Reward change committed' WHERE id=?",order.getId());
+  });
+  assertThat(jdbc.queryForObject("SELECT customer_name FROM orders WHERE id=?",String.class,order.getId())).isEqualTo("Reward change committed");
  }
  @Test void hundredConcurrentSpendsCannotOverdrawOneWallet() throws Exception {
   grant(1000);var orders=new ArrayList<Order>();for(int i=0;i<100;i++)orders.add(order("PENDING_PAYMENT",true));

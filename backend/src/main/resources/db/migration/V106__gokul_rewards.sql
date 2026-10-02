@@ -26,6 +26,7 @@ CREATE TABLE loyalty_ledger (
  FOREIGN KEY(environment,subject_id) REFERENCES loyalty_accounts(environment,subject_id)
 );
 CREATE INDEX loyalty_ledger_owner ON loyalty_ledger(environment,subject_id,id);
+CREATE INDEX loyalty_ledger_order_kind ON loyalty_ledger(order_id,kind) WHERE order_id IS NOT NULL;
 -- Mutable projections; source of truth is the append-only ledger.
 CREATE TABLE loyalty_lots (
  ledger_id BIGINT PRIMARY KEY REFERENCES loyalty_ledger(id), remaining INTEGER NOT NULL CHECK(remaining>=0)

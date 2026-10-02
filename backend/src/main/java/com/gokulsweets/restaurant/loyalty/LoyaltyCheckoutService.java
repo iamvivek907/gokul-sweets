@@ -22,8 +22,9 @@ public class LoyaltyCheckoutService {
   if(order.getOrderStatus()!=OrderStatus.PENDING_PAYMENT||payments.existsByOrderId(order.getId()))throw new IllegalStateException("Rewards cannot change after payment starts.");
   if(!loyalty.enabled())throw new IllegalStateException("Rewards are currently unavailable.");
   if(code!=null&&!code.isBlank())loyalty.verifyPolicy(policyVersion);
+  String manualCode=order.isRebateManualSelection()?order.getRebateCode():null;
   loyalty.remove(order);rebates.remove(number);loyalty.reserve(order,code);orders.saveAndFlush(order);
-  var offer=rebates.applyBest(number);
+  var offer=rebates.reapplyManualOrBest(number,manualCode);
   return new Checkout(loyalty.orderWallet(order),order.getLoyaltyRewardCode(),order.getLoyaltyCoins(),order.getLoyaltyDiscount(),offer);
  }
 }

@@ -96,15 +96,18 @@ public class LoyaltyService {
    """,(rs,row)->new Entry(rs.getLong(1),rs.getString(2),rs.getInt(3),rs.getString(4),rs.getString(5),rs.getTimestamp(6).toInstant(),rs.getTimestamp(7)==null?null:rs.getTimestamp(7).toInstant()),environment,subject);
   int completed=jdbc.queryForObject("SELECT COUNT(*)::integer FROM loyalty_qualifying_orders WHERE environment=? AND subject_id=? AND NOT reversed",Integer.class,environment,subject);
   var expiry=lots(environment,subject).stream().map(Lot::expiry).filter(Objects::nonNull).min(Instant::compareTo).orElse(null);
-  int pending=jdbc.queryForObject("""
-   SELECT COALESCE(SUM(FLOOR(GREATEST(o.loyalty_eligible_subtotal-o.loyalty_discount-COALESCE(o.rebate_discount_amount,0),0)/o.loyalty_earning_rupees_per_coin)),0)::integer
+  var pendingOrders=jdbc.queryForList("""
+   SELECT o.subtotal,o.loyalty_discount,o.rebate_discount_amount,o.loyalty_eligible_subtotal,o.loyalty_test_order,o.rebate_code,o.loyalty_earning_rupees_per_coin,o.loyalty_qualifying_minimum
    FROM orders o JOIN verified_order_ownership own ON own.order_id=o.id
    WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     AND o.order_status NOT IN ('PICKED_UP','DELIVERED','CANCELLED','PAYMENT_FAILED')
+    AND EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='PAID')
     AND NOT EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status IN ('REFUNDED','REFUND_PENDING'))
-   """,Integer.class,environment,subject);
+   """,environment,subject);
+  var excludedPromotions=excludedPromotions();
+  int pending=pendingOrders.stream().mapToInt(row->earning(row,excludedPromotions).coins()).reduce(0,Math::addExact);
   return new Wallet(balance,Math.max(0,-signed),pending,completed,catalogue(balance,subtotal),history,expiry,rules.getRedemptionPercent(),
-   "Earn 1 coin per ₹"+rules.getRupeesPerCoin()+" of eligible products after paid pickup/delivery completion. Tax and fees earn no coins. One reward and one coupon per order; rewards apply first, up to "+rules.getRedemptionPercent()+"% of product subtotal. Coins expire "+rules.getExpiryDays()+" days after your last qualifying completed order. Refunds reverse earned coins; spent reversed coins offset future earnings. No historical-order credits.",policyVersion());
+   "Earn 1 coin per ₹"+rules.getRupeesPerCoin()+" of eligible products after paid pickup/delivery completion. Minimum net eligible product spend ₹"+rules.getQualifyingSubtotal()+" is required. Tax and fees earn no coins. One reward and one coupon per order; rewards apply first, up to "+rules.getRedemptionPercent()+"% of product subtotal. Coins expire "+rules.getExpiryDays()+" days after your last qualifying completed order. Refunds reverse earned coins; spent reversed coins offset future earnings. No historical-order credits.",policyVersion());
  }
  @Transactional
  public Reward preview(String environment,UUID subject,BigDecimal subtotal,String code){
@@ -172,8 +175,9 @@ public class LoyaltyService {
   if(order.getLoyaltyCoins()==0)return;
   var states=jdbc.queryForList("SELECT state FROM loyalty_holds WHERE order_id=? AND state<>'RELEASED'",String.class,order.getId());
   if(states.size()!=1||!states.getFirst().equals("RESERVED"))throw invalid("This reward reservation is no longer payable. Review your order.");
-  boolean eligible=Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_rewards r WHERE r.code=? AND r.active AND r.coins=? AND r.discount=? AND r.minimum_subtotal<=?)",Boolean.class,order.getLoyaltyRewardCode(),order.getLoyaltyCoins(),order.getLoyaltyDiscount(),order.getLoyaltyEligibleSubtotal()));
-  if(!eligible||order.getLoyaltyDiscount().compareTo(cap(order.getLoyaltyEligibleSubtotal()))>0)throw invalid("Your reward eligibility changed. Review the reward before payment.");
+  BigDecimal currentEligible=eligibleSubtotal(order);
+  boolean eligible=Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_rewards r WHERE r.code=? AND r.active AND r.coins=? AND r.discount=? AND r.minimum_subtotal<=?)",Boolean.class,order.getLoyaltyRewardCode(),order.getLoyaltyCoins(),order.getLoyaltyDiscount(),currentEligible));
+  if(!eligible||order.getLoyaltyDiscount().compareTo(cap(currentEligible))>0)throw invalid("Your reward eligibility changed. Review the reward before payment.");
   var owner=owner(order.getId());
   boolean expired=Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_hold_lots h JOIN loyalty_ledger l ON l.id=h.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id JOIN loyalty_holds hold ON hold.order_id=h.order_id AND hold.generation=h.generation WHERE h.order_id=? AND hold.state='RESERVED' AND GREATEST(l.expires_at,a.last_qualifying_activity+(l.expiry_days*INTERVAL '1 day'))<=?)",Boolean.class,order.getId(),timestamp(now())));
   if(owner==null||expired)throw invalid("Your reserved coins expired. Review checkout without this reward.");
@@ -194,6 +198,20 @@ public class LoyaltyService {
   if(request.coins()<0)consumeLots(environment,subject,-request.coins(),null,0);
   int after=signedBalance(environment,subject);jdbc.update("INSERT INTO loyalty_adjustment_audit(ledger_id,staff_id,old_balance,new_balance,reason) VALUES (?,?,?,?,?)",id,staffId,before,after,request.reason().trim());
   return new Adjusted(id,before,after);
+ }
+ private record Earning(BigDecimal eligible,BigDecimal minimum,int coins) {}
+ private Set<String> excludedPromotions(){return new HashSet<>(jdbc.queryForList("SELECT code FROM loyalty_excluded_rebates",String.class));}
+ /** One calculation for paid pending estimates and completed-order credits. */
+ private Earning earning(Map<String,Object> row,Set<String> excludedPromotions){
+  BigDecimal subtotal=(BigDecimal)row.get("subtotal"),discount=(BigDecimal)row.get("loyalty_discount"),coupon=(BigDecimal)row.get("rebate_discount_amount");
+  BigDecimal eligibleBase=((BigDecimal)row.get("loyalty_eligible_subtotal")).subtract(discount).max(BigDecimal.ZERO);
+  BigDecimal afterReward=subtotal.subtract(discount).max(BigDecimal.ZERO);
+  BigDecimal allocatedCoupon=afterReward.signum()==0?BigDecimal.ZERO:(coupon==null?BigDecimal.ZERO:coupon).multiply(eligibleBase).divide(afterReward,2,RoundingMode.HALF_UP);
+  BigDecimal eligible=eligibleBase.subtract(allocatedCoupon).max(BigDecimal.ZERO);
+  if(Boolean.TRUE.equals(row.get("loyalty_test_order"))||excludedPromotions.contains(row.get("rebate_code")))eligible=BigDecimal.ZERO;
+  BigDecimal minimum=(BigDecimal)row.get("loyalty_qualifying_minimum");
+  int coins=eligible.compareTo(minimum)<0?0:eligible.divideToIntegralValue((BigDecimal)row.get("loyalty_earning_rupees_per_coin")).intValueExact();
+  return new Earning(eligible,minimum,coins);
  }
  /** Authoritative terminal order/payment state, not a customer callback. Idempotent under retries. */
  @Transactional
@@ -230,15 +248,10 @@ public class LoyaltyService {
    return;
   }
   if(!Boolean.TRUE.equals(row.get("loyalty_enrolled"))||!paid||!("PICKED_UP".equals(status)||"DELIVERED".equals(status)))return;
-  BigDecimal subtotal=(BigDecimal)row.get("subtotal"),discount=(BigDecimal)row.get("loyalty_discount"),coupon=(BigDecimal)row.get("rebate_discount_amount");
-  BigDecimal eligibleBase=((BigDecimal)row.get("loyalty_eligible_subtotal")).subtract(discount).max(BigDecimal.ZERO);
-  BigDecimal afterReward=subtotal.subtract(discount).max(BigDecimal.ZERO);
-  BigDecimal allocatedCoupon=afterReward.signum()==0?BigDecimal.ZERO:(coupon==null?BigDecimal.ZERO:coupon).multiply(eligibleBase).divide(afterReward,2,RoundingMode.HALF_UP);
-  BigDecimal eligible=eligibleBase.subtract(allocatedCoupon).max(BigDecimal.ZERO);
-  if(Boolean.TRUE.equals(row.get("loyalty_test_order"))||Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM loyalty_excluded_rebates WHERE code=?)",Boolean.class,row.get("rebate_code"))))eligible=BigDecimal.ZERO;
-  BigDecimal divisor=(BigDecimal)row.get("loyalty_earning_rupees_per_coin"),minimum=(BigDecimal)row.get("loyalty_qualifying_minimum");
+  var earning=earning(row,excludedPromotions());
+  BigDecimal eligible=earning.eligible(),minimum=earning.minimum();
+  int earned=earning.coins();
   int welcome=(Integer)row.get("loyalty_welcome_coins"),expiryDays=(Integer)row.get("loyalty_expiry_days");
-  int earned=eligible.divideToIntegralValue(divisor).intValueExact();
   if(!exists(owner.environment(),owner.subject(),"earned:"+orderId)&&eligible.compareTo(minimum)>=0)
    {
     jdbc.update("INSERT INTO loyalty_qualifying_orders(order_id,environment,subject_id,eligible_subtotal,completed_at) VALUES (?,?,?,?,?) ON CONFLICT DO NOTHING",orderId,owner.environment(),owner.subject(),eligible,timestamp(now()));
