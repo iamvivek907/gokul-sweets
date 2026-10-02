@@ -40,8 +40,9 @@ export function MobileAccountBack() {
     const {branch} = useSelectedBranch();
     const features = useStorefrontFeatures();
     const home = features?.branchExperience ? branch ? `/branches/${branch.id}` : "/branches" : "/";
+    const homeLabel = features?.branchExperience ? branch ? "Branch home" : "All branches" : "Home";
     return <nav className="mobile-account-back" aria-label="Account navigation">
         <Link href="/menu"><span aria-hidden="true">←</span> <T text="Back to menu" /></Link>
-        <Link href={home}><T text="Branch home" /></Link>
+        <Link href={home}><T text={homeLabel} /></Link>
     </nav>;
 }

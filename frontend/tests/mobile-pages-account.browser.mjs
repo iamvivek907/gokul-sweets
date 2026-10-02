@@ -9,16 +9,16 @@ const sweet={id:1,name:'Gulab Jamun',description:'Fresh sweets for your celebrat
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 try{
  for(const [width,themed] of [[320,true],[390,true],[601,true],[640,true],[641,true],[1280,true],[390,false]]){
-  let authenticated=true,logoutError=true,staffChecks=0,orders=0;
+  let authenticated=true,logoutError=true,staffChecks=0,orders=0,customerName='Vivek Chaurasia',branchExperience=true;
   const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',timezoneId:'America/Los_Angeles'}),page=await context.newPage();
-  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));window.initSendOTP=config=>config.success({accessToken:'test-provider-proof'});},branch);
+  await context.addInitScript(branch=>{if(!sessionStorage.getItem('test-branch-initialized')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('test-branch-initialized','true');}window.initSendOTP=config=>config.success({accessToken:'test-provider-proof'});},branch);
   await context.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;let json=[];
-   if(path==='/api/storefront/features')json={futuristicStorefrontV2:themed,checkoutExperienceV2:themed,simplifiedCheckout:themed,acceptedCheckoutQuote:themed,customerAccountHub:true,notificationInbox:true,branchExperience:true,occasionEnquiries:true,today};
+   if(path==='/api/storefront/features')json={futuristicStorefrontV2:themed,checkoutExperienceV2:themed,simplifiedCheckout:themed,acceptedCheckoutQuote:themed,customerAccountHub:true,notificationInbox:true,branchExperience,occasionEnquiries:true,today};
    else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
-   else if(path==='/api/customer/identity/me')json={authenticated,name:'Vivek Chaurasia',phone:'+919876543210'};
+   else if(path==='/api/customer/identity/me')json={authenticated,name:customerName,phone:'+919876543210'};
    else if(path==='/api/customer/identity/start')return route.fulfill({status:204});
-   else if(path==='/api/customer/identity/exchange'){authenticated=true;json={authenticated,name:'Vivek Chaurasia',phone:'+919876543210'};}
+   else if(path==='/api/customer/identity/exchange'){authenticated=true;json={authenticated,name:customerName,phone:'+919876543210'};}
    else if(path==='/api/customer/identity/logout'){if(logoutError)return route.fulfill({status:503,json:{message:'Unavailable'}});authenticated=false;return route.fulfill({status:204});}
    else if(path==='/api/customer/identity/notifications')json={messages:[],unreadCount:1,nextBefore:null,readThrough:0};
    else if(path==='/api/customer/identity/account')json={paidOrders:1,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
@@ -64,6 +64,27 @@ try{
    await lastLink.scrollIntoViewIfNeeded();await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
    const lastBox=await lastLink.boundingBox(),navigationBox=await page.locator('.customer-bottom-navigation').boundingBox();
    assert.ok(lastBox.y+lastBox.height<=navigationBox.y,'last profile link scrolls fully above fixed navigation');
+   if(width===390){
+    customerName=undefined;await page.reload();await page.locator('.customer-account-mobile-label svg').waitFor();
+    assert.equal(await page.locator('.customer-account-mobile-label').textContent(),'','no-name session uses a neutral account icon');
+    assert.match(await page.locator('.customer-account-link').getAttribute('aria-label'),/3210/);
+    customerName='Vivek Chaurasia';branchExperience=false;await page.reload();
+    await page.locator('.mobile-account-back').getByRole('link',{name:'Home',exact:true}).waitFor();
+    assert.equal(await page.locator('.mobile-account-back').getByRole('link',{name:'Home',exact:true}).getAttribute('href'),'/');
+    branchExperience=true;await page.evaluate(()=>localStorage.removeItem('gokul-selected-branch'));await page.reload();
+    await page.locator('.mobile-account-back').getByRole('link',{name:'All branches',exact:true}).waitFor();
+    assert.equal(await page.locator('.mobile-account-back').getByRole('link',{name:'All branches',exact:true}).getAttribute('href'),'/branches');
+    await page.evaluate(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-language','hi');},otherBranch);await page.reload();
+    await page.locator('.mobile-account-back').getByRole('link',{name:'शाखा का मुख्य पृष्ठ',exact:true}).waitFor();
+    await page.getByText('मिठाइयाँ, नाश्ता और भोजन देखें',{exact:true}).waitFor();
+    await page.getByText('अपना कार्ट देखें',{exact:true}).waitFor();
+    await page.getByText('बड़ी मात्रा में मिठाइयों और उत्सव के उपहार बॉक्स की योजना बनाएँ',{exact:true}).waitFor();
+    await page.locator('.mobile-account-links').getByRole('link',{name:'गोकुल स्वीट्स के बारे में',exact:true}).waitFor();
+    await page.locator('.mobile-account-back').getByRole('link',{name:'मेन्यू पर वापस जाएँ',exact:true}).waitFor();
+    await page.goto(`${base}/occasions`);await page.locator('.mobile-occasion-navigation').getByRole('link',{name:'अनुरोध और मूल्य प्रस्ताव',exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Hindi navigation stays contained');
+    await page.evaluate(()=>localStorage.setItem('gokul-language','en'));await page.goto(`${base}/profile`);await page.locator('.account-hub').waitFor();
+   }
    await page.locator('.mobile-account-back a[href="/menu"]').click();await page.waitForURL('**/menu');
    await page.locator('.customer-bottom-navigation a[href="/profile"]').click();await page.waitForURL('**/profile');await page.locator('.account-hub').waitFor();
    await page.locator('.mobile-account-logout').click();await page.getByRole('status').filter({hasText:'Could not sign out'}).waitFor();assert.equal(authenticated,true);
