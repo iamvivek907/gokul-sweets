@@ -1810,6 +1810,7 @@ export default function PaymentPage() {
         {paymentDeadlineReached && <p><T text="This payment window has closed. Check payment before starting another checkout." /></p>}
         {cartChanged && <p><T text="Your cart has changed. Check this order before starting another checkout." /></p>}
         </section>{error && <p role="alert">{translate(error)}</p>}
+        {paymentPollingV2 && pollingNotice && <p role="status" className="mobile-order-note">{translate(pollingNotice)}</p>}
         <div className="mobile-order-actions">
         {!phonePeStatusOnly && <button type="button" disabled={openingPayment || refreshing || cancelling || cartChanged || paymentDeadlineReached} onClick={() => void handlePayNow()}>{openingPayment ? translate("Opening payment…") : translate("Continue payment")}</button>}
         <button type="button" disabled={openingPayment || refreshing || cancelling} onClick={() => void refreshCurrentPayment()}>{refreshing ? translate("Checking payment…") : translate("Check Payment Status")}</button>

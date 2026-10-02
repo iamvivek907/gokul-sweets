@@ -12,7 +12,7 @@ try {
   if(width===640){order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
   if(fulfillment==='DELIVERY'){Object.assign(order,{fulfillmentType:'DELIVERY',pickupDate:null,pickupStartTime:null,pickupEndTime:null,pickupType:null,deliveryDate:date,deliveryStartTime:'18:00:00',deliveryEndTime:'19:00:00',deliveryAddressLine:'12 Main Road',deliveryLocality:'Test locality',deliveryPostalCode:'226001',deliveryFee:30,totalAmount:122});}
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
-  let mutations=0,cancels=0,cancelError=true;
+  let mutations=0,cancels=0,cancelError=true,failRefresh=false,refreshes=0;
   await context.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;let json=[];
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -25,7 +25,8 @@ try {
    else if(path==='/api/orders/TEST-ORDER/pickup-code')json={code:'1234'};
    else if(path==='/api/customer/identity/orders')json=[order];
    else if(path==='/api/payments/order/TEST-ORDER')json={payment:{paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus,amount:order.totalAmount,currency:'INR',expiresAt:new Date(Date.now()+600000).toISOString()}};
-   else if(path==='/api/payments/10/refresh')json={paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus,amount:order.totalAmount,currency:'INR'};
+   else if(path==='/api/payments/10/refresh'){refreshes++;if(failRefresh)return route.fulfill({status:503,json:{message:'Temporary provider failure'},headers});json={paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus,amount:order.totalAmount,currency:'INR'};
+   }
    else if(path==='/api/payments/10/cancel-checkout'){cancels++;if(cancelError)return route.fulfill({status:503,json:{message:'Provider check unavailable'},headers});json={paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus:'FAILED',amount:order.totalAmount,currency:'INR'};}
    else if(path==='/api/payments/providers')json={defaultProvider:'PHONEPE',enabledProviders:['PHONEPE']};
    return route.fulfill({json,headers});
@@ -62,7 +63,12 @@ try {
   if(width<=640&&enabled){
    await page.goto(`${base}/checkout/payment/TEST-ORDER`);assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false);
    if(paymentStatus==='PAID'){await page.waitForURL('**/orders/TEST-ORDER');await page.locator('.mobile-order-detail').waitFor();}
-   else if(paymentStatus==='PENDING'){await page.getByRole('heading',{name:'Checking your payment…',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Payment',exact:true}).count(),0);await page.getByRole('button',{name:'Check Payment Status',exact:true}).waitFor();}
+   else if(paymentStatus==='PENDING'){await page.getByRole('heading',{name:'Checking your payment…',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Payment',exact:true}).count(),0);await page.getByRole('button',{name:'Check Payment Status',exact:true}).waitFor();
+    failRefresh=true;await page.getByRole('button',{name:'Check Payment Status',exact:true}).click();
+    await page.getByRole('status').filter({hasText:"We couldn't confirm the latest payment status yet."}).waitFor();
+    const attempts=refreshes;await page.getByRole('button',{name:'Check Payment Status',exact:true}).click();
+    await page.getByRole('status').filter({hasText:'We checked recently. Please wait a moment before checking again.'}).waitFor();assert.equal(refreshes,attempts,'cooldown explains why no provider check is sent');
+   }
    else {await page.getByRole('heading',{name:'Payment didn’t complete',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Payment',exact:true}).count(),0);await page.getByRole('link',{name:'View order',exact:true}).click();await page.locator('.mobile-order-detail').waitFor();}
   }
   assert.equal(mutations,0,'viewing/downloading an order never creates or cancels a payment');
