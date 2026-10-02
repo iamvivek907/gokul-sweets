@@ -227,6 +227,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 </div>
             </div>
         </header>
+        <section className="mobile-profile-rewards" aria-label="Rewards"><div><T text="Rewards" /><strong><T text="Coming soon" /></strong></div><p><T text="Earned points are not available yet. A balance will appear here when the rewards programme is launched." /></p></section>
         <div className="account-layout mt-6">
             <nav className="account-navigation" aria-label="Profile sections">
                 {([['badges', 'Badges'], ['orders', 'Order history'], ['favourites', 'Favourites'],
@@ -255,6 +256,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                     <p className="mt-4 text-xs text-[#756763]"><T text="Badges recognise visits. They are not points or discounts." /></p>
                 </section>}
         {activeSection === "orders" && <section id="account-orders" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+            {features?.occasionEnquiries && <nav className="mobile-profile-order-types" aria-label="Order history types"><span><T text="Pickup orders" /></span><Link href="/occasions/requests"><T text="Bulk order requests" /></Link></nav>}
             <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]"><T text="Your orders" /></h2>
                 <p className="mt-1 text-sm text-[#756763]"><T text="Only orders placed while signed in to this account." /></p></div>
                 <span className="text-sm text-[#756763]"><T text="All branches" /></span></div>

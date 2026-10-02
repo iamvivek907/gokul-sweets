@@ -1,5 +1,9 @@
 export const hindi: Record<string,string> = {
- "Celebrations & Gifts":"उत्सव और उपहार",
+ "Bulk order": "थोक ऑर्डर",
+    "Bulk order requests": "थोक ऑर्डर अनुरोध",
+    "Pickup orders": "पिकअप ऑर्डर",
+    "Coming soon": "जल्द आ रहा है",
+    "Celebrations & Gifts":"उत्सव और उपहार",
  "Choose your favourites from the menu to start your order.":"अपना ऑर्डर शुरू करने के लिए मेन्यू से अपनी पसंद चुनें।",
  "Log out":"लॉग आउट",
  "Branch home":"शाखा का मुख्य पृष्ठ",
