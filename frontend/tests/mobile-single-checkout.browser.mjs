@@ -33,7 +33,7 @@ try{for(const scenario of ['phone','boundary','desktop','changed-total','uncerta
  await context.route('**/api/**',async route=>{
   const req=route.request(),p=new URL(req.url()).pathname;let json=[];
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
-  if(p==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,simplifiedCheckout:true,smartPickupSelection:true,smartAvailability:true,authoritativePickupCommitment:true,acceptedCheckoutQuote:true,persistentPickupContext:true,cartSwitchPreview:true,inPlaceBranchSwitch:true,accessibleOrderingV2:true,paymentPollingV2:true,paidCartRecovery:true,pickupAddOns:true,futureOrderingDays:30,today:date};
+  if(p==='/api/storefront/features')json={branchExperience:true,futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,simplifiedCheckout:true,smartPickupSelection:true,smartAvailability:true,authoritativePickupCommitment:true,acceptedCheckoutQuote:true,persistentPickupContext:true,cartSwitchPreview:true,inPlaceBranchSwitch:true,accessibleOrderingV2:true,paymentPollingV2:true,paidCartRecovery:true,pickupAddOns:true,futureOrderingDays:30,today:date};
   else if(p==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
   else if(p==='/api/customer/identity/me')json={authenticated:signedIn,...(signedIn?{phone:'+919876543210',name:'Verified customer'}:{})};
   else if(p==='/api/customer/identity/start')json={};
