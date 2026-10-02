@@ -1,4 +1,7 @@
 export const hindi: Record<string,string> = {
+ "Celebrations & Gifts":"उत्सव और उपहार",
+ "Choose your favourites from the menu to start your order.":"अपना ऑर्डर शुरू करने के लिए मेन्यू से अपनी पसंद चुनें।",
+ "Log out":"लॉग आउट",
   "Filters":"फ़िल्टर", "Price up to":"अधिकतम मूल्य", "Any price":"कोई भी मूल्य", "Portion choices":"आधा / पूरा विकल्प",
   "Add more":"और जोड़ें", "Change pickup":"पिकअप बदलें", "Offers & total":"छूट और कुल राशि",
   "Phone verified":"मोबाइल की पुष्टि हो गई", "Best available offer applied automatically":"सबसे अच्छी उपलब्ध छूट अपने आप लगी",

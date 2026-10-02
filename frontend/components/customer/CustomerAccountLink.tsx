@@ -34,6 +34,7 @@ export default function CustomerAccountLink() {
     const label = session.authenticated ? session.name?.trim() || (phone ? `•••• ${phone.slice(-4)}` : "Account") : "Log in";
     return <Link href="/profile" className="customer-account-link max-w-[10rem] shrink-0 truncate rounded-full border border-[#d8c6ba] px-3 py-2 text-sm font-semibold text-[#173c39]"
         aria-label={session.authenticated ? `Open profile for ${session.authenticated ? label : translate(label)}` : translate("Log in to your account")}>
-        {session.authenticated ? label : translate(label)}
+        <span className="customer-account-desktop-label">{session.authenticated ? label : translate(label)}</span>
+        <span className="customer-account-mobile-label" aria-hidden="true">{session.authenticated ? (session.name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("") || "☰") : translate("Log in")}</span>
     </Link>;
 }
