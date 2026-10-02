@@ -70,11 +70,30 @@ async function loadMenu(
     );
 }
 // Consume a launch prefetch once; later visits always reload live availability.
-const warmedMenus = new Map<number, {started: number; request: Promise<MenuCategory[]>}>();
+const WARM_MENU_TTL = 15_000;
+const MAX_WARM_MENUS = 3;
+type WarmMenu = {started: number; request: Promise<MenuCategory[]>; controller: AbortController; timer: ReturnType<typeof setTimeout>};
+const warmedMenus = new Map<number, WarmMenu>();
+function discardWarmMenu(branchId: number, entry: WarmMenu): void {
+    if (warmedMenus.get(branchId) !== entry) return;
+    warmedMenus.delete(branchId);
+    clearTimeout(entry.timer);
+    entry.controller.abort();
+}
 export async function warmMenu(branchId: number): Promise<void> {
+    for (const [id, entry] of warmedMenus) {
+        if (Date.now() - entry.started >= WARM_MENU_TTL) discardWarmMenu(id, entry);
+    }
     if (warmedMenus.has(branchId)) return;
-    const request = loadMenu(branchId);
-    const entry = {started: Date.now(), request};
+    if (warmedMenus.size >= MAX_WARM_MENUS) {
+        const oldest = warmedMenus.entries().next().value;
+        if (oldest) discardWarmMenu(oldest[0], oldest[1]);
+    }
+    const controller = new AbortController();
+    const request = loadMenu(branchId, controller.signal);
+    const entry: WarmMenu = {started: Date.now(), request, controller,
+        timer: setTimeout(() => discardWarmMenu(branchId, entry), WARM_MENU_TTL)};
+    entry.timer.unref?.();
     warmedMenus.set(branchId, entry);
     try {
         const categories = await request;
@@ -82,7 +101,7 @@ export async function warmMenu(branchId: number): Promise<void> {
         for (const product of categories.flatMap(category => category.products).slice(0, 8)) {
             if (product.imageUrl) {const image = new Image(); image.src = product.imageUrl;}
         }
-    } catch {if (warmedMenus.get(branchId) === entry) warmedMenus.delete(branchId);}
+    } catch {discardWarmMenu(branchId, entry);}
 }
 // Abort this consumer promptly without cancelling the shared launch request.
 function waitForWarmMenu(request: Promise<MenuCategory[]>, signal?: AbortSignal): Promise<MenuCategory[]> {
@@ -97,12 +116,14 @@ function waitForWarmMenu(request: Promise<MenuCategory[]>, signal?: AbortSignal)
 export async function getMenu(branchId: number, signal?: AbortSignal): Promise<MenuCategory[]> {
     const warm = warmedMenus.get(branchId);
     warmedMenus.delete(branchId);
-    if (warm && Date.now() - warm.started < 15_000) {
+    if (warm) clearTimeout(warm.timer);
+    if (warm && Date.now() - warm.started < WARM_MENU_TTL) {
         try {
             const result = await waitForWarmMenu(warm.request, signal);
             if (signal?.aborted) throw new DOMException("Request aborted", "AbortError");
             return result;
         } catch (error) {if (signal?.aborted) throw error;}
     }
+    warm?.controller.abort();
     return loadMenu(branchId, signal);
 }

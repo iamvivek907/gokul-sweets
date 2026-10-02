@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "next": "16.3.8",
+    "pdfkit": "0.20.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-easy-crop": "^6.2.3"
@@ -17,6 +18,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pdfkit": "0.17.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

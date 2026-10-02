@@ -44,6 +44,12 @@ jobs:
           NEXT_PUBLIC_MSG91_WIDGET_ID: ci-test-widget
           NEXT_PUBLIC_MSG91_WIDGET_TOKEN: ci-test-widget-token
 
+      - name: Install PDF text and accessibility regression tools
+        run: |
+          if ! command -v pdftotext >/dev/null || ! command -v pdfinfo >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y poppler-utils
+          fi
       - name: Install inbox browser regression runner
         run: |
           # Keep browser tooling outside the application dependency tree.

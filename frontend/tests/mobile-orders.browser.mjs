@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {execFileSync} from 'node:child_process';
 import {mkdir, readFile} from 'node:fs/promises';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
@@ -8,13 +9,15 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 try {
  for (const [width,enabled,paymentStatus,fulfillment='PICKUP'] of [[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY']]) {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
-  const order={orderNumber:'TEST-ORDER',branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  const order={orderNumber:'TEST-ORDER',branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   // Customer responses may have no branch address; both forms must still download a paid invoice.
   if(width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP')order.branchAddress=null;
-  if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
+  if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
   if(fulfillment==='DELIVERY'){Object.assign(order,{fulfillmentType:'DELIVERY',pickupDate:null,pickupStartTime:null,pickupEndTime:null,pickupType:null,deliveryDate:date,deliveryStartTime:'18:00:00',deliveryEndTime:'19:00:00',deliveryAddressLine:'12 Main Road',deliveryLocality:'Test locality',deliveryPostalCode:'226001',deliveryFee:30,totalAmount:122});}
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   let mutations=0,cancels=0,cancelError=true,failRefresh=false,refreshes=0;
+  let fontError=width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP';
+  await context.route('**/fonts/invoice-v1/**',route=>fontError?route.fulfill({status:503,body:'Unavailable'}):route.continue());
   await context.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;let json=[];
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -47,16 +50,27 @@ try {
     if(fulfillment==='PICKUP')await page.getByLabel('Pickup code: 1 2 3 4',{exact:true}).waitFor();
     if(fulfillment==='DELIVERY')await page.getByText('Delivery fee',{exact:true}).waitFor();
     await page.getByText('Offer savings',{exact:true}).waitFor();
-    await page.evaluate(()=>{window.invoiceText=[];const draw=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...args){window.invoiceText.push(text);return draw.call(this,text,...args);};});
+    if(fontError){await page.getByRole('button',{name:'Download invoice',exact:true}).click();await page.getByRole('alert').filter({hasText:'Unable to download the invoice'}).waitFor();fontError=false;}
     const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Download invoice',exact:true}).click();
     const download=await downloadPromise;assert.equal(download.suggestedFilename(),'Gokul-TEST-ORDER-invoice.pdf');
-    const data=await readFile(await download.path());assert.equal(data.subarray(0,8).toString(),'%PDF-1.4');assert.ok(data.includes(Buffer.from('/Type /Page')));
-    const invoiceText=await page.evaluate(()=>window.invoiceText);
+    const data=await readFile(await download.path());assert.equal(data.subarray(0,8).toString(),'%PDF-1.7');assert.ok(data.includes(Buffer.from('/Type /Page')));
+    const invoiceText=execFileSync('pdftotext',[await download.path(),'-'],{encoding:'utf8'});
+    const invoiceInfo=execFileSync('pdfinfo',[await download.path()],{encoding:'utf8'});
+    assert.match(invoiceInfo,/Tagged:\s+yes/);assert.match(invoiceInfo,/Suspects:\s+no/);
+    for(const marker of ['/StructTreeRoot','/S /Document','/S /H1','/S /H2','/S /P','/ToUnicode','/FontFile2'])assert.ok(data.includes(Buffer.from(marker)),marker);
     assert.ok(invoiceText.includes(branch.name));assert.ok(invoiceText.includes(`PAID TOTAL: INR ${order.totalAmount.toFixed(2)}`));
-    if(!order.branchAddress)assert.equal(invoiceText.some(line=>line==='null'||line==='undefined'),false,'missing address is omitted from invoice');
-    if(fulfillment==='DELIVERY')assert.ok((await page.evaluate(()=>window.invoiceText)).includes('Delivery fee: INR 30.00'));
-    if(width===640)assert.ok(data.includes(Buffer.from('/Count 3')),'large invoices paginate');
-    if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await download.saveAs(`${process.env.SCREENSHOT_DIR}/order-invoice.pdf`);}
+    assert.ok(invoiceText.includes(order.items[0].productName),'Hindi and Tamil names copy in logical Unicode order');
+    if(!order.branchAddress)assert.equal(/\b(null|undefined)\b/u.test(invoiceText),false,'missing address is omitted from invoice');
+    if(fulfillment==='DELIVERY')assert.ok(invoiceText.includes('Delivery fee: INR 30.00'));
+    if(width===640){assert.ok(Number(invoiceInfo.match(/Pages:\s+(\d+)/)[1])>=2,'large invoices paginate');
+      for(const text of invoiceText.split('\f').filter(text=>text.trim())){
+        assert.doesNotMatch(text.trim(),/^500 g @/u,'a page cannot start with an orphaned item quantity');
+        assert.doesNotMatch(text.trim(),/Milk sweet \d+$/u,'a page cannot end with an orphaned item name');
+      }
+      for(const item of order.items){assert.equal(invoiceText.split(`${item.productName} \n`).length-1,1,'each item appears once across page breaks');}
+      assert.ok(invoiceText.indexOf(order.items.at(-1).productName)<invoiceText.indexOf('PAID TOTAL:'));
+    }
+    if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await download.saveAs(`${process.env.SCREENSHOT_DIR}/order-invoice-${width}-${fulfillment}.pdf`);}
    }
   }
   await page.evaluate(()=>window.scrollTo(0,0));
