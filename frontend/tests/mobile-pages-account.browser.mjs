@@ -39,9 +39,11 @@ try{
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(process.env.SCREENSHOT_DIR&&compact){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/branch-home-${width}.png`,fullPage:true});}
   await page.goto(`${base}/branches/2`);await page.locator('.branch-rated-grid article').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  const celebration=page.getByRole('button',{name:'Celebrations & Gifts · Other Gokul branch',exact:true});
+  const celebration=page.getByRole('button',{name:'Explore this branch · Celebrations & Gifts · Other Gokul branch',exact:true});
   assert.equal(await celebration.locator('.mobile-celebration-label').isVisible(),compact);
   assert.equal(await celebration.locator('.desktop-celebration-label').isVisible(),!compact);
+  const visibleCelebrationLabel=await celebration.locator(compact?'.mobile-celebration-label':'.desktop-celebration-label').innerText();
+  assert.ok((await celebration.getAttribute('aria-label')).includes(visibleCelebrationLabel),'accessible name includes the visible label for speech control');
   await celebration.click();await page.waitForURL('**/occasions');
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-branch')).id),2,'celebration tab selects its own branch');
   await page.goto(`${base}/occasions`);await page.getByLabel('Gulab Jamun quantity').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
