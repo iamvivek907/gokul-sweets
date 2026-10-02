@@ -46,14 +46,14 @@ export default function BranchHomePage() {
                 <nav className="gokul-branch-tabs" aria-label="Branch pages">
                     <button type="button" aria-current={tab === "home" ? "page" : undefined} onClick={() => setTab("home")}><T text="Home" /></button>
                     {selected?.id === branch.id ? <Link href="/menu"><T text="Menu" /></Link> : <BranchSelector cardBranch={branch} destination="menu" />}
-                    {occasionEnquiries && (selected?.id === branch.id ? <Link href="/occasions"><span className="desktop-celebration-label"><T text="Occasions & gifting" /></span><span className="mobile-celebration-label"><T text="Celebrations & Gifts" /></span></Link> : <BranchSelector cardBranch={branch} destination="occasions" />)}
-                    {occasionEnquiries && <Link href="/occasions/requests">My requests & quotes</Link>}
+                    {occasionEnquiries && (selected?.id === branch.id ? <Link href="/occasions"><span className="desktop-celebration-label"><T text="Occasions & gifting" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></Link> : <BranchSelector cardBranch={branch} destination="occasions" />)}
+                    {occasionEnquiries && <Link className="branch-request-desktop" href="/occasions/requests">My requests & quotes</Link>}
                     <button type="button" aria-current={tab === "details" ? "page" : undefined} onClick={() => setTab("details")}><T text="Branch details" /></button>
                 </nav>
                 {tab === "details" ? <BranchDetails branch={branch} /> : <><BranchDiscovery branch={branch} selected={selected?.id === branch.id} /><section className="branch-home-welcome">
                     <h2>Made for your next visit.</h2><p>{branch.pickupAvailable ? "Browse what is available here, place an order and choose your pickup time at checkout." : "Explore this branch and contact us for your visit."}</p>
-                    <button type="button" onClick={() => setTab("details")}>See branch details →</button>
-                    {occasionEnquiries && selected?.id === branch.id && <Link className="ml-4 inline-flex min-h-11 items-center font-semibold underline" href="/occasions">Plan occasion food →</Link>}
+                    <button className="branch-welcome-desktop" type="button" onClick={() => setTab("details")}>See branch details →</button><div className="branch-welcome-mobile">{selected?.id === branch.id ? <Link href="/menu"><T text="Browse menu" /></Link> : <BranchSelector cardBranch={branch} destination="menu" />}</div>
+                    {occasionEnquiries && selected?.id === branch.id && <Link className="branch-welcome-desktop ml-4 inline-flex min-h-11 items-center font-semibold underline" href="/occasions">Plan occasion food →</Link>}
                 </section></>}
             </>}
         </article>

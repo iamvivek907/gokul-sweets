@@ -5,7 +5,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const branch={id:1,code:'TEST',name:'Gokul Tamkuhi Road with a long branch name',active:true,pickupAvailable:true,address:'Test address',phone:'9876543210'};
 const otherBranch={...branch,id:2,code:"OTHER",name:"Other Gokul branch"};
-const sweet={id:1,name:'Gulab Jamun',description:'Fresh sweets for your celebration',saleMode:'WEIGHT',occasionOnly:false,published:true,leadDays:2,pieceGrams:50,categoryName:'Sweets',unitPrice:300,taxPercent:5,imageUrl:null};
+const sweet={id:1,name:'Gulab Jamun',description:'Fresh sweets for your celebration',saleMode:'WEIGHT',occasionOnly:false,published:true,leadDays:2,pieceGrams:50,categoryName:'Sweets',unitPrice:300,taxPercent:5,imageUrl:'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="600" height="400"%3E%3Crect width="600" height="400" fill="%23c76752"/%3E%3C/svg%3E'};
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 try{
  for(const [width,themed] of [[320,true],[390,true],[601,true],[640,true],[641,true],[1280,true],[390,false]]){
@@ -37,9 +37,10 @@ try{
   if(compact){assert.ok((await page.locator('.customer-site-header').boundingBox()).height<=110,'header is at most two short rows');assert.equal(await page.locator('.branch-rated-grid article').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ')[0]),'88px');}
   else assert.equal(await page.locator('.branch-rated-grid article').evaluate(e=>getComputedStyle(e).display),'block');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  if(compact){for(const box of await page.locator('.branch-home .gokul-branch-tabs :is(a,button):visible').all()){const b=await box.boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width,'branch tabs fit without clipping');}assert.equal(await page.locator('.gokul-branch-tabs [aria-current=page]').evaluate(e=>getComputedStyle(e).color),'rgb(255, 250, 242)','active tab remains readable');assert.equal(await page.locator('.branch-request-desktop').isVisible(),false);assert.equal(await page.locator('.branch-welcome-mobile').isVisible(),true);}
   if(process.env.SCREENSHOT_DIR&&compact){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/branch-home-${width}.png`,fullPage:true});}
   await page.goto(`${base}/branches/2`);await page.locator('.branch-rated-grid article').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  const celebration=page.getByRole('button',{name:'Explore this branch · Celebrations & Gifts · Other Gokul branch',exact:true});
+  const celebration=page.getByRole('button',{name:'Explore this branch · Bulk order · Other Gokul branch',exact:true});
   assert.equal(await celebration.locator('.mobile-celebration-label').isVisible(),compact);
   assert.equal(await celebration.locator('.desktop-celebration-label').isVisible(),!compact);
   const visibleCelebrationLabel=await celebration.locator(compact?'.mobile-celebration-label':'.desktop-celebration-label').innerText();
@@ -49,6 +50,7 @@ try{
   await page.goto(`${base}/occasions`);await page.getByLabel('Gulab Jamun quantity').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   assert.equal(await page.locator('.mobile-occasion-navigation').isVisible(),compact);
   assert.equal(await page.locator('.occasion-product').evaluate(e=>getComputedStyle(e).display),compact?'block':themed?'flex':'block');
+  if(compact){for(const control of await page.locator('#occasion-plan input:not([type=checkbox]),#occasion-plan select').all()){const b=await control.boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width,'bulk-order inputs fit the viewport');}}
   await page.getByLabel('Gulab Jamun quantity').fill('2.5');
   await page.getByLabel('Gulab Jamun unit').selectOption('PIECE');
   assert.equal(await page.getByLabel('Gulab Jamun quantity').inputValue(),'0','unit changes preserve the existing reset behavior');
@@ -62,6 +64,12 @@ try{
   assert.equal(await page.locator('.mobile-account-links a[href="/admin"]').count(),0,'staff access remains role checked');
   assert.equal(staffChecks,compact?1:0,'desktop and flag OFF add no new staff checks');
   if(compact){
+   assert.equal(await page.locator('.mobile-account-links a[href="/menu"],.mobile-account-links a[href="/cart"],.mobile-account-links a[href="/occasions"]').count(),0);
+   assert.equal(await page.locator('.mobile-profile-rewards').isVisible(),true);
+   await page.getByRole('button',{name:'Order history',exact:true}).click();
+   await page.locator('.mobile-profile-order-types').getByRole('link',{name:'Bulk order requests',exact:true}).waitFor();
+   assert.equal(await page.locator('.mobile-profile-order-types a').getAttribute('href'),'/occasions/requests');
+   await page.getByRole('button',{name:'Badges',exact:true}).click();
    const lastLink=page.locator('.mobile-account-links a').last();
    await lastLink.scrollIntoViewIfNeeded();await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
    const lastBox=await lastLink.boundingBox(),navigationBox=await page.locator('.customer-bottom-navigation').boundingBox();
@@ -88,9 +96,6 @@ try{
     assert.equal(await page.locator('.mobile-account-back').getByRole('link',{name:'All branches',exact:true}).getAttribute('href'),'/branches');
     await page.evaluate(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-language','hi');},otherBranch);await page.reload();
     await page.locator('.mobile-account-back').getByRole('link',{name:'शाखा का मुख्य पृष्ठ',exact:true}).waitFor();
-    await page.getByText('मिठाइयाँ, नाश्ता और भोजन देखें',{exact:true}).waitFor();
-    await page.getByText('अपना कार्ट देखें',{exact:true}).waitFor();
-    await page.getByText('बड़ी मात्रा में मिठाइयों और उत्सव के उपहार बॉक्स की योजना बनाएँ',{exact:true}).waitFor();
     await page.locator('.mobile-account-links').getByRole('link',{name:'गोकुल स्वीट्स के बारे में',exact:true}).waitFor();
     await page.locator('.mobile-account-back').getByRole('link',{name:'मेन्यू पर वापस जाएँ',exact:true}).waitFor();
     await page.goto(`${base}/occasions`);await page.locator('.mobile-occasion-navigation').getByRole('link',{name:'अनुरोध और मूल्य प्रस्ताव',exact:true}).waitFor();

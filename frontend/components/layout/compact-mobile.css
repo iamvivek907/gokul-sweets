@@ -302,3 +302,43 @@
  .future-storefront .account-navigation :is(button,a):hover,.future-storefront .account-navigation :is(button,a):focus-visible,.future-storefront .account-navigation button[aria-pressed=true]{background:#edf5ef;color:#143936}
  .future-storefront .account-details-signout{display:none}
 }
+
+/* Phone refinements reuse the live catalogue/account data; desktop stays unchanged. */
+.branch-welcome-mobile,.mobile-profile-rewards,.mobile-profile-order-types{display:none}
+@media(max-width:640px){
+ .future-storefront :is(.branch-home,.occasion-journey,.customer-profile){width:100%;min-width:0;padding-left:12px;padding-right:12px;box-sizing:border-box;overflow-wrap:anywhere}
+ .future-storefront :is(.branch-home,.occasion-journey) :is(section,fieldset,form,label,.occasion-product,.occasion-product>div,.occasion-quantity){min-width:0;max-width:100%}
+ .future-storefront .occasion-journey :is(input:not([type=checkbox]),select,textarea){min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+ .future-storefront #occasion-plan fieldset{width:100%;min-inline-size:0}
+ .future-storefront #occasion-plan label.flex-1{flex-basis:100%}
+ .future-storefront .occasion-quantity{display:grid;align-items:end;grid-template-columns:minmax(0,1fr) minmax(72px,90px)}
+ .future-storefront .branch-home>.gokul-branch-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;overflow:visible;min-height:0;padding:8px 0;border:0}
+ .future-storefront .branch-home>.gokul-branch-tabs :is(a,button){min-width:0;min-height:48px;justify-content:center;white-space:normal;text-align:center;font-size:11px;padding:6px 4px;border:1px solid #d2dfd6;border-radius:12px;background:#fffaf2}
+ .future-storefront .branch-home>.gokul-branch-tabs :is(a,button)[aria-current=page]{background:#143936;color:#fffaf2;border-color:#143936}
+ .future-storefront .branch-home>.gokul-branch-tabs .branch-request-desktop,.future-storefront .branch-welcome-desktop{display:none}
+ .future-storefront .branch-welcome-mobile{display:block;margin-top:12px}
+ .future-storefront .branch-welcome-mobile :is(a,button){display:flex;position:static;width:100%;min-height:48px;align-items:center;justify-content:center;border-radius:14px;background:#143936;color:#fffaf2;font-weight:750}
+ .future-storefront .branch-welcome-mobile .gokul-branch-card-action-label{position:static;opacity:1;color:inherit}
+ .future-storefront :is(.mobile-account-back,.mobile-occasion-navigation,.mobile-checkout-nav){gap:8px;flex-wrap:wrap}
+ .future-storefront :is(.mobile-account-back,.mobile-occasion-navigation,.mobile-checkout-nav) a,.future-storefront .branch-home>a{min-height:44px;padding:10px 12px;border:1px solid #d2dfd6;border-radius:12px;background:#fffaf2;color:#143936;text-decoration:none;box-shadow:0 3px 0 #dce5df;font-weight:700;font-size:12px;line-height:1.3}
+ .future-storefront :is(.mobile-account-back,.mobile-occasion-navigation,.mobile-checkout-nav) a>span[aria-hidden]{display:none}
+ .future-storefront .mobile-checkout-heading>a,.future-storefront .mobile-change-pickup{min-height:44px;padding:8px 12px;border-radius:12px;background:#edf3ee;border:1px solid #d2dfd6;font-weight:700}
+ .future-storefront .account-cover{box-shadow:none}
+ .future-storefront .account-earned{max-width:none;padding:8px 12px}
+ .future-storefront .account-earned-symbol{width:32px;height:32px;font-size:18px}
+ .future-storefront .account-earned strong{font-size:14px}
+ .future-storefront .account-navigation :is(button,a){border:1px solid #e0e8e2;border-radius:10px;background:#fffaf2}
+ .future-storefront .account-navigation button[aria-pressed=true]{background:#143936;color:#fffaf2;border-color:#143936}
+ .future-storefront .mobile-profile-rewards{display:block;margin-top:12px;padding:14px;border:1px solid #d2dfd6;border-radius:16px;background:linear-gradient(120deg,#edf3ee,#fffaf2)}
+ .future-storefront .mobile-profile-rewards>div{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;font-weight:750}
+ .future-storefront .mobile-profile-rewards strong{font-size:11px;padding:4px 8px;border-radius:8px;background:#143936;color:#fffaf2}
+ .future-storefront .mobile-profile-rewards p{font-size:12px;line-height:1.5;margin-top:8px;color:#526862}
+ .future-storefront .account-milestones .account-badge{min-height:0;display:grid;grid-template-columns:32px minmax(0,1fr);gap:4px 10px;padding:12px}
+ .future-storefront .account-badge-icon{grid-row:span 2;width:32px;height:32px;font-size:18px}
+ .future-storefront .account-badge strong{font-size:13px}
+ .future-storefront .account-badge>span:last-child{grid-column:2;font-size:11px}
+ .future-storefront .mobile-profile-order-types{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:16px;font-size:12px;font-weight:700}
+ .future-storefront .mobile-profile-order-types :is(a,span){display:flex;align-items:center;justify-content:center;min-height:48px;padding:8px;border:1px solid #d2dfd6;border-radius:12px;text-align:center}
+ .future-storefront .mobile-profile-order-types span{background:#143936;color:#fffaf2}
+ .future-storefront .mobile-profile-order-types a{background:#edf3ee;color:#143936}
+}

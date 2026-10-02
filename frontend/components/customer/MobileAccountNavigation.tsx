@@ -24,9 +24,6 @@ export default function MobileAccountNavigation() {
     }, [phone, themed]);
     return <div className="mobile-account-navigation">
         <nav className="mobile-account-links" aria-label="Explore Gokul">
-            <Link href="/menu"><T text="Menu" /><small><T text="Browse sweets, snacks and food" /></small></Link>
-            <Link href="/cart"><T text="Cart" /><small><T text="View your cart" /></small></Link>
-            {features?.occasionEnquiries && <Link href="/occasions"><T text="Celebrations & Gifts" /><small><T text="Plan bulk sweets and celebration gift boxes" /></small></Link>}
             <Link href="/about"><T text="About Gokul Sweets" /></Link>
             <Link href="/profile/privacy"><T text="Privacy and data" /></Link>
             <a href="https://www.instagram.com/_gokulsweets" target="_blank" rel="noopener noreferrer">Instagram</a>

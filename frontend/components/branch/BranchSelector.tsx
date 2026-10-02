@@ -261,9 +261,9 @@ export default function BranchSelector({compact = false, locationControl = false
                 onKeep={() => setProposedBranch(null)} onConfirm={confirmSwitch} />, document.body)}
 
             {cardBranch ? <button type="button" className="gokul-branch-card-action"
-                aria-label={destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Celebrations & Gifts")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
+                aria-label={destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Bulk order")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
                 onClick={() => handleSelectBranch(cardBranch)}>
-                <span className="gokul-branch-card-action-label">{destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Celebrations & Gifts" /></span></> : <T text="Explore this branch" />}</span>
+                <span className="gokul-branch-card-action-label">{destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></> : <T text="Explore this branch" />}</span>
             </button> : <button
                 type="button"
                 popoverTarget={popoverId}
