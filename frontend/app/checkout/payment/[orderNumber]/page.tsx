@@ -1803,6 +1803,7 @@ export default function PaymentPage() {
      */
 
     if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote && isPending) return <AppShell showSocialPopup={false}>
+        <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout} />
         <MobilePaymentCancelDialog active={confirmCancel} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
         <section className="mobile-order-detail"><nav><Link href="/orders">← My orders</Link><Link href={`/orders/${encodeURIComponent(orderNumber)}`}>View order</Link></nav>
         <header><h1><T text="Checking your payment…" /></h1><p>{orderNumber}</p></header>

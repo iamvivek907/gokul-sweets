@@ -72,7 +72,7 @@ async function loadMenu(
 // Consume a launch prefetch once; later visits always reload live availability.
 const WARM_MENU_TTL = 15_000;
 const MAX_WARM_MENUS = 3;
-type WarmMenu = {started: number; request: Promise<MenuCategory[]>; controller: AbortController; timer: ReturnType<typeof setTimeout>};
+type WarmMenu = {started: number; request: Promise<MenuCategory[]>; controller: AbortController; timer: ReturnType<typeof setTimeout>; consumed: boolean; settled: boolean};
 const warmedMenus = new Map<number, WarmMenu>();
 function discardWarmMenu(branchId: number, entry: WarmMenu): void {
     if (warmedMenus.get(branchId) !== entry) return;
@@ -92,7 +92,7 @@ export async function warmMenu(branchId: number): Promise<void> {
     const controller = new AbortController();
     const request = loadMenu(branchId, controller.signal);
     const entry: WarmMenu = {started: Date.now(), request, controller,
-        timer: setTimeout(() => discardWarmMenu(branchId, entry), WARM_MENU_TTL)};
+        consumed: false, settled: false, timer: setTimeout(() => discardWarmMenu(branchId, entry), WARM_MENU_TTL)};
     entry.timer.unref?.();
     warmedMenus.set(branchId, entry);
     try {
@@ -102,6 +102,14 @@ export async function warmMenu(branchId: number): Promise<void> {
             if (product.imageUrl) {const image = new Image(); image.src = product.imageUrl;}
         }
     } catch {discardWarmMenu(branchId, entry);}
+    finally {
+        entry.settled = true;
+        // Keep the deadline after consumption until the shared request has actually settled.
+        if (entry.consumed && warmedMenus.get(branchId) === entry) {
+            warmedMenus.delete(branchId);
+            clearTimeout(entry.timer);
+        }
+    }
 }
 // Abort this consumer promptly without cancelling the shared launch request.
 function waitForWarmMenu(request: Promise<MenuCategory[]>, signal?: AbortSignal): Promise<MenuCategory[]> {
@@ -114,9 +122,15 @@ function waitForWarmMenu(request: Promise<MenuCategory[]>, signal?: AbortSignal)
     });
 }
 export async function getMenu(branchId: number, signal?: AbortSignal): Promise<MenuCategory[]> {
-    const warm = warmedMenus.get(branchId);
-    warmedMenus.delete(branchId);
-    if (warm) clearTimeout(warm.timer);
+    const entry = warmedMenus.get(branchId);
+    const warm = entry && !entry.consumed ? entry : undefined;
+    if (warm) {
+        warm.consumed = true;
+        if (warm.settled) {
+            warmedMenus.delete(branchId);
+            clearTimeout(warm.timer);
+        }
+    }
     if (warm && Date.now() - warm.started < WARM_MENU_TTL) {
         try {
             const result = await waitForWarmMenu(warm.request, signal);
@@ -124,6 +138,6 @@ export async function getMenu(branchId: number, signal?: AbortSignal): Promise<M
             return result;
         } catch (error) {if (signal?.aborted) throw error;}
     }
-    warm?.controller.abort();
+    if (warm) discardWarmMenu(branchId, warm);
     return loadMenu(branchId, signal);
 }
