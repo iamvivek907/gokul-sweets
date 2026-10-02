@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {T,useTranslation} from "@/lib/language";
 import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
 
@@ -285,6 +287,7 @@ export default function PaymentPage() {
 
     const router =
         useRouter();
+    const phone = usePhoneViewport();
 
 
     const params =
@@ -1315,11 +1318,12 @@ export default function PaymentPage() {
         if(!payment || cancelling || openingPayment || refreshing) return;
         setCancelling(true);setError(null);
         try {
+            const recoveryOrder=await getCustomerOrder(payment.orderNumber);
             const result=await cancelPaymentCheckout(payment.paymentId);
             applyPaymentResult(result);
             if(result.paymentStatus==="EXPIRED" || result.paymentStatus==="FAILED") {
                 clearPendingPayment();clearPendingOrder();clearPaymentGatewayVisit(payment.orderNumber);
-                router.push(deliveryOrder ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`);
+                router.push(recoveryOrder.fulfillmentType === "DELIVERY" ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`);
             } else {setConfirmCancel(false);setError("Payment was already confirmed. View this order before starting another checkout.");}
         } catch(error) {setError(error instanceof Error ? error.message : "Could not check payment. Your order is unchanged; try again.");}
         finally {setCancelling(false);}
@@ -1507,6 +1511,10 @@ export default function PaymentPage() {
      * LOADING
      * =========================================================
      */
+
+    if (phone && (loading || payment?.paymentStatus === "PAID") && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
+        <div className="mobile-payment-verifying" role="status" aria-live="polite"><span aria-hidden="true">G</span><h1><T text="Checking your payment…" /></h1><p><T text="Please keep this page open." /></p><div aria-hidden="true" /></div>
+    </AppShell>;
 
     if (
         loading
@@ -1793,6 +1801,32 @@ export default function PaymentPage() {
      * PAGE
      * =========================================================
      */
+
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote && isPending) return <AppShell showSocialPopup={false}>
+        <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout} />
+        <MobilePaymentCancelDialog active={confirmCancel} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
+        <section className="mobile-order-detail"><nav><Link href="/orders">← My orders</Link><Link href={`/orders/${encodeURIComponent(orderNumber)}`}>View order</Link></nav>
+        <header><h1><T text="Checking your payment…" /></h1><p>{orderNumber}</p></header>
+        <section className="mobile-order-panel" role="status"><p><T text="Your cart is saved. Your order opens automatically once payment is confirmed." /></p><strong>{formatCurrency(payment.amount)}</strong>
+        {paymentDeadlineReached && <p><T text="This payment window has closed. Check payment before starting another checkout." /></p>}
+        {cartChanged && <p><T text="Your cart has changed. Check this order before starting another checkout." /></p>}
+        </section>{error && <p role="alert">{translate(error)}</p>}
+        {paymentPollingV2 && pollingNotice && <p role="status" className="mobile-order-note">{translate(pollingNotice)}</p>}
+        <div className="mobile-order-actions">
+        {!phonePeStatusOnly && <button type="button" disabled={openingPayment || refreshing || cancelling || cartChanged || paymentDeadlineReached} onClick={() => void handlePayNow()}>{openingPayment ? translate("Opening payment…") : translate("Continue payment")}</button>}
+        <button type="button" disabled={openingPayment || refreshing || cancelling} onClick={() => void refreshCurrentPayment()}>{refreshing ? translate("Checking payment…") : translate("Check Payment Status")}</button>
+        <button type="button" disabled={openingPayment || refreshing || cancelling} onClick={() => setConfirmCancel(true)}><T text="Cancel this order" /></button>
+        </div></section>
+    </AppShell>;
+
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote && (isFailed || isExpired)) return <AppShell showSocialPopup={false}>
+        <section className="mobile-order-detail"><nav><Link href="/orders">← My orders</Link><Link href="/menu">View menu</Link></nav>
+        <header><h1><T text="Payment didn’t complete" /></h1><p>{orderNumber}</p></header>
+        <section className="mobile-order-panel"><p><T text="Your cart is saved. We’ll check the payment before opening a fresh checkout." /></p><p>Payment: {payment.paymentStatus}</p><strong>{formatCurrency(payment.amount)}</strong></section>
+        {error && <p role="alert">{translate(error)}</p>}
+        <div className="mobile-order-actions"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={() => void cancelCheckout()}>{cancelling ? translate("Checking payment…") : translate("Retry checkout")}</button><Link href={`/orders/${encodeURIComponent(orderNumber)}`}>View order</Link></div>
+        </section>
+    </AppShell>;
 
     return (
 

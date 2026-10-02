@@ -5,6 +5,7 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
+    useEffect,
     useState
 } from "react";
 
@@ -38,7 +39,8 @@ import {
 import {
     useSelectedBranch
 } from "@/hooks/useSelectedBranch";
-import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useStorefrontFeatures,useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {useOnlineStatus} from "@/hooks/useOnlineStatus";
 
 import type {
@@ -47,6 +49,15 @@ import type {
 
 
 export default function CartPage() {
+    const phone=usePhoneViewport(),online=useOnlineStatus(),{features,error,retry}=useStorefrontConfiguration(),router=useRouter();
+    const compact=phone===true&&features?.simplifiedCheckout===true&&features.checkoutExperienceV2&&features.acceptedCheckoutQuote;
+    useEffect(()=>{if(compact)router.replace("/checkout/mobile");},[compact,router]);
+    if(phone===true&&!features&&(error||!online))return <AppShell showSocialPopup={false}><section className="mx-auto max-w-lg p-6"><h1><T text="Online ordering is taking longer to connect" /></h1><p role="alert" className="my-4">{online?error:<T text="You’re offline. Your cart is saved. Reconnect to continue." />}</p><button type="button" disabled={!online} className="min-h-11 rounded-xl border px-4 disabled:opacity-50" onClick={retry}><T text="Try again" /></button><Link href="/menu" className="ml-4 inline-flex min-h-11 items-center"><T text="Back to menu" /></Link></section></AppShell>;
+    if(phone===null||phone===true&&!features||compact)return <AppShell showSocialPopup={false}><p role="status" className="p-6"><T text="Loading checkout…" /></p></AppShell>;
+    return <CartContent/>;
+}
+
+function CartContent() {
     const translate = useTranslation();
     const pickupCheck = useDateAvailability();
     const features = useStorefrontFeatures();

@@ -113,11 +113,12 @@ export interface OrderResponse {
 
 
 export interface CustomerOrderResponse {
+    deliveryFee?: number;
     orderNumber: string;
     orderStatus: OrderStatus;
     paymentStatus: PaymentStatus | null;
     branchName: string;
-    branchAddress: string;
+    branchAddress: string | null;
     branchFssaiLicenceNumber?: string | null;
     branchPhone?: string | null;
     estimatedReadyAt?: string | null;

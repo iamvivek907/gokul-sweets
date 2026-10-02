@@ -8,9 +8,10 @@ import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import CustomerIdentityPanel,{type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import PickupAddOns from "./PickupAddOns";
+import MobilePickupDialog from "./MobilePickupDialog";
 import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
 import {availabilityItems,checkCartAvailability,type CartAvailability} from "@/services/availabilityApi";
-import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
+import {getCartSnapshot,parseCart,saveCart,clearStoredCart} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getPickupSlotSnapshot,parsePickupSlot,savePickupSlot,saveCustomerDetails} from "@/lib/checkoutStorage";
 import {getPendingOrderSnapshot,getServerPendingOrderSnapshot,subscribeToPendingOrder,parsePendingOrder,savePendingOrder} from "@/lib/pendingOrderStorage";
@@ -54,10 +55,16 @@ export default function MobileCheckout(){
  const [availability,setAvailability]=useState<{key:string;value:CartAvailability}|null>(null);
  const [availabilityError,setAvailabilityError]=useState<{key:string;message:string}|null>(null);
  const [revision,setRevision]=useState(0);
+ const [pickupValidating,setPickupValidating]=useState(false);
+ const pickupCheck=useRef<AbortController|null>(null);
+ const mounted=useRef(true);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;pickupCheck.current?.abort();};},[]);
+ useEffect(()=>()=>{pickupCheck.current?.abort();},[availabilityKey]);
+ const [pickupPopup,setPickupPopup]=useState<string|null>(null);
  const [chosen,setChosen]=useState<PickupSelection|null>(null);
  const [price,setPrice]=useState<{key:string;value:Preview}|null>(null);
  const [priceError,setPriceError]=useState<{key:string;message:string}|null>(null);
- const [error,setError]=useState("");const [busy,setBusy]=useState(false),[addOnBusy,setAddOnBusy]=useState(false);
+ const [error,setError]=useState("");const [busy,setBusy]=useState(false),[handoff,setHandoff]=useState(false),[addOnBusy,setAddOnBusy]=useState(false);
  const locked=useRef(false);
  const [attempt,setAttempt]=useState<Attempt|null>(null);
  const [attemptLoaded,setAttemptLoaded]=useState(false);
@@ -65,6 +72,42 @@ export default function MobileCheckout(){
  const [recovery,setRecovery]=useState<string|null>(null);
  useEffect(()=>{let alive=true;queueMicrotask(()=>{if(alive)setRecovery(new URLSearchParams(window.location.search).get("paymentRecovery"));});return()=>{alive=false;};},[]);
  const frozen=!attemptLoaded||busy||!!attempt||!!pending;
+ const [selecting,setSelecting]=useState(false);
+ const [selection,setSelection]=useState<{branchId:number|null;ids:number[]}>({branchId:null,ids:[]});
+ const selected=selection.branchId===cart.branchId?selection.ids.filter(id=>cart.items.some(item=>item.product.id===id)):[];
+ const editingLocked=frozen||addOnBusy||pickupValidating;
+ const hadItems=useRef(false);
+ useEffect(()=>{
+  if(!attemptLoaded||busy||addOnBusy||attempt||pending)return;
+  if(cart.items.length){hadItems.current=true;return;}
+  if(hadItems.current)router.replace("/menu");
+ },[attemptLoaded,busy,addOnBusy,attempt,pendingValue,pending,cart.items.length,router]);
+ function removeItems(ids:number[]){
+  if(editingLocked)return;
+  const current=parseCart(getCartSnapshot());
+  if(current.branchId!==cart.branchId)return;
+  const remove=new Set(ids),items=current.items.filter(item=>!remove.has(item.product.id));
+  if(items.length===current.items.length)return;
+  if(items.length)saveCart({branchId:current.branchId,items});else clearStoredCart();
+  setSelection({branchId:cart.branchId,ids:selected.filter(id=>!remove.has(id))});
+ }
+
+ async function confirmPickup(selection:PickupSelection):Promise<boolean>{
+  if(editingLocked||pickupCheck.current||!branch)return false;
+  const savedCart=getCartSnapshot(),savedBranch=getStoredBranchSnapshot();
+  const controller=new AbortController();pickupCheck.current=controller;setPickupValidating(true);
+  try{
+   const fresh=await checkCartAvailability(branch.id,selection.date,1,availabilityItems(parseCart(savedCart).items),AbortSignal.any([controller.signal,AbortSignal.timeout(15000)]));
+   if(!mounted.current||controller.signal.aborted||getCartSnapshot()!==savedCart||getStoredBranchSnapshot()!==savedBranch||getPendingOrderSnapshot()||locked.current||sessionStorage.getItem(ATTEMPT))return false;
+   if(validAvailability)setAvailability({key:availabilityKey,value:{...validAvailability,dates:validAvailability.dates.map(day=>fresh.dates.find(updated=>updated.date===day.date)??day)}});
+   const available=pickupOptions(fresh).find(option=>option.date===selection.date&&option.slot.id===selection.slot.id&&option.pickupType===selection.pickupType);
+   if(!available)return false;
+   setChosen(available);savePickupSlot(available);setPickupPopup(null);return true;
+  }catch{throw new Error("We couldn’t confirm this pickup time. Your previous pickup is saved. Please try again.");}
+  finally{if(pickupCheck.current===controller)pickupCheck.current=null;if(mounted.current)setPickupValidating(false);}
+ }
+ function closePickup(){pickupCheck.current?.abort();setPickupPopup(null);}
+
  useEffect(()=>{
   if(!attemptLoaded||!branch||cart.branchId!==branch.id||!cart.items.length||pending||attempt)return;
   const controller=new AbortController();
@@ -120,7 +163,7 @@ export default function MobileCheckout(){
    if(payment.paymentStatus!=="PENDING"){router.replace(`/checkout/payment/${encodeURIComponent(order.orderNumber)}`);return;}
    markPaymentGatewayOpened(payment.orderNumber,payment.paymentId);
    const outcome=await openPaymentCheckout(payment);
-   if(payment.provider==="PHONEPE"&&payment.paymentUrl)return;
+   if(payment.provider==="PHONEPE"&&payment.paymentUrl){setHandoff(true);return;}
    if(outcome.kind==="updated")savePendingPayment({...outcome.payment,cartFingerprint:fingerprint});
    router.replace(`/checkout/payment/${encodeURIComponent(order.orderNumber)}`);
   }catch(failure){setError(failure instanceof Error?failure.message:"Payment could not be started. Your cart is saved.");
@@ -130,20 +173,31 @@ export default function MobileCheckout(){
    if(!orderCreated&&sessionStorage.getItem(ATTEMPT))setError("We couldn’t confirm whether your order was created. Retry this exact checkout to safely recover it. Your cart is saved.");
   }finally{locked.current=false;setBusy(false);}
  }
+ useEffect(()=>{if(!handoff)return;const timer=setTimeout(()=>{setHandoff(false);setError("The payment page is taking longer to open. Continue your existing payment to try again.");},20000);return()=>clearTimeout(timer);},[handoff]);
+ if(busy||handoff)return <div className="mobile-checkout-loading" role="status" aria-live="polite"><div><span className="mobile-checkout-loading-brand">Gokul Sweets</span><div className="mobile-checkout-loading-progress" aria-hidden="true"><span/></div><p><T text="Opening secure payment…" /></p><small><T text="Please keep this page open." /></small></div></div>;
  if(attemptLoaded&&cart.isEmpty&&!pending&&!attempt)return <div className="mobile-checkout"><h1><T text="Your cart is empty" /></h1><Link href="/menu"><T text="Browse menu" /></Link></div>;
  if(attemptLoaded&&(!branch||cart.branchId!==branch.id)&&!attempt&&!pending)return <div className="mobile-checkout"><h1><T text="Your order" /></h1><p><T text="Choose the matching branch before checking out." /></p><Link href="/menu"><T text="Back to menu" /></Link></div>;
  return <div className="mobile-checkout">
+  <nav className="mobile-checkout-nav" aria-label="Checkout navigation"><Link className="mobile-checkout-back" href="/menu"><span aria-hidden="true">←</span> <T text="Back to menu" /></Link>{branch&&<Link href={`/branches/${branch.id}`}><T text="Branch home" /></Link>}</nav>
   <div className="mobile-checkout-heading"><div><p>{branch?.name??"Saved checkout"}</p><h1><T text="Your order" /></h1></div><Link href="/menu"><T text="Add more" /></Link></div>
   {recovery&&<p role="status"><T text="Payment wasn’t completed. Your cart is saved; review it and try again." /></p>}
-  <section aria-label="Cart items" className="mobile-checkout-section">{cart.items.map(item=><article className="mobile-cart-row" key={item.product.id}><div><strong>{item.product.name}</strong><p>{item.product.saleMode==="WEIGHT"?formatWeight(item.weightGrams??0):money(item.product.price)}</p></div><div className="mobile-quantity"><button type="button" disabled={frozen} aria-label={`Remove one ${item.product.name}`} onClick={()=>cart.decreaseQuantity(item.product.id)}>−</button><span>{item.product.saleMode==="WEIGHT"?formatWeight(item.weightGrams??0):item.quantity}</span><button type="button" disabled={frozen} aria-label={`Add one ${item.product.name}`} onClick={()=>cart.increaseQuantity(item.product.id)}>+</button></div></article>)}</section>
+  <section aria-label="Cart items" className="mobile-checkout-section">
+   <div className="mobile-cart-toolbar"><h2><T text="Items" /></h2><button type="button" disabled={editingLocked} aria-pressed={selecting} onClick={()=>{setSelecting(v=>!v);setSelection({branchId:cart.branchId,ids:[]});}}><T text={selecting?"Cancel selection":"Select items"} /></button><button type="button" disabled={editingLocked||cart.isEmpty} onClick={()=>removeItems(cart.items.map(item=>item.product.id))}><T text="Clear cart" /></button></div>
+   {selecting&&<div className="mobile-cart-selection"><label><input type="checkbox" disabled={editingLocked} checked={!cart.isEmpty&&selected.length===cart.items.length} onChange={e=>setSelection({branchId:cart.branchId,ids:e.target.checked?cart.items.map(item=>item.product.id):[]})}/><T text="Select all" /></label><button type="button" disabled={editingLocked||!selected.length} onClick={()=>removeItems(selected)}><T text="Remove selected" /> ({selected.length})</button></div>}
+   {cart.items.map(item=><article className="mobile-cart-row" key={item.product.id}>
+    <div className="mobile-cart-item"><div className="mobile-cart-item-title">{selecting&&<label className="mobile-cart-item-select"><input type="checkbox" aria-label={`Select ${item.product.name}`} disabled={editingLocked} checked={selected.includes(item.product.id)} onChange={e=>setSelection({branchId:cart.branchId,ids:e.target.checked?[...selected,item.product.id]:selected.filter(id=>id!==item.product.id)})}/></label>}<strong>{item.product.name}</strong></div><div className="mobile-cart-item-meta"><p>{item.product.saleMode==="WEIGHT"?formatWeight(item.weightGrams??0):money(item.product.price)}</p><button type="button" disabled={editingLocked} aria-label={`Remove ${item.product.name} from cart`} onClick={()=>removeItems([item.product.id])}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><T text="Remove" /></button></div></div>
+    <div className="mobile-quantity"><button type="button" disabled={editingLocked} aria-label={`Remove one ${item.product.name}`} onClick={()=>cart.decreaseQuantity(item.product.id)}>−</button><span>{item.product.saleMode==="WEIGHT"?formatWeight(item.weightGrams??0):item.quantity}</span><button type="button" disabled={editingLocked} aria-label={`Add one ${item.product.name}`} onClick={()=>cart.increaseQuantity(item.product.id)}>+</button></div>
+   </article>)}
+  </section>
   {pending?<section className="mobile-checkout-section"><h2><T text="Continue your existing order" /></h2><p><T text="Your order is already reserved. Check its payment status before starting another checkout." /></p><Link href={`/checkout/payment/${encodeURIComponent(pending.orderNumber)}`}><T text="Continue payment" /></Link></section>:<>
-  <section className="mobile-checkout-section"><h2><T text="Pickup" /></h2>{validAvailability&&chosen?<><p><strong>{pickupLabel(chosen)}</strong></p><details><summary><T text="Change pickup" /></summary><div className="mobile-pickup-options">{pickupOptions(validAvailability).map(next=><label key={`${next.slot.id}:${next.pickupType}`}><input type="radio" name="mobile-pickup" disabled={frozen} checked={chosen.slot.id===next.slot.id&&chosen.pickupType===next.pickupType} onChange={()=>{setChosen(next);savePickupSlot(next);}}/>{pickupLabel(next)}</label>)}</div></details></>:<p role="status">{availabilityError?.key===availabilityKey?availabilityError.message:validAvailability?"No pickup slots fit this cart. Change quantities or try another date from the pickup selector.":attempt?`${attempt.request.pickupType} pickup saved for retry. Your original pickup will be recovered with the order.`:"Checking the earliest available pickup…"}</p>}{validAvailability&&!chosen&&<Link href="/checkout/pickup"><T text="Choose pickup" /></Link>}{availabilityError?.key===availabilityKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
+  <section className="mobile-checkout-section"><h2><T text="Pickup" /></h2>{validAvailability&&chosen?<><p><strong>{pickupLabel(chosen)}</strong></p><button className="mobile-change-pickup" type="button" disabled={editingLocked} onClick={()=>setPickupPopup(availabilityKey)}><T text="Change pickup" /></button></>:<p role="status">{availabilityError?.key===availabilityKey?availabilityError.message:validAvailability?"No pickup slots fit this cart. Change quantities or try another date from the pickup selector.":attempt?`${attempt.request.pickupType} pickup saved for retry. Your original pickup will be recovered with the order.`:"Checking the earliest available pickup…"}</p>}{validAvailability&&!chosen&&<Link href="/checkout/pickup"><T text="Choose pickup" /></Link>}{availabilityError?.key===availabilityKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
   <CustomerIdentityPanel mode="mobileCheckout" sessionRevision={identityRevision} onSessionChange={onSession}/>
   <section className="mobile-checkout-section"><h2><T text="Offers & total" /></h2>{preview?<><p>{best?<><strong>{best.name}</strong> · <T text="Best available offer applied automatically" /> · −{money(best.rebateAmount)}</>:<T text="Your current menu price" />}</p><details><summary><T text="Price details" /></summary><dl><div><dt><T text="Items" /></dt><dd>{money(Number(preview.quote.subtotal))}</dd></div><div><dt><T text="Tax" /></dt><dd>{money(Number(preview.quote.taxAmount))}</dd></div><div><dt><T text="Priority pickup" /></dt><dd>{money(Number(preview.quote.priorityCharge??0))}</dd></div><div><dt><T text="Convenience fee" /></dt><dd>{money(Number(preview.quote.convenienceFee??0))}</dd></div><div><dt><T text="Online payment fee" /> ({preview.quote.paymentFeeRate??0}%)</dt><dd>{money(Number(preview.paymentFee??preview.quote.paymentFee??0))} · <T text="Includes" /> {money(Number(preview.paymentFeeTax??preview.quote.paymentFeeTax??0))} <T text="fee tax" /></dd></div>{best&&<div><dt>{best.name}</dt><dd>−{money(best.rebateAmount)}</dd></div>}<div><dt><T text="Total" /></dt><dd>{money(total!)}</dd></div></dl></details></>:<p role="status">{priceError?.key===priceKey?priceError.message:contact?"Checking prices and your best offer…":"Verify your phone here to see your final total and eligible offers."}</p>}{priceError?.key===priceKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
-  {features?.pickupAddOns&&branch&&chosen&&validAvailability&&!attempt&&<PickupAddOns branchId={branch.id} date={chosen.date} disabled={busy||addOnBusy} offers={[...(preview?.offers??[]),...(preview?.spendTargets??[])]} onAdded={()=>{}} onBusy={setAddOnBusy}/>}
+  {features?.pickupAddOns&&branch&&chosen&&validAvailability&&!attempt&&<PickupAddOns branchId={branch.id} date={chosen.date} disabled={busy||addOnBusy||pickupValidating} offers={[...(preview?.offers??[]),...(preview?.spendTargets??[])]} onAdded={()=>{}} onBusy={setAddOnBusy}/>}
   </>}
+  {pickupPopup===availabilityKey&&validAvailability&&!pending&&!attempt&&<MobilePickupDialog dates={validAvailability.dates} options={pickupOptions(validAvailability)} chosen={chosen} disabled={editingLocked} onClose={closePickup} onConfirm={confirmPickup}/>}
   {error&&<p role="alert" className="mobile-checkout-error">{error}</p>}
   {attempt&&<p role="status"><T text="This checkout is saved for a safe retry. Its items and pickup are locked until the order is recovered." /></p>}
-  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
+  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||pickupValidating||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
  </div>;
 }

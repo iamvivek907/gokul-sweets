@@ -1,4 +1,6 @@
 "use client";
+import MobileOrderDetail from "@/components/order/MobileOrderDetail";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import PickupCodeCard from "@/components/order/PickupCodeCard";
 import {T,useTranslation} from "@/lib/language";
 import {formatWeight} from "@/lib/orderQuantity";
@@ -121,6 +123,7 @@ function formatUpdatedAt(value: string): string {
 export default function OrderDetailPage() {
     const translate = useTranslation();
 
+    const phone = usePhoneViewport();
     const features = useStorefrontFeatures();
     const trackingEnabled = features?.truthfulOrderTracking === true;
 
@@ -351,6 +354,11 @@ export default function OrderDetailPage() {
     const pastPickupWindow = order.fulfillmentType === "PICKUP" && pendingPreparation &&
         !!order.pickupDate && !!order.pickupEndTime &&
         parseBusinessTimestamp(`${order.pickupDate}T${order.pickupEndTime}`).getTime() <= currentOrder.checkedAt;
+
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
+        <NotificationReadOnOpen orderNumber={orderNumber} />
+        <MobileOrderDetail order={order} status={status} refreshing={refreshing} onRefresh={() => void handleRefresh()} trackingEnabled={trackingEnabled} pastPickupWindow={pastPickupWindow} />
+    </AppShell>;
 
     return (
         <AppShell>
