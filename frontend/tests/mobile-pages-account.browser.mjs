@@ -73,6 +73,16 @@ try{
     customerName='Vivek Chaurasia';branchExperience=false;await page.reload();
     await page.locator('.mobile-account-back').getByRole('link',{name:'Home',exact:true}).waitFor();
     assert.equal(await page.locator('.mobile-account-back').getByRole('link',{name:'Home',exact:true}).getAttribute('href'),'/');
+    await page.goto(`${base}/occasions`);
+    await page.locator('.mobile-occasion-navigation').getByRole('link',{name:'Home',exact:true}).waitFor();
+    assert.equal(await page.locator('.mobile-occasion-navigation a').first().getAttribute('href'),'/','celebration back respects flag OFF with a stored branch');
+    await page.evaluate(()=>localStorage.removeItem('gokul-selected-branch'));await page.reload();
+    await page.locator('.mobile-occasion-navigation').getByRole('link',{name:'Home',exact:true}).waitFor();
+    assert.equal(await page.locator('.mobile-occasion-navigation a').first().getAttribute('href'),'/','flag OFF without a branch goes home');
+    branchExperience=true;await page.reload();
+    await page.locator('.mobile-occasion-navigation').getByRole('link',{name:'All branches',exact:true}).waitFor();
+    assert.equal(await page.locator('.mobile-occasion-navigation a').first().getAttribute('href'),'/branches');
+    await page.goto(`${base}/profile`);
     branchExperience=true;await page.evaluate(()=>localStorage.removeItem('gokul-selected-branch'));await page.reload();
     await page.locator('.mobile-account-back').getByRole('link',{name:'All branches',exact:true}).waitFor();
     assert.equal(await page.locator('.mobile-account-back').getByRole('link',{name:'All branches',exact:true}).getAttribute('href'),'/branches');
@@ -103,6 +113,13 @@ try{
    await largeText.evaluate(e=>e.remove());
    if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/profile-${width}.png`,fullPage:true});
    await page.goto(`${base}/cart`);await page.waitForURL('**/checkout/mobile');await page.locator('.mobile-empty-cart').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+   assert.equal(await page.locator('.mobile-checkout-nav').getByRole('link',{name:'Branch home',exact:true}).getAttribute('href'),'/branches/2');
+   if(width===390){
+    branchExperience=false;await page.reload();await page.locator('.mobile-empty-cart').waitFor();
+    assert.equal(await page.locator('.mobile-checkout-nav a[href^="/branches"]').count(),0,'empty cart does not advertise disabled branch home');
+    assert.equal(await page.getByRole('link',{name:'Back to menu',exact:true}).isVisible(),true);
+    branchExperience=true;await page.reload();await page.locator('.mobile-checkout-nav').getByRole('link',{name:'Branch home',exact:true}).waitFor();
+   }
    const browse=page.getByRole('link',{name:'Browse menu',exact:true});assert.ok((await browse.boundingBox()).height>=48);
    assert.equal(await page.getByRole('link',{name:'Back to menu',exact:true}).isVisible(),true);
    if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/empty-cart-${width}.png`,fullPage:true});

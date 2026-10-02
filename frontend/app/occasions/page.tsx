@@ -27,6 +27,8 @@ export default function OccasionsPage() {
     const router=useRouter();
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();
+    const home = features?.branchExperience ? branch ? `/branches/${branch.id}` : "/branches" : "/";
+    const homeLabel = features?.branchExperience ? branch ? "Branch home" : "All branches" : "Home";
     const [sessionVersion, setSessionVersion] = useState(0);
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [catalogueSearch, setCatalogueSearch] = useState("");
@@ -101,7 +103,7 @@ export default function OccasionsPage() {
     const incompletePrice=prices.some(price=>price==null)||groups.some(group=>boxes.find(box=>box.id===group.boxId)?.price==null||group.includeSpoons);
     return <AppShell editorial showSocialPopup={false}>
         <div className="occasion-journey mx-auto max-w-7xl px-4 py-8 text-[#173a37] sm:px-6">
-            <nav className="mobile-occasion-navigation" aria-label="Celebration navigation"><Link href={branch ? `/branches/${branch.id}` : "/branches"}><span aria-hidden="true">←</span> <T text="Branch home" /></Link><Link href="/occasions/requests"><T text="Requests & quotes" /></Link></nav>
+            <nav className="mobile-occasion-navigation" aria-label="Celebration navigation"><Link href={home}><span aria-hidden="true">←</span> <T text={homeLabel} /></Link><Link href="/occasions/requests"><T text="Requests & quotes" /></Link></nav>
             <header className="occasion-hero"><p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]"><span className="desktop-celebration-label">Occasions at Gokul</span><span className="mobile-celebration-label"><T text="Celebrations & Gifts" /></span></p>
             <h1 className="mt-3 font-serif text-4xl sm:text-6xl">{campaign?.headline||"Sweet moments. Thoughtfully planned."}</h1>
             <p className="mt-4 max-w-2xl">{campaign?.description||"Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment."}</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div>{campaign?.imageUrl&&<img src={campaign.imageUrl} alt={`${branch?.name??"Gokul"} occasion collection`} className="occasion-campaign-photo" />}<div className="occasion-hero-actions"><a href="#occasion-plan" className="occasion-primary">Build your celebration</a><Link href="/occasions/requests" className="occasion-secondary">Track requests & quotes</Link></div></header>
