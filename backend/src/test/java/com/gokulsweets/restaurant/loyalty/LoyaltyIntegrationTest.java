@@ -126,8 +126,8 @@ class LoyaltyIntegrationTest {
  }
  @Test void newProductExclusionInvalidatesExistingRewardBeforePayment(){
   grant(100);var order=order("PENDING_PAYMENT",true);loyalty.reserve(order,"SWEET_5");loyalty.verifyPayment(order);
-  long category=jdbc.queryForObject("INSERT INTO categories(name) VALUES (?) RETURNING id",Long.class,"Rewards exclusion "+subject);
-  long product=jdbc.queryForObject("INSERT INTO products(name,category_id,sale_mode,base_price) VALUES (?, ?, 'UNIT',149) RETURNING id",Long.class,"Excluded reward product "+subject,category);
+  long category=jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?,?) RETURNING id",Long.class,"LOY-EX-"+subject,"Rewards exclusion "+subject);
+  long product=jdbc.queryForObject("INSERT INTO products(code,name,category_id,sale_mode,base_price) VALUES (?, ?, ?, 'UNIT',149) RETURNING id",Long.class,"LOY-PRODUCT-"+subject,"Excluded reward product "+subject,category);
   order.getItems().getFirst().getProduct().setId(product);
   jdbc.update("INSERT INTO loyalty_excluded_products(product_id) VALUES (?)",product);
   try{
