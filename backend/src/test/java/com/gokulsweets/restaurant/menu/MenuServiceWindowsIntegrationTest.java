@@ -103,7 +103,7 @@ class MenuServiceWindowsIntegrationTest {
  @Test void enquiryAcceptanceSerializesClosureAndDuplicateRecoverySurvivesClosure() throws Exception {
   boolean enabled=features.isOccasionEnquiries();features.setOccasionEnquiries(true);
   var subject=UUID.randomUUID();var environment=com.gokulsweets.restaurant.customer.consent.ConsentEnvironment.DEV;
-  jdbc.update("INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES (?,'DEV',?)",subject,"+91"+String.format("%010d",branch));
+  jdbc.update("INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES (?,'DEV',?)",subject,"+919"+String.format("%09d",branch));
   long tax=jdbc.queryForObject("INSERT INTO tax_categories(code,name,cgst_rate,sgst_rate) VALUES (?,'Test tax',0,0) RETURNING id",Long.class,"SERVICE-"+UUID.randomUUID());
   jdbc.update("UPDATE products SET tax_category_id=? WHERE id=?",tax,samosa);
   jdbc.update("UPDATE branch_products SET occasion_published=true WHERE id=?",samosaBp);
