@@ -91,4 +91,15 @@ try{
  await routes.context.close();console.log('PWA route, desktop, flag-OFF and standalone safety passed');
  // Active provider verification suppresses installation without changing login.
  const otp=await setup({ios:true,authenticated:false});await card(otp.page).getByRole('button',{name:'Install App',exact:true}).waitFor();await otp.page.getByRole('button',{name:'Verify with SMS',exact:true}).click();await otp.page.waitForFunction(()=>window.__widgetConfig!==null);await card(otp.page).waitFor({state:'hidden'});await otp.context.close();console.log('PWA OTP suppression passed');
+ // Legacy iOS promotions obey the same blocker on flag-OFF phones and wider tablets.
+ for(const config of [{width:390,themed:false},{width:768,themed:false},{width:768,themed:true}]){
+  const h=await setup({...config,ios:true,authenticated:false});
+  const legacy=h.page.getByRole('button',{name:/Install Gokul Sweets Faster access/});
+  await legacy.waitFor();await h.page.getByRole('button',{name:'Verify with SMS',exact:true}).click();
+  await h.page.waitForFunction(()=>window.__widgetConfig!==null);await legacy.waitFor({state:'hidden'});
+  assert.equal(await card(h.page).count(),0);
+  await h.page.evaluate(()=>window.__widgetConfig.failure());await legacy.waitFor();
+  assert.equal(await h.page.evaluate(()=>window.__nativeCalls),0);assert.deepEqual(h.errors,[]);
+  await h.context.close();console.log(`PWA legacy iOS OTP suppression/recovery ${config.width}px themed=${config.themed} passed`);
+ }
 }finally{await browser.close();}

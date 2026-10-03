@@ -40,10 +40,7 @@ function LegacyInstallAppBanner() {
         return null;
     }
 
-    if (
-        !canInstall &&
-        !isIOS
-    ) {
+    if (!canInstall) {
 
         return null;
     }
