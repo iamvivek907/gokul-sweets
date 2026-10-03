@@ -41,7 +41,14 @@ try{for(const width of [390,1280]){
  await samosa.getByText('Available from 11:00 AM IST.',{exact:true}).waitFor();assert.equal(await samosa.getByRole('button',{name:/^Add .* to cart$/}).isDisabled(),true);
  opened=true;await page.clock.fastForward(21000);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('.gokul-product-card button')].some(button=>button.getAttribute('aria-label')==='Add Samosa to cart'&&!button.disabled));
  assert.equal(await samosa.getByRole('button',{name:/^Add .* to cart$/}).isEnabled(),true);
- await page.goto(`${base}/admin/menu/service-hours`);await page.getByRole('heading',{name:'Menu service hours'}).waitFor();await page.getByRole('checkbox',{name:'Enforce service hours and sold-out rules for this branch'}).check();
+ await page.goto(`${base}/admin/menu/service-hours`);await page.getByRole('heading',{name:'Menu service hours'}).waitFor();const help=page.getByRole('button',{name:'Help for Samosa sold out',exact:true});await help.click();
+ const helpDialog=page.getByRole('dialog',{name:'Samosa sold out',exact:true});await helpDialog.waitFor();await helpDialog.getByText('What to enter or do',{exact:true}).waitFor();
+ assert.equal(await page.getByRole('checkbox',{name:'Sold out until cleared'}).first().isChecked(),false,'help does not toggle the setting');
+ assert.equal(await helpDialog.evaluate(node=>{const box=node.getBoundingClientRect();return box.left>=0&&box.right<=innerWidth&&box.top>=0&&box.bottom<=innerHeight;}),true,'help fits the viewport');
+ await helpDialog.getByRole('button',{name:'Close',exact:true}).click();assert.equal(await help.evaluate(node=>node===document.activeElement),true);
+ await help.focus();await page.keyboard.press('Enter');await helpDialog.waitFor();await page.keyboard.press('Escape');assert.equal(await page.getByRole('dialog').count(),0);
+ await help.click();await page.mouse.click(2,2);assert.equal(await page.getByRole('dialog').count(),0,'outside tap dismisses help');assert.equal(saved.revision,0);
+ await page.getByRole('checkbox',{name:'Enforce service hours and sold-out rules for this branch'}).check();
  await page.getByRole('combobox',{name:/^Category/}).selectOption('1');await page.getByRole('button',{name:'Apply category hours to draft'}).click();
  const baseRule=page.locator('section').filter({has:page.getByRole('heading',{name:'Samosa',exact:true})});const dependent=page.locator('section').filter({has:page.getByRole('heading',{name:'Chola samosa',exact:true})});
  await baseRule.getByRole('checkbox',{name:'Sold out until cleared'}).check();await dependent.getByLabel('Requires an available item').selectOption('101');

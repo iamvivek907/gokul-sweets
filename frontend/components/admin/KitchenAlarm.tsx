@@ -1,4 +1,5 @@
 "use client";
+import AdminHelp from "@/components/admin/AdminHelp";
 
 import {useCallback, useEffect, useRef, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
@@ -116,7 +117,7 @@ export default function KitchenAlarm() {
     }, [enabled, permitted,soundReady]);
     if (!permitted) return null;
     return <aside className="mx-4 my-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-slate-900" aria-label="Kitchen alarm">
-        <div className="flex flex-wrap gap-3"><button type="button" disabled={enabled&&soundReady} className="min-h-11 rounded-xl bg-teal-900 px-4 font-bold text-white disabled:opacity-70" onClick={()=>{void activateSound();}}>{translate(enabled ? soundReady ? "Kitchen alarm enabled" : "Resume kitchen sound" : "Enable kitchen alarm")}</button>
+        <div className="flex flex-wrap gap-3"><AdminHelp title="Kitchen sound alarm" description="Repeats for waiting orders and overdue preparation work while the portal is open. Your choice is saved for this staff browser. After refresh, browsers require a first tap or key press before sound can resume. Closed or locked screens use staff push instead." guidance="Click Enable kitchen alarm once. After refresh, tap anywhere or choose Resume kitchen sound. Disable kitchen alarm clears the saved preference for this browser; it does not disable push alerts."/><button type="button" disabled={enabled&&soundReady} className="min-h-11 rounded-xl bg-teal-900 px-4 font-bold text-white disabled:opacity-70" onClick={()=>{void activateSound();}}>{translate(enabled ? soundReady ? "Kitchen alarm enabled" : "Resume kitchen sound" : "Enable kitchen alarm")}</button>
         {enabled&&<button type="button" className="min-h-11 rounded-xl border border-teal-900 px-4 font-bold" onClick={()=>{generation.current++;setEnabled(false);setSoundReady(false);due.current=0;fresh.current=0;void audio.current?.suspend();try{localStorage.setItem(preferenceKey,"off");}catch{/* This visit remains muted. */}setMessage("Kitchen alarm disabled for this staff browser.");}}>Disable kitchen alarm</button>}</div>
         {enabled&&!soundReady&&<p className="mt-2">Your alarm preference is saved. Tap once anywhere in this portal to restore sound after refresh.</p>}
         <p role="status" className="mt-2">{translate(message || "Your choice is remembered for this staff browser. Sound repeats until waiting orders enter KOT and overdue preparing orders are marked ready.")}</p>

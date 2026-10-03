@@ -4,6 +4,8 @@
 
 Admin → Menu → Service hours & sold out provides branch-specific daily opening/closing times, weekdays, persistent sold-out switches and one ingredient dependency per item. MENU_MANAGE and the existing branch-access checks apply. Category actions copy hours to the current items only; future products need their own rules. Saving is atomic and revision checked; conflicting edits require a reload.
 
+Labelled help icons open a touch/keyboard-accessible dialog with a definition, valid inputs, examples and save guidance. They cover branch selection, enforcement, category/item times, weekdays, sold-out status, dependencies, saving/reloading, branch operations, sound and push/session settings. Close, Escape and outside tap dismiss help without changing the setting.
+
 Service enforcement defaults OFF. Enable it for each configured branch. Opening is inclusive, closing exclusive, and every calculation uses server IST. Overnight windows belong to their opening weekday. Empty times mean all day on the selected weekdays. Sold out remains set until staff clears it. Dependencies propagate availability; they do not introduce ingredient stock consumption or replace existing inventory checks.
 
 Example configurations: breakfast parathas 09:00–11:00, fast food/dinner 11:00–21:30, samosa 10:00–17:00, and chola samosa requiring samosa. Sweets can start at 08:00 with a business-selected closing time. These examples are not automatically enabled or seeded.
