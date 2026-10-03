@@ -58,6 +58,7 @@ try{
   await page.getByText('1 items · 0 packing groups',{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(process.env.SCREENSHOT_DIR&&compact){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/celebrations-${width}.png`,fullPage:true});}
+  assert.match(await page.locator('.customer-account-link').getAttribute('aria-label'),/\bVC\b/,'account accessible name includes the visible initials');
   await page.locator('.customer-account-link').click();await page.waitForURL('**/profile');await page.locator('.account-hub').waitFor();
   assert.equal(await page.locator('.mobile-account-navigation').isVisible(),compact);
   assert.equal(await page.locator('.mobile-account-logout').isVisible(),compact);

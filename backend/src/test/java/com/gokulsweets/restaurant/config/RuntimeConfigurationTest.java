@@ -22,7 +22,6 @@ class RuntimeConfigurationTest {
                 .filter(key -> key.startsWith("gokul.features."))
                 .filter(key -> !key.endsWith("future-ordering-days"))
                 .filter(key -> !key.endsWith("branch-experience"))
-                .filter(key -> !key.endsWith("gokul-rewards"))
                 .filter(key -> !List.of("gokul.features.simplified-checkout", "gokul.features.bilingual-storefront", "gokul.features.admin-preparation-board").contains(key))
                 .toList();
         assertThat(properties.getProperty("gokul.notifications.staff.email-enabled")).endsWith(":true}");
@@ -40,7 +39,7 @@ class RuntimeConfigurationTest {
         assertThat(properties.getProperty("gokul.features.occasion-enquiries")).endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.occasion-payments")).endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.occasion-bulk-production")).endsWith(":true}");
-        assertThat(properties.getProperty("gokul.features.gokul-rewards")).endsWith(":false}");
+        assertThat(properties.getProperty("gokul.features.gokul-rewards")).isEqualTo("${GOKUL_FEATURES_GOKUL_REWARDS:true}");
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("inventory.automation.scheduler-enabled")).isEqualTo("true");
         assertThat(properties.getProperty("gokul.identity.provider-abuse-controls-verified")).endsWith(":false}");

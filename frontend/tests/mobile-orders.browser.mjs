@@ -43,6 +43,9 @@ try {
   const compact=width<=640&&enabled;
   assert.equal(await page.locator('.mobile-order-detail').count(),compact?1:0);
   if(compact){
+   const reference=page.locator('.mobile-order-detail header [data-copyable]');
+   assert.equal(await reference.textContent(),order.orderNumber);
+   assert.equal(await reference.evaluate(e=>getComputedStyle(e).userSelect),'text','order reference remains selectable in the compact themed view');
    assert.equal(await page.locator('.mobile-order-detail').evaluate(e=>e.scrollWidth<=e.clientWidth),true);
    if(paymentStatus==='FAILED')assert.equal(await page.getByRole('link',{name:'Retry checkout',exact:true}).getAttribute('href'),'/checkout/payment/TEST-ORDER');
    assert.equal(await page.getByRole('button',{name:'Download invoice',exact:true}).count(),paymentStatus==='PAID'?1:0);

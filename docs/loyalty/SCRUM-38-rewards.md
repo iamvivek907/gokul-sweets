@@ -20,13 +20,13 @@ Current provider refund flows are whole-order refunds. A future partial-refund U
 
 ## Rollout and funding
 
-`GOKUL_FEATURES_GOKUL_REWARDS=false` by default. Effective dependencies: verified customer OTP identity and accepted checkout quotes, together with their existing environment/session safeguards. OFF hides customer rewards and blocks new reward reservations; existing terminal holds/refunds still reconcile. Owner controls are at `/admin/loyalty` and remain available for audit while checkout rollout is OFF.
+Rewards default ON following the owner's activation request. `GOKUL_FEATURES_GOKUL_REWARDS=false` remains an explicit environment override. Effective dependencies: verified customer OTP identity and accepted checkout quotes, together with their existing environment/session safeguards. OFF hides customer rewards and blocks new reward reservations; existing terminal holds/refunds still reconcile. Owner controls are at `/admin/loyalty` and remain available for audit while checkout rollout is OFF. Changing the repository default does not change an existing explicit environment override or deploy the feature.
 
 Configurable server properties: earning divisor, maximum redemption percentage (up to 10%), expiry (up to 180 days), normal cost ceiling (up to 3%), qualifying minimum and welcome coins. The 15-coin welcome bonus is configurable but defaults to 0. At ₹149, the normal 14 coins plus 15 bonus coins have a ₹7.25 maximum face liability (4.87%), before any streak benefit. Finance must fund that additional promotion before enabling it. Never describe that combination as a 3% normal-cost program.
 
 Owner-only catalogue and exclusion changes require an audit reason. Balance adjustments require the exact verified environment/subject, a UUID idempotency key and a reason; the ledger records old/new balances and staff identity. Administrative debits cannot exceed available coins. Dashboard liability includes paused reward tiers and separates active reward reservation amounts. Ledger access never falls back to searching by customer phone.
 
-Campaign multipliers and physical Sweet Streak fulfillment are separate funded rollout work; this change does not advertise or grant unfunded free products, fabricate stamp benefits or claim that a campaign budget has been approved. This checkout/ledger rollout must remain OFF until the owner approves those program boundaries and DEV provider QA.
+Campaign multipliers and physical Sweet Streak fulfillment are separate funded rollout work; this change does not advertise or grant unfunded free products, fabricate stamp benefits or claim that a campaign budget has been approved. The owner's activation request enables the implemented checkout/ledger program only; welcome coins remain 0 by default and separate campaigns remain outside this rollout. DEV provider QA remains a release validation step.
 
 ## Economics and QA
 

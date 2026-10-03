@@ -13,6 +13,23 @@ class StorefrontFeaturesControllerTest {
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-25T18:31:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @Test
+    void rewardsRequireTheirOwnSwitchIdentityAndAcceptedQuotes() {
+        var properties = new EnhancementProperties();
+        var controller = new StorefrontFeaturesController(properties, clock);
+        properties.setGokulRewards(true);
+        assertThat(controller.features().gokulRewards()).isFalse();
+        properties.setCustomerOtpIdentity(true);
+        assertThat(controller.features().gokulRewards()).isFalse();
+        properties.setAcceptedCheckoutQuote(true);
+        assertThat(controller.features().gokulRewards()).isTrue();
+        properties.setGokulRewards(false);
+        assertThat(controller.features().gokulRewards()).isFalse();
+        properties.setGokulRewards(true);
+        properties.setCustomerOtpIdentity(false);
+        assertThat(controller.features().gokulRewards()).isFalse();
+    }
+
+    @Test
     void optionalAlertsRequireInboxAndIdentityAndNeverEnableThem() {
         var properties = new EnhancementProperties();
         properties.setNotificationAlerts(true);
