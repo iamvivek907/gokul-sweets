@@ -1,0 +1,26 @@
+/* Only the effective compact customer shell receives the new presentation. */
+.pwa-install-card {display: none;}
+@media (max-width: 640px) {
+    .future-storefront .pwa-install-card {display: flex; align-items: flex-start; gap: 10px; margin: 12px 0; padding: 12px; border: 1px solid var(--future-border, #dddfd5); border-radius: 18px; background: #fffaf2; color: #172e2c; box-shadow: 0 4px 14px #09272508;}
+    .future-storefront .pwa-install-mark {display: grid; place-items: center; flex: 0 0 38px; width: 38px; height: 42px; border-radius: 12px; background: #143936; color: #fffaf2; font-size: 25px; font-weight: 800;}
+    .future-storefront .pwa-install-copy {min-width: 0; flex: 1;}
+    .future-storefront .pwa-install-copy strong {display: block; font-size: 14px; line-height: 1.4;}
+    .future-storefront .pwa-install-copy p {margin: 3px 0 0; color: #53645f; font-size: 12px; line-height: 1.5; overflow-wrap: anywhere;}
+    .future-storefront .pwa-install-copy button, .future-storefront .pwa-install-done {min-height: 44px; margin-top: 9px; padding: 9px 18px; border: 1px solid #a94d39; border-radius: 14px; background: #c76752; color: #fffaf2; font-size: 13px; font-weight: 750; box-shadow: 0 3px 0 #a94d39;}
+    .future-storefront .pwa-install-dismiss, .future-storefront .pwa-install-guide header button {min-height: 44px; min-width: 44px; padding: 8px; border: 1px solid #dddfd5; border-radius: 12px; color: #143936; background: #fffaf2; font-size: 12px; font-weight: 650;}
+    .future-storefront .pwa-install-card button:active {transform: translateY(1px); box-shadow: none;}
+    .future-storefront .pwa-install-card button:focus-visible {outline: 3px solid #c76752; outline-offset: 3px;}
+    .future-storefront .pwa-install-guide {position: fixed; inset: auto 0 0; width: 100%; max-width: 640px; max-height: calc(100dvh - 24px); margin: 0 auto; padding: 18px 18px max(24px, env(safe-area-inset-bottom)); border: 1px solid #dddfd5; border-radius: 24px 24px 0 0; background: #fffaf2; color: #172e2c; overflow-y: auto; overscroll-behavior: contain;}
+    .future-storefront .pwa-install-guide::backdrop {background: #09272599;}
+    .future-storefront .pwa-install-guide header {display: flex; align-items: center; justify-content: space-between;}
+    .future-storefront .pwa-install-guide h2 {margin-top: 16px; font-size: 21px; line-height: 1.25; font-weight: 800;}
+    .future-storefront .pwa-install-guide p {margin-top: 8px; font-size: 13px; line-height: 1.5; color: #53645f;}
+    .future-storefront .pwa-install-guide ol {display: grid; gap: 14px; margin-top: 20px; list-style: none; padding: 0;}
+    .future-storefront .pwa-install-guide li {display: flex; gap: 12px; align-items: flex-start;}
+    .future-storefront .pwa-install-guide li > span {display: grid; place-items: center; flex: 0 0 30px; height: 30px; border: 1px solid #dddfd5; border-radius: 10px; background: #f0f1e8; font-weight: 750;}
+    .future-storefront .pwa-install-guide li strong {font-size: 14px;}
+    .future-storefront .pwa-install-guide li p {margin-top: 2px;}
+    .future-storefront .pwa-install-guide .pwa-install-browser-note {margin-top: 18px; padding: 10px; border: 1px solid #dddfd5; border-radius: 12px; font-size: 12px;}
+    .future-storefront .pwa-install-done {width: 100%; margin-top: 16px;}
+}
+@media (prefers-reduced-motion: reduce) {.future-storefront .pwa-install-card button {transform: none;}}

@@ -1,4 +1,5 @@
 "use client";
+import PwaInstallRuntime from "@/components/pwa/PwaInstallRuntime";
 import MobileBrandLaunch from "@/components/common/MobileBrandLaunch";
 import NavigationFeedback from "@/components/common/NavigationFeedback";
 import {LanguageRuntime} from "@/lib/language";
@@ -31,6 +32,7 @@ export default function AppProviders({
             <MobileBrandLaunch />
             <NavigationFeedback />
             <ServiceWorkerRegistration />
+            <PwaInstallRuntime />
 
             <OfflineBanner />
             <StorefrontVitals />

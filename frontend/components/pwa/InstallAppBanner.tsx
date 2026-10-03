@@ -1,4 +1,6 @@
 "use client";
+import MobileInstallAppBanner from "./MobileInstallAppBanner";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {T} from "@/lib/language";
 
 
@@ -10,9 +12,15 @@ import {
     usePwaInstall
 } from "@/hooks/usePwaInstall";
 
-export default function InstallAppBanner() {
+export default function InstallAppBanner({compact = false}: {compact?: boolean}) {
+    return compact ? <MobileInstallAppBanner /> : <LegacyInstallAppBanner />;
+}
+
+function LegacyInstallAppBanner() {
+    const features = useStorefrontFeatures();
 
     const {
+        isMobile,
         canInstall,
         isInstalled,
         isIOS,
@@ -24,6 +32,9 @@ export default function InstallAppBanner() {
         setShowIOSHelp
     ] =
         useState(false);
+
+    // The customer shell owns the new phone card; retain the existing desktop/OFF UI.
+    if (isMobile && (features?.futuristicStorefrontV2 || features?.checkoutExperienceV2)) return null;
 
     if (isInstalled) {
         return null;

@@ -5,6 +5,7 @@ import type {
     ReactNode
 } from "react";
 
+import InstallAppBanner from "@/components/pwa/InstallAppBanner";
 import ConnectionNotice from "@/components/common/ConnectionNotice";
 import Header
     from "./Header";
@@ -82,6 +83,7 @@ export default function AppShell({
                 "
             >
                 {futuristic && <CustomerBreadcrumbs />}
+                {futuristic && <InstallAppBanner compact />}
                 {children}
             </main>
 
