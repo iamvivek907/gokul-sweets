@@ -235,6 +235,10 @@ export default function OrdersPage() {
                         }
 
                         return (
+                            order.orderNumber
+                                .toLowerCase()
+                                .includes(normalizedQuery)
+                            ||
                             orderDisplayNumber(order)
                                 .toLowerCase()
                                 .includes(normalizedQuery)
