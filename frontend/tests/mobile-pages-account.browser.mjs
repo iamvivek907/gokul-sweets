@@ -138,6 +138,17 @@ try{
    if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/empty-cart-${width}.png`,fullPage:true});
    await browse.click();await page.waitForURL('**/menu');
   }
+  if(!compact){
+   await page.getByRole('button',{name:'Profile details',exact:true}).click();
+   const signout=page.locator('.account-details-signout'),dialog=page.getByRole('dialog',{name:'Log out of Gokul?'});
+   await signout.click();await dialog.waitFor();assert.equal(logoutCalls,0,'desktop opening does not send logout');
+   assert.equal(await dialog.getByRole('button',{name:'Stay signed in'}).evaluate(e=>e===document.activeElement),true);
+   await dialog.getByRole('button',{name:'Stay signed in'}).click();assert.equal(logoutCalls,0);
+   await signout.click();await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});assert.equal(logoutCalls,0);
+   await signout.click();await page.mouse.click(2,2);await dialog.waitFor({state:'hidden'});assert.equal(logoutCalls,0);
+   await signout.click();await dialog.getByRole('button',{name:'Log out',exact:true}).click();await dialog.getByRole('alert').filter({hasText:'Could not sign out'}).waitFor();assert.equal(authenticated,true);assert.equal(logoutCalls,1);
+   logoutError=false;await dialog.getByRole('button',{name:'Log out',exact:true}).click();await page.locator('.account-hub').waitFor({state:'detached'});assert.equal(authenticated,false);assert.equal(logoutCalls,2);
+  }
   assert.equal(orders,0,'navigation, profile and presentation never place orders');
   await context.close();console.log(`Mobile pages/account ${width}px theme=${themed} passed`);
  }

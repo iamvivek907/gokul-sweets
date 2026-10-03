@@ -52,11 +52,15 @@ class LoyaltyIntegrationTest {
  }
  @Test void catalogueInsertionWaitsForAcceptedRewardReservation() throws Exception {assertPolicyMutationWaits(true);}
  @Test void exclusionReplacementWaitsForAcceptedRewardReservation() throws Exception {assertPolicyMutationWaits(false);}
- private void assertPolicyMutationWaits(boolean catalogue) throws Exception {
+ @Test void paymentValidationLocksCatalogueWithRolloutOff() throws Exception {assertPolicyMutationWaits(true,true);}
+ @Test void paymentValidationLocksExclusionsWithRolloutOff() throws Exception {assertPolicyMutationWaits(false,true);}
+ private void assertPolicyMutationWaits(boolean catalogue) throws Exception {assertPolicyMutationWaits(catalogue,false);}
+ private void assertPolicyMutationWaits(boolean catalogue,boolean payment) throws Exception {
   grant(100);var pending=order("PENDING_PAYMENT",true);String accepted=loyalty.policyVersion();String code="LOCK_"+subject.toString().replace("-","").toUpperCase(Locale.ROOT);
   var products=jdbc.queryForList("SELECT product_id FROM loyalty_excluded_products",Long.class);var promotions=jdbc.queryForList("SELECT code FROM loyalty_excluded_rebates",String.class);
   long category=jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?,?) RETURNING id",Long.class,code,code);
   long product=jdbc.queryForObject("INSERT INTO products(code,name,category_id,sale_mode,base_price) VALUES (?, ?, ?, 'UNIT',149) RETURNING id",Long.class,code,code,category);
+  if(payment){pending.getItems().getFirst().getProduct().setId(product);loyalty.reserve(pending,"SWEET_5");flags.setGokulRewards(false);}
   long role=jdbc.queryForObject("SELECT id FROM roles WHERE name='OWNER_ADMIN'",Long.class);
   long actor=jdbc.queryForObject("INSERT INTO staff_users(username,password_hash,full_name,role_id) VALUES (?,'test','Policy lock test',?) RETURNING id",Long.class,code,role);
   var staff=org.mockito.Mockito.mock(com.gokulsweets.restaurant.security.StaffAuthorizationService.class);
@@ -67,7 +71,7 @@ class LoyaltyIntegrationTest {
   try(var pool=Executors.newSingleThreadExecutor()){
    try{
     new TransactionTemplate(manager).executeWithoutResult(tx->{
-     loyalty.verifyPolicy(accepted);
+     if(payment)loyalty.verifyPayment(pending);else loyalty.verifyPolicy(accepted);
      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND granted",Integer.class)).as("accepted transaction holds a policy lock").isPositive();
      writer.set(pool.submit(()->new TransactionTemplate(manager).executeWithoutResult(write->{
       jdbc.execute("SET LOCAL lock_timeout='5s'");pid.set(jdbc.queryForObject("SELECT pg_backend_pid()",Integer.class));connected.countDown();
@@ -81,12 +85,11 @@ class LoyaltyIntegrationTest {
       if(writer.get().isDone())writer.get().get();
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=? AND locktype='advisory' AND NOT granted",Integer.class,pid.get())).as("waiting writer %s; advisory locks %s",pid.get(),jdbc.queryForList("SELECT pid,mode,granted FROM pg_locks WHERE locktype='advisory'")).isEqualTo(1);
      }catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException(interrupted);}catch(ExecutionException failed){throw new IllegalStateException("Policy writer failed before acquiring its lock",failed.getCause());}
-     assertThat(loyalty.policyVersion()).isEqualTo(accepted);
-     loyalty.reserve(pending,"SWEET_5");
+     if(!payment){assertThat(loyalty.policyVersion()).isEqualTo(accepted);loyalty.reserve(pending,"SWEET_5");}
     });
     writer.get().get(6,TimeUnit.SECONDS);
-    assertThat(loyalty.policyVersion()).isNotEqualTo(accepted);
-    assertThatThrownBy(()->new TransactionTemplate(manager).executeWithoutResult(tx->loyalty.verifyPolicy(accepted))).hasMessageContaining("changed");
+    if(!payment){assertThat(loyalty.policyVersion()).isNotEqualTo(accepted);assertThatThrownBy(()->new TransactionTemplate(manager).executeWithoutResult(tx->loyalty.verifyPolicy(accepted))).hasMessageContaining("changed");}
+    else if(!catalogue)assertThatThrownBy(()->loyalty.verifyPayment(pending)).hasMessageContaining("eligibility changed");
     assertThat(jdbc.queryForObject("SELECT state FROM loyalty_holds WHERE order_id=?",String.class,pending.getId())).isEqualTo("RESERVED");
    }finally{
     new TransactionTemplate(manager).executeWithoutResult(tx->{
@@ -98,8 +101,9 @@ class LoyaltyIntegrationTest {
    }
   }
  }
- private void grant(int coins){
-  long ledger=jdbc.queryForObject("INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,reason,expires_at) VALUES ('DEV',? ,?,'ADJUSTED',?,'Test fixture',CURRENT_TIMESTAMP+INTERVAL '180 days') RETURNING id",Long.class,subject,"fixture:"+UUID.randomUUID(),coins);
+ private void grant(int coins){grant(coins,180);}
+ private void grant(int coins,int days){
+  long ledger=jdbc.queryForObject("INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,reason,expires_at) VALUES ('DEV',? ,?,'ADJUSTED',?,'Test fixture',CURRENT_TIMESTAMP+(?*INTERVAL '1 day')) RETURNING id",Long.class,subject,"fixture:"+UUID.randomUUID(),coins,days);
   jdbc.update("INSERT INTO loyalty_lots(ledger_id,remaining) VALUES (?,?)",ledger,coins);
  }
  private Order order(String status,boolean enrolled){
@@ -131,6 +135,33 @@ class LoyaltyIntegrationTest {
   assertThat(loyalty.wallet("DEV",subject,null).balance()).isZero();assertThat(loyalty.wallet("DEV",subject,null).completedOrders()).isZero();
   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=? AND kind='EARNED'",Integer.class,order.getId())).isEqualTo(1);
   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=? AND kind='REVERSED'",Integer.class,order.getId())).isEqualTo(1);
+ }
+ @Test void refundReversesItsOwnLotsAndPreservesOlderCredits(){
+  grant(100,90);
+  var completed=order("PICKED_UP",true);paid(completed.getId(),"PAID");loyalty.reconcile(completed.getId());
+  jdbc.update("UPDATE payments SET payment_status='REFUNDED' WHERE order_id=?",completed.getId());loyalty.reconcile(completed.getId());loyalty.reconcile(completed.getId());
+  assertThat(loyalty.wallet("DEV",subject,null).balance()).isEqualTo(100);
+  assertThat(jdbc.queryForObject("SELECT p.remaining FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id WHERE l.subject_id=? AND l.kind='ADJUSTED'",Integer.class,subject)).isEqualTo(100);
+  assertThat(jdbc.queryForObject("SELECT p.remaining FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id WHERE l.order_id=? AND l.kind='EARNED'",Integer.class,completed.getId())).isZero();
+ }
+ @Test void refundTargetsEarnedWelcomeAndRestoredOriginsBeforeOtherCredits(){
+  grant(10,90);
+  var completed=order("PICKED_UP",true);jdbc.update("UPDATE orders SET subtotal=400,loyalty_eligible_subtotal=400,loyalty_welcome_coins=10 WHERE id=?",completed.getId());paid(completed.getId(),"PAID");loyalty.reconcile(completed.getId());
+  assertThat(loyalty.wallet("DEV",subject,null).balance()).isEqualTo(60);
+  var spending=order("PENDING_PAYMENT",true);loyalty.reserve(spending,"SWEET_5");loyalty.remove(spending);
+  jdbc.update("UPDATE payments SET payment_status='REFUNDED' WHERE order_id=?",completed.getId());loyalty.reconcile(completed.getId());loyalty.reconcile(completed.getId());
+  assertThat(loyalty.wallet("DEV",subject,null).balance()).isEqualTo(10);
+  assertThat(jdbc.queryForObject("SELECT COALESCE(SUM(p.remaining),0)::integer FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id JOIN loyalty_ledger original ON original.id=COALESCE(l.source_credit_id,l.id) WHERE original.order_id=? AND original.kind IN ('EARNED','WELCOME')",Integer.class,completed.getId())).isZero();
+  assertThat(jdbc.queryForObject("SELECT p.remaining FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id JOIN loyalty_ledger original ON original.id=l.source_credit_id WHERE l.subject_id=? AND l.kind='RESTORED' AND original.kind='ADJUSTED'",Integer.class,subject)).isEqualTo(10);
+ }
+ @Test void spentRefundCreditsBecomeDebtAndOffsetFutureEarnings(){
+  var completed=order("PICKED_UP",true);jdbc.update("UPDATE orders SET subtotal=400,loyalty_eligible_subtotal=400 WHERE id=?",completed.getId());paid(completed.getId(),"PAID");loyalty.reconcile(completed.getId());
+  var spending=order("PENDING_PAYMENT",true);loyalty.reserve(spending,"SWEET_5");
+  jdbc.update("UPDATE payments SET payment_status='REFUNDED' WHERE order_id=?",completed.getId());loyalty.reconcile(completed.getId());loyalty.reconcile(completed.getId());
+  var reversed=loyalty.wallet("DEV",subject,null);assertThat(reversed.balance()).isZero();assertThat(reversed.debt()).isEqualTo(30);
+  var next=order("PICKED_UP",true);jdbc.update("UPDATE orders SET subtotal=400,loyalty_eligible_subtotal=400 WHERE id=?",next.getId());paid(next.getId(),"PAID");loyalty.reconcile(next.getId());
+  var replenished=loyalty.wallet("DEV",subject,null);assertThat(replenished.balance()).isEqualTo(10);assertThat(replenished.debt()).isZero();
+  assertThat(jdbc.queryForObject("SELECT p.remaining FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id WHERE l.order_id=? AND l.kind='EARNED'",Integer.class,next.getId())).isEqualTo(10);
  }
  @Test void noHistoricalOrUnpaidCreditsAndFlagOffRejectsNewRewards(){
   var historical=order("PICKED_UP",false);paid(historical.getId(),"PAID");loyalty.reconcile(historical.getId());
