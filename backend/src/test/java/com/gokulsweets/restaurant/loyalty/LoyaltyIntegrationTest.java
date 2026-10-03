@@ -16,7 +16,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 
-@SpringBootTest
+@SpringBootTest(properties = {"spring.datasource.hikari.maximum-pool-size=5", "spring.datasource.hikari.minimum-idle=1"})
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class LoyaltyIntegrationTest {
  @Autowired com.gokulsweets.restaurant.order.lifecycle.service.AdminOrderLifecycleCoordinator lifecycle;
  @Autowired com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
