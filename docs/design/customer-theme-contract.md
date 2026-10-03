@@ -57,3 +57,7 @@ A confirmed retail order receives a permanent short numeric label, shown as Orde
 ## Customer logout and notifications
 
 Customer logout requires an explicit confirmation, with Stay signed in focused by default. Escape and outside dismissal retain the session; a failed logout retains sign-in and permits retry. Notifications use the dedicated /notifications route from both the header bell and profile, retain a safe same-origin return path including query/section, and default back to Profile for direct visits. The former profile notification hash redirects to this route. Private notifications remain gated by the effective inbox flag and verified identity. Phone cards use compact spacing, readable IST timestamps and short actions without exposing internal references in action labels; desktop card spacing and working read/preferences/review actions remain.
+
+## Compact mobile installation
+
+Below 641px, the effective customer visual shell offers an optional compact Home/branch-home/Profile installation card with the same teal, cream and coral palette and tactile 44px controls. Chromium uses one centrally owned browser install event; iPhone uses an explicit, accessible instructional bottom sheet. Actual standalone launches hide promotion; local preferences only enforce cooldowns. Active verification and checkout/payment/order routes suppress the new promotion. The canonical manifest, root worker scope, existing automatic update flow, desktop and flag-OFF legacy presentation are preserved.

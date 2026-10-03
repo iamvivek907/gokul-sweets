@@ -1,4 +1,5 @@
 "use client";
+import {pwaInstall} from "@/lib/pwaInstall";
 import {T,useTranslation} from "@/lib/language";
 
 import {useEffect, useRef, useState} from "react";
@@ -91,6 +92,13 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         window.addEventListener("keydown", onEscape);
         return () => window.removeEventListener("keydown", onEscape);
     }, [mode, availability, session.authenticated, promptDismissed]);
+
+    const installBlocker = useRef({});
+    useEffect(() => {
+        const source = installBlocker.current;
+        pwaInstall.blockPromotion(source, busy);
+        return () => pwaInstall.blockPromotion(source, false);
+    }, [busy]);
 
     if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status"><T text="Checking phone verification…" /></p>;
     if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" && guestAllowed ? null : <section
