@@ -44,6 +44,11 @@ async function emit(page,{result='dismissed',pending=false,fails=false}={}){
 }
 const card=page=>page.locator('.pwa-install-card');
 try{
+ // Declared image assets decode at their actual manifest sizes, including maskable.
+ const assets=await setup();const manifest=await (await assets.page.request.get(`${base}/manifest.webmanifest`)).json();
+ assert.equal(manifest.id,'/');assert.equal(manifest.start_url,'/');assert.equal(manifest.scope,'/');
+ for(const icon of manifest.icons){const size=Number(icon.sizes.split('x')[0]);const dimensions=await assets.page.evaluate(async src=>{const image=new Image();image.src=src;await image.decode();return [image.naturalWidth,image.naturalHeight];},icon.src);assert.deepEqual(dimensions,[size,size]);}
+ await assets.context.close();
  // Native signal, rapid taps, consumed event, preference persistence and unavailable state.
  const {context,page,errors}=await setup();await page.locator('.account-hub').waitFor();assert.equal(await card(page).count(),0);
  await emit(page,{pending:true});await card(page).getByRole('button',{name:'Install App',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.__nativeCalls),0);

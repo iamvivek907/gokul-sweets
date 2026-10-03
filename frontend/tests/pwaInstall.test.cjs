@@ -56,3 +56,12 @@ test('canonical manifest and service-worker identity remain stable without force
 test('unavailable cross-tab locking fails gracefully without leaving a dead prompt',async()=>{
  const h=harness({locks:{async request(){throw Error('Lock denied');}}});const native=h.prompt();assert.equal(await h.store.promptInstall(),false);assert.equal(native.calls,0);assert.equal(h.store.getSnapshot().isInstallPromptAvailable,false);assert.match(h.store.getSnapshot().error,/keep ordering/);assert.equal(h.store.getSnapshot().isPromptInProgress,false);
 });
+
+test('all declared install and push icons exist at their advertised PNG sizes',()=>{
+ const manifest=fs.readFileSync('app/manifest.ts','utf8');
+ for(const path of [...manifest.matchAll(/src: "([^"]+\.png)"/g)].map(match=>match[1])){
+  const bytes=fs.readFileSync('public'+path),size=path.includes('192')?192:512;
+  assert.equal(bytes.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);
+ }
+ assert.deepEqual(fs.readFileSync('public/icon-192.png'),fs.readFileSync('public/icons/icon-192.png'));
+});
