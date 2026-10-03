@@ -5,7 +5,8 @@ import {T} from "@/lib/language";
 
 import {formatWeight} from "@/lib/orderQuantity";
 
-import CustomerNotificationInbox from "@/components/customer/CustomerNotificationInbox";
+import CustomerNotificationLink from "./CustomerNotificationLink";
+import LogoutConfirmation from "./LogoutConfirmation";
 import {useCallback, useEffect, useRef, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
@@ -55,6 +56,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
     const [preview, setPreview] = useState<Preview | null>(null);
     const [menu, setMenu] = useState<MenuProduct[]>([]);
     const [activeSection, setActiveSection] = useState<AccountSection>("badges");
+    const [logoutOpen, setLogoutOpen] = useState(false);
     const [editingDetails, setEditingDetails] = useState(false);
     const [nameDraft, setNameDraft] = useState(session?.name ?? "");
 
@@ -63,12 +65,13 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
             const selected = ({"#account-milestones": "badges", "#account-orders": "orders",
                 "#account-favourites": "favourites", "#account-addresses": "addresses",
                 "#account-preferences": "preferences", "#account-details": "details", "#account-notifications": "notifications"} as Record<string, AccountSection>)[window.location.hash];
+            if (selected === "notifications") {router.replace("/notifications?from=%2Fprofile"); return;}
             if (selected) setActiveSection(selected);
         };
         fromHash();
         window.addEventListener("hashchange", fromHash);
         return () => window.removeEventListener("hashchange", fromHash);
-    }, []);
+    }, [router]);
 
     const reload = useCallback(async () => {
         const [next, history] = await Promise.all([
@@ -203,7 +206,8 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
             await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
             onSessionChange({authenticated: false});
             window.dispatchEvent(new Event("gokul-customer-identity-changed"));
-        } catch {setMessage("Could not sign out. Please try again."); setBusy(false);}
+            return true;
+        } catch {setMessage("Could not sign out. Please try again."); setBusy(false); return false;}
     }
 
     const earned = currentMilestone(account.paidOrders);
@@ -211,6 +215,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
     const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
     const maskedPhone = session.phone ? `+91 •••••• ${session.phone.replace(/\D/g, "").slice(-4)}` : "Phone verified";
     return <div className="account-hub mt-6">
+        <LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={signOut} />
         <header className="account-cover relative overflow-hidden rounded-3xl p-6 sm:p-9">
             <div className="account-cover-art" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span></div>
             <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -238,11 +243,10 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                     ['addresses', 'My addresses'], ['preferences', 'Preferences'], ['details', 'Profile details']] as const)
                     .map(([section, label]) => <button key={section} type="button" aria-pressed={activeSection === section}
                         onClick={() => showSection(section)}>{label}</button>)}
-                {features?.notificationInbox && <button type="button" aria-pressed={activeSection === "notifications"} onClick={() => showSection("notifications")}><T text="Notification inbox" /></button>}
+                {features?.notificationInbox && <CustomerNotificationLink><T text="Notification inbox" /></CustomerNotificationLink>}
                 <Link href="/profile/privacy"><T text="Privacy and data" /></Link>
             </nav>
             <div id="account-content" className="account-panels min-w-0 scroll-mt-28 space-y-6" aria-live="polite">
-                {activeSection === "notifications" && features?.notificationInbox && <CustomerNotificationInbox key={session.phone} />}
                 {activeSection === "badges" && <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#c88a20]">Gokul journey</p>
@@ -365,6 +369,6 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
         {message && <p role="status" aria-live="polite" className="rounded-xl border border-[#eadfd6] bg-white p-4 text-sm">{message}</p>}
             </div>
         </div>
-        <button type="button" disabled={busy} onClick={() => void signOut()} className="mobile-account-logout"><T text="Log out" /></button>
+        <button type="button" disabled={busy} onClick={() => setLogoutOpen(true)} className="mobile-account-logout"><T text="Log out" /></button>
     </div>;
 }

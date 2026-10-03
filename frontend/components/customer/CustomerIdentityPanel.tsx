@@ -7,6 +7,7 @@ import {ApiError} from "@/services/apiClient";
 import {proofFromWidget} from "@/lib/msg91Proof";
 import {MSG91_WIDGET_ID, MSG91_WIDGET_TOKEN} from "@/lib/constants";
 import Link from "next/link";
+import LogoutConfirmation from "./LogoutConfirmation";
 
 const widgetId = MSG91_WIDGET_ID;
 const widgetToken = MSG91_WIDGET_TOKEN;
@@ -52,6 +53,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
     const [guestAllowed, setGuestAllowed] = useState(true);
     const [revision, setRevision] = useState(0);
+    const [logoutOpen, setLogoutOpen] = useState(false);
     const [busy, setBusy] = useState(false);
     const [promptDismissed, setPromptDismissed] = useState(false);
     const promptButton = useRef<HTMLButtonElement>(null);
@@ -169,8 +171,10 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
                 onSessionChange?.({authenticated: false});
                 window.dispatchEvent(new Event("gokul-customer-identity-changed"));
             }
+            return true;
         } catch {
             if (alive.current) setError("Could not sign out. Please try again.");
+            return false;
         } finally {
             if (alive.current) setBusy(false);
         }
@@ -259,10 +263,10 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
             </div>
             {nameError && <p role="alert" className="mt-2 text-sm text-[#9e2732]">{nameError}</p>}
         </div>}
-        <button type="button" disabled={busy} onClick={() => {void (session.authenticated ? logout() : start());}}
+        <button type="button" disabled={busy} onClick={() => {if (session.authenticated) setLogoutOpen(true); else void start();}}
             className="mt-4 min-h-11 rounded-full bg-[#7a1625] px-6 py-2 text-sm font-semibold text-white disabled:opacity-50">
             {busy ? "Please wait…" : session.authenticated ? "Sign out" : "Verify with SMS"}
         </button>
         {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
-    </section>{session.authenticated && <Link href="/profile/privacy" className="mt-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#e8d7c9] bg-white px-5 text-sm font-semibold text-[#7a1625]">Privacy and data choices <span aria-hidden="true">→</span></Link>}</>;
+    </section><LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={logout} />{session.authenticated && <Link href="/profile/privacy" className="mt-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#e8d7c9] bg-white px-5 text-sm font-semibold text-[#7a1625]">Privacy and data choices <span aria-hidden="true">→</span></Link>}</>;
 }

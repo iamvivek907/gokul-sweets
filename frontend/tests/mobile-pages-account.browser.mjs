@@ -9,7 +9,7 @@ const sweet={id:1,name:'Gulab Jamun',description:'Fresh sweets for your celebrat
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 try{
  for(const [width,themed] of [[320,true],[390,true],[601,true],[640,true],[641,true],[1280,true],[390,false]]){
-  let authenticated=true,logoutError=true,staffChecks=0,orders=0,customerName='Vivek Chaurasia',branchExperience=true;
+  let authenticated=true,logoutError=true,logoutCalls=0,staffChecks=0,orders=0,customerName='Vivek Chaurasia',branchExperience=true;
   const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',timezoneId:'America/Los_Angeles'}),page=await context.newPage();
   await context.addInitScript(branch=>{if(!sessionStorage.getItem('test-branch-initialized')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('test-branch-initialized','true');}window.initSendOTP=config=>config.success({accessToken:'test-provider-proof'});},branch);
   await context.route('**/api/**',async route=>{
@@ -19,7 +19,7 @@ try{
    else if(path==='/api/customer/identity/me')json={authenticated,name:customerName,phone:'+919876543210'};
    else if(path==='/api/customer/identity/start')return route.fulfill({status:204});
    else if(path==='/api/customer/identity/exchange'){authenticated=true;json={authenticated,name:customerName,phone:'+919876543210'};}
-   else if(path==='/api/customer/identity/logout'){if(logoutError)return route.fulfill({status:503,json:{message:'Unavailable'}});authenticated=false;return route.fulfill({status:204});}
+   else if(path==='/api/customer/identity/logout'){logoutCalls++;if(logoutError)return route.fulfill({status:503,json:{message:'Unavailable'}});authenticated=false;return route.fulfill({status:204});}
    else if(path==='/api/customer/identity/notifications')json={messages:[],unreadCount:1,nextBefore:null,readThrough:0};
    else if(path==='/api/customer/identity/account')json={paidOrders:1,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
    else if(path==='/api/branches')json=[branch,otherBranch];else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=otherBranch;
@@ -105,8 +105,15 @@ try{
    }
    await page.locator('.mobile-account-back a[href="/menu"]').click();await page.waitForURL('**/menu');
    await page.locator('.customer-bottom-navigation a[href="/profile"]').click();await page.waitForURL('**/profile');await page.locator('.account-hub').waitFor();
-   await page.locator('.mobile-account-logout').click();await page.getByRole('status').filter({hasText:'Could not sign out'}).waitFor();assert.equal(authenticated,true);
-   logoutError=false;await page.locator('.mobile-account-logout').click();await page.locator('.account-hub').waitFor({state:'detached'});
+   const logoutDialog=page.getByRole('dialog',{name:'Log out of Gokul?'});
+   await page.locator('.mobile-account-logout').click();await logoutDialog.waitFor();
+   assert.equal(await logoutDialog.getByRole('button',{name:'Stay signed in'}).evaluate(e=>e===document.activeElement),true);
+   await logoutDialog.getByRole('button',{name:'Stay signed in'}).click();assert.equal(logoutCalls,0);assert.equal(authenticated,true);
+   await page.locator('.mobile-account-logout').click();await page.keyboard.press('Escape');assert.equal(logoutCalls,0);
+   await page.locator('.mobile-account-logout').click();await page.mouse.click(2,2);await logoutDialog.waitFor({state:'hidden'});assert.equal(logoutCalls,0);
+   await page.locator('.mobile-account-logout').click();await logoutDialog.getByRole('button',{name:'Log out',exact:true}).click();
+   await logoutDialog.getByRole('alert').filter({hasText:'Could not sign out'}).waitFor();assert.equal(authenticated,true);assert.equal(logoutCalls,1);
+   logoutError=false;await logoutDialog.getByRole('button',{name:'Log out',exact:true}).click();await page.locator('.account-hub').waitFor({state:'detached'});assert.equal(logoutCalls,2);
    await page.locator('.customer-account-mobile-label').getByText('Log in',{exact:true}).waitFor();
    assert.equal(await page.locator('.mobile-account-navigation').isVisible(),true,'public menu remains after logout');
    assert.equal(await page.locator('.account-navigation').count(),0,'private profile sections disappear');
