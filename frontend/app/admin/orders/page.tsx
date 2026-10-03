@@ -4764,7 +4764,6 @@ function OrderCard({
 
 
 function OrderDetailDrawer({
-    orderNumber,
     order,
     loading,
     refreshing,

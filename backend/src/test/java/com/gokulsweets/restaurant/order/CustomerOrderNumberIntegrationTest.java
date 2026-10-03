@@ -28,15 +28,21 @@ class CustomerOrderNumberIntegrationTest {
     @Autowired PlatformTransactionManager transactions;
 
     private long branch() {
-        return jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Number test') RETURNING id",
+        long id = jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Number test') RETURNING id",
                 Long.class, "NUM-" + UUID.randomUUID().toString().substring(0, 8));
+        jdbc.update("""
+                INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)
+                VALUES (?,(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date+1,'10:00','10:30',500)
+                """, id);
+        return id;
     }
 
     private long pending(long branch) {
         return jdbc.queryForObject("""
-                INSERT INTO orders(order_number,branch_id,customer_name,customer_phone,order_status,reservation_expires_at)
-                VALUES (?,?,'Number test','9876543210','PENDING_PAYMENT',CURRENT_TIMESTAMP+INTERVAL '15 minutes') RETURNING id
-                """, Long.class, "NUM-" + UUID.randomUUID(), branch);
+                INSERT INTO orders(order_number,branch_id,pickup_slot_id,pickup_type,customer_name,customer_phone,order_status,reservation_expires_at)
+                VALUES (?, ?, (SELECT id FROM pickup_slots WHERE branch_id=? ORDER BY id LIMIT 1),
+                        'NORMAL','Number test','9876543210','PENDING_PAYMENT',CURRENT_TIMESTAMP+INTERVAL '15 minutes') RETURNING id
+                """, Long.class, "NUM-" + UUID.randomUUID(), branch, branch);
     }
 
     private Long number(long id) {

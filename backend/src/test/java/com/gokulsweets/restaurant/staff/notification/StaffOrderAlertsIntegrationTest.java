@@ -139,7 +139,11 @@ class StaffOrderAlertsIntegrationTest {
         jdbc.update("UPDATE payments SET payment_status = 'PAID' WHERE id = ?", payment);
         alerts.paymentConfirmed(payment); alerts.paymentConfirmed(payment);
         assertThat(alerts.page(staff, null).messages()).hasSize(1);
-        assertThat(alerts.page(staff, null).messages().getFirst().event().message()).contains(number, "06:00 PM", "IST");
+        Long customerNumber = jdbc.queryForObject("SELECT customer_order_number FROM orders WHERE id=?", Long.class, order);
+        var event = alerts.page(staff, null).messages().getFirst().event();
+        assertThat(event.message()).contains("#" + customerNumber, "06:00 PM", "IST").doesNotContain(number);
+        assertThat(event.customerOrderNumber()).isEqualTo(customerNumber);
+        assertThat(event.orderNumber()).isEqualTo(number);
         assertThat(alerts.page(otherStaff, null).messages()).isEmpty();
         assertThatThrownBy(() -> alerts.markRead(otherStaff, latest())).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
         alerts.markRead(staff, latest()); alerts.markRead(staff, latest());
