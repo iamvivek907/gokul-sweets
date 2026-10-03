@@ -61,3 +61,7 @@ Customer logout requires an explicit confirmation, with Stay signed in focused b
 ## Compact mobile installation
 
 Below 641px, the effective customer visual shell offers an optional compact Home/branch-home/Profile installation card with the same teal, cream and coral palette and tactile 44px controls. Chromium uses one centrally owned browser install event; iPhone uses an explicit, accessible instructional bottom sheet. Actual standalone launches hide promotion; local preferences only enforce cooldowns. Active verification and checkout/payment/order routes suppress the new promotion. The canonical manifest, root worker scope, existing automatic update flow, desktop and flag-OFF legacy presentation are preserved.
+
+## Branch operations and timed menu availability
+
+Service rules reuse the current menu cards and controls on mobile and desktop. Unavailable items show their server-derived IST reason; addition and increase stay disabled until availability is rechecked. Service enforcement defaults OFF and preserves original filtering. Branch closure uses the existing teal/cream shell and a clear branch-selection action, while order history and payment recovery remain reachable. No new checkout or desktop navigation layout is introduced.

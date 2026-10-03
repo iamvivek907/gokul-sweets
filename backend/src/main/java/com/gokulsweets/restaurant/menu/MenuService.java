@@ -25,6 +25,7 @@ import java.util.Map;
 public class MenuService {
 
     private final BranchRepository branchRepository;
+    private final MenuServiceWindows serviceWindows;
 
     private final BranchProductRepository branchProductRepository;
 
@@ -39,11 +40,10 @@ public class MenuService {
                         branchId
                 );
 
-        List<BranchProduct> branchProducts =
-                branchProductRepository
-                        .findAvailableMenu(
-                                branch.getId()
-                        );
+        var service = serviceWindows.snapshot(branchId);
+        List<BranchProduct> branchProducts = service.enabled()
+                ? branchProductRepository.findAdminMenu(branchId).stream().filter(bp -> bp.getProduct().isActive() && bp.getProduct().getCategory().isActive() && !bp.isOccasionOnly()).toList()
+                : branchProductRepository.findAvailableMenu(branchId);
 
         Map<Long, CategoryBucket> categories =
                 new LinkedHashMap<>();
@@ -74,7 +74,8 @@ public class MenuService {
                     toMenuProduct(
                             branchProduct,
                             product,
-                            category
+                            category,
+                            service.status(product.getId())
                     )
             );
         }
@@ -140,7 +141,7 @@ public class MenuService {
                         );
 
 
-        if (!branch.isActive()) {
+        if (!branch.isActive() || !branch.isOperational()) {
 
             log.warn(
                     "Menu requested for inactive branch: branchId={}",
@@ -148,7 +149,7 @@ public class MenuService {
             );
 
             throw new IllegalArgumentException(
-                    "Selected branch is currently unavailable."
+                    "This branch is currently not operational."
             );
         }
 
@@ -160,7 +161,8 @@ public class MenuService {
     private MenuProductResponse toMenuProduct(
             BranchProduct branchProduct,
             Product product,
-            Category category
+            Category category,
+            MenuServiceWindows.Status serviceAvailability
     ) {
 
         BigDecimal effectivePrice =
@@ -188,13 +190,14 @@ public class MenuService {
                  */
                 product.getImageUrl(),
 
-                branchProduct.isAvailable(),
+                branchProduct.isAvailable() && (serviceAvailability == null || serviceAvailability.available()),
 
                 product.getSaleMode(),
 
                 product.getMinimumWeightGrams(),
 
-                product.getWeightStepGrams()
+                product.getWeightStepGrams(),
+                serviceAvailability
         );
     }
 

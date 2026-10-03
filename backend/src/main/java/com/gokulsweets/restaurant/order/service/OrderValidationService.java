@@ -41,6 +41,7 @@ public class OrderValidationService {
 
     private final PickupSlotValidationService pickupSlotValidationService;
     private final SmartOrderingRules smartOrderingRules;
+    private final com.gokulsweets.restaurant.menu.MenuServiceWindows serviceWindows;
 
     @Transactional(readOnly = true)
     public List<ValidatedOrderItem> validateCart(Long branchId, List<CreateOrderItemRequest> items) {
@@ -296,7 +297,14 @@ public class OrderValidationService {
         List<ValidatedOrderItem> items =
                 validateProducts(
                         branch.getId(),
-                        normalizedItems
+                        normalizedItems,
+                        !(keepsExistingReservation && order.getItems().size()==normalizedItems.size()
+                            && order.getItems().stream().allMatch(item -> {
+                                var requested=normalizedItems.get(item.getProduct().getId());
+                                return requested!=null && (item.getSaleMode()==ProductSaleMode.WEIGHT
+                                    ? java.util.Objects.equals(item.getWeightGrams(),requested.weightGrams()) && (requested.quantity()==null || requested.quantity()==1)
+                                    : java.util.Objects.equals(item.getQuantity(),requested.quantity()) && requested.weightGrams()==null);
+                            }))
                 );
 
         log.debug(
@@ -612,11 +620,17 @@ public class OrderValidationService {
     // VALIDATE PRODUCTS
     // =========================================================
 
+    private List<ValidatedOrderItem> validateProducts(Long branchId,Map<Long,RequestedOrderItem> requestedItems) {
+        return validateProducts(branchId,requestedItems,true);
+    }
     private List<ValidatedOrderItem> validateProducts(
             Long branchId,
-            Map<Long, RequestedOrderItem> requestedItems
+            Map<Long, RequestedOrderItem> requestedItems,
+            boolean enforceService
     ) {
 
+        var serviceAvailability = enforceService ? serviceWindows.snapshot(branchId)
+                : new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false,Map.of());
         Set<Long> productIds =
                 requestedItems.keySet();
 
@@ -690,6 +704,8 @@ public class OrderValidationService {
                         "One or more selected products are currently unavailable."
                 );
             }
+
+            serviceAvailability.requireAvailable(productId);
 
             if (!branchProduct.isAvailable()) {
 

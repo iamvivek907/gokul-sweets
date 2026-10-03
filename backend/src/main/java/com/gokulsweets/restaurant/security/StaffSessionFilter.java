@@ -60,6 +60,11 @@ public class StaffSessionFilter extends OncePerRequestFilter {
             }
             sessions.auditSensitiveAction(verified.staffId());
         }
+        String token=StaffSessionService.cookie(request);
+        if(!path.equals("/api/admin/auth/logout") && !StaffSessionService.isAdministrator(current)) {
+            if(!sessions.renewStaff(verified,token,current)){response.sendError(401);return;}
+            response.addHeader("Set-Cookie",AdminAuthController.cookie(token,StaffSessionService.sessionLifetime(current)).toString());
+        }
         UserDetails details = users.loadUserByUsername(verified.username());
         var auth = UsernamePasswordAuthenticationToken.authenticated(details, null, details.getAuthorities());
         SecurityContextHolder.getContext().setAuthentication(auth);

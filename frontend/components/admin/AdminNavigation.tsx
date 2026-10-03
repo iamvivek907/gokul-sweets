@@ -21,6 +21,7 @@ export const adminGroups: {label: string; items: Item[]}[] = [
         {href: "/admin/loyalty", label: "Gokul rewards", ownerOnly: true},
         {href: "/admin/menu", label: "Menu management", permissions: ["MENU_MANAGE"], exact: true},
         {href: "/admin/menu/live", label: "Products & categories", permissions: ["MENU_MANAGE"]},
+        {href: "/admin/menu/service-hours", label: "Service hours & sold out", permissions: ["MENU_MANAGE"]},
         {href: "/admin/menu/images", label: "Product images", permissions: ["MENU_MANAGE"]},
         {href: "/admin/menu/import", label: "Import menu", permissions: ["MENU_MANAGE"]},
         {href: "/admin/tax-categories", label: "Tax categories", permissions: ["MENU_MANAGE"]}

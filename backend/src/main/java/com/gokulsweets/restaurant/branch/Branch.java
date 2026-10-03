@@ -66,6 +66,9 @@ public class Branch {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(nullable=false)
+    private boolean operational = true;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 

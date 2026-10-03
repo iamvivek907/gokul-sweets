@@ -68,11 +68,11 @@ public class AdminAuthController {
 
     private ResponseEntity<LoginResponse> signedIn(StaffSessionService.SignIn session, List<String> recovery) {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .header(HttpHeaders.SET_COOKIE, cookie(session.token(), Duration.ofHours(8)).toString())
+                .header(HttpHeaders.SET_COOKIE, cookie(session.token(), StaffSessionService.sessionLifetime(session.user())).toString())
                 .header("X-Staff-CSRF", session.csrf())
                 .body(new LoginResponse(AdminAuthResponse.from(session.user()), recovery));
     }
-    private ResponseCookie cookie(String value, Duration age) {
+    static ResponseCookie cookie(String value, Duration age) {
         return ResponseCookie.from(StaffSessionService.COOKIE_NAME, value)
                 .httpOnly(true).secure(true).sameSite("Lax").path("/api/admin")
                 .maxAge(age).build();

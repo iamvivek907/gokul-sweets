@@ -86,6 +86,7 @@ jobs:
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-pages-account.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/branch-discovery.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/pwa-install.browser.mjs
+          node tests/menu-service-hours.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/simple-checkout-kitchen.browser.mjs
 
       - name: Upload SCRUM-111 layout evidence

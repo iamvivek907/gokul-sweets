@@ -110,7 +110,7 @@ public class OccasionEnquiryService {
                 """, (rs, row) -> (UUID) rs.getObject(1), environment.name(), subject, requestHash,
                 Timestamp.from(clock.instant().minus(Duration.ofMinutes(15))));
         if (!duplicate.isEmpty()) return get(environment, subject, duplicate.getFirst());
-        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM branches WHERE id = ? AND active)",
+        if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM branches WHERE id = ? AND active AND operational)",
                 Boolean.class, input.branchId()))) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Branch is unavailable.");
         var catalogue = new OccasionCatalogue(jdbc, features, clock);
         var options = catalogue.catalogue(input.branchId(), false).sweets();

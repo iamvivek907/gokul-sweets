@@ -24,7 +24,8 @@ public record BranchResponse(
         String mobileCoverImageUrl,
         String coverAltText,
         String description,
-        boolean pickupAvailable
+        boolean pickupAvailable,
+        boolean operational
 ) {
 
     public static BranchResponse from(Branch branch, String coverImageUrl, String mobileCoverImageUrl,
@@ -43,7 +44,7 @@ public record BranchResponse(
                 branch.getLongitude(),
                 branch.getOpeningTime(),
                 branch.getClosingTime(),
-                branch.isActive(), coverImageUrl, mobileCoverImageUrl, coverAltText, description, pickupAvailable
+                branch.isActive(), coverImageUrl, mobileCoverImageUrl, coverAltText, description, pickupAvailable, branch.isOperational()
         );
     }
 }

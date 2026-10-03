@@ -1,4 +1,5 @@
 "use client";
+import {useMenuServiceRefresh} from "@/hooks/useMenuServiceRefresh";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -102,6 +103,7 @@ export default function MenuScreen() {
         useState<MenuCategory[]>(
             []
         );
+    useMenuServiceRefresh(branch?.id,categories,setCategories);
 
 
     const [
@@ -741,6 +743,7 @@ export default function MenuScreen() {
         product: MenuProduct
     ) {
 
+        if (!product.available) return;
         if (product.saleMode === "WEIGHT") {
             setWeightProduct(product);
             return;
@@ -763,6 +766,8 @@ export default function MenuScreen() {
         }
 
 
+        const liveProduct=categories.flatMap(category=>category.products).find(item=>item.id===product.id);
+        if(!liveProduct?.available){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         const result =
             addItem(
                 product,

@@ -202,7 +202,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                {isAvailable ? "Try another pickup date" : "Unavailable"}
+                                {isAvailable ? "Try another pickup date" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}
                             </span>
                         </div>
                     )
@@ -275,6 +275,8 @@ export default function ProductCard({
                     )
                 }
 
+
+                {!isAvailable && product.serviceAvailability?.message && <p className="my-1 text-xs leading-5 text-[#a94d39]" role="status">{product.serviceAvailability.message}</p>}
 
                 {/* Rating */}
 
@@ -553,7 +555,7 @@ export default function ProductCard({
                                                 selectionLabel
                                             }
                                             type="button"
-                                            disabled={unavailableForPickup}
+                                            disabled={!isAvailable || unavailableForPickup}
                                             tabIndex={
                                                 isInCart
                                                     ? 0

@@ -260,10 +260,10 @@ export default function BranchSelector({compact = false, locationControl = false
             {proposedBranch && createPortal(<StartFreshDialog branchName={proposedBranch.name} itemCount={cart.itemCount}
                 onKeep={() => setProposedBranch(null)} onConfirm={confirmSwitch} />, document.body)}
 
-            {cardBranch ? <button type="button" className="gokul-branch-card-action"
-                aria-label={destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Bulk order")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
+            {cardBranch ? <button type="button" disabled={cardBranch.operational===false} className="gokul-branch-card-action"
+                aria-label={cardBranch.operational===false?`${cardBranch.name} · ${translate("Currently not operational")}`:destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Bulk order")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
                 onClick={() => handleSelectBranch(cardBranch)}>
-                <span className="gokul-branch-card-action-label">{destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></> : <T text="Explore this branch" />}</span>
+                <span className="gokul-branch-card-action-label">{cardBranch.operational===false?<T text="Currently not operational"/>:destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></> : <T text="Explore this branch" />}</span>
             </button> : <button
                 type="button"
                 popoverTarget={popoverId}
@@ -559,6 +559,7 @@ export default function BranchSelector({compact = false, locationControl = false
                                                 item.id
                                             }
                                             type="button"
+                                            disabled={item.operational===false}
                                             onClick={() =>
                                                 handleSelectBranch(
                                                     item
@@ -601,6 +602,7 @@ export default function BranchSelector({compact = false, locationControl = false
                                                         {
                                                             item.name
                                                         }
+                                                        {item.operational===false&&<span className="mt-1 block text-xs font-semibold"><T text="Currently not operational"/></span>}
                                                     </p>
 
 
