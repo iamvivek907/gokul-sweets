@@ -15,7 +15,8 @@ import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
-@SpringBootTest
+@SpringBootTest(properties={"spring.datasource.hikari.maximum-pool-size=3","spring.datasource.hikari.minimum-idle=0"})
+@org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class MenuServiceWindowsIntegrationTest {
  @Autowired MenuServiceWindows windows;
  @Autowired BranchOperations operations;

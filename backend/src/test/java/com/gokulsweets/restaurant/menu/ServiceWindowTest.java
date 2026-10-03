@@ -24,4 +24,8 @@ class ServiceWindowTest {
   assertThat(weekdays.contains(at("2026-10-10T10:00:00"))).isFalse();
   assertThat(weekdays.nextChange(at("2026-10-10T10:00:00"))).isEqualTo(at("2026-10-12T00:00:00").toInstant());
  }
+ @Test void consecutiveAllDayWindowsDoNotExpireAtAnUnchangedMidnight(){
+  assertThat(new ServiceWindow(null,null,127).nextChange(at("2026-10-05T23:59:59"))).isNull();
+  assertThat(new ServiceWindow(null,null,3).nextChange(at("2026-10-05T23:59:59"))).isEqualTo(at("2026-10-07T00:00:00").toInstant());
+ }
 }

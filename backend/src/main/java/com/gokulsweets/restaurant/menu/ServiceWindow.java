@@ -21,7 +21,11 @@ public record ServiceWindow(LocalTime startsAt, LocalTime endsAt, int weekdays) 
             var start = date.atTime(startsAt == null ? LocalTime.MIDNIGHT : startsAt).atZone(now.getZone()).toInstant();
             var end = (startsAt == null || endsAt.isBefore(startsAt) ? date.plusDays(1) : date)
                     .atTime(endsAt == null ? LocalTime.MIDNIGHT : endsAt).atZone(now.getZone()).toInstant();
-            for (var boundary : new Instant[]{start,end}) if (boundary.isAfter(now.toInstant()) && (next == null || boundary.isBefore(next))) next=boundary;
+            for (var boundary : new Instant[]{start,end}) {
+                var atBoundary=boundary.atZone(now.getZone());
+                if (boundary.isAfter(now.toInstant()) && (next == null || boundary.isBefore(next))
+                        && contains(atBoundary.minusNanos(1)) != contains(atBoundary)) next=boundary;
+            }
         }
         return next;
     }
