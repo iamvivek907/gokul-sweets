@@ -1,10 +1,12 @@
 "use client";
+import AdminHelp from "@/components/admin/AdminHelp";
 
 import {useCallback, useEffect, useRef, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {getActiveBranches} from "@/services/branchApi";
 import {useTranslation} from "@/lib/language";
+import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {adminFetch} from "@/services/adminApi";
 
 /** Lives in the admin layout so navigating to an order does not silence due work. */
@@ -15,11 +17,42 @@ export default function KitchenAlarm() {
     const canStart = hasPermission("ORDER_START_PREPARATION"), canReady = hasPermission("ORDER_MARK_READY");
     const permitted = !!authorization && hasPermission("ORDER_VIEW") && (canStart || canReady) && !!features?.adminPreparationBoard;
     const [enabled, setEnabled] = useState(false);
+    const [soundReady,setSoundReady] = useState(false);
+    const preferenceKey = `gokul-kitchen-alarm:${ADMIN_API_BASE_URL}:${profile?.staffId}`;
+    const generation = useRef(0);
     const [message, setMessage] = useState("");
     const audio = useRef<AudioContext | null>(null);
     const due = useRef(0);
     const fresh = useRef(0);
     const revision = useRef(0);
+    const activateSound = useCallback(async () => {
+        const current = generation.current;
+        try {
+            audio.current ??= new AudioContext();
+            await audio.current.resume();
+            if (current !== generation.current) return;
+            const running = audio.current.state === "running";
+            setSoundReady(running); setEnabled(true);
+            try {localStorage.setItem(preferenceKey,"on");} catch { /* Sound still works for this visit. */ }
+            if (!running) setMessage("Sound is waiting for browser permission. Tap Resume kitchen sound.");
+        } catch {if(current===generation.current){setSoundReady(false);setMessage("This device could not enable sound. Use staff push alerts.");}}
+    },[preferenceKey]);
+    useEffect(() => {
+        const current=++generation.current;
+        void Promise.resolve().then(()=>{
+            if(current!==generation.current)return;
+            setEnabled(false);setSoundReady(false);setMessage("");
+            if(permitted) {try {if(localStorage.getItem(preferenceKey)==="on")setEnabled(true);} catch { /* Private browsing. */ }}
+        });
+        function teardown(){generation.current=current+1;const previous=audio.current;audio.current=null;void previous?.close();}
+        return teardown;
+    },[permitted,preferenceKey]);
+    useEffect(()=>{
+        if(!enabled||!permitted||soundReady)return;
+        const resume=()=>{void activateSound();};
+        window.addEventListener("pointerdown",resume);window.addEventListener("keydown",resume);
+        return()=>{window.removeEventListener("pointerdown",resume);window.removeEventListener("keydown",resume);};
+    },[enabled,permitted,soundReady,activateSound]);
     const check = useCallback(async (signal?: AbortSignal) => {
         if (!permitted || !authorization || !profile) return;
         const current = ++revision.current;
@@ -59,7 +92,7 @@ export default function KitchenAlarm() {
         return () => {controller.abort(); due.current = 0; fresh.current = 0; clearInterval(timer); window.removeEventListener("gokul-kitchen-changed", refresh); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh);};
     }, [enabled, permitted, check, profile?.staffId]);
     useEffect(() => {
-        if (!enabled || !permitted) return;
+        if (!enabled || !permitted || !soundReady) return;
         const timer = window.setInterval(() => {
             if (!audio.current || due.current < 1 || Date.now() - fresh.current > 45000 || !navigator.onLine || document.visibilityState !== "visible") return;
             const ring = async () => {
@@ -75,21 +108,19 @@ export default function KitchenAlarm() {
                         gain.gain.exponentialRampToValueAtTime(.001, context.currentTime + i * .4 + .3);
                         tone.start(context.currentTime + i * .4); tone.stop(context.currentTime + i * .4 + .35);
                     }
-                } catch {setEnabled(false); setMessage("Sound was blocked. Enable the kitchen alarm again.");}
+                } catch {setSoundReady(false); setMessage("Sound was blocked. Tap Resume kitchen sound.");}
             };
             if (navigator.locks) void navigator.locks.request("gokul-kitchen-alarm", {ifAvailable: true}, lock => lock ? ring() : undefined);
             else void ring();
         }, 2000);
         return () => clearInterval(timer);
-    }, [enabled, permitted]);
-    useEffect(() => () => {void audio.current?.close();}, []);
+    }, [enabled, permitted,soundReady]);
     if (!permitted) return null;
     return <aside className="mx-4 my-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-slate-900" aria-label="Kitchen alarm">
-        <button type="button" disabled={enabled} className="min-h-11 rounded-xl bg-teal-900 px-4 font-bold text-white disabled:opacity-70" onClick={async () => {
-            try {audio.current ??= new AudioContext(); await audio.current.resume(); setEnabled(true);}
-            catch {setMessage("This device could not enable sound. Use staff push alerts.");}
-        }}>{translate(enabled ? "Kitchen alarm enabled" : "Enable kitchen alarm")}</button>
-        <p role="status" className="mt-2">{translate(message || "Enable sound once per session. It repeats until waiting orders enter KOT and overdue preparing orders are marked ready.")}</p>
+        <div className="flex flex-wrap gap-3"><AdminHelp title="Kitchen sound alarm" description="Repeats for waiting orders and overdue preparation work while the portal is open. Your choice is saved for this staff browser. After refresh, browsers require a first tap or key press before sound can resume. Closed or locked screens use staff push instead." guidance="Click Enable kitchen alarm once. After refresh, tap anywhere or choose Resume kitchen sound. Disable kitchen alarm clears the saved preference for this browser; it does not disable push alerts."/><button type="button" disabled={enabled&&soundReady} className="min-h-11 rounded-xl bg-teal-900 px-4 font-bold text-white disabled:opacity-70" onClick={()=>{void activateSound();}}>{translate(enabled ? soundReady ? "Kitchen alarm enabled" : "Resume kitchen sound" : "Enable kitchen alarm")}</button>
+        {enabled&&<button type="button" className="min-h-11 rounded-xl border border-teal-900 px-4 font-bold" onClick={()=>{generation.current++;setEnabled(false);setSoundReady(false);due.current=0;fresh.current=0;void audio.current?.suspend();try{localStorage.setItem(preferenceKey,"off");}catch{/* This visit remains muted. */}setMessage("Kitchen alarm disabled for this staff browser.");}}>{translate("Disable kitchen alarm")}</button>}</div>
+        {enabled&&!soundReady&&<p className="mt-2">Your alarm preference is saved. Tap once anywhere in this portal to restore sound after refresh.</p>}
+        <p role="status" className="mt-2">{translate(message || "Your choice is remembered for this staff browser. Sound repeats until waiting orders enter KOT and overdue preparing orders are marked ready.")}</p>
         <p className="mt-1">{translate("Keep the PWA open for continuous sound. Locked-screen alerts use")} <a className="underline" href="/admin/staff-notifications">{translate("staff push settings")}</a>{translate("; phone sound settings apply.")}</p>
     </aside>;
 }

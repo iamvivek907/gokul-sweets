@@ -5,6 +5,7 @@ import type {
     ReactNode
 } from "react";
 
+import BranchOperationalGuard from "./BranchOperationalGuard";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
 import ConnectionNotice from "@/components/common/ConnectionNotice";
 import Header
@@ -84,7 +85,7 @@ export default function AppShell({
             >
                 {futuristic && <CustomerBreadcrumbs />}
                 {futuristic && <InstallAppBanner compact />}
-                {children}
+                <BranchOperationalGuard>{children}</BranchOperationalGuard>
             </main>
 
             <CustomerFooter />

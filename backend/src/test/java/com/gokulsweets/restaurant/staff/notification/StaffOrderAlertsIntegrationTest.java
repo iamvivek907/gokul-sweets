@@ -65,6 +65,9 @@ class StaffOrderAlertsIntegrationTest {
             """, Long.class, number, branch, slot);
         payment = jdbc.queryForObject("INSERT INTO payments(order_id, provider, amount, payment_status) VALUES (?, 'PHONEPE', 100, 'PAID') RETURNING id", Long.class, order);
         StaffUser user = new StaffUser(); user.setId(staff);
+        var staffRole = new com.gokulsweets.restaurant.staff.Role();
+        staffRole.setName(jdbc.queryForObject("SELECT name FROM roles WHERE id = ?", String.class, role));
+        user.setRole(staffRole);
         user.setUpdatedAt(jdbc.queryForObject("SELECT updated_at FROM staff_users WHERE id = ?", LocalDateTime.class, staff));
         cookie = sessions.issue(user).token();
         when(push.configured()).thenReturn(true);

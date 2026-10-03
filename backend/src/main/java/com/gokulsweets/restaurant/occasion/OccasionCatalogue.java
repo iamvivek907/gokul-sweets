@@ -54,6 +54,7 @@ public class OccasionCatalogue {
     @Transactional(readOnly=true)
     public Catalogue catalogue(long branchId, boolean admin) {
         enabled();
+        if(!admin && !Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM branches WHERE id=? AND active AND operational)",Boolean.class,branchId)))throw new ResponseStatusException(HttpStatus.CONFLICT,"This branch is currently not operational.");
         var sweets = jdbc.query("""
             SELECT p.id,p.name,p.description,p.image_url,p.sale_mode,bp.occasion_only,bp.occasion_published,
                    bp.occasion_lead_days,bp.occasion_piece_grams,p.category_id,c.name,COALESCE(bp.price_override,p.base_price),tc.cgst_rate+tc.sgst_rate

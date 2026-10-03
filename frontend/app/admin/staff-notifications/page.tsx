@@ -1,4 +1,5 @@
 "use client";
+import AdminHelp from "@/components/admin/AdminHelp";
 import {T} from "@/lib/language";
 
 import {useCallback, useEffect, useState} from "react";
@@ -86,9 +87,9 @@ export default function StaffNotificationsPage() {
         {settings?.enabled && <>
             <details open className="mt-6 rounded-3xl border border-[#eadfd6] bg-white p-5 sm:p-6" aria-label="Staff push settings">
                 <summary className="cursor-pointer text-lg font-bold">Notification delivery settings</summary>
-                <h2 className="mt-3 font-bold">Get alerts when the portal is closed</h2>
+                <div className="mt-3 flex items-center justify-between gap-2"><h2 className="font-bold">Get alerts when the portal is closed</h2><AdminHelp title="Staff push and session duration" description="Push sends branch alerts to this registered browser, including when the portal is closed. Sound and delivery depend on browser permission and phone settings. Logout, expired sessions and revoked access stop alerts. Staff sessions renew during use with a 365-day inactivity limit; admins must sign in again after 15 hours." guidance="Enable staff push separately on each device and allow browser notifications. On iPhone, use the installed Home Screen app and allow Notifications, Banners and Sounds. Refresh keeps registration; Check staff registration verifies it. Disable staff push affects this browser only."/></div>
                 <p className="mt-3 rounded-xl bg-[#e7f0e9] p-4 text-sm"><T text="For iPhone banners: open the installed app, enable staff push here, then allow Notifications, Banners and Sounds in iPhone Settings. Focus or Silent mode can suppress alerts."/></p>
-                <p className="mt-2 text-sm leading-6">Register each staff browser separately. Alerts stop after logout or session expiry (staff sign-in lasts up to 8 hours). Browser permission, device mute and OS settings control delivery and sound. On iOS/iPadOS 16.4+, use the installed Home Screen app.</p>
+                <p className="mt-2 text-sm leading-6">Register each staff browser separately. Alerts stop after logout or session expiry (staff sessions renew for up to a year of inactivity; administrator sessions last 15 hours). Browser permission, device mute and OS settings control delivery and sound. On iOS/iPadOS 16.4+, use the installed Home Screen app.</p>
                 <p className="mt-2 text-sm">Order references and branch timing may appear on your lock screen.</p>
                 {!supported && <p className="mt-3 text-sm">Push is unsupported here. This inbox and the preparation queue remain available.</p>}
                 {!settings.pushConfigured && <p className="mt-3 text-sm">Push sender configuration is missing. Contact your administrator; no registration is available yet.</p>}

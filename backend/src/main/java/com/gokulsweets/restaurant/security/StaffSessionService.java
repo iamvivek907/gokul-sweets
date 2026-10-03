@@ -112,10 +112,25 @@ public class StaffSessionService {
     @Transactional
     public SignIn issue(StaffUser user) {
         String token = randomToken(), csrf = derivedCsrf(token);
-        jdbc.update("INSERT INTO staff_sessions(token_hash, staff_id, csrf_hash, staff_updated_at, expires_at) VALUES (?, ?, ?, ?, ?)",
+        Instant issuedAt=Instant.now(inventoryClock);
+        jdbc.update("INSERT INTO staff_sessions(token_hash, staff_id, csrf_hash, staff_updated_at, expires_at,created_at) VALUES (?, ?, ?, ?, ?, ?)",
                 hash(token), user.getId(), hash(csrf), user.getUpdatedAt(),
-                Timestamp.from(Instant.now(inventoryClock).plusSeconds(8 * 3600)));
+                Timestamp.from(issuedAt.plus(sessionLifetime(user))),Timestamp.from(issuedAt));
         return new SignIn(token, csrf, user, false);
+    }
+
+    public static boolean isAdministrator(StaffUser user) {
+        return user.getRole().getName().toUpperCase(java.util.Locale.ROOT).contains("ADMIN");
+    }
+    public static java.time.Duration sessionLifetime(StaffUser user) {
+        return isAdministrator(user) ? java.time.Duration.ofHours(15) : java.time.Duration.ofDays(365);
+    }
+    @Transactional
+    public boolean renewStaff(Verified verified,String token,StaffUser user) {
+        if(isAdministrator(user)) return false;
+        Instant now=Instant.now(inventoryClock);
+        return jdbc.update("UPDATE staff_sessions SET expires_at=? WHERE token_hash=? AND staff_id=? AND revoked_at IS NULL AND expires_at>? AND staff_updated_at=? AND EXISTS(SELECT 1 FROM staff_users u JOIN roles r ON r.id=u.role_id WHERE u.id=staff_sessions.staff_id AND u.active AND u.updated_at=staff_sessions.staff_updated_at AND UPPER(r.name) NOT LIKE '%ADMIN%')",
+                Timestamp.from(now.plus(sessionLifetime(user))),hash(token),verified.staffId(),Timestamp.from(now),user.getUpdatedAt())==1;
     }
 
     @Transactional(readOnly = true)
@@ -124,10 +139,12 @@ public class StaffSessionService {
         return jdbc.query("""
                 SELECT u.id, u.username, s.csrf_hash, s.created_at FROM staff_sessions s
                 JOIN staff_users u ON u.id = s.staff_id
+                JOIN roles r ON r.id = u.role_id
                 WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
                   AND s.staff_updated_at = u.updated_at AND u.active
+                  AND (UPPER(r.name) NOT LIKE '%ADMIN%' OR s.created_at > ?)
                 """, (rs, row) -> new Verified(rs.getLong(1), rs.getString(2), rs.getString(3), rs.getTimestamp(4).toInstant()),
-                hash(token), Timestamp.from(Instant.now(inventoryClock))).stream().findFirst().orElse(null);
+                hash(token), Timestamp.from(Instant.now(inventoryClock)), Timestamp.from(Instant.now(inventoryClock).minusSeconds(15*3600))).stream().findFirst().orElse(null);
     }
 
     @Transactional public void revoke(String token) {

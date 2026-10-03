@@ -26,6 +26,11 @@ public record MenuProductResponse(
 
         Integer minimumWeightGrams,
 
-        Integer weightStepGrams
+        Integer weightStepGrams,
+
+        com.gokulsweets.restaurant.menu.MenuServiceWindows.Status serviceAvailability
 ) {
+    public MenuProductResponse(Long id,Long categoryId,String categoryName,String name,String description,BigDecimal price,String imageUrl,boolean available,ProductSaleMode saleMode,Integer minimumWeightGrams,Integer weightStepGrams) {
+        this(id,categoryId,categoryName,name,description,price,imageUrl,available,saleMode,minimumWeightGrams,weightStepGrams,null);
+    }
 }

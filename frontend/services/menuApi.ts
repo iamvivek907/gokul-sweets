@@ -16,6 +16,12 @@ const USE_MOCK_MENU =
     === "true";
 
 
+export function stampMenuServiceAvailability(data:MenuCategory[]):MenuCategory[] {
+    if(!data.some(category=>category.products.some(product=>product.serviceAvailability)))return data;
+    const receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now();
+    return data.map(category=>({...category,products:category.products.map(product=>product.serviceAvailability?{...product,serviceAvailability:{...product.serviceAvailability,receivedMonotonic}}:product)}));
+}
+
 async function loadMenu(
     branchId: number,
     signal?: AbortSignal
@@ -67,7 +73,7 @@ async function loadMenu(
             method: "GET",
             signal
         }
-    );
+    ).then(stampMenuServiceAvailability);
 }
 // Consume a launch prefetch once; later visits always reload live availability.
 const WARM_MENU_TTL = 15_000;

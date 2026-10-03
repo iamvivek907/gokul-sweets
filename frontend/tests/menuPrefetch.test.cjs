@@ -80,3 +80,11 @@ test('late completion of an expired request cannot remove its replacement',async
  const second=f.api.warmMenu(1);await first;f.resolve();await second;
  await f.api.getMenu(1);assert.equal(f.requests,2);assert.equal(f.timers,0);
 });
+
+test('a warmed service decision retains its receipt time when consumed later',async()=>{
+ const f=setup(),warming=f.api.warmMenu(1);
+ f.resolve([{id:1,products:[{id:1,serviceAvailability:{evaluatedAt:'2026-10-05T05:29:50Z',nextChangeAt:'2026-10-05T05:30:00Z',available:true}}]}]);
+ await warming;f.advance(9000);const menu=await f.api.getMenu(1);
+ assert.equal(menu[0].products[0].serviceAvailability.receivedMonotonic,0,'consumption must not restart the service deadline');
+ assert.equal(f.requests,1);
+});

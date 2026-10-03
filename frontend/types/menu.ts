@@ -21,6 +21,8 @@ export interface MenuProduct {
 
     available: boolean;
 
+    serviceAvailability?: {available: boolean; code: string; message: string | null; nextChangeAt: string | null; evaluatedAt?: string | null; receivedMonotonic?: number} | null;
+
     saleMode: ProductSaleMode;
 
     minimumWeightGrams: number | null;
