@@ -25,6 +25,7 @@ class LoyaltyIntegrationTest {
  @Autowired JdbcTemplate jdbc;
  @Autowired EnhancementProperties flags;
  @Autowired PlatformTransactionManager manager;
+ @Autowired tools.jackson.databind.ObjectMapper mapper;
  private boolean rewards,identity,quote;
  private UUID subject;private long branch;private long slot;
  @BeforeEach void setup(){
@@ -48,6 +49,52 @@ class LoyaltyIntegrationTest {
   var result=transaction.execute(status->{jdbc.execute("SET TRANSACTION READ ONLY");assertThat(jdbc.queryForObject("SHOW transaction_read_only",String.class)).isEqualTo("on");return service.preview(request,null);});
   assertThat(result.token()).isNotBlank();
   new TransactionTemplate(manager).executeWithoutResult(status->service.accept(request,null,amounts,result.token()));
+ }
+ @Test void catalogueInsertionWaitsForAcceptedRewardReservation() throws Exception {assertPolicyMutationWaits(true);}
+ @Test void exclusionReplacementWaitsForAcceptedRewardReservation() throws Exception {assertPolicyMutationWaits(false);}
+ private void assertPolicyMutationWaits(boolean catalogue) throws Exception {
+  grant(100);var pending=order("PENDING_PAYMENT",true);String accepted=loyalty.policyVersion();String code="LOCK_"+subject.toString().replace("-","");
+  var products=jdbc.queryForList("SELECT product_id FROM loyalty_excluded_products",Long.class);var promotions=jdbc.queryForList("SELECT code FROM loyalty_excluded_rebates",String.class);
+  long category=jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?,?) RETURNING id",Long.class,code,code);
+  long product=jdbc.queryForObject("INSERT INTO products(code,name,category_id,sale_mode,base_price) VALUES (?, ?, ?, 'UNIT',149) RETURNING id",Long.class,code,code,category);
+  long role=jdbc.queryForObject("SELECT id FROM roles WHERE name='OWNER_ADMIN'",Long.class);
+  long actor=jdbc.queryForObject("INSERT INTO staff_users(username,password_hash,full_name,role_id) VALUES (?,'test','Policy lock test',?) RETURNING id",Long.class,code,role);
+  var staff=org.mockito.Mockito.mock(com.gokulsweets.restaurant.security.StaffAuthorizationService.class);
+  var user=new com.gokulsweets.restaurant.staff.StaffUser();user.setId(actor);var owner=new com.gokulsweets.restaurant.staff.Role();owner.setName("OWNER_ADMIN");user.setRole(owner);org.mockito.Mockito.when(staff.getCurrentStaff()).thenReturn(user);
+  var admin=new LoyaltyAdminController(staff,jdbc,loyalty,rules,mapper);
+  var productIds=new ArrayList<>(products);productIds.add(product);var rebateCodes=new ArrayList<>(promotions);rebateCodes.add(code);
+  var connected=new CountDownLatch(1);var pid=new java.util.concurrent.atomic.AtomicInteger();var writer=new java.util.concurrent.atomic.AtomicReference<Future<?>>();
+  try(var pool=Executors.newSingleThreadExecutor()){
+   try{
+    new TransactionTemplate(manager).executeWithoutResult(tx->{
+     loyalty.verifyPolicy(accepted);
+     writer.set(pool.submit(()->new TransactionTemplate(manager).executeWithoutResult(write->{
+      jdbc.execute("SET LOCAL lock_timeout='5s'");pid.set(jdbc.queryForObject("SELECT pg_backend_pid()",Integer.class));connected.countDown();
+      if(catalogue)admin.reward(new LoyaltyAdminController.RewardInput(code,"Concurrent catalogue insertion",10,BigDecimal.ONE,new BigDecimal("149"),true,"Policy lock regression"));
+      else admin.exclusions(new LoyaltyAdminController.Exclusions(productIds,rebateCodes,"Policy lock regression"));
+     })));
+     try{
+      assertThat(connected.await(3,TimeUnit.SECONDS)).isTrue();
+      long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
+      while(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=? AND locktype='advisory' AND NOT granted",Integer.class,pid.get())==0&&System.nanoTime()<deadline)Thread.sleep(10);
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=? AND locktype='advisory' AND NOT granted",Integer.class,pid.get())).isEqualTo(1);
+     }catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException(interrupted);}
+     assertThat(loyalty.policyVersion()).isEqualTo(accepted);
+     loyalty.reserve(pending,"SWEET_5");
+    });
+    writer.get().get(6,TimeUnit.SECONDS);
+    assertThat(loyalty.policyVersion()).isNotEqualTo(accepted);
+    assertThatThrownBy(()->new TransactionTemplate(manager).executeWithoutResult(tx->loyalty.verifyPolicy(accepted))).hasMessageContaining("changed");
+    assertThat(jdbc.queryForObject("SELECT state FROM loyalty_holds WHERE order_id=?",String.class,pending.getId())).isEqualTo("RESERVED");
+   }finally{
+    new TransactionTemplate(manager).executeWithoutResult(tx->{
+     loyalty.lockPolicyForUpdate();jdbc.update("DELETE FROM loyalty_rewards WHERE code=?",code);
+     jdbc.update("DELETE FROM loyalty_excluded_products");jdbc.update("DELETE FROM loyalty_excluded_rebates");
+     for(long id:products)jdbc.update("INSERT INTO loyalty_excluded_products VALUES (?)",id);
+     for(String promotion:promotions)jdbc.update("INSERT INTO loyalty_excluded_rebates VALUES (?)",promotion);
+    });
+   }
+  }
  }
  private void grant(int coins){
   long ledger=jdbc.queryForObject("INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,reason,expires_at) VALUES ('DEV',? ,?,'ADJUSTED',?,'Test fixture',CURRENT_TIMESTAMP+INTERVAL '180 days') RETURNING id",Long.class,subject,"fixture:"+UUID.randomUUID(),coins);

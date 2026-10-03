@@ -635,6 +635,17 @@ public class RebateEligibilityService {
         }
     }
 
+    /** Explicit-code pricing for an unsaved validated draft; persisted orders retain payment guards. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<AvailableRebateResponse> findEligibleDraftRebate(Order draft, String code) {
+        if (draft.getId() != null) throw new IllegalArgumentException("Draft pricing requires an unsaved order.");
+        try {
+            return java.util.Optional.of(priceEligibleCode(draft, code));
+        } catch (IllegalArgumentException | IllegalStateException ineligible) {
+            return java.util.Optional.empty();
+        }
+    }
+
     @Transactional(readOnly = true)
     public AvailableRebateResponse getEligibleRebate(
             Order order,
@@ -658,6 +669,10 @@ public class RebateEligibilityService {
             );
         }
 
+        return priceEligibleCode(order, rebateCode);
+    }
+
+    private AvailableRebateResponse priceEligibleCode(Order order, String rebateCode) {
         String normalizedCode =
                 rebateCode
                         .trim()

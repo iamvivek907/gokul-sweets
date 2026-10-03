@@ -51,10 +51,27 @@ class MobileCheckoutPreviewTest {
   verify(loyalty).wallet("DEV",subject.id(),new java.math.BigDecimal("200"));
   verify(loyalty).preview("DEV",subject.id(),new java.math.BigDecimal("200"),null);
  }
+ @Test void explicitMobileOfferUsesRealDraftEligibilityWithoutAnOrderStatus(){
+  var repository=mock(com.gokulsweets.restaurant.rebate.RebateRepository.class);
+  var payments=mock(com.gokulsweets.restaurant.payment.repository.PaymentRepository.class);
+  var realEligibility=new RebateEligibilityService(mock(com.gokulsweets.restaurant.order.repository.OrderRepository.class),payments,repository,mock(com.gokulsweets.restaurant.rebate.RebateSlabRepository.class),mock(com.gokulsweets.restaurant.rebate.RebateCustomerRepository.class),mock(com.gokulsweets.restaurant.rebate.RebateRedemptionRepository.class));
+  var offer=new com.gokulsweets.restaurant.rebate.Rebate();offer.setId(4L);offer.setCode("SAVE8");offer.setName("Chosen weaker offer");offer.setScope(com.gokulsweets.restaurant.rebate.RebateScope.GENERAL);offer.setRebateType(com.gokulsweets.restaurant.rebate.RebateType.FIXED_AMOUNT);offer.setRebateValue(new java.math.BigDecimal("8"));
+  var now=java.time.LocalDateTime.now(java.time.ZoneId.of("Asia/Kolkata"));offer.setValidFrom(now.minusDays(1));offer.setValidUntil(now.plusDays(1));
+  when(repository.findByCodeIgnoreCase("SAVE8")).thenReturn(java.util.Optional.of(offer));
+  when(repository.findActivePublicCandidates(eq(1L),any())).thenReturn(List.of(offer));
+  var selected=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of(),null,null,"SAVE8");
+  when(quotes.preview(selected,null)).thenReturn(new CheckoutQuoteService.Quote(List.of(),"100","0","0","0","0","102","INR","2099-01-01T00:00:00Z","signed","2","0","2","0"));
+  var result=new MobileCheckoutPreview(ownership,quotes,realEligibility,loyalty).preview(selected,"verified");
+  assertThat(result.selectedOffer().code()).isEqualTo("SAVE8");assertThat(result.selectedOffer().payableAfterRebate()).isEqualByComparingTo("93.84");
+  when(repository.findActivePublicCandidates(eq(1L),any())).thenReturn(List.of());
+  var entered=new MobileCheckoutPreview(ownership,quotes,realEligibility,loyalty).preview(selected,"verified");
+  assertThat(entered.selectedOffer().code()).isEqualTo("SAVE8");assertThat(entered.offers()).hasSize(1);
+  verifyNoInteractions(payments);
+ }
  @Test void explicitOfferRejectionHasADistinctRecoveryCode(){
   var selected=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of(),null,null,"OLD");
   when(quotes.preview(selected,null)).thenReturn(new CheckoutQuoteService.Quote(List.of(),"100","0","0","0","0","100","INR","2099-01-01T00:00:00Z","signed","0","0","0","0"));
-  when(rebates.previewDraft(any())).thenReturn(List.of());when(rebates.findEligibleRebate(any(),eq("OLD"))).thenReturn(java.util.Optional.empty());
+  when(rebates.previewDraft(any())).thenReturn(List.of());when(rebates.findEligibleDraftRebate(any(),eq("OLD"))).thenReturn(java.util.Optional.empty());
   assertThatThrownBy(()->preview.preview(selected,"verified")).isInstanceOf(OfferIneligibleException.class);
   var response=new com.gokulsweets.restaurant.exception.GlobalExceptionHandler().handleIneligibleOffer(new OfferIneligibleException(),new org.springframework.mock.web.MockHttpServletRequest());
   assertThat(response.getStatusCode().value()).isEqualTo(409);assertThat(response.getBody().code()).isEqualTo("OFFER_INELIGIBLE");

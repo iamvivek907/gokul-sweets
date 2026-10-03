@@ -62,6 +62,26 @@ class DeliveryRebatePricingTest {
         verifyNoInteractions(orders, payments);
     }
 
+    @Test void explicitDraftOffersUseRealEligibilityWithoutPersistedPaymentGuards() {
+        var draft=order("2","0"); draft.setId(null); draft.setOrderNumber(null); draft.setOrderStatus(null);
+        var offer=rebate(); clearInvocations(orders,payments);
+        assertThat(eligibility.findEligibleDraftRebate(draft," save20 ").orElseThrow().payableAfterRebate()).isEqualByComparingTo("147.90");
+        offer.setMinimumOrderAmount(n("101"));
+        assertThat(eligibility.findEligibleDraftRebate(draft,"SAVE20")).isEmpty();
+        offer.setMinimumOrderAmount(n("100")); offer.setActive(false);
+        assertThat(eligibility.findEligibleDraftRebate(draft,"SAVE20")).isEmpty();
+        verifyNoInteractions(orders,payments);
+    }
+
+    @Test void draftEntryCannotBypassPersistedOrderOrStartedPaymentGuards() {
+        var saved=order("2","0"); rebate();
+        assertThatThrownBy(()->eligibility.findEligibleDraftRebate(saved,"SAVE20")).hasMessageContaining("unsaved");
+        saved.setOrderStatus(OrderStatus.CONFIRMED);
+        assertThat(eligibility.findEligibleRebate(saved,"SAVE20")).isEmpty();
+        saved.setOrderStatus(OrderStatus.PENDING_PAYMENT); when(payments.existsByOrderId(1L)).thenReturn(true);
+        assertThat(eligibility.findEligibleRebate(saved,"SAVE20")).isEmpty();
+    }
+
     @Test void deliveryPreviewApplyAndRemovePreserveChargeWithInclusivePercentageFee() {
         var order = order("2", "18"); rebate();
         var preview = eligibility.getAvailableRebates("DELIVERY-TEST").getFirst();

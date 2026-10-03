@@ -39,7 +39,7 @@ public class MobileCheckoutPreview {
   var offers=rebates.previewDraft(order);
   var best=offers.stream().min(java.util.Comparator.comparing(AvailableRebateResponse::payableAfterRebate));
   if(request.offerCode()!=null&&!request.offerCode().isBlank()){
-   var selected=rebates.findEligibleRebate(order,request.offerCode()).orElseThrow(OfferIneligibleException::new);
+   var selected=rebates.findEligibleDraftRebate(order,request.offerCode()).orElseThrow(OfferIneligibleException::new);
    best=java.util.Optional.of(selected);
    if(offers.stream().noneMatch(offer->offer.code().equals(selected.code())))offers=java.util.stream.Stream.concat(offers.stream(),java.util.stream.Stream.of(selected)).toList();
   }

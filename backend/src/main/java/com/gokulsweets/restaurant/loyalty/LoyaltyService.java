@@ -29,11 +29,15 @@ public class LoyaltyService {
  private record Lot(long id,int remaining,Instant expiry,Long origin) { Lot(long id,int remaining,Instant expiry){this(id,remaining,expiry,null);} }
  private record Owner(String environment,UUID subject) {}
  public boolean enabled(){return features.rewardsReady();}
+ // One transaction-scoped lock covers catalogue rows and both exclusion sets, including insertions.
+ private static final int POLICY_LOCK_NAMESPACE=0x474b5352;
+ public void lockPolicyForUpdate(){jdbc.execute("SELECT pg_advisory_xact_lock("+POLICY_LOCK_NAMESPACE+",38)");}
  public String policyVersion(){return policyVersion(false);}
  public String lockPolicyVersion(){return policyVersion(true);}
  private String policyVersion(boolean lock){
   if(!enabled())return "OFF";
-  String policy=jdbc.queryForList("SELECT code,version,coins,discount,minimum_subtotal,active FROM loyalty_rewards ORDER BY code"+(lock?" FOR SHARE":"")).toString()+jdbc.queryForList("SELECT product_id FROM loyalty_excluded_products ORDER BY product_id").toString()+jdbc.queryForList("SELECT code FROM loyalty_excluded_rebates ORDER BY code").toString()+"|"+rules.getRupeesPerCoin()+"|"+rules.getRedemptionPercent()+"|"+rules.getExpiryDays()+"|"+rules.getQualifyingSubtotal()+"|"+rules.getWelcomeCoins();
+  if(lock)jdbc.execute("SELECT pg_advisory_xact_lock_shared("+POLICY_LOCK_NAMESPACE+",38)");
+  String policy=jdbc.queryForList("SELECT code,version,coins,discount,minimum_subtotal,active FROM loyalty_rewards ORDER BY code").toString()+jdbc.queryForList("SELECT product_id FROM loyalty_excluded_products ORDER BY product_id").toString()+jdbc.queryForList("SELECT code FROM loyalty_excluded_rebates ORDER BY code").toString()+"|"+rules.getRupeesPerCoin()+"|"+rules.getRedemptionPercent()+"|"+rules.getExpiryDays()+"|"+rules.getQualifyingSubtotal()+"|"+rules.getWelcomeCoins();
   try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
  }
  public void verifyPolicy(String version){if(version==null||!lockPolicyVersion().equals(version))throw invalid("Reward rules changed. Refresh your earned coins before selecting a reward.");}

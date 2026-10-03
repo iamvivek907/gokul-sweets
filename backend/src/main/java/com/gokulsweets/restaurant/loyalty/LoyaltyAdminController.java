@@ -36,12 +36,14 @@ public class LoyaltyAdminController {
  @PutMapping("/rewards") @Transactional public void reward(@RequestBody RewardInput input){
   long actor=owner();reason(input.reason());
   if(input.code()==null||!input.code().matches("[A-Z0-9_]{1,40}")||input.name()==null||input.name().isBlank()||input.name().length()>100||input.coins()<1||input.coins()>100000||input.discount()==null||input.discount().signum()<=0||input.minimumSubtotal()==null||input.minimumSubtotal().signum()<=0||input.discount().multiply(new BigDecimal("100")).compareTo(BigDecimal.valueOf(input.coins()).multiply(rules.getRupeesPerCoin()).multiply(rules.getNormalMaximumCostPercent()))>0)throw new IllegalArgumentException("A funded reward needs valid amounts and must stay within the normal 3% coin-cost budget.");
+  loyalty.lockPolicyForUpdate();
   var before=jdbc.queryForList("SELECT * FROM loyalty_rewards WHERE code=? FOR UPDATE",input.code());
   jdbc.update("INSERT INTO loyalty_rewards(code,name,coins,discount,minimum_subtotal,active) VALUES (?,?,?,?,?,?) ON CONFLICT(code) DO UPDATE SET name=EXCLUDED.name,coins=EXCLUDED.coins,discount=EXCLUDED.discount,minimum_subtotal=EXCLUDED.minimum_subtotal,active=EXCLUDED.active,version=loyalty_rewards.version+1",input.code(),input.name().trim(),input.coins(),input.discount(),input.minimumSubtotal(),input.active());
   audit(actor,"REWARD",input.code(),input.reason(),before,input);
  }
  @PutMapping("/exclusions") @Transactional public void exclusions(@RequestBody Exclusions input){
   long actor=owner();reason(input.reason());if(input.productIds()==null||input.rebateCodes()==null||input.productIds().size()>500||input.rebateCodes().size()>500||input.productIds().stream().anyMatch(id->id==null||id<=0)||input.rebateCodes().stream().anyMatch(code->code==null||!code.matches("[A-Z0-9_-]{1,100}")))throw new IllegalArgumentException("Invalid excluded products or promotion codes.");
+  loyalty.lockPolicyForUpdate();
   var before=Map.of("products",jdbc.queryForList("SELECT * FROM loyalty_excluded_products"),"rebates",jdbc.queryForList("SELECT * FROM loyalty_excluded_rebates"));
   jdbc.update("DELETE FROM loyalty_excluded_products");jdbc.update("DELETE FROM loyalty_excluded_rebates");
   for(long id:new HashSet<>(input.productIds()))jdbc.update("INSERT INTO loyalty_excluded_products VALUES (?)",id);
