@@ -67,6 +67,7 @@ public class AdminOrderWorkflowService {
     private final com.gokulsweets.restaurant.occasion.OccasionProductionReadinessService bulkReadiness;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
     private final PickupCodeService pickupCodes;
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
 
 
     /*
@@ -241,6 +242,7 @@ public class AdminOrderWorkflowService {
          * =====================================================
          */
 
+        if(updatedRows==1&&(targetStatus==OrderStatus.PICKED_UP||targetStatus==OrderStatus.DELIVERED))loyalty.reconcile(order.getId());
         if (updatedRows == 1)
             notifications.orderReady(order.getId());
         if (updatedRows == 1 && order.getFulfillmentType() == FulfillmentType.DELIVERY) {

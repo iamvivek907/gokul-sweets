@@ -117,7 +117,7 @@ class DeliveryOrderCreationIntegrationTest {
         var ownership = mock(VerifiedOrderOwnership.class);
         var accepted = new DeliveryAcceptedQuoteService(flags, preparation, ist);
         ReflectionTestUtils.setField(accepted, "signingKey", "delivery-quote-test-signing-key-at-least-32-characters");
-        var service = new DeliveryOrderCreationService(flags, preparation, accepted, rider, inventory,
+        var service = new DeliveryOrderCreationService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),flags, preparation, accepted, rider, inventory,
                 idempotency, orders, jdbc, numbers, contacts, ownership, ist);
         var draft = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
                 "Customer", "9999999999", "12 Main Road", null);
@@ -176,7 +176,7 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(deliveryQueue.eligible(branchId + 999, date.atTime(11, 0), 10)).isEmpty();
 
         // External printer-agent contract: delivery has its own IST window; never invent a pickup slot.
-        var printPayload = new PrintAgentClaimResponse.KotPayload(1L, "KOT-1", saved.getOrderNumber(),
+        var printPayload = new PrintAgentClaimResponse.KotPayload(1L, "KOT-1", saved.getOrderNumber(), saved.getCustomerOrderNumber(),
                 branch.getName(), branch.getAddress(), null, null, null, null, "Kitchen", date.atTime(10, 0),
                 List.of(new PrintAgentClaimResponse.Item("Sweet", 1, 0)), FulfillmentType.DELIVERY,
                 kitchenWindow.date(), kitchenWindow.start(), kitchenWindow.end());

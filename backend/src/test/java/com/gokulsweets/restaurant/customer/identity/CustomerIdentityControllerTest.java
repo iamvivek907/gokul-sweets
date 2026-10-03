@@ -44,7 +44,7 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.web.environment-cors-enabled", "true")
             .withProperty("gokul.identity.provider-abuse-controls-verified", "true")
             .withProperty("gokul.environment-isolation.environment", "DEV");
-    private final CustomerIdentityController controller = new CustomerIdentityController(
+    private final CustomerIdentityController controller = new CustomerIdentityController(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
             exchange, sessions, subjects, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
             ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub, notifications, alerts);
 

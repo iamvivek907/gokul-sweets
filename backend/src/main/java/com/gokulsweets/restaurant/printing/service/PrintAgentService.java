@@ -602,6 +602,7 @@ public class PrintAgentService {
                         kot.getKotNumber(),
                         kot.getOrder()
                                 .getOrderNumber(),
+                        kot.getOrder().getCustomerOrderNumber(),
                         kot.getBranch()
                                 .getName(),
                         kot.getBranch()

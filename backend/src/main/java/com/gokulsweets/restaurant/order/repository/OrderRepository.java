@@ -22,6 +22,7 @@ import java.util.Optional;
 
 public interface OrderRepository
         extends JpaRepository<Order, Long> {
+    Optional<Order> findByCustomerOrderNumber(Long customerOrderNumber);
     @org.springframework.data.jpa.repository.Modifying(clearAutomatically=true,flushAutomatically=true)
     @org.springframework.data.jpa.repository.Query("UPDATE Order o SET o.orderStatus=com.gokulsweets.restaurant.order.enums.OrderStatus.CANCELLED WHERE o.id=:id AND o.orderStatus=com.gokulsweets.restaurant.order.enums.OrderStatus.PAYMENT_FAILED")
     int cancelFailedCheckout(@org.springframework.data.repository.query.Param("id") Long id);

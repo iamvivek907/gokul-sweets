@@ -636,6 +636,12 @@ export async function startSelectedAdminOrders(
  * =========================================================
  */
 
+export async function getAdminOrderByCustomerNumber(number: string, authorization: string): Promise<AdminOrderDetail> {
+    const response = await adminFetch(`/api/admin/orders/number/${encodeURIComponent(number)}`, authorization, {cache: "no-store"});
+    if (!response.ok) throw new Error(await getErrorMessage(response, "Could not find this order. Check the number and your branch access."));
+    return response.json();
+}
+
 export async function getAdminOrderDetail(
     orderNumber: string,
     authorization: string,

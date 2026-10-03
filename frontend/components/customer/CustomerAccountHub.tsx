@@ -1,9 +1,12 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
+import CustomerRewards from "./CustomerRewards";
 import {T} from "@/lib/language";
 
 import {formatWeight} from "@/lib/orderQuantity";
 
-import CustomerNotificationInbox from "@/components/customer/CustomerNotificationInbox";
+import CustomerNotificationLink from "./CustomerNotificationLink";
+import LogoutConfirmation from "./LogoutConfirmation";
 import {useCallback, useEffect, useRef, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
@@ -53,6 +56,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
     const [preview, setPreview] = useState<Preview | null>(null);
     const [menu, setMenu] = useState<MenuProduct[]>([]);
     const [activeSection, setActiveSection] = useState<AccountSection>("badges");
+    const [logoutOpen, setLogoutOpen] = useState(false);
     const [editingDetails, setEditingDetails] = useState(false);
     const [nameDraft, setNameDraft] = useState(session?.name ?? "");
 
@@ -61,12 +65,13 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
             const selected = ({"#account-milestones": "badges", "#account-orders": "orders",
                 "#account-favourites": "favourites", "#account-addresses": "addresses",
                 "#account-preferences": "preferences", "#account-details": "details", "#account-notifications": "notifications"} as Record<string, AccountSection>)[window.location.hash];
+            if (selected === "notifications") {router.replace("/notifications?from=%2Fprofile"); return;}
             if (selected) setActiveSection(selected);
         };
         fromHash();
         window.addEventListener("hashchange", fromHash);
         return () => window.removeEventListener("hashchange", fromHash);
-    }, []);
+    }, [router]);
 
     const reload = useCallback(async () => {
         const [next, history] = await Promise.all([
@@ -201,7 +206,8 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
             await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
             onSessionChange({authenticated: false});
             window.dispatchEvent(new Event("gokul-customer-identity-changed"));
-        } catch {setMessage("Could not sign out. Please try again."); setBusy(false);}
+            return true;
+        } catch {setMessage("Could not sign out. Please try again."); setBusy(false); return false;}
     }
 
     const earned = currentMilestone(account.paidOrders);
@@ -209,6 +215,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
     const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
     const maskedPhone = session.phone ? `+91 •••••• ${session.phone.replace(/\D/g, "").slice(-4)}` : "Phone verified";
     return <div className="account-hub mt-6">
+        <LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={signOut} />
         <header className="account-cover relative overflow-hidden rounded-3xl p-6 sm:p-9">
             <div className="account-cover-art" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span></div>
             <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -227,18 +234,19 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 </div>
             </div>
         </header>
+        {features?.gokulRewards?<CustomerRewards/>:<>
         <section className="mobile-profile-rewards" aria-label="Rewards"><div><T text="Rewards" /><strong><T text="Coming soon" /></strong></div><p><T text="Earned points are not available yet. A balance will appear here when the rewards programme is launched." /></p></section>
+        </>}
         <div className="account-layout mt-6">
             <nav className="account-navigation" aria-label="Profile sections">
                 {([['badges', 'Badges'], ['orders', 'Order history'], ['favourites', 'Favourites'],
                     ['addresses', 'My addresses'], ['preferences', 'Preferences'], ['details', 'Profile details']] as const)
                     .map(([section, label]) => <button key={section} type="button" aria-pressed={activeSection === section}
                         onClick={() => showSection(section)}>{label}</button>)}
-                {features?.notificationInbox && <button type="button" aria-pressed={activeSection === "notifications"} onClick={() => showSection("notifications")}><T text="Notification inbox" /></button>}
+                {features?.notificationInbox && <CustomerNotificationLink><T text="Notification inbox" /></CustomerNotificationLink>}
                 <Link href="/profile/privacy"><T text="Privacy and data" /></Link>
             </nav>
             <div id="account-content" className="account-panels min-w-0 scroll-mt-28 space-y-6" aria-live="polite">
-                {activeSection === "notifications" && features?.notificationInbox && <CustomerNotificationInbox key={session.phone} />}
                 {activeSection === "badges" && <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
                     <div className="flex flex-wrap items-end justify-between gap-4">
                         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#c88a20]">Gokul journey</p>
@@ -261,7 +269,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 <p className="mt-1 text-sm text-[#756763]"><T text="Only orders placed while signed in to this account." /></p></div>
                 <span className="text-sm text-[#756763]"><T text="All branches" /></span></div>
             {orders.length ? <div className="mt-4 max-h-[36rem] space-y-3 overflow-y-auto">{orders.map(order => <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3">
-                <div><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{order.orderNumber}</button>
+                <div><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{orderDisplayNumber(order)}</button>
                 <p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_", " ")}</p></div>
                 <div className="flex gap-2"><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Details" /></button>
                 <button type="button" disabled={busy} onClick={() => {void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50"><T text="Reorder" /></button></div></div>)}</div> : <p className="mt-5 text-sm text-[#756763]"><T text="No orders belong to this verified account yet." /></p>}
@@ -277,7 +285,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 {detailError && <p role="alert" className="text-[#9e2732]">{detailError}</p>}
                 {selectedOrder && <div className="space-y-5 text-sm">
                     <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]"><T text="Order number" /></p>
-                        <p className="selectable-text mt-1 break-all font-semibold">{selectedOrder.orderNumber}</p></div>
+                        <p className="selectable-text mt-1 break-all font-semibold">{orderDisplayNumber(selectedOrder)}</p></div>
                     <div className="flex flex-wrap items-center gap-2"><strong className="text-base">{selectedOrder.branchName}</strong>
                         <span className="rounded-full bg-[#e5f0e8] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#143936]">{selectedOrder.orderStatus.replaceAll("_", " ")}</span></div>
                     <div className="rounded-2xl border border-[#d9e5dc] bg-white p-4"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">{selectedOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} schedule</p>
@@ -355,12 +363,12 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
             <div className="mt-7 flex flex-wrap items-center gap-3 border-t border-[#eadfd6] pt-5">
                 <button type="button" onClick={() => showSection("addresses")} className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#173c39] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#28544e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173c39]"><T text="Manage addresses" /></button>
                 <button type="button" onClick={() => showSection("preferences")} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#bacdc8] bg-[#f4f8f5] px-5 py-2.5 text-sm font-semibold text-[#173c39] transition-colors hover:bg-[#e6f0eb] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#173c39]"><T text="Manage preferences" /></button>
-                <button type="button" disabled={busy} onClick={() => {void signOut();}} className="account-details-signout inline-flex min-h-11 items-center justify-center rounded-xl border border-[#eadfd6] px-5 py-2.5 text-sm font-semibold text-[#7a1625] transition-colors hover:bg-[#fff4ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1625] disabled:opacity-50"><T text="Sign out" /></button>
+                <button type="button" disabled={busy} onClick={() => setLogoutOpen(true)} className="account-details-signout inline-flex min-h-11 items-center justify-center rounded-xl border border-[#eadfd6] px-5 py-2.5 text-sm font-semibold text-[#7a1625] transition-colors hover:bg-[#fff4ee] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#7a1625] disabled:opacity-50"><T text="Sign out" /></button>
             </div>
         </section>}
         {message && <p role="status" aria-live="polite" className="rounded-xl border border-[#eadfd6] bg-white p-4 text-sm">{message}</p>}
             </div>
         </div>
-        <button type="button" disabled={busy} onClick={() => void signOut()} className="mobile-account-logout"><T text="Log out" /></button>
+        <button type="button" disabled={busy} onClick={() => setLogoutOpen(true)} className="mobile-account-logout"><T text="Log out" /></button>
     </div>;
 }

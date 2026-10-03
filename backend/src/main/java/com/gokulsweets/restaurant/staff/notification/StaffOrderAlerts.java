@@ -42,8 +42,8 @@ public class StaffOrderAlerts {
           WHERE rp.role_id = u.role_id AND p.name = e.required_permission)
         """;
     public record Event(long id, long orderId, String orderNumber, long branchId, String kind, String title,
-                        String message, LocalDateTime scheduledAt, java.time.Instant createdAt,java.util.UUID enquiryId,String targetUrl) {
-        public Event(long id,long orderId,String orderNumber,long branchId,String kind,String title,String message,LocalDateTime scheduledAt,java.time.Instant createdAt) {this(id,orderId,orderNumber,branchId,kind,title,message,scheduledAt,createdAt,null,"/admin/orders/"+orderNumber);}
+                        String message, LocalDateTime scheduledAt, java.time.Instant createdAt,java.util.UUID enquiryId,String targetUrl,Long customerOrderNumber) {
+        public Event(long id,long orderId,String orderNumber,long branchId,String kind,String title,String message,LocalDateTime scheduledAt,java.time.Instant createdAt) {this(id,orderId,orderNumber,branchId,kind,title,message,scheduledAt,createdAt,null,"/admin/orders/"+orderNumber,null);}
     }
     public record Message(Event event, java.time.Instant readAt, boolean actionRequired, String pushState, String emailState) {}
     public record Page(List<Message> messages, long unreadCount, Long nextBefore, long readThrough) {
@@ -66,7 +66,7 @@ public class StaffOrderAlerts {
         jdbc.update("""
             INSERT INTO staff_order_alerts(environment, event_key, order_id, branch_id, kind, required_permission, title, message)
             SELECT ?, 'paid:' || o.id, o.id, o.branch_id, 'NEW_ORDER', 'ORDER_VIEW', LEFT('New paid order · ' || b.name, 160),
-              'Order ' || o.order_number || ' is confirmed. ' || CASE WHEN s.id IS NULL THEN 'Open the delivery order for its service window.'
+              'Order ' || COALESCE('#' || o.customer_order_number::text,o.order_number) || ' is confirmed. ' || CASE WHEN s.id IS NULL THEN 'Open the delivery order for its service window.'
               ELSE 'Pickup ' || to_char(s.slot_date, 'DD Mon YYYY') || ', ' || to_char(s.start_time, 'HH12:MI AM') || ' IST. Check the preparation queue.' END
             FROM payments p JOIN orders o ON o.id = p.order_id JOIN branches b ON b.id = o.branch_id
             LEFT JOIN pickup_slots s ON s.id = o.pickup_slot_id
@@ -137,7 +137,7 @@ public class StaffOrderAlerts {
                   title, message, scheduled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(environment, event_key) DO NOTHING
                 """, scope(), reminderKey(order.getId(),kind,scheduled), order.getId(), order.getBranch().getId(), kind,
-                permission, title, "Order " + order.getOrderNumber() + " · " + order.getBranch().getName() + ". " + message, Timestamp.valueOf(scheduled));
+                permission, title, "Order " + (order.getCustomerOrderNumber()==null ? order.getOrderNumber() : "#"+order.getCustomerOrderNumber()) + " · " + order.getBranch().getName() + ". " + message, Timestamp.valueOf(scheduled));
     }
     String reminderKey(long orderId,String kind,LocalDateTime scheduled) {
         String key=orderId+":"+kind+":"+scheduled;
@@ -182,7 +182,7 @@ public class StaffOrderAlerts {
         return new Event(rs.getLong("id"), rs.getLong("order_id"), rs.getString("order_number"), rs.getLong("branch_id"),
                 rs.getString("kind"), rs.getString("title"), rs.getString("message"), scheduled == null ? null : scheduled.toLocalDateTime(),
                 rs.getTimestamp("created_at").toInstant(),rs.getObject("enquiry_id",java.util.UUID.class),
-                rs.getObject("enquiry_id")==null?"/admin/orders/"+java.net.URLEncoder.encode(rs.getString("order_number"),java.nio.charset.StandardCharsets.UTF_8):"/admin/occasion-enquiries?branch="+rs.getLong("branch_id")+"&enquiry="+rs.getObject("enquiry_id"));
+                rs.getObject("enquiry_id")==null?"/admin/orders/"+java.net.URLEncoder.encode(rs.getString("order_number"),java.nio.charset.StandardCharsets.UTF_8):"/admin/occasion-enquiries?branch="+rs.getLong("branch_id")+"&enquiry="+rs.getObject("enquiry_id"), rs.getObject("customer_order_number",Long.class));
     }
     @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public Page page(long staffId, Long before) {return page(staffId, before, false, "");}
@@ -192,13 +192,13 @@ public class StaffOrderAlerts {
         if (query.length() > 100) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         if (before != null && before <= 0) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
         var messages = jdbc.query("""
-            SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) order_number, r.read_at,
+            SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) order_number, o.customer_order_number, r.read_at,
               (SELECT state FROM staff_alert_deliveries d WHERE d.event_id = e.id AND d.staff_id = u.id AND d.channel = 'PUSH' ORDER BY d.id DESC LIMIT 1) push_state,
               (SELECT state FROM staff_alert_deliveries d WHERE d.event_id = e.id AND d.staff_id = u.id AND d.channel = 'EMAIL') email_state
             FROM staff_order_alerts e LEFT JOIN orders o ON o.id = e.order_id JOIN staff_users u ON u.id = ?
             LEFT JOIN staff_order_alert_reads r ON r.event_id = e.id AND r.staff_id = u.id
             WHERE e.environment = ? AND e.id < ? AND (NOT ? OR r.read_at IS NULL)
-              AND (? = '' OR strpos(lower(COALESCE(o.order_number,e.enquiry_id::text) || ' ' || e.title || ' ' || e.message), lower(?)) > 0) AND
+              AND (? = '' OR strpos(lower(COALESCE(o.order_number,e.enquiry_id::text) || ' ' || COALESCE(o.customer_order_number::text,'') || ' ' || e.title || ' ' || e.message), lower(?)) > 0) AND
             """ + ELIGIBLE + " ORDER BY e.id DESC LIMIT 31", (rs, row) -> {
                 var event = event(rs); var read = rs.getTimestamp("read_at");
                 return new Message(event, read == null ? null : read.toInstant(), actionable(event), rs.getString("push_state"), rs.getString("email_state"));

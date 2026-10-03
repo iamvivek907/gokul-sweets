@@ -506,6 +506,7 @@ public class KotService {
                 kot.getId(),
                 kot.getKotNumber(),
                 order.getOrderNumber(),
+                order.getCustomerOrderNumber(),
 
                 kot.getBranch()
                         .getId(),

@@ -34,7 +34,7 @@ export default function CustomerAccountLink() {
     const label = session.authenticated ? session.name?.trim() || (phone ? `•••• ${phone.slice(-4)}` : "Account") : "Log in";
     const initials = session.name?.trim().split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
     return <Link href="/profile" className="customer-account-link max-w-[10rem] shrink-0 truncate rounded-full border border-[#d8c6ba] px-3 py-2 text-sm font-semibold text-[#173c39]"
-        aria-label={session.authenticated ? `Open profile for ${session.authenticated ? label : translate(label)}` : translate("Log in to your account")}>
+        aria-label={session.authenticated ? `Open profile for ${label}${initials ? ` (${initials})` : ""}` : translate("Log in to your account")}>
         <span className="customer-account-desktop-label">{session.authenticated ? label : translate(label)}</span>
         <span className="customer-account-mobile-label" aria-hidden="true">{session.authenticated ? (initials || <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="3.2" /><path d="M5.5 20c.7-4 3-6 6.5-6s5.8 2 6.5 6" strokeLinecap="round" /></svg>) : translate("Log in")}</span>
     </Link>;

@@ -342,3 +342,16 @@
  .future-storefront .mobile-profile-order-types span{background:#143936;color:#fffaf2}
  .future-storefront .mobile-profile-order-types a{background:#edf3ee;color:#143936}
 }
+
+@media (max-width: 640px) {
+  .future-storefront .customer-notifications { min-width: 0; }
+  .future-storefront .customer-notification-inbox { padding: 16px; border-radius: 20px; overflow-wrap: anywhere; }
+  .future-storefront .customer-notification-inbox h2 { font-size: 18px; }
+  .future-storefront .notification-card { padding: 12px; }
+  .future-storefront .notification-card p { line-height: 1.5; }
+  .future-storefront .notification-actions { gap: 8px; }
+  .future-storefront .notification-actions > a:not(.notification-review-action),
+  .future-storefront .notification-actions > button { padding: 0 12px; border: 1px solid #eadfd6; border-radius: 999px; text-decoration: none; }
+  .future-storefront .notification-help { font-size: 12px; }
+  .future-storefront .notification-back { background: #fffaf2; }
+}

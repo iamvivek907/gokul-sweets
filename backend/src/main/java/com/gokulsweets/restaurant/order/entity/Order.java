@@ -62,6 +62,17 @@ import java.util.List;
 @Getter
 @Setter
 public class Order {
+    @Column(nullable=false) private boolean rebateManualSelection;
+    @Column(nullable=false) private boolean loyaltyEnrolled;
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyEarningRupeesPerCoin=new BigDecimal("10");
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyQualifyingMinimum=new BigDecimal("149");
+    @Column(nullable=false) private int loyaltyWelcomeCoins;
+    @Column(nullable=false) private int loyaltyExpiryDays=180;
+    @Column(nullable=false) private boolean loyaltyTestOrder;
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyEligibleSubtotal=BigDecimal.ZERO;
+    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyDiscount=BigDecimal.ZERO;
+    @Column(length=40) private String loyaltyRewardCode;
+    @Column(nullable=false) private int loyaltyCoins;
     @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFee=BigDecimal.ZERO;
     @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFeeTax=BigDecimal.ZERO;
     @Column(nullable=false,precision=5,scale=2) private BigDecimal paymentFeeRate=BigDecimal.ZERO;
@@ -86,6 +97,13 @@ public class Order {
             length = 50
     )
     private String orderNumber;
+
+    /** Database-assigned once on confirmation; never used as an access credential. */
+    @org.hibernate.annotations.Generated(event = {
+            org.hibernate.generator.EventType.INSERT, org.hibernate.generator.EventType.UPDATE
+    })
+    @Column(name = "customer_order_number", insertable = false, updatable = false, unique = true)
+    private Long customerOrderNumber;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(

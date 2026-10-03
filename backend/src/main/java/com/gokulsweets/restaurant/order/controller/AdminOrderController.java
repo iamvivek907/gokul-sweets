@@ -84,6 +84,11 @@ public class AdminOrderController {
         );
     }
 
+    @GetMapping("/number/{customerOrderNumber}")
+    public ResponseEntity<AdminOrderDetailResponse> getOrderByCustomerNumber(@PathVariable long customerOrderNumber) {
+        return ResponseEntity.ok(adminOrderQueryService.getOrderByCustomerNumber(customerOrderNumber));
+    }
+
     @GetMapping("/{orderNumber}")
     public ResponseEntity<AdminOrderDetailResponse> getOrder(
             @PathVariable String orderNumber

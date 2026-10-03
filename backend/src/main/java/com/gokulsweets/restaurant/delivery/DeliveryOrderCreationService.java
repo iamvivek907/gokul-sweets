@@ -27,6 +27,7 @@ import java.util.HexFormat;
 @Service
 @RequiredArgsConstructor
 public class DeliveryOrderCreationService {
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
     private final EnhancementProperties flags;
     private final DeliveryOrderPreparationService preparation;
     private final DeliveryAcceptedQuoteService acceptedQuotes;
@@ -110,6 +111,7 @@ public class DeliveryOrderCreationService {
                     e.wasteCost(), e.paymentCost(), e.journeyCost(), e.remedyCost(), e.fee(), e.contribution());
         }
         ownership.bindNewOrder(saved.getId(), request.customerPhone(), identityToken);
+        loyalty.reserve(saved,null);
         inventory.synchronizePendingDeliveryOrder(saved, prepared.validated());
         idempotency.linkOrder(idempotencyKey, saved);
         return response(saved);

@@ -123,6 +123,13 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(com.gokulsweets.restaurant.order.service.OfferIneligibleException.class)
+    public ResponseEntity<ApiErrorResponse> handleIneligibleOffer(
+            com.gokulsweets.restaurant.order.service.OfferIneligibleException exception,
+            HttpServletRequest request) {
+        return loggedResponse(HttpStatus.CONFLICT, "OFFER_INELIGIBLE", exception.getMessage(), request);
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiErrorResponse> handleIllegalState(
             IllegalStateException exception,

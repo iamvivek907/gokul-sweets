@@ -15,6 +15,7 @@ import java.util.List;
 public record AdminOrderDetailResponse(
 
         String orderNumber,
+        Long customerOrderNumber,
 
         Long branchId,
 

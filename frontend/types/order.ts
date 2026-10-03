@@ -41,6 +41,8 @@ export interface CreateOrderRequest {
     pickupType: PickupType;
     items: CreateOrderItemRequest[];
     quoteToken?: string;
+    rewardCode?: string | null;
+    offerCode?: string | null;
 }
 
 export interface CheckoutQuote {
@@ -85,6 +87,7 @@ export interface OrderItemResponse {
 export interface OrderResponse {
     id: number;
     orderNumber: string;
+    customerOrderNumber?: number | null;
     branchId: number;
     pickupSlotId: number;
     pickupDate: string;
@@ -113,8 +116,13 @@ export interface OrderResponse {
 
 
 export interface CustomerOrderResponse {
+    loyaltyDiscount?: number;
+    loyaltyCoins?: number;
+    loyaltyRewardCode?: string | null;
+    rebateDiscountAmount?: number;
     deliveryFee?: number;
     orderNumber: string;
+    customerOrderNumber?: number | null;
     orderStatus: OrderStatus;
     paymentStatus: PaymentStatus | null;
     branchName: string;
@@ -159,6 +167,7 @@ export interface CustomerOrderResponse {
  */
 export interface CustomerOrderSummaryResponse {
     orderNumber: string;
+    customerOrderNumber?: number | null;
     orderStatus: OrderStatus;
     branchId: number;
     branchName: string;

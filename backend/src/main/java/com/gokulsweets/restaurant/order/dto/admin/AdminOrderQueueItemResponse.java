@@ -14,6 +14,7 @@ import java.time.LocalTime;
 public record AdminOrderQueueItemResponse(
 
         String orderNumber,
+        Long customerOrderNumber,
 
         Long branchId,
 

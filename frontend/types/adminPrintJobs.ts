@@ -35,6 +35,7 @@ export interface AdminPrintJob {
     kotNumber: string;
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     printerId: number | null;
 

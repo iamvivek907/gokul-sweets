@@ -12,7 +12,7 @@ try{async function chooseLanguage(surface,locale){await surface.getByRole('butto
 for(const width of [1280,390]){
  const context=await browser.newContext({viewport:{width,height:900}}),page=await context.newPage();await page.clock.install({time:now});let quoteCalls=0,mutations=0,starts=0,readyMoves=0,bestOffers=0,simplified=width===1280,visual=true,gateway=false;
  const errors=[];page.on('pageerror',error=>errors.push(error.message));let authenticated=false;
- const row=(bucket)=>({orderNumber:'TEST-KITCHEN',customerName:'Test customer',fulfillmentType:'PICKUP',orderStatus:readyMoves?'READY_FOR_PICKUP':starts?'PREPARING':'CONFIRMED',bucket,date,start:'18:00:00',end:'18:30:00',preparationAt:`${date}T17:00:00`});
+ const row=(bucket)=>({orderNumber:'TEST-KITCHEN',customerOrderNumber:42,customerName:'Test customer',fulfillmentType:'PICKUP',orderStatus:readyMoves?'READY_FOR_PICKUP':starts?'PREPARING':'CONFIRMED',bucket,date,start:'18:00:00',end:'18:30:00',preparationAt:`${date}T17:00:00`});
  await context.route('**/api/**',async route=>{
   const req=route.request(),u=new URL(req.url()),p=u.pathname,headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,PATCH,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key,x-staff-csrf'};
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -82,11 +82,11 @@ for(const width of [1280,390]){
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT');assert.equal(mutations,1);assert.equal(bestOffers,1);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),width===390?200:180);
  await page.goto(`${base}/admin/orders`);await page.getByRole('heading',{name:'Plan, prepare, hand over'}).waitFor();
- await page.getByRole('button',{name:/Scheduled future/}).click();await page.waitForURL('**kitchen=SCHEDULED');await page.getByText('Scheduled future',{exact:true}).last().waitFor();assert.equal(await page.getByRole('checkbox',{name:'Select TEST-KITCHEN'}).count(),0);
+ await page.getByRole('button',{name:/Scheduled future/}).click();await page.waitForURL('**kitchen=SCHEDULED');await page.getByText('Scheduled future',{exact:true}).last().waitFor();assert.equal(await page.getByRole('checkbox',{name:'Select #42'}).count(),0);
  await page.reload();assert.match(page.url(),/kitchen=SCHEDULED/);await page.getByRole('heading',{name:'Plan, prepare, hand over'}).waitFor();
  await chooseLanguage(page,'hi');await page.getByRole('heading',{name:'योजना बनाएँ, तैयार करें, सौंपें'}).waitFor();await page.getByRole('button',{name:'रसोई का अलार्म चालू करें'}).waitFor();await chooseLanguage(page,'en');
  await page.getByRole('button',{name:'Enable kitchen alarm'}).click();await page.waitForFunction(()=>window.__chimes>=6);
- await page.getByRole('button',{name:/Needs preparation/}).click();await page.getByRole('checkbox',{name:'Select TEST-KITCHEN'}).check();await page.getByRole('button',{name:'Start selected in KOT (1)'}).click();await page.getByRole('button',{name:'Confirm start'}).click();await page.getByText(/1 started · 0 skipped/).waitFor();assert.equal(starts,1);await page.getByText('No orders need action. Alarm is watching for new work.').waitFor();const stopped=await page.evaluate(()=>window.__chimes);await page.waitForTimeout(2500);assert.equal(await page.evaluate(()=>window.__chimes),stopped);
+ await page.getByRole('button',{name:/Needs preparation/}).click();await page.getByRole('checkbox',{name:'Select #42'}).check();await page.getByRole('button',{name:'Start selected in KOT (1)'}).click();const confirmation=page.getByRole('dialog');await confirmation.waitFor();assert.match(await confirmation.innerText(),/#42/);assert.doesNotMatch(await confirmation.innerText(),/TEST-KITCHEN/);await page.getByRole('button',{name:'Confirm start'}).click();await page.getByText(/1 started · 0 skipped/).waitFor();assert.equal(starts,1);await page.getByText('No orders need action. Alarm is watching for new work.').waitFor();const stopped=await page.evaluate(()=>window.__chimes);await page.waitForTimeout(2500);assert.equal(await page.evaluate(()=>window.__chimes),stopped);
  // PREPARING orders can be completed directly, without opening View order.
  await page.getByRole('button',{name:'Or tap to confirm',exact:true}).click();
  await page.getByRole('button',{name:'Yes, mark ready',exact:true}).click();await page.getByText(/Order marked ready/).waitFor();assert.equal(readyMoves,1);

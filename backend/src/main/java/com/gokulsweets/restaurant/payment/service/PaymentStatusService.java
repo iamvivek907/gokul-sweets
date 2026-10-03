@@ -31,6 +31,7 @@ public class PaymentStatusService {
                     "Asia/Kolkata"
             );
 
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
     private final PaymentRepository paymentRepository;
 
     private final OrderRepository orderRepository;
@@ -368,6 +369,7 @@ public class PaymentStatusService {
         orderRepository.flush();
         paymentRepository.flush();
         if(pickupCodes!=null)pickupCodes.issueForPaidPayment(paymentId);
+        loyalty.reconcile(payment.getOrder().getId());
         notifications.paymentChanged(paymentId);
         staffAlerts.paymentConfirmed(paymentId);
 
@@ -699,6 +701,7 @@ public class PaymentStatusService {
         );
 
         paymentRepository.flush();
+        loyalty.reconcile(payment.getOrder().getId());
         notifications.paymentChanged(paymentId);
 
         log.info(

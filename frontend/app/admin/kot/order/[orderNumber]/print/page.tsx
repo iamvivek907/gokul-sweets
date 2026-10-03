@@ -1,4 +1,5 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T} from "@/lib/language";
 
 
@@ -1005,9 +1006,7 @@ export default function AdminKotPrintPage() {
 
                         <TicketRow
                             label="Order"
-                            value={
-                                kot.orderNumber
-                            }
+                            value={orderDisplayNumber(kot)}
                             strong
                         />
 

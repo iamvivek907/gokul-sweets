@@ -1,4 +1,7 @@
 "use client";
+import OrderRewards from "./OrderRewards";
+import OfferChoiceDialog from "./OfferChoiceDialog";
+import type {RewardCheckout} from "@/services/loyaltyApi";
 import {T,useTranslation} from "@/lib/language";
 import CheckoutAdjustmentDialog from "./CheckoutAdjustmentDialog";
 import type {CartItem} from "@/types/cart";
@@ -142,6 +145,7 @@ export default function CheckoutOffersPanel({
     const [navigating,setNavigating]=useState(false);
 
     const features=useStorefrontFeatures();
+    const [savingsBusy,setSavingsBusy]=useState(false),[offerPopup,setOfferPopup]=useState(false);
     const [addonBusy,setAddonBusy]=useState(false);
     const [priceReviewRequired,setPriceReviewRequired]=useState(reviewRequired);
     const [totalChanged,setTotalChanged]=useState(reviewRequired);
@@ -568,7 +572,7 @@ export default function CheckoutOffersPanel({
 
 
     async function handleFindOffers() {
-        if(addonBusy)return;
+        if(addonBusy||savingsBusy)return;
 
         if (
             loading
@@ -701,7 +705,7 @@ export default function CheckoutOffersPanel({
             | "exclusive"
     ) {
 
-        if(addonBusy)return;
+        if(addonBusy||savingsBusy)return;
         const normalizedCode =
             code
                 .trim()
@@ -822,7 +826,7 @@ export default function CheckoutOffersPanel({
 
 
     async function handleRemove() {
-        if(addonBusy)return;
+        if(addonBusy||savingsBusy)return;
 
         if (
             removing
@@ -936,6 +940,7 @@ export default function CheckoutOffersPanel({
 
 
     function handleContinueToPayment() {
+        if(savingsBusy)return;
         if(navigating || addonBusy || priceReviewRequired || refreshFailed || applyingCode || removing)return;
 
         if (
@@ -1032,6 +1037,16 @@ export default function CheckoutOffersPanel({
     }
 
 
+    async function savingsChanged(result:RewardCheckout){
+        if(result.offer){setAppliedRebate(result.offer);updatePendingOrderTotal(result.offer.totalAmount);}
+        setPriceReviewRequired(true);setTotalChanged(true);
+        try{const [summary,offers]=await Promise.all([getCustomerOrder(orderNumber),getAvailableRebates(orderNumber)]);setOrderSummary(summary);setRebates(offers);setOffersLoadedSuccessfully(true);setRefreshFailed(false);}catch{setRefreshFailed(true);throw new Error("Savings were updated. Reload this checkout to review the confirmed total before payment.");}
+    }
+    async function chooseOffer(code:string){
+        if(savingsBusy||addonBusy)throw new Error("Wait for the current checkout check.");
+        setSavingsBusy(true);
+        try{const response=await applyRebate(orderNumber,code);setAppliedRebate(response);updatePendingOrderTotal(response.totalAmount);setOrderSummary(current=>current?{...current,totalAmount:response.totalAmount,paymentFee:response.paymentFee??current.paymentFee,paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax}:current);}finally{setSavingsBusy(false);}
+    }
     const [adjusting,setAdjusting]=useState(false);
     async function refreshAfterAddition(changedItems?:CartItem[],changedPickup?:PickupSelection) {
         setTotalChanged(true);setPriceReviewRequired(true);setAppliedRebate(null);setSuccessMessage(null);
@@ -1267,7 +1282,9 @@ export default function CheckoutOffersPanel({
                         )
                         : (
                             <>
-
+                                {features?.gokulRewards&&<OrderRewards orderNumber={orderNumber} disabled={loading||addonBusy||!!applyingCode||removing||reservationExpired} onBusy={setSavingsBusy} onChanged={savingsChanged}/>}
+                                {offersLoadedSuccessfully&&rebates.length>0&&<button type="button" className="checkout-change-offer mb-3" disabled={savingsBusy||loading||!!applyingCode||removing} onClick={()=>setOfferPopup(true)}><T text="Change offer" /></button>}
+                                {offerPopup&&<OfferChoiceDialog offers={rebates} selected={appliedRebate?.rebateCode??null} onApply={chooseOffer} onClose={()=>setOfferPopup(false)}/>}
                                 <div
                                     className="
                                         rounded-3xl
@@ -1817,6 +1834,13 @@ export default function CheckoutOffersPanel({
                                                     )
                                                 }
 
+                                                {(orderSummary.loyaltyDiscount ?? 0) > 0 && (
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="text-green-700"><T text="Reward saving" /></span>
+                                                        <span className="font-bold text-green-700">-{formatCurrency(orderSummary.loyaltyDiscount ?? 0)}</span>
+                                                    </div>
+                                                )}
+
                                                 {
                                                     appliedRebate
                                                     && (
@@ -1850,7 +1874,7 @@ export default function CheckoutOffersPanel({
                                     <button
                                         type="button"
                                         disabled={
-                                            navigating || priceReviewRequired || refreshFailed || loading || addonBusy
+                                            savingsBusy || navigating || priceReviewRequired || refreshFailed || loading || addonBusy
                                             ||
                                             Boolean(
                                                 applyingCode
@@ -1903,7 +1927,7 @@ export default function CheckoutOffersPanel({
 
             {refreshFailed && !reservationExpired && <button type="button" disabled={addonBusy} className="min-h-12 rounded-xl border px-4 font-semibold" onClick={async()=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition();}catch{/* The current-screen error already explains how to retry. */}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}><T text="Recheck current cart and total" /></button>}
             {adjusting && pendingOrder && parsePickupSlot(getPickupSlotSnapshot()) && <CheckoutAdjustmentDialog items={items} pickup={parsePickupSlot(getPickupSlotSnapshot())!} branchId={pendingOrder.branchId} days={features?.futureOrderingDays??30} onClose={()=>setAdjusting(false)} onApply={async(changedItems,changedPickup)=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition(changedItems,changedPickup);}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}/>}
-            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={navigating?translate("Opening secure payment…"):priceReviewRequired ? translate("Review updated total") : translate("Continue to payment")} amount={displayTotal} disabled={navigating || priceReviewRequired || refreshFailed || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
+            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={navigating?translate("Opening secure payment…"):priceReviewRequired ? translate("Review updated total") : translate("Continue to payment")} amount={displayTotal} disabled={savingsBusy || navigating || priceReviewRequired || refreshFailed || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
         </div>
     );
 }

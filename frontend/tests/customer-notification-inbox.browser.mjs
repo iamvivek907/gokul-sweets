@@ -35,10 +35,31 @@ try {
     });
     const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
     await page.goto(`${base}/profile`);
-    await page.getByRole("button", {name: "Notification inbox", exact: true}).click();
+    await page.getByRole("link", {name: "Notification inbox", exact: true}).click();
     await page.getByRole("heading", {name: "Payment received"}).waitFor();
-    assert.equal(await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).getAttribute("href"), "/orders/GKS-EXACT-42");
-    assert.equal(await page.getByRole("link", {name: "Open occasion request"}).getAttribute("href"), "/occasions/requests?enquiry=request-43");
+    const back=page.getByRole('link',{name:'Back to previous page'});
+    assert.equal(new URL(page.url()).pathname,'/notifications');
+    assert.equal(await back.getAttribute('href'),'/profile');
+    await page.reload();await page.getByRole('heading',{name:'Payment received'}).waitFor();
+    assert.equal(await back.getAttribute('href'),'/profile');
+    await back.click();await page.waitForURL('**/profile');
+    for(const origin of ['/menu?category=sweets#menu-products','/','/profile#account-orders']) {
+        await page.goto(`${base}${origin}`);
+        await page.getByRole('link',{name:/^Notifications, .* unread$/}).first().click();
+        await page.getByRole('heading',{name:'Payment received'}).waitFor();
+        assert.equal(await back.getAttribute('href'),origin);
+        await back.click();await page.waitForURL(url=>url.pathname+url.search+url.hash===origin);assert.equal(new URL(page.url()).pathname+new URL(page.url()).search+new URL(page.url()).hash,origin);
+    }
+    await page.goto(`${base}/profile#account-notifications`);await page.waitForURL('**/notifications?from=*');
+    await page.getByRole('heading',{name:'Payment received'}).waitFor();
+    assert.equal(await back.getAttribute('href'),'/profile');
+    for(const origin of ['https://example.com','//example.com','/\\example.com','/notifications']) {
+        await page.goto(`${base}/notifications?from=${encodeURIComponent(origin)}`);
+        await page.getByRole('heading',{name:'Payment received'}).waitFor();
+        assert.equal(await back.getAttribute('href'),'/profile');
+    }
+    assert.equal(await page.locator('a[href="/orders/GKS-EXACT-42"]').getAttribute("href"), "/orders/GKS-EXACT-42");
+    assert.equal(await page.getByRole("link", {name: "View bulk request"}).getAttribute("href"), "/occasions/requests?enquiry=request-43");
     assert.match(await page.locator("time").first().textContent(), /30 Sept|30 Sep/);
     assert.match(await page.locator("time").first().textContent(), /12:05.*am.*IST/i);
     await page.getByText("Notification settings", {exact: true}).click();
@@ -57,11 +78,12 @@ try {
     assert.equal(reads, 1);
     assert.equal(await page.getByRole("button", {name: "Mark as read"}).count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (process.env.NOTIFICATION_SCREENSHOT_DIR) {await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-mobile.png`, fullPage:true});}
     read = false;
     await page.getByRole("button", {name: "Refresh inbox"}).click();
     await page.getByRole("heading", {name: /Notification inbox.*1 unread/}).waitFor();
-    await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).evaluate(link => link.addEventListener("click", event => event.preventDefault(), {once:true}));
-    await page.getByRole("link", {name: "Open order GKS-EXACT-42"}).click();
+    await page.locator('a[href="/orders/GKS-EXACT-42"]').evaluate(link => link.addEventListener("click", event => event.preventDefault(), {once:true}));
+    await page.locator('a[href="/orders/GKS-EXACT-42"]').click();
     await page.getByRole("heading", {name: /Notification inbox.*0 unread/}).waitFor();
     assert.equal(reads, 2);
     read = false;
@@ -71,6 +93,7 @@ try {
     await page.getByRole("heading", {name: /Notification inbox.*0 unread/}).waitFor();
     assert.equal(reads, 3);
     await page.setViewportSize({width: 1440, height: 1000});
+    if (process.env.NOTIFICATION_SCREENSHOT_DIR) {await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-desktop.png`, fullPage:true});}
     failLoad = true;
     await page.getByRole("button", {name: "Refresh inbox"}).click();
     await page.getByRole("alert").filter({hasText: "could not confirm"}).waitFor();
@@ -79,12 +102,12 @@ try {
     enabled = false;
     await page.evaluate(() => sessionStorage.clear());
     await page.reload();
-    await page.getByRole("button", {name: "Order history", exact: true}).waitFor();
-    assert.equal(await page.getByRole("button", {name: "Notification inbox", exact: true}).count(), 0);
+    await page.getByText("Notifications are not available yet. Check Order history for current updates.", {exact:true}).waitFor();
+    assert.equal(await page.getByRole("link", {name: "Notification inbox", exact: true}).count(), 0);
     enabled = true; authenticated = false;
     await page.evaluate(() => sessionStorage.clear());
     await page.reload();
-    await page.getByRole("heading", {name: "All your Gokul moments, together."}).waitFor();
+    await page.getByRole("button", {name: "Verify with SMS", exact:true}).waitFor();
     assert.equal(await page.getByRole("heading", {name: "Payment received"}).count(), 0);
     console.log("PASS: exact links, IST, read acknowledgement, offline recovery, consent, mobile layout, flag-OFF and guest isolation.");
 } finally {await browser.close();}

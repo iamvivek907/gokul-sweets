@@ -52,6 +52,31 @@ class RebateBestOfferTest {
         when(rebates.findById(1L)).thenReturn(Optional.of(rebate));
         assertThatThrownBy(() -> service.applyBest("TEST")).isInstanceOf(IllegalStateException.class).hasMessageContaining("offer changed");
     }
+    @Test void rewardChangesPreserveAnEligibleWeakerExplicitCoupon() {
+        var order=order("110");var choice=offer("5","110");
+        when(eligibility.findEligibleRebate(order,"BEST")).thenReturn(Optional.of(choice));
+        when(eligibility.getEligibleRebate(order,"BEST")).thenReturn(choice);
+        var rebate=new Rebate();rebate.setId(1L);rebate.setCode("BEST");rebate.setName("Chosen offer");
+        when(rebates.findById(1L)).thenReturn(Optional.of(rebate));
+        var result=service.reapplyManualOrBest("TEST","BEST");
+        assertThat(result.rebateAmount()).isEqualByComparingTo("5");assertThat(order.isRebateManualSelection()).isTrue();
+        verify(eligibility,never()).getAvailableRebates(any());
+    }
+    @Test void ineligibleExplicitCouponFallsBackToBestWithoutKeepingManualMarker() {
+        var order=order("115");var best=offer("20","95");
+        when(eligibility.findEligibleRebate(order,"OLD")).thenReturn(Optional.empty());
+        when(eligibility.getAvailableRebates("TEST")).thenReturn(List.of(best));
+        when(eligibility.getEligibleRebate(order,"BEST")).thenReturn(best);
+        var rebate=new Rebate();rebate.setId(1L);rebate.setCode("BEST");when(rebates.findById(1L)).thenReturn(Optional.of(rebate));
+        assertThat(service.reapplyManualOrBest("TEST","OLD").rebateCode()).isEqualTo("BEST");
+        assertThat(order.isRebateManualSelection()).isFalse();
+    }
+    @Test void clearedCouponMarkerCannotSuppressTheNextBestOffer() {
+        var order=order("115");order.setRebateManualSelection(true);var best=offer("20","95");
+        when(eligibility.getAvailableRebates("TEST")).thenReturn(List.of(best));when(eligibility.getEligibleRebate(order,"BEST")).thenReturn(best);
+        var rebate=new Rebate();rebate.setId(1L);rebate.setCode("BEST");when(rebates.findById(1L)).thenReturn(Optional.of(rebate));
+        assertThat(service.applyBest("TEST").rebateCode()).isEqualTo("BEST");assertThat(order.isRebateManualSelection()).isFalse();
+    }
     @Test void automaticOffersCannotChangeAStartedPayment() {
         order("115"); when(payments.existsByOrderId(1L)).thenReturn(true);
         assertThatThrownBy(() -> service.applyBest("TEST")).isInstanceOf(IllegalStateException.class);

@@ -85,7 +85,9 @@ class CustomerNotificationInboxIntegrationTest {
             inbox.orderReady(fixture.id()); inbox.orderReady(fixture.id());
             var message = inbox.page("DEV", subject, null).messages().getFirst();
             assertThat(message.kind()).isEqualTo(stage);
-            assertThat(message.message()).contains(fixture.number());
+            Long customerNumber = jdbc.queryForObject("SELECT customer_order_number FROM orders WHERE id=?", Long.class, fixture.id());
+            assertThat(message.message()).contains("#" + customerNumber).doesNotContain(fixture.number());
+            assertThat(message.targetId()).isEqualTo(fixture.number());
             if (stage.equals("CONFIRMED")) assertThat(message.message()).contains("IST", "Pickup booked");
             if (stage.equals("PREPARING")) assertThat(message.message()).contains("wait for the ready");
         }

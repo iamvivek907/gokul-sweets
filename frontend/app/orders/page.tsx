@@ -1,4 +1,5 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T,useTranslation} from "@/lib/language";
 
 import {
@@ -238,6 +239,10 @@ export default function OrdersPage() {
                                 .toLowerCase()
                                 .includes(normalizedQuery)
                             ||
+                            orderDisplayNumber(order)
+                                .toLowerCase()
+                                .includes(normalizedQuery)
+                            ||
                             order.branchName
                                 .toLowerCase()
                                 .includes(normalizedQuery)
@@ -425,7 +430,7 @@ export default function OrdersPage() {
                                     <p>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} · {order.pickupDate ? formatOrderDate(order.pickupDate) : order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending"}</p>
                                     <div><span className={getStatusClasses(status.tone)}>{status.label}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
                                     {trackingEnabled && order.delayReportedAt && <p>Ready time updated — open for details.</p>}
-                                    <Link className="mobile-order-open" href={`/orders/${encodeURIComponent(order.orderNumber)}`}>View order {order.orderNumber} →</Link>
+                                    <Link className="mobile-order-open" href={`/orders/${encodeURIComponent(order.orderNumber)}`}>View order {orderDisplayNumber(order)} →</Link>
                                 </article>;
                                 return (
                                     <article
@@ -435,7 +440,7 @@ export default function OrdersPage() {
                                         <div className="flex items-start justify-between gap-3">
                                             <div className="min-w-0">
                                                 <p className="text-[10px] font-bold uppercase tracking-wide text-[#756763]"><T text="Order" /></p>
-                                                <p className="mt-1 break-all text-sm font-bold text-[#241715]">{order.orderNumber}</p>
+                                                <p className="mt-1 break-all text-sm font-bold text-[#241715]">{orderDisplayNumber(order)}</p>
                                             </div>
                                             <span className={`shrink-0 rounded-full border px-3 py-1 text-[11px] font-bold ${getStatusClasses(status.tone)}`}>
                                                 {status.label}

@@ -39,6 +39,7 @@ public class AdminOrderLifecycleCoordinator {
                     OrderStatus.PICKUP_WINDOW_EXPIRED
             );
 
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
     private final OrderRepository orderRepository;
     private final PaymentRepository paymentRepository;
     private final AdminOrderWorkflowService workflowService;
@@ -140,6 +141,7 @@ public class AdminOrderLifecycleCoordinator {
 
         if (order.getOrderStatus() == OrderStatus.PICKED_UP) {
             inventoryLifecycleService.fulfilOrderInventory(orderNumber, currentActor());
+            loyalty.reconcile(order.getId());
             return queryService.getOrder(orderNumber);
         }
         if (order.getOrderStatus() != OrderStatus.PICKUP_WINDOW_EXPIRED) {
@@ -152,6 +154,7 @@ public class AdminOrderLifecycleCoordinator {
         inventoryLifecycleService.fulfilOrderInventory(orderNumber, currentActor());
         order.setOrderStatus(OrderStatus.PICKED_UP);
         orderRepository.saveAndFlush(order);
+        loyalty.reconcile(order.getId());
         notifications.orderReady(order.getId());
 
         log.info("Late order collected: orderNumber={}, actor={}",

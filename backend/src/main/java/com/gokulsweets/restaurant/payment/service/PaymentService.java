@@ -34,6 +34,7 @@ public class PaymentService {
     )
     private long paymentExpiryMinutes;
 
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
     private final PaymentRepository paymentRepository;
 
     private final OrderRepository orderRepository;
@@ -173,6 +174,7 @@ public class PaymentService {
          * - usage limit was reached
          * - calculated rebate amount changed
          */
+        loyalty.verifyPayment(order);
         rebateApplicationService
                 .revalidateAppliedRebateBeforePayment(
                         order

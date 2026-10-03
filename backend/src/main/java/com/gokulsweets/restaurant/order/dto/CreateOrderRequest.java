@@ -38,8 +38,13 @@ public record CreateOrderRequest(
 
         @NotEmpty(message = "At least one order item is required.")
         List<@Valid CreateOrderItemRequest> items,
-        String quoteToken
+        String quoteToken,
+        @Size(max=40) String rewardCode,
+        @Size(max=100) String offerCode
 ) {
+    public CreateOrderRequest(Long branchId, Long pickupSlotId, String customerName, String customerPhone, PickupType pickupType, List<CreateOrderItemRequest> items, String quoteToken) {
+        this(branchId,pickupSlotId,customerName,customerPhone,pickupType,items,quoteToken,null,null);
+    }
     public CreateOrderRequest(Long branchId, Long pickupSlotId, String customerName,
                               String customerPhone, PickupType pickupType, List<CreateOrderItemRequest> items) {
         this(branchId, pickupSlotId, customerName, customerPhone, pickupType, items, null);

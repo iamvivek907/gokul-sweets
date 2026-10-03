@@ -13,6 +13,7 @@ public record CustomerOrderHistoryItemResponse(
         Long orderId,
 
         String orderNumber,
+        Long customerOrderNumber,
 
         Long branchId,
 

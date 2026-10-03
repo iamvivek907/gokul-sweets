@@ -549,13 +549,14 @@ public class RebateEligibilityService {
     // =========================================================
 
     private AvailableRebateResponse withFee(AvailableRebateResponse r,Order order) {
-        return new AvailableRebateResponse(r.rebateId(),r.code(),r.name(),r.description(),r.scope(),r.rebateType(),r.rebateAmount(),com.gokulsweets.restaurant.order.service.PaymentFeePricing.totalWithFee(order,r.payableAfterRebate().add(defaultZero(order.getConvenienceFee())).add(defaultZero(order.getDeliveryFee()))),r.minimumOrderAmount(),r.maximumDiscountAmount(),r.nextSlabMinimumOrderAmount(),r.nextSlabRebateAmount(),r.amountNeededForNextSlab());
+        return new AvailableRebateResponse(r.rebateId(),r.code(),r.name(),r.description(),r.scope(),r.rebateType(),r.rebateAmount(),com.gokulsweets.restaurant.order.service.PaymentFeePricing.totalWithFee(order,r.payableAfterRebate().add(order.isLoyaltyEnrolled()?defaultZero(order.getTaxAmount()).add(defaultZero(order.getPriorityCharge())):BigDecimal.ZERO).add(defaultZero(order.getConvenienceFee())).add(defaultZero(order.getDeliveryFee()))),r.minimumOrderAmount(),r.maximumDiscountAmount(),r.nextSlabMinimumOrderAmount(),r.nextSlabRebateAmount(),r.amountNeededForNextSlab());
     }
 
     private BigDecimal calculateEligibleAmount(
             Order order
     ) {
 
+        if(order.isLoyaltyEnrolled()) return money(defaultZero(order.getSubtotal()).subtract(defaultZero(order.getLoyaltyDiscount())).max(BigDecimal.ZERO));
         BigDecimal amount =
                 defaultZero(
                         order.getSubtotal()
@@ -624,6 +625,27 @@ public class RebateEligibilityService {
                 );
     }
 
+    /** An ineligible saved choice is expected during reward changes, not a failed transaction. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<AvailableRebateResponse> findEligibleRebate(Order order, String code) {
+        try {
+            return java.util.Optional.of(getEligibleRebate(order, code));
+        } catch (IllegalArgumentException | IllegalStateException ineligible) {
+            return java.util.Optional.empty();
+        }
+    }
+
+    /** Explicit-code pricing for an unsaved validated draft; persisted orders retain payment guards. */
+    @Transactional(readOnly = true)
+    public java.util.Optional<AvailableRebateResponse> findEligibleDraftRebate(Order draft, String code) {
+        if (draft.getId() != null) throw new IllegalArgumentException("Draft pricing requires an unsaved order.");
+        try {
+            return java.util.Optional.of(priceEligibleCode(draft, code));
+        } catch (IllegalArgumentException | IllegalStateException ineligible) {
+            return java.util.Optional.empty();
+        }
+    }
+
     @Transactional(readOnly = true)
     public AvailableRebateResponse getEligibleRebate(
             Order order,
@@ -647,6 +669,10 @@ public class RebateEligibilityService {
             );
         }
 
+        return priceEligibleCode(order, rebateCode);
+    }
+
+    private AvailableRebateResponse priceEligibleCode(Order order, String rebateCode) {
         String normalizedCode =
                 rebateCode
                         .trim()

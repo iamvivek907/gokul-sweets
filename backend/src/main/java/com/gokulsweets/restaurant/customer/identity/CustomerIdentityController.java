@@ -39,6 +39,7 @@ import java.util.UUID;
 public class CustomerIdentityController {
     private static final String COOKIE = "__Host-gokul-customer";
     private static final String DEVICE_COOKIE = "__Host-gokul-device";
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
     private final VerifiedIdentityExchange exchange;
     private final VerifiedCustomerSessionStore sessions;
     private final VerifiedCustomerPhoneLookup subjects;
@@ -207,6 +208,12 @@ public class CustomerIdentityController {
         requireTrustedMutation(request);
         accountHub.deleteAddress(environment.name(), requiredSubject(request, environment), addressId);
         return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+    }
+
+    @GetMapping("/rewards")
+    public ResponseEntity<com.gokulsweets.restaurant.loyalty.LoyaltyService.Wallet> rewards(HttpServletRequest request) {
+        var environment=enabledEnvironment();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(loyalty.wallet(environment.name(),requiredSubject(request,environment),null));
     }
 
     private ConsentEnvironment accountEnvironment() {

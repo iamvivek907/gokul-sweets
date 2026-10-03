@@ -100,7 +100,7 @@ public class StaffAlertDispatcher {
     }
     private Task claim() {
         var tasks = jdbc.query("""
-            SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) order_number, d.id delivery_id, d.staff_id, d.channel, d.subscription_id, d.attempts,
+            SELECT e.*, COALESCE(o.order_number,'Request '||LEFT(e.enquiry_id::text,8)) order_number, o.customer_order_number, d.id delivery_id, d.staff_id, d.channel, d.subscription_id, d.attempts,
               s.endpoint, s.public_key, s.auth_secret FROM staff_alert_deliveries d
             JOIN staff_order_alerts e ON e.id = d.event_id LEFT JOIN orders o ON o.id = e.order_id
             LEFT JOIN staff_push_subscriptions s ON s.id = d.subscription_id

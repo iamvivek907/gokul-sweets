@@ -66,6 +66,7 @@ public class OrderService {
     private final PickupCommitmentCheck pickupCommitmentCheck;
     private final CheckoutQuoteService checkoutQuoteService;
     private final VerifiedOrderOwnership verifiedOrderOwnership;
+    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
 
     @Value(
             "${checkout.reservation-expiry-minutes:15}"
@@ -181,6 +182,7 @@ public class OrderService {
                         );
 
         verifiedOrderOwnership.bindNewOrder(savedOrder.getId(), request.customerPhone(), identityToken);
+        loyalty.reserve(savedOrder, request.rewardCode());
 
         /*
          * Reserve the complete order inventory after the order
@@ -299,6 +301,8 @@ public class OrderService {
                     "This order can no longer be changed because payment processing has already started."
             );
         }
+
+        if (order.getLoyaltyCoins()>0) throw new IllegalStateException("Remove your reward before editing the reserved checkout.");
 
         Long previousPickupSlotId =
                 order.getPickupSlot()
@@ -423,6 +427,7 @@ public class OrderService {
          * backend will calculate current eligibility
          * again.
          */
+        if(order.isLoyaltyEnrolled())order.setLoyaltyEligibleSubtotal(loyalty.eligibleSubtotal(order));
         clearAppliedRebate(
                 order
         );
@@ -570,6 +575,7 @@ public class OrderService {
     private void clearAppliedRebate(
             Order order
     ) {
+        order.setRebateManualSelection(false);
 
         if (
                 order.getRebate()

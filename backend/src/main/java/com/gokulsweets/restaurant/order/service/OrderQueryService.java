@@ -70,6 +70,7 @@ public class OrderQueryService {
 
         return new CustomerOrderResponse(
                 order.getOrderNumber(),
+                order.getCustomerOrderNumber(),
                 order.getOrderStatus(),
                 paymentStatus,
                 order.getBranch().getName(),
@@ -103,7 +104,7 @@ public class OrderQueryService {
                 order.getDeliveryLocality(),
                 order.getDeliveryPostalCode(),
                 order.getBranch().getFssaiLicenceNumber(),
-                order.getDeliveryFee()
+                order.getDeliveryFee(),order.getLoyaltyDiscount(),order.getLoyaltyCoins(),order.getLoyaltyRewardCode(),order.getRebateDiscountAmount()
         );
     }
 
@@ -172,6 +173,7 @@ public class OrderQueryService {
         var slot = order.getPickupSlot();
         return new CustomerOrderSummaryResponse(
                 order.getOrderNumber(),
+                order.getCustomerOrderNumber(),
                 order.getOrderStatus(),
                 order.getBranch().getId(),
                 order.getBranch().getName(),

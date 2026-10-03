@@ -1,4 +1,5 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {useState} from "react";
 import Link from "next/link";
 import type {CustomerOrderResponse} from "@/types/order";
@@ -31,7 +32,7 @@ export default function MobileOrderDetail({order, status, refreshing, onRefresh,
     }
     return <section className="mobile-order-detail">
         <nav><Link href="/orders">← My orders</Link><Link href="/menu">View menu</Link></nav>
-        <header><h1><T text="Order details" /></h1><p>{order.orderNumber} · {formatBusinessTimestamp(order.createdAt, {day:"numeric", month:"short", hour:"numeric", minute:"2-digit"})} IST</p></header>
+        <header><h1><T text="Order details" /></h1><p><span data-copyable>{orderDisplayNumber(order)}</span> · {formatBusinessTimestamp(order.createdAt, {day:"numeric", month:"short", hour:"numeric", minute:"2-digit"})} IST</p></header>
         <section className={`mobile-order-status ${getStatusClasses(status.tone)}`} aria-label="Order status"><h2>{status.label}</h2><p>{status.message}</p><p>Payment: {order.paymentStatus ? order.paymentStatus.replaceAll("_", " ") : "No payment attempt recorded"}</p></section>
         {trackingEnabled && order.delayReportedAt && order.estimatedReadyAt && <section role="status" className="mobile-order-note"><strong>Ready time update</strong><p>{formatBusinessTimestamp(order.estimatedReadyAt, {day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})} IST · {order.delayReason}</p><p>Reported {formatBusinessTimestamp(order.delayReportedAt, {hour:"numeric",minute:"2-digit"})} IST. Confirm collection changes with the branch.</p></section>}
         {trackingEnabled && pastPickupWindow && !order.estimatedReadyAt && <p className="mobile-order-note">Your booked pickup window has passed. Contact the branch before travelling; no revised ready time has been reported.</p>}

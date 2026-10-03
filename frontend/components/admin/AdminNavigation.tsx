@@ -18,6 +18,7 @@ export const adminGroups: {label: string; items: Item[]}[] = [
         {href: "/admin/privacy-requests", label: "Privacy requests", permissions: ["PRIVACY_REQUEST_VIEW"], ownerOnly: true}
     ]},
     {label: "Menu", items: [
+        {href: "/admin/loyalty", label: "Gokul rewards", ownerOnly: true},
         {href: "/admin/menu", label: "Menu management", permissions: ["MENU_MANAGE"], exact: true},
         {href: "/admin/menu/live", label: "Products & categories", permissions: ["MENU_MANAGE"]},
         {href: "/admin/menu/images", label: "Product images", permissions: ["MENU_MANAGE"]},

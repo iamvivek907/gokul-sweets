@@ -14,6 +14,7 @@ import java.util.List;
 public record CustomerOrderResponse(
 
         String orderNumber,
+        Long customerOrderNumber,
 
         OrderStatus orderStatus,
 
@@ -68,6 +69,7 @@ public record CustomerOrderResponse(
         String deliveryLocality,
         String deliveryPostalCode,
         String branchFssaiLicenceNumber,
-        BigDecimal deliveryFee
+        BigDecimal deliveryFee,
+        BigDecimal loyaltyDiscount, int loyaltyCoins, String loyaltyRewardCode, BigDecimal rebateDiscountAmount
 ) {
 }

@@ -364,6 +364,7 @@ public class AdminPrintJobService {
                 printJob.getKot()
                         .getOrder()
                         .getOrderNumber(),
+                printJob.getKot().getOrder().getCustomerOrderNumber(),
 
                 printJob.getPrinter()
                         == null
