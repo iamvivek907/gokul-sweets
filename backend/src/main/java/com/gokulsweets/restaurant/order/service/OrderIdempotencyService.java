@@ -55,9 +55,21 @@ public class OrderIdempotencyService {
             );
         }
 
+        // Preserve historical hashes when neither selection is present. Quote tokens
+        // are intentionally excluded: refreshing a quote must still retry this order.
+        appendSelection(canonical, "reward", normalize(request.rewardCode()));
+        appendSelection(canonical, "offer", normalize(request.offerCode()).toUpperCase(java.util.Locale.ROOT));
+
         return sha256(
                 canonical.toString()
         );
+    }
+
+    private void appendSelection(StringBuilder canonical, String kind, String selection) {
+        if (!selection.isEmpty()) {
+            canonical.append('|').append(kind).append(':')
+                    .append(selection.length()).append(':').append(selection);
+        }
     }
 
     private StringBuilder createRequestPrefix(

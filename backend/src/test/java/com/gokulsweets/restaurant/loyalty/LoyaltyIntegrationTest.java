@@ -18,6 +18,11 @@ import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest
 class LoyaltyIntegrationTest {
+ @Autowired com.gokulsweets.restaurant.order.lifecycle.service.AdminOrderLifecycleCoordinator lifecycle;
+ @Autowired com.gokulsweets.restaurant.order.service.PickupCodeService pickupCodes;
+ @org.springframework.test.context.bean.override.mockito.MockitoBean com.gokulsweets.restaurant.inventory.service.OrderInventoryLifecycleService inventory;
+ @org.springframework.test.context.bean.override.mockito.MockitoBean com.gokulsweets.restaurant.security.StaffAuthorizationService staff;
+ @org.springframework.test.context.bean.override.mockito.MockitoBean com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
  @Autowired LoyaltyService loyalty;
  @Autowired LoyaltyCheckoutService checkout;
  @Autowired LoyaltyProperties rules;
@@ -127,6 +132,40 @@ class LoyaltyIntegrationTest {
  @Test void capRejectsSeventyFiveRupeeRewardAtSixNinetyNineButAllowsSevenFifty(){
   grant(1000);assertThatThrownBy(()->loyalty.preview("DEV",subject,new BigDecimal("699"),"SWEET_75")).hasMessageContaining("eligible");
   assertThat(loyalty.preview("DEV",subject,new BigDecimal("750"),"SWEET_75").coins()).isEqualTo(300);
+ }
+ private String prepareLatePickup(Order order) {
+  paid(order.getId(),"PAID");
+  long payment=jdbc.queryForObject("SELECT id FROM payments WHERE order_id=?",Long.class,order.getId());
+  pickupCodes.issueForPaidPayment(payment);
+  jdbc.update("UPDATE order_pickup_codes SET code='0042' WHERE order_id=?",order.getId());
+  org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
+   new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("loyalty-test","test",List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ORDER_VIEW"))));
+  return jdbc.queryForObject("SELECT order_number FROM orders WHERE id=?",String.class,order.getId());
+ }
+ @Test void latePickupCreditsOnceEvenWithRolloutOffAndRepeatedHandover() {
+  var order=order("PICKUP_WINDOW_EXPIRED",true);String number=prepareLatePickup(order);
+  flags.setGokulRewards(false);
+  try {
+   assertThatThrownBy(()->lifecycle.collectLateOrder(number,"9999")).hasMessageContaining("Incorrect");
+   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=?",Integer.class,order.getId())).isZero();
+   assertThat(lifecycle.collectLateOrder(number,"0042").orderStatus()).isEqualTo(OrderStatus.PICKED_UP);
+   lifecycle.collectLateOrder(number,"0042");
+   assertThat(jdbc.queryForObject("SELECT SUM(coins)::integer FROM loyalty_ledger WHERE order_id=? AND kind='EARNED'",Integer.class,order.getId())).isEqualTo(14);
+   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=? AND kind='EARNED'",Integer.class,order.getId())).isEqualTo(1);
+  } finally {org.springframework.security.core.context.SecurityContextHolder.clearContext();}
+ }
+ @Test void latePickupRollbackKeepsCoinsStatusAndPickupCodeThenAllowsRetry() {
+  var order=order("PICKUP_WINDOW_EXPIRED",true);String number=prepareLatePickup(order);
+  org.mockito.Mockito.doThrow(new IllegalStateException("Simulated completion failure")).when(notifications).orderReady(order.getId());
+  try {
+   assertThatThrownBy(()->lifecycle.collectLateOrder(number,"0042")).hasMessageContaining("Simulated completion failure");
+   assertThat(jdbc.queryForObject("SELECT order_status FROM orders WHERE id=?",String.class,order.getId())).isEqualTo("PICKUP_WINDOW_EXPIRED");
+   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=?",Integer.class,order.getId())).isZero();
+   assertThat(pickupCodes.customerCode(number).code()).isEqualTo("0042");
+   org.mockito.Mockito.reset(notifications);
+   lifecycle.collectLateOrder(number,"0042");
+   assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=? AND kind='EARNED'",Integer.class,order.getId())).isEqualTo(1);
+  } finally {org.springframework.security.core.context.SecurityContextHolder.clearContext();}
  }
  @Test void completedPaymentCreditsOnceAndFullRefundUsesCompensatingEvents(){
   var order=order("PICKED_UP",true);paid(order.getId(),"PAID");loyalty.reconcile(order.getId());loyalty.reconcile(order.getId());
