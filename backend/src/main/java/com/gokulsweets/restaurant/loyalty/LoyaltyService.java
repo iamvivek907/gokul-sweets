@@ -23,7 +23,7 @@ public class LoyaltyService {
  private final LoyaltyProperties rules;
  private final Clock inventoryClock;
  public record Reward(String code,String name,int coins,BigDecimal discount,BigDecimal minimumSubtotal,boolean eligible,String unavailableReason) {}
- public record Entry(long id,String kind,int coins,String reason,String orderNumber,Instant createdAt,Instant expiresAt) {}
+ public record Entry(long id,String kind,int coins,String reason,String orderNumber,Long customerOrderNumber,Instant createdAt,Instant expiresAt) {}
  public record Wallet(int balance,int debt,int pendingCoins,int completedOrders,List<Reward> rewards,List<Entry> history,Instant nextExpiry,BigDecimal maximumRedemptionPercent,String terms,String policyVersion) {}
  public record Selection(String rewardCode,String policyVersion) {}
  private record Lot(long id,int remaining,Instant expiry,Long origin) { Lot(long id,int remaining,Instant expiry){this(id,remaining,expiry,null);} }
@@ -91,9 +91,9 @@ public class LoyaltyService {
   lock(environment,subject);expire(environment,subject);
   int signed=signedBalance(environment,subject),balance=Math.max(0,signed);
   var history=jdbc.query("""
-   SELECT l.id,l.kind,l.coins,l.reason,o.order_number,l.created_at,l.expires_at FROM loyalty_ledger l
+   SELECT l.id,l.kind,l.coins,l.reason,o.order_number,l.created_at,l.expires_at,o.customer_order_number FROM loyalty_ledger l
    LEFT JOIN orders o ON o.id=l.order_id WHERE l.environment=? AND l.subject_id=? ORDER BY l.id DESC LIMIT 100
-   """,(rs,row)->new Entry(rs.getLong(1),rs.getString(2),rs.getInt(3),rs.getString(4),rs.getString(5),rs.getTimestamp(6).toInstant(),rs.getTimestamp(7)==null?null:rs.getTimestamp(7).toInstant()),environment,subject);
+   """,(rs,row)->new Entry(rs.getLong(1),rs.getString(2),rs.getInt(3),rs.getString(4),rs.getString(5),rs.getObject(8,Long.class),rs.getTimestamp(6).toInstant(),rs.getTimestamp(7)==null?null:rs.getTimestamp(7).toInstant()),environment,subject);
   int completed=jdbc.queryForObject("SELECT COUNT(*)::integer FROM loyalty_qualifying_orders WHERE environment=? AND subject_id=? AND NOT reversed",Integer.class,environment,subject);
   var expiry=lots(environment,subject).stream().map(Lot::expiry).filter(Objects::nonNull).min(Instant::compareTo).orElse(null);
   var pendingOrders=jdbc.queryForList("""

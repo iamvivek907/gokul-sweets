@@ -1,4 +1,5 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import CustomerRewards from "./CustomerRewards";
 import {T} from "@/lib/language";
 
@@ -264,7 +265,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 <p className="mt-1 text-sm text-[#756763]"><T text="Only orders placed while signed in to this account." /></p></div>
                 <span className="text-sm text-[#756763]"><T text="All branches" /></span></div>
             {orders.length ? <div className="mt-4 max-h-[36rem] space-y-3 overflow-y-auto">{orders.map(order => <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3">
-                <div><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{order.orderNumber}</button>
+                <div><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{orderDisplayNumber(order)}</button>
                 <p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_", " ")}</p></div>
                 <div className="flex gap-2"><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Details" /></button>
                 <button type="button" disabled={busy} onClick={() => {void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50"><T text="Reorder" /></button></div></div>)}</div> : <p className="mt-5 text-sm text-[#756763]"><T text="No orders belong to this verified account yet." /></p>}
@@ -280,7 +281,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 {detailError && <p role="alert" className="text-[#9e2732]">{detailError}</p>}
                 {selectedOrder && <div className="space-y-5 text-sm">
                     <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]"><T text="Order number" /></p>
-                        <p className="selectable-text mt-1 break-all font-semibold">{selectedOrder.orderNumber}</p></div>
+                        <p className="selectable-text mt-1 break-all font-semibold">{orderDisplayNumber(selectedOrder)}</p></div>
                     <div className="flex flex-wrap items-center gap-2"><strong className="text-base">{selectedOrder.branchName}</strong>
                         <span className="rounded-full bg-[#e5f0e8] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#143936]">{selectedOrder.orderStatus.replaceAll("_", " ")}</span></div>
                     <div className="rounded-2xl border border-[#d9e5dc] bg-white p-4"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">{selectedOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} schedule</p>

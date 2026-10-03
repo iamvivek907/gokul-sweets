@@ -45,6 +45,7 @@ export interface AdminKot {
     kotNumber: string;
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 
@@ -89,6 +90,7 @@ export interface AdminKotReprintResponse {
     kotNumber: string;
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 

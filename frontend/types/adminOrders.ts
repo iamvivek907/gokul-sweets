@@ -55,6 +55,7 @@ export type PreparationBatchResult =
 export interface AdminOrderSummary {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 
@@ -111,6 +112,7 @@ export interface AdminOrderPageResponse {
 export interface AdminOrderQueueItem {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 
@@ -216,6 +218,7 @@ export interface AdminStartSelectedPreparationRequest {
 export interface AdminBatchPreparationItem {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     result: PreparationBatchResult;
 
@@ -272,6 +275,7 @@ export interface AdminOrderItem {
 export interface AdminOrderDetail {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 

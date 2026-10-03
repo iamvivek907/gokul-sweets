@@ -55,6 +55,7 @@ public record PrintAgentClaimResponse(
             String kotNumber,
 
             String orderNumber,
+        Long customerOrderNumber,
 
             String branchName,
 

@@ -20,6 +20,7 @@ public record AdminPrintJobResponse(
         String kotNumber,
 
         String orderNumber,
+        Long customerOrderNumber,
 
         Long printerId,
 

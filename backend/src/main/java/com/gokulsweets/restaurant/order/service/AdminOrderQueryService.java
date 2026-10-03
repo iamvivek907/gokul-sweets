@@ -79,6 +79,16 @@ public class AdminOrderQueryService {
     private final JdbcTemplate jdbc;
     private final DeliveryPreparationQueue deliveryPreparationQueue;
 
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    @Transactional(readOnly = true)
+    public AdminOrderDetailResponse getOrderByCustomerNumber(long number) {
+        if (number < 1) throw new IllegalArgumentException("Enter a valid order number.");
+        Order order = orderRepository.findByCustomerOrderNumber(number)
+                .orElseThrow(() -> new IllegalArgumentException("Order does not exist."));
+        // Retains the existing branch authorization and detailed response mapping.
+        return getOrder(order.getOrderNumber());
+    }
+
 
     /*
      * =========================================================
@@ -562,6 +572,7 @@ public class AdminOrderQueryService {
 
         return new AdminOrderDetailResponse(
                 order.getOrderNumber(),
+                order.getCustomerOrderNumber(),
 
                 order.getBranch()
                         .getId(),
@@ -734,6 +745,7 @@ public class AdminOrderQueryService {
 
         return new AdminOrderSummaryResponse(
                 order.getOrderNumber(),
+                order.getCustomerOrderNumber(),
 
                 order.getBranch()
                         .getId(),
@@ -824,6 +836,7 @@ public class AdminOrderQueryService {
 
         return new AdminOrderQueueItemResponse(
                 order.getOrderNumber(),
+                order.getCustomerOrderNumber(),
 
                 order.getBranch()
                         .getId(),

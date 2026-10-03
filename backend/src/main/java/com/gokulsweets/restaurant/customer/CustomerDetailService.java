@@ -173,6 +173,7 @@ public class CustomerDetailService {
         return new CustomerOrderHistoryItemResponse(
                 order.getId(),
                 order.getOrderNumber(),
+                order.getCustomerOrderNumber(),
                 order.getBranch()
                         .getId(),
                 order.getBranch()

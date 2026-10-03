@@ -1,4 +1,5 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T} from "@/lib/language";
 
 
@@ -569,7 +570,7 @@ export default function AdminCustomerDetailPage({
                                                                             >
 
                                                                                 <td className="px-5 py-4 font-semibold text-[#241715]">
-                                                                                    {order.orderNumber}
+                                                                                    {orderDisplayNumber(order)}
                                                                                 </td>
 
                                                                                 <td className="px-5 py-4 text-sm text-[#756763]">

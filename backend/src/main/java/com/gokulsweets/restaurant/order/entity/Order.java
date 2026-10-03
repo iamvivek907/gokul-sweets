@@ -98,6 +98,13 @@ public class Order {
     )
     private String orderNumber;
 
+    /** Database-assigned once on confirmation; never used as an access credential. */
+    @org.hibernate.annotations.Generated(event = {
+            org.hibernate.generator.EventType.INSERT, org.hibernate.generator.EventType.UPDATE
+    })
+    @Column(name = "customer_order_number", insertable = false, updatable = false, unique = true)
+    private Long customerOrderNumber;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(
             name = "branch_id",

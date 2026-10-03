@@ -15,6 +15,7 @@ public record AdminKotResponse(
         String kotNumber,
 
         String orderNumber,
+        Long customerOrderNumber,
 
         Long branchId,
 

@@ -9,7 +9,7 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 try {
  for (const [width,enabled,paymentStatus,fulfillment='PICKUP'] of [[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[640,true,'PENDING'],[1280,true,'PENDING'],[390,false,'PENDING'],[390,true,'PENDING','DELIVERY'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY']]) {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
-  const order={orderNumber:'TEST-ORDER',branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  const order={orderNumber:'TEST-ORDER',customerOrderNumber:paymentStatus==='PAID'?1:null,branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   // Customer responses may have no branch address; both forms must still download a paid invoice.
   if(width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP')order.branchAddress=null;
   if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
@@ -44,7 +44,7 @@ try {
   assert.equal(await page.locator('.mobile-order-detail').count(),compact?1:0);
   if(compact){
    const reference=page.locator('.mobile-order-detail header [data-copyable]');
-   assert.equal(await reference.textContent(),order.orderNumber);
+   assert.equal(await reference.textContent(),order.customerOrderNumber ? `#${order.customerOrderNumber}` : order.orderNumber);
    assert.equal(await reference.evaluate(e=>getComputedStyle(e).userSelect),'text','order reference remains selectable in the compact themed view');
    assert.equal(await page.locator('.mobile-order-detail').evaluate(e=>e.scrollWidth<=e.clientWidth),true);
    if(paymentStatus==='FAILED')assert.equal(await page.getByRole('link',{name:'Retry checkout',exact:true}).getAttribute('href'),'/checkout/payment/TEST-ORDER');
@@ -55,13 +55,13 @@ try {
     await page.getByText('Offer savings',{exact:true}).waitFor();
     if(fontError){await page.getByRole('button',{name:'Download invoice',exact:true}).click();await page.getByRole('alert').filter({hasText:'Unable to download the invoice'}).waitFor();fontError=false;}
     const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Download invoice',exact:true}).click();
-    const download=await downloadPromise;assert.equal(download.suggestedFilename(),'Gokul-TEST-ORDER-invoice.pdf');
+    const download=await downloadPromise;assert.equal(download.suggestedFilename(),`Gokul-${order.customerOrderNumber ?? order.orderNumber}-invoice.pdf`);
     const data=await readFile(await download.path());assert.equal(data.subarray(0,8).toString(),'%PDF-1.7');assert.ok(data.includes(Buffer.from('/Type /Page')));
     const invoiceText=execFileSync('pdftotext',[await download.path(),'-'],{encoding:'utf8'});
     const invoiceInfo=execFileSync('pdfinfo',[await download.path()],{encoding:'utf8'});
     assert.match(invoiceInfo,/Tagged:\s+yes/);assert.match(invoiceInfo,/Suspects:\s+no/);
     for(const marker of ['/StructTreeRoot','/S /Document','/S /H1','/S /H2','/S /P','/ToUnicode','/FontFile2'])assert.ok(data.includes(Buffer.from(marker)),marker);
-    assert.ok(invoiceText.includes(branch.name));assert.ok(invoiceText.includes(`PAID TOTAL: INR ${order.totalAmount.toFixed(2)}`));
+    assert.ok(invoiceText.includes(branch.name));assert.ok(invoiceText.includes('#1'),'invoice shows the customer order number');assert.ok(invoiceText.includes(`PAID TOTAL: INR ${order.totalAmount.toFixed(2)}`));
     assert.ok(invoiceText.includes(order.items[0].productName),'Hindi and Tamil names copy in logical Unicode order');
     if(!order.branchAddress)assert.equal(/\b(null|undefined)\b/u.test(invoiceText),false,'missing address is omitted from invoice');
     if(fulfillment==='DELIVERY')assert.ok(invoiceText.includes('Delivery fee: INR 30.00'));
@@ -81,7 +81,7 @@ try {
   await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();
   await page.locator(compact?'.mobile-order-card':'article').first().waitFor();
   assert.equal(await page.locator('.mobile-order-card').count(),compact?1:0);
-  if(compact){await page.getByRole('link',{name:'View order TEST-ORDER →',exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'← My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
+  if(compact){await page.getByRole('link',{name:`View order ${order.customerOrderNumber ? '#'+order.customerOrderNumber : order.orderNumber} →`,exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'← My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
   if((width<=640&&enabled)||paymentStatus==='PENDING'){
    await page.goto(`${base}/checkout/payment/TEST-ORDER`);assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false);
    if(paymentStatus==='PAID'){await page.waitForURL('**/orders/TEST-ORDER');await page.locator('.mobile-order-detail').waitFor();}

@@ -24,7 +24,7 @@ public class KitchenPlanningService {
     private final PreparationWindowProperties windows;
     private final ApplicationClock clock;
     public enum Filter {ALL, OVERDUE, ELIGIBLE, SCHEDULED, PREPARING, READY}
-    public record Row(String orderNumber, String customerName, String fulfillmentType, String orderStatus,
+    public record Row(String orderNumber, Long customerOrderNumber, String customerName, String fulfillmentType, String orderStatus,
                       String bucket, LocalDate date, LocalTime start, LocalTime end, LocalDateTime preparationAt) {}
     public record Slot(LocalDate date, LocalTime start, LocalTime end, String fulfillmentType,
                        long waiting, long preparing, long ready, long total) {}
@@ -32,7 +32,7 @@ public class KitchenPlanningService {
     public record AlertCounts(long needsPreparation, long readyOverdue) {}
     private static final String BASE="""
         WITH timed AS (
-          SELECT o.id,o.order_number,o.customer_name,o.fulfillment_type,o.order_status,
+          SELECT o.id,o.order_number,o.customer_order_number,o.customer_name,o.fulfillment_type,o.order_status,
            CASE WHEN o.fulfillment_type='DELIVERY' THEN w.service_date ELSE s.slot_date END service_date,
            CASE WHEN o.fulfillment_type='DELIVERY' THEN w.starts_at ELSE s.start_time END starts_at,
            CASE WHEN o.fulfillment_type='DELIVERY' THEN w.ends_at ELSE s.end_time END ends_at,
@@ -70,8 +70,8 @@ public class KitchenPlanningService {
         counts.put("ALL",counts.values().stream().mapToLong(Long::longValue).sum());
         if(filter!=Filter.ALL){scope+=" AND bucket=?";params.add(filter.name());}
         long total=counts.get(filter.name());params.add(20);params.add(page*20);
-        var rows=jdbc.query(BASE+"SELECT order_number,customer_name,fulfillment_type,order_status,bucket,service_date,starts_at,ends_at,preparation_at FROM planned"+scope+" ORDER BY service_date,starts_at,id LIMIT ? OFFSET ?",
-            (rs,n)->new Row(rs.getString(1),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getObject(6,LocalDate.class),rs.getObject(7,LocalTime.class),rs.getObject(8,LocalTime.class),rs.getObject(9,LocalDateTime.class)),params.toArray());
+        var rows=jdbc.query(BASE+"SELECT order_number,customer_name,fulfillment_type,order_status,bucket,service_date,starts_at,ends_at,preparation_at,customer_order_number FROM planned"+scope+" ORDER BY service_date,starts_at,id LIMIT ? OFFSET ?",
+            (rs,n)->new Row(rs.getString(1),rs.getObject(10,Long.class),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getObject(6,LocalDate.class),rs.getObject(7,LocalTime.class),rs.getObject(8,LocalTime.class),rs.getObject(9,LocalDateTime.class)),params.toArray());
         return new Plan(rows,slots,counts,page,total,now);
     }
 

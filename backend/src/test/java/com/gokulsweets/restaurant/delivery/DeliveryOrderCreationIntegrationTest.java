@@ -176,7 +176,7 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(deliveryQueue.eligible(branchId + 999, date.atTime(11, 0), 10)).isEmpty();
 
         // External printer-agent contract: delivery has its own IST window; never invent a pickup slot.
-        var printPayload = new PrintAgentClaimResponse.KotPayload(1L, "KOT-1", saved.getOrderNumber(),
+        var printPayload = new PrintAgentClaimResponse.KotPayload(1L, "KOT-1", saved.getOrderNumber(), saved.getCustomerOrderNumber(),
                 branch.getName(), branch.getAddress(), null, null, null, null, "Kitchen", date.atTime(10, 0),
                 List.of(new PrintAgentClaimResponse.Item("Sweet", 1, 0)), FulfillmentType.DELIVERY,
                 kitchenWindow.date(), kitchenWindow.start(), kitchenWindow.end());

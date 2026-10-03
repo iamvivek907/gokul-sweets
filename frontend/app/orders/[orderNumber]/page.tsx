@@ -1,4 +1,5 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import MobileOrderDetail from "@/components/order/MobileOrderDetail";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import PickupCodeCard from "@/components/order/PickupCodeCard";
@@ -379,7 +380,7 @@ export default function OrderDetailPage() {
                         <div className="min-w-0">
                             <p className="text-xs font-bold uppercase tracking-wide text-[#c88a20]">Order tracking</p>
                             <h1 data-copyable className="mt-2 break-all text-xl font-bold text-[#241715] sm:text-2xl">
-                                {order.orderNumber}
+                                {orderDisplayNumber(order)}
                             </h1>
                             <p className="mt-2 text-xs text-[#756763]">
                                 Last updated {formatUpdatedAt(order.updatedAt)}
@@ -468,7 +469,7 @@ export default function OrderDetailPage() {
                                 </a>
                             )}
                             {trackingEnabled && (
-                                <p className="mt-2 text-xs text-[#756763]">For help, quote order {order.orderNumber}. {!order.branchPhone && <Link className="underline" href="/about#our-branches">Find branch contact details</Link>}</p>
+                                <p className="mt-2 text-xs text-[#756763]">For help, quote order {orderDisplayNumber(order)}. {!order.branchPhone && <Link className="underline" href="/about#our-branches">Find branch contact details</Link>}</p>
                             )}
                         </div>
                         <div className="rounded-2xl bg-[#fffaf3] p-4">

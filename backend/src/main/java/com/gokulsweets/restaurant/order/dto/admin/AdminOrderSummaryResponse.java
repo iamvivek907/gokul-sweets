@@ -13,6 +13,7 @@ import java.time.LocalTime;
 public record AdminOrderSummaryResponse(
 
         String orderNumber,
+        Long customerOrderNumber,
 
         Long branchId,
 

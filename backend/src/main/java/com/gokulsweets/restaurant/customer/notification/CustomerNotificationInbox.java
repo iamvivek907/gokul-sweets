@@ -57,7 +57,7 @@ public class CustomerNotificationInbox {
                     'PAYMENT_' || p.payment_status, 'ORDER', o.order_number,
                     CASE p.payment_status WHEN 'PAID' THEN 'Your order is confirmed'
                          WHEN 'REFUNDED' THEN 'Refund completed' ELSE 'Payment needs refund review' END,
-                    CASE p.payment_status WHEN 'PAID' THEN 'Order ' || o.order_number || ' · ' || b.name || '. Payment verified. ' || CASE WHEN ps.id IS NOT NULL THEN 'Pickup booked for ' || to_char(ps.slot_date, 'DD Mon YYYY') || ', ' || to_char(ps.start_time, 'HH12:MI AM') || ' IST. We will notify you when preparation starts.' ELSE 'Open your order for its delivery window.' END
+                    CASE p.payment_status WHEN 'PAID' THEN 'Order ' || COALESCE('#' || o.customer_order_number::text,o.order_number) || ' · ' || b.name || '. Payment verified. ' || CASE WHEN ps.id IS NOT NULL THEN 'Pickup booked for ' || to_char(ps.slot_date, 'DD Mon YYYY') || ', ' || to_char(ps.start_time, 'HH12:MI AM') || ' IST. We will notify you when preparation starts.' ELSE 'Open your order for its delivery window.' END
                          WHEN 'REFUNDED' THEN 'The payment provider confirmed your refund. Bank processing times may apply.'
                          ELSE 'This payment requires a refund review. This message does not confirm that money has been refunded.' END
                 FROM payments p JOIN orders o ON o.id = p.order_id
@@ -98,7 +98,7 @@ public class CustomerNotificationInbox {
                          WHEN 'PICKUP_WINDOW_EXPIRED' THEN 'Your pickup window has ended'
                          WHEN 'NO_SHOW' THEN 'Your order was not collected'
                          ELSE 'Your order was cancelled' END,
-                    'Order ' || o.order_number || ' · ' || b.name || '. ' ||
+                    'Order ' || COALESCE('#' || o.customer_order_number::text,o.order_number) || ' · ' || b.name || '. ' ||
                     CASE o.order_status WHEN 'CONFIRMED' THEN
                             CASE WHEN ps.id IS NOT NULL THEN 'Pickup booked for ' || to_char(ps.slot_date, 'DD Mon YYYY') || ', ' || to_char(ps.start_time, 'HH12:MI AM') || ' IST. We will notify you when preparation starts.'
                                  ELSE 'Your delivery booking is confirmed. Open the order for its delivery window.' END
@@ -142,7 +142,7 @@ public class CustomerNotificationInbox {
                 SELECT own.environment, own.verified_subject_id,
                     'delay:' || o.id || ':' || md5(o.delay_reported_at::text || o.estimated_ready_at::text || o.delay_reason),
                     'READY_TIME_CHANGED', 'ORDER', o.order_number, 'Your ready-time estimate changed',
-                    'Order ' || o.order_number || ': revised ready time ' || to_char(o.estimated_ready_at, 'DD Mon YYYY, HH12:MI AM') || ' IST. Open your order for the branch explanation.'
+                    'Order ' || COALESCE('#' || o.customer_order_number::text,o.order_number) || ': revised ready time ' || to_char(o.estimated_ready_at, 'DD Mon YYYY, HH12:MI AM') || ' IST. Open your order for the branch explanation.'
                 FROM orders o JOIN verified_order_ownership own ON own.order_id = o.id
                 WHERE o.id = ? AND own.environment = ? AND o.order_status IN ('CONFIRMED','PREPARING')
                   AND o.delay_reported_at IS NOT NULL AND o.estimated_ready_at IS NOT NULL AND o.delay_reason IS NOT NULL

@@ -1,4 +1,5 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T} from "@/lib/language";
 
 import KitchenBoard from "@/components/admin/KitchenBoard";
@@ -22,6 +23,7 @@ import {
 
 import {
     getAdminOrderDetail,
+    getAdminOrderByCustomerNumber,
     getAdminOrders,
     getAdminPreparationQueue,
     getAdminPreparationQueueCounts,
@@ -513,6 +515,8 @@ function getTransitionLabel(
 
 
 export default function AdminOrdersPage() {
+    const [numberLookupBusy, setNumberLookupBusy] = useState(false);
+    const [numberLookupError, setNumberLookupError] = useState("");
     const useKitchenBoard=useStorefrontFeatures()?.adminPreparationBoard===true;
 
     const {
@@ -1877,6 +1881,18 @@ export default function AdminOrdersPage() {
      * =========================================================
      */
 
+    async function findCustomerOrderNumber() {
+        const number = search.trim().replace(/^#/, "");
+        if (!authorization || numberLookupBusy || !/^[1-9]\d*$/.test(number)) return;
+        setNumberLookupBusy(true); setNumberLookupError("");
+        try {
+            const found = await getAdminOrderByCustomerNumber(number, authorization);
+            await openOrderDetail(found.orderNumber);
+        } catch (cause) {
+            setNumberLookupError(cause instanceof Error ? cause.message : "Could not find this order.");
+        } finally {setNumberLookupBusy(false);}
+    }
+
     async function openOrderDetail(
         orderNumber: string
     ) {
@@ -2424,6 +2440,7 @@ export default function AdminOrdersPage() {
                         const searchable =
                             [
                                 order.orderNumber,
+                                orderDisplayNumber(order),
                                 order.customerName,
                                 order.maskedCustomerPhone
                                     ?? "",
@@ -3732,6 +3749,9 @@ export default function AdminOrdersPage() {
                                     "
                                 />
 
+                                {/^(?:#)?[1-9]\d*$/.test(search.trim()) && <button type="button" disabled={numberLookupBusy} onClick={() => void findCustomerOrderNumber()} className="mt-3 min-h-11 rounded-xl border border-[#173c39] px-4 font-bold text-[#173c39] disabled:opacity-50">{numberLookupBusy ? "Finding order…" : `Find order #${search.trim().replace(/^#/, "")} across pages`}</button>}
+                                {numberLookupError && <p role="alert" className="mt-2 text-sm text-red-800">{numberLookupError}</p>}
+
                             </div>
 
 
@@ -4245,7 +4265,7 @@ function PreparationQueueCard({
                     <input
                         type="checkbox"
                         aria-label={
-                            `Select ${order.orderNumber}`
+                            `Select ${orderDisplayNumber(order)}`
                         }
                         checked={
                             selected
@@ -4344,9 +4364,7 @@ function PreparationQueueCard({
                                 hover:underline
                             "
                         >
-                            {
-                                order.orderNumber
-                            }
+                            {orderDisplayNumber(order)}
                         </button>
 
 
@@ -4525,9 +4543,7 @@ function OrderCard({
                                 text-[#241715]
                             "
                         >
-                            {
-                                order.orderNumber
-                            }
+                            {orderDisplayNumber(order)}
                         </h2>
 
 
@@ -4915,7 +4931,7 @@ function OrderDetailDrawer({
 
         const confirmed =
             window.confirm(
-                `Queue another kitchen print for order ${order.orderNumber}?`
+                `Queue another kitchen print for order ${orderDisplayNumber(order)}?`
             );
 
 
@@ -4998,7 +5014,7 @@ function OrderDetailDrawer({
                 role="dialog"
                 aria-modal="true"
                 aria-label={
-                    `Order ${orderNumber}`
+                    `Order ${order ? orderDisplayNumber(order) : "details"}`
                 }
                 className="
                     absolute
@@ -5065,9 +5081,7 @@ function OrderDetailDrawer({
                                     sm:text-2xl
                                 "
                             >
-                                {
-                                    orderNumber
-                                }
+                                {order ? orderDisplayNumber(order) : "Loading order…"}
                             </h2>
 
                         </div>
@@ -5649,7 +5663,7 @@ function OrderDetailDrawer({
 
                                     {trackingEnabled && order?.fulfillmentType === "PICKUP" && (
                                         <section className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm" aria-label="Order delay">
-                                            <h3 className="font-bold">Customer ready time update · {order.orderNumber}</h3>
+                                            <h3 className="font-bold">Customer ready time update · {orderDisplayNumber(order)}</h3>
                                             {order.estimatedReadyAt && order.delayReportedAt && (
                                                 <p className="mt-2">Current estimate: {formatBusinessTimestamp(order.estimatedReadyAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. Reported {formatBusinessTimestamp(order.delayReportedAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. {order.delayReason}</p>
                                             )}
@@ -5719,7 +5733,7 @@ function OrderDetailDrawer({
                                                 </p>
 
 
-                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction orderNumber={order.orderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
+                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction orderNumber={order.orderNumber} customerOrderNumber={order.customerOrderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
                                                 <button
                                                     type="button"
                                                     disabled={
