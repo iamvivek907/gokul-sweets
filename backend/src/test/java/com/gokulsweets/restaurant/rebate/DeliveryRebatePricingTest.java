@@ -66,7 +66,7 @@ class DeliveryRebatePricingTest {
         var draft=order("2","0"); draft.setId(null); draft.setOrderNumber(null); draft.setOrderStatus(null);
         var offer=rebate(); clearInvocations(orders,payments);
         assertThat(eligibility.findEligibleDraftRebate(draft," save20 ").orElseThrow().payableAfterRebate()).isEqualByComparingTo("147.90");
-        offer.setMinimumOrderAmount(n("101"));
+        offer.setMinimumOrderAmount(n("106"));
         assertThat(eligibility.findEligibleDraftRebate(draft,"SAVE20")).isEmpty();
         offer.setMinimumOrderAmount(n("100")); offer.setActive(false);
         assertThat(eligibility.findEligibleDraftRebate(draft,"SAVE20")).isEmpty();

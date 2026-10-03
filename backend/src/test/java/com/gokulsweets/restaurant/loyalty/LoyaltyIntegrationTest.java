@@ -53,7 +53,7 @@ class LoyaltyIntegrationTest {
  @Test void catalogueInsertionWaitsForAcceptedRewardReservation() throws Exception {assertPolicyMutationWaits(true);}
  @Test void exclusionReplacementWaitsForAcceptedRewardReservation() throws Exception {assertPolicyMutationWaits(false);}
  private void assertPolicyMutationWaits(boolean catalogue) throws Exception {
-  grant(100);var pending=order("PENDING_PAYMENT",true);String accepted=loyalty.policyVersion();String code="LOCK_"+subject.toString().replace("-","");
+  grant(100);var pending=order("PENDING_PAYMENT",true);String accepted=loyalty.policyVersion();String code="LOCK_"+subject.toString().replace("-","").toUpperCase(Locale.ROOT);
   var products=jdbc.queryForList("SELECT product_id FROM loyalty_excluded_products",Long.class);var promotions=jdbc.queryForList("SELECT code FROM loyalty_excluded_rebates",String.class);
   long category=jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?,?) RETURNING id",Long.class,code,code);
   long product=jdbc.queryForObject("INSERT INTO products(code,name,category_id,sale_mode,base_price) VALUES (?, ?, ?, 'UNIT',149) RETURNING id",Long.class,code,code,category);
@@ -68,6 +68,7 @@ class LoyaltyIntegrationTest {
    try{
     new TransactionTemplate(manager).executeWithoutResult(tx->{
      loyalty.verifyPolicy(accepted);
+     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=pg_backend_pid() AND locktype='advisory' AND granted",Integer.class)).as("accepted transaction holds a policy lock").isPositive();
      writer.set(pool.submit(()->new TransactionTemplate(manager).executeWithoutResult(write->{
       jdbc.execute("SET LOCAL lock_timeout='5s'");pid.set(jdbc.queryForObject("SELECT pg_backend_pid()",Integer.class));connected.countDown();
       if(catalogue)admin.reward(new LoyaltyAdminController.RewardInput(code,"Concurrent catalogue insertion",10,BigDecimal.ONE,new BigDecimal("149"),true,"Policy lock regression"));
@@ -77,8 +78,9 @@ class LoyaltyIntegrationTest {
       assertThat(connected.await(3,TimeUnit.SECONDS)).isTrue();
       long deadline=System.nanoTime()+TimeUnit.SECONDS.toNanos(3);
       while(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=? AND locktype='advisory' AND NOT granted",Integer.class,pid.get())==0&&System.nanoTime()<deadline)Thread.sleep(10);
-      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=? AND locktype='advisory' AND NOT granted",Integer.class,pid.get())).isEqualTo(1);
-     }catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException(interrupted);}
+      if(writer.get().isDone())writer.get().get();
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pg_locks WHERE pid=? AND locktype='advisory' AND NOT granted",Integer.class,pid.get())).as("waiting writer %s; advisory locks %s",pid.get(),jdbc.queryForList("SELECT pid,mode,granted FROM pg_locks WHERE locktype='advisory'")).isEqualTo(1);
+     }catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IllegalStateException(interrupted);}catch(ExecutionException failed){throw new IllegalStateException("Policy writer failed before acquiring its lock",failed.getCause());}
      assertThat(loyalty.policyVersion()).isEqualTo(accepted);
      loyalty.reserve(pending,"SWEET_5");
     });
