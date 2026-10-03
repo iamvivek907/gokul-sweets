@@ -78,7 +78,7 @@ try {
     assert.equal(reads, 1);
     assert.equal(await page.getByRole("button", {name: "Mark as read"}).count(), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-    if (process.env.NOTIFICATION_SCREENSHOT_DIR) await page.screenshot({path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-mobile.png`, fullPage:true});
+    if (process.env.NOTIFICATION_SCREENSHOT_DIR) {await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-mobile.png`, fullPage:true});}
     read = false;
     await page.getByRole("button", {name: "Refresh inbox"}).click();
     await page.getByRole("heading", {name: /Notification inbox.*1 unread/}).waitFor();
@@ -93,7 +93,7 @@ try {
     await page.getByRole("heading", {name: /Notification inbox.*0 unread/}).waitFor();
     assert.equal(reads, 3);
     await page.setViewportSize({width: 1440, height: 1000});
-    if (process.env.NOTIFICATION_SCREENSHOT_DIR) await page.screenshot({path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-desktop.png`, fullPage:true});
+    if (process.env.NOTIFICATION_SCREENSHOT_DIR) {await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-desktop.png`, fullPage:true});}
     failLoad = true;
     await page.getByRole("button", {name: "Refresh inbox"}).click();
     await page.getByRole("alert").filter({hasText: "could not confirm"}).waitFor();
