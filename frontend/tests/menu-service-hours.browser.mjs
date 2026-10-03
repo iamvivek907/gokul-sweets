@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
+import {mkdir} from 'node:fs/promises';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const branch={id:1,code:'SERVICE',name:'Service branch',active:true,operational:true,address:'Test address',city:'Test city',openingTime:'08:00:00',closingTime:'22:00:00',pickupAvailable:true};
@@ -22,6 +23,7 @@ try{for(const width of [390,1280]){
   else if(path==='/api/customer/identity/me')json={authenticated:true,phone:'+919876543210',name:'Service customer'};
   else if(path==='/api/branches'||path==='/api/admin/branches')json=[{...branch,operational}];
   else if(path==='/api/branches/1'||path==='/api/admin/branches/1')json={...branch,operational};
+  else if(path==='/api/admin/branches/1/offerings')json={draft:[],published:[],version:0};
   else if(path==='/api/admin/branches/1/menu')json=[1,2].map(id=>({branchProductId:100+id,branchId:1,productId:id,productName:id===1?'Samosa':'Chola samosa',categoryId:1,categoryName:'Snacks',productActive:true,categoryActive:true,available:true,effectivePrice:20,displayOrder:id}));
   else if(path==='/api/admin/branches/1/menu-service-windows'){
    if(request.method()==='PUT'){const value=request.postDataJSON();assert.equal(value.revision,saved.revision);saved={...value,revision:saved.revision+1};}
@@ -40,15 +42,16 @@ try{for(const width of [390,1280]){
  opened=true;await page.clock.fastForward(21000);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('.gokul-product-card button')].some(button=>button.getAttribute('aria-label')==='Add Samosa to cart'&&!button.disabled));
  assert.equal(await samosa.getByRole('button',{name:/^Add .* to cart$/}).isEnabled(),true);
  await page.goto(`${base}/admin/menu/service-hours`);await page.getByRole('heading',{name:'Menu service hours'}).waitFor();await page.getByRole('checkbox',{name:'Enforce service hours and sold-out rules for this branch'}).check();
- await page.getByLabel('Category',{exact:true}).selectOption('1');await page.getByRole('button',{name:'Apply category hours to draft'}).click();
+ await page.getByRole('combobox',{name:/^Category/}).selectOption('1');await page.getByRole('button',{name:'Apply category hours to draft'}).click();
  const baseRule=page.locator('section').filter({has:page.getByRole('heading',{name:'Samosa',exact:true})});const dependent=page.locator('section').filter({has:page.getByRole('heading',{name:'Chola samosa',exact:true})});
  await baseRule.getByRole('checkbox',{name:'Sold out until cleared'}).check();await dependent.getByLabel('Requires an available item').selectOption('101');
  await page.getByRole('button',{name:'Save branch service rules'}).click();await page.getByText(/Saved. New orders use these IST rules/).waitFor();
  assert.equal(saved.items.find(item=>item.branchProductId===101).soldOut,true);assert.equal(saved.items.find(item=>item.branchProductId===102).requiresBranchProductId,101);assert.equal(saved.items[0].startsAt,'11:00');assert.equal(saved.items[0].endsAt,'21:30');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/service-hours-${width}.png`,fullPage:true});}
  await page.reload();await baseRule.getByRole('checkbox',{name:'Sold out until cleared'}).waitFor();assert.equal(await baseRule.getByRole('checkbox',{name:'Sold out until cleared'}).isChecked(),true);
  await page.goto(`${base}/menu`);await page.getByText('Sold out',{exact:true}).first().waitFor();assert.equal(await page.getByRole('button',{name:/^Add .* to cart$/}).first().isDisabled(),true);
- await page.goto(`${base}/admin/branches`);const toggle=page.getByRole('switch',{name:'Branch is operational'});await toggle.waitFor();await toggle.uncheck();await page.getByText('Branch closed for new customer visits and orders. Existing orders are retained.',{exact:true}).waitFor();assert.equal(operational,false);
+ await page.goto(`${base}/admin/branches`);const toggle=page.getByRole('switch',{name:'Branch is operational'});await toggle.waitFor();await toggle.click();await page.getByText('Branch closed for new customer visits and orders. Existing orders are retained.',{exact:true}).waitFor();assert.equal(operational,false);
  for(const path of ['/branches/1','/menu']){await page.goto(`${base}${path}`);await page.getByRole('heading',{name:'Currently not operational',exact:true}).waitFor();assert.equal(await page.locator('.gokul-product-card').count(),0);}
  operational=true;saved={...saved,enabled:false};await page.goto(`${base}/menu`);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();assert.equal(await page.getByRole('heading',{name:'Currently not operational',exact:true}).count(),0);
  // Closing boundary + failed refresh disables stale Add controls while retaining the cart.

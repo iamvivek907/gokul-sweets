@@ -24,7 +24,7 @@ class MenuServiceWindowsIntegrationTest {
  @Autowired JdbcTemplate jdbc;
  @Autowired PlatformTransactionManager manager;
  @MockitoBean StaffAuthorizationService authorization;
- @MockitoBean(name="inventoryClock") Clock clock;
+ @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(name="inventoryClock") Clock clock;
  long branch,category,samosa,chola,samosaBp,cholaBp;
  @BeforeEach void setup(){
   time("2026-10-05T05:30:00Z");String code="SERVICE-"+UUID.randomUUID();

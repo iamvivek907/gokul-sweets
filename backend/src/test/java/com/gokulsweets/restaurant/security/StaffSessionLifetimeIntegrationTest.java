@@ -14,7 +14,7 @@ import static org.mockito.Mockito.*;
 class StaffSessionLifetimeIntegrationTest {
  @Autowired StaffSessionService sessions;
  @Autowired JdbcTemplate jdbc;
- @MockitoBean(name="inventoryClock") Clock clock;
+ @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(name="inventoryClock") Clock clock;
  Object originalKey;
  @BeforeEach void setup(){originalKey=ReflectionTestUtils.getField(sessions,"encryptionKey");ReflectionTestUtils.setField(sessions,"encryptionKey",Base64.getEncoder().encodeToString(new byte[32]));time(Instant.parse("2026-10-05T05:30:00Z"));}
  @AfterEach void restore(){ReflectionTestUtils.setField(sessions,"encryptionKey",originalKey);}
@@ -27,7 +27,8 @@ class StaffSessionLifetimeIntegrationTest {
  }
  @Test void staffSurvivesRefreshAndRenewsWithoutChangingPushSessionIdentity(){
   var user=user("KITCHEN_STAFF");var signIn=sessions.issue(user);var hash=StaffSessionService.hash(signIn.token());
-  assertThat(jdbc.queryForObject("SELECT expires_at FROM staff_sessions WHERE token_hash=?",(r,n)->r.getTimestamp(1).toInstant(),hash)).isEqualTo(clock.instant().plus(Duration.ofDays(365)));
+  Instant expires=jdbc.queryForObject("SELECT expires_at FROM staff_sessions WHERE token_hash=?",(r,n)->r.getTimestamp(1).toInstant(),hash);
+  assertThat(expires).isEqualTo(clock.instant().plus(Duration.ofDays(365)));
   time(clock.instant().plus(Duration.ofDays(364)));var verified=sessions.verify(signIn.token());assertThat(verified).isNotNull();
   assertThat(sessions.renewStaff(verified,signIn.token(),user)).isTrue();
   time(clock.instant().plus(Duration.ofDays(2)));assertThat(sessions.verify(signIn.token())).isNotNull();
