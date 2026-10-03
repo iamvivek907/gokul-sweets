@@ -52,7 +52,7 @@ class MobileCheckoutPreviewTest {
   verify(loyalty).preview("DEV",subject.id(),new java.math.BigDecimal("200"),null);
  }
  @Test void explicitOfferRejectionHasADistinctRecoveryCode(){
-  var selected=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of(),null,"SWEET_5","OLD");
+  var selected=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of(),null,null,"OLD");
   when(quotes.preview(selected,null)).thenReturn(new CheckoutQuoteService.Quote(List.of(),"100","0","0","0","0","100","INR","2099-01-01T00:00:00Z","signed","0","0","0","0"));
   when(rebates.previewDraft(any())).thenReturn(List.of());when(rebates.findEligibleRebate(any(),eq("OLD"))).thenReturn(java.util.Optional.empty());
   assertThatThrownBy(()->preview.preview(selected,"verified")).isInstanceOf(OfferIneligibleException.class);
