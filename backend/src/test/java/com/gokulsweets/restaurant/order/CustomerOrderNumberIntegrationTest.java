@@ -42,7 +42,7 @@ class CustomerOrderNumberIntegrationTest {
                 INSERT INTO orders(order_number,branch_id,pickup_slot_id,pickup_type,customer_name,customer_phone,order_status,reservation_expires_at)
                 VALUES (?, ?, (SELECT id FROM pickup_slots WHERE branch_id=? ORDER BY id LIMIT 1),
                         'NORMAL','Number test','9876543210','PENDING_PAYMENT',CURRENT_TIMESTAMP+INTERVAL '15 minutes') RETURNING id
-                """, Long.class, "NUM-" + UUID.randomUUID(), branch, branch);
+                """, Long.class, ("NUM-" + UUID.randomUUID()).toUpperCase(java.util.Locale.ROOT), branch, branch);
     }
 
     private Long number(long id) {
