@@ -5,7 +5,7 @@ const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BA
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Rewards branch',code:'REWARD',active:true,pickupAvailable:true},product={id:1,name:'Fresh sweets',categoryId:1,categoryName:'Sweets',price:150,saleMode:'UNIT',available:true},slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,priorityEnabled:false};
 const wallet={policyVersion:'rules-v1',balance:100,pendingCoins:15,completedOrders:3,debt:0,maximumRedemptionPercent:10,terms:'Coins expire 180 days after your last qualifying completed order. Tax and fees are excluded.',history:[],nextExpiry:null,rewards:[{code:'SWEET_5',name:'₹5 sweet saving',coins:30,discount:5,minimumSubtotal:149,eligible:true,unavailableReason:null}]};
-try{for(const scenario of ['switch','reward-first','offer-failure','reward-failure','flag-off','desktop']){
+try{for(const scenario of ['switch','reward-first','offer-failure','reward-failure','flag-off','desktop','manual-reward','manual-ineligible','cart-reward-error']){
  console.log('Rewards scenario:',scenario);const desktop=scenario==='desktop',enabled=scenario!=='flag-off';
  const context=await browser.newContext({viewport:{width:desktop?1280:390,height:900},serviceWorkers:'block'}),page=await context.newPage();let previews=[],applies=[],posts=[],rewardCode=null,currentTotal=142.8;
  const offer=(code,amount,reward=0)=>({rebateId:amount,code,name:`Save ${amount}`,rebateType:'FIXED_AMOUNT',scope:'GENERAL',rebateAmount:amount,payableAfterRebate:Math.round((160-reward-amount)*102)/100,minimumOrderAmount:code==='SAVE20'?150:100});
@@ -21,10 +21,12 @@ try{for(const scenario of ['switch','reward-first','offer-failure','reward-failu
   else if(path.endsWith('/availability'))json={today:date,maximumDate:date,dates:[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false}]}]};
   else if(path==='/api/orders/mobile-preview'){
    const data=req.postDataJSON();previews.push(data);
+   if(data.rewardCode&&data.offerCode==='SAVE20')return route.fulfill({status:409,headers,json:{code:'OFFER_INELIGIBLE',message:'Selected offer is no longer eligible'}});
+   if(scenario==='cart-reward-error'&&data.rewardCode&&data.items[0].quantity===1)return route.fulfill({status:409,headers,json:{message:'Reward minimum no longer met'}});
    if((scenario==='offer-failure'&&data.offerCode==='SAVE8')||(scenario==='reward-failure'&&data.rewardCode))return route.fulfill({status:503,headers,json:{message:'Savings verification unavailable. Try again.'}});
    const reward=data.rewardCode?5:0,eligible=offers(reward),selected=eligible.find(o=>o.code===data.offerCode)??eligible[0];
    json={quote:{token:'server-signed',subtotal:'150',taxAmount:'0',priorityCharge:'0',convenienceFee:'10',paymentFeeRate:'2',totalAmount:'163.20',currency:'INR',expiresAt:new Date(Date.now()+600000).toISOString(),items:[]},offers:eligible,selectedOffer:selected,rewards:enabled?wallet:null,rewardDiscount:reward,totalBeforeOffer:(160-reward)*1.02,paymentFee:Math.round((160-reward-selected.rebateAmount)*2)/100};
-  }else if(path==='/api/orders'&&req.method()==='POST'){posts.push(req.postDataJSON());json=order();}
+  }else if(path==='/api/orders'&&req.method()==='POST'){posts.push(req.postDataJSON());rewardCode=req.postDataJSON().rewardCode??null;json=order();}
   else if(path==='/api/orders/REWARDS-TEST')json=order();
   else if(path.endsWith('/available-rebates'))json=offers(rewardCode?5:0);
   else if(path.endsWith('/rebate-spend-targets'))json=[];
@@ -40,7 +42,35 @@ try{for(const scenario of ['switch','reward-first','offer-failure','reward-failu
  if(desktop){await page.getByRole('heading',{name:'Your earned coins'}).waitFor();await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('status').filter({hasText:'Reward applied'}).waitFor();await page.getByText('Reward saving',{exact:true}).waitFor();assert.match(await page.getByText('Reward saving',{exact:true}).locator('..').innerText(),/₹5.00/);assert.equal(rewardCode,'SWEET_5');assert.equal(await page.locator('.mobile-checkout').count(),0);await context.close();continue;}
  await page.getByRole('button',{name:'Pay now',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
  if(!enabled){assert.equal(await page.getByRole('heading',{name:'Your earned coins'}).count(),0);await context.close();continue;}
- if(scenario.startsWith('reward-')){
+ if(scenario.startsWith('manual-')){
+  await page.getByRole('button',{name:'Change offer'}).click();const dialog=page.getByRole('dialog');
+  const choice=scenario==='manual-reward'?'Save 8':'Save 20';
+  if(scenario==='manual-ineligible'){
+   await dialog.getByRole('button',{name:'Close ×'}).click();
+   // Select a previously valid strong coupon through its code field.
+   await page.getByRole('button',{name:'Change offer'}).click();
+   await page.getByRole('dialog').getByRole('textbox').fill('SAVE20');
+   await page.getByRole('dialog').locator('form').getByRole('button',{name:'Apply',exact:true}).click();
+  }else await dialog.locator('article').filter({hasText:choice}).getByRole('button',{name:'Apply',exact:true}).click();
+  await dialog.waitFor({state:'hidden'});await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('button',{name:'Remove reward'}).waitFor();
+  if(scenario==='manual-reward'){
+   assert.match(await page.locator('.mobile-checkout-pay strong').innerText(),/149.94/);
+   assert.equal(previews.at(-1).offerCode,'SAVE8');
+   await page.getByRole('button',{name:'Pay now',exact:true}).click();await page.waitForURL('https://gateway.example.invalid/rewards');
+   assert.equal(posts[0].offerCode,'SAVE8');assert.equal(posts[0].rewardCode,'SWEET_5');assert.deepEqual(applies,['SAVE8']);
+  }else{
+   assert.ok(previews.some(p=>p.offerCode==='SAVE20'&&p.rewardCode==='SWEET_5'));
+   assert.equal(previews.at(-1).offerCode??null,null);assert.match(await page.locator('.mobile-checkout-pay strong').innerText(),/147.90/);
+  }
+ }else if(scenario==='cart-reward-error'){
+  await page.getByRole('button',{name:'Add one Fresh sweets'}).click();await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
+  await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('button',{name:'Remove reward'}).waitFor();
+  await page.getByRole('button',{name:'Remove one Fresh sweets'}).click();
+  await page.getByRole('region',{name:'Reward recovery'}).waitFor();assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);
+  await page.getByRole('region',{name:'Reward recovery'}).getByRole('button',{name:'Remove reward'}).click();
+  await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
+  assert.equal(previews.at(-1).rewardCode,undefined);assert.equal(await page.getByRole('region',{name:'Reward recovery'}).count(),0);
+ }else if(scenario.startsWith('reward-')){
   await page.getByRole('button',{name:/₹5 sweet saving/}).click();
   if(scenario==='reward-failure'){await page.getByRole('alert').filter({hasText:'Savings verification unavailable'}).waitFor();assert.equal(await page.getByRole('button',{name:'Remove reward'}).count(),0);assert.match(await page.locator('.mobile-checkout-pay strong').innerText(),/142.80/);}
   else{await page.getByRole('button',{name:'Remove reward'}).waitFor();assert.match(await page.locator('.mobile-checkout-pay strong').innerText(),/147.90/);await page.getByRole('button',{name:'Change offer'}).click();assert.equal(await page.getByRole('dialog').getByText('Save 20',{exact:true}).count(),0);await page.getByRole('dialog').getByRole('button',{name:'Close ×'}).click();}

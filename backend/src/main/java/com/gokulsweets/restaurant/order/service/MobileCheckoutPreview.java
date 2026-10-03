@@ -31,7 +31,7 @@ public class MobileCheckoutPreview {
    var subject=ownership.verifiedSubject(request.customerPhone(),token);
    var excluded=loyalty.excludedProducts();
    BigDecimal eligible=BigDecimal.ZERO;
-   for(int i=0;i<request.items().size();i++)if(!excluded.contains(request.items().get(i).productId()))eligible=eligible.add(new BigDecimal(quote.items().get(i).total()).subtract(new BigDecimal(quote.items().get(i).taxAmount())));
+   for(var line:quote.items())if(!excluded.contains(line.productId()))eligible=eligible.add(new BigDecimal(line.total()).subtract(new BigDecimal(line.taxAmount())));
    wallet=loyalty.wallet(subject.environment(),subject.id(),eligible);
    var reward=loyalty.preview(subject.environment(),subject.id(),eligible,request.rewardCode());
    order.setLoyaltyEnrolled(true);order.setLoyaltyDiscount(reward==null?BigDecimal.ZERO:reward.discount());
@@ -39,7 +39,7 @@ public class MobileCheckoutPreview {
   var offers=rebates.previewDraft(order);
   var best=offers.stream().min(java.util.Comparator.comparing(AvailableRebateResponse::payableAfterRebate));
   if(request.offerCode()!=null&&!request.offerCode().isBlank()){
-   var selected=rebates.getEligibleRebate(order,request.offerCode());
+   var selected=rebates.findEligibleRebate(order,request.offerCode()).orElseThrow(OfferIneligibleException::new);
    best=java.util.Optional.of(selected);
    if(offers.stream().noneMatch(offer->offer.code().equals(selected.code())))offers=java.util.stream.Stream.concat(offers.stream(),java.util.stream.Stream.of(selected)).toList();
   }

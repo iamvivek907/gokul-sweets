@@ -35,6 +35,20 @@ class LoyaltyIntegrationTest {
   loyalty.wallet("DEV",subject,null);
  }
  @AfterEach void restore(){flags.setGokulRewards(rewards);flags.setCustomerOtpIdentity(identity);flags.setAcceptedCheckoutQuote(quote);}
+ @Test void rewardsEnabledQuoteCanRunInAPostgresReadOnlyTransaction(){
+  var validation=org.mockito.Mockito.mock(com.gokulsweets.restaurant.order.service.OrderValidationService.class);
+  var calculation=org.mockito.Mockito.mock(com.gokulsweets.restaurant.order.service.OrderCalculationService.class);
+  var service=new com.gokulsweets.restaurant.order.service.CheckoutQuoteService(flags,validation,calculation,org.mockito.Mockito.mock(com.gokulsweets.restaurant.order.repository.OrderRepository.class),loyalty);
+  org.springframework.test.util.ReflectionTestUtils.setField(service,"signingKey","readonly-quote-regression-signing-key");
+  var request=new com.gokulsweets.restaurant.order.dto.CreateOrderRequest(branch,slot,"Customer","9876543210",PickupType.NORMAL,List.of());
+  var data=org.mockito.Mockito.mock(com.gokulsweets.restaurant.order.service.model.ValidatedOrderData.class);
+  var amounts=new com.gokulsweets.restaurant.order.service.model.OrderCalculationResult(List.of(),new BigDecimal("149"),BigDecimal.ZERO,BigDecimal.ZERO,new BigDecimal("149"));
+  org.mockito.Mockito.when(validation.validate(request)).thenReturn(data);org.mockito.Mockito.when(calculation.calculate(data)).thenReturn(amounts);
+  var transaction=new TransactionTemplate(manager);transaction.setReadOnly(true);
+  var result=transaction.execute(status->{jdbc.execute("SET TRANSACTION READ ONLY");assertThat(jdbc.queryForObject("SHOW transaction_read_only",String.class)).isEqualTo("on");return service.preview(request,null);});
+  assertThat(result.token()).isNotBlank();
+  new TransactionTemplate(manager).executeWithoutResult(status->service.accept(request,null,amounts,result.token()));
+ }
  private void grant(int coins){
   long ledger=jdbc.queryForObject("INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,reason,expires_at) VALUES ('DEV',? ,?,'ADJUSTED',?,'Test fixture',CURRENT_TIMESTAMP+INTERVAL '180 days') RETURNING id",Long.class,subject,"fixture:"+UUID.randomUUID(),coins);
   jdbc.update("INSERT INTO loyalty_lots(ledger_id,remaining) VALUES (?,?)",ledger,coins);

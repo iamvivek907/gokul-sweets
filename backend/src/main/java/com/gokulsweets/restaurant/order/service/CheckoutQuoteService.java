@@ -32,7 +32,7 @@ public class CheckoutQuoteService {
     @Value("${checkout.quote-signing-key:}")
     private String signingKey;
 
-    public record Line(String name, String unitPrice, String taxRate, String taxAmount, String total) {}
+    public record Line(String name, String unitPrice, String taxRate, String taxAmount, String total, long productId) {}
     public record Quote(List<Line> items, String subtotal, String taxAmount,
                         String priorityCharge, String convenienceFee, String convenienceFeeTax, String totalAmount, String currency,
                         String expiresAt, String token,String paymentFee,String paymentFeeTax,String paymentFeeRate,String paymentFeeTaxRate) {}
@@ -56,11 +56,11 @@ public class CheckoutQuoteService {
         }
         OrderCalculationResult amounts = calculation.calculate(data);
         long expiry = Instant.now().plusSeconds(300).getEpochSecond();
-        String payload = payload(request, pendingOrderNumber, amounts);
+        String payload = payload(request, pendingOrderNumber, amounts, false);
         String token = expiry + "." + sign(expiry + ":" + payload);
         return new Quote(amounts.items().stream().map(item -> new Line(item.product().getName(),
                         item.unitPrice().toPlainString(), item.taxRate().toPlainString(),
-                        item.taxAmount().toPlainString(), item.lineTotal().toPlainString())).toList(),
+                        item.taxAmount().toPlainString(), item.lineTotal().toPlainString(), item.product().getId())).toList(),
                 amounts.subtotal().toPlainString(), amounts.taxAmount().toPlainString(),
                 amounts.priorityCharge().toPlainString(), amounts.convenienceFee().toPlainString(), amounts.convenienceFeeTax().toPlainString(), amounts.totalAmount().toPlainString(),
                 "INR", Instant.ofEpochSecond(expiry).toString(), token,amounts.paymentFee().toPlainString(),amounts.paymentFeeTax().toPlainString(),amounts.paymentFeeRate().toPlainString(),amounts.paymentFeeTaxRate().toPlainString());
@@ -77,7 +77,7 @@ public class CheckoutQuoteService {
         if (expiry <= Instant.now().getEpochSecond()) {
             throw new IllegalStateException("This price quote expired. Review the current price again.");
         }
-        String expected = sign(parts[0] + ":" + payload(request, orderNumber, amounts));
+        String expected = sign(parts[0] + ":" + payload(request, orderNumber, amounts, true));
         if (!MessageDigest.isEqual(expected.getBytes(StandardCharsets.US_ASCII),
                 parts[1].getBytes(StandardCharsets.US_ASCII))) {
             throw new IllegalStateException("Your price or pickup details changed. Review the updated quote.");
@@ -92,7 +92,7 @@ public class CheckoutQuoteService {
                 request.items(), request.quoteToken()), order.getOrderNumber(), amounts, request.quoteToken());
     }
 
-    private String payload(CreateOrderRequest request, String orderNumber, OrderCalculationResult amounts) {
+    private String payload(CreateOrderRequest request, String orderNumber, OrderCalculationResult amounts, boolean lockPolicy) {
         StringBuilder value = new StringBuilder("v1|").append(orderNumber == null ? "new" : orderNumber)
                 .append('|').append(request.branchId()).append('|').append(request.pickupSlotId())
                 .append('|').append(request.pickupType()).append('|').append(request.customerName())
@@ -102,7 +102,7 @@ public class CheckoutQuoteService {
         amounts.items().forEach(item -> value.append(item.product().getId()).append(':')
                 .append(item.unitPrice()).append(':').append(item.taxRate()).append(':')
                 .append(item.taxAmount()).append(':').append(item.lineTotal()).append(';'));
-        return value.append("|loyalty-policy:").append(loyalty.policyVersion()).append("|reward:").append(request.rewardCode()).append("|offer:").append(request.offerCode()).append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
+        return value.append("|loyalty-policy:").append(lockPolicy ? loyalty.lockPolicyVersion() : loyalty.policyVersion()).append("|reward:").append(request.rewardCode()).append("|offer:").append(request.offerCode()).append('|').append(amounts.subtotal()).append('|').append(amounts.taxAmount())
                 .append('|').append(amounts.priorityCharge()).append('|').append(amounts.convenienceFee()).append('|').append(amounts.convenienceFeeTax()).append('|').append(amounts.totalAmount()).append('|').append(amounts.feeConfigurationVersion()).append('|').append(amounts.convenienceFeeTaxRate()).append('|').append(amounts.paymentFee()).append('|').append(amounts.paymentFeeTax()).append('|').append(amounts.paymentFeeRate()).append('|').append(amounts.paymentFeeTaxRate()).toString();
     }
 

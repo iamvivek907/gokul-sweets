@@ -18,6 +18,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 
 class CheckoutQuoteServiceTest {
     private final EnhancementProperties features = new EnhancementProperties();
@@ -52,7 +54,9 @@ class CheckoutQuoteServiceTest {
     void changedRewardPolicyInvalidatesQuoteEvenWhenRupeeTotalIsUnchanged() {
         when(loyalty.policyVersion()).thenReturn("coins-30");
         var quote = service.preview(request, null);
-        when(loyalty.policyVersion()).thenReturn("coins-31");
+        when(loyalty.lockPolicyVersion()).thenReturn("coins-30");
+        service.accept(request, null, amounts, quote.token());
+        when(loyalty.lockPolicyVersion()).thenReturn("coins-31");
         assertThatThrownBy(() -> service.accept(request, null, amounts, quote.token()))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("changed");
     }
@@ -102,5 +106,11 @@ class CheckoutQuoteServiceTest {
         features.setAcceptedCheckoutQuote(false);
         service.accept(request, null, amounts, null);
         assertThatThrownBy(() -> service.preview(request, null)).isInstanceOf(IllegalStateException.class);
+    }
+    @Test void onlyQuoteAcceptanceLocksTheRewardPolicy(){
+        when(loyalty.policyVersion()).thenReturn("policy-v1");when(loyalty.lockPolicyVersion()).thenReturn("policy-v1");
+        var quote=service.preview(request,null);
+        verify(loyalty).policyVersion();verify(loyalty,never()).lockPolicyVersion();
+        service.accept(request,null,amounts,quote.token());verify(loyalty).lockPolicyVersion();
     }
 }

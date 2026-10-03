@@ -12,7 +12,8 @@ class MobileCheckoutPreviewTest {
  final VerifiedOrderOwnership ownership=mock(VerifiedOrderOwnership.class);
  final CheckoutQuoteService quotes=mock(CheckoutQuoteService.class);
  final RebateEligibilityService rebates=mock(RebateEligibilityService.class);
- final MobileCheckoutPreview preview=new MobileCheckoutPreview(ownership,quotes,rebates,mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class));
+ final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty=mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class);
+ final MobileCheckoutPreview preview=new MobileCheckoutPreview(ownership,quotes,rebates,loyalty);
  final CreateOrderRequest request=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of());
  @Test void identityMustBeCheckedBeforePricing(){
   doThrow(new IllegalArgumentException("Verify phone")).when(ownership).requireVerifiedIdentity("9876543210","expired");
@@ -33,5 +34,29 @@ class MobileCheckoutPreviewTest {
   var result=preview.preview(request,"verified");
   assertThat(result.paymentFee()).isEqualByComparingTo("1.90");assertThat(result.paymentFeeTax()).isEqualByComparingTo("0.29");
   assertThat(new java.math.BigDecimal("95").add(result.paymentFee())).isEqualByComparingTo(result.offers().getFirst().payableAfterRebate());
+ }
+ @Test void normalizedQuoteIdsHandleDuplicateRowsAndExcludedProductsWithoutIndexingTheRequest(){
+  var duplicate=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of(
+   new com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest(1L,1,null),
+   new com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest(1L,1,null),
+   new com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest(2L,1,null)));
+  var quote=new CheckoutQuoteService.Quote(List.of(
+   new CheckoutQuoteService.Line("Excluded","100","5","5","105",2L),
+   new CheckoutQuoteService.Line("Eligible merged row","100","5","10","210",1L)),"300","15","0","0","0","315","INR","2099-01-01T00:00:00Z","signed","0","0","0","0");
+  var subject=new VerifiedOrderOwnership.Subject("DEV",java.util.UUID.randomUUID());
+  when(quotes.preview(duplicate,null)).thenReturn(quote);when(loyalty.enabled()).thenReturn(true);
+  when(ownership.verifiedSubject("9876543210","verified")).thenReturn(subject);
+  when(loyalty.excludedProducts()).thenReturn(java.util.Set.of(2L));when(rebates.previewDraft(any())).thenReturn(List.of());
+  assertThat(preview.preview(duplicate,"verified").quote().items()).hasSize(2);
+  verify(loyalty).wallet("DEV",subject.id(),new java.math.BigDecimal("200"));
+  verify(loyalty).preview("DEV",subject.id(),new java.math.BigDecimal("200"),null);
+ }
+ @Test void explicitOfferRejectionHasADistinctRecoveryCode(){
+  var selected=new CreateOrderRequest(1L,2L,"Customer","9876543210",PickupType.NORMAL,List.of(),null,"SWEET_5","OLD");
+  when(quotes.preview(selected,null)).thenReturn(new CheckoutQuoteService.Quote(List.of(),"100","0","0","0","0","100","INR","2099-01-01T00:00:00Z","signed","0","0","0","0"));
+  when(rebates.previewDraft(any())).thenReturn(List.of());when(rebates.findEligibleRebate(any(),eq("OLD"))).thenReturn(java.util.Optional.empty());
+  assertThatThrownBy(()->preview.preview(selected,"verified")).isInstanceOf(OfferIneligibleException.class);
+  var response=new com.gokulsweets.restaurant.exception.GlobalExceptionHandler().handleIneligibleOffer(new OfferIneligibleException(),new org.springframework.mock.web.MockHttpServletRequest());
+  assertThat(response.getStatusCode().value()).isEqualTo(409);assertThat(response.getBody().code()).isEqualTo("OFFER_INELIGIBLE");
  }
 }
