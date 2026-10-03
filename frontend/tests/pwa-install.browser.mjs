@@ -43,6 +43,19 @@ async function emit(page,{result='dismissed',pending=false,fails=false}={}){
  },{result,pending,fails});
 }
 const card=page=>page.locator('.pwa-install-card');
+async function assertActionContrast(button){
+ const ratio=await button.evaluate(element=>{
+  const style=getComputedStyle(element);
+  const luminance=color=>{
+   const values=color.match(/[\d.]+/g).slice(0,3).map(value=>{
+    const channel=Number(value)/255;return channel<=.04045?channel/12.92:((channel+.055)/1.055)**2.4;
+   });return values[0]*.2126+values[1]*.7152+values[2]*.0722;
+  };
+  const text=luminance(style.color),background=luminance(style.backgroundColor);
+  return (Math.max(text,background)+.05)/(Math.min(text,background)+.05);
+ });
+ assert.ok(ratio>=4.5,`Primary action text contrast ${ratio.toFixed(2)}:1 must meet 4.5:1`);
+}
 try{
  // Declared image assets decode at their actual manifest sizes, including maskable.
  const assets=await setup();const manifest=await (await assets.page.request.get(`${base}/manifest.webmanifest`)).json();
@@ -52,6 +65,7 @@ try{
  // Native signal, rapid taps, consumed event, preference persistence and unavailable state.
  const {context,page,errors}=await setup();await page.locator('.account-hub').waitFor();assert.equal(await card(page).count(),0);
  await emit(page,{pending:true});await card(page).getByRole('button',{name:'Install App',exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.__nativeCalls),0);
+ await assertActionContrast(card(page).getByRole('button',{name:'Install App',exact:true}));
  await card(page).getByRole('button',{name:'Install App',exact:true}).click();await page.waitForFunction(()=>window.__nativeCalls===1);await page.evaluate(()=>document.querySelector('.pwa-install-copy button')?.click());
  assert.equal(await page.evaluate(()=>window.__nativeCalls),1);assert.deepEqual(await page.evaluate(()=>window.__activeGesture),[true]);
  await page.evaluate(()=>window.__resolveChoice('dismissed'));await card(page).waitFor({state:'hidden'});await page.reload();await page.locator('.account-hub').waitFor();await emit(page);assert.equal(await card(page).count(),0);
@@ -71,6 +85,7 @@ try{
  for(const width of [320,390,640]){
   const h=await setup({width,ios:true,stored:true});await card(h.page).getByRole('button',{name:'Install App',exact:true}).waitFor();assert.equal(await h.page.getByRole('dialog').count(),0);
   const install=card(h.page).getByRole('button',{name:'Install App',exact:true});await install.click();const guide=h.page.getByRole('dialog',{name:'Add Gokul Sweets to your Home Screen'});await guide.waitFor();assert.equal(await guide.locator('li').count(),3);assert.equal(await guide.getByRole('button',{name:'Close install instructions'}).evaluate(e=>e===document.activeElement),true);
+  await assertActionContrast(install);await assertActionContrast(guide.getByRole('button',{name:'Got it',exact:true}));
   await h.page.keyboard.press('Escape');await guide.waitFor({state:'hidden'});assert.equal(await install.evaluate(e=>e===document.activeElement),true);
   await install.click();await guide.getByRole('button',{name:'Got it',exact:true}).click();await guide.waitFor({state:'hidden'});assert.equal(await install.isVisible(),true);
   await install.click();await h.page.mouse.click(5,5);await guide.waitFor({state:'hidden'});assert.equal(await h.page.evaluate(()=>window.__nativeCalls),0);
