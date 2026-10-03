@@ -18,6 +18,8 @@ import static org.mockito.Mockito.*;
 @SpringBootTest(properties={"spring.datasource.hikari.maximum-pool-size=3","spring.datasource.hikari.minimum-idle=0"})
 @org.springframework.test.annotation.DirtiesContext(classMode=org.springframework.test.annotation.DirtiesContext.ClassMode.AFTER_CLASS)
 class MenuServiceWindowsIntegrationTest {
+ @Autowired com.gokulsweets.restaurant.occasion.OccasionEnquiryService enquiries;
+ @Autowired com.gokulsweets.restaurant.config.EnhancementProperties features;
  @Autowired MenuServiceWindows windows;
  @Autowired BranchOperations operations;
  @Autowired MenuService menu;
@@ -98,4 +100,27 @@ class MenuServiceWindowsIntegrationTest {
   assertThatThrownBy(()->validation.validateCart(branch,List.of(new CreateOrderItemRequest(samosa,1,null)))).hasMessageContaining("not operational");
   operations.set(branch,new BranchOperations.Status(true));assertThat(windows.snapshot(branch).status(samosa).available()).isTrue();
  }
+ @Test void enquiryAcceptanceSerializesClosureAndDuplicateRecoverySurvivesClosure() throws Exception {
+  boolean enabled=features.isOccasionEnquiries();features.setOccasionEnquiries(true);
+  var subject=UUID.randomUUID();var environment=com.gokulsweets.restaurant.customer.consent.ConsentEnvironment.DEV;
+  jdbc.update("INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES (?,'DEV',?)",subject,"+91"+String.format("%010d",branch));
+  long tax=jdbc.queryForObject("INSERT INTO tax_categories(code,name,cgst_rate,sgst_rate) VALUES (?,'Test tax',0,0) RETURNING id",Long.class,"SERVICE-"+UUID.randomUUID());
+  jdbc.update("UPDATE products SET tax_category_id=? WHERE id=?",tax,samosa);
+  jdbc.update("UPDATE branch_products SET occasion_published=true WHERE id=?",samosaBp);
+  var request=new com.gokulsweets.restaurant.occasion.OccasionEnquiryService.Request(branch,"Celebration",LocalDate.of(2026,10,10),10,com.gokulsweets.restaurant.occasion.OccasionEnquiryService.Fulfilment.PICKUP,null,null,List.of(new com.gokulsweets.restaurant.occasion.OccasionEnquiryService.Item(samosa,java.math.BigDecimal.ONE,com.gokulsweets.restaurant.occasion.OccasionEnquiryService.Unit.PIECE,"Samosa")));
+  var locked=new CountDownLatch(1);var release=new CountDownLatch(1);var started=new CountDownLatch(1);
+  try(var executor=Executors.newVirtualThreadPerTaskExecutor()){
+   var accepting=executor.submit(()->new TransactionTemplate(manager).execute(status->{var result=enquiries.submit(environment,subject,request);jdbc.update("UPDATE occasion_enquiries SET created_at=? WHERE id=?",java.sql.Timestamp.from(clock.instant()),result.id());locked.countDown();try{if(!release.await(5,TimeUnit.SECONDS))throw new IllegalStateException("Enquiry lock timeout");}catch(InterruptedException e){Thread.currentThread().interrupt();throw new RuntimeException(e);}return result;}));
+   try {
+    assertThat(locked.await(5,TimeUnit.SECONDS)).isTrue();
+    var closing=executor.submit(()->{started.countDown();return operations.set(branch,new BranchOperations.Status(false));});
+    assertThat(started.await(5,TimeUnit.SECONDS)).isTrue();try{assertThatThrownBy(()->closing.get(150,TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);}finally{release.countDown();}
+    var accepted=accepting.get(5,TimeUnit.SECONDS);assertThat(closing.get(5,TimeUnit.SECONDS).operational()).isFalse();
+    assertThat(enquiries.submit(environment,subject,request).id()).isEqualTo(accepted.id());
+    var changed=new com.gokulsweets.restaurant.occasion.OccasionEnquiryService.Request(branch,"Different celebration",request.serviceDate(),10,request.fulfilment(),null,null,request.items());
+    assertThatThrownBy(()->enquiries.submit(environment,subject,changed)).hasMessageContaining("Branch is unavailable");
+   } finally {release.countDown();}
+  } finally {features.setOccasionEnquiries(enabled);}
+ }
+
 }

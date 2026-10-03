@@ -39,6 +39,7 @@ class OccasionEnquiryServiceTest {
         assertThatThrownBy(() -> service.quote(ConsentEnvironment.DEV, 1, UUID.randomUUID(), "manager",
                 new OccasionEnquiryService.Quote(new BigDecimal("1000.00"), new BigDecimal("200.00"),
                         expires, null, "Pickup", List.of()))).isInstanceOf(ResponseStatusException.class);
+        verify(jdbc).query(contains("FOR SHARE"), org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<Boolean>>any(), eq(1L));
         verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
     private final UUID subject = UUID.randomUUID();
@@ -85,11 +86,13 @@ class OccasionEnquiryServiceTest {
                         null, new BigDecimal("1.5"))))
                 .isInstanceOf(ResponseStatusException.class);
         when(jdbc.queryForObject(contains("FROM branches"), eq(Boolean.class), any())).thenReturn(true);
+        when(jdbc.query(contains("FOR SHARE"), org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<Boolean>>any(), eq(1L))).thenReturn(List.of(true));
         when(jdbc.queryForObject(contains("FROM branch_products"), eq(Boolean.class), any(), any(), any(), any(), any(), any()))
                 .thenReturn(false);
         assertThatThrownBy(() -> service.submit(ConsentEnvironment.DEV, subject,
                 request(LocalDate.of(2026, 10, 1), OccasionEnquiryService.Fulfilment.PICKUP, null, BigDecimal.ONE)))
                 .isInstanceOf(ResponseStatusException.class);
+        verify(jdbc).query(contains("FOR SHARE"), org.mockito.ArgumentMatchers.<org.springframework.jdbc.core.RowMapper<Boolean>>any(), eq(1L));
         verify(jdbc, never()).update(anyString(), any(Object[].class));
     }
 

@@ -18,7 +18,7 @@ try{for(const width of [390,1280]){
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
   let json=[];
   if(path==='/api/admin/auth/me')json={staffId:12,username:'owner',fullName:'Owner',roleName:'OWNER_ADMIN',branchIds:[1],permissions:['MENU_MANAGE','BRANCH_MANAGE']};
-  else if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,branchExperience:true,contextualStorefrontV2:true,preHomeIntentGateway:true,customerAccountHub:true,today:'2026-10-05'};
+  else if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,branchExperience:true,contextualStorefrontV2:true,preHomeIntentGateway:true,customerAccountHub:true,occasionEnquiries:true,today:'2026-10-05'};
   else if(path==='/api/storefront/customer-identity')json={enabled:true};
   else if(path==='/api/customer/identity/me')json={authenticated:true,phone:'+919876543210',name:'Service customer'};
   else if(path==='/api/branches'||path==='/api/admin/branches')json=[{...branch,operational}];
@@ -60,6 +60,10 @@ try{for(const width of [390,1280]){
  await page.goto(`${base}/menu`);await page.getByText('Sold out',{exact:true}).first().waitFor();assert.equal(await page.getByRole('button',{name:/^Add .* to cart$/}).first().isDisabled(),true);
  await page.goto(`${base}/admin/branches`);const toggle=page.getByRole('switch',{name:'Branch is operational'});await toggle.waitFor();await toggle.click();await page.getByText('Branch closed for new customer visits and orders. Existing orders are retained.',{exact:true}).waitFor();assert.equal(operational,false);
  for(const path of ['/branches/1','/menu']){await page.goto(`${base}${path}`);await page.getByRole('heading',{name:'Currently not operational',exact:true}).waitFor();assert.equal(await page.locator('.gokul-product-card').count(),0);}
+ await page.goto(`${base}/occasions/requests`);await page.getByRole('heading',{name:'Requests & quotes',exact:true}).waitFor();await page.getByRole('heading',{name:'Your requests',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Currently not operational',exact:true}).count(),0,'existing requests remain accessible after branch closure');
+ await page.evaluate(()=>localStorage.setItem('gokul-language','hi'));await page.goto(`${base}/menu`);await page.getByRole('heading',{name:'अभी संचालन में नहीं है',exact:true}).waitFor();await page.getByRole('link',{name:'दूसरी शाखा चुनें',exact:true}).waitFor();
+ operational=true;await page.goto(`${base}/menu`);await page.getByText('स्टॉक खत्म',{exact:true}).first().waitFor();
+ await page.evaluate(()=>localStorage.setItem('gokul-language','en'));
  operational=true;saved={...saved,enabled:false};await page.goto(`${base}/menu`);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();assert.equal(await page.getByRole('heading',{name:'Currently not operational',exact:true}).count(),0);
  // Closing boundary + failed refresh disables stale Add controls while retaining the cart.
  await samosa.getByRole('button',{name:/^Add .* to cart$/}).click();failMenu=true;await page.clock.fastForward(6*3600000+1000);await samosa.getByText('Checking current availability…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/^Add .* to cart$/}).last().isDisabled(),true);
