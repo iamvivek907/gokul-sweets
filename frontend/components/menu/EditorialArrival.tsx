@@ -133,7 +133,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                     <div className={styles.branchCopy}>
                         <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
                         <p>{branchExperience ? item.description || item.city || item.address || translate("Explore this branch") : item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
-                        {branchExperience && <p>{item.pickupAvailable ? "Order for pickup" : "Online pickup unavailable"}</p>}
+                        {branchExperience && item.operational !== false && <p><T text={item.pickupAvailable ? "Order for pickup" : "Online pickup unavailable"} /></p>}
                         <span className={styles.cardPrompt}><T text={item.operational===false?"Currently not operational":"Explore this branch"} /></span>
                     </div>
                     <BranchSelector cardBranch={item} destination={branchExperience ? "branchHome" : "menu"} />

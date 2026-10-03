@@ -123,4 +123,13 @@ class MenuServiceWindowsIntegrationTest {
   } finally {features.setOccasionEnquiries(enabled);}
  }
 
+ @Test void inactiveAndTemporarilyClosedBranchesKeepDistinctMessages(){
+  operations.set(branch,new BranchOperations.Status(false));
+  assertThatThrownBy(()->menu.getMenu(branch)).hasMessage("This branch is currently not operational.");
+  jdbc.update("UPDATE branches SET active=false WHERE id=?",branch);
+  assertThatThrownBy(()->menu.getMenu(branch)).hasMessage("Selected branch is currently unavailable.");
+  operations.set(branch,new BranchOperations.Status(true));
+  assertThatThrownBy(()->menu.getMenu(branch)).hasMessage("Selected branch is currently unavailable.");
+ }
+
 }

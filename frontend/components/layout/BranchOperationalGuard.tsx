@@ -10,7 +10,7 @@ export default function BranchOperationalGuard({children}:{children:ReactNode}){
  const translate=useTranslation();
  const pathname=usePathname(),{branch}=useSelectedBranch();
  const routed=pathname.match(/^\/branches\/(\d+)(?:\/|$)/);
- const id=routed?Number(routed[1]):pathname==="/menu"||pathname==="/occasions"?branch?.id:null;
+ const id=routed?Number(routed[1]):pathname==="/"||pathname==="/menu"||pathname==="/occasions"?branch?.id:null;
  const [status,setStatus]=useState<{id:number;branch:Branch|null;error:boolean}|null>(null);
  useEffect(()=>{
   if(!id)return;const controller=new AbortController();

@@ -141,7 +141,7 @@ public class MenuService {
                         );
 
 
-        if (!branch.isActive() || !branch.isOperational()) {
+        if (!branch.isActive()) {
 
             log.warn(
                     "Menu requested for inactive branch: branchId={}",
@@ -149,10 +149,15 @@ public class MenuService {
             );
 
             throw new IllegalArgumentException(
-                    "This branch is currently not operational."
+                    "Selected branch is currently unavailable."
             );
         }
 
+
+        if (!branch.isOperational()) {
+            log.warn("Menu requested for non-operational branch: branchId={}", branchId);
+            throw new IllegalArgumentException("This branch is currently not operational.");
+        }
 
         return branch;
     }
