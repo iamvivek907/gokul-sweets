@@ -12,6 +12,7 @@ import CheckoutMobileAction from "@/components/checkout/CheckoutMobileAction";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {formatWeight} from "@/lib/orderQuantity";
 
+import {CheckoutSavingsUncertainError} from "@/lib/checkoutRefresh";
 import {refreshCurrentCheckoutQuote} from "@/lib/checkoutQuoteRefresh";
 import {checkoutQuoteKey} from "@/lib/checkoutQuoteKey";
 import {applyBestRebate} from "@/services/rebateApi";
@@ -797,8 +798,12 @@ export default function ReviewPage() {
             savePendingOrder({...pending, totalAmount: applied.totalAmount});
             window.dispatchEvent(new Event("gokul-navigation-start"));
             router.push(`/checkout/payment/${encodeURIComponent(orderNumber)}`);
-        } catch {
-            setOrderError("Your pickup is reserved. Choose an offer below or continue to payment.");
+        } catch (error) {
+            if(error instanceof CheckoutSavingsUncertainError){
+                const pending=parsePendingOrder(getPendingOrderSnapshot());
+                if(pending?.orderNumber===orderNumber)savePendingOrder({...pending,offerRecheckRequired:true,priceReviewRequired:true});
+                setOrderError(error.message);
+            }else setOrderError("Your pickup is reserved. Choose an offer below or continue to payment.");
         }
     }
 
