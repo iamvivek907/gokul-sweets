@@ -1,3 +1,9 @@
+## October reference-inspired customer presentation
+
+The owner’s latest direction supersedes the earlier cream/teal/coral presentation in the enabled customer shell. Use white surfaces, charcoal ink, emerald controls, pale neutral section backgrounds and blue savings accents. Real food photography takes priority over explanatory panels. Shared shell ownership, effective flags, authoritative prices, pickup checks, identity and payment recovery remain unchanged. The flag-OFF and staff presentations retain their existing styling.
+
+`reference-storefront.css`, loaded last by AppShell, owns this coordinated rebrand. Phone menu rows use larger photos and white/green Add controls; pickup date/time selections explicitly pair green backgrounds with white primary and secondary labels. Pairings appear as a contained inline carousel only after verified suggestions are available. Without a chosen pickup date, suggestions are checked against the server’s current IST date; this does not select or promise a pickup slot. Adding still rechecks availability. Pairings use a compact, stable 200px region with readable loading/empty states so delayed availability, history and offer reads never move following products. Details remain available through the menu tabs, including across viewport changes. Savings use blue; pending/loading states never imply a completed payment.
+
 # Customer theme contract
 
 ## SCRUM-107 owner-approved arrival palette

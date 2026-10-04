@@ -41,7 +41,8 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
  const contact=useMemo(()=>session?verifiedCheckoutContact(session):null,[session]);
  const selectionKey=JSON.stringify(intent.selection);
  const selected=useMemo(()=>JSON.parse(selectionKey) as PickupSelection|null,[selectionKey]);
- const request=JSON.stringify({serviceDate:intent.date,items:availabilityItems(cart.items)});
+ const serviceDate=intent.date??features?.today;
+ const request=JSON.stringify({serviceDate,items:availabilityItems(cart.items)});
  const key=JSON.stringify([branchId,request,selected?.slot.id,selected?.pickupType,smartAvailability,identityRevision]);
  const offerKey=JSON.stringify([key,contact?.phone]);
  useEffect(()=>()=>{addition.current?.abort();},[key]);
@@ -63,7 +64,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
   return()=>{controller?.abort();unsubscribe();};
  },[branchId]);
  useEffect(()=>{
-  if(!features||!intent.date||!cart.items.length||cart.branchId!==branchId)return;
+  if(!features||!serviceDate||!cart.items.length||cart.branchId!==branchId)return;
   const c=new AbortController();
   const timer=setTimeout(()=>void (async()=>{
    const counts=new Map<number,number>();for(const visit of visits){if(visit.branchId!==branchId||visit.paymentStatus!=="PAID"||!["PICKED_UP","DELIVERED"].includes(visit.orderStatus))continue;for(const item of visit.items)counts.set(item.productId,(counts.get(item.productId)??0)+1);}
@@ -71,7 +72,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
    // Slot checks below already include dated inventory. Without them, batch-check favourites
    // independently of the smart-availability flag; optional failures hide unverified candidates.
    const favouritesCheck=candidates.length&&(!smartAvailability||!selected)
-    ? checkInventory(branchId,{serviceDate:intent.date!,items:candidates.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))},AbortSignal.any([c.signal,AbortSignal.timeout(8000)]))
+    ? checkInventory(branchId,{serviceDate:serviceDate!,items:candidates.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))},AbortSignal.any([c.signal,AbortSignal.timeout(8000)]))
        .then(value=>candidates.filter(s=>value.enforcementEnabled===false||value.items.some(item=>item.productId===s.product.id&&item.orderable))).catch(()=>[])
     : Promise.resolve(candidates);
    const [recommended,favourites]=await Promise.all([
@@ -89,7 +90,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
    if(!c.signal.aborted)setResult(previous=>({key,items:stableSuggestions(previous?.key===key?previous.items:[],items)}));
   })(),450);
   return()=>{clearTimeout(timer);c.abort();};
- },[key,branchId,request,intent.date,cart.branchId,cart.items.length,cart.items,products,visits,selected,smartAvailability,features]);
+ },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,cart.items,products,visits,selected,smartAvailability,features]);
  // Optional pricing must not delay products that have already passed their availability checks.
  useEffect(()=>{
   if(!features||!selected||!contact||!cart.items.length||cart.branchId!==branchId)return;
@@ -125,10 +126,11 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
   finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current)setBusy(false);}
  }
  const available=!!suggestions.length||!!target||!!message;
- const summary=!intent.date?"Choose pickup to see optional additions.":current&&!available?"No optional additions right now.":available?"Optional additions at menu prices.":"Checking suggestions. Continue browsing.";
+
+ const summary=message||(current?"No optional additions right now.":"Checking pairings…");
  return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection">
   <h3><T text="Pairs well with your selection"/></h3>
-  <p role="status"><T text={summary}/></p>
+  <div className="mobile-menu-pairing-row mobile-menu-pairings-inline">{!message&&suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name} from pairings`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"before tax":"incl. item tax"}/></small></article>)}{(!suggestions.length||!!message)&&<p className="mobile-menu-pairing-status" role="status"><T text={summary}/></p>}</div>
   <button id="mobile-menu-pairings-open" className="mobile-menu-suggestions-open" type="button" disabled={!available} onClick={()=>setOpen(true)} aria-haspopup="dialog"><T text="View optional additions"/></button>
   {open&&<MenuDiscoverySheet title="Optional additions" onClose={()=>setOpen(false)}>
    <div className="mobile-menu-pairing-row">{suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name}`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p>{s.reason}</p></article>)}</div>
