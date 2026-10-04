@@ -33,9 +33,9 @@ export function availabilityItems(items: CartItem[]) {
 
 export function checkCartAvailability(
     branchId: number, startDate: string, days: number,
-    items: ReturnType<typeof availabilityItems>, signal?: AbortSignal
+    items: ReturnType<typeof availabilityItems>, signal?: AbortSignal, menuPreview = false
 ) {
-    return apiClient<CartAvailability>(`/api/branches/${branchId}/availability`, {
+    return apiClient<CartAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true" : ""}`, {
         method: "POST", signal, body: JSON.stringify({startDate, days, items, fulfilmentType: "PICKUP"})
     });
 }

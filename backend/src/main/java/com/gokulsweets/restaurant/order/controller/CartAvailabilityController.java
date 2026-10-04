@@ -19,9 +19,10 @@ public class CartAvailabilityController {
     private final CartAvailabilityService service;
 
     @PostMapping("/api/branches/{branchId}/availability")
-    public ResponseEntity<CartAvailabilityService.Availability> check(@PathVariable Long branchId, @Valid @RequestBody Request request) {
+    public ResponseEntity<CartAvailabilityService.Availability> check(@PathVariable Long branchId, @Valid @RequestBody Request request,
+            @RequestParam(defaultValue = "false") boolean menuPreview) {
         if (!features.isSmartAvailability()) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(service.check(branchId, request.startDate(), request.days(), request.items()));
+        return ResponseEntity.ok(service.check(branchId, request.startDate(), request.days(), request.items(), menuPreview));
     }
 
     // Omitted fulfilment retains legacy pickup semantics; delivery must not silently reuse pickup policies.

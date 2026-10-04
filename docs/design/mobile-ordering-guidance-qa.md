@@ -1,6 +1,6 @@
 # Mobile ordering guidance QA
 
-Scope: phones below 641px with the existing effective customer shell. Compact checkout still requires simplifiedCheckout, checkoutExperienceV2 and acceptedCheckoutQuote. No backend, deployment or manifest changes.
+Scope: phones below 641px with the existing effective customer shell. Compact checkout still requires simplifiedCheckout, checkoutExperienceV2 and acceptedCheckoutQuote. Menu discovery opts into the server’s menuPreview availability mode; checkout retains whole-cart validation. No deployment or manifest changes.
 
 - At 320, 390 and 640px, verify readable branch addresses and collection actions without horizontal overflow. At 641px and with flags OFF, verify existing layouts.
 - Reopen a saved cart with a past IST pickup. Menu hides that selection, explains it and exposes Choose time. Confirm a future time, including a partial menu availability case. Server rejection must retain the previous stored pickup.
@@ -9,4 +9,8 @@ Scope: phones below 641px with the existing effective customer shell. Compact ch
 - Return from PhonePe to compact checkout: an existing gateway-marked reservation resumes its payment page. Follow an in-app link or Back: failed provider verification retains reservation; verified unpaid cancellation keeps cart and proceeds; paid results preserve the order. Repeat with desktop, flags OFF and delivery recovery.
 - Test an actual low-network Android and iPhone gateway close/return. Chromium mocks verify recovery state and navigation but cannot reproduce PhonePe UAT or an iOS gesture rendering defect. Connection-aware savings depend on the browser exposing connection information.
 
-Automated coverage: mobile-ordering-guidance.browser.mjs, mobile-single-checkout.browser.mjs, mobile-orders.browser.mjs, rewards-checkout.browser.mjs, menuPickupOptions.test.cjs and menuPrefetch.test.cjs, alongside the complete existing browser suite.
+Automated coverage: mobile-ordering-guidance.browser.mjs, mobile-single-checkout.browser.mjs, mobile-orders.browser.mjs, rewards-checkout.browser.mjs, menuPickupOptions.test.cjs and menuPrefetch.test.cjs, mobile-ordering-resilience.browser.mjs and CartAvailabilityServiceTest, alongside the complete existing browser suite.
+
+Review regressions: mix a today-only product with a seven-day product and verify later dates remain discoverable while checkout still rejects the today-only item. Keep pickup add-ons ON with smart availability OFF; pairings and the existing add check must work without calling the disabled endpoint. Hold an offer response: verified pairings must appear first. Leave during a delayed Add: the saved cart must remain unchanged. Switch away from ordinary checkout and return: its scroll position must remain unchanged.
+
+On slow/save-data phones, optional launch route/menu/cover prefetches, eager menu image warming, animated campaign playback and completed-order history fetches are skipped. Optional offer checking runs independently of product suggestions. Obsolete checks are aborted; pickup and Add checks have bounded waits and preserve the saved cart on failure. Browsers without Network Information support retain existing media behaviour, so actual device/network QA remains necessary.

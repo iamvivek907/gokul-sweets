@@ -80,6 +80,7 @@ jobs:
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/compact-mobile-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-single-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-guidance.browser.mjs
+          node tests/mobile-ordering-resilience.browser.mjs
           node tests/rewards-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-account-corrections.browser.mjs
           node tests/loyalty-admin.browser.mjs

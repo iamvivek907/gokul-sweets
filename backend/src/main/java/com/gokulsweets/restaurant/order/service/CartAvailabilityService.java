@@ -43,6 +43,13 @@ public class CartAvailabilityService {
 
     @Transactional(readOnly = true)
     public Availability check(Long branchId, LocalDate startDate, int days, List<CreateOrderItemRequest> requested) {
+        return check(branchId, startDate, days, requested, false);
+    }
+
+    /** Menu discovery spans individual product horizons; order validation still checks every item. */
+    @Transactional(readOnly = true)
+    public Availability check(Long branchId, LocalDate startDate, int days,
+                              List<CreateOrderItemRequest> requested, boolean menuPreview) {
         LocalDate today = LocalDate.now(inventoryClock);
         if (startDate.isBefore(today) || startDate.isAfter(today.plusDays(features.getFutureOrderingDays()))) {
             throw new IllegalArgumentException("Choose a date within the advance ordering window.");
@@ -56,7 +63,7 @@ public class CartAvailabilityService {
         LocalDate maximumDate = today.plusDays(features.getFutureOrderingDays());
         if (settings != null && today.plusDays(settings.getAdvanceBookingDays()).isBefore(maximumDate))
             maximumDate = today.plusDays(settings.getAdvanceBookingDays());
-        if (inventoryProperties.isEnforcementEnabled()) {
+        if (inventoryProperties.isEnforcementEnabled() && !menuPreview) {
             for (var policy : policies.values()) if (today.plusDays(policy.getBookingHorizonDays()).isBefore(maximumDate))
                 maximumDate = today.plusDays(policy.getBookingHorizonDays());
         }

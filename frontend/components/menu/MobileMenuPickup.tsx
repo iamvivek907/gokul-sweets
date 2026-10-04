@@ -22,7 +22,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
  async function choose(){
   if(busy)return;
   setBusy(true);setError("");const c=new AbortController();controller.current=c;
-  try{const value=await checkCartAvailability(branchId,today,days+1,JSON.parse(request),AbortSignal.any([c.signal,AbortSignal.timeout(15000)]));if(!c.signal.aborted){setData(value);setOpen(true);}}
+  try{const value=await checkCartAvailability(branchId,today,days+1,JSON.parse(request),AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);if(!c.signal.aborted){setData(value);setOpen(true);}}
   catch{if(!c.signal.aborted)setError("We couldn’t load pickup times. Your cart is saved. Try again.");}
   finally{if(!c.signal.aborted)setBusy(false);}
  }
@@ -33,7 +33,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
  {error&&<p role="alert">{error}</p>}
  {open&&data&&<Dialog dates={data.dates} options={menuPickupOptions(data,ids)} chosen={selection??menuPickupOptions(data,ids)[0]??null} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);}} onConfirm={async value=>{
   const branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot();const c=new AbortController();controller.current=c;
-  const fresh=await checkCartAvailability(branchId,value.date,1,JSON.parse(request),AbortSignal.any([c.signal,AbortSignal.timeout(15000)]));
+  const fresh=await checkCartAvailability(branchId,value.date,1,JSON.parse(request),AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);
   if(c.signal.aborted||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot())return false;
   const checked=menuPickupOptions(fresh,ids).find(s=>s.slot.id===value.slot.id&&s.date===value.date&&s.pickupType===value.pickupType);
   if(!checked){setData(previous=>previous?{...previous,dates:previous.dates.map(d=>fresh.dates.find(f=>f.date===d.date)??d)}:fresh);return false;}

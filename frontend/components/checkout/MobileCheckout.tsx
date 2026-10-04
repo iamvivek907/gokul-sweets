@@ -84,7 +84,7 @@ export default function MobileCheckout(){
  const [attemptLoaded,setAttemptLoaded]=useState(false);
  useEffect(()=>{let alive=true;queueMicrotask(()=>{if(!alive)return;try{const value=JSON.parse(sessionStorage.getItem(ATTEMPT)??"null") as Attempt|null;if(value?.key&&value.request&&typeof value.expected==="number")setAttempt(value);}catch{/* No saved attempt. */}setAttemptLoaded(true);});return()=>{alive=false;};},[]);
  useEffect(()=>{
-  const resume=()=>{if(document.visibilityState!=="visible")return;if(handoff){setHandoff(false);}window.scrollTo({left:0,top:0,behavior:"instant"});};
+  const resume=()=>{if(document.visibilityState!=="visible"||!handoff)return;setHandoff(false);window.scrollTo({left:0,top:0,behavior:"instant"});};
   window.addEventListener("pageshow",resume);document.addEventListener("visibilitychange",resume);
   return()=>{window.removeEventListener("pageshow",resume);document.removeEventListener("visibilitychange",resume);};
  },[handoff]);
