@@ -17,3 +17,12 @@ Automated coverage: mobile-ordering-guidance.browser.mjs, mobile-single-checkout
 Review regressions: mix a today-only product with a seven-day product and verify later dates remain discoverable while checkout still rejects the today-only item. Keep pickup add-ons ON with smart availability OFF; pairings and the existing add check must work without calling the disabled endpoint. Hold an offer response: verified pairings must appear first. Leave during a delayed Add: the saved cart must remain unchanged. Switch away from ordinary checkout and return: its scroll position must remain unchanged.
 
 On slow/save-data phones, optional launch route/menu/cover prefetches, eager menu image warming, animated campaign playback and completed-order history fetches are skipped. Optional offer checking runs independently of product suggestions. Obsolete checks are aborted; pickup and Add checks have bounded waits and preserve the saved cart on failure. Browsers without Network Information support retain existing media behaviour, so actual device/network QA remains necessary.
+
+Second review regressions:
+
+- Stall Check Payment Status, then Back to menu. Stay/Escape can dismiss the waiting leave dialog before cancellation starts; the refresh deadline releases its controls and a subsequent exit safely checks/cancels.
+- Stall a checkout add-on for 15 seconds: cart/payment controls recover and Retry is available. Navigate away before the response: a late response cannot mutate the cart. Repeat with changed cart/branch/pickup context.
+- Fail menu availability: customer-rated favourites expose Retry availability, retain disabled unverified additions, and restore Add after a successful retry.
+- Dispatch an identity change while personalized suggestions are visible and replacement requests are delayed: old favourites and offer results disappear immediately.
+- Delay optional offer responses and assert the following product and floating Continue action retain their positions. The suggestion viewport and offer-action space are reserved while requests settle; long content scrolls inside the region.
+- Connection-policy mocks and paced API responses (150 ms per response) cover recovery behaviour. These do not reproduce actual cellular throughput/packet loss, native PhonePe behaviour or measured real-device frame rates.

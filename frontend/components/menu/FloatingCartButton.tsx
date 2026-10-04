@@ -11,6 +11,7 @@ import {useState, useEffect} from "react";
 
 interface FloatingCartButtonProps {
     offerTarget?:AvailableRebateResponse|null;
+    offerEnabled?:boolean;
 
     itemCount:
         number;
@@ -43,6 +44,7 @@ function formatCurrency(
 export default function FloatingCartButton({
     itemCount,
     total,
+    offerEnabled=false,
     offerTarget
 }: FloatingCartButtonProps) {
 
@@ -77,7 +79,7 @@ export default function FloatingCartButton({
             "
         >
 
-            {consolidated&&offerTarget&&<button type="button" className="mobile-cart-offer-target" onClick={()=>document.getElementById("mobile-menu-offer")?.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"center"})}><span aria-hidden="true">%</span><span><strong><T text="Unlock"/> {formatCurrency(offerTarget.nextSlabRebateAmount!)} <T text="off"/></strong><small><T text="Add"/> {formatCurrency(offerTarget.amountNeededForNextSlab!)} <T text="in eligible items"/></small></span><span aria-hidden="true">⌃</span></button>}
+            {consolidated&&offerEnabled&&<div className="mobile-cart-offer-slot">{offerTarget&&<button type="button" className="mobile-cart-offer-target" onClick={()=>document.getElementById("mobile-menu-offer")?.scrollIntoView({behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth",block:"center"})}><span aria-hidden="true">%</span><span><strong><T text="Unlock"/> {formatCurrency(offerTarget.nextSlabRebateAmount!)} <T text="off"/></strong><small><T text="Add"/> {formatCurrency(offerTarget.amountNeededForNextSlab!)} <T text="in eligible items"/></small></span><span aria-hidden="true">⌃</span></button>}</div>}
             <Link
                 href={consolidated ? "/checkout/mobile" : quick ? "/checkout/pickup" : "/cart"}
                 className="

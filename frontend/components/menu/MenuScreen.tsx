@@ -749,7 +749,7 @@ export default function MenuScreen() {
     const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
-    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<MobileMenuSuggestions branchId={branch.id} products={allProducts} onTarget={onMenuTarget}/>:null;
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions branchId={branch.id} products={allProducts} onTarget={onMenuTarget}/></div>:null;
 
     function handleAddToCart(
         product: MenuProduct
@@ -1192,7 +1192,7 @@ export default function MenuScreen() {
 
                 </header>
 
-                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data} onAdd={handleAddToCart}/>}
+                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
                 <div className={phoneMenu&&mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>
                 {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
 
@@ -1578,7 +1578,7 @@ export default function MenuScreen() {
 
 
             <FloatingCartButton
-                offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
+                offerEnabled={!!pairing} offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
                 itemCount={
                     itemCount
                 }

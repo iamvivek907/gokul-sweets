@@ -420,11 +420,20 @@
  .future-storefront .mobile-menu-highlights h2{font-size:1rem!important;font-family:inherit!important;font-weight:750;margin:4px 0 14px}
 }
 @media(max-width:640px){
- .future-storefront .gokul-floating-cart>.mobile-cart-offer-target{display:flex;align-items:center;gap:10px;min-height:58px;margin-bottom:4px;background:#e9f3f1!important;color:#143936!important;border:1px solid #c8dedb;border-radius:14px;box-shadow:none!important;padding:10px 12px}
+ .future-storefront .gokul-floating-cart .mobile-cart-offer-target{display:flex;align-items:center;gap:10px;min-height:58px;margin-bottom:4px;background:#e9f3f1!important;color:#143936!important;border:1px solid #c8dedb;border-radius:14px;box-shadow:none!important;padding:10px 12px}
  .future-storefront .mobile-cart-offer-target>span:nth-child(2){flex:1}.future-storefront .mobile-cart-offer-target strong{display:block;font-size:.8125rem}.future-storefront .mobile-cart-offer-target small{display:block;font-size:.6875rem;margin-top:3px}
  .future-storefront .mobile-cart-offer-target>span:first-child{display:grid;place-items:center;width:30px;height:30px;border:2px solid #abcfc5;border-radius:50%;font-weight:750}
  .future-storefront #mobile-menu-offer{scroll-margin-block:120px}
- .future-storefront .gokul-editorial-menu:has(~ .gokul-floating-cart .mobile-cart-offer-target){padding-bottom:190px}
+ .future-storefront .gokul-editorial-menu:has(~ .gokul-floating-cart .mobile-cart-offer-slot){padding-bottom:250px}
 }
 
 @media(max-width:640px){.future-storefront dialog.mobile-payment-leave{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0}.future-storefront dialog.mobile-payment-leave::backdrop{background:#09272580}}
+
+@media(max-width:640px){
+ .future-storefront .mobile-menu-pairing-slot{height:420px;overflow-y:auto;overscroll-behavior-y:contain;contain:layout}
+ .future-storefront .mobile-menu-pairing-slot>.mobile-menu-suggestions{min-height:100%;margin-top:0}
+ .future-storefront .mobile-cart-offer-slot{height:76px;overflow:auto;pointer-events:none}
+ .future-storefront .mobile-cart-offer-slot .mobile-cart-offer-target{width:100%;margin-bottom:0;pointer-events:auto}
+ .future-storefront .mobile-menu-highlights [role=alert]{margin-bottom:12px;font-size:.8125rem;line-height:1.5}
+ .future-storefront .mobile-menu-highlights [role=alert] button{min-height:44px;padding:8px 12px;margin-top:8px;border:1px solid #b7cdbb;border-radius:10px;background:#fffaf2;font-weight:700}
+}

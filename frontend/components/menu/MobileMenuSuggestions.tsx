@@ -32,13 +32,14 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
  useEffect(()=>{latestProducts.current=products;},[products]);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;addition.current?.abort();};},[]);
  const [visits,setVisits]=useState<Visit[]>([]);
+ const [identityRevision,setIdentityRevision]=useState(0);
  const [session,setSession]=useState<CustomerSession|null>(null),[result,setResult]=useState<{key:string;items:Suggestion[]}|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const [offerResult,setOfferResult]=useState<{key:string;offers:AvailableRebateResponse[]}|null>(null);
  const contact=useMemo(()=>session?verifiedCheckoutContact(session):null,[session]);
  const selectionKey=JSON.stringify(intent.selection);
  const selected=useMemo(()=>JSON.parse(selectionKey) as PickupSelection|null,[selectionKey]);
  const request=JSON.stringify({serviceDate:intent.date,items:availabilityItems(cart.items)});
- const key=JSON.stringify([branchId,request,selected?.slot.id,selected?.pickupType,smartAvailability]);
+ const key=JSON.stringify([branchId,request,selected?.slot.id,selected?.pickupType,smartAvailability,identityRevision]);
  const offerKey=JSON.stringify([key,contact?.phone]);
  useEffect(()=>()=>{addition.current?.abort();},[key]);
  useEffect(()=>{
@@ -54,7 +55,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
     if(!c.signal.aborted)setVisits(details.flatMap(r=>r.status==="fulfilled"&&Array.isArray(r.value.items)?[r.value]:[]));
    }catch{if(!c.signal.aborted){if(!identified)setSession(null);setVisits([]);}}
   }
-  const identityChanged=()=>{setSession(null);setVisits([]);void load();};
+  const identityChanged=()=>{addition.current?.abort();setIdentityRevision(value=>value+1);setSession(null);setVisits([]);setResult(null);setOfferResult(null);setMessage("");void load();};
   void load();window.addEventListener("gokul-customer-identity-changed",identityChanged);
   return()=>{controller?.abort();window.removeEventListener("gokul-customer-identity-changed",identityChanged);};
  },[branchId]);
@@ -120,7 +121,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
   }catch(error){if(mounted.current&&!controller.signal.aborted)setMessage(error instanceof Error?error.message:"We couldn’t check this addition. Your cart is saved. Try again.");}
   finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current)setBusy(false);}
  }
- if(!suggestions.length&&!target&&!message)return null;
+ if(!suggestions.length&&!target&&!message)return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection"><h3><T text="Pairs well with your selection"/></h3><p role="status"><T text={!intent.date?"Choose pickup to see optional additions. Your cart is saved.":current?"No additions fit this pickup right now. Continue choosing from the menu.":"Checking optional suggestions. You can continue choosing from the menu."}/></p></section>;
  return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection"><header><div><span><T text="MAKE IT A LITTLE SWEETER"/></span><h3><T text="Pairs well with your selection"/></h3></div></header>
  {target&&<div id="mobile-menu-offer" className="mobile-menu-offer-progress" role="status"><span aria-hidden="true">%</span><div><strong><T text="Add"/> {money(target.amountNeededForNextSlab!)} <T text="in eligible items"/></strong><p><T text="Unlock"/> {money(target.nextSlabRebateAmount!)} <T text="off"/> · {target.name}</p><small><T text="Fees don’t count. Savings checked again at checkout."/></small></div></div>}
  <div className="mobile-menu-pairing-row">{suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name}`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p>{s.reason}</p></article>)}</div>

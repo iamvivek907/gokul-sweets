@@ -95,7 +95,7 @@ export function getPaymentProviderConfiguration(
 
 export function getPaymentForOrder(
     orderNumber: string,
-    signal?: AbortSignal
+    signal: AbortSignal = AbortSignal.timeout(15000)
 ): Promise<PaymentLookupResponse> {
 
     return apiClient<PaymentLookupResponse>(
@@ -117,7 +117,7 @@ export function getPaymentForOrder(
 
 export function refreshPayment(
     paymentId: number,
-    signal?: AbortSignal
+    signal: AbortSignal = AbortSignal.timeout(15000)
 ): Promise<PaymentResponse> {
 
     return apiClient<PaymentResponse>(

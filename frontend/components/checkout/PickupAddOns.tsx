@@ -18,25 +18,31 @@ const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency
 export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=[],onAdded,onBusy,onAdjust,compact=false}:{branchId:number;date:string;orderNumber?:string;disabled:boolean;offers?:AvailableRebateResponse[];onAdded:()=>void|Promise<void>;onBusy?:(busy:boolean)=>void;onAdjust?:()=>void;compact?:boolean}) {
     const translate = useTranslation();
  const {items,addItem}=useCart();const locked=useRef(false);
+ const mounted=useRef(false),addition=useRef<AbortController|null>(null);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;addition.current?.abort();};},[]);
  const [response,setResponse]=useState<{key:string;items:Suggestion[]}|null>(null);
  const [dismissed,setDismissed]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
  const request=JSON.stringify({serviceDate:date,items:items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))});
  const path=`/api/menu/pickup-addons?branchId=${branchId}${orderNumber?`&orderNumber=${encodeURIComponent(orderNumber)}`:""}`;
  const key=`${path}:${request}`;
- useEffect(()=>{if(dismissed)return;const controller=new AbortController();apiClient<Suggestion[]>(path,{method:"POST",body:request,credentials:"include",signal:controller.signal}).then(items=>{if(!controller.signal.aborted)setResponse({key,items});}).catch(()=>{if(!controller.signal.aborted)setResponse({key,items:[]});});return()=>controller.abort();},[path,request,key,dismissed]);
+ useEffect(()=>()=>{addition.current?.abort();},[key]);
+ useEffect(()=>{if(dismissed)return;const controller=new AbortController();apiClient<Suggestion[]>(path,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])}).then(items=>{if(!controller.signal.aborted)setResponse({key,items});}).catch(()=>{if(!controller.signal.aborted)setResponse({key,items:[]});});return()=>controller.abort();},[path,request,key,dismissed]);
  const target=usefulRebateTarget(offers);
  const suggestions=rankAddOns(response?.key===key ? response.items.filter(s=>(!compact||s.product.available)&&!items.some(i=>i.product.id===s.product.id)) : [],target?.amountNeededForNextSlab ?? null);
  async function add(s:Suggestion) {
   if(disabled||locked.current)return;locked.current=true;setBusy(true);onBusy?.(true);setMessage("");let added=false;let addedSnapshot:string|null=null;
   const cart=getCartSnapshot(),branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot();
+  const controller=new AbortController();addition.current=controller;
+  const signal=AbortSignal.any([controller.signal,AbortSignal.timeout(15000)]);
   try {const combined=JSON.parse(request);combined.items.push({productId:s.product.id,quantity:s.weightGrams==null?1:null,weightGrams:s.weightGrams});
-   const check=await apiClient<{orderable:boolean}>(path.replace("pickup-addons?","pickup-addons/check?"),{method:"POST",body:JSON.stringify(combined),credentials:"include"});
+   const check=await apiClient<{orderable:boolean}>(path.replace("pickup-addons?","pickup-addons/check?"),{method:"POST",body:JSON.stringify(combined),credentials:"include",signal});
+   if(signal.aborted||!mounted.current)return;
    if(cart!==getCartSnapshot()||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot()){setMessage("Your cart or pickup changed. Review it before adding.");return;}
    if(!check.orderable){setMessage("This addition no longer fits your pickup. Your cart is unchanged.");return;}
    if(addItem(s.product,branchId,s.weightGrams??undefined)!=="added"){setMessage("Choose the matching branch before adding.");return;}
-   added=true;addedSnapshot=getCartSnapshot();await onAdded();setMessage(`${s.product.name} added. Review your updated price and offer before payment.`);
-  } catch {if(added&&addedSnapshot===getCartSnapshot()){saveCart(parseCart(cart));added=false;}setMessage(added?"This item is in your cart. Review the cart to refresh its price before payment.":"We couldn’t complete this addition. Your existing cart and pickup are unchanged. Try again, or adjust quantities and pickup here.");}
-  finally{locked.current=false;setBusy(false);onBusy?.(false);}
+   added=true;addedSnapshot=getCartSnapshot();await onAdded();if(!mounted.current||controller.signal.aborted)return;setMessage(`${s.product.name} added. Review your updated price and offer before payment.`);
+  } catch {if(!mounted.current||controller.signal.aborted)return;if(added&&addedSnapshot===getCartSnapshot()){saveCart(parseCart(cart));added=false;}setMessage(added?"This item is in your cart. Review the cart to refresh its price before payment.":"We couldn’t complete this addition. Your existing cart and pickup are unchanged. Try again, or adjust quantities and pickup here.");}
+  finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current){setBusy(false);onBusy?.(false);}}
  }
  if(dismissed || (!suggestions.length&&!message&&!target))return null;
  return <section className={`${styles.panel} ${compact?styles.compact:""}`} aria-label="Pickup add-ons"><div className={styles.heading}><div><p className={styles.eyebrow}><T text="A little extra for your pickup" /></p><h2><T text="Pairs well with your order" /></h2></div><button type="button" className={styles.skip} disabled={busy} onClick={()=>setDismissed(true)}><T text="No thanks" /></button></div>
