@@ -90,7 +90,7 @@ try {
   }
   await search.fill('missing-order-reference');assert.equal(await search.inputValue(),'missing-order-reference');await historyCard.waitFor({state:'hidden'});
   await search.fill('');await historyCard.waitFor();
-  if(compact){await page.getByRole('link',{name:`View order ${order.customerOrderNumber ? '#'+order.customerOrderNumber : order.orderNumber} →`,exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'← My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
+  if(compact){await page.getByRole('link',{name:`View order ${order.customerOrderNumber ? '#'+order.customerOrderNumber : order.orderNumber} →`,exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
   if((width<=640&&enabled)||paymentStatus==='PENDING'){
    await page.goto(`${base}/checkout/payment/TEST-ORDER`);assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false);
    if(paymentStatus==='PAID'){await page.waitForURL('**/orders/TEST-ORDER');await page.locator('.mobile-order-detail').waitFor();}

@@ -207,7 +207,8 @@ public class OrderCorrectionService {
     orders.saveAndFlush(order);
     payment.setRefundAmount(preview.refundAmount());
     if (preview.refundAmount().signum() > 0) {
-      payment.setRefundReferenceId("GKC-" + payment.getId());
+      // Save once with the cancellation: database ids can overlap across DEV/PROD.
+      payment.setRefundReferenceId("GKC-" + UUID.randomUUID());
       payment.setPaymentStatus(PaymentStatus.REFUND_PENDING);
       payment.setRefundFailureReason(null);
       payments.saveAndFlush(payment);

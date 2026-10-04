@@ -50,10 +50,16 @@ try{
   }
   await page.goto(`${base}/notifications?from=${encodeURIComponent('/profile')}`);await page.getByRole('heading',{name:'Notifications',exact:true}).waitFor();await page.getByText('Payment received',{exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:'Back to previous page',exact:true}).getAttribute('href'),'/profile');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(process.env.SCREENSHOT_DIR&&compact){await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/notifications-new-${width}.png`,fullPage:true});}
-  await page.goto(`${base}/notifications?from=${encodeURIComponent('/menu?category=snacks')}`);await page.getByRole('link',{name:'Back to previous page',exact:true}).waitFor();assert.equal(await page.getByRole('link',{name:'Back to previous page',exact:true}).getAttribute('href'),'/menu?category=snacks');
+  await page.goto(`${base}/notifications?from=${encodeURIComponent('/menu?category=snacks')}`);await page.locator('.notification-back[href="/menu?category=snacks"]').waitFor();assert.equal(await page.getByRole('link',{name:'Back to previous page',exact:true}).getAttribute('href'),'/menu?category=snacks');await page.getByRole('link',{name:'Back to previous page',exact:true}).click();await page.waitForURL('**/menu?category=snacks');
   await page.goto(`${base}/orders/CORRECTION-TEST`);await page.getByRole('heading',{name:compact?'Order details':'#42',exact:true}).waitFor();
   if(compact){await page.getByRole('button',{name:'Review cancellation',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Cancel this order?',exact:true});await dialog.waitFor();assert.match(await dialog.innerText(),/₹100.00/);assert.match(await dialog.innerText(),/₹12.00/);await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});assert.equal(cancelBodies.length,0);await page.getByRole('button',{name:'Review cancellation',exact:true}).click();await dialog.getByRole('button',{name:'Cancel & request food refund',exact:true}).click();await dialog.getByRole('alert').waitFor();await dialog.getByRole('button',{name:'Retry cancellation',exact:true}).click();await dialog.waitFor({state:'hidden'});await page.getByText('Food refund requested',{exact:true}).waitFor();assert.equal(cancelBodies.length,2);assert.deepEqual(cancelBodies[0],cancelBodies[1]);assert.equal(cancelBodies[0].acceptedRefundAmount,100);assert.equal(cancelBodies[0].acceptedRetainedCharges,12);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);}
   else assert.equal(await page.locator('.mobile-order-cancellation').count(),0);
   await context.close();console.log(`New account/correction ${width}px passed`);
  }
+ const noJs=await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:844}}),noJsPage=await noJs.newPage();
+ await noJsPage.goto(`${base}/notifications?from=${encodeURIComponent('/menu?category=snacks')}`);
+ // Next streams this markup behind its loading boundary; inspect the actual SSR anchor before scripts reveal it.
+ assert.equal(await noJsPage.locator('.notification-back').getAttribute('href'),'/menu?category=snacks');
+
+ await noJs.close();console.log('Server-rendered notification return URL before JavaScript passed');
 }finally{await browser.close();}

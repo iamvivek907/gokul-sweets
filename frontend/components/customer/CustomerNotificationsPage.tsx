@@ -8,11 +8,11 @@ import CustomerNotificationInbox from "./CustomerNotificationInbox";
 import {useCustomerLocation} from "./CustomerNotificationLink";
 import {T} from "@/lib/language";
 
-export default function CustomerNotificationsPage() {
+export default function CustomerNotificationsPage({initialFrom}: {initialFrom?: string} = {}) {
     const {features, error, retry} = useStorefrontConfiguration();
     const [session, setSession] = useState<CustomerSession | null>(null);
     const location = useCustomerLocation();
-    const from = new URL(location, "https://storefront.invalid").searchParams.get("from");
+    const from = new URL(location, "https://storefront.invalid").searchParams.get("from") ?? initialFrom;
     let origin = "/profile";
     if (from?.startsWith("/") && !from.startsWith("//") && !/[\\\u0000-\u0020]/.test(from)) {
         const destination = new URL(from, "https://storefront.invalid");

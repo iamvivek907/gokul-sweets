@@ -248,6 +248,23 @@ class OrderCorrectionIntegrationTest {
   }
 
   @Test
+  void refundReferencesAreUniqueAcrossOrdersAndStableOnRetry() {
+    var key = UUID.randomUUID();
+    var input = cancel(key);
+    corrections.cancel(reference, input, false);
+    String first = jdbc.queryForObject("SELECT refund_reference_id FROM payments WHERE id=?", String.class, payment);
+    assertThat(UUID.fromString(first.substring(4))).isNotNull();
+    corrections.cancel(reference, input, false);
+    assertThat(jdbc.queryForObject("SELECT refund_reference_id FROM payments WHERE id=?", String.class, payment)).isEqualTo(first);
+    // Request keys are scoped to an order and cannot be used as the provider's global refund id.
+    setup();
+    corrections.cancel(reference, cancel(key), false);
+    String second = jdbc.queryForObject("SELECT refund_reference_id FROM payments WHERE id=?", String.class, payment);
+    assertThat(UUID.fromString(second.substring(4))).isNotNull();
+    assertThat(second).isNotEqualTo(first);
+  }
+
+  @Test
   void staleRefundReviewAndCollectedOrderCannotCancel() {
     var stale = cancel(UUID.randomUUID());
     jdbc.update("UPDATE orders SET convenience_fee=5 WHERE id=?", order);
