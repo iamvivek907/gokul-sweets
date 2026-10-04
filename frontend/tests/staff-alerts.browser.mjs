@@ -74,11 +74,11 @@ try {
     await page.getByRole("button", {name: "Enable staff push for this browser"}).click();
     await page.getByRole("button", {name: "Check staff registration"}).waitFor();
     await page.getByRole("button", {name: "Disable staff push"}).click();
-    await page.getByRole("alert").waitFor(); assert.equal(registered, true);
+    await page.locator('main [role="alert"]').waitFor(); assert.equal(registered, true);
     assert.equal(await page.getByRole("button", {name: "Disable staff push"}).count(), 1);
     await page.getByRole("button", {name: "Disable staff push"}).click();
     await page.getByText("Staff push disabled for this browser.", {exact: false}).waitFor(); assert.equal(registered, false);
-    await page.getByRole("button", {name: "Mark as read"}).click(); await page.getByRole("alert").waitFor();
+    await page.getByRole("button", {name: "Mark as read"}).click(); await page.locator('main [role="alert"]').waitFor();
     assert.equal(read, false); assert.equal(mutations, 0);
     await page.getByRole("button", {name: "Mark as read"}).click();
     await page.getByRole("link", {name: "Staff alerts, 0 unread"}).waitFor();
