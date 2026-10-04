@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import MobilePageBack from "./MobilePageBack";
 import {useEffect, useState} from "react";
 import {T} from "@/lib/language";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
@@ -39,7 +40,7 @@ export function MobileAccountBack() {
     const home = features?.branchExperience ? branch ? `/branches/${branch.id}` : "/branches" : "/";
     const homeLabel = features?.branchExperience ? branch ? "Branch home" : "All branches" : "Home";
     return <nav className="mobile-account-back" aria-label="Account navigation">
-        <Link href="/menu"><span aria-hidden="true">←</span> <T text="Back to menu" /></Link>
+        <MobilePageBack href="/menu" label="Back to menu"/>
         <Link href={home}><T text={homeLabel} /></Link>
     </nav>;
 }

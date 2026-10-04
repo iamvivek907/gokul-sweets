@@ -119,7 +119,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
         </section>
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
-                <span><T text="OUR BRANCHES" /></span><h2><T text="Your next visit starts here." /></h2>
+                <span><T text="OUR BRANCHES" /></span><h2><span className="arrival-desktop-copy"><T text="Your next visit starts here." /></span><span className="arrival-mobile-copy"><T text="Choose where you’ll collect"/></span></h2>
                 <p><T text="Choose a Gokul branch near you to see its live menu and pickup choices." /></p>
             </div>
             <div className={styles.branchGrid}>
@@ -134,6 +134,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                         <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
                         <p>{branchExperience ? item.description || item.city || item.address || translate("Explore this branch") : item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
                         {branchExperience && item.operational !== false && <p><T text={item.pickupAvailable ? "Order for pickup" : "Online pickup unavailable"} /></p>}
+                        <p className="arrival-mobile-address">{[item.address,item.city,item.pincode].filter(Boolean).join(", ")||translate("Contact the branch for its pickup address")}</p>
                         <span className={styles.cardPrompt}><T text={item.operational===false?"Currently not operational":"Explore this branch"} /></span>
                     </div>
                     <BranchSelector cardBranch={item} destination={branchExperience ? "branchHome" : "menu"} />

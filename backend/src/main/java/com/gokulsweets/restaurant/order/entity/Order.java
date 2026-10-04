@@ -90,6 +90,10 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @jakarta.persistence.Transient
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private com.gokulsweets.restaurant.customer.identity.VerifiedOrderOwnership.Subject verifiedOfferSubject;
+
     @Column(
             name = "order_number",
             nullable = false,

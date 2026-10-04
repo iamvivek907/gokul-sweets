@@ -29,7 +29,8 @@ export const adminGroups: {label: string; items: Item[]}[] = [
     {label: "Storefront", items: [
         {href: "/admin/about", label: "About & people", permissions: ["ABOUT_MANAGE"]},
         {href: "/admin/homepage-campaigns", label: "Homepage campaigns", permissions: ["MENU_MANAGE"]},
-        {href: "/admin/notifications", label: "Offers", permissions: ["REBATE_VIEW", "REBATE_MANAGE"]}
+        {href: "/admin/notifications", label: "Offers", permissions: ["REBATE_VIEW", "REBATE_MANAGE"]},
+        {href: "/admin/visit-offers", label: "Earned-visit offers", permissions: ["REBATE_VIEW", "REBATE_MANAGE"]}
     ]},
     {label: "Branch operations", items: [
         {href: "/admin/branches", label: "Branches & settings", permissions: ["BRANCH_MANAGE"]},

@@ -120,11 +120,12 @@ public class PaytmPaymentProvider implements PaymentProvider {
     public RefundResult refund(Payment payment) {
         validateRefundable(payment);
         return mapRefund(
+                payment,
                 paytmClient.initiateRefund(
                         requireProviderOrderId(payment),
                         payment.getProviderPaymentId(),
                         payment.getRefundReferenceId(),
-                        payment.getAmount()
+                        payment.requestedRefundAmount()
                 ),
                 true
         );
@@ -139,6 +140,7 @@ public class PaytmPaymentProvider implements PaymentProvider {
             );
         }
         return mapRefund(
+                payment,
                 paytmClient.getRefundStatus(
                         requireProviderOrderId(payment),
                         payment.getRefundReferenceId()
@@ -148,9 +150,11 @@ public class PaytmPaymentProvider implements PaymentProvider {
     }
 
     private RefundResult mapRefund(
+            Payment payment,
             PaytmRefundGatewayResult response,
             boolean initiation
     ) {
+        validateRefundResponse(payment, response);
         String status = response.resultStatus();
         String code = response.resultCode();
 
@@ -184,6 +188,21 @@ public class PaytmPaymentProvider implements PaymentProvider {
                         ? "Paytm refund initiation failed."
                         : "Paytm refund failed."
         );
+    }
+
+    private void validateRefundResponse(Payment payment, PaytmRefundGatewayResult response) {
+        if (!requireProviderOrderId(payment).equals(response.orderId())
+                || payment.getProviderPaymentId() == null
+                || !payment.getProviderPaymentId().equals(response.txnId())
+                || payment.getRefundReferenceId() == null
+                || !payment.getRefundReferenceId().equals(response.refId())
+                || response.refundAmount() == null
+                || payment.requestedRefundAmount().compareTo(response.refundAmount()) != 0
+                || response.providerRefundId() == null || response.providerRefundId().isBlank()
+                || payment.getProviderRefundId() != null && !payment.getProviderRefundId().isBlank()
+                    && !payment.getProviderRefundId().equals(response.providerRefundId())) {
+            throw new IllegalStateException("Paytm refund amount or identifiers do not match the recorded refund.");
+        }
     }
 
     private String requireProviderOrderId(Payment payment) {

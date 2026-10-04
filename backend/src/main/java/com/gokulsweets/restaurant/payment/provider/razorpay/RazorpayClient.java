@@ -119,7 +119,7 @@ public class RazorpayClient {
         JsonNode response = send(
                 "POST",
                 "/v1/payments/" + encodePath(providerPaymentId) + "/refund",
-                body
+                body, "gokul-refund-" + refundReference
         );
         return mapRefund(response);
     }
@@ -164,11 +164,11 @@ public class RazorpayClient {
         );
     }
 
-    private JsonNode send(
-            String method,
-            String path,
-            JsonNode body
-    ) {
+    private JsonNode send(String method, String path, JsonNode body) {
+        return send(method,path,body,null);
+    }
+
+    private JsonNode send(String method, String path, JsonNode body, String refundIdempotency) {
         properties.requireApiConfiguration();
 
         try {
@@ -179,6 +179,8 @@ public class RazorpayClient {
                     ))
                     .header("Authorization", basicAuthorization())
                     .header("Accept", "application/json");
+
+            if (refundIdempotency != null) builder.header("X-Refund-Idempotency", refundIdempotency);
 
             if (body == null) {
                 builder.method(method, HttpRequest.BodyPublishers.noBody());
@@ -255,8 +257,17 @@ public class RazorpayClient {
         return new ProviderRefund(
                 requiredText(node, "id"),
                 requiredText(node, "status"),
-                textOrNull(node, "payment_id")
+                requiredText(node, "payment_id"),
+                requiredRefundAmount(node)
         );
+    }
+
+    private long requiredRefundAmount(JsonNode node) {
+        JsonNode amount = node.path("amount");
+        if (!amount.isIntegralNumber() || !amount.canConvertToLong() || amount.asLong() <= 0) {
+            throw new IllegalStateException("Razorpay refund amount is missing or invalid.");
+        }
+        return amount.asLong();
     }
 
     private void verifyHmac(
@@ -396,7 +407,8 @@ public class RazorpayClient {
     public record ProviderRefund(
             String id,
             String status,
-            String paymentId
+            String paymentId,
+            long amount
     ) {
     }
 }

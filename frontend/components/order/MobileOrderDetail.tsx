@@ -7,6 +7,8 @@ import {formatOrderCurrency as money, formatOrderDate, formatOrderTime, getOrder
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 import {formatWeight} from "@/lib/orderQuantity";
 import {downloadOrderInvoice, orderDiscount} from "@/lib/orderInvoice";
+import OrderCancellation from "./OrderCancellation";
+import MobilePageBack from "@/components/customer/MobilePageBack";
 import PickupCodeCard from "./PickupCodeCard";
 import OrderReviewCard from "./OrderReviewCard";
 import {T} from "@/lib/language";
@@ -31,7 +33,7 @@ export default function MobileOrderDetail({order, status, refreshing, onRefresh,
         finally {setDownloading(false);}
     }
     return <section className="mobile-order-detail">
-        <nav><Link href="/orders">← My orders</Link><Link href="/menu">View menu</Link></nav>
+        <nav><MobilePageBack href="/orders" label="My orders" /><Link href="/menu">View menu</Link></nav>
         <header><h1><T text="Order details" /></h1><p><span data-copyable>{orderDisplayNumber(order)}</span> · {formatBusinessTimestamp(order.createdAt, {day:"numeric", month:"short", hour:"numeric", minute:"2-digit"})} IST</p></header>
         <section className={`mobile-order-status ${getStatusClasses(status.tone)}`} aria-label="Order status"><h2>{status.label}</h2><p>{status.message}</p><p>Payment: {order.paymentStatus ? order.paymentStatus.replaceAll("_", " ") : "No payment attempt recorded"}</p></section>
         {trackingEnabled && order.delayReportedAt && order.estimatedReadyAt && <section role="status" className="mobile-order-note"><strong>Ready time update</strong><p>{formatBusinessTimestamp(order.estimatedReadyAt, {day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})} IST · {order.delayReason}</p><p>Reported {formatBusinessTimestamp(order.delayReportedAt, {hour:"numeric",minute:"2-digit"})} IST. Confirm collection changes with the branch.</p></section>}
@@ -47,6 +49,7 @@ export default function MobileOrderDetail({order, status, refreshing, onRefresh,
             {(order.deliveryFee ?? 0) > 0 && <div className="mobile-order-row"><span>Delivery fee</span><span>{money(order.deliveryFee ?? 0)}</span></div>}{order.priorityCharge > 0 && <div className="mobile-order-row"><span>Priority charge</span><span>{money(order.priorityCharge)}</span></div>}{discount > 0 && <div className="mobile-order-row"><span>Offer savings</span><span>−{money(discount)}</span></div>}
             <div className="mobile-order-row mobile-order-total"><strong>{paid ? "Paid total" : "Order total"}</strong><strong>{money(order.totalAmount)}</strong></div>
         </section>
+        {["PAID","REFUND_PENDING","REFUNDED","REFUND_FAILED"].includes(order.paymentStatus??"") && <OrderCancellation orderNumber={order.orderNumber} onChanged={onRefresh} />}
         {order.branchFssaiLicenceNumber && <p className="mobile-order-licence">Gokul Sweets · FSSAI {order.branchFssaiLicenceNumber}</p>}
         {completed && <div id="order-review"><OrderReviewCard orderNumber={order.orderNumber} /></div>}
         <div className="mobile-order-actions">{order.paymentStatus === "PENDING" && <Link href={`/checkout/payment/${encodeURIComponent(order.orderNumber)}`}>Continue payment</Link>}{paid && <button type="button" disabled={downloading} onClick={() => void invoice()}>{downloading ? "Downloading…" : "Download invoice"}</button>}{!paid && ["FAILED", "EXPIRED"].includes(order.paymentStatus ?? "") && <Link href={`/checkout/payment/${encodeURIComponent(order.orderNumber)}`}>Retry checkout</Link>}<button type="button" disabled={refreshing} onClick={onRefresh}>{refreshing ? "Refreshing…" : "Refresh status"}</button></div>

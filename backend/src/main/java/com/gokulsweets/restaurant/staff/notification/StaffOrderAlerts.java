@@ -76,6 +76,17 @@ public class StaffOrderAlerts {
     }
 
     @Transactional(propagation=Propagation.MANDATORY)
+    public void pickupTransferred(Order order, java.util.UUID requestKey) {
+        if (!enabled()) return;
+        jdbc.update("""
+          INSERT INTO staff_order_alerts(environment,event_key,order_id,branch_id,kind,required_permission,title,message)
+          VALUES (?,?,?,?,'NEW_ORDER','ORDER_VIEW','Pickup order transferred to your branch',?)
+          ON CONFLICT(environment,event_key) DO NOTHING
+          """,scope(),"transfer:"+requestKey,order.getId(),order.getBranch().getId(),
+          "Order "+(order.getCustomerOrderNumber()==null?order.getOrderNumber():"#"+order.getCustomerOrderNumber())+" · "+order.getBranch().getName()+". Check its updated pickup time and preparation queue.");
+    }
+
+    @Transactional(propagation=Propagation.MANDATORY)
     public void occasionChanged(java.util.UUID id,boolean advance) {
         if(!enabled())return;
         jdbc.update("""
@@ -136,7 +147,7 @@ public class StaffOrderAlerts {
                 INSERT INTO staff_order_alerts(environment, event_key, order_id, branch_id, kind, required_permission,
                   title, message, scheduled_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(environment, event_key) DO NOTHING
-                """, scope(), reminderKey(order.getId(),kind,scheduled), order.getId(), order.getBranch().getId(), kind,
+                """, scope(), reminderKey(order.getId(),kind,scheduled)+(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM order_corrections WHERE order_id=? AND kind='TRANSFER')",Boolean.class,order.getId()))?":branch:"+order.getBranch().getId():""), order.getId(), order.getBranch().getId(), kind,
                 permission, title, "Order " + (order.getCustomerOrderNumber()==null ? order.getOrderNumber() : "#"+order.getCustomerOrderNumber()) + " · " + order.getBranch().getName() + ". " + message, Timestamp.valueOf(scheduled));
     }
     String reminderKey(long orderId,String kind,LocalDateTime scheduled) {
@@ -159,7 +170,7 @@ public class StaffOrderAlerts {
     public boolean actionable(Event event) {
         if(event.enquiryId()!=null)return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM occasion_enquiries WHERE id=? AND environment=? AND status IN "+(event.kind().equals("NEW_OCCASION_REQUEST")?"('REQUESTED')":"('PAID','CONFIRMED') AND EXISTS(SELECT 1 FROM occasion_production_allocations a WHERE a.enquiry_id=occasion_enquiries.id AND a.state='COMMITTED' AND a.production_approved_at IS NULL AND a.ready_quantity=0)")+")",Boolean.class,event.enquiryId(),scope()));
         Order order = orders.findById(event.orderId()).orElse(null);
-        if (order == null) return false;
+        if (order == null || order.getBranch().getId()!=event.branchId()) return false;
         if (event.kind().equals("NEW_ORDER")) return order.getOrderStatus() == OrderStatus.CONFIRMED;
         if (order.getOrderStatus() != OrderStatus.CONFIRMED && order.getOrderStatus() != OrderStatus.PREPARING) return false;
         try {

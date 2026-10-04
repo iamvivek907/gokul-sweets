@@ -1,6 +1,10 @@
 "use client";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import CustomerRewards from "./CustomerRewards";
+import AddressLocationAssist from "./AddressLocationAssist";
+import AccountTierMark from "./AccountTierMark";
+import MobilePageBack from "./MobilePageBack";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {T} from "@/lib/language";
 
 import {formatWeight} from "@/lib/orderQuantity";
@@ -28,15 +32,17 @@ import {formatOrderCurrency, formatOrderDate, formatOrderTime} from "@/lib/order
 
 const base = "/api/customer/identity/account";
 type Address = {id: number; label: string; addressLine: string; locality: string; postalCode: string};
-type Account = {paidOrders: number; favouriteProductIds: number[]; addresses: Address[];
+type Account = {completedOrders?:number;paidOrders: number; favouriteProductIds: number[]; addresses: Address[];
     preferences: {dietaryNotes: string | null; preferredBranchId: number | null}};
 type Preview = {orderNumber: string; items: Array<{product: MenuProduct; quantity: number; weightGrams: number | null}>;
     changed: string[]; unavailable: string[]; stock: CartSwitchPreview; cartSnapshot: string; date: string};
-type AccountSection = "badges" | "orders" | "favourites" | "addresses" | "preferences" | "details" | "notifications";
+export type AccountSection = "badges" | "orders" | "favourites" | "addresses" | "preferences" | "details" | "notifications";
 
-export default function CustomerAccountHub({session, onSessionChange}: {session: CustomerSession | null;
+export default function CustomerAccountHub({session, onSessionChange, initialSection}: {initialSection?:AccountSection;session: CustomerSession | null;
     onSessionChange: (session: CustomerSession) => void}) {
     const features = useStorefrontFeatures();
+    const phone=usePhoneViewport();
+    const compact=phone===true&&(features?.futuristicStorefrontV2===true||features?.checkoutExperienceV2===true);
     const enabled = features?.customerAccountHub === true;
     const {branch} = useSelectedBranch();
     const {items: cartItems, branchId: cartBranchId} = useCart();
@@ -55,7 +61,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
     const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
     const [preview, setPreview] = useState<Preview | null>(null);
     const [menu, setMenu] = useState<MenuProduct[]>([]);
-    const [activeSection, setActiveSection] = useState<AccountSection>("badges");
+    const [activeSection, setActiveSection] = useState<AccountSection>(initialSection??"badges");
     const [logoutOpen, setLogoutOpen] = useState(false);
     const [editingDetails, setEditingDetails] = useState(false);
     const [nameDraft, setNameDraft] = useState(session?.name ?? "");
@@ -210,11 +216,12 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
         } catch {setMessage("Could not sign out. Please try again."); setBusy(false); return false;}
     }
 
-    const earned = currentMilestone(account.paidOrders);
-    const displayName = session.name?.trim() || "Gokul guest";
+    const earned = currentMilestone(account.completedOrders??0);
+    const displayName = session.name?.trim() || (compact?"Your Gokul account":"Gokul guest");
     const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
     const maskedPhone = session.phone ? `+91 •••••• ${session.phone.replace(/\D/g, "").slice(-4)}` : "Phone verified";
-    return <div className="account-hub mt-6">
+    return <div className={`account-hub mt-6 ${initialSection?"account-focused":"account-overview"}`}>
+        {initialSection&&<MobilePageBack href="/profile" label="Back to profile" className="account-focused-back"/>}
         <LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={signOut} />
         <header className="account-cover relative overflow-hidden rounded-3xl p-6 sm:p-9">
             <div className="account-cover-art" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span></div>
@@ -222,7 +229,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 <div className="flex min-w-0 items-center gap-4 sm:gap-6">
                     <div className="account-avatar" aria-hidden="true">{initials}</div>
                     <div className="min-w-0"><p className="account-cover-kicker"><T text="Your Gokul profile" /></p>
-                        <h1 className="mt-1 truncate text-2xl font-bold sm:text-4xl">{displayName}</h1>
+                        <h1 className="mt-1 truncate text-2xl font-bold sm:text-4xl">{displayName}<AccountTierMark orders={account.completedOrders??0}/></h1>
                         <p className="mt-2 text-sm">{maskedPhone}</p>
                         <button type="button" onClick={() => {setNameDraft(session.name ?? ""); setEditingDetails(true); showSection("details");}}
                             className="mt-4 rounded-full border border-[#f6dcae] px-4 py-2 text-sm font-semibold text-[#fff9ed] hover:bg-white/15"><T text="Edit details" /></button></div>
@@ -234,15 +241,16 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 </div>
             </div>
         </header>
-        {features?.gokulRewards?<CustomerRewards/>:<>
+        {features?.gokulRewards?<CustomerRewards overview/>:<>
         <section className="mobile-profile-rewards" aria-label="Rewards"><div><T text="Rewards" /><strong><T text="Coming soon" /></strong></div><p><T text="Earned points are not available yet. A balance will appear here when the rewards programme is launched." /></p></section>
         </>}
+        {!session.name?.trim()&&<aside className="account-name-invitation"><div><strong><T text="What should we call you?"/></strong><p><T text="Add your name for a warmer welcome. It is optional."/></p></div><button type="button" onClick={()=>{setEditingDetails(true);showSection("details");}}><T text="Add your name"/></button></aside>}
         <div className="account-layout mt-6">
             <nav className="account-navigation" aria-label="Profile sections">
                 {([['badges', 'Badges'], ['orders', 'Order history'], ['favourites', 'Favourites'],
                     ['addresses', 'My addresses'], ['preferences', 'Preferences'], ['details', 'Profile details']] as const)
                     .map(([section, label]) => <button key={section} type="button" aria-pressed={activeSection === section}
-                        onClick={() => showSection(section)}>{label}</button>)}
+                        onClick={() => compact?router.push(`/profile/${section}`):showSection(section)}><span>{label}</span><svg className="account-nav-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.8"/></svg></button>)}
                 {features?.notificationInbox && <CustomerNotificationLink><T text="Notification inbox" /></CustomerNotificationLink>}
                 <Link href="/profile/privacy"><T text="Privacy and data" /></Link>
             </nav>
@@ -252,10 +260,10 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                         <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#c88a20]">Gokul journey</p>
                             <h2 className="mt-2 text-2xl font-bold text-[#241715]"><T text="Your badges" /></h2>
                             <p className="mt-2 text-sm text-[#756763]"><T text="Earned from completed paid orders on your account." /></p></div>
-                        <div className="account-order-count"><strong>{account.paidOrders}</strong><span>paid {account.paidOrders === 1 ? "order" : "orders"}</span></div>
+                        <div className="account-order-count"><strong>{account.completedOrders??0}</strong><span><T text="completed visits"/></span></div>
                     </div>
                     <div className="mt-6 grid gap-3 sm:grid-cols-3">{accountMilestones.map(milestone => {
-                        const unlocked = account.paidOrders >= milestone.orders;
+                        const unlocked = (account.completedOrders??0) >= milestone.orders;
                         return <div key={milestone.orders} className={`account-badge ${unlocked ? "is-earned" : "is-locked"}`}>
                             <span className="account-badge-icon" aria-label={unlocked ? "Unlocked" : "Locked"}>{unlocked ? "✓" : "○"}</span>
                             <strong>{milestone.title}</strong><span>{milestone.description}</span>
@@ -285,7 +293,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 {detailError && <p role="alert" className="text-[#9e2732]">{detailError}</p>}
                 {selectedOrder && <div className="space-y-5 text-sm">
                     <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]"><T text="Order number" /></p>
-                        <p className="selectable-text mt-1 break-all font-semibold">{orderDisplayNumber(selectedOrder)}</p></div>
+                        <p className="selectable-text mt-1 break-all font-semibold">{orderDisplayNumber(selectedOrder)}</p>{compact&&<Link className="inline-flex min-h-11 items-center rounded-xl border px-4 text-sm font-bold mt-3" href={`/orders/${encodeURIComponent(selectedOrder.orderNumber)}`}>Manage order & refund</Link>}</div>
                     <div className="flex flex-wrap items-center gap-2"><strong className="text-base">{selectedOrder.branchName}</strong>
                         <span className="rounded-full bg-[#e5f0e8] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#143936]">{selectedOrder.orderStatus.replaceAll("_", " ")}</span></div>
                     <div className="rounded-2xl border border-[#d9e5dc] bg-white p-4"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">{selectedOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} schedule</p>
@@ -320,6 +328,7 @@ export default function CustomerAccountHub({session, onSessionChange}: {session:
                 {account.addresses.map(saved => <div key={saved.id} className="mt-4 flex flex-wrap items-start justify-between gap-4 border-t border-[#eadfd6] pt-3"><div><strong className="text-sm">{saved.label}</strong><p className="text-sm text-[#756763]">{saved.addressLine}, {saved.locality} {saved.postalCode}</p></div>
                     <div className="flex gap-3"><button type="button" disabled={busy} onClick={() => {setEditingAddressId(saved.id); setAddress({label: saved.label, addressLine: saved.addressLine, locality: saved.locality, postalCode: saved.postalCode});}} className="text-sm font-semibold text-[#7a1625]"><T text="Edit" /></button>
                     <button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/addresses/${saved.id}`, {method: "DELETE", credentials: "include"}), "Address removed.");}} className="text-sm font-semibold text-[#7a1625]"><T text="Remove" /></button></div></div>)}
+                {compact&&<AddressLocationAssist onSuggestion={value=>{setAddress(current=>({...current,label:current.label||"Home",addressLine:value.addressLine,locality:value.locality,postalCode:value.postalCode}));}}/>}
                 <form className="mt-5 grid gap-2" onSubmit={event => {event.preventDefault(); void perform(async () => {await apiClient<Address>(editingAddressId === null ? `${base}/addresses` : `${base}/addresses/${editingAddressId}`, {method: editingAddressId === null ? "POST" : "PUT", credentials: "include", body: JSON.stringify(address)}); setEditingAddressId(null); setAddress({label: "", addressLine: "", locality: "", postalCode: ""});}, editingAddressId === null ? "Address saved." : "Address updated.");}}>
                     <h3 className="text-sm font-semibold">{editingAddressId === null ? "Add an address" : "Edit address"}</h3>
                     {(["label", "addressLine", "locality", "postalCode"] as const).map(field => <label key={field} className="text-xs font-semibold capitalize">{field === "addressLine" ? "Address line" : field === "postalCode" ? "Postal code" : field}<input required maxLength={field === "postalCode" ? 6 : field === "label" ? 40 : field === "locality" ? 100 : 180} value={address[field]} onChange={event => setAddress(current => ({...current, [field]: event.target.value}))} className="mt-1 block min-h-11 w-full rounded-xl border border-[#eadfd6] px-3 text-sm" /></label>)}

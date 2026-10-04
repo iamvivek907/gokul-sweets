@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import MobilePageBack from "@/components/customer/MobilePageBack";
 import {useCallback,useEffect,useMemo,useRef,useState,useSyncExternalStore} from "react";
 import {useRouter} from "next/navigation";
 import {useCart} from "@/hooks/useCart";
@@ -69,6 +70,9 @@ export default function MobileCheckout(){
  const [price,setPrice]=useState<{key:string;value:Preview}|null>(null);
  const [priceError,setPriceError]=useState<{key:string;message:string}|null>(null);
  const [error,setError]=useState("");const [busy,setBusy]=useState(false),[handoff,setHandoff]=useState(false),[addOnBusy,setAddOnBusy]=useState(false);
+ const [confirmedBranch,setConfirmedBranch]=useState<string|null>(null);
+ const branchReviewKey=JSON.stringify([branch?.id,branch?.name,branch?.address,branch?.city,branch?.pincode]);
+ const branchReviewed=confirmedBranch===branchReviewKey;
  const locked=useRef(false);
  const [attempt,setAttempt]=useState<Attempt|null>(null);
  const [attemptLoaded,setAttemptLoaded]=useState(false);
@@ -157,6 +161,7 @@ export default function MobileCheckout(){
  async function pay(){
   if(locked.current||addOnBusy||savingsBusy||pending)return;
   const saved=attempt;
+  if(!saved&&!branchReviewed){setError("Confirm the pickup branch before payment. Collect only from the branch shown here.");return;}
   if(!saved&&(!request||!preview||total===null||quoteExpired(preview.quote.expiresAt))){setRevision(v=>v+1);setError("Checking your current price before payment. Please review the refreshed total.");return;}
   locked.current=true;setBusy(true);setError("");
   let orderCreated=false;let postingOrder=false;
@@ -196,10 +201,10 @@ export default function MobileCheckout(){
  }
  useEffect(()=>{if(!handoff)return;const timer=setTimeout(()=>{setHandoff(false);setError("The payment page is taking longer to open. Continue your existing payment to try again.");},20000);return()=>clearTimeout(timer);},[handoff]);
  if(busy||handoff)return <div className="mobile-checkout-loading" role="status" aria-live="polite"><div><span className="mobile-checkout-loading-brand">Gokul Sweets</span><div className="mobile-checkout-loading-progress" aria-hidden="true"><span/></div><p><T text="Opening secure payment…" /></p><small><T text="Please keep this page open." /></small></div></div>;
- if(attemptLoaded&&cart.isEmpty&&!pending&&!attempt)return <div className="mobile-checkout mobile-empty-cart"><nav className="mobile-checkout-nav" aria-label="Checkout navigation"><Link href="/menu"><span aria-hidden="true">←</span> <T text="Back to menu" /></Link>{features?.branchExperience&&branch&&<Link href={`/branches/${branch.id}`}><T text="Branch home" /></Link>}</nav><section><span className="mobile-empty-cart-mark" aria-hidden="true">G</span><h1><T text="Your cart is empty" /></h1><p><T text="Choose your favourites from the menu to start your order." /></p><Link className="mobile-empty-cart-action" href="/menu"><T text="Browse menu" /></Link></section></div>;
+ if(attemptLoaded&&cart.isEmpty&&!pending&&!attempt)return <div className="mobile-checkout mobile-empty-cart"><nav className="mobile-checkout-nav" aria-label="Checkout navigation"><MobilePageBack href="/menu" label="Back to menu"/>{features?.branchExperience&&branch&&<Link href={`/branches/${branch.id}`}><T text="Branch home" /></Link>}</nav><section><span className="mobile-empty-cart-mark" aria-hidden="true">G</span><h1><T text="Your cart is empty" /></h1><p><T text="Choose your favourites from the menu to start your order." /></p><Link className="mobile-empty-cart-action" href="/menu"><T text="Browse menu" /></Link></section></div>;
  if(attemptLoaded&&(!branch||cart.branchId!==branch.id)&&!attempt&&!pending)return <div className="mobile-checkout"><h1><T text="Your order" /></h1><p><T text="Choose the matching branch before checking out." /></p><Link href="/menu"><T text="Back to menu" /></Link></div>;
  return <div className="mobile-checkout">
-  <nav className="mobile-checkout-nav" aria-label="Checkout navigation"><Link className="mobile-checkout-back" href="/menu"><span aria-hidden="true">←</span> <T text="Back to menu" /></Link>{features?.branchExperience&&branch&&<Link href={`/branches/${branch.id}`}><T text="Branch home" /></Link>}</nav>
+  <nav className="mobile-checkout-nav" aria-label="Checkout navigation"><MobilePageBack href="/menu" label="Back to menu" className="mobile-checkout-back"/>{features?.branchExperience&&branch&&<Link href={`/branches/${branch.id}`}><T text="Branch home" /></Link>}</nav>
   <div className="mobile-checkout-heading"><div><p>{branch?.name??"Saved checkout"}</p><h1><T text="Your order" /></h1></div><Link href="/menu"><T text="Add more" /></Link></div>
   {recovery&&<p role="status"><T text="Payment wasn’t completed. Your cart is saved; review it and try again." /></p>}
   <section aria-label="Cart items" className="mobile-checkout-section">
@@ -222,6 +227,7 @@ export default function MobileCheckout(){
   {pickupPopup===availabilityKey&&validAvailability&&!pending&&!attempt&&<MobilePickupDialog dates={validAvailability.dates} options={pickupOptions(validAvailability)} chosen={chosen} disabled={editingLocked} onClose={closePickup} onConfirm={confirmPickup}/>}
   {error&&<p role="alert" className="mobile-checkout-error">{error}</p>}
   {attempt&&<p role="status"><T text="This checkout is saved for a safe retry. Its items and pickup are locked until the order is recovered." /></p>}
-  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||pickupValidating||savingsBusy||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
+  {!pending&&!attempt&&branch&&<section className="mobile-branch-review" aria-label="Confirm pickup branch"><span><T text="YOUR PICKUP BRANCH"/></span><h2>{branch.name}</h2><p>{[branch.address,branch.city,branch.pincode].filter(Boolean).join(", ")||"Contact the branch to confirm its location before travelling."}</p><label><input type="checkbox" checked={branchReviewed} onChange={event=>setConfirmedBranch(event.target.checked?branchReviewKey:null)}/><span><T text="I will collect my order at this branch."/></span></label><p><T text="Check the branch before paying. Customer cancellation is available for 10 minutes after payment confirmation. Only the food amount is refundable; additional charges and their taxes are retained."/></p><Link href="/cancellation-policy?from=/checkout/mobile"><T text="Cancellation & refunds"/></Link></section>}
+  {!pending&&<div className="mobile-checkout-pay"><div><small><T text={total===null?"Items subtotal":"Total to pay"}/></small><strong>{money(attempt?.expected??total??cart.subtotal)}</strong></div><button type="button" disabled={!attemptLoaded||busy||addOnBusy||pickupValidating||savingsBusy||!contact||(!attempt&&(!preview||!contact||!chosen||!validAvailability||!branchReviewed))} onClick={()=>void pay()}>{busy?<T text="Opening payment…"/>:attempt?<T text="Retry checkout"/>:<T text="Pay now"/>}</button></div>}
  </div>;
 }

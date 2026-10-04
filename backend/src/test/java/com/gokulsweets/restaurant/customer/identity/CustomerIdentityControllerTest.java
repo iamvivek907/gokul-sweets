@@ -46,7 +46,7 @@ class CustomerIdentityControllerTest {
             .withProperty("gokul.environment-isolation.environment", "DEV");
     private final CustomerIdentityController controller = new CustomerIdentityController(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
             exchange, sessions, subjects, features, settings, new WebCorsProperties(), new IdentityClientConnection(settings),
-            ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub, notifications, alerts);
+            ownership, orders, rateLimiter, devices, consents, privacyRequests, accountHub, mock(ReverseAddressLookup.class), notifications, alerts);
 
     @Test
     void alertsRequireTrustedCurrentSessionAndCanAlwaysRevokeOwnedSubscription() {

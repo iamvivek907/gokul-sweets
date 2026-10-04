@@ -4,12 +4,12 @@ import {T} from "@/lib/language";
 
 import {useState} from "react";
 import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
-import CustomerAccountHub from "@/components/customer/CustomerAccountHub";
+import CustomerAccountHub, {type AccountSection} from "@/components/customer/CustomerAccountHub";
 import MobileAccountNavigation, {MobileAccountBack} from "@/components/customer/MobileAccountNavigation";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
 import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
 
-export default function ProfileAccountExperience() {
+export default function ProfileAccountExperience({initialSection}:{initialSection?:AccountSection}={}) {
     const [session, setSession] = useState<CustomerSession | null>(null);
     const {features, error, retry} = useStorefrontConfiguration();
     const enabled = features?.customerAccountHub === true;
@@ -24,9 +24,9 @@ export default function ProfileAccountExperience() {
         <section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label="Rewards">
             <h2 className="text-xl font-semibold text-[#241715]"><T text="Rewards" /></h2><p className="mt-2 text-sm leading-6 text-[#756763]"><T text="Earned points are not available yet. A balance will appear here when the rewards programme is launched." /></p></section><MobileAccountNavigation /></div>;
 
-    return <div className="customer-profile mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
+    return <div className={`customer-profile mx-auto max-w-6xl px-4 pb-28 pt-5 sm:px-6 sm:pt-8 ${initialSection?"profile-focused-route":""}`}>
         <MobileAccountBack />
-        {session?.authenticated ? <CustomerAccountHub session={session} onSessionChange={setSession} /> :
+        {session?.authenticated ? <CustomerAccountHub key={initialSection??"overview"} initialSection={initialSection} session={session} onSessionChange={setSession} /> :
             <header className="account-profile-heading rounded-3xl border border-[#eadfd6] bg-white p-7 sm:p-10">
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]"><T text="Your Gokul profile" /></p>
                 <h1 className="mt-3 text-3xl font-bold text-[#241715] sm:text-4xl"><T text="All your Gokul moments, together." /></h1>

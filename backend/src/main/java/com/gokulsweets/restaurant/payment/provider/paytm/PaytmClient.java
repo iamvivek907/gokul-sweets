@@ -1114,8 +1114,25 @@ public class PaytmClient {
                 resultStatus,
                 resultCode,
                 resultMessage,
-                providerRefundId
+                providerRefundId,
+                refundAmount(body.get("refundAmount")),
+                textOrNull(body.get("refId")),
+                textOrNull(body.get("orderId")),
+                textOrNull(body.get("txnId"))
         );
+    }
+
+    private BigDecimal refundAmount(JsonNode value) {
+        if (value == null || value.isNull()) return null;
+        if (!value.isTextual() && !value.isNumber())
+            throw new IllegalStateException("Paytm refund amount is invalid.");
+        try {
+            var amount = new BigDecimal(value.asText());
+            if (amount.signum() <= 0) throw new ArithmeticException();
+            return amount.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (NumberFormatException | ArithmeticException invalid) {
+            throw new IllegalStateException("Paytm refund amount is invalid.");
+        }
     }
 
     // =========================================================

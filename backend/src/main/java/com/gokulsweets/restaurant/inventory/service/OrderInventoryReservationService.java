@@ -82,6 +82,18 @@ public class OrderInventoryReservationService {
                 validatedOrder.pickupSlot().getStartTime(), pickupChanged);
     }
 
+    /** Paid branch correction creates and confirms receiving stock in the same outer transaction. */
+    @Transactional
+    public void reserveTransferredOrder(Order order,ValidatedOrderData validated,boolean hadStock) {
+        if(!properties.isEnforcementEnabled()&&!hadStock)return;
+        var expiry=order.getReservationExpiresAt();
+        try {
+            order.setReservationExpiresAt(LocalDateTime.now(inventoryClock).plusMinutes(15));
+            validatePendingOrder(order,validated,FulfillmentType.PICKUP);
+            synchronizePendingInventory(order,validated,validated.pickupSlot().getSlotDate(),validated.pickupSlot().getStartTime(),true);
+        } finally {order.setReservationExpiresAt(expiry);}
+    }
+
     /** Only a held window belonging to this order's branch can supply the inventory service date. */
     @Transactional
     public void synchronizePendingDeliveryOrder(Order order, ValidatedOrderData validatedOrder) {

@@ -21,7 +21,7 @@ try{
    else if(path==='/api/customer/identity/exchange'){authenticated=true;json={authenticated,name:customerName,phone:'+919876543210'};}
    else if(path==='/api/customer/identity/logout'){logoutCalls++;if(logoutError)return route.fulfill({status:503,json:{message:'Unavailable'}});authenticated=false;return route.fulfill({status:204});}
    else if(path==='/api/customer/identity/notifications')json={messages:[],unreadCount:1,nextBefore:null,readThrough:0};
-   else if(path==='/api/customer/identity/account')json={paidOrders:1,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
+   else if(path==='/api/customer/identity/account')json={completedOrders:1,paidOrders:1,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
    else if(path==='/api/branches')json=[branch,otherBranch];else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=otherBranch;
    else if(/^\/api\/branches\/[12]\/discovery$/.test(path))json={overallExperience:{average:4.8,count:2},offerings:[{title:'Fresh sweets',description:'Made at this branch'}],topRatedItems:[{productId:1,name:'Gulab Jamun',imageUrl:null,average:5,count:2,reviews:[]}]};
    else if(/^\/api\/branches\/[12]\/occasion-catalogue$/.test(path))json={sweets:[sweet],boxes:[],branding:{headline:'Wedding Dhamaka',description:'Exclusive for weddings',imageUrl:null,published:true}};
@@ -70,7 +70,7 @@ try{
    await page.getByRole('button',{name:'Order history',exact:true}).click();
    await page.locator('.mobile-profile-order-types').getByRole('link',{name:'Bulk order requests',exact:true}).waitFor();
    assert.equal(await page.locator('.mobile-profile-order-types a').getAttribute('href'),'/occasions/requests');
-   await page.getByRole('button',{name:'Badges',exact:true}).click();
+   await page.getByRole('link',{name:'Back to profile',exact:true}).click();await page.waitForURL('**/profile');await page.getByRole('button',{name:'Badges',exact:true}).click();await page.waitForURL('**/profile/badges');await page.getByRole('link',{name:'Back to profile',exact:true}).click();await page.waitForURL('**/profile');
    const lastLink=page.locator('.mobile-account-links a').last();
    await lastLink.scrollIntoViewIfNeeded();await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
    const lastBox=await lastLink.boundingBox(),navigationBox=await page.locator('.customer-bottom-navigation').boundingBox();

@@ -19,7 +19,7 @@ class StaffSessionLifetimeIntegrationTest {
  Object originalKey;
  @BeforeEach void setup(){originalKey=ReflectionTestUtils.getField(sessions,"encryptionKey");ReflectionTestUtils.setField(sessions,"encryptionKey",Base64.getEncoder().encodeToString(new byte[32]));time(Instant.parse("2026-10-05T05:30:00Z"));}
  @AfterEach void restore(){ReflectionTestUtils.setField(sessions,"encryptionKey",originalKey);}
- void time(Instant now){when(clock.instant()).thenReturn(now);when(clock.getZone()).thenReturn(ZoneId.of("Asia/Kolkata"));}
+ void time(Instant now){doReturn(now).when(clock).instant();doReturn(ZoneId.of("Asia/Kolkata")).when(clock).getZone();}
  StaffUser user(String roleName){
   long roleId=jdbc.queryForObject("SELECT id FROM roles WHERE name=?",Long.class,roleName);
   var user=new StaffUser();user.setId(jdbc.queryForObject("INSERT INTO staff_users(username,password_hash,full_name,role_id) VALUES (?,'test','Session test',?) RETURNING id",Long.class,"session-"+UUID.randomUUID(),roleId));

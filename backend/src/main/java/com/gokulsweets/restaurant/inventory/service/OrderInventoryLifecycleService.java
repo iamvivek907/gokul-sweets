@@ -31,7 +31,17 @@ public class OrderInventoryLifecycleService {
     /* Future payment-success hook. Safe and idempotent. */
     @Transactional
     public void confirmOrderInventory(String orderNumber) {
-        List<InventoryReservation> reservations = lockOrderReservations(orderNumber);
+        confirmReservations(orderNumber, lockOrderReservations(orderNumber));
+    }
+
+    /** Used only after the order-locked branch transfer has cancelled the original commitments. */
+    @Transactional
+    public void confirmTransferredOrderInventory(String orderNumber) {
+        confirmReservations(orderNumber, lockOrderReservations(orderNumber).stream()
+                .filter(r -> r.getStatus() != InventoryReservationStatus.CANCELLED).toList());
+    }
+
+    private void confirmReservations(String orderNumber, List<InventoryReservation> reservations) {
         if (reservations.isEmpty()) return;
 
         Map<AllocationKey, InventoryDailyAllocation> allocations =
@@ -79,7 +89,8 @@ public class OrderInventoryLifecycleService {
 
     @Transactional
     public void fulfilOrderInventory(String orderNumber, String actor) {
-        List<InventoryReservation> reservations = lockOrderReservations(orderNumber);
+        List<InventoryReservation> reservations = lockOrderReservations(orderNumber).stream()
+                .filter(r -> r.getStatus() != InventoryReservationStatus.CANCELLED).toList();
         if (reservations.isEmpty()) return;
 
         Map<AllocationKey, InventoryDailyAllocation> allocations =

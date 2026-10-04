@@ -126,10 +126,10 @@ public class RazorpayPaymentProvider implements PaymentProvider {
         requireRefundFields(payment);
         RazorpayClient.ProviderRefund refund = client.createRefund(
                 payment.getProviderPaymentId(),
-                payment.getAmount(),
+                payment.requestedRefundAmount(),
                 payment.getRefundReferenceId()
         );
-        return mapRefund(refund);
+        return mapRefund(payment, refund);
     }
 
     @Override
@@ -140,14 +140,27 @@ public class RazorpayPaymentProvider implements PaymentProvider {
                     "Razorpay refund ID is missing."
             );
         }
-        return mapRefund(client.fetchRefund(
+        requireRefundFields(payment);
+        return mapRefund(payment, client.fetchRefund(
                 payment.getProviderRefundId()
         ));
     }
 
     private RefundResult mapRefund(
+            Payment payment,
             RazorpayClient.ProviderRefund refund
     ) {
+        if (!payment.getProviderPaymentId().equals(refund.paymentId())) {
+            throw new IllegalStateException("Razorpay refund belongs to a different payment.");
+        }
+        long expectedAmount = payment.requestedRefundAmount().movePointRight(2).longValueExact();
+        if (refund.amount() != expectedAmount) {
+            throw new IllegalStateException("Razorpay refund amount does not match the requested refund.");
+        }
+        if (payment.getProviderRefundId() != null && !payment.getProviderRefundId().isBlank()
+                && !payment.getProviderRefundId().equals(refund.id())) {
+            throw new IllegalStateException("Razorpay refund ID does not match the recorded refund.");
+        }
         return switch (refund.status().toLowerCase()) {
             case "processed" -> new RefundResult(
                     PaymentStatus.REFUNDED,

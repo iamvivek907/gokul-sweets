@@ -148,20 +148,37 @@ public class PhonePePaymentProvider implements PaymentProvider {
 
     @Override
     public RefundResult refund(Payment payment) {
-        return new RefundResult(
-                PaymentStatus.REFUND_FAILED,
-                null,
-                "Automatic PhonePe refunds are not configured. Manual refund is required."
-        );
+        requireRefundReference(payment);
+        // Check first: a prior successful POST may have lost its response.
+        try {return mapRefund(payment,client.refundStatus(payment.getRefundReferenceId()),true);}
+        catch(com.gokulsweets.restaurant.payment.exception.PaymentGatewayException missing) {
+            if(!"PHONEPE_REFUND_NOT_FOUND".equals(missing.getCode()))throw missing;
+        }
+        return mapRefund(payment,client.refund(payment.getRefundReferenceId(),requireProviderOrderId(payment),payment.requestedRefundAmount()),false);
     }
-
     @Override
     public RefundResult verifyRefund(Payment payment) {
-        return new RefundResult(
-                PaymentStatus.REFUND_FAILED,
-                null,
-                "Automatic PhonePe refund status checks are not configured."
-        );
+        requireRefundReference(payment);
+        return mapRefund(payment,client.refundStatus(payment.getRefundReferenceId()),true);
+    }
+    private void requireRefundReference(Payment payment) {
+        if(payment.getRefundReferenceId()==null||payment.getRefundReferenceId().isBlank())throw new IllegalStateException("Refund reference is missing.");
+        requireProviderOrderId(payment);
+    }
+    private RefundResult mapRefund(Payment payment,PhonePeClient.RefundResponse result,boolean status) {
+        long expected=payment.requestedRefundAmount().movePointRight(2).longValueExact();
+        if(result.amount()!=expected
+                || result.refundId()==null || result.refundId().isBlank()
+                || result.merchantRefundId()!=null && !payment.getRefundReferenceId().equals(result.merchantRefundId())
+                || status && !requireProviderOrderId(payment).equals(result.originalMerchantOrderId())
+                || !status && result.originalMerchantOrderId()!=null && !requireProviderOrderId(payment).equals(result.originalMerchantOrderId())
+                || payment.getProviderRefundId()!=null && !payment.getProviderRefundId().isBlank() && !payment.getProviderRefundId().equals(result.refundId()))throw new IllegalStateException("PhonePe refund reference or amount did not match the recorded request.");
+        return switch(result.state().trim().toUpperCase(java.util.Locale.ROOT)) {
+            case "COMPLETED" -> new RefundResult(PaymentStatus.REFUNDED,result.refundId(),null);
+            case "FAILED" -> new RefundResult(PaymentStatus.REFUND_FAILED,result.refundId(),"PhonePe reported that the refund failed. Staff review is required.");
+            case "PENDING" -> new RefundResult(PaymentStatus.REFUND_PENDING,result.refundId(),null);
+            default -> throw new IllegalStateException("PhonePe returned an unknown refund state.");
+        };
     }
 
     private String requireProviderOrderId(
