@@ -352,6 +352,7 @@ public class OrderCorrectionService {
               .findFirst()
               .orElseThrow();
       if (old.getUnitPrice().compareTo(line.unitPrice()) != 0
+          || old.getTaxRate().compareTo(line.taxRate()) != 0
           || old.getTaxAmount().compareTo(line.taxAmount()) != 0
           || old.getLineTotal().compareTo(line.lineTotal()) != 0)
         throw conflict("Item prices or taxes differ. Cancel/refund and place a new order instead.");

@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.rebate;
 
 import com.gokulsweets.restaurant.order.entity.Order;
+import com.gokulsweets.restaurant.customer.identity.CustomerVisitPolicy.SelectionMode;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
@@ -105,7 +106,7 @@ public class RebateEligibilityService {
         List<AvailableRebateResponse> available =
                 new ArrayList<>();
 
-        var visitEligible = visitEligibleOffers(candidates, order);
+        var visitEligible = visitEligibleOffers(candidates, order, SelectionMode.PREVIEW);
         for (Rebate rebate : candidates) {
 
             if (!isScopeEligible(
@@ -171,7 +172,7 @@ public class RebateEligibilityService {
         var baseline=available.stream().map(AvailableRebateResponse::rebateAmount).max(BigDecimal::compareTo).orElse(BigDecimal.ZERO).max(defaultZero(order.getRebateDiscountAmount()));
         var targets=new ArrayList<AvailableRebateResponse>();
         var candidates=rebateRepository.findActivePublicCandidates(order.getBranch().getId(),LocalDateTime.now(BUSINESS_ZONE));
-        var visitEligible=visitEligibleOffers(candidates,order);
+        var visitEligible=visitEligibleOffers(candidates,order,SelectionMode.PREVIEW);
         for(var rebate:candidates) {
             if(!isScopeEligible(rebate,order,visitEligible)||!isUsageEligible(rebate,order))continue;
             if(rebate.getRebateType()!=RebateType.SLAB)continue;
@@ -195,9 +196,9 @@ public class RebateEligibilityService {
     // SCOPE
     // =========================================================
 
-    private java.util.Set<Long> visitEligibleOffers(List<Rebate> candidates, Order order) {
+    private java.util.Set<Long> visitEligibleOffers(List<Rebate> candidates, Order order, SelectionMode mode) {
         var ids = candidates.stream().map(Rebate::getId).toList();
-        return visits == null ? new java.util.HashSet<>(ids) : visits.eligibleOffers(ids, order);
+        return visits == null ? new java.util.HashSet<>(ids) : visits.eligibleOffers(ids, order, mode);
     }
 
     private boolean isScopeEligible(
@@ -640,7 +641,7 @@ public class RebateEligibilityService {
     }
 
     /** An ineligible saved choice is expected during reward changes, not a failed transaction. */
-    @Transactional(readOnly = true)
+    @Transactional
     public java.util.Optional<AvailableRebateResponse> findEligibleRebate(Order order, String code) {
         try {
             return java.util.Optional.of(getEligibleRebate(order, code));
@@ -654,13 +655,13 @@ public class RebateEligibilityService {
     public java.util.Optional<AvailableRebateResponse> findEligibleDraftRebate(Order draft, String code) {
         if (draft.getId() != null) throw new IllegalArgumentException("Draft pricing requires an unsaved order.");
         try {
-            return java.util.Optional.of(priceEligibleCode(draft, code));
+            return java.util.Optional.of(priceEligibleCode(draft, code, SelectionMode.PREVIEW));
         } catch (IllegalArgumentException | IllegalStateException ineligible) {
             return java.util.Optional.empty();
         }
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AvailableRebateResponse getEligibleRebate(
             Order order,
             String rebateCode
@@ -683,10 +684,10 @@ public class RebateEligibilityService {
             );
         }
 
-        return priceEligibleCode(order, rebateCode);
+        return priceEligibleCode(order, rebateCode, SelectionMode.ACCEPTANCE);
     }
 
-    private AvailableRebateResponse priceEligibleCode(Order order, String rebateCode) {
+    private AvailableRebateResponse priceEligibleCode(Order order, String rebateCode, SelectionMode mode) {
         String normalizedCode =
                 rebateCode
                         .trim()
@@ -755,7 +756,7 @@ public class RebateEligibilityService {
 
         if (!isScopeEligible(
                 rebate,
-                order, visitEligibleOffers(List.of(rebate), order)
+                order, visitEligibleOffers(List.of(rebate), order, mode)
         )) {
 
             throw new IllegalStateException(

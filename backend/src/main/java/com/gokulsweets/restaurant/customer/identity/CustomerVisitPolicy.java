@@ -25,18 +25,27 @@ public class CustomerVisitPolicy {
         subject);
   }
 
+  public enum SelectionMode { PREVIEW, ACCEPTANCE }
+
   public boolean offerEligible(long rebateId, Order order) {
-    return eligibleOffers(java.util.List.of(rebateId), order).contains(rebateId);
+    return offerEligible(rebateId, order, SelectionMode.PREVIEW);
+  }
+
+  public boolean offerEligible(long rebateId, Order order, SelectionMode mode) {
+    return eligibleOffers(java.util.List.of(rebateId), order, mode).contains(rebateId);
   }
 
   /** One request-local snapshot; never cache eligibility across orders or policy updates. */
-  public java.util.Set<Long> eligibleOffers(java.util.Collection<Long> rebateIds, Order order) {
+  public java.util.Set<Long> eligibleOffers(java.util.Collection<Long> rebateIds, Order order, SelectionMode mode) {
     var ids = rebateIds.stream().distinct().sorted().toList();
     if (ids.isEmpty()) return java.util.Set.of();
     var placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
-    // Stable parent locks protect even rules not inserted yet. Read-only quotes must not lock.
-    if (TransactionSynchronizationManager.isActualTransactionActive()
-        && !TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+    // Selection intent is explicit: a preview may have a writable outer wallet transaction.
+    if (mode == SelectionMode.ACCEPTANCE) {
+      if (!TransactionSynchronizationManager.isActualTransactionActive()
+          || TransactionSynchronizationManager.isCurrentTransactionReadOnly())
+        throw new IllegalStateException("Offer acceptance requires a writable transaction.");
+      // Stable parent locks protect even rules not inserted yet.
       jdbc.queryForList("SELECT id FROM rebates WHERE id IN (" + placeholders
           + ") ORDER BY id FOR SHARE", Long.class, ids.toArray());
     }

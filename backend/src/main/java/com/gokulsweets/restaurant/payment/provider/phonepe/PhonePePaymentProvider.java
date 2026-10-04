@@ -167,7 +167,12 @@ public class PhonePePaymentProvider implements PaymentProvider {
     }
     private RefundResult mapRefund(Payment payment,PhonePeClient.RefundResponse result,boolean status) {
         long expected=payment.requestedRefundAmount().movePointRight(2).longValueExact();
-        if(result.amount()!=expected||status&&(!payment.getRefundReferenceId().equals(result.merchantRefundId())||!requireProviderOrderId(payment).equals(result.originalMerchantOrderId())))throw new IllegalStateException("PhonePe refund reference or amount did not match the recorded request.");
+        if(result.amount()!=expected
+                || result.refundId()==null || result.refundId().isBlank()
+                || result.merchantRefundId()!=null && !payment.getRefundReferenceId().equals(result.merchantRefundId())
+                || status && !requireProviderOrderId(payment).equals(result.originalMerchantOrderId())
+                || !status && result.originalMerchantOrderId()!=null && !requireProviderOrderId(payment).equals(result.originalMerchantOrderId())
+                || payment.getProviderRefundId()!=null && !payment.getProviderRefundId().isBlank() && !payment.getProviderRefundId().equals(result.refundId()))throw new IllegalStateException("PhonePe refund reference or amount did not match the recorded request.");
         return switch(result.state().trim().toUpperCase(java.util.Locale.ROOT)) {
             case "COMPLETED" -> new RefundResult(PaymentStatus.REFUNDED,result.refundId(),null);
             case "FAILED" -> new RefundResult(PaymentStatus.REFUND_FAILED,result.refundId(),"PhonePe reported that the refund failed. Staff review is required.");

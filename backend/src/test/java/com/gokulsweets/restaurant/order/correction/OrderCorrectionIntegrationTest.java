@@ -316,6 +316,25 @@ class OrderCorrectionIntegrationTest {
   }
 
   @Test
+  void transferRejectsDifferentRatesEvenWhenTaxAmountsRoundIdentically() {
+    boolean taxEnabled = Boolean.TRUE.equals(jdbc.queryForObject("SELECT enabled FROM tax_collection_settings WHERE id=1", Boolean.class));
+    jdbc.update("UPDATE tax_collection_settings SET enabled=true WHERE id=1");
+    try {
+    jdbc.update("UPDATE branch_products SET price_override=0.01 WHERE id=?", targetBp);
+    jdbc.update("UPDATE order_items SET unit_price=0.01,line_total=0.01,tax_rate=0,tax_amount=0 WHERE order_id=?", order);
+    jdbc.update("UPDATE orders SET subtotal=0.01,total_amount=0.01 WHERE id=?", order);
+    jdbc.update("UPDATE tax_categories SET cgst_rate=2.5,sgst_rate=2.5 WHERE id=(SELECT tax_category_id FROM products WHERE id=?)", product);
+    assertThatThrownBy(() -> corrections.transfer(reference,
+        new OrderCorrectionService.Transfer(UUID.randomUUID(), target, targetSlot, "Wrong branch")))
+        .hasMessageContaining("taxes differ");
+    assertThat(branchOf()).isEqualTo(source);
+    assertThat(booked(sourceSlot)).isEqualTo(1);
+    assertThat(booked(targetSlot)).isZero();
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_corrections WHERE order_id=?", Long.class, order)).isZero();
+    } finally { jdbc.update("UPDATE tax_collection_settings SET enabled=? WHERE id=1", taxEnabled); }
+  }
+
+  @Test
   void differingPriceOrUnavailableStockRollsBackSource() {
     jdbc.update("UPDATE branch_products SET price_override=110 WHERE id=?", targetBp);
     assertThatThrownBy(
@@ -460,7 +479,7 @@ class OrderCorrectionIntegrationTest {
                   new org.springframework.transaction.support.TransactionTemplate(transactions)
                       .execute(
                           tx -> {
-                            assertThat(visits.offerEligible(rebate, draft)).isTrue();
+                            assertThat(visits.offerEligible(rebate, draft, CustomerVisitPolicy.SelectionMode.ACCEPTANCE)).isTrue();
                             locked.countDown();
                             try {
                               if (!release.await(5, TimeUnit.SECONDS))
@@ -491,6 +510,35 @@ class OrderCorrectionIntegrationTest {
       }
       assertThat(accepting.get(5, TimeUnit.SECONDS)).isTrue();
       assertThat(update.get(5, TimeUnit.SECONDS)).isTrue();
+    }
+    assertThat(visits.offerEligible(rebate, draft)).isFalse();
+  }
+
+  @Autowired com.gokulsweets.restaurant.rebate.RebateEligibilityService rebateEligibility;
+
+  @Test
+  void writableMobilePreviewDoesNotBlockAuditedRuleChanges() throws Exception {
+    long rebate = rebate();
+    var draft = new com.gokulsweets.restaurant.order.entity.Order();
+    var branch = new com.gokulsweets.restaurant.branch.Branch();
+    branch.setId(source); draft.setBranch(branch); draft.setSubtotal(new BigDecimal("100"));
+    var previewed = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    try (var executor = Executors.newFixedThreadPool(2)) {
+      var preview = executor.submit(() -> new org.springframework.transaction.support.TransactionTemplate(transactions).execute(tx -> {
+        assertThat(rebateEligibility.previewDraft(draft)).anyMatch(offer -> offer.rebateId() == rebate);
+        previewed.countDown();
+        try { if (!release.await(5, TimeUnit.SECONDS)) throw new IllegalStateException("Preview timeout"); }
+        catch (InterruptedException e) { Thread.currentThread().interrupt(); throw new RuntimeException(e); }
+        return true;
+      }));
+      assertThat(previewed.await(5, TimeUnit.SECONDS)).isTrue();
+      try {
+        var update = executor.submit(() -> { visitRules.save(rebate,
+            new com.gokulsweets.restaurant.rebate.RebateVisitRuleController.Input(5, "Visit policy change during preview")); return true; });
+        assertThat(update.get(3, TimeUnit.SECONDS)).isTrue();
+      } finally { release.countDown(); }
+      assertThat(preview.get(5, TimeUnit.SECONDS)).isTrue();
     }
     assertThat(visits.offerEligible(rebate, draft)).isFalse();
   }

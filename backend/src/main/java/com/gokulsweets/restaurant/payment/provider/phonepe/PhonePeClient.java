@@ -338,7 +338,7 @@ public class PhonePeClient {
         return refundResponse(sendApiRequest("GET","/payments/v2/refund/"+URLEncoder.encode(reference,StandardCharsets.UTF_8)+"/status",null));
     }
     private RefundResponse refundResponse(JsonNode value) {
-        if(!value.path("amount").isNumber()||textOrNull(value,"state")==null)throw new IllegalStateException("PhonePe did not return a complete refund response.");
+        if(!value.path("amount").isIntegralNumber()||!value.path("amount").canConvertToLong()||value.path("amount").asLong()<=0||textOrNull(value,"state")==null)throw new IllegalStateException("PhonePe did not return a complete refund response.");
         return new RefundResponse(textOrNull(value,"refundId"),value.path("amount").asLong(),textOrNull(value,"state"),textOrNull(value,"merchantRefundId"),textOrNull(value,"originalMerchantOrderId"));
     }
 

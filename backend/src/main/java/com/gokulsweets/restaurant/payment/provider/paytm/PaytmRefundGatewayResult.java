@@ -8,6 +8,14 @@ public record PaytmRefundGatewayResult(
 
         String resultMessage,
 
-        String providerRefundId
+        String providerRefundId,
+
+        java.math.BigDecimal refundAmount,
+
+        String refId,
+
+        String orderId,
+
+        String txnId
 ) {
 }
