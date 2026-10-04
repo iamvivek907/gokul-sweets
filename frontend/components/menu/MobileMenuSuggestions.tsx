@@ -126,12 +126,11 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
   finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current)setBusy(false);}
  }
  const available=!!suggestions.length||!!target||!!message;
- if(!available)return null;
- const summary=suggestions.length?"Optional additions at menu prices.":"No optional additions right now.";
+
+ const summary=message||(current?"No optional additions right now.":"Checking pairings…");
  return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection">
   <h3><T text="Pairs well with your selection"/></h3>
-  <div className="mobile-menu-pairing-row mobile-menu-pairings-inline">{suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name} from pairings`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"before tax":"incl. item tax"}/></small></article>)}</div>
-  {message&&<p role="status">{message}</p>}
+  <div className="mobile-menu-pairing-row mobile-menu-pairings-inline">{!message&&suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name} from pairings`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"before tax":"incl. item tax"}/></small></article>)}{(!suggestions.length||!!message)&&<p className="mobile-menu-pairing-status" role="status"><T text={summary}/></p>}</div>
   <button id="mobile-menu-pairings-open" className="mobile-menu-suggestions-open" type="button" disabled={!available} onClick={()=>setOpen(true)} aria-haspopup="dialog"><T text="View optional additions"/></button>
   {open&&<MenuDiscoverySheet title="Optional additions" onClose={()=>setOpen(false)}>
    <div className="mobile-menu-pairing-row">{suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name}`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p>{s.reason}</p></article>)}</div>

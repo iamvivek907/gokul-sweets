@@ -49,6 +49,10 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
  const compact=width<=640&&enabled;
  assert.equal(await page.locator('.mobile-menu-pickup').count(),compact?1:0);
  if(compact){
+  const tabs=page.getByRole('navigation',{name:'Branch pages'});await tabs.getByRole('button',{name:'Branch details',exact:true}).click();
+  const details=page.getByRole('region',{name:`${branch.name} details`,exact:true});await details.waitFor();await details.getByRole('heading',{name:'Address',exact:true}).waitFor();
+  await page.setViewportSize({width:1280,height:900});await details.waitFor();await page.setViewportSize({width,height:900});await details.waitFor();
+  assert.equal(await tabs.getByRole('button',{name:'Menu',exact:true}).isVisible(),true,'return to menu survives viewport changes');await tabs.getByRole('button',{name:'Menu',exact:true}).click();await page.locator('.gokul-product-card').first().waitFor();
   await page.getByText('Your previous pickup has passed. Choose a new time; your cart is saved.',{exact:true}).waitFor();
   assert.match(await page.locator('.mobile-selected-weight-price').innerText(),/250 g.*100/);
   await page.getByRole('button',{name:'Choose time',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:date,exact:true}).click();await dialog.getByRole('button',{name:'15:00–16:00 Standard',exact:true}).click();
