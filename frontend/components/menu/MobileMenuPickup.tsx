@@ -39,6 +39,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
   if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");
   // One response covers discovery and the actual cart, including larger weights and quantities.
   const cartItems=availabilityItems(cart.items);
+  if(cartItems.length>100)throw new Error("Review this large cart at checkout before changing pickup. Your previous pickup is saved.");
   const amounts=new Map(cartItems.map(item=>[item.productId,item]));
   const menuItems=JSON.parse(request) as ReturnType<typeof availabilityItems>;
   const requested=[...cartItems,...menuItems.filter(item=>!amounts.has(item.productId))].slice(0,100);
