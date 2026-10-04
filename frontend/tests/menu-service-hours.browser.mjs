@@ -66,7 +66,7 @@ try{for(const width of [390,1280]){
  await page.evaluate(()=>localStorage.setItem('gokul-language','hi'));await page.goto(`${base}/menu`);await page.getByRole('heading',{name:'अभी संचालन में नहीं है',exact:true}).waitFor();await page.getByRole('link',{name:'दूसरी शाखा चुनें',exact:true}).waitFor();
  operational=true;await page.goto(`${base}/menu`);await page.getByText('स्टॉक खत्म',{exact:true}).first().waitFor();
  await page.evaluate(()=>localStorage.setItem('gokul-language','en'));
- operational=true;saved={...saved,enabled:false};await page.goto(`${base}/branches`);await closedCard.getByText('Order for pickup',{exact:true}).waitFor();await page.goto(`${base}/menu`);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();assert.equal(await page.getByRole('heading',{name:'Currently not operational',exact:true}).count(),0);
+ operational=true;saved={...saved,enabled:false};await page.goto(`${base}/branches`);await closedCard.getByText(width<=640?'Collect your order here':'Order for pickup',{exact:true}).waitFor();await page.goto(`${base}/menu`);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();assert.equal(await page.getByRole('heading',{name:'Currently not operational',exact:true}).count(),0);
  // Closing boundary + failed refresh disables stale Add controls while retaining the cart.
  await samosa.getByRole('button',{name:/^Add .* to cart$/}).click();failMenu=true;await page.clock.fastForward(6*3600000+1000);await samosa.getByText('Checking current availability…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/^Add .* to cart$/}).last().isDisabled(),true);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
