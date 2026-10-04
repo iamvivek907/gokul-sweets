@@ -149,7 +149,7 @@ export default function ProductCard({
                                 }
                                 fill
                                 sizes="
-                                    (max-width: 639px) 112px,
+                                    (max-width: 639px) 136px,
                                     (max-width: 768px) 45vw,
                                     (max-width: 1024px) 30vw,
                                     280px
@@ -257,6 +257,7 @@ export default function ProductCard({
 
                 {
                     product.description
+                    && (!refined || product.description.trim().toLowerCase() !== product.name.trim().toLowerCase())
                     && (
                         <p className="
                             mt-1
