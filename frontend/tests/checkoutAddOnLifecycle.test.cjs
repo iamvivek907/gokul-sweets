@@ -16,7 +16,7 @@ function fixture(){
 }
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 test('checkout addition cannot mutate a cart after its component is abandoned',async()=>{
- const f=fixture();f.start();assert.deepEqual(f.busy,[true]);f.unmount();f.resolve();await flush();assert.equal(f.added,0);assert.equal(f.signal.aborted,true);
+ const f=fixture();f.start();assert.deepEqual(f.busy,[true]);f.unmount();f.resolve();await flush();assert.equal(f.added,0);assert.equal(f.signal.aborted,true);assert.equal(f.busy.at(-1),false,'the parent checkout must unlock even when the add-on unmounts');
 });
 test('changed checkout context aborts a pending addition and releases busy state',async()=>{
  const f=fixture();f.start();f.changeContext();f.resolve();await flush();assert.equal(f.added,0);assert.deepEqual(f.busy,[true,false]);

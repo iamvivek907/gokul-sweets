@@ -18,8 +18,9 @@ const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency
 export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=[],onAdded,onBusy,onAdjust,compact=false}:{branchId:number;date:string;orderNumber?:string;disabled:boolean;offers?:AvailableRebateResponse[];onAdded:()=>void|Promise<void>;onBusy?:(busy:boolean)=>void;onAdjust?:()=>void;compact?:boolean}) {
     const translate = useTranslation();
  const {items,addItem}=useCart();const locked=useRef(false);
- const mounted=useRef(false),addition=useRef<AbortController|null>(null);
- useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;addition.current?.abort();};},[]);
+ const mounted=useRef(false),addition=useRef<AbortController|null>(null),busyCallback=useRef(onBusy);
+ useEffect(()=>{busyCallback.current=onBusy;},[onBusy]);
+ useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;addition.current?.abort();busyCallback.current?.(false);};},[]);
  const [response,setResponse]=useState<{key:string;items:Suggestion[]}|null>(null);
  const [dismissed,setDismissed]=useState(false),[message,setMessage]=useState(""),[busy,setBusy]=useState(false);
  const request=JSON.stringify({serviceDate:date,items:items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))});
