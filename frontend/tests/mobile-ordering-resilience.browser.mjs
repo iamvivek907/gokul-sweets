@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
+async function documentBox(page,selector){return page.locator(selector).evaluate(node=>{const box=node.getBoundingClientRect();return {y:box.top+scrollY,x:box.left+scrollX};});}
 async function waitForMock(check){const deadline=Date.now()+15000;while(!check()){assert.ok(Date.now()<deadline,'mock request started before deadline');await new Promise(r=>setTimeout(r,50));}}
 async function openPairings(page){
  const sheet=page.getByRole('dialog',{name:'Optional additions',exact:true});if(await sheet.isVisible())return;
@@ -20,7 +21,7 @@ const slot={id:7,branchId:1,slotDate:date,startTime:'15:00:00',endTime:'16:00:00
 const offer={rebateId:1,code:'SAVE',name:'Sweet saving',description:'Eligible food only',scope:'GENERAL',rebateType:'SLAB',rebateAmount:0,payableAfterRebate:100,minimumOrderAmount:150,maximumDiscountAmount:20,nextSlabMinimumOrderAmount:150,nextSlabRebateAmount:10,amountNeededForNextSlab:25};
 try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
- let previewCalls=0,addonChecks=0,historyCalls=0,inventoryCalls=0,favouriteStock=false,confirmationFails=false,availabilityCalls=0,smart=true,signedIn=true,availabilityFails=false,holdRecommendations=false,releaseRecommendations,hold=false,release,releasePreview,checkStarted,recommendationsEmpty=false,longText=false; const started=new Promise(r=>checkStarted=r);const previewGate=new Promise(r=>releasePreview=r);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let previewCalls=0,addonChecks=0,historyCalls=0,inventoryCalls=0,favouriteStock=false,confirmationFails=false,availabilityCalls=0,smart=true,signedIn=true,availabilityFails=false,holdRecommendations=false,releaseRecommendations,hold=false,release,releasePreview,checkStarted,recommendationsEmpty=false,longText=false,releaseRatings,releaseAvailability;const ratingsGate=new Promise(r=>releaseRatings=r),availabilityGate=new Promise(r=>releaseAvailability=r); const started=new Promise(r=>checkStarted=r);const previewGate=new Promise(r=>releasePreview=r);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{const p=new URL(route.request().url()).pathname;let json=[];
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -29,13 +30,13 @@ try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]])
   else if(p==='/api/branches')json=[branch];else if(p==='/api/branches/1')json=branch;
   else if(p==='/api/menu')json=[{id:1,name:'Sweets',products:[sweet]},{id:2,name:'Drinks',products:[tea,sold,favourite]}];
   else if(p==='/api/menu/portion-groups')json={groups:[]};
-  else if(p==='/api/reviews/product-summaries')json=[{productId:1,averageRating:4.8,ratingCount:12}];
+  else if(p==='/api/reviews/product-summaries'){await ratingsGate;json=[{productId:1,averageRating:4.8,ratingCount:12}];}
   else if(p==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
   else if(p==='/api/customer/identity/orders'){historyCalls++;json=[{orderNumber:'PREVIOUS',branchId:1,orderStatus:'PICKED_UP'},{orderNumber:'UNPAID',branchId:1,orderStatus:'CONFIRMED'}];}
   else if(p==='/api/customer/identity/orders/PREVIOUS')json={branchId:1,orderStatus:'PICKED_UP',paymentStatus:'PAID',items:[{productId:4}]};
   else if(p==='/api/customer/identity/me')json={authenticated:signedIn,name:'Test customer',phone:'+919876543210'};
   else if(p==='/api/branches/1/availability'){
-   availabilityCalls++;if(availabilityFails)return route.fulfill({status:503,json:{message:'Availability temporarily unavailable'},headers});if(!smart)return route.fulfill({status:404,json:{message:'Disabled'},headers});const body=route.request().postDataJSON();const valid=body.startDate===date;
+   availabilityCalls++;await availabilityGate;if(availabilityFails)return route.fulfill({status:503,json:{message:'Availability temporarily unavailable'},headers});if(!smart)return route.fulfill({status:404,json:{message:'Disabled'},headers});const body=route.request().postDataJSON();const valid=body.startDate===date;
    json={today,maximumDate:date,dates:[{date:body.startDate,available:valid,items:[{productId:1,available:true},{productId:2,available:true}],slots:valid?[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]:[]},...(body.days>1?[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]}]:[])]};
    if(body.days===1&&body.startDate===date&&confirmationFails&&page.url().includes('/menu')&&await page.getByRole('dialog').count())json.dates[0].slots=[];
   }
@@ -47,7 +48,7 @@ try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]])
  });
  await context.addInitScript(({branch,sweet,slot,date})=>{if(!localStorage.getItem('gokul-cart')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:sweet,quantity:0,weightGrams:250}]}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));}}, {branch,sweet,slot,date});
  if(constrained)await context.addInitScript(()=>Object.defineProperty(navigator,'connection',{configurable:true,value:{effectiveType:'3g',saveData:false}}));
- await page.goto(`${base}/menu`); await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'}); const pairing=page.getByRole('region',{name:'Pairs well with your selection'});await openPairings(page);await pairing.getByRole('button',{name:'Add Special tea',exact:true}).waitFor({timeout:4000});
+ await page.goto(`${base}/menu`); await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'}); await page.locator('#gokul-product-2').waitFor();await page.locator('.mobile-menu-pickup').waitFor();const beforeRatings=await documentBox(page,'#gokul-product-2'),pickupBeforeRatings=await documentBox(page,'.mobile-menu-pickup');releaseRatings();await page.getByRole('button',{name:'View customer favourites',exact:true}).waitFor();await page.waitForFunction(()=>!Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='View customer favourites')?.disabled);assert.ok(Math.abs((await documentBox(page,'#gokul-product-2')).y-beforeRatings.y)<=1,'late ratings cannot move products');assert.ok(Math.abs((await documentBox(page,'.mobile-menu-pickup')).y-pickupBeforeRatings.y)<=1,'late ratings cannot move pickup controls');releaseAvailability();await page.getByRole('button',{name:'View customer favourites',exact:true}).click();await page.getByRole('button',{name:'Add Fresh peda from favourites',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('[aria-label="Add Fresh peda from favourites"]')?.disabled);await page.getByRole('dialog',{name:'Customer-rated favourites',exact:true}).getByRole('button',{name:/^Close/}).click();assert.ok(Math.abs((await documentBox(page,'#gokul-product-2')).y-beforeRatings.y)<=1,'late availability cannot move products');assert.ok(Math.abs((await documentBox(page,'.mobile-menu-pickup')).y-pickupBeforeRatings.y)<=1,'late availability cannot move pickup');console.log('Late ratings and availability preserve menu layout');const pairing=page.getByRole('region',{name:'Pairs well with your selection'});await openPairings(page);await pairing.getByRole('button',{name:'Add Special tea',exact:true}).waitFor({timeout:4000});
  if(!constrained)await pairing.getByText('Your completed-order favourite',{exact:true}).waitFor();assert.ok(constrained?historyCalls===0:historyCalls>=1,'constrained phones skip optional history downloads');
  const suggestionAction=await pairing.getByRole('button',{name:'Add Special tea',exact:true}).boundingBox();const following=await page.locator('#gokul-product-2').boundingBox();const cartAction=await page.locator('.gokul-floating-cart a').boundingBox();
  assert.ok(previewCalls>0);assert.equal(await pairing.getByText(/Unlock/).count(),0,'pairings are usable while offer verification is pending');releasePreview();await pairing.getByText(/Unlock/).waitFor();
@@ -84,7 +85,7 @@ try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]])
  await pairing.getByText('No optional additions right now.',{exact:true}).waitFor();
  assert.ok((await page.locator('.mobile-menu-pairing-slot').boundingBox()).height<210,'empty suggestions do not reserve 420px');
  recommendationsEmpty=false;signedIn=true;await page.evaluate(()=>window.dispatchEvent(new Event('gokul-customer-identity-changed')));
-  availabilityFails=true;await page.reload();const retry=page.getByRole('button',{name:'Retry availability',exact:true});await retry.waitFor();
+  availabilityFails=true;await page.reload();await page.getByRole('button',{name:'View customer favourites',exact:true}).click();const retry=page.getByRole('button',{name:'Retry availability',exact:true});await retry.waitFor();
  assert.equal(await page.getByRole('button',{name:'Add Fresh peda from favourites',exact:true}).isDisabled(),true);
  availabilityFails=false;await retry.click();await retry.waitFor({state:'hidden'});
  await page.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(b=>b.getAttribute('aria-label')==='Add Fresh peda from favourites'&&!b.disabled));

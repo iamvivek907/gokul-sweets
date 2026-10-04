@@ -5,3 +5,11 @@ export class CheckoutUpdateUncertainError extends Error {
   this.name = "CheckoutUpdateUncertainError";
  }
 }
+
+/** An offer write may have completed; recover the server total before payment. */
+export class CheckoutSavingsUncertainError extends Error {
+ constructor() {
+  super("We couldn’t confirm the offer update. Your reservation and cart are saved. Recheck the reserved total before payment.");
+  this.name="CheckoutSavingsUncertainError";
+ }
+}

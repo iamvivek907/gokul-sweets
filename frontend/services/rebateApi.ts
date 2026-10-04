@@ -1,6 +1,5 @@
-import {
-    apiClient
-} from "@/services/apiClient";
+import {CheckoutSavingsUncertainError} from "@/lib/checkoutRefresh";
+import {ApiError,apiClient} from "@/services/apiClient";
 
 import type {
     AppliedRebateResponse,
@@ -31,7 +30,7 @@ import type {
  * - payable amount
  */
 export async function getAvailableRebates(
-    orderNumber: string, signal?: AbortSignal
+    orderNumber: string, signal: AbortSignal = AbortSignal.timeout(15000)
 ): Promise<AvailableRebateResponse[]> {
 
     return apiClient<
@@ -45,9 +44,9 @@ export async function getAvailableRebates(
 }
 
 /** The backend locks the order, preserves stronger selected offers and revalidates eligibility. */
-export async function applyBestRebate(orderNumber: string): Promise<AppliedRebateResponse> {
-    return apiClient<AppliedRebateResponse>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate/best`, {
-        method: "POST", credentials: "include", signal: AbortSignal.timeout(10_000)
+export async function applyBestRebate(orderNumber: string, signal:AbortSignal=AbortSignal.timeout(10000)): Promise<AppliedRebateResponse> {
+    return mutateRebate(`/api/orders/${encodeURIComponent(orderNumber)}/rebate/best`, {
+        method: "POST", credentials: "include", signal
     });
 }
 
@@ -74,7 +73,8 @@ export async function applyBestRebate(orderNumber: string): Promise<AppliedRebat
  */
 export async function applyRebate(
     orderNumber: string,
-    code: string
+    code: string,
+    signal:AbortSignal=AbortSignal.timeout(15000)
 ): Promise<AppliedRebateResponse> {
 
     const request:
@@ -87,9 +87,7 @@ export async function applyRebate(
         };
 
 
-    return apiClient<
-        AppliedRebateResponse
-    >(
+    return mutateRebate(
         `/api/orders/${encodeURIComponent(
             orderNumber
         )}/rebate`,
@@ -97,6 +95,7 @@ export async function applyRebate(
             method:
                 "POST",
             credentials: "include",
+            signal,
 
             body:
                 JSON.stringify(
@@ -120,19 +119,26 @@ export async function applyRebate(
  * amountBeforeRebate as the order total.
  */
 export async function removeRebate(
-    orderNumber: string
+    orderNumber: string, signal:AbortSignal=AbortSignal.timeout(15000)
 ): Promise<AppliedRebateResponse> {
 
-    return apiClient<
-        AppliedRebateResponse
-    >(
+    return mutateRebate(
         `/api/orders/${encodeURIComponent(
             orderNumber
         )}/rebate`,
         {
             method:
                 "DELETE",
-            credentials: "include"
+            credentials: "include",
+            signal
         }
     );
+}
+
+async function mutateRebate(path:string,options:RequestInit):Promise<AppliedRebateResponse>{
+ try{return await apiClient<AppliedRebateResponse>(path,options);}
+ catch(error){
+  if(options.signal?.aborted||!(error instanceof ApiError)||error.status===0||error.status>=500)throw new CheckoutSavingsUncertainError();
+  throw error;
+ }
 }

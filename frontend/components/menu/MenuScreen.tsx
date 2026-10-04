@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-const MobileMenuHighlights=dynamic(()=>import("./MobileMenuHighlights"));
+import MobileMenuHighlights from "./MobileMenuHighlights";
 const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
 const MobileMenuSuggestions=dynamic(()=>import("./MobileMenuSuggestions"));
 import {useMenuServiceRefresh} from "@/hooks/useMenuServiceRefresh";
@@ -1192,7 +1192,7 @@ export default function MenuScreen() {
 
                 </header>
 
-                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
+                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} ratingsLoading={ratingsLoading} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
                 <div className={phoneMenu&&mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>
                 {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
 

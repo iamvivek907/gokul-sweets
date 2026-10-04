@@ -33,3 +33,9 @@ Third review regressions:
 - Delay an offer with a ₹25 additional-spend target for ₹30/₹35 suggestions. Both x/y coordinates and product identity must remain stable. Late history candidates append without moving existing suggestions; updated prices refresh in place.
 - Log out in another same-origin tab. The open suggestion sheet closes immediately and private favourites/offers disappear. Re-enter the menu tab after session changes with storage unavailable: focus/visibility resume must revalidate identity. Invalidation tokens contain no customer data.
 - At 320/390/640px, check compact loading/empty summaries, bottom-sheet open/Close/Escape/outside dismissal, focus restoration, keyboard operation and long text. The menu has no nested vertical scroll trap; sheet contents and footer actions remain reachable. Repeat with desktop and flags OFF.
+
+Fourth review regressions:
+
+- Stall a manual offer POST after the reservation exists and the server commits the discount. After 15 seconds, release the loading state, retain cart/order, and require Recheck reserved total. Reload and enter the payment URL directly: no new order/payment may bypass recovery. Recover only the authoritative reserved total, then require acknowledgement before payment. Repeat with failed optional offer discovery and the older feature-OFF offers page.
+- Delay a standard review add-on quote, then change cart, branch, pickup, contact, or pending order. Discard the response and never display its amount for the changed checkout. Unchanged checkout responses remain usable.
+- Delay ratings and availability independently. Customer favourites keep the same compact summary space, with no movement of pickup or product controls. Open the explicit favourites sheet, verify available Add controls, retry failed availability, and check Close/Escape/outside dismissal and focus restoration at 320/390/640px.

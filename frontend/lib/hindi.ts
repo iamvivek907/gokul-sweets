@@ -863,3 +863,13 @@ Object.assign(hindi, {
  "Checking suggestions. Continue browsing.":"सुझाव जाँचे जा रहे हैं। मेन्यू देखना जारी रखें।",
  "We couldn’t confirm the updated reservation. Your addition remains in the cart. Recheck the current cart and total before payment.":"नई बुकिंग की पुष्टि नहीं हो सकी। जोड़ी गई चीज़ कार्ट में सुरक्षित है। भुगतान से पहले कार्ट और कुल राशि दोबारा जाँचें।"
 });
+
+Object.assign(hindi, {
+ "View customer favourites":"ग्राहकों की पसंद देखें",
+ "Checking favourites…":"पसंदीदा चीज़ें जाँची जा रही हैं…",
+ "No rated favourites right now":"अभी कोई रेटिंग वाली पसंद उपलब्ध नहीं है",
+ "Review reserved total":"बुकिंग की कुल राशि देखें",
+ "Recheck reserved total":"बुकिंग की कुल राशि दोबारा जाँचें",
+ "Reserved total recovered. Review the confirmed amount before payment.":"बुकिंग की राशि मिल गई है। भुगतान से पहले पुष्टि की गई कुल राशि देखें।",
+ "We couldn’t confirm the offer update. Your reservation and cart are saved. Recheck the reserved total before payment.":"ऑफ़र में बदलाव की पुष्टि नहीं हो सकी। आपकी बुकिंग और कार्ट सुरक्षित हैं। भुगतान से पहले बुकिंग की कुल राशि दोबारा जाँचें।"
+});

@@ -13,7 +13,7 @@ import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
 import {usefulRebateTarget} from "@/lib/pickupAddOnRebate";
 import {stableSuggestions} from "@/lib/stableSuggestions";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
-import type {ReactNode} from "react";
+import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
 import {menuPickupOptions} from "@/lib/menuPickupOptions";
 import {pickupIsFresh} from "@/lib/pickupFreshness";
@@ -130,24 +130,11 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
   <h3><T text="Pairs well with your selection"/></h3>
   <p role="status"><T text={summary}/></p>
   <button id="mobile-menu-pairings-open" className="mobile-menu-suggestions-open" type="button" disabled={!available} onClick={()=>setOpen(true)} aria-haspopup="dialog"><T text="View optional additions"/></button>
-  {open&&<SuggestionSheet onClose={()=>setOpen(false)}>
+  {open&&<MenuDiscoverySheet title="Optional additions" onClose={()=>setOpen(false)}>
    <div className="mobile-menu-pairing-row">{suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name}`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p>{s.reason}</p></article>)}</div>
    {target&&<div className="mobile-menu-offer-progress" role="status"><span aria-hidden="true">%</span><div><strong><T text="Add"/> {money(target.amountNeededForNextSlab!)} <T text="in eligible items"/></strong><p><T text="Unlock"/> {money(target.nextSlabRebateAmount!)} <T text="off"/> · {target.name}</p><small><T text="Fees don’t count. Savings checked again at checkout."/></small></div></div>}
    {message&&<p role="status">{message}</p>}
    {!suggestions.length&&!target&&!message&&<p role="status"><T text={summary}/></p>}
-  </SuggestionSheet>}
+  </MenuDiscoverySheet>}
  </section>;
-}
-
-function SuggestionSheet({children,onClose}:{children:ReactNode;onClose:()=>void}){
- const dialog=useRef<HTMLDialogElement>(null);
- useEffect(()=>{
-  const surface=dialog.current,previous=document.activeElement as HTMLElement|null,overflow=document.body.style.overflow;
-  document.body.style.overflow="hidden";surface?.showModal();
-  return()=>{surface?.close();document.body.style.overflow=overflow;previous?.focus();};
- },[]);
- return <dialog ref={dialog} className="mobile-menu-suggestion-dialog" aria-labelledby="mobile-menu-suggestion-title" onCancel={event=>{event.preventDefault();onClose();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))onClose();}}>
-  <header><h2 id="mobile-menu-suggestion-title"><T text="Optional additions"/></h2><button type="button" onClick={onClose} autoFocus><T text="Close"/> ×</button></header>
-  <div className="mobile-menu-suggestion-body">{children}</div>
- </dialog>;
 }

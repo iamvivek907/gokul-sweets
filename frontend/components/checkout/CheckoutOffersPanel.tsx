@@ -1,5 +1,5 @@
 "use client";
-import {CheckoutUpdateUncertainError} from "@/lib/checkoutRefresh";
+import {CheckoutSavingsUncertainError,CheckoutUpdateUncertainError} from "@/lib/checkoutRefresh";
 import OrderRewards from "./OrderRewards";
 import OfferChoiceDialog from "./OfferChoiceDialog";
 import type {RewardCheckout} from "@/services/loyaltyApi";
@@ -152,6 +152,7 @@ export default function CheckoutOffersPanel({
     const [priceReviewRequired,setPriceReviewRequired]=useState(reviewRequired);
     const [totalChanged,setTotalChanged]=useState(reviewRequired);
     const [refreshFailed,setRefreshFailed]=useState(false);
+    const [savingsUncertain,setSavingsUncertain]=useState(false);
     const [spendTargets,setSpendTargets]=useState<AvailableRebateResponse[]>([]);
     useEffect(()=>{const c=new AbortController();apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal:c.signal}).then(setSpendTargets).catch(()=>{});return()=>c.abort();},[orderNumber]);
     const router =
@@ -183,6 +184,9 @@ export default function CheckoutOffersPanel({
             ]
         );
 
+
+    const savingsRecheckRequired=savingsUncertain||pendingOrder?.offerRecheckRequired===true;
+    const needsPriceReview=priceReviewRequired||pendingOrder?.priceReviewRequired===true;
 
     const currentCartFingerprint =
         useMemo(
@@ -801,6 +805,7 @@ export default function CheckoutOffersPanel({
 
         } catch (exception) {
 
+            if(exception instanceof CheckoutSavingsUncertainError)requireSavingsRecheck();
             console.error(
                 "Unable to apply offer code:",
                 exception
@@ -909,6 +914,7 @@ export default function CheckoutOffersPanel({
 
         } catch (exception) {
 
+            if(exception instanceof CheckoutSavingsUncertainError)requireSavingsRecheck();
             console.error(
                 "Unable to remove applied offer:",
                 exception
@@ -943,7 +949,7 @@ export default function CheckoutOffersPanel({
 
     function handleContinueToPayment() {
         if(savingsBusy)return;
-        if(navigating || addonBusy || priceReviewRequired || refreshFailed || applyingCode || removing)return;
+        if(navigating || addonBusy || needsPriceReview || refreshFailed || savingsRecheckRequired || applyingCode || removing)return;
 
         if (
             !pendingOrder
@@ -1039,15 +1045,46 @@ export default function CheckoutOffersPanel({
     }
 
 
+    function requireSavingsRecheck(){
+        const saved=parsePendingOrder(getPendingOrderSnapshot());
+        if(saved?.orderNumber===orderNumber)savePendingOrder({...saved,offerRecheckRequired:true,priceReviewRequired:true});
+        setSavingsUncertain(true);setRefreshFailed(true);setPriceReviewRequired(true);setTotalChanged(true);setAppliedRebate(null);
+        onRefreshRequiredChange?.(true);
+    }
+    async function recoverSavingsTotal(){
+        const signal=AbortSignal.timeout(15000),snapshot=getPendingOrderSnapshot();
+        try{
+            const summary=await getCustomerOrder(orderNumber,signal);
+            if(getPendingOrderSnapshot()!==snapshot)throw new Error("Your reservation changed elsewhere. Check it again.");
+            if(summary.orderStatus!=="PENDING_PAYMENT"||summary.paymentStatus!==null)throw new Error("This order has a payment attempt or has changed. Review its payment status before continuing.");
+            const saved=parsePendingOrder(snapshot);
+            if(!saved||saved.orderNumber!==orderNumber)throw new Error("No pending checkout was found. Review your orders.");
+            setOrderSummary(summary);setAppliedRebate(null);
+            savePendingOrder({...saved,totalAmount:summary.totalAmount,offerRecheckRequired:false,priceReviewRequired:true});
+            setSavingsUncertain(false);setRefreshFailed(false);setTotalChanged(true);setPriceReviewRequired(true);
+            setError(null);setErrorSource(null);onRefreshRequiredChange?.(false);
+            setSuccessMessage("Reserved total recovered. Review the confirmed amount before payment.");
+            // Offer discovery is optional; a failed read cannot replace the confirmed total.
+            const offers=await getAvailableRebates(orderNumber,signal).catch(()=>null);
+            if(offers&&parsePendingOrder(getPendingOrderSnapshot())?.orderNumber===orderNumber){setRebates(offers);setOffersLoadedSuccessfully(true);}
+        }catch(error){setRefreshFailed(true);setError(error instanceof Error?error.message:"Could not recover the reserved total. Try again.");setErrorSource("general");throw error;}
+    }
+    function confirmPriceReview(checked:boolean){
+        if(refreshFailed||savingsRecheckRequired)return;
+        setPriceReviewRequired(!checked);
+        const saved=parsePendingOrder(getPendingOrderSnapshot());
+        if(saved?.orderNumber===orderNumber)savePendingOrder({...saved,priceReviewRequired:!checked});
+    }
+
     async function savingsChanged(result:RewardCheckout){
         if(result.offer){setAppliedRebate(result.offer);updatePendingOrderTotal(result.offer.totalAmount);}
         setPriceReviewRequired(true);setTotalChanged(true);
-        try{const [summary,offers]=await Promise.all([getCustomerOrder(orderNumber),getAvailableRebates(orderNumber)]);setOrderSummary(summary);setRebates(offers);setOffersLoadedSuccessfully(true);setRefreshFailed(false);}catch{setRefreshFailed(true);throw new Error("Savings were updated. Reload this checkout to review the confirmed total before payment.");}
+        try{const signal=AbortSignal.timeout(15000);const [summary,offers]=await Promise.all([getCustomerOrder(orderNumber,signal),getAvailableRebates(orderNumber,signal)]);setOrderSummary(summary);setRebates(offers);setOffersLoadedSuccessfully(true);setRefreshFailed(false);}catch{setRefreshFailed(true);throw new Error("Savings were updated. Reload this checkout to review the confirmed total before payment.");}
     }
     async function chooseOffer(code:string){
         if(savingsBusy||addonBusy)throw new Error("Wait for the current checkout check.");
         setSavingsBusy(true);
-        try{const response=await applyRebate(orderNumber,code);setAppliedRebate(response);updatePendingOrderTotal(response.totalAmount);setOrderSummary(current=>current?{...current,totalAmount:response.totalAmount,paymentFee:response.paymentFee??current.paymentFee,paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax}:current);}finally{setSavingsBusy(false);}
+        try{const response=await applyRebate(orderNumber,code);setAppliedRebate(response);updatePendingOrderTotal(response.totalAmount);setOrderSummary(current=>current?{...current,totalAmount:response.totalAmount,paymentFee:response.paymentFee??current.paymentFee,paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax}:current);}catch(error){if(error instanceof CheckoutSavingsUncertainError)requireSavingsRecheck();throw error;}finally{setSavingsBusy(false);}
     }
     const [adjusting,setAdjusting]=useState(false);
     async function refreshAfterAddition(changedItems?:CartItem[],changedPickup?:PickupSelection, signal:AbortSignal=AbortSignal.timeout(15000)) {
@@ -1875,11 +1912,11 @@ export default function CheckoutOffersPanel({
                                         </p>
                                     </div>
 
-                                    {totalChanged && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" disabled={refreshFailed||addonBusy} checked={!priceReviewRequired} onChange={e=>setPriceReviewRequired(!e.target.checked)} />{" "}<T text="I have reviewed the updated total and offers." /></label>}
+                                    {(totalChanged||pendingOrder?.priceReviewRequired) && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" disabled={refreshFailed||savingsRecheckRequired||addonBusy} checked={!needsPriceReview} onChange={e=>confirmPriceReview(e.target.checked)} />{" "}<T text="I have reviewed the updated total and offers." /></label>}
                                     <button
                                         type="button"
                                         disabled={
-                                            savingsBusy || navigating || priceReviewRequired || refreshFailed || loading || addonBusy
+                                            savingsBusy || navigating || needsPriceReview || savingsRecheckRequired || refreshFailed || loading || addonBusy
                                             ||
                                             Boolean(
                                                 applyingCode
@@ -1930,9 +1967,9 @@ export default function CheckoutOffersPanel({
                         )
             }
 
-            {refreshFailed && !reservationExpired && <button type="button" disabled={addonBusy} className="min-h-12 rounded-xl border px-4 font-semibold" onClick={async()=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition();}catch{/* The current-screen error already explains how to retry. */}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}><T text="Recheck current cart and total" /></button>}
+            {(refreshFailed||savingsRecheckRequired) && !reservationExpired && <button type="button" disabled={addonBusy} className="min-h-12 rounded-xl border px-4 font-semibold" onClick={async()=>{setAddonBusy(true);onCartMutationBusy?.(true);try{if(savingsRecheckRequired)await recoverSavingsTotal();else await refreshAfterAddition();}catch{/* The current-screen error already explains how to retry. */}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}><T text={savingsRecheckRequired?"Recheck reserved total":"Recheck current cart and total"} /></button>}
             {adjusting && pendingOrder && parsePickupSlot(getPickupSlotSnapshot()) && <CheckoutAdjustmentDialog items={items} pickup={parsePickupSlot(getPickupSlotSnapshot())!} branchId={pendingOrder.branchId} days={features?.futureOrderingDays??30} onClose={()=>setAdjusting(false)} onApply={async(changedItems,changedPickup)=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition(changedItems,changedPickup);}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}/>}
-            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={navigating?translate("Opening secure payment…"):priceReviewRequired ? translate("Review updated total") : translate("Continue to payment")} amount={displayTotal} disabled={savingsBusy || navigating || priceReviewRequired || refreshFailed || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
+            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={navigating?translate("Opening secure payment…"):needsPriceReview ? translate("Review updated total") : translate("Continue to payment")} amount={displayTotal} disabled={savingsBusy || navigating || needsPriceReview || savingsRecheckRequired || refreshFailed || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
         </div>
     );
 }

@@ -1,4 +1,5 @@
 "use client";
+import {CheckoutSavingsUncertainError} from "@/lib/checkoutRefresh";
 import {T,useTranslation} from "@/lib/language";
 
 import {
@@ -808,6 +809,8 @@ function LegacyOffersPage() {
             );
 
         } catch (exception) {
+            if(exception instanceof CheckoutSavingsUncertainError){const saved=parsePendingOrder(getPendingOrderSnapshot());if(saved?.orderNumber===orderNumber)savePendingOrder({...saved,offerRecheckRequired:true,priceReviewRequired:true});}
+            if(exception instanceof CheckoutSavingsUncertainError){const saved=parsePendingOrder(getPendingOrderSnapshot());if(saved?.orderNumber===orderNumber)savePendingOrder({...saved,offerRecheckRequired:true,priceReviewRequired:true});}
 
             console.error(
                 "Unable to remove rebate:",
@@ -3023,6 +3026,9 @@ export default function OffersPage() {
     useTranslation();
     const features=useStorefrontFeatures();
     const params=useParams<{orderNumber:string}>();
-    if(features?.pickupAddOns||features?.gokulRewards) return <AppShell><CheckoutExperienceFrame enabled={features.checkoutExperienceV2} stage="offers"><section className="mx-auto w-full min-w-0 max-w-2xl px-4 pb-28 pt-5"><CheckoutOffersPanel orderNumber={params.orderNumber}/></section></CheckoutExperienceFrame></AppShell>;
+    const pendingSnapshot=useSyncExternalStore(subscribeToPendingOrder,getPendingOrderSnapshot,getServerPendingOrderSnapshot);
+    const pending=parsePendingOrder(pendingSnapshot);
+    const recoveryRequired=pending?.orderNumber===params.orderNumber&&(pending.offerRecheckRequired||pending.priceReviewRequired);
+    if(features?.pickupAddOns||features?.gokulRewards||recoveryRequired) return <AppShell><CheckoutExperienceFrame enabled={features?.checkoutExperienceV2===true} stage="offers"><section className="mx-auto w-full min-w-0 max-w-2xl px-4 pb-28 pt-5"><CheckoutOffersPanel orderNumber={params.orderNumber}/></section></CheckoutExperienceFrame></AppShell>;
     return <LegacyOffersPage/>;
 }

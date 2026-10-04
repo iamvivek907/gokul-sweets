@@ -818,6 +818,11 @@ export default function PaymentPage() {
                              * -------------------------------------------------
                              */
 
+                            if(pendingOrder.offerRecheckRequired||pendingOrder.priceReviewRequired){
+                                router.replace(`/checkout/offers/${encodeURIComponent(orderNumber)}`);
+                                return null;
+                            }
+
                             const backendOrder =
                                 await getCustomerOrder(
                                     orderNumber

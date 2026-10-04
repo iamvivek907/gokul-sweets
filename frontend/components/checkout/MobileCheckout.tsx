@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import {CheckoutSavingsUncertainError} from "@/lib/checkoutRefresh";
 import dynamic from "next/dynamic";
 import MobilePageBack from "@/components/customer/MobilePageBack";
 import {useCallback,useEffect,useMemo,useRef,useState,useSyncExternalStore} from "react";
@@ -176,7 +177,7 @@ export default function MobileCheckout(){
   if(!saved&&!branchReviewed){setError("Confirm the pickup branch before payment. Collect only from the branch shown here.");return;}
   if(!saved&&(!request||!preview||total===null||quoteExpired(preview.quote.expiresAt))){setRevision(v=>v+1);setError("Checking your current price before payment. Please review the refreshed total.");return;}
   locked.current=true;setBusy(true);setError("");
-  let orderCreated=false;let postingOrder=false;
+  let orderCreated=false;let postingOrder=false;let createdOrderNumber:string|null=null;
   try{
    const current=verifiedCheckoutContact(await apiClient<CustomerSession>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.timeout(5000)}));
    const expectedPhone=saved?.request.customerPhone??request!.customerPhone;
@@ -184,7 +185,7 @@ export default function MobileCheckout(){
    const value=saved??{request:{...request!,quoteToken:preview!.quote.token},key:crypto.randomUUID(),cart:getCartSnapshot(),branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot(),expected:total!,offerCode};
    if(!saved&&(value.cart!==getCartSnapshot()||value.branch!==getStoredBranchSnapshot()||value.pickup!==getPickupSlotSnapshot()))throw new Error("Your cart, branch or pickup changed elsewhere. Review the saved checkout before payment.");
    sessionStorage.setItem(ATTEMPT,JSON.stringify(value));setAttempt(value);
-   postingOrder=true;const order=await createOrder(value.request,value.key,AbortSignal.timeout(20000));orderCreated=true;
+   postingOrder=true;const order=await createOrder(value.request,value.key,AbortSignal.timeout(20000));orderCreated=true;createdOrderNumber=order.orderNumber;
    const fingerprint=createCartFingerprint(parseCart(value.cart).items);
    savePendingOrder({orderId:order.id,orderNumber:order.orderNumber,orderStatus:order.orderStatus,branchId:order.branchId,pickupSlotId:order.pickupSlotId,totalAmount:order.totalAmount,reservationExpiresAt:order.reservationExpiresAt,createdAt:order.createdAt,cartFingerprint:fingerprint});
    sessionStorage.removeItem(ATTEMPT);setAttempt(null);
@@ -205,6 +206,7 @@ export default function MobileCheckout(){
    if(outcome.kind==="updated")savePendingPayment({...outcome.payment,cartFingerprint:fingerprint});
    router.replace(`/checkout/payment/${encodeURIComponent(order.orderNumber)}`);
   }catch(failure){setError(failure instanceof Error?failure.message:"Payment could not be started. Your cart is saved.");
+   if(failure instanceof CheckoutSavingsUncertainError){const reserved=parsePendingOrder(getPendingOrderSnapshot());if(reserved?.orderNumber===createdOrderNumber)savePendingOrder({...reserved,offerRecheckRequired:true,priceReviewRequired:true});}
    if(failure instanceof ApiError&&failure.status===401){setSession({authenticated:false});setIdentityRevision(v=>v+1);}
    if(postingOrder&&!orderCreated&&failure instanceof ApiError&&(failure.status===400||failure.status===409)){sessionStorage.removeItem(ATTEMPT);setAttempt(null);setRevision(v=>v+1);}
    // An uncertain POST must be retried with its original request and key.
@@ -233,7 +235,7 @@ export default function MobileCheckout(){
     <div className="mobile-quantity"><button type="button" disabled={editingLocked} aria-label={`Remove one ${item.product.name}`} onClick={()=>cart.decreaseQuantity(item.product.id)}>−</button><span>{item.product.saleMode==="WEIGHT"?formatWeight(item.weightGrams??0):item.quantity}</span><button type="button" disabled={editingLocked} aria-label={`Add one ${item.product.name}`} onClick={()=>cart.increaseQuantity(item.product.id)}>+</button></div>
    </article>)}
   </section>
-  {pending?<section className="mobile-checkout-section"><h2><T text="Continue your existing order" /></h2><p><T text="Your order is already reserved. Check its payment status before starting another checkout." /></p><Link href={`/checkout/payment/${encodeURIComponent(pending.orderNumber)}`}><T text="Continue payment" /></Link></section>:<>
+  {pending?<section className="mobile-checkout-section"><h2><T text="Continue your existing order" /></h2><p><T text="Your order is already reserved. Check its payment status before starting another checkout." /></p><Link href={`/checkout/${pending.offerRecheckRequired||pending.priceReviewRequired?"offers":"payment"}/${encodeURIComponent(pending.orderNumber)}`}><T text={pending.offerRecheckRequired||pending.priceReviewRequired?"Review reserved total":"Continue payment"} /></Link></section>:<>
   <section className="mobile-checkout-section"><h2><T text="Pickup" /></h2>{validAvailability&&chosen?<><p><strong>{pickupLabel(chosen)}</strong></p><button className="mobile-change-pickup" type="button" disabled={editingLocked} onClick={()=>setPickupPopup(availabilityKey)}><T text="Change pickup" /></button></>:<p role="status">{availabilityError?.key===availabilityKey?availabilityError.message:validAvailability?"No pickup slots fit this cart. Change quantities or try another date from the pickup selector.":attempt?`${attempt.request.pickupType} pickup saved for retry. Your original pickup will be recovered with the order.`:"Checking the earliest available pickup…"}</p>}{validAvailability&&!chosen&&<Link href="/checkout/pickup"><T text="Choose pickup" /></Link>}{availabilityError?.key===availabilityKey&&<button onClick={()=>setRevision(v=>v+1)}><T text="Try again" /></button>}</section>
   <div ref={identitySection} className={guidance==="identity"&&!contact?"mobile-checkout-guidance":""}><CustomerIdentityPanel mode="mobileCheckout" sessionRevision={identityRevision} onSessionChange={onSession}/>{guidance==="identity"&&!contact&&<p role="status"><T text="Sign in here to continue to payment. Your cart is saved."/></p>}</div>
   {features?.gokulRewards&&preview?.rewards&&<RewardPicker compact wallet={preview.rewards} selected={rewardCode} discount={Number(preview.rewardDiscount??0)} busy={editingLocked} onSelect={code=>void changeSavings({rewardCode:code}).catch(failure=>setError(failure instanceof Error?failure.message:"Rewards could not be checked. Try again."))}/>}
