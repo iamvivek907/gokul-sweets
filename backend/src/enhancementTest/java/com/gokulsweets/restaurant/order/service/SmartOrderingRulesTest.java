@@ -37,8 +37,10 @@ class SmartOrderingRulesTest {
         verifyNoInteractions(settings);
         var service = mock(CartAvailabilityService.class);
         var controller = new CartAvailabilityController(features, service);
-        assertThat(controller.check(1L, new CartAvailabilityController.Request(LocalDate.now(clock), 1,
-                List.of(new CreateOrderItemRequest(1L, 1, null)), null)).getStatusCode().value()).isEqualTo(404);
+        var request = new CartAvailabilityController.Request(LocalDate.now(clock), 1,
+                List.of(new CreateOrderItemRequest(1L, 1, null)), null);
+        assertThat(controller.check(1L, request, false).getStatusCode().value()).isEqualTo(404);
+        assertThat(controller.check(1L, request, true).getStatusCode().value()).isEqualTo(404);
         verifyNoInteractions(service);
     }
 

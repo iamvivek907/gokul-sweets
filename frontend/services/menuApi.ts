@@ -1,3 +1,4 @@
+import {constrainedPhoneConnection} from "@/lib/mobileConnection";
 import {
     apiClient
 } from "@/services/apiClient";
@@ -104,6 +105,7 @@ export async function warmMenu(branchId: number): Promise<void> {
     try {
         const categories = await request;
         if (warmedMenus.get(branchId) !== entry) return;
+        if (constrainedPhoneConnection()) return;
         for (const product of categories.flatMap(category => category.products).slice(0, 8)) {
             if (product.imageUrl) {const image = new Image(); image.src = product.imageUrl;}
         }

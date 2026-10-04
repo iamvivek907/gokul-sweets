@@ -1,4 +1,5 @@
 "use client";
+import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import CustomerRewards from "./CustomerRewards";
 import AddressLocationAssist from "./AddressLocationAssist";
@@ -199,7 +200,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
             const updated = await apiClient<CustomerSession>("/api/customer/identity/me", {credentials: "include"});
             if (!updated.authenticated) throw new Error("Session expired");
             onSessionChange(updated);
-            window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+            notifyCustomerIdentityChanged();
             setEditingDetails(false);
             setMessage("Your name was updated.");
         } catch {setMessage("Your name could not be saved. Please try again.");}
@@ -211,7 +212,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
         try {
             await apiClient<void>("/api/customer/identity/logout", {method: "POST", credentials: "include"});
             onSessionChange({authenticated: false});
-            window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+            notifyCustomerIdentityChanged();
             return true;
         } catch {setMessage("Could not sign out. Please try again."); setBusy(false); return false;}
     }

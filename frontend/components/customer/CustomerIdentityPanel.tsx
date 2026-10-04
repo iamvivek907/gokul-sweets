@@ -1,4 +1,5 @@
 "use client";
+import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {pwaInstall} from "@/lib/pwaInstall";
 import {T,useTranslation} from "@/lib/language";
 
@@ -147,7 +148,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
                                 setSession(signedIn);
                                 onSessionChange?.(signedIn);
                                 setNameDraft(signedIn.name ?? "");
-                                window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+                                notifyCustomerIdentityChanged();
                             }
                         } catch (failure) {
                             if (alive.current) setError(failure instanceof ApiError && failure.status === 429
@@ -177,7 +178,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
             if (alive.current) {
                 setSession({authenticated: false});
                 onSessionChange?.({authenticated: false});
-                window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+                notifyCustomerIdentityChanged();
             }
             return true;
         } catch {
@@ -202,7 +203,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
             });
             const updated = await apiClient<CustomerSession>("/api/customer/identity/me", {credentials: "include"});
             if (!updated.authenticated) throw new Error("Session expired");
-            if (alive.current) {setSession(updated); onSessionChange?.(updated); window.dispatchEvent(new Event("gokul-customer-identity-changed"));}
+            if (alive.current) {setSession(updated); onSessionChange?.(updated); notifyCustomerIdentityChanged();}
         } catch {
             if (alive.current) setNameError("Could not save your name. Please check it and try again.");
         } finally {

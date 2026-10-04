@@ -12,6 +12,8 @@ import CheckoutMobileAction from "@/components/checkout/CheckoutMobileAction";
 import PickupAddOns from "@/components/checkout/PickupAddOns";
 import {formatWeight} from "@/lib/orderQuantity";
 
+import {CheckoutSavingsUncertainError} from "@/lib/checkoutRefresh";
+import {refreshCurrentCheckoutQuote} from "@/lib/checkoutQuoteRefresh";
 import {checkoutQuoteKey} from "@/lib/checkoutQuoteKey";
 import {applyBestRebate} from "@/services/rebateApi";
 import {apiClient} from "@/services/apiClient";
@@ -560,6 +562,8 @@ export default function ReviewPage() {
     const accessible = storefrontFeatures?.accessibleOrderingV2 === true;
     const online = useOnlineStatus();
     const [addonBusy,setAddonBusy]=useState(false);
+    // Keep the reservation recovery panel mounted after an uncertain cart update releases its busy state.
+    const [refreshOrderNumber,setRefreshOrderNumber]=useState<string|null>(null);
     const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
     const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
     const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
@@ -757,6 +761,7 @@ export default function ReviewPage() {
                 quantity: item.product.saleMode === "UNIT" ? item.quantity : null, weightGrams: item.weightGrams}))}, undefined])
         : "";
     const pendingOrderNumber = pendingOrder?.orderNumber;
+    const visibleQuote=acceptedQuote&&initialPriceKey&&acceptedQuote.key===checkoutQuoteKey(JSON.parse(initialPriceKey)[0],pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch?.id?pendingOrderNumber:undefined)?acceptedQuote:null;
     useEffect(() => {
         if (!storefrontFeatures?.simplifiedCheckout || !quoteEnabled || invalidBranch || !initialPriceKey || pendingOrderNumber || !online) return;
         if (autoPriceKey.current === initialPriceKey) return;
@@ -793,8 +798,12 @@ export default function ReviewPage() {
             savePendingOrder({...pending, totalAmount: applied.totalAmount});
             window.dispatchEvent(new Event("gokul-navigation-start"));
             router.push(`/checkout/payment/${encodeURIComponent(orderNumber)}`);
-        } catch {
-            setOrderError("Your pickup is reserved. Choose an offer below or continue to payment.");
+        } catch (error) {
+            if(error instanceof CheckoutSavingsUncertainError){
+                const pending=parsePendingOrder(getPendingOrderSnapshot());
+                if(pending?.orderNumber===orderNumber)savePendingOrder({...pending,offerRecheckRequired:true,priceReviewRequired:true});
+                setOrderError(error.message);
+            }else setOrderError("Your pickup is reserved. Choose an offer below or continue to payment.");
         }
     }
 
@@ -1644,7 +1653,7 @@ try {
             pickupSelection.slot.id
         &&
         (pendingOrder.cartFingerprint ===
-            currentCartFingerprint || addonBusy)
+            currentCartFingerprint || addonBusy || refreshOrderNumber===pendingOrder.orderNumber)
             ? pendingOrder.orderNumber
             : null;
 
@@ -2390,11 +2399,11 @@ try {
                 }
 
 
-                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async()=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await previewCheckoutQuote(request,number);setAcceptedQuote({key:checkoutQuoteKey(request,number),quote});}}/>}
+                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async(signal)=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await refreshCurrentCheckoutQuote(request,number,signal);if(quote)setAcceptedQuote({key:checkoutQuoteKey(request,number),quote});}}/>}
                 {/* Offers + final price */}
 
                 {storefrontFeatures?.simplifiedCheckout && !preparedOrderNumber && <p className="my-4 rounded-xl bg-[#e7f0e9] p-4 text-sm text-[#143936]"><T text="The best available offer is applied automatically. Add a little extra below if you like, then continue to payment."/></p>}
-                {quoteEnabled && !preparedOrderNumber && acceptedQuote && (
+                {quoteEnabled && !preparedOrderNumber && visibleQuote && (
                     <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-white p-4" role="status">
                         <p className="font-bold"><T text="Your price, before offers" /></p>
                         {quoteExpired && <p className="mt-2 rounded-xl bg-[#fff4e5] p-3 text-sm" role="status">
@@ -2404,23 +2413,23 @@ try {
                                 ? "Your price has been refreshed. Please review it once more before continuing."
                                 : `Your total changed from ${formatCurrency(Number(quoteNotice.oldTotal))} to ${formatCurrency(Number(quoteNotice.newTotal))}. Please review the new amount before continuing.`}
                         </p>}
-                        {acceptedQuote.quote.items.map((line, index) => (
+                        {visibleQuote.quote.items.map((line, index) => (
                             <p className="mt-2 text-sm" key={`${line.name}-${index}`}>
                                 {line.name}: ₹{line.total}{" "}<T text="(unit ₹" />{line.unitPrice}<T text=", tax" />{" "}{line.taxRate}%)
                             </p>
                         ))}
-                        <p className="mt-3 text-sm"><T text="Items" /> ₹{acceptedQuote.quote.subtotal} · <T text="Tax" /> ₹{acceptedQuote.quote.taxAmount} · <T text="Pickup charge" /> ₹{acceptedQuote.quote.priorityCharge}</p>
-                        {Number(acceptedQuote.quote.paymentFee??0)>0&&<p className="mt-2 text-sm"><T text="Online payment fee" /> ({acceptedQuote.quote.paymentFeeRate}%) ₹{acceptedQuote.quote.paymentFee} · <T text="Includes" /> ₹{acceptedQuote.quote.paymentFeeTax} <T text="fee tax" /></p>}
-                        {Number(acceptedQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm"><T text="Convenience fee ₹" />{acceptedQuote.quote.convenienceFee}{" "}<T text="(includes ₹" />{acceptedQuote.quote.convenienceFeeTax}{" "}<T text="tax)" /></p>}
-                        <p className="mt-2 font-bold"><T text="Total before optional offers" /> ₹{acceptedQuote.quote.totalAmount}</p>
-                        {!quoteExpired && <p className="mt-2 text-xs"><T text="This price is available until" /> {new Date(acceptedQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy"><T text="See the cancellation policy" /><LinkFeedback /></Link> <T text="before paying." /></p>}
+                        <p className="mt-3 text-sm"><T text="Items" /> ₹{visibleQuote.quote.subtotal} · <T text="Tax" /> ₹{visibleQuote.quote.taxAmount} · <T text="Pickup charge" /> ₹{visibleQuote.quote.priorityCharge}</p>
+                        {Number(visibleQuote.quote.paymentFee??0)>0&&<p className="mt-2 text-sm"><T text="Online payment fee" /> ({visibleQuote.quote.paymentFeeRate}%) ₹{visibleQuote.quote.paymentFee} · <T text="Includes" /> ₹{visibleQuote.quote.paymentFeeTax} <T text="fee tax" /></p>}
+                        {Number(visibleQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm"><T text="Convenience fee ₹" />{visibleQuote.quote.convenienceFee}{" "}<T text="(includes ₹" />{visibleQuote.quote.convenienceFeeTax}{" "}<T text="tax)" /></p>}
+                        <p className="mt-2 font-bold"><T text="Total before optional offers" /> ₹{visibleQuote.quote.totalAmount}</p>
+                        {!quoteExpired && <p className="mt-2 text-xs"><T text="This price is available until" /> {new Date(visibleQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy"><T text="See the cancellation policy" /><LinkFeedback /></Link> <T text="before paying." /></p>}
                     </div>
                 )}
 
                 {
                     preparedOrderNumber
                         ? (
-                            submitting && storefrontFeatures?.simplifiedCheckout ? <p role="status" className="my-4 rounded-2xl bg-[#e7f0e9] p-5 text-[#143936]"><T text="Finding your best offer and opening payment…" /></p> : <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
+                            submitting && storefrontFeatures?.simplifiedCheckout ? <p role="status" className="my-4 rounded-2xl bg-[#e7f0e9] p-5 text-[#143936]"><T text="Finding your best offer and opening payment…" /></p> : <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError} onRefreshRequiredChange={required=>{setRefreshOrderNumber(required?preparedOrderNumber:null);if(!required)setOrderError(null);}}
                                 orderNumber={
                                     preparedOrderNumber
                                 }
@@ -2505,9 +2514,9 @@ try {
                                     {
                                         priceChecking || submitting
                                             ? translate("Preparing your order...")
-                                            : quoteExpired
+                                            : quoteExpired && visibleQuote
                                                 ? translate("Refresh your total")
-                                            : quoteEnabled && acceptedQuote
+                                            : quoteEnabled && visibleQuote
                                                 ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Accept price and reserve pickup")
                                                 : translate("Check Final Price & Offers")
                                     }
@@ -2546,7 +2555,7 @@ try {
                 }
 
                 {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated||!quote?null:{key:checkoutQuoteKey(request,number),quote});setInventoryIssue(null);setOrderError(null);}}/>}
-                {!preparedOrderNumber && <CheckoutMobileAction label={priceChecking ? translate("Checking your total…") : submitting ? translate("Checking…") : quoteEnabled && acceptedQuote ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Review & reserve") : translate("Check price & offers")} amount={acceptedQuote ? Number(acceptedQuote.quote.totalAmount) : undefined} disabled={priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
+                {!preparedOrderNumber && <CheckoutMobileAction label={priceChecking ? translate("Checking your total…") : submitting ? translate("Checking…") : quoteEnabled && visibleQuote ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Review & reserve") : translate("Check price & offers")} amount={visibleQuote ? Number(visibleQuote.quote.totalAmount) : undefined} disabled={priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
             </section>
 
             </CheckoutExperienceFrame>

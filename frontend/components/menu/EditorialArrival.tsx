@@ -9,6 +9,7 @@ import {useEffect, useState} from "react";
 import BranchSelector from "@/components/branch/BranchSelector";
 import CampaignMedia from "@/components/menu/CampaignMedia";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {getActiveBranches} from "@/services/branchApi";
 import {apiClient} from "@/services/apiClient";
 import {visibleCampaigns} from "@/lib/campaigns";
@@ -20,6 +21,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
     campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; occasionEnquiries?: boolean;
 }) {
     const translate = useTranslation();
+    const phone=usePhoneViewport();
 
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -123,18 +125,19 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <p><T text="Choose a Gokul branch near you to see its live menu and pickup choices." /></p>
             </div>
             <div className={styles.branchGrid}>
-                {branches.map(item => <article className={styles.branchCard} key={item.id}>
+                {branches.map(item => <article className={`${styles.branchCard} arrival-pickup-card ${item.operational===false?"arrival-pickup-card--closed":""}`} key={item.id}>
                     {!failedBranchPhotos.includes(item.id) && branchExperience && item.coverImageUrl
                         ? <picture><source media="(max-width: 700px)" srcSet={item.mobileCoverImageUrl || item.coverImageUrl} />
-                            <img src={item.coverImageUrl} alt={item.coverAltText || item.name}
+                            <img src={item.coverImageUrl} alt={item.coverAltText || item.name} loading={phone===true?"lazy":undefined} decoding={phone===true?"async":undefined}
                                 className={styles.branchPhoto} onError={() => setFailedBranchPhotos(current => [...current, item.id])} /></picture>
                         : !branchExperience && branchPhotos[item.id] && <Image src={branchPhotos[item.id]} alt={item.name}
                             fill sizes="(max-width: 700px) 100vw, 50vw" className={styles.branchPhoto} />}
-                    <div className={styles.branchCopy}>
+                    <div className={`${styles.branchCopy} arrival-pickup-copy`}>
                         <span>{item.city ?? "GOKUL BRANCH"}</span><h3>{item.name}</h3>
                         <p>{branchExperience ? item.description || item.city || item.address || translate("Explore this branch") : item.city ?? item.address ?? "Explore this branch’s live menu and pickup choices."}</p>
                         {branchExperience && item.operational !== false && <p><T text={item.pickupAvailable ? "Order for pickup" : "Online pickup unavailable"} /></p>}
                         <p className="arrival-mobile-address">{[item.address,item.city,item.pincode].filter(Boolean).join(", ")||translate("Contact the branch for its pickup address")}</p>
+                        {phone===true&&<span className="arrival-pickup-status"><T text={item.operational===false?"Currently not operational":item.pickupAvailable?"Collect your order here":"Online pickup unavailable"}/></span>}
                         <span className={styles.cardPrompt}><T text={item.operational===false?"Currently not operational":"Explore this branch"} /></span>
                     </div>
                     <BranchSelector cardBranch={item} destination={branchExperience ? "branchHome" : "menu"} />

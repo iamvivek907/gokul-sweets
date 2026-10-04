@@ -5,10 +5,13 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 
 import Link from "next/link";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import type {AvailableRebateResponse} from "@/types/rebate";
 import {useState, useEffect} from "react";
 
 
 interface FloatingCartButtonProps {
+    offerTarget?:AvailableRebateResponse|null;
+    offerEnabled?:boolean;
 
     itemCount:
         number;
@@ -40,7 +43,9 @@ function formatCurrency(
 
 export default function FloatingCartButton({
     itemCount,
-    total
+    total,
+    offerEnabled=false,
+    offerTarget
 }: FloatingCartButtonProps) {
 
     const features = useStorefrontFeatures();
@@ -74,6 +79,7 @@ export default function FloatingCartButton({
             "
         >
 
+            {consolidated&&offerEnabled&&<div className="mobile-cart-offer-slot">{offerTarget&&<button type="button" className="mobile-cart-offer-target" onClick={()=>document.getElementById("mobile-menu-pairings-open")?.click()} aria-haspopup="dialog"><span aria-hidden="true">%</span><span><strong><T text="Unlock"/> {formatCurrency(offerTarget.nextSlabRebateAmount!)} <T text="off"/></strong><small><T text="Add"/> {formatCurrency(offerTarget.amountNeededForNextSlab!)} <T text="in eligible items"/></small></span><span aria-hidden="true">⌃</span></button>}</div>}
             <Link
                 href={consolidated ? "/checkout/mobile" : quick ? "/checkout/pickup" : "/cart"}
                 className="

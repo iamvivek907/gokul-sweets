@@ -64,12 +64,24 @@ try {
   assert.equal(signedIn,true);
   if(width<=640){
    await page.goto(`${base}/checkout/payment/TEST-MOBILE`);await launch.waitFor({state:'hidden'});
+   if(checkout&&acceptedQuote&&simplified){
+    assert.equal(await page.getByRole('button',{name:'Cancel this order',exact:true}).count(),0);
+    await page.getByRole('link',{name:'Back to menu',exact:true}).click();
+    const leave=page.getByRole('dialog');await leave.getByRole('alert').filter({hasText:'Provider check unavailable'}).waitFor();
+    assert.equal(cancels,1);assert.equal(new URL(page.url()).pathname,'/checkout/payment/TEST-MOBILE');
+    await leave.getByRole('button',{name:'Stay on payment',exact:true}).click();await leave.waitFor({state:'hidden'});
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
+    cancelError=false;await page.getByRole('link',{name:'Back to menu',exact:true}).click();await page.waitForURL('**/menu');
+    assert.equal(cancels,2);assert.equal(mutations,0);
+    await page.goto(`${base}/checkout/review?paymentRecovery=failed`);
+   }else{
    await page.getByRole('button',{name:'Cancel this order',exact:true}).click();
    const cancel=page.getByRole('dialog',{name:'Cancel this payment?'});await cancel.waitFor();assert.equal(cancels,0);
    await cancel.getByRole('button',{name:'Keep payment',exact:true}).click();await cancel.waitFor({state:'hidden'});assert.equal(cancels,0);
    await page.getByRole('button',{name:'Cancel this order',exact:true}).click();await cancel.getByRole('button',{name:'Confirm cancellation',exact:true}).click();
    await cancel.getByRole('alert').filter({hasText:'Provider check unavailable'}).waitFor();assert.equal(new URL(page.url()).pathname,'/checkout/payment/TEST-MOBILE');assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
    cancelError=false;await cancel.getByRole('button',{name:'Confirm cancellation',exact:true}).click();
+   }
    await page.waitForURL('**/checkout/review?paymentRecovery=failed');await page.getByText('Ready to try again',{exact:true}).waitFor();assert.equal(cancels,2);assert.equal(mutations,0);
    if(!checkout){await page.locator('.checkout-mobile-action').waitFor();assert.notEqual(await page.locator('.checkout-mobile-action').evaluate(e=>getComputedStyle(e).position),'fixed');assert.equal(await page.locator('.customer-bottom-navigation').isVisible(),true);}
   }

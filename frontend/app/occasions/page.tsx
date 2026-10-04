@@ -1,6 +1,7 @@
 
 /* eslint-disable @next/next/no-img-element -- Real catalogue URLs are rendered directly without transforming supplier photos. */
 "use client";
+import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {T} from "@/lib/language";
 
 import OccasionPackingBuilder from "@/components/occasion/OccasionPackingBuilder";
@@ -80,7 +81,7 @@ export default function OccasionsPage() {
         } catch (error) {
             if (error instanceof ApiError && error.status === 401) {
                 setSession({authenticated: false}); setSessionVersion(current => current + 1);
-                window.dispatchEvent(new Event("gokul-customer-identity-changed"));
+                notifyCustomerIdentityChanged();
             }
             setMessage(error instanceof ApiError && error.status === 401 ? "Please verify your phone, then try again."
                 : error instanceof ApiError && error.status === 429 ? "Requests are arriving too quickly. Please wait a moment and retry; your selections are saved here."

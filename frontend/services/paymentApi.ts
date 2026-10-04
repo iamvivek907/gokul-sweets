@@ -95,7 +95,7 @@ export function getPaymentProviderConfiguration(
 
 export function getPaymentForOrder(
     orderNumber: string,
-    signal?: AbortSignal
+    signal: AbortSignal = AbortSignal.timeout(15000)
 ): Promise<PaymentLookupResponse> {
 
     return apiClient<PaymentLookupResponse>(
@@ -117,7 +117,7 @@ export function getPaymentForOrder(
 
 export function refreshPayment(
     paymentId: number,
-    signal?: AbortSignal
+    signal: AbortSignal = AbortSignal.timeout(15000)
 ): Promise<PaymentResponse> {
 
     return apiClient<PaymentResponse>(
@@ -154,6 +154,6 @@ export function verifyRazorpayPayment(
     );
 }
 
-export function cancelPaymentCheckout(paymentId:number): Promise<PaymentResponse> {
-    return apiClient<PaymentResponse>(`/api/payments/${paymentId}/cancel-checkout`,{method:"POST",credentials:"include"});
+export function cancelPaymentCheckout(paymentId:number, signal?:AbortSignal): Promise<PaymentResponse> {
+    return apiClient<PaymentResponse>(`/api/payments/${paymentId}/cancel-checkout`,{method:"POST",credentials:"include",signal});
 }

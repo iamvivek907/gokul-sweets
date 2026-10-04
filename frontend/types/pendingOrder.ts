@@ -8,6 +8,8 @@ export interface PendingOrderSession {
     fulfillmentType?: "PICKUP" | "DELIVERY";
 
     totalAmount: number;
+    offerRecheckRequired?: boolean;
+    priceReviewRequired?: boolean;
 
     reservationExpiresAt: string;
 

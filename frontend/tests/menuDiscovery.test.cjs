@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),test=require('node:test'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 function load(name){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(`lib/${name}.ts`,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports});return exports;}
-const {groupMenuProducts}=load('menuGroups'),{rankAddOns}=load('addOnRanking');
+const {groupMenuProducts}=load('menuGroups'),{rankAddOns}=load('addOnRanking'),{stableSuggestions}=load('stableSuggestions');
 test('category sections retain backend order, descriptions and product order after filtering',()=>{
  const categories=[{id:2,name:'Meals',description:'Lunch',products:[]},{id:1,name:'Sweets',description:'Mithai',products:[]},{id:3,name:'Drinks',products:[]}];
  const products=[{id:20,categoryId:2},{id:10,categoryId:1},{id:21,categoryId:2}];
@@ -9,4 +9,10 @@ test('category sections retain backend order, descriptions and product order aft
 test('add-on ranking uses genuine portions, closest reaching addition first, then closest below',()=>{
  const items=[{id:1,portionTotal:36.75},{id:2,portionTotal:315},{id:3,portionTotal:147},{id:4,portionTotal:78.75}];
  const ranked=rankAddOns(items,143);assert.deepEqual(Array.from(ranked,x=>x.id),[3,2,4,1]);assert.equal(ranked[0],items[2]);assert.equal(items[0].id,1);assert.equal(rankAddOns(items,null),items);assert.equal(rankAddOns(items,0),items);
+});
+
+test('late suggestions refresh prices without moving existing cards or duplicating products',()=>{
+ const chai={product:{id:1},portionTotal:35},tea={product:{id:2},portionTotal:30},newTea={product:{id:2},portionTotal:31},extra={product:{id:3},portionTotal:20};
+ const result=stableSuggestions([chai,tea],[newTea,extra,chai]);assert.deepEqual(Array.from(result,item=>item.product.id),[1,2,3]);assert.equal(result[1],newTea);
+ assert.deepEqual(Array.from(stableSuggestions([chai,tea],[newTea]),item=>item.product.id),[2]);
 });

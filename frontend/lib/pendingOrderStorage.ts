@@ -160,6 +160,8 @@ export function parsePendingOrder(
 
             totalAmount:
                 parsed.totalAmount,
+            ...(parsed.offerRecheckRequired===true?{offerRecheckRequired:true}:{}),
+            ...(parsed.priceReviewRequired===true?{priceReviewRequired:true}:{}),
 
             reservationExpiresAt:
                 parsed.reservationExpiresAt,

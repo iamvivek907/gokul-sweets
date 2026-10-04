@@ -100,6 +100,47 @@ class CartAvailabilityServiceTest {
         assertThat(sameDateService.check(branchId, date, 1, request).dates().getFirst().plannedProduction()).isFalse();
     }
 
+    @Test
+    void menuPreviewKeepsLongerProductHorizonsWithoutWeakeningCartAvailability() {
+        Clock clock = Clock.fixed(Instant.parse("2026-10-04T03:00:00Z"), ZoneId.of("Asia/Kolkata"));
+        LocalDate today = LocalDate.of(2026, 10, 4), tomorrow = today.plusDays(1);
+        Branch branch = new Branch(); branch.setId(10L);
+        var breakfast = branchProduct(branch, 101L, 201L, "Breakfast");
+        var sweets = branchProduct(branch, 102L, 202L, "Sweets");
+        var breakfastPolicy = productionPolicy(breakfast); breakfastPolicy.setBookingHorizonDays(0);
+        var sweetsPolicy = productionPolicy(sweets);
+        EnhancementProperties features = new EnhancementProperties(); features.setFutureOrderingDays(7);
+        InventoryProperties inventory = new InventoryProperties(); inventory.setEnforcementEnabled(true);
+        var validation = Mockito.mock(OrderValidationService.class);
+        var policies = Mockito.mock(BranchInventoryPolicyRepository.class);
+        var allocations = Mockito.mock(InventoryDailyAllocationRepository.class);
+        var slots = Mockito.mock(PickupSlotRepository.class);
+        var settings = Mockito.mock(BranchPickupSettingsRepository.class);
+        when(validation.validateCart(any(), anyList())).thenReturn(List.of(
+                new ValidatedOrderItem(breakfast.getProduct(), breakfast, ProductSaleMode.UNIT, 1, null),
+                new ValidatedOrderItem(sweets.getProduct(), sweets, ProductSaleMode.UNIT, 1, null)));
+        when(policies.findByBranchProductIdIn(anyList())).thenReturn(List.of(breakfastPolicy, sweetsPolicy));
+        when(allocations.findByBranchProductIdInAndServiceDateBetween(anyList(), any(), any()))
+                .thenReturn(List.of(approved(sweets, tomorrow, 10)));
+        when(settings.findByBranchId(10L)).thenReturn(Optional.empty());
+        when(slots.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(any(), any(), any()))
+                .thenReturn(List.of(slot(branch, tomorrow, 1000L, LocalTime.NOON, LocalTime.of(13, 0))));
+        var service = new CartAvailabilityService(features, inventory, validation,
+                new SmartOrderingRules(features, settings, clock), policies, allocations,
+                new InventoryAvailabilityService(), slots, settings, clock);
+        var request = List.of(new CreateOrderItemRequest(201L, 1, null), new CreateOrderItemRequest(202L, 1, null));
+        assertThat(service.check(10L, today, 8, request).dates()).hasSize(1);
+        var preview = service.check(10L, today, 8, request, true);
+        assertThat(preview.dates()).hasSize(8);
+        var time = preview.dates().get(1).slots().getFirst();
+        assertThat(time.slot().remainingCapacity()).isPositive();
+        assertThat(time.issues()).extracting(CartAvailabilityService.ItemAvailability::productId).containsExactly(201L);
+        assertThat(time.issues().getFirst().code()).isEqualTo("PRODUCT_HORIZON");
+        // Neither the menu-preview response nor normal checkout approves a cart containing the breakfast item.
+        assertThat(time.normalAvailable()).isFalse();
+        assertThat(service.check(10L, tomorrow, 1, request).dates().getFirst().slots().getFirst().normalAvailable()).isFalse();
+    }
+
     private BranchProduct branchProduct(Branch branch, long id, long productId, String name) {
         var product = new Product(); product.setId(productId); product.setName(name);
         var branchProduct = new BranchProduct(); branchProduct.setId(id);
