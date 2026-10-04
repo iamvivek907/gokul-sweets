@@ -40,6 +40,8 @@ export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=
    if(signal.aborted||!mounted.current)return;
    if(cart!==getCartSnapshot()||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot()){setMessage("Your cart or pickup changed. Review it before adding.");return;}
    if(!check.orderable){setMessage("This addition no longer fits your pickup. Your cart is unchanged.");return;}
+   // Validation is complete; our own cart write must not abort the subsequent quote refresh.
+   addition.current=null;
    if(addItem(s.product,branchId,s.weightGrams??undefined)!=="added"){setMessage("Choose the matching branch before adding.");return;}
    added=true;addedSnapshot=getCartSnapshot();await onAdded();if(!mounted.current||controller.signal.aborted)return;setMessage(`${s.product.name} added. Review your updated price and offer before payment.`);
   } catch {if(!mounted.current||controller.signal.aborted)return;if(added&&addedSnapshot===getCartSnapshot()){saveCart(parseCart(cart));added=false;}setMessage(added?"This item is in your cart. Review the cart to refresh its price before payment.":"We couldn’t complete this addition. Your existing cart and pickup are unchanged. Try again, or adjust quantities and pickup here.");}
