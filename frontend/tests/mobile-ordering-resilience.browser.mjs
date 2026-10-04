@@ -43,8 +43,9 @@ try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]])
  if(constrained)await context.addInitScript(()=>Object.defineProperty(navigator,'connection',{configurable:true,value:{effectiveType:'3g',saveData:false}}));
  await page.goto(`${base}/menu`); await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'}); const pairing=page.getByRole('region',{name:'Pairs well with your selection'});await pairing.getByRole('button',{name:'Add Special tea',exact:true}).waitFor({timeout:4000});
  if(!constrained)await pairing.getByText('Your completed-order favourite',{exact:true}).waitFor();assert.equal(historyCalls,constrained?0:1,'constrained phones skip optional history downloads');
- const following=await page.locator('#gokul-product-2').boundingBox();const cartAction=await page.locator('.gokul-floating-cart a').boundingBox();
+ const suggestionAction=await pairing.getByRole('button',{name:'Add Special tea',exact:true}).boundingBox();const following=await page.locator('#gokul-product-2').boundingBox();const cartAction=await page.locator('.gokul-floating-cart a').boundingBox();
  assert.ok(previewCalls>0);assert.equal(await pairing.getByText(/Unlock/).count(),0,'pairings are usable while offer verification is pending');releasePreview();await pairing.getByText(/Unlock/).waitFor();
+ assert.ok(Math.abs((await pairing.getByRole('button',{name:'Add Special tea',exact:true}).boundingBox()).y-suggestionAction.y)<=1,'late offer cannot move a suggestion Add control');
  assert.ok(Math.abs((await page.locator('#gokul-product-2').boundingBox()).y-following.y)<=1,'late offer cannot move the following product');
  assert.ok(Math.abs((await page.locator('.gokul-floating-cart a').boundingBox()).y-cartAction.y)<=1,'late offer cannot move Continue');
  if(!constrained){
