@@ -6,6 +6,7 @@ import {useCart} from "@/hooks/useCart";
 import {usePickupIntent} from "@/hooks/usePickupIntent";
 import {apiClient} from "@/services/apiClient";
 import {availabilityItems,checkCartAvailability} from "@/services/availabilityApi";
+import {checkInventory} from "@/services/inventoryApi";
 import {getCartSnapshot} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
@@ -61,10 +62,19 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
   if(!features||!intent.date||!cart.items.length||cart.branchId!==branchId)return;
   const c=new AbortController();
   const timer=setTimeout(()=>void (async()=>{
-   let items=await apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}`,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([c.signal,AbortSignal.timeout(8000)])}).catch(()=>[]);
    const counts=new Map<number,number>();for(const visit of visits){if(visit.branchId!==branchId||visit.paymentStatus!=="PAID"||!["PICKED_UP","DELIVERED"].includes(visit.orderStatus))continue;for(const item of visit.items)counts.set(item.productId,(counts.get(item.productId)??0)+1);}
-   const favourites=products.filter(p=>p.available&&counts.has(p.id)&&!cart.items.some(i=>i.product.id===p.id)&&!items.some(i=>i.product.id===p.id)).sort((a,b)=>counts.get(b.id)!-counts.get(a.id)!||a.id-b.id).slice(0,2).map(product=>{const weightGrams=product.saleMode==="WEIGHT"?product.minimumWeightGrams??250:null;const price=Math.round(product.price*(weightGrams===null?1:weightGrams/1000)*100)/100;return {product,weightGrams,portionPrice:price,portionTotal:price,includesTax:false,reason:"Your completed-order favourite"};});
-   items=[...favourites,...items].filter(s=>products.some(p=>p.id===s.product.id&&p.available)&&!cart.items.some(i=>i.product.id===s.product.id)).slice(0,5);
+   const candidates=products.filter(p=>p.available&&counts.has(p.id)&&!cart.items.some(i=>i.product.id===p.id)).sort((a,b)=>counts.get(b.id)!-counts.get(a.id)!||a.id-b.id).slice(0,2).map(product=>{const weightGrams=product.saleMode==="WEIGHT"?product.minimumWeightGrams??250:null;const price=Math.round(product.price*(weightGrams===null?1:weightGrams/1000)*100)/100;return {product,weightGrams,portionPrice:price,portionTotal:price,includesTax:false,reason:"Your completed-order favourite"};});
+   // Slot checks below already include dated inventory. Without them, batch-check favourites
+   // independently of the smart-availability flag; optional failures hide unverified candidates.
+   const favouritesCheck=candidates.length&&(!smartAvailability||!selected)
+    ? checkInventory(branchId,{serviceDate:intent.date!,items:candidates.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))},AbortSignal.any([c.signal,AbortSignal.timeout(8000)]))
+       .then(value=>candidates.filter(s=>value.enforcementEnabled===false||value.items.some(item=>item.productId===s.product.id&&item.orderable))).catch(()=>[])
+    : Promise.resolve(candidates);
+   const [recommended,favourites]=await Promise.all([
+    apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}`,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([c.signal,AbortSignal.timeout(8000)])}).catch(()=>[]),
+    favouritesCheck
+   ]);
+   let items=[...favourites.filter(s=>!recommended.some(item=>item.product.id===s.product.id)),...recommended].filter(s=>products.some(p=>p.id===s.product.id&&p.available)&&!cart.items.some(i=>i.product.id===s.product.id)).slice(0,5);
    if(smartAvailability&&selected&&items.length){
     const combined=[...JSON.parse(request).items,...items.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))];
     const available=await checkCartAvailability(branchId,selected.date,1,combined,AbortSignal.any([c.signal,AbortSignal.timeout(8000)])).catch(()=>null);

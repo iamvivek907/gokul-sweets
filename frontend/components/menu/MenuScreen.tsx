@@ -1194,7 +1194,7 @@ export default function MenuScreen() {
 
                 {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data} onAdd={handleAddToCart}/>}
                 <div className={phoneMenu&&mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>
-                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired}/>}
+                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
 
                 <div
                     className="gokul-menu-tools

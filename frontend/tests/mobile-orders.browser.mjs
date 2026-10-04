@@ -7,7 +7,7 @@ const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BA
 const branch={id:1,name:'Gokul Test branch',code:'TEST',address:'Test address',phone:'9876543210',active:true,pickupAvailable:true};
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 try {
- for (const [width,enabled,paymentStatus,fulfillment='PICKUP',legacyNavigation=false] of [[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[640,true,'PENDING'],[1280,true,'PENDING'],[390,false,'PENDING'],[390,true,'PENDING','DELIVERY'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY'],[390,true,'PENDING','PICKUP',true]]) {
+ for (const [width,enabled,paymentStatus,fulfillment='PICKUP',legacyNavigation=false,stalled=false] of [[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[640,true,'PENDING'],[1280,true,'PENDING'],[390,false,'PENDING'],[390,true,'PENDING','DELIVERY'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY'],[390,true,'PENDING','PICKUP',true],[390,true,'PENDING','PICKUP',true,true]]) {
   if(process.env.ORDERS_ONLY_PENDING && !(width===390&&enabled&&paymentStatus==='PENDING'&&fulfillment==='PICKUP'))continue;
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
   if(legacyNavigation)await context.addInitScript(()=>Object.defineProperty(window,'navigation',{value:undefined}));
@@ -17,7 +17,7 @@ try {
   if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
   if(fulfillment==='DELIVERY'){Object.assign(order,{fulfillmentType:'DELIVERY',pickupDate:null,pickupStartTime:null,pickupEndTime:null,pickupType:null,deliveryDate:date,deliveryStartTime:'18:00:00',deliveryEndTime:'19:00:00',deliveryAddressLine:'12 Main Road',deliveryLocality:'Test locality',deliveryPostalCode:'226001',deliveryFee:30,totalAmount:122});}
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
-  let mutations=0,cancels=0,cancelError=true,cancelPaid=false,failRefresh=false,refreshes=0;
+  let mutations=0,cancels=0,cancelError=true,cancelPaid=false,failRefresh=false,refreshes=0,stallCancellation=stalled;
   let fontError=width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP';
   await context.route('**/fonts/invoice-v1/**',route=>fontError?route.fulfill({status:503,body:'Unavailable'}):route.continue());
   await context.route('**/api/**',async route=>{
@@ -35,7 +35,7 @@ try {
    else if(path==='/api/payments/order/TEST-ORDER')json={payment:{paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus,amount:order.totalAmount,currency:'INR',expiresAt:new Date(Date.now()+600000).toISOString()}};
    else if(path==='/api/payments/10/refresh'){refreshes++;if(failRefresh)return route.fulfill({status:503,json:{message:'Temporary provider failure'},headers});json={paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus,amount:order.totalAmount,currency:'INR'};
    }
-   else if(path==='/api/payments/10/cancel-checkout'){cancels++;if(cancelError)return route.fulfill({status:503,json:{message:'Provider check unavailable'},headers});if(cancelPaid){order.paymentStatus='PAID';order.orderStatus='CONFIRMED';}json={paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus:cancelPaid?'PAID':'FAILED',amount:order.totalAmount,currency:'INR'};}
+   else if(path==='/api/payments/10/cancel-checkout'){cancels++;if(stallCancellation)return;if(cancelError)return route.fulfill({status:503,json:{message:'Provider check unavailable'},headers});if(cancelPaid){order.paymentStatus='PAID';order.orderStatus='CONFIRMED';}json={paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus:cancelPaid?'PAID':'FAILED',amount:order.totalAmount,currency:'INR'};}
    else if(path==='/api/payments/providers')json={defaultProvider:'PHONEPE',enabledProviders:['PHONEPE']};
    return route.fulfill({json,headers});
   });
@@ -114,6 +114,13 @@ try {
    const paymentPath='/checkout/payment/TEST-ORDER';
    if(compact){
     if(width===390&&fulfillment==='PICKUP')await page.evaluate(()=>history.back());else await page.locator('a[href="/orders"]:visible').first().click();
+    if(stalled){
+     const leave=page.getByRole('dialog');await leave.getByRole('alert').filter({hasText:'We haven’t confirmed whether cancellation completed'}).waitFor({timeout:20000});
+     assert.equal(new URL(page.url()).pathname,paymentPath);assert.equal(cancels,1);
+     assert.equal(await leave.getByRole('button',{name:'Stay on payment',exact:true}).isEnabled(),true);
+     stallCancellation=false;cancelError=false;await leave.getByRole('button',{name:'Retry payment check',exact:true}).click();await page.waitForURL('**/orders/TEST-ORDER');
+     assert.equal(cancels,2);assert.equal(mutations,0);await context.close();console.log('Stalled payment exit recovers safely');continue;
+    }
     const leave=page.getByRole('dialog');await leave.getByRole('alert').filter({hasText:'Provider check unavailable'}).waitFor().catch(async e=>{console.log({url:page.url(),cancels,errors:await page.locator('[role=alert]').allTextContents(),dialog:await leave.allTextContents()});throw e;});
     assert.equal(new URL(page.url()).pathname,paymentPath);assert.equal(cancels,1);
     await leave.getByRole('button',{name:'Stay on payment',exact:true}).click();await leave.waitFor({state:'hidden'});

@@ -14,7 +14,7 @@ const slot={id:7,branchId:1,slotDate:date,startTime:'15:00:00',endTime:'16:00:00
 const offer={rebateId:1,code:'SAVE',name:'Sweet saving',description:'Eligible food only',scope:'GENERAL',rebateType:'SLAB',rebateAmount:0,payableAfterRebate:100,minimumOrderAmount:150,maximumDiscountAmount:20,nextSlabMinimumOrderAmount:150,nextSlabRebateAmount:10,amountNeededForNextSlab:50};
 try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[390,false]]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
- let previewCalls=0,addonChecks=0,confirmationFails=true,availabilityCalls=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let previewCalls=0,addonChecks=0,confirmationFails=true,cartConflict=true,availabilityCalls=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{const p=new URL(route.request().url()).pathname;let json=[];
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -31,6 +31,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
    availabilityCalls++;const body=route.request().postDataJSON();const valid=body.startDate===date;
    json={today,maximumDate:date,dates:[{date:body.startDate,available:valid,items:[{productId:1,available:true},{productId:2,available:true}],slots:valid?[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]:[]},...(body.days>1?[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]}]:[])]};
    if(body.days===1&&body.startDate===date&&confirmationFails&&page.url().includes('/menu')&&await page.getByRole('dialog').count())json.dates[0].slots=[];
+   if(body.startDate===date&&cartConflict&&body.items.some(item=>item.productId===1&&item.weightGrams===750))json.dates[0].slots=[{slot,normalAvailable:false,priorityAvailable:false,issues:[{productId:1,productName:sweet.name,available:false,code:'QUANTITY_TOO_LARGE',reason:'Only 500 g remain.'}]}];
   }
   else if(p==='/api/menu/pickup-addons')json=[{product:tea,weightGrams:null,portionPrice:30,portionTotal:30,reason:'Often ordered with Fresh peda'},{product:sold,weightGrams:null,portionPrice:30,portionTotal:30,reason:'A branch favourite'}];
   else if(p==='/api/menu/pickup-addons/check'){addonChecks++;json={orderable:true};}
@@ -45,7 +46,12 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
   await page.getByText('Your previous pickup has passed. Choose a new time; your cart is saved.',{exact:true}).waitFor();
   assert.match(await page.locator('.mobile-selected-weight-price').innerText(),/250 g.*100/);
   await page.getByRole('button',{name:'Choose time',exact:true}).click();const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:date,exact:true}).click();await dialog.getByRole('button',{name:'15:00–16:00 Standard',exact:true}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.getByRole('alert').waitFor();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).slot.id),1);
-  await dialog.getByRole('button',{name:'Close pickup selector'}).click();confirmationFails=false;await page.getByRole('button',{name:'Choose time',exact:true}).click();await dialog.getByRole('button',{name:date,exact:true}).click();await dialog.getByRole('button',{name:'15:00–16:00 Standard',exact:true}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.waitFor({state:'hidden'});
+  await dialog.getByRole('button',{name:'Close pickup selector'}).click();confirmationFails=false;
+  await page.evaluate(()=>{const cart=JSON.parse(localStorage.getItem('gokul-cart'));cart.items[0].weightGrams=750;localStorage.setItem('gokul-cart',JSON.stringify(cart));window.dispatchEvent(new Event('storage'));});
+  const savedCart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+  await page.getByRole('button',{name:'Choose time',exact:true}).click();await dialog.getByRole('button',{name:date,exact:true}).click();await dialog.getByRole('button',{name:'15:00–16:00 Standard',exact:true}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();
+  await dialog.getByRole('alert').filter({hasText:'Only 500 g remain'}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),savedCart);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).slot.id),1);
+  cartConflict=false;await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.waitFor({state:'hidden'});
   const pairing=page.getByRole('region',{name:'Pairs well with your selection'});await pairing.waitFor();await pairing.getByText('Often ordered with Fresh peda',{exact:true}).waitFor();assert.equal(await pairing.getByText('Sold-out samosa',{exact:true}).count(),0);await pairing.getByText(/Unlock/).waitFor();await pairing.getByText('Your completed-order favourite',{exact:true}).waitFor();
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/menu-guidance-${width}.png`,fullPage:true});}
   await pairing.getByRole('button',{name:'Add Special tea',exact:true}).click();await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length===2);assert.equal(addonChecks,1);

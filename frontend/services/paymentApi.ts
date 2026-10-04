@@ -154,6 +154,6 @@ export function verifyRazorpayPayment(
     );
 }
 
-export function cancelPaymentCheckout(paymentId:number): Promise<PaymentResponse> {
-    return apiClient<PaymentResponse>(`/api/payments/${paymentId}/cancel-checkout`,{method:"POST",credentials:"include"});
+export function cancelPaymentCheckout(paymentId:number, signal?:AbortSignal): Promise<PaymentResponse> {
+    return apiClient<PaymentResponse>(`/api/payments/${paymentId}/cancel-checkout`,{method:"POST",credentials:"include",signal});
 }
