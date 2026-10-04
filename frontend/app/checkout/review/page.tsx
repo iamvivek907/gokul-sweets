@@ -560,6 +560,8 @@ export default function ReviewPage() {
     const accessible = storefrontFeatures?.accessibleOrderingV2 === true;
     const online = useOnlineStatus();
     const [addonBusy,setAddonBusy]=useState(false);
+    // Keep the reservation recovery panel mounted after an uncertain cart update releases its busy state.
+    const [refreshOrderNumber,setRefreshOrderNumber]=useState<string|null>(null);
     const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
     const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
     const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
@@ -1644,7 +1646,7 @@ try {
             pickupSelection.slot.id
         &&
         (pendingOrder.cartFingerprint ===
-            currentCartFingerprint || addonBusy)
+            currentCartFingerprint || addonBusy || refreshOrderNumber===pendingOrder.orderNumber)
             ? pendingOrder.orderNumber
             : null;
 
@@ -2420,7 +2422,7 @@ try {
                 {
                     preparedOrderNumber
                         ? (
-                            submitting && storefrontFeatures?.simplifiedCheckout ? <p role="status" className="my-4 rounded-2xl bg-[#e7f0e9] p-5 text-[#143936]"><T text="Finding your best offer and opening payment…" /></p> : <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError}
+                            submitting && storefrontFeatures?.simplifiedCheckout ? <p role="status" className="my-4 rounded-2xl bg-[#e7f0e9] p-5 text-[#143936]"><T text="Finding your best offer and opening payment…" /></p> : <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError} onRefreshRequiredChange={required=>{setRefreshOrderNumber(required?preparedOrderNumber:null);if(!required)setOrderError(null);}}
                                 orderNumber={
                                     preparedOrderNumber
                                 }

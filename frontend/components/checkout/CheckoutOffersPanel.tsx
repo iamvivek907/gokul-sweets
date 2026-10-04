@@ -77,6 +77,7 @@ interface CheckoutOffersPanelProps {
     reviewRequired?:boolean;
     onCartMutationBusy?: (busy:boolean)=>void;
     onUpdateError?: (message:string)=>void;
+    onRefreshRequiredChange?: (required:boolean)=>void;
 
     orderNumber:
         string;
@@ -140,7 +141,7 @@ function padSeconds(
 
 
 export default function CheckoutOffersPanel({
-    orderNumber, onCartMutationBusy, onUpdateError, reviewRequired=false
+    orderNumber, onCartMutationBusy, onUpdateError, onRefreshRequiredChange, reviewRequired=false
 }: CheckoutOffersPanelProps) {
     const translate = useTranslation();
     const [navigating,setNavigating]=useState(false);
@@ -1069,7 +1070,7 @@ export default function CheckoutOffersPanel({
             if(changedItems)saveCart(cart);if(changedPickup)savePickupSlot(changedPickup);
             setOrderSummary({...current,pickupDate:pickup.date,pickupStartTime:pickup.slot.startTime,pickupEndTime:pickup.slot.endTime,pickupType:pickup.pickupType,items:updated.items,subtotal:updated.subtotal,taxAmount:updated.taxAmount,priorityCharge:updated.priorityCharge,convenienceFee:updated.convenienceFee,convenienceFeeTax:updated.convenienceFeeTax,paymentFee:updated.paymentFee,paymentFeeTax:updated.paymentFeeTax,paymentFeeRate:updated.paymentFeeRate,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt});
             savePendingOrder({...saved,pickupSlotId:pickup.slot.id,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(cart.items)});
-            setRefreshFailed(false);setError(null);setErrorSource(null);
+            setRefreshFailed(false);onRefreshRequiredChange?.(false);setError(null);setErrorSource(null);
             const [offers,targets]=await Promise.allSettled([getAvailableRebates(orderNumber,signal),apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal})]);
             setRebates(offers.status==="fulfilled"?offers.value:[]);setOffersLoadedSuccessfully(offers.status==="fulfilled");
             setSpendTargets(targets.status==="fulfilled"?targets.value:[]);
@@ -1077,7 +1078,7 @@ export default function CheckoutOffersPanel({
         } catch(cause) {
             const failure=updateStarted?new CheckoutUpdateUncertainError():cause;
             const message=failure instanceof Error?failure.message:"Could not refresh the price. Review your cart before payment.";
-            setRefreshFailed(true);setRebates([]);setSpendTargets([]);setOffersLoadedSuccessfully(false);setError(message);setErrorSource("general");onUpdateError?.(message);throw failure;
+            setRefreshFailed(true);onRefreshRequiredChange?.(true);setRebates([]);setSpendTargets([]);setOffersLoadedSuccessfully(false);setError(message);setErrorSource("general");onUpdateError?.(message);throw failure;
         }
     }
 
