@@ -127,3 +127,9 @@ body:has(.future-storefront[data-customer-route]){background:#fff}
 .future-storefront[data-customer-route] .mobile-menu-pairing-status{align-self:center;font-size:13px;line-height:20px;color:#656b75}
 .future-storefront[data-customer-route] .mobile-menu-suggestions>.mobile-menu-suggestions-open{justify-self:start;min-height:44px;margin:0}
 }
+.future-storefront[data-customer-route] .occasion-packing-action{background:#087f42!important;color:#fff!important;border-color:#087f42}
+.future-storefront[data-customer-route] .occasion-packing-action:disabled{background:#e7e9ed!important;color:#656b75!important;border-color:#d4d8de}
+@media(max-width:640px){
+.future-storefront[data-customer-route] .branch-home>.gokul-branch-tabs :is(a,button){background:#fff;color:#656b75;border-color:#e7e9ed}
+.future-storefront[data-customer-route] .branch-home>.gokul-branch-tabs :is(a,button)[aria-current=page]{background:#087f42;color:#fff;border-color:#087f42}
+}

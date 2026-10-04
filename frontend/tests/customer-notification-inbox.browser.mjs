@@ -65,8 +65,10 @@ try {
     await page.getByText("Notification settings", {exact: true}).click();
     assert.equal(await page.getByRole("checkbox", {name: "Include optional offers in my inbox when available"}).isDisabled(), true);
     const review=page.getByRole("link",{name:"Share an optional review"});
-    assert.equal(await review.evaluate(element=>getComputedStyle(element).color),"rgb(255, 250, 242)");
-    assert.equal(await review.evaluate(element=>getComputedStyle(element).backgroundColor),"rgb(20, 57, 54)");
+    assert.equal(await review.evaluate(element=>getComputedStyle(element).color),"rgb(255, 255, 255)");
+    assert.equal(await review.evaluate(element=>getComputedStyle(element).backgroundColor),"rgb(8, 127, 66)");
+    const reviewContrast=await review.evaluate(element=>{const lum=color=>{const values=color.match(/\d+/g).slice(0,3).map(Number).map(v=>{const s=v/255;return s<=.04045?s/12.92:((s+.055)/1.055)**2.4;});return values[0]*.2126+values[1]*.7152+values[2]*.0722;};const style=getComputedStyle(element),fg=lum(style.color),bg=lum(style.backgroundColor);return (Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05);});
+    assert.ok(reviewContrast>=4.5,'notification review action retains readable contrast');
     failRead = true;
     await page.getByRole("button", {name: "Mark as read"}).click();
     await page.getByRole("alert").filter({hasText: "could not confirm"}).waitFor();
