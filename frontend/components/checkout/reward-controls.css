@@ -26,14 +26,14 @@
  .future-storefront .checkout-reward-options>summary{min-height:44px;display:flex;align-items:center;font-weight:700;color:#143936;cursor:pointer}
  .future-storefront .checkout-rewards-compact .checkout-reward-choices{display:flex;overflow-x:auto;gap:8px;scroll-snap-type:x proximity;margin:4px 0 12px;padding-bottom:4px}
  .future-storefront .checkout-rewards-compact .checkout-reward-choices button{flex:0 0 160px;scroll-snap-align:start;background:#fffaf2}
- .future-storefront .checkout-offer-dialog{position:fixed;inset:auto 0 0;margin:0 auto;width:100%;max-width:640px;max-height:85dvh;border-radius:24px 24px 0 0;border-bottom:0;box-shadow:0 -12px 48px #09272530;overscroll-behavior:contain}
- .future-storefront .checkout-offer-dialog>div{padding:20px 16px calc(20px + env(safe-area-inset-bottom))}
- .future-storefront .checkout-offer-dialog header{position:sticky;top:0;background:#fffaf2;z-index:1;padding-bottom:8px}
- .future-storefront .checkout-offer-dialog header h2{font-size:1.125rem}
- .future-storefront .checkout-offer-dialog header button{background:#edf4ee;border-color:#c8d9cd}
- .future-storefront .checkout-offer-dialog p{font-size:.8125rem;line-height:1.6}
- .future-storefront .checkout-offer-list article{padding:12px}
- .future-storefront .checkout-offer-list article span{display:block;color:#226643;font-weight:700;margin-top:6px}
+ .future-storefront .mobile-checkout .checkout-offer-dialog{position:fixed;inset:auto 0 0;margin:0 auto;width:100%;max-width:640px;max-height:85dvh;border-radius:24px 24px 0 0;border-bottom:0;box-shadow:0 -12px 48px #09272530;overscroll-behavior:contain}
+ .future-storefront .mobile-checkout .checkout-offer-dialog>div{padding:20px 16px calc(20px + env(safe-area-inset-bottom))}
+ .future-storefront .mobile-checkout .checkout-offer-dialog header{position:sticky;top:0;background:#fffaf2;z-index:1;padding-bottom:8px}
+ .future-storefront .mobile-checkout .checkout-offer-dialog header h2{font-size:1.125rem}
+ .future-storefront .mobile-checkout .checkout-offer-dialog header button{background:#edf4ee;border-color:#c8d9cd}
+ .future-storefront .mobile-checkout .checkout-offer-dialog p{font-size:.8125rem;line-height:1.6}
+ .future-storefront .mobile-checkout .checkout-offer-list article{padding:12px}
+ .future-storefront .mobile-checkout .checkout-offer-list article span{display:block;color:#226643;font-weight:700;margin-top:6px}
  .future-storefront .mobile-checkout-guidance{scroll-margin-top:100px;border-radius:18px;outline:3px solid #a94d39;outline-offset:4px}
  .future-storefront .mobile-checkout-guidance>p[role=status]{padding:10px 14px;color:#8b3526;font-weight:700;font-size:.8125rem}
  .future-storefront .mobile-checkout-pay button[data-payment-ready=false]{background:#52695f;color:#fffaf2}
