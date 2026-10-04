@@ -1071,6 +1071,7 @@ export default function CheckoutOffersPanel({
     }
     function confirmPriceReview(checked:boolean){
         if(refreshFailed||savingsRecheckRequired)return;
+        setTotalChanged(true);
         setPriceReviewRequired(!checked);
         const saved=parsePendingOrder(getPendingOrderSnapshot());
         if(saved?.orderNumber===orderNumber)savePendingOrder({...saved,priceReviewRequired:!checked});

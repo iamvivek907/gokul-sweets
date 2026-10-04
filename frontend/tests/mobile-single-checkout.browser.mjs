@@ -134,7 +134,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),finalTotal());assert.equal(await review.isChecked(),false);
   await page.reload();await review.waitFor();assert.equal(await review.isChecked(),false);assert.equal(payments,0);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cartBefore);
   holdOffers=true;await page.getByRole('button',{name:'Find available offers',exact:true}).click();await page.getByRole('button',{name:'Find available offers',exact:true}).waitFor({state:'hidden'});await page.getByRole('button',{name:'Find available offers',exact:true}).waitFor({timeout:22000});assert.equal(payments,0);holdOffers=false;releaseOffers();console.log('Stalled optional offer discovery releases controls');
-  await review.check();await page.getByRole('button',{name:'Continue to payment',exact:true}).last().click();await page.waitForURL('**/checkout/payment/TEST-SINGLE');assert.equal(orders.length,1);
+  await review.check();await page.getByRole('button',{name:'Continue to payment',exact:true}).last().click();await page.waitForURL('**/checkout/payment/TEST-SINGLE');await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-pending-payment')??'null')?.orderNumber==='TEST-SINGLE');assert.equal(orders.length,1);assert.equal(payments,1);
   console.log('Stalled manual offer recovery, reload and payment guard passed');await context.close();continue;
  }
  if(scenario==='gateway-loading'){
