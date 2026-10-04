@@ -66,6 +66,10 @@ jobs:
             if curl --silent --fail http://127.0.0.1:3311/profile > /dev/null; then break; fi
             sleep 1
           done
+          mkdir -p /tmp/gokul-scrum111-layouts
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-guidance.browser.mjs
+          node tests/mobile-ordering-resilience.browser.mjs
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/branch-discovery.browser.mjs
           node tests/customer-notification-inbox.browser.mjs
           node tests/customer-alerts.browser.mjs
           node tests/staff-alerts.browser.mjs
@@ -79,15 +83,12 @@ jobs:
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/storefront-reconnect.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/compact-mobile-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-single-checkout.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-guidance.browser.mjs
-          node tests/mobile-ordering-resilience.browser.mjs
           node tests/rewards-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-account-corrections.browser.mjs
           node tests/loyalty-admin.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-orders.browser.mjs
           node tests/cart-settings-recovery.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-pages-account.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/branch-discovery.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/pwa-install.browser.mjs
           node tests/menu-service-hours.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/simple-checkout-kitchen.browser.mjs
