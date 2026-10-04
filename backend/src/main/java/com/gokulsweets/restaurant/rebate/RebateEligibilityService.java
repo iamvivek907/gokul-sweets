@@ -105,11 +105,12 @@ public class RebateEligibilityService {
         List<AvailableRebateResponse> available =
                 new ArrayList<>();
 
+        var visitEligible = visitEligibleOffers(candidates, order);
         for (Rebate rebate : candidates) {
 
             if (!isScopeEligible(
                     rebate,
-                    order
+                    order, visitEligible
             )) {
                 continue;
             }
@@ -169,8 +170,10 @@ public class RebateEligibilityService {
         var eligible=calculateEligibleAmount(order);
         var baseline=available.stream().map(AvailableRebateResponse::rebateAmount).max(BigDecimal::compareTo).orElse(BigDecimal.ZERO).max(defaultZero(order.getRebateDiscountAmount()));
         var targets=new ArrayList<AvailableRebateResponse>();
-        for(var rebate:rebateRepository.findActivePublicCandidates(order.getBranch().getId(),LocalDateTime.now(BUSINESS_ZONE))) {
-            if(!isScopeEligible(rebate,order)||!isUsageEligible(rebate,order))continue;
+        var candidates=rebateRepository.findActivePublicCandidates(order.getBranch().getId(),LocalDateTime.now(BUSINESS_ZONE));
+        var visitEligible=visitEligibleOffers(candidates,order);
+        for(var rebate:candidates) {
+            if(!isScopeEligible(rebate,order,visitEligible)||!isUsageEligible(rebate,order))continue;
             if(rebate.getRebateType()!=RebateType.SLAB)continue;
             for(var slab:rebateSlabRepository.findByRebateIdOrderByMinimumOrderAmountAsc(rebate.getId())) {
                 var threshold=slab.getMinimumOrderAmount().max(defaultZero(rebate.getMinimumOrderAmount()));
@@ -192,11 +195,17 @@ public class RebateEligibilityService {
     // SCOPE
     // =========================================================
 
+    private java.util.Set<Long> visitEligibleOffers(List<Rebate> candidates, Order order) {
+        var ids = candidates.stream().map(Rebate::getId).toList();
+        return visits == null ? new java.util.HashSet<>(ids) : visits.eligibleOffers(ids, order);
+    }
+
     private boolean isScopeEligible(
             Rebate rebate,
-            Order order
+            Order order,
+            java.util.Set<Long> visitEligible
     ) {
-        if(visits!=null&&!visits.offerEligible(rebate.getId(),order))return false;
+        if(!visitEligible.contains(rebate.getId()))return false;
 
         if (rebate.getScope()
                 == RebateScope.GENERAL) {
@@ -746,7 +755,7 @@ public class RebateEligibilityService {
 
         if (!isScopeEligible(
                 rebate,
-                order
+                order, visitEligibleOffers(List.of(rebate), order)
         )) {
 
             throw new IllegalStateException(

@@ -71,7 +71,7 @@ export default function MobileCheckout(){
  const [priceError,setPriceError]=useState<{key:string;message:string}|null>(null);
  const [error,setError]=useState("");const [busy,setBusy]=useState(false),[handoff,setHandoff]=useState(false),[addOnBusy,setAddOnBusy]=useState(false);
  const [confirmedBranch,setConfirmedBranch]=useState<string|null>(null);
- const branchReviewKey=JSON.stringify([branch?.id,branch?.name,branch?.address,branch?.city]);
+ const branchReviewKey=JSON.stringify([branch?.id,branch?.name,branch?.address,branch?.city,branch?.pincode]);
  const branchReviewed=confirmedBranch===branchReviewKey;
  const locked=useRef(false);
  const [attempt,setAttempt]=useState<Attempt|null>(null);

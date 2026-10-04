@@ -26,35 +26,42 @@ public class CustomerVisitPolicy {
   }
 
   public boolean offerEligible(long rebateId, Order order) {
-    // The parent lock also protects a rule which has not been inserted yet.
+    return eligibleOffers(java.util.List.of(rebateId), order).contains(rebateId);
+  }
+
+  /** One request-local snapshot; never cache eligibility across orders or policy updates. */
+  public java.util.Set<Long> eligibleOffers(java.util.Collection<Long> rebateIds, Order order) {
+    var ids = rebateIds.stream().distinct().sorted().toList();
+    if (ids.isEmpty()) return java.util.Set.of();
+    var placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+    // Stable parent locks protect even rules not inserted yet. Read-only quotes must not lock.
     if (TransactionSynchronizationManager.isActualTransactionActive()
-        && !TransactionSynchronizationManager.isCurrentTransactionReadOnly())
-      jdbc.queryForList("SELECT id FROM rebates WHERE id=? FOR SHARE", Long.class, rebateId);
-    var minimum =
-        jdbc
-            .query(
-                "SELECT minimum_completed_orders FROM rebate_visit_rules WHERE rebate_id=?",
-                (rs, n) -> rs.getInt(1),
-                rebateId)
-            .stream()
-            .findFirst()
-            .orElse(0);
-    if (minimum == 0) return true;
+        && !TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+      jdbc.queryForList("SELECT id FROM rebates WHERE id IN (" + placeholders
+          + ") ORDER BY id FOR SHARE", Long.class, ids.toArray());
+    }
+    var minima = new java.util.HashMap<Long, Integer>();
+    jdbc.query("SELECT rebate_id,minimum_completed_orders FROM rebate_visit_rules WHERE rebate_id IN ("
+        + placeholders + ")", (org.springframework.jdbc.core.RowCallbackHandler) rs ->
+            minima.put(rs.getLong(1), rs.getInt(2)), ids.toArray());
+    long completedCount = minima.values().stream().anyMatch(minimum -> minimum > 0)
+        ? completedForOrder(order) : 0;
+    return ids.stream().filter(id -> completedCount >= minima.getOrDefault(id, 0))
+        .collect(java.util.stream.Collectors.toUnmodifiableSet());
+  }
+
+  private long completedForOrder(Order order) {
     // Draft quotes have no order id; only a validated phone-bound owner can qualify.
     if (order.getVerifiedOfferSubject() != null) {
       var subject = order.getVerifiedOfferSubject();
-      return completed(subject.environment(), subject.id()) >= minimum;
+      return completed(subject.environment(), subject.id());
     }
-    var owners =
-        order.getId() == null
-            ? java.util.List.<java.util.Map<String, Object>>of()
-            : jdbc.queryForList(
-                "SELECT environment,verified_subject_id FROM verified_order_ownership WHERE"
-                    + " order_id=?",
-                order.getId());
-    if (owners.isEmpty()) return false;
+    var owners = order.getId() == null
+        ? java.util.List.<java.util.Map<String, Object>>of()
+        : jdbc.queryForList("SELECT environment,verified_subject_id FROM verified_order_ownership WHERE order_id=?",
+            order.getId());
+    if (owners.isEmpty()) return 0;
     var owner = owners.getFirst();
-    return completed((String) owner.get("environment"), (UUID) owner.get("verified_subject_id"))
-        >= minimum;
+    return completed((String) owner.get("environment"), (UUID) owner.get("verified_subject_id"));
   }
 }

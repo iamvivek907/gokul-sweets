@@ -257,8 +257,17 @@ public class RazorpayClient {
         return new ProviderRefund(
                 requiredText(node, "id"),
                 requiredText(node, "status"),
-                textOrNull(node, "payment_id")
+                requiredText(node, "payment_id"),
+                requiredRefundAmount(node)
         );
+    }
+
+    private long requiredRefundAmount(JsonNode node) {
+        JsonNode amount = node.path("amount");
+        if (!amount.isIntegralNumber() || !amount.canConvertToLong() || amount.asLong() <= 0) {
+            throw new IllegalStateException("Razorpay refund amount is missing or invalid.");
+        }
+        return amount.asLong();
     }
 
     private void verifyHmac(
@@ -398,7 +407,8 @@ public class RazorpayClient {
     public record ProviderRefund(
             String id,
             String status,
-            String paymentId
+            String paymentId,
+            long amount
     ) {
     }
 }
