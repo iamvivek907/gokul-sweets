@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.test.context.bean.override.convention.TestBean;
 
 @SpringBootTest(
     properties = {
@@ -33,7 +33,7 @@ class OrderCorrectionIntegrationTest {
   @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
   @MockitoBean StaffAuthorizationService staff;
 
-  @MockitoSpyBean(name = "inventoryClock")
+  @TestBean(name = "inventoryClock", methodName = "testClock")
   Clock clock;
 
   long source,
@@ -51,10 +51,24 @@ class OrderCorrectionIntegrationTest {
   UUID subject;
   static final Instant NOW = Instant.parse("2026-10-05T04:00:00Z");
 
+  static Clock testClock() {
+    return new AdjustableClock(NOW);
+  }
+
+  // A real clock avoids inline-spy races when correction tests use concurrent transactions.
+  static final class AdjustableClock extends Clock {
+    private volatile Instant current;
+
+    AdjustableClock(Instant current) { this.current = current; }
+    void setInstant(Instant current) { this.current = current; }
+    @Override public ZoneId getZone() { return ZoneId.of("Asia/Kolkata"); }
+    @Override public Clock withZone(ZoneId zone) { return Clock.fixed(current, zone); }
+    @Override public Instant instant() { return current; }
+  }
+
   @BeforeEach
   void setup() {
-    doReturn(NOW).when(clock).instant();
-    doReturn(ZoneId.of("Asia/Kolkata")).when(clock).getZone();
+    ((AdjustableClock) clock).setInstant(NOW);
     var user = new com.gokulsweets.restaurant.staff.StaffUser();
     user.setId(
         jdbc.queryForObject(
@@ -196,9 +210,9 @@ class OrderCorrectionIntegrationTest {
   @Test
   void customerFullTenMinutesDuringPreparationAndBoundaryIsServerClock() {
     jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?", order);
-    doReturn(NOW.plusSeconds(299)).when(clock).instant();
+    ((AdjustableClock) clock).setInstant(NOW.plusSeconds(299));
     assertThat(corrections.preview(reference, false).canCancel()).isTrue();
-    doReturn(NOW.plusSeconds(300)).when(clock).instant();
+    ((AdjustableClock) clock).setInstant(NOW.plusSeconds(300));
     assertThat(corrections.preview(reference, false).canCancel()).isFalse();
     assertThatThrownBy(() -> corrections.cancel(reference, cancel(UUID.randomUUID()), false))
         .hasMessageContaining("window");
