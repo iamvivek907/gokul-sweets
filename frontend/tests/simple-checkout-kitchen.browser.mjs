@@ -72,11 +72,18 @@ for(const width of [1280,390]){
  // One deliberate reserve action applies the best offer and opens payment without a second price confirmation.
  await page.getByRole('button',{name:'Continue to payment',exact:true}).filter({visible:true}).first().click();
  if(width===390){
-  await page.getByText('Your pickup is reserved. Choose an offer below or continue to payment.',{exact:true}).waitFor();
+  await page.getByText('We couldn’t confirm the offer update. Your reservation and cart are saved. Recheck the reserved total before payment.',{exact:true}).waitFor();
   assert.match(page.url(),/checkout\/review$/);assert.equal(mutations,1);assert.equal(bestOffers,1);
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),200);
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).offerRecheckRequired),true);
+  const acknowledgement=page.getByRole('checkbox',{name:'I have reviewed the updated total and offers.',exact:true});await acknowledgement.waitFor();assert.equal(await acknowledgement.isDisabled(),true);
+  await page.getByRole('button',{name:'Recheck reserved total',exact:true}).click();await page.getByText('Reserved total recovered. Review the confirmed amount before payment.',{exact:true}).waitFor();
+  assert.equal(mutations,1);assert.equal(bestOffers,1);assert.equal(await acknowledgement.isChecked(),false);
+  await acknowledgement.check();assert.equal(await acknowledgement.isChecked(),true);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).priceReviewRequired),false);
   await page.getByRole('button',{name:/^Continue to [Pp]ayment$/,exact:true}).filter({visible:true}).first().click();
+  console.log('Automatic offer failure requires reserved-total recovery with visual/add-on/reward flags OFF');
  }
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT',{timeout:10000}).catch(async error=>{console.log(JSON.stringify({width,mutations,bestOffers,quoteCalls,url:page.url(),body:await page.locator('body').innerText(),pending:await page.evaluate(()=>localStorage.getItem('gokul-pending-order'))}));throw error;});
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT');assert.equal(mutations,1);assert.equal(bestOffers,1);
