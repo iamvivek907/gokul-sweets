@@ -99,6 +99,11 @@ public class Payment {
     )
     private BigDecimal amount;
 
+    @Column(name="refund_amount",precision=12,scale=2)
+    private BigDecimal refundAmount;
+
+    public BigDecimal requestedRefundAmount(){return refundAmount==null?amount:refundAmount;}
+
     @Column(
             nullable = false,
             length = 10

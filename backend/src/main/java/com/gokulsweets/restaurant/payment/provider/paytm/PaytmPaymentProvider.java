@@ -124,7 +124,7 @@ public class PaytmPaymentProvider implements PaymentProvider {
                         requireProviderOrderId(payment),
                         payment.getProviderPaymentId(),
                         payment.getRefundReferenceId(),
-                        payment.getAmount()
+                        payment.requestedRefundAmount()
                 ),
                 true
         );

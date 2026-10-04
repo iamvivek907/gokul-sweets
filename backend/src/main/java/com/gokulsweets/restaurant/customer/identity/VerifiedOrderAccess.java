@@ -73,7 +73,12 @@ public class VerifiedOrderAccess {
     }
 
     /** Pickup secrets require an actual owner session even when legacy order reads are public. */
-    public void requirePickupCode(String orderNumber,HttpServletRequest request) {
+    public void requirePickupCode(String orderNumber,HttpServletRequest request) {requireOwner(orderNumber,request);}
+
+    /** Financial changes never use the optional public/legacy read boundary. */
+    public void requireOwner(String orderNumber,HttpServletRequest request) {
+        if(orderNumber==null||orderNumber.isBlank())throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        final String reference=orderNumber.trim().toUpperCase(java.util.Locale.ROOT);
         String configured=settings.getProperty("gokul.environment-isolation.environment","");
         ConsentEnvironment environment;
         try {environment=ConsentEnvironment.valueOf(configured);}catch(IllegalArgumentException e){throw new ResponseStatusException(HttpStatus.NOT_FOUND);}
@@ -81,7 +86,7 @@ public class VerifiedOrderAccess {
             if(!connection.resolve(request).secure()||!cors.effectiveAllowedOrigins(settings).contains(request.getHeader(HttpHeaders.ORIGIN)))throw new ResponseStatusException(HttpStatus.NOT_FOUND);
         }catch(IllegalStateException e){throw new ResponseStatusException(HttpStatus.NOT_FOUND);}
         String token=request.getCookies()==null?null:Arrays.stream(request.getCookies()).filter(c->"__Host-gokul-customer".equals(c.getName())).map(jakarta.servlet.http.Cookie::getValue).findFirst().orElse(null);
-        boolean owns=sessions.subject(environment,token,Instant.now()).map(subject->ownership.owns(environment.name(),subject,orderNumber)).orElse(false);
+        boolean owns=sessions.subject(environment,token,Instant.now()).map(subject->ownership.owns(environment.name(),subject,reference)).orElse(false);
         if(!owns)throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     }
 

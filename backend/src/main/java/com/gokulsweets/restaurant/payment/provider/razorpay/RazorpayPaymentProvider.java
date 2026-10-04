@@ -126,7 +126,7 @@ public class RazorpayPaymentProvider implements PaymentProvider {
         requireRefundFields(payment);
         RazorpayClient.ProviderRefund refund = client.createRefund(
                 payment.getProviderPaymentId(),
-                payment.getAmount(),
+                payment.requestedRefundAmount(),
                 payment.getRefundReferenceId()
         );
         return mapRefund(refund);

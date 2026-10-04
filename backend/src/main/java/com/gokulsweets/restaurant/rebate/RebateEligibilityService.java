@@ -26,6 +26,10 @@ public class RebateEligibilityService {
     private static final ZoneId BUSINESS_ZONE =
             ZoneId.of("Asia/Kolkata");
 
+    private com.gokulsweets.restaurant.customer.identity.CustomerVisitPolicy visits;
+    @org.springframework.beans.factory.annotation.Autowired
+    public void setVisitPolicy(com.gokulsweets.restaurant.customer.identity.CustomerVisitPolicy policy){visits=policy;}
+
     private final OrderRepository orderRepository;
 
     private final PaymentRepository paymentRepository;
@@ -192,6 +196,7 @@ public class RebateEligibilityService {
             Rebate rebate,
             Order order
     ) {
+        if(visits!=null&&!visits.offerEligible(rebate.getId(),order))return false;
 
         if (rebate.getScope()
                 == RebateScope.GENERAL) {

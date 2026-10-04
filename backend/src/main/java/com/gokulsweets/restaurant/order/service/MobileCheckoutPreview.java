@@ -23,6 +23,7 @@ public class MobileCheckoutPreview {
   ownership.requireVerifiedIdentity(request.customerPhone(),token);
   var quote=quotes.preview(request,null);
   var order=new Order();var branch=new Branch();branch.setId(request.branchId());order.setBranch(branch);
+  order.setVerifiedOfferSubject(ownership.verifiedSubject(request.customerPhone(),token));
   order.setCustomerPhone(request.customerPhone());order.setPickupType(request.pickupType());order.setFulfillmentType(FulfillmentType.PICKUP);
   order.setSubtotal(new BigDecimal(quote.subtotal()));order.setTaxAmount(new BigDecimal(quote.taxAmount()));order.setPriorityCharge(new BigDecimal(quote.priorityCharge()));
   order.setConvenienceFee(new BigDecimal(quote.convenienceFee()));order.setPaymentFeeRate(new BigDecimal(quote.paymentFeeRate()));

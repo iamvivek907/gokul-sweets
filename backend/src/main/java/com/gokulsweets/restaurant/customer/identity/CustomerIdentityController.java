@@ -54,6 +54,7 @@ public class CustomerIdentityController {
     private final ConsentLedger consents;
     private final CustomerPrivacyRequests privacyRequests;
     private final CustomerAccountHub accountHub;
+    private final ReverseAddressLookup addressLookup;
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox notifications;
     private final com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences alerts;
 
@@ -150,6 +151,17 @@ public class CustomerIdentityController {
         }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(orders.getCustomerOrder(orderNumber));
+    }
+
+    @GetMapping("/account/location")
+    public ResponseEntity<Map<String,Boolean>> locationAvailable(HttpServletRequest request) {
+        var environment=enabledEnvironment();requiredSubject(request,environment);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(Map.of("enabled",addressLookup.enabled()));
+    }
+    @PostMapping("/account/location")
+    public ResponseEntity<ReverseAddressLookup.Suggestion> suggestAddress(@RequestBody ReverseAddressLookup.Coordinates coordinates,HttpServletRequest request) {
+        var environment=enabledEnvironment();requireTrustedMutation(request);var subject=requiredSubject(request,environment);
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(addressLookup.suggest(environment.name(),subject,coordinates));
     }
 
     @GetMapping("/account")

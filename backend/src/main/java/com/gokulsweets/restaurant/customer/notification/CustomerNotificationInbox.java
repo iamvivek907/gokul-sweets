@@ -58,7 +58,7 @@ public class CustomerNotificationInbox {
                     CASE p.payment_status WHEN 'PAID' THEN 'Your order is confirmed'
                          WHEN 'REFUNDED' THEN 'Refund completed' ELSE 'Payment needs refund review' END,
                     CASE p.payment_status WHEN 'PAID' THEN 'Order ' || COALESCE('#' || o.customer_order_number::text,o.order_number) || ' · ' || b.name || '. Payment verified. ' || CASE WHEN ps.id IS NOT NULL THEN 'Pickup booked for ' || to_char(ps.slot_date, 'DD Mon YYYY') || ', ' || to_char(ps.start_time, 'HH12:MI AM') || ' IST. We will notify you when preparation starts.' ELSE 'Open your order for its delivery window.' END
-                         WHEN 'REFUNDED' THEN 'The payment provider confirmed your refund. Bank processing times may apply.'
+                         WHEN 'REFUNDED' THEN 'The payment provider confirmed a refund of ₹' || COALESCE(p.refund_amount,p.amount)::text || '. Bank processing times may apply. Open the order for retained charges.'
                          ELSE 'This payment requires a refund review. This message does not confirm that money has been refunded.' END
                 FROM payments p JOIN orders o ON o.id = p.order_id
                 JOIN branches b ON b.id = o.branch_id LEFT JOIN pickup_slots ps ON ps.id = o.pickup_slot_id
@@ -66,6 +66,17 @@ public class CustomerNotificationInbox {
                 WHERE p.id = ? AND own.environment = ? AND p.payment_status IN ('PAID','REFUNDED','REFUND_PENDING')
                 ON CONFLICT (environment, subject_id, event_key) DO NOTHING
                 """, paymentId, environment());
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void correction(Long orderId,UUID requestKey,String title,String message) {
+        if(!enabled())return;
+        jdbc.update("""
+            INSERT INTO customer_notification_events(environment,subject_id,event_key,kind,target_type,target_id,title,message)
+            SELECT own.environment,own.verified_subject_id,?,'ORDER_CORRECTION','ORDER',o.order_number,?,?
+            FROM orders o JOIN verified_order_ownership own ON own.order_id=o.id
+            WHERE o.id=? AND own.environment=? ON CONFLICT(environment,subject_id,event_key) DO NOTHING
+            ""","correction:"+requestKey,title,message,orderId,environment());
     }
 
     @Transactional(propagation = Propagation.MANDATORY)

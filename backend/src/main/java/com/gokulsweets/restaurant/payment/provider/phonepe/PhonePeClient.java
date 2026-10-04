@@ -327,6 +327,21 @@ public class PhonePeClient {
         }
     }
 
+    /** Merchant refund reference and amount remain identical on every recovery attempt. */
+    public record RefundResponse(String refundId, long amount, String state, String merchantRefundId, String originalMerchantOrderId) {}
+    public RefundResponse refund(String reference, String orderId, BigDecimal amount) {
+        ObjectNode payload=objectMapper.createObjectNode();
+        payload.put("merchantRefundId",reference);payload.put("originalMerchantOrderId",orderId);payload.put("amount",toSubunits(amount));
+        return refundResponse(sendApiRequest("POST","/payments/v2/refund",payload));
+    }
+    public RefundResponse refundStatus(String reference) {
+        return refundResponse(sendApiRequest("GET","/payments/v2/refund/"+URLEncoder.encode(reference,StandardCharsets.UTF_8)+"/status",null));
+    }
+    private RefundResponse refundResponse(JsonNode value) {
+        if(!value.path("amount").isNumber()||textOrNull(value,"state")==null)throw new IllegalStateException("PhonePe did not return a complete refund response.");
+        return new RefundResponse(textOrNull(value,"refundId"),value.path("amount").asLong(),textOrNull(value,"state"),textOrNull(value,"merchantRefundId"),textOrNull(value,"originalMerchantOrderId"));
+    }
+
     private JsonNode sendApiRequest(
             String method,
             String path,
@@ -532,7 +547,7 @@ public class PhonePeClient {
                     );
 
             throw new PaymentGatewayException(
-                    "PHONEPE_REQUEST_REJECTED",
+                    refundNotFound(response) ? "PHONEPE_REFUND_NOT_FOUND" : "PHONEPE_REQUEST_REJECTED",
                     providerMessage == null
                             ? (
                             retryable
@@ -718,6 +733,12 @@ public class PhonePeClient {
                 && current.value().equals(token)) {
             accessToken = null;
         }
+    }
+
+    private boolean refundNotFound(HttpResponse<String> response) {
+        if(response.statusCode()!=404)return false;
+        try {return "REFUND_NOT_FOUND".equals(textOrNull(objectMapper.readTree(response.body()),"code"));}
+        catch(Exception ignored){return false;}
     }
 
     private String extractProviderMessage(

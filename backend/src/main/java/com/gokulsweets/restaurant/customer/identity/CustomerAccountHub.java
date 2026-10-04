@@ -19,7 +19,7 @@ public class CustomerAccountHub {
     public record Address(long id, String label, String addressLine, String locality, String postalCode) {}
     public record Preferences(String dietaryNotes, Long preferredBranchId) {}
     public record Snapshot(long paidOrders, List<Long> favouriteProductIds, List<Address> addresses,
-                           Preferences preferences) {}
+                           Preferences preferences,long completedOrders) {}
     public record AddressInput(String label, String addressLine, String locality, String postalCode) {}
 
     @Transactional(readOnly = true)
@@ -48,7 +48,7 @@ public class CustomerAccountHub {
                 """, (rs, row) -> new Preferences(rs.getString(1),
                 rs.getObject(2, Long.class)), environment, subject)
                 .stream().findFirst().orElse(new Preferences(null, null));
-        return new Snapshot(paid == null ? 0 : paid, favourites, addresses, preferences);
+        return new Snapshot(paid == null ? 0 : paid, favourites, addresses, preferences,new CustomerVisitPolicy(jdbc).completed(environment,subject));
     }
 
     @Transactional

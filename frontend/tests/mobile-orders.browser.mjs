@@ -27,6 +27,7 @@ try {
    else if(path==='/api/customer/identity/me')json={authenticated:true,phone:'+919876543210'};
    else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
    else if(path==='/api/orders/TEST-ORDER')json=order;
+   else if(path==='/api/customer/identity/orders/TEST-ORDER/correction')json={orderNumber:order.orderNumber,branchName:branch.name,serverTime:new Date().toISOString(),cancellationDeadline:new Date(Date.now()+300000).toISOString(),canCancel:paymentStatus==='PAID',canTransfer:false,refundAmount:Math.max(0,order.totalAmount-(order.convenienceFee??0)-(order.paymentFee??0)-(order.deliveryFee??0)),retainedCharges:(order.convenienceFee??0)+(order.paymentFee??0)+(order.deliveryFee??0),refundStatus:'NOT_REQUESTED',explanation:'Food refund only'};
    else if(path==='/api/orders/TEST-ORDER/pickup-code')json={code:'1234'};
    else if(path==='/api/customer/identity/orders')json=[order];
    else if(path==='/api/payments/order/TEST-ORDER')json={payment:{paymentId:10,orderNumber:order.orderNumber,provider:'PHONEPE',paymentStatus,amount:order.totalAmount,currency:'INR',expiresAt:new Date(Date.now()+600000).toISOString()}};
