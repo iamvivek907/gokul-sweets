@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/paymentNavigation";
 
 import {usePathname} from "next/navigation";
 import type {

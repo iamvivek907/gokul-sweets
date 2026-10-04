@@ -1,4 +1,8 @@
 "use client";
+import dynamic from "next/dynamic";
+const MobileMenuHighlights=dynamic(()=>import("./MobileMenuHighlights"));
+const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
+const MobileMenuSuggestions=dynamic(()=>import("./MobileMenuSuggestions"));
 import {useMenuServiceRefresh} from "@/hooks/useMenuServiceRefresh";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -16,6 +20,7 @@ import NewBranchItems from "@/components/menu/NewBranchItems";
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
+    useCallback,
     useEffect,
     useMemo,
     useRef,
@@ -57,6 +62,7 @@ import {
     useCart
 } from "@/hooks/useCart";
 
+import type {AvailableRebateResponse} from "@/types/rebate";
 import type {
     MenuCategory,
     MenuProduct
@@ -738,6 +744,12 @@ export default function MenuScreen() {
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
     const pickupCheck = useDateAvailability(filteredProducts);
+    const [menuOffer,setMenuOffer]=useState<{key:string;target:AvailableRebateResponse|null}|null>(null);
+    const offerContext=JSON.stringify([branch?.id,items,pickupCheck.intent.selection]);
+    const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
+    const [lastAdded,setLastAdded]=useState<number|null>(null);
+    const pairingSeed=lastAdded??items.at(-1)?.product.id;
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<MobileMenuSuggestions branchId={branch.id} products={allProducts} onTarget={onMenuTarget}/>:null;
 
     function handleAddToCart(
         product: MenuProduct
@@ -780,6 +792,7 @@ export default function MenuScreen() {
             result === "added"
         ) {
 
+            setLastAdded(product.id);
             showCartNotice(
                 product.name
             );
@@ -816,6 +829,7 @@ export default function MenuScreen() {
             );
 
 
+            setLastAdded(product.id);
             showCartNotice(
                 product.name
             );
@@ -1178,7 +1192,9 @@ export default function MenuScreen() {
 
                 </header>
 
-                <PickupContext check={pickupCheck} />
+                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data} onAdd={handleAddToCart}/>}
+                <div className={phoneMenu&&mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>
+                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired}/>}
 
                 <div
                     className="gokul-menu-tools
@@ -1367,6 +1383,8 @@ export default function MenuScreen() {
                                     <div className="gokul-menu-category-heading"><h3>{group.name}</h3><span>{group.products.length} {group.products.length === 1 ? translate("item") : "items"}</span></div>
                                     {group.description && <p>{group.description}</p>}
                                 <ProductGrid
+                                    pairingSeed={pairingSeed}
+                                    pairing={pairing}
                                     portionGroups={phoneMenu?portionGroups:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
@@ -1399,6 +1417,8 @@ export default function MenuScreen() {
                                 />
                                 </section>) : (
                                 <ProductGrid
+                                    pairingSeed={pairingSeed}
+                                    pairing={pairing}
                                     portionGroups={phoneMenu?portionGroups:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
@@ -1558,6 +1578,7 @@ export default function MenuScreen() {
 
 
             <FloatingCartButton
+                offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
                 itemCount={
                     itemCount
                 }

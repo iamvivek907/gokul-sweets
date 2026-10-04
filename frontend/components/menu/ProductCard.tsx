@@ -367,6 +367,7 @@ export default function ProductCard({
                 </div>
 
 
+                {refined&&isWeighted&&isInCart&&<p className="mobile-selected-weight-price">{selectionLabel} · {formatCurrency(product.price*(weightGrams??0)/1000,true)}</p>}
                 {portionOptions}
                 {/* Price + Add */}
 

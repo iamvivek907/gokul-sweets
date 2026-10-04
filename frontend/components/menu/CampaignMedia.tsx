@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import {constrainedPhoneConnection} from "@/lib/mobileConnection";
 import {useEffect, useRef, useState, useSyncExternalStore} from "react";
 import type {HomepageCampaign} from "@/types/campaign";
 import {useStaticCampaignMedia} from "@/lib/mediaRecovery";
@@ -34,7 +35,7 @@ export default function CampaignMedia({campaign, hero = false, immersive = false
     const mobile = useSyncExternalStore(subscribeMobile,
         () => window.matchMedia("(max-width: 767px)").matches, () => false);
     const [failed, setFailed] = useState(false);
-    const saveData = useSyncExternalStore(subscribeSaveData, () => connection()?.saveData === true, () => true);
+    const saveData = useSyncExternalStore(subscribeSaveData, () => connection()?.saveData === true || constrainedPhoneConnection(), () => true);
     const [visible, setVisible] = useState(hero);
     const frame = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -49,7 +50,7 @@ export default function CampaignMedia({campaign, hero = false, immersive = false
     const selectedType = mobileAsset ? campaign.mobileMediaType ?? "image/png" : campaign.mediaType;
     const selectedUrl = mobileAsset ? campaign.mobileMediaUrl : campaign.mediaUrl;
     const animated = selectedType === "image/gif" || selectedType?.startsWith("video/") === true;
-    const useFallback = useStaticCampaignMedia(animated, reduced, accessible && saveData, failed, visible);
+    const useFallback = useStaticCampaignMedia(animated, reduced, (accessible || mobile && typeof matchMedia!=="undefined" && matchMedia("(max-width: 640px)").matches) && saveData, failed, visible);
     const source = useFallback ? campaign.fallbackMediaUrl : selectedUrl;
     const frameStyle = campaignFrameStyle(mobileAsset ? {
         x: campaign.mobileX ?? 50, y: campaign.mobileY ?? 50, zoom: campaign.mobileZoom ?? 100,

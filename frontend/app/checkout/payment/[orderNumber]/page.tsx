@@ -1314,7 +1314,7 @@ export default function PaymentPage() {
     useEffect(()=>{let alive=true;getCustomerOrder(orderNumber).then(order=>{if(alive)setFeeBreakdown({fee:order.convenienceFee??0,tax:order.convenienceFeeTax??0,paymentFee:order.paymentFee??0,paymentTax:order.paymentFeeTax??0,paymentRate:order.paymentFeeRate??0});}).catch(()=>{});return()=>{alive=false;};},[orderNumber]);
     const [cancelling,setCancelling]=useState(false);
     const [confirmCancel,setConfirmCancel]=useState(false);
-    async function cancelCheckout() {
+    async function cancelCheckout(destination?:string) {
         if(!payment || cancelling || openingPayment || refreshing) return;
         setCancelling(true);setError(null);
         try {
@@ -1323,7 +1323,7 @@ export default function PaymentPage() {
             applyPaymentResult(result);
             if(result.paymentStatus==="EXPIRED" || result.paymentStatus==="FAILED") {
                 clearPendingPayment();clearPendingOrder();clearPaymentGatewayVisit(payment.orderNumber);
-                router.push(recoveryOrder.fulfillmentType === "DELIVERY" ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`);
+                router.push(destination ?? (recoveryOrder.fulfillmentType === "DELIVERY" ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`));
             } else {setConfirmCancel(false);setError("Payment was already confirmed. View this order before starting another checkout.");}
         } catch(error) {setError(error instanceof Error ? error.message : "Could not check payment. Your order is unchanged; try again.");}
         finally {setCancelling(false);}
@@ -1803,7 +1803,7 @@ export default function PaymentPage() {
      */
 
     if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote && isPending) return <AppShell showSocialPopup={false}>
-        <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout} />
+        <PaymentLeaveChoice autoCancel active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout} />
         <MobilePaymentCancelDialog active={confirmCancel} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
         <section className="mobile-order-detail"><nav><Link href="/orders">← My orders</Link><Link href={`/orders/${encodeURIComponent(orderNumber)}`}>View order</Link></nav>
         <header><h1><T text="Checking your payment…" /></h1><p>{orderNumber}</p></header>
@@ -1815,7 +1815,8 @@ export default function PaymentPage() {
         <div className="mobile-order-actions">
         {!phonePeStatusOnly && <button type="button" disabled={openingPayment || refreshing || cancelling || cartChanged || paymentDeadlineReached} onClick={() => void handlePayNow()}>{openingPayment ? translate("Opening payment…") : translate("Continue payment")}</button>}
         <button type="button" disabled={openingPayment || refreshing || cancelling} onClick={() => void refreshCurrentPayment()}>{refreshing ? translate("Checking payment…") : translate("Check Payment Status")}</button>
-        <button type="button" disabled={openingPayment || refreshing || cancelling} onClick={() => setConfirmCancel(true)}><T text="Cancel this order" /></button>
+        <Link href="/menu"><T text="Back to menu"/></Link>
+        <p className="mobile-payment-leave-note"><T text="Leaving this page checks payment and cancels an unpaid order. Your cart stays saved."/></p>
         </div></section>
     </AppShell>;
 

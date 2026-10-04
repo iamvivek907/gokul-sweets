@@ -39,10 +39,11 @@ try{for(const scenario of ['switch','reward-first','offer-failure','reward-failu
  await context.route('https://gateway.example.invalid/**',route=>route.fulfill({body:'Test gateway'}));
  await context.addInitScript(({branch,product,desktop})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:1,weightGrams:null}]}));if(desktop)localStorage.setItem('gokul-pending-order',JSON.stringify({orderId:1,orderNumber:'REWARDS-TEST',orderStatus:'PENDING_PAYMENT',branchId:1,pickupSlotId:1,totalAmount:142.8,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),cartFingerprint:'1:UNIT:1:-'}));},{branch,product,desktop});
  await page.goto(`${base}${desktop?'/checkout/offers/REWARDS-TEST':'/checkout/mobile'}`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
- if(desktop){await page.getByRole('heading',{name:'Your earned coins'}).waitFor();await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('status').filter({hasText:'Reward applied'}).waitFor();await page.getByText('Reward saving',{exact:true}).waitFor();assert.match(await page.getByText('Reward saving',{exact:true}).locator('..').innerText(),/₹5.00/);assert.equal(rewardCode,'SWEET_5');assert.equal(await page.locator('.mobile-checkout').count(),0);await context.close();continue;}
+ if(desktop){await page.getByRole('heading',{name:'Your earned coins'}).waitFor();if(!await page.getByRole('button',{name:/₹5 sweet saving/}).isVisible())await page.locator('.checkout-reward-options summary').click();await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('status').filter({hasText:'Reward applied'}).waitFor();await page.getByText('Reward saving',{exact:true}).waitFor();assert.match(await page.getByText('Reward saving',{exact:true}).locator('..').innerText(),/₹5.00/);assert.equal(rewardCode,'SWEET_5');assert.equal(await page.locator('.mobile-checkout').count(),0);await context.close();continue;}
  await page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true}).check();
  await page.getByRole('button',{name:'Pay now',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
  if(!enabled){assert.equal(await page.getByRole('heading',{name:'Your earned coins'}).count(),0);await context.close();continue;}
+ await page.locator('.checkout-reward-options summary').click();
  if(scenario.startsWith('manual-')){
   await page.getByRole('button',{name:'Change offer'}).click();const dialog=page.getByRole('dialog');
   const choice=scenario==='manual-reward'?'Save 8':'Save 20';
@@ -53,7 +54,7 @@ try{for(const scenario of ['switch','reward-first','offer-failure','reward-failu
    await page.getByRole('dialog').getByRole('textbox').fill('SAVE20');
    await page.getByRole('dialog').locator('form').getByRole('button',{name:'Apply',exact:true}).click();
   }else await dialog.locator('article').filter({hasText:choice}).getByRole('button',{name:'Apply',exact:true}).click();
-  await dialog.waitFor({state:'hidden'});await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('button',{name:'Remove reward'}).waitFor();
+  await dialog.waitFor({state:'hidden'});if(!await page.getByRole('button',{name:/₹5 sweet saving/}).isVisible())await page.locator('.checkout-reward-options summary').click();await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('button',{name:'Remove reward'}).waitFor();
   if(scenario==='manual-reward'){
    assert.match(await page.locator('.mobile-checkout-pay strong').innerText(),/149.94/);
    assert.equal(previews.at(-1).offerCode,'SAVE8');
@@ -65,14 +66,14 @@ try{for(const scenario of ['switch','reward-first','offer-failure','reward-failu
   }
  }else if(scenario==='cart-reward-error'){
   await page.getByRole('button',{name:'Add one Fresh sweets'}).click();await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
-  await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('button',{name:'Remove reward'}).waitFor();
+  if(!await page.getByRole('button',{name:/₹5 sweet saving/}).isVisible())await page.locator('.checkout-reward-options summary').click();await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('button',{name:'Remove reward'}).waitFor();
   await page.getByRole('button',{name:'Remove one Fresh sweets'}).click();
   await page.getByRole('region',{name:'Reward recovery'}).waitFor();assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);
   await page.getByRole('region',{name:'Reward recovery'}).getByRole('button',{name:'Remove reward'}).click();
   await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
   assert.equal(previews.at(-1).rewardCode,undefined);assert.equal(await page.getByRole('region',{name:'Reward recovery'}).count(),0);
  }else if(scenario.startsWith('reward-')){
-  await page.getByRole('button',{name:/₹5 sweet saving/}).click();
+  if(!await page.getByRole('button',{name:/₹5 sweet saving/}).isVisible())await page.locator('.checkout-reward-options summary').click();await page.getByRole('button',{name:/₹5 sweet saving/}).click();
   if(scenario==='reward-failure'){await page.getByRole('alert').filter({hasText:'Savings verification unavailable'}).waitFor();assert.equal(await page.getByRole('button',{name:'Remove reward'}).count(),0);assert.match(await page.locator('.mobile-checkout-pay strong').innerText(),/142.80/);}
   else{await page.getByRole('button',{name:'Remove reward'}).waitFor();assert.match(await page.locator('.mobile-checkout-pay strong').innerText(),/147.90/);await page.getByRole('button',{name:'Change offer'}).click();assert.equal(await page.getByRole('dialog').getByText('Save 20',{exact:true}).count(),0);await page.getByRole('dialog').getByRole('button',{name:'Close ×'}).click();}
  }else{

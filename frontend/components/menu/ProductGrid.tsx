@@ -1,4 +1,5 @@
 "use client";
+import type {ReactNode} from "react";
 import {T} from "@/lib/language";
 
 import MobilePortionCard from "./MobilePortionCard";
@@ -19,6 +20,8 @@ import type {
 
 
 interface ProductGridProps {
+    pairingSeed?:number;
+    pairing?:ReactNode;
     portionGroups?: PortionGroup[];
     refined?: boolean;
     pickupItems?: ItemAvailability[];
@@ -52,6 +55,8 @@ interface ProductGridProps {
 
 
 export default function ProductGrid({
+    pairingSeed,
+    pairing,
     portionGroups,
     refined = false,
     products,
@@ -121,7 +126,7 @@ export default function ProductGrid({
             <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
                 {mobileMenuRows(products,portionGroups??[]).map(row => {
                     const product=row.product;
-                    if(row.group&&row.products)return <div key={row.group.key} id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware}/></div>;
+                    if(row.group&&row.products)return <div key={row.group.key} id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware}/>{row.products.some(p=>p.id===pairingSeed)&&pairing}</div>;
                     const pickup = pickupItems?.find(item => item.productId === product.id);
                     const unavailable = dateAware && pickup?.available === false;
                     return (
@@ -144,6 +149,7 @@ export default function ProductGrid({
                                 onDecrease={onDecrease}
                                 onAdd={onAdd}
                             />
+                            {product.id===pairingSeed&&pairing}
                             {unavailable && (
                                 <p role="status" className="menu-availability-note">
                                     {describePickupAvailability(pickup, false)}

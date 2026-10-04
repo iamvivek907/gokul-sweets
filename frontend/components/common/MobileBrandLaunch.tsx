@@ -2,6 +2,7 @@
 import {useEffect, useRef} from "react";
 import {usePathname, useRouter} from "next/navigation";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
+import {constrainedPhoneConnection} from "@/lib/mobileConnection";
 import {warmMenu} from "@/services/menuApi";
 import {T} from "@/lib/language";
 import "./MobileBrandLaunch.css";
@@ -39,6 +40,7 @@ export default function MobileBrandLaunch() {
     useEffect(() => {if (paymentReturn) dialog.current?.close();}, [paymentReturn]);
     useEffect(() => {
         if (staff || paymentReturn || !branch || !matchMedia("(max-width: 640px)").matches) return;
+        if (constrainedPhoneConnection()) return;
         router.prefetch("/menu");
         router.prefetch(`/branches/${branch.id}`);
         void warmMenu(branch.id);

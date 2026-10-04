@@ -5,16 +5,16 @@ const test = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
 const code=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../services/menuApi.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-function setup(){
- let now=0,nextTimer=0;const timers=new Map(),requests=[];const exports={};
+function setup(constrained=false){
+ let now=0,nextTimer=0;const timers=new Map(),requests=[],images=[];const exports={};
  const advance=milliseconds=>{now+=milliseconds;for(const [id,timer] of timers){if(timer.at<=now){timers.delete(id);timer.callback();}}};
- vm.runInNewContext(code,{exports,process:{env:{}},Date:{now:()=>now},DOMException,AbortController,Image:class{},
+ vm.runInNewContext(code,{exports,process:{env:{}},Date:{now:()=>now},DOMException,AbortController,Image:class{set src(value){images.push(value);}},
   setTimeout:(callback,delay)=>{const id=++nextTimer;timers.set(id,{callback,at:now+delay});return id;},clearTimeout:id=>timers.delete(id),
-  require:name=>name.includes('apiClient')?{apiClient:(_,options)=>new Promise((resolve,reject)=>{
+  require:name=>name.includes('mobileConnection')?{constrainedPhoneConnection:()=>constrained}:name.includes('apiClient')?{apiClient:(_,options)=>new Promise((resolve,reject)=>{
    requests.push({resolve,signal:options.signal});options.signal?.addEventListener('abort',()=>reject(new DOMException('Request aborted','AbortError')),{once:true});
   })}:{getMockMenu:()=>[]}});
  return {api:exports,resolve:(value=[])=>requests.forEach(request=>request.resolve(value)),advance,
-  get requests(){return requests.length;},get timers(){return timers.size;},signals:()=>requests.map(request=>request.signal)};
+  get images(){return images;},get requests(){return requests.length;},get timers(){return timers.size;},signals:()=>requests.map(request=>request.signal)};
 }
 test('caller abort immediately rejects a stalled shared prefetch without a second request',async()=>{
  const fixture=setup(),warming=fixture.api.warmMenu(1),controller=new AbortController();
@@ -87,4 +87,8 @@ test('a warmed service decision retains its receipt time when consumed later',as
  await warming;f.advance(9000);const menu=await f.api.getMenu(1);
  assert.equal(menu[0].products[0].serviceAvailability.receivedMonotonic,0,'consumption must not restart the service deadline');
  assert.equal(f.requests,1);
+});
+
+test('constrained phone connections retain menu warmup without eagerly downloading product artwork',async()=>{
+ const f=setup(true),warming=f.api.warmMenu(1);f.resolve([{products:[{id:1,imageUrl:'https://images.invalid/large.jpg'}]}]);await warming;assert.equal(f.images.length,0);assert.equal((await f.api.getMenu(1)).length,1);assert.equal(f.requests,1);
 });
