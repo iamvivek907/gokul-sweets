@@ -1,4 +1,5 @@
 "use client";
+import {CheckoutUpdateUncertainError} from "@/lib/checkoutRefresh";
 import OrderRewards from "./OrderRewards";
 import OfferChoiceDialog from "./OfferChoiceDialog";
 import type {RewardCheckout} from "@/services/loyaltyApi";
@@ -1048,32 +1049,35 @@ export default function CheckoutOffersPanel({
         try{const response=await applyRebate(orderNumber,code);setAppliedRebate(response);updatePendingOrderTotal(response.totalAmount);setOrderSummary(current=>current?{...current,totalAmount:response.totalAmount,paymentFee:response.paymentFee??current.paymentFee,paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax}:current);}finally{setSavingsBusy(false);}
     }
     const [adjusting,setAdjusting]=useState(false);
-    async function refreshAfterAddition(changedItems?:CartItem[],changedPickup?:PickupSelection) {
+    async function refreshAfterAddition(changedItems?:CartItem[],changedPickup?:PickupSelection, signal:AbortSignal=AbortSignal.timeout(15000)) {
         setTotalChanged(true);setPriceReviewRequired(true);setAppliedRebate(null);setSuccessMessage(null);
         const cartSnapshot=getCartSnapshot(), pickupSnapshot=getPickupSlotSnapshot(), branchSnapshot=getStoredBranchSnapshot();
         const storedCart=parseCart(cartSnapshot),cart=changedItems?{...storedCart,items:changedItems}:storedCart,pickup=changedPickup??parsePickupSlot(pickupSnapshot),customer=parseCustomerDetails(getCustomerSnapshot());
         const saved=parsePendingOrder(getPendingOrderSnapshot());
         const unchanged=()=>cartSnapshot===getCartSnapshot()&&pickupSnapshot===getPickupSlotSnapshot()&&branchSnapshot===getStoredBranchSnapshot()&&parsePendingOrder(getPendingOrderSnapshot())?.orderNumber===orderNumber;
+        let updateStarted=false;
         try {
             if(!saved || saved.orderNumber!==orderNumber || saved.branchId!==cart.branchId || !pickup || pickup.pickupType!=="NORMAL" || !customer || !cart.items.length)throw new Error("Review your cart and pickup details before refreshing the price.");
-            const current=await getCustomerOrder(orderNumber);
+            const current=await getCustomerOrder(orderNumber,signal);
             if(current.orderStatus!=="PENDING_PAYMENT" || current.paymentStatus!==null)throw new Error("This order has a payment attempt or has changed. Review its payment status before adding items.");
             const request={branchId:saved.branchId,pickupSlotId:pickup.slot.id,pickupType:pickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};
-            const quote=features?.acceptedCheckoutQuote?await previewCheckoutQuote(request,orderNumber):null;
+            const quote=features?.acceptedCheckoutQuote?await previewCheckoutQuote(request,orderNumber,signal):null;
             if(!unchanged())throw new Error("Your cart or pickup changed during the price check. Review it again.");
-            const updated=await updatePendingCheckout(orderNumber,{pickupSlotId:request.pickupSlotId,pickupType:request.pickupType,items:request.items,quoteToken:quote?.token});
+            updateStarted=true;
+            const updated=await updatePendingCheckout(orderNumber,{pickupSlotId:request.pickupSlotId,pickupType:request.pickupType,items:request.items,quoteToken:quote?.token},signal);
             if(!unchanged() || updated.orderStatus!=="PENDING_PAYMENT")throw new Error("Your checkout changed. Review the cart before continuing.");
             if(changedItems)saveCart(cart);if(changedPickup)savePickupSlot(changedPickup);
             setOrderSummary({...current,pickupDate:pickup.date,pickupStartTime:pickup.slot.startTime,pickupEndTime:pickup.slot.endTime,pickupType:pickup.pickupType,items:updated.items,subtotal:updated.subtotal,taxAmount:updated.taxAmount,priorityCharge:updated.priorityCharge,convenienceFee:updated.convenienceFee,convenienceFeeTax:updated.convenienceFeeTax,paymentFee:updated.paymentFee,paymentFeeTax:updated.paymentFeeTax,paymentFeeRate:updated.paymentFeeRate,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt});
             savePendingOrder({...saved,pickupSlotId:pickup.slot.id,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(cart.items)});
             setRefreshFailed(false);setError(null);setErrorSource(null);
-            const [offers,targets]=await Promise.allSettled([getAvailableRebates(orderNumber),apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include"})]);
+            const [offers,targets]=await Promise.allSettled([getAvailableRebates(orderNumber,signal),apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal})]);
             setRebates(offers.status==="fulfilled"?offers.value:[]);setOffersLoadedSuccessfully(offers.status==="fulfilled");
             setSpendTargets(targets.status==="fulfilled"?targets.value:[]);
             setSuccessMessage("Addition checked. Review the updated total and choose any available offer before payment.");
         } catch(cause) {
-            const message=cause instanceof Error?cause.message:"Could not refresh the price. Review your cart before payment.";
-            setRefreshFailed(true);setRebates([]);setSpendTargets([]);setOffersLoadedSuccessfully(false);setError(message);setErrorSource("general");onUpdateError?.(message);throw cause;
+            const failure=updateStarted?new CheckoutUpdateUncertainError():cause;
+            const message=failure instanceof Error?failure.message:"Could not refresh the price. Review your cart before payment.";
+            setRefreshFailed(true);setRebates([]);setSpendTargets([]);setOffersLoadedSuccessfully(false);setError(message);setErrorSource("general");onUpdateError?.(message);throw failure;
         }
     }
 
@@ -1567,7 +1571,7 @@ export default function CheckoutOffersPanel({
                                     }
 
 
-                                    {features?.pickupAddOns && pendingOrder && orderSummary?.pickupType==="NORMAL" && orderSummary.pickupDate && orderSummary.orderStatus==="PENDING_PAYMENT" && orderSummary.paymentStatus==null && <PickupAddOns branchId={pendingOrder.branchId} date={orderSummary.pickupDate} orderNumber={orderNumber} offers={spendTargets} disabled={loading || reservationExpired || !!applyingCode || removing} onBusy={busy=>{setAddonBusy(busy);onCartMutationBusy?.(busy);}} onAdded={()=>refreshAfterAddition()} onAdjust={()=>setAdjusting(true)}/>}
+                                    {features?.pickupAddOns && pendingOrder && orderSummary?.pickupType==="NORMAL" && orderSummary.pickupDate && orderSummary.orderStatus==="PENDING_PAYMENT" && orderSummary.paymentStatus==null && <PickupAddOns branchId={pendingOrder.branchId} date={orderSummary.pickupDate} orderNumber={orderNumber} offers={spendTargets} disabled={loading || reservationExpired || !!applyingCode || removing} onBusy={busy=>{setAddonBusy(busy);onCartMutationBusy?.(busy);}} onAdded={signal=>refreshAfterAddition(undefined,undefined,signal)} onAdjust={()=>setAdjusting(true)}/>}
                                     <div className="mt-5 border-t border-[#eadfd6] pt-5">
                                         <p className="text-sm font-bold text-[#241715]">
                                             <T text="Have a creator or exclusive code?" /></p>

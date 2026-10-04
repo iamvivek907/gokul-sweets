@@ -430,10 +430,21 @@
 @media(max-width:640px){.future-storefront dialog.mobile-payment-leave{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0}.future-storefront dialog.mobile-payment-leave::backdrop{background:#09272580}}
 
 @media(max-width:640px){
- .future-storefront .mobile-menu-pairing-slot{height:420px;overflow-y:auto;overscroll-behavior-y:contain;contain:layout}
- .future-storefront .mobile-menu-pairing-slot>.mobile-menu-suggestions{min-height:100%;margin-top:0}
+ .future-storefront .mobile-menu-pairing-slot{min-height:144px;contain:layout}
+ .future-storefront .mobile-menu-pairing-slot>.mobile-menu-suggestions{min-height:144px;margin-top:0}
  .future-storefront .mobile-cart-offer-slot{height:76px;overflow:auto;pointer-events:none}
  .future-storefront .mobile-cart-offer-slot .mobile-cart-offer-target{width:100%;margin-bottom:0;pointer-events:auto}
  .future-storefront .mobile-menu-highlights [role=alert]{margin-bottom:12px;font-size:.8125rem;line-height:1.5}
  .future-storefront .mobile-menu-highlights [role=alert] button{min-height:44px;padding:8px 12px;margin-top:8px;border:1px solid #b7cdbb;border-radius:10px;background:#fffaf2;font-weight:700}
+}
+
+@media(max-width:640px){
+ .future-storefront .mobile-menu-suggestions-open{min-height:44px;padding:8px 12px;margin-top:8px;border:1px solid #b7cdbb;border-radius:10px;background:#fffaf2;font-weight:700;font-size:.8125rem}
+ .future-storefront .mobile-menu-suggestion-dialog{position:fixed;inset:auto 0 0;margin:0 auto;width:100%;max-width:640px;height:min(560px,85dvh);max-height:85dvh;overflow-y:auto;border:1px solid #c8d9cd;border-bottom:0;border-radius:24px 24px 0 0;background:#fffaf2;color:#143936;padding:0;box-shadow:0 -12px 48px #09272530}
+ .future-storefront .mobile-menu-suggestion-dialog::backdrop{background:#09272580}
+ .future-storefront .mobile-menu-suggestion-dialog>header{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px;background:#fffaf2;z-index:2}
+ .future-storefront .mobile-menu-suggestion-dialog h2{font-size:1.125rem;font-weight:750}
+ .future-storefront .mobile-menu-suggestion-dialog>header button{min-height:44px;padding:8px 12px;border:1px solid #c8d9cd;border-radius:12px;background:#edf4ee;font-weight:700}
+ .future-storefront .mobile-menu-suggestion-body{padding:4px 16px calc(20px + env(safe-area-inset-bottom));overflow-wrap:anywhere}
+ .future-storefront .mobile-menu-suggestion-body>p{font-size:.8125rem;line-height:1.6;margin-top:12px}
 }

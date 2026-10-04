@@ -11,7 +11,9 @@ import {getCartSnapshot} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
 import {usefulRebateTarget} from "@/lib/pickupAddOnRebate";
-import {rankAddOns} from "@/lib/addOnRanking";
+import {stableSuggestions} from "@/lib/stableSuggestions";
+import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
+import type {ReactNode} from "react";
 import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
 import {menuPickupOptions} from "@/lib/menuPickupOptions";
 import {pickupIsFresh} from "@/lib/pickupFreshness";
@@ -32,6 +34,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
  useEffect(()=>{latestProducts.current=products;},[products]);
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;addition.current?.abort();};},[]);
  const [visits,setVisits]=useState<Visit[]>([]);
+ const [open,setOpen]=useState(false);
  const [identityRevision,setIdentityRevision]=useState(0);
  const [session,setSession]=useState<CustomerSession|null>(null),[result,setResult]=useState<{key:string;items:Suggestion[]}|null>(null),[busy,setBusy]=useState(false),[message,setMessage]=useState("");
  const [offerResult,setOfferResult]=useState<{key:string;offers:AvailableRebateResponse[]}|null>(null);
@@ -55,9 +58,9 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
     if(!c.signal.aborted)setVisits(details.flatMap(r=>r.status==="fulfilled"&&Array.isArray(r.value.items)?[r.value]:[]));
    }catch{if(!c.signal.aborted){if(!identified)setSession(null);setVisits([]);}}
   }
-  const identityChanged=()=>{addition.current?.abort();setIdentityRevision(value=>value+1);setSession(null);setVisits([]);setResult(null);setOfferResult(null);setMessage("");void load();};
-  void load();window.addEventListener("gokul-customer-identity-changed",identityChanged);
-  return()=>{controller?.abort();window.removeEventListener("gokul-customer-identity-changed",identityChanged);};
+  const identityChanged=()=>{addition.current?.abort();setIdentityRevision(value=>value+1);setSession(null);setVisits([]);setResult(null);setOfferResult(null);setMessage("");setOpen(false);void load();};
+  void load();const unsubscribe=subscribeCustomerIdentityChanges(identityChanged);
+  return()=>{controller?.abort();unsubscribe();};
  },[branchId]);
  useEffect(()=>{
   if(!features||!intent.date||!cart.items.length||cart.branchId!==branchId)return;
@@ -75,7 +78,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
     apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}`,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([c.signal,AbortSignal.timeout(8000)])}).catch(()=>[]),
     favouritesCheck
    ]);
-   let items=[...favourites.filter(s=>!recommended.some(item=>item.product.id===s.product.id)),...recommended].filter(s=>products.some(p=>p.id===s.product.id&&p.available)&&!cart.items.some(i=>i.product.id===s.product.id)).slice(0,5);
+   let items=[...recommended,...favourites.filter(s=>!recommended.some(item=>item.product.id===s.product.id))].filter(s=>products.some(p=>p.id===s.product.id&&p.available)&&!cart.items.some(i=>i.product.id===s.product.id)).slice(0,5);
    if(smartAvailability&&selected&&items.length){
     const combined=[...JSON.parse(request).items,...items.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))];
     const available=await checkCartAvailability(branchId,selected.date,1,combined,AbortSignal.any([c.signal,AbortSignal.timeout(8000)])).catch(()=>null);
@@ -83,7 +86,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
     const issues=available?.dates.find(d=>d.date===selected.date)?.slots.find(s=>s.slot.id===selected.slot.id)?.issues??[];
     items=option&&!issues.some(i=>!i.available&&cart.items.some(c=>c.product.id===i.productId))?items.filter(s=>!issues.some(i=>i.productId===s.product.id&&!i.available)):[];
    }
-   if(!c.signal.aborted)setResult({key,items});
+   if(!c.signal.aborted)setResult(previous=>({key,items:stableSuggestions(previous?.key===key?previous.items:[],items)}));
   })(),450);
   return()=>{clearTimeout(timer);c.abort();};
  },[key,branchId,request,intent.date,cart.branchId,cart.items.length,cart.items,products,visits,selected,smartAvailability,features]);
@@ -101,7 +104,7 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
  const target=useMemo(()=>usefulRebateTarget(offerResult?.key===offerKey?offerResult.offers:[]),[offerResult,offerKey]);
  useEffect(()=>{onTarget?.(target);return()=>onTarget?.(null);},[target,onTarget]);
  const live=new Map(products.map(p=>[p.id,p]));
- const suggestions=rankAddOns((current?.items??[]).filter(s=>live.get(s.product.id)?.available&&!cart.items.some(i=>i.product.id===s.product.id)),target?.amountNeededForNextSlab??null);
+ const suggestions=(current?.items??[]).filter(s=>live.get(s.product.id)?.available&&!cart.items.some(i=>i.product.id===s.product.id));
  async function add(s:Suggestion){
   if(locked.current)return;locked.current=true;setBusy(true);setMessage("");
   const before=getCartSnapshot(),branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot();
@@ -121,9 +124,30 @@ export default function MobileMenuSuggestions({branchId,products,onTarget}:{bran
   }catch(error){if(mounted.current&&!controller.signal.aborted)setMessage(error instanceof Error?error.message:"We couldn’t check this addition. Your cart is saved. Try again.");}
   finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current)setBusy(false);}
  }
- if(!suggestions.length&&!target&&!message)return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection"><h3><T text="Pairs well with your selection"/></h3><p role="status"><T text={!intent.date?"Choose pickup to see optional additions. Your cart is saved.":current?"No optional additions to show right now. Continue choosing from the menu.":"Checking optional suggestions. You can continue choosing from the menu."}/></p></section>;
- return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection"><header><div><span><T text="MAKE IT A LITTLE SWEETER"/></span><h3><T text="Pairs well with your selection"/></h3></div></header>
- <div className="mobile-menu-pairing-row">{suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name}`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p>{s.reason}</p></article>)}</div>
- {target&&<div id="mobile-menu-offer" className="mobile-menu-offer-progress" role="status"><span aria-hidden="true">%</span><div><strong><T text="Add"/> {money(target.amountNeededForNextSlab!)} <T text="in eligible items"/></strong><p><T text="Unlock"/> {money(target.nextSlabRebateAmount!)} <T text="off"/> · {target.name}</p><small><T text="Fees don’t count. Savings checked again at checkout."/></small></div></div>}
- {message&&<p role="status">{message}</p>}</section>;
+ const available=!!suggestions.length||!!target||!!message;
+ const summary=!intent.date?"Choose pickup to see optional additions.":current&&!available?"No optional additions right now.":available?"Optional additions at menu prices.":"Checking suggestions. Continue browsing.";
+ return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection">
+  <h3><T text="Pairs well with your selection"/></h3>
+  <p role="status"><T text={summary}/></p>
+  <button id="mobile-menu-pairings-open" className="mobile-menu-suggestions-open" type="button" disabled={!available} onClick={()=>setOpen(true)} aria-haspopup="dialog"><T text="View optional additions"/></button>
+  {open&&<SuggestionSheet onClose={()=>setOpen(false)}>
+   <div className="mobile-menu-pairing-row">{suggestions.map(s=><article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}<button type="button" disabled={busy} aria-label={`Add ${s.product.name}`} onClick={()=>void add(s)}><T text={busy?"Checking…":"Add"}/> +</button></div><h4>{s.product.name}</h4><strong>{money(s.portionTotal)}</strong><small>{s.weightGrams===null?"1 piece":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p>{s.reason}</p></article>)}</div>
+   {target&&<div className="mobile-menu-offer-progress" role="status"><span aria-hidden="true">%</span><div><strong><T text="Add"/> {money(target.amountNeededForNextSlab!)} <T text="in eligible items"/></strong><p><T text="Unlock"/> {money(target.nextSlabRebateAmount!)} <T text="off"/> · {target.name}</p><small><T text="Fees don’t count. Savings checked again at checkout."/></small></div></div>}
+   {message&&<p role="status">{message}</p>}
+   {!suggestions.length&&!target&&!message&&<p role="status"><T text={summary}/></p>}
+  </SuggestionSheet>}
+ </section>;
+}
+
+function SuggestionSheet({children,onClose}:{children:ReactNode;onClose:()=>void}){
+ const dialog=useRef<HTMLDialogElement>(null);
+ useEffect(()=>{
+  const surface=dialog.current,previous=document.activeElement as HTMLElement|null,overflow=document.body.style.overflow;
+  document.body.style.overflow="hidden";surface?.showModal();
+  return()=>{surface?.close();document.body.style.overflow=overflow;previous?.focus();};
+ },[]);
+ return <dialog ref={dialog} className="mobile-menu-suggestion-dialog" aria-labelledby="mobile-menu-suggestion-title" onCancel={event=>{event.preventDefault();onClose();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))onClose();}}>
+  <header><h2 id="mobile-menu-suggestion-title"><T text="Optional additions"/></h2><button type="button" onClick={onClose} autoFocus><T text="Close"/> ×</button></header>
+  <div className="mobile-menu-suggestion-body">{children}</div>
+ </dialog>;
 }

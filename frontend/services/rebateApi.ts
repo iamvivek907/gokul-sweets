@@ -31,7 +31,7 @@ import type {
  * - payable amount
  */
 export async function getAvailableRebates(
-    orderNumber: string
+    orderNumber: string, signal?: AbortSignal
 ): Promise<AvailableRebateResponse[]> {
 
     return apiClient<
@@ -40,7 +40,7 @@ export async function getAvailableRebates(
         `/api/orders/${encodeURIComponent(
             orderNumber
         )}/available-rebates`,
-        {credentials: "include"}
+        {credentials: "include", signal}
     );
 }
 

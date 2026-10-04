@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {mkdir} from 'node:fs/promises';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
+async function openPairings(page){
+ const sheet=page.getByRole('dialog',{name:'Optional additions',exact:true});if(await sheet.isVisible())return;
+ await page.waitForFunction(()=>{const button=document.getElementById('mobile-menu-pairings-open');return button&&!button.disabled;});
+ await page.getByRole('button',{name:'View optional additions',exact:true}).click();await sheet.waitFor();
+}
+async function closePairings(page){const sheet=page.getByRole('dialog',{name:'Optional additions',exact:true});if(await sheet.isVisible())await sheet.getByRole('button',{name:/^Close/}).click();}
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
@@ -52,10 +58,10 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
   await page.getByRole('button',{name:'Choose time',exact:true}).click();await dialog.getByRole('button',{name:date,exact:true}).click();await dialog.getByRole('button',{name:'15:00–16:00 Standard',exact:true}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();
   await dialog.getByRole('alert').filter({hasText:'Only 500 g remain'}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),savedCart);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).slot.id),1);
   cartConflict=false;await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.waitFor({state:'hidden'});
-  const pairing=page.getByRole('region',{name:'Pairs well with your selection'});await pairing.waitFor();await pairing.getByText('Often ordered with Fresh peda',{exact:true}).waitFor();assert.equal(await pairing.getByText('Sold-out samosa',{exact:true}).count(),0);await pairing.getByText(/Unlock/).waitFor();await pairing.getByText('Your completed-order favourite',{exact:true}).waitFor();
-  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/menu-guidance-${width}.png`,fullPage:true});}
+  const pairing=page.getByRole('region',{name:'Pairs well with your selection'});await pairing.waitFor();await openPairings(page);await pairing.getByText('Often ordered with Fresh peda',{exact:true}).waitFor();assert.equal(await pairing.getByText('Sold-out samosa',{exact:true}).count(),0);await pairing.getByText(/Unlock/).waitFor();await pairing.getByText('Your completed-order favourite',{exact:true}).waitFor();
+  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await closePairings(page);await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/menu-guidance-${width}.png`,fullPage:true});await openPairings(page);await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/suggestion-sheet-${width}.png`});}
   await pairing.getByRole('button',{name:'Add Special tea',exact:true}).click();await page.waitForFunction(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length===2);assert.equal(addonChecks,1);
-  await page.locator('.gokul-floating-cart a').click();await page.waitForURL('**/checkout/mobile');await page.getByRole('heading',{name:'Your earned coins',exact:true}).waitFor();assert.equal(await page.locator('.checkout-reward-options').getAttribute('open'),null);assert.ok((await page.locator('.checkout-rewards-compact').boundingBox()).height<230);
+  await closePairings(page);await page.locator('.gokul-floating-cart a').click();await page.waitForURL('**/checkout/mobile');await page.getByRole('heading',{name:'Your earned coins',exact:true}).waitFor();assert.equal(await page.locator('.checkout-reward-options').getAttribute('open'),null);assert.ok((await page.locator('.checkout-rewards-compact').boundingBox()).height<230);
   await page.getByRole('button',{name:'Add offer code',exact:true}).click();const offers=page.getByRole('dialog',{name:'Choose an offer'});const box=await offers.boundingBox();assert.ok(Math.abs(box.y+box.height-900)<3,'offers rest at bottom');if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/offers-guidance-${width}.png`});await page.keyboard.press('Escape');
   await page.getByRole('button',{name:/Price details/}).click();await page.getByRole('dialog',{name:'Bill summary'}).getByText('Total to pay',{exact:true}).waitFor();await page.keyboard.press('Escape');
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/checkout-guidance-${width}.png`,fullPage:true});}

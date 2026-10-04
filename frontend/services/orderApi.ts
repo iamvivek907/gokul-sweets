@@ -11,11 +11,11 @@ import type {
     UpdatePendingOrderRequest
 } from "@/types/order";
 
-export async function previewCheckoutQuote(request: CreateOrderRequest, pendingOrderNumber?: string): Promise<CheckoutQuote> {
+export async function previewCheckoutQuote(request: CreateOrderRequest, pendingOrderNumber?: string, signal: AbortSignal = AbortSignal.timeout(15000)): Promise<CheckoutQuote> {
     const path = pendingOrderNumber
         ? `/api/orders/${encodeURIComponent(pendingOrderNumber)}/quote`
         : "/api/orders/quote";
-    return apiClient<CheckoutQuote>(path, {method: "POST", body: JSON.stringify(request), credentials: "include"});
+    return apiClient<CheckoutQuote>(path, {method: "POST", body: JSON.stringify(request), credentials: "include", signal});
 }
 
 

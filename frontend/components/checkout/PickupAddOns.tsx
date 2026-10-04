@@ -1,6 +1,6 @@
 "use client";
 import {T,useTranslation} from "@/lib/language";
-import {rankAddOns} from "@/lib/addOnRanking";
+import {CheckoutUpdateUncertainError} from "@/lib/checkoutRefresh";
 import Image from "next/image";
 import {useEffect,useRef,useState} from "react";
 import {useCart} from "@/hooks/useCart";
@@ -15,7 +15,7 @@ import type {AvailableRebateResponse} from "@/types/rebate";
 import styles from "./PickupAddOns.module.css";
 type Suggestion={product:MenuProduct;weightGrams:number|null;portionPrice:number;portionTotal:number;reason:string};
 const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(n);
-export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=[],onAdded,onBusy,onAdjust,compact=false}:{branchId:number;date:string;orderNumber?:string;disabled:boolean;offers?:AvailableRebateResponse[];onAdded:()=>void|Promise<void>;onBusy?:(busy:boolean)=>void;onAdjust?:()=>void;compact?:boolean}) {
+export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=[],onAdded,onBusy,onAdjust,compact=false}:{branchId:number;date:string;orderNumber?:string;disabled:boolean;offers?:AvailableRebateResponse[];onAdded:(signal:AbortSignal)=>void|Promise<void>;onBusy?:(busy:boolean)=>void;onAdjust?:()=>void;compact?:boolean}) {
     const translate = useTranslation();
  const {items,addItem}=useCart();const locked=useRef(false);
  const mounted=useRef(false),addition=useRef<AbortController|null>(null),busyCallback=useRef(onBusy);
@@ -29,7 +29,7 @@ export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=
  useEffect(()=>()=>{addition.current?.abort();},[key]);
  useEffect(()=>{if(dismissed)return;const controller=new AbortController();apiClient<Suggestion[]>(path,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])}).then(items=>{if(!controller.signal.aborted)setResponse({key,items});}).catch(()=>{if(!controller.signal.aborted)setResponse({key,items:[]});});return()=>controller.abort();},[path,request,key,dismissed]);
  const target=usefulRebateTarget(offers);
- const suggestions=rankAddOns(response?.key===key ? response.items.filter(s=>(!compact||s.product.available)&&!items.some(i=>i.product.id===s.product.id)) : [],target?.amountNeededForNextSlab ?? null);
+ const suggestions=response?.key===key ? response.items.filter(s=>(!compact||s.product.available)&&!items.some(i=>i.product.id===s.product.id)) : [];
  async function add(s:Suggestion) {
   if(disabled||locked.current)return;locked.current=true;setBusy(true);onBusy?.(true);setMessage("");let added=false;let addedSnapshot:string|null=null;
   const cart=getCartSnapshot(),branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot();
@@ -43,8 +43,8 @@ export default function PickupAddOns({branchId,date,orderNumber,disabled,offers=
    // Validation is complete; our own cart write must not abort the subsequent quote refresh.
    addition.current=null;
    if(addItem(s.product,branchId,s.weightGrams??undefined)!=="added"){setMessage("Choose the matching branch before adding.");return;}
-   added=true;addedSnapshot=getCartSnapshot();await onAdded();if(!mounted.current||controller.signal.aborted)return;setMessage(`${s.product.name} added. Review your updated price and offer before payment.`);
-  } catch {if(!mounted.current||controller.signal.aborted)return;if(added&&addedSnapshot===getCartSnapshot()){saveCart(parseCart(cart));added=false;}setMessage(added?"This item is in your cart. Review the cart to refresh its price before payment.":"We couldn’t complete this addition. Your existing cart and pickup are unchanged. Try again, or adjust quantities and pickup here.");}
+   added=true;addedSnapshot=getCartSnapshot();await onAdded(AbortSignal.timeout(15000));if(!mounted.current||controller.signal.aborted)return;setMessage(`${s.product.name} added. Review your updated price and offer before payment.`);
+  } catch(error) {if(!mounted.current||controller.signal.aborted)return;if(error instanceof CheckoutUpdateUncertainError){setMessage(error.message);return;}if(added&&addedSnapshot===getCartSnapshot()){saveCart(parseCart(cart));added=false;}setMessage(added?"This item is in your cart. Review the cart to refresh its price before payment.":"We couldn’t complete this addition. Your existing cart and pickup are unchanged. Try again, or adjust quantities and pickup here.");}
   finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current){setBusy(false);onBusy?.(false);}}
  }
  if(dismissed || (!suggestions.length&&!message&&!target))return null;

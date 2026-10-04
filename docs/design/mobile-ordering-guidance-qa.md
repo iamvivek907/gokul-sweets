@@ -24,5 +24,12 @@ Second review regressions:
 - Stall a checkout add-on for 15 seconds: cart/payment controls recover and Retry is available. Navigate away before the response: a late response cannot mutate the cart. Repeat with changed cart/branch/pickup context.
 - Fail menu availability: customer-rated favourites expose Retry availability, retain disabled unverified additions, and restore Add after a successful retry.
 - Dispatch an identity change while personalized suggestions are visible and replacement requests are delayed: old favourites and offer results disappear immediately.
-- Delay optional offer responses and assert the following product and floating Continue action retain their positions. The suggestion viewport and offer-action space are reserved while requests settle; long content scrolls inside the region.
+- Delay optional offer responses and assert the following product and floating Continue action retain their positions. The compact suggestion summary and offer-action space remain stable while requests settle. Optional additions open an explicit bottom sheet; longer content scrolls there without trapping menu gestures.
 - Connection-policy mocks and paced API responses (150 ms per response) cover recovery behaviour. These do not reproduce actual cellular throughput/packet loss, native PhonePe behaviour or measured real-device frame rates.
+
+Third review regressions:
+
+- Stall the quote after successful add-on validation: the 15-second refresh deadline releases checkout and restores the unchanged prior cart. Stall the reservation PUT after the server applies it: retain the addition, report the uncertain outcome, block payment, and recover through Recheck current cart and total without creating a payment.
+- Delay an offer with a ₹25 additional-spend target for ₹30/₹35 suggestions. Both x/y coordinates and product identity must remain stable. Late history candidates append without moving existing suggestions; updated prices refresh in place.
+- Log out in another same-origin tab. The open suggestion sheet closes immediately and private favourites/offers disappear. Re-enter the menu tab after session changes with storage unavailable: focus/visibility resume must revalidate identity. Invalidation tokens contain no customer data.
+- At 320/390/640px, check compact loading/empty summaries, bottom-sheet open/Close/Escape/outside dismissal, focus restoration, keyboard operation and long text. The menu has no nested vertical scroll trap; sheet contents and footer actions remain reachable. Repeat with desktop and flags OFF.

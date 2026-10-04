@@ -853,3 +853,13 @@ Object.assign(hindi, {
  "Example: 2% on ₹1,000 adds ₹20. The global tax-off setting also turns off this fee’s tax component.":"उदाहरण: ₹1,000 पर 2% शुल्क ₹20 जोड़ता है। सभी कर बंद करने की सेटिंग इस शुल्क का कर भी बंद करती है।",
  "A separate percentage charge on the payable amount after discounts, including convenience or delivery charges. The percentage includes fee tax; it is shown before payment. Off or 0% means no charge.":"छूट के बाद देय राशि पर अलग प्रतिशत शुल्क, जिसमें सुविधा या डिलीवरी शुल्क भी शामिल हैं। प्रतिशत में शुल्क का कर शामिल है; यह भुगतान से पहले दिखता है। बंद या 0% होने पर कोई शुल्क नहीं लगता।"
 });
+
+Object.assign(hindi, {
+ "View optional additions":"वैकल्पिक चीज़ें देखें",
+ "Optional additions":"वैकल्पिक चीज़ें",
+ "Choose pickup to see optional additions.":"वैकल्पिक चीज़ें देखने के लिए पिकअप चुनें।",
+ "No optional additions right now.":"अभी कोई वैकल्पिक चीज़ उपलब्ध नहीं है।",
+ "Optional additions at menu prices.":"मेन्यू की कीमत पर अपनी पसंद से जोड़ें।",
+ "Checking suggestions. Continue browsing.":"सुझाव जाँचे जा रहे हैं। मेन्यू देखना जारी रखें।",
+ "We couldn’t confirm the updated reservation. Your addition remains in the cart. Recheck the current cart and total before payment.":"नई बुकिंग की पुष्टि नहीं हो सकी। जोड़ी गई चीज़ कार्ट में सुरक्षित है। भुगतान से पहले कार्ट और कुल राशि दोबारा जाँचें।"
+});
