@@ -36,7 +36,7 @@
  .future-storefront .checkout-offer-list article span{display:block;color:#226643;font-weight:700;margin-top:6px}
  .future-storefront .mobile-checkout-guidance{scroll-margin-top:100px;border-radius:18px;outline:3px solid #a94d39;outline-offset:4px}
  .future-storefront .mobile-checkout-guidance>p[role=status]{padding:10px 14px;color:#8b3526;font-weight:700;font-size:.8125rem}
- .future-storefront .mobile-checkout-pay button[data-payment-ready=false]{background:#697c72;color:#fffaf2}
+ .future-storefront .mobile-checkout-pay button[data-payment-ready=false]{background:#52695f;color:#fffaf2}
 }
 @media(max-width:640px){
  .future-storefront .mobile-checkout-savings{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#e9f3f1;border:1px solid #c8dedb;border-radius:12px;padding:12px 14px;color:#226643;font-size:.8125rem;font-weight:700;margin-bottom:12px}
