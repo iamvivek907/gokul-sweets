@@ -62,10 +62,12 @@ public class PreparationQueueQueriesImpl implements PreparationQueueQueries {
         }
         var ids = jdbc.queryForList(sql, Long.class, args.toArray());
         if (ids.isEmpty()) return List.of();
-        // Fetch the same relations as the former JOIN FETCH query without an N+1 lookup.
+        // Recheck scope: an order can be transferred or started after the ID query.
+        // Fetch relations in one batch while excluding orders that left this queue.
         var rows = entityManager.createQuery(
-            "SELECT o FROM Order o JOIN FETCH o.branch JOIN FETCH o.pickupSlot WHERE o.id IN :ids", Order.class)
-            .setParameter("ids", ids).getResultList();
+            "SELECT o FROM Order o JOIN FETCH o.branch JOIN FETCH o.pickupSlot WHERE o.id IN :ids AND o.branch.id=:branchId AND o.orderStatus=:status", Order.class)
+            .setParameter("ids", ids).setParameter("branchId", branchId)
+            .setParameter("status", confirmedStatus).getResultList();
         var indexed = rows.stream().collect(Collectors.toMap(Order::getId, Function.identity()));
         return ids.stream().map(indexed::get).filter(Objects::nonNull).toList();
     }

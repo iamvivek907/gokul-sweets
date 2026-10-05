@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 class KitchenPlanningIntegrationTest {
  @Autowired KitchenPlanningService service;
  @Autowired com.gokulsweets.restaurant.order.repository.OrderRepository orders;
- @Autowired JdbcTemplate jdbc;
+ @MockitoSpyBean JdbcTemplate jdbc;
  @Autowired EnhancementProperties flags;
  @MockitoBean StaffAuthorizationService staff;
  @MockitoSpyBean ApplicationClock clock;
@@ -117,6 +117,21 @@ class KitchenPlanningIntegrationTest {
   var result=service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(18,0),0);
   assertThat(result.total()).isEqualTo(1);verify(staff).requireBranchAccess(branch);
   assertThat(service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(19,0),0).orders()).isEmpty();
+ }
+ @Test void excludesOrdersTransferredOrStartedBetweenIdSelectionAndEntityFetch(){
+  order("CONFIRMED",branch,slot);order("CONFIRMED",branch,slot);order("CONFIRMED",branch,slot);
+  var ids=jdbc.queryForList("SELECT id FROM orders WHERE branch_id=? ORDER BY id",Long.class,branch);
+  long other=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Transfer target') RETURNING id",Long.class,"RACE-"+UUID.randomUUID());
+  long otherSlot=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,'2026-10-01','18:00','18:30',100) RETURNING id",Long.class,other);
+  // Deterministic interleaving at the real JDBC/JPA boundary, without timing-dependent threads.
+  doAnswer(invocation->{
+   var selected=invocation.callRealMethod();
+   jdbc.update("UPDATE orders SET branch_id=?,pickup_slot_id=? WHERE id=?",other,otherSlot,ids.get(0));
+   jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?",ids.get(1));
+   return selected;
+  }).when(jdbc).queryForList(startsWith("SELECT o.id "),eq(Long.class),any(Object[].class));
+  assertThat(queue(LocalDate.of(2026,10,1),LocalTime.of(18,0),0))
+   .extracting(com.gokulsweets.restaurant.order.entity.Order::getId).containsExactly(ids.get(2));
  }
  java.util.List<com.gokulsweets.restaurant.order.entity.Order> queue(LocalDate day,LocalTime cutoff,int page){
   return orders.findPreparationQueueCandidates(branch,com.gokulsweets.restaurant.order.enums.OrderStatus.CONFIRMED,

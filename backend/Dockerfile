@@ -10,6 +10,9 @@ RUN ./gradlew --no-daemon clean bootJar
 
 FROM eclipse-temurin:21-jre
 
+# Tested with a 512 MB container; deployments may override this environment value.
+ENV JAVA_TOOL_OPTIONS="-Xmx192m -XX:+ExitOnOutOfMemoryError"
+
 WORKDIR /app
 
 COPY --from=build /app/build/libs/restaurant-backend-0.0.1-SNAPSHOT.jar app.jar
