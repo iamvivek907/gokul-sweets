@@ -47,7 +47,7 @@ public class RebateEligibilityService {
     public record PublicOffer(Long rebateId, String code, String name, String description,
                               RebateType rebateType, BigDecimal rebateValue,
                               BigDecimal minimumOrderAmount, BigDecimal maximumDiscountAmount,
-                              List<PublicTier> tiers) {}
+                              List<PublicTier> tiers, java.time.Instant validUntil) {}
 
     /** Advertise unrestricted public terms without exposing customer-specific codes or eligibility. */
     @Transactional(readOnly = true)
@@ -64,7 +64,8 @@ public class RebateEligibilityService {
                         r.getRebateType(), r.getRebateType() == RebateType.FIXED_AMOUNT && r.getMaximumDiscountAmount() != null
                                 ? r.getRebateValue().min(r.getMaximumDiscountAmount()) : r.getRebateValue(),
                         defaultZero(r.getMinimumOrderAmount()),
-                        r.getMaximumDiscountAmount(), publicTiers(r)))
+                        r.getMaximumDiscountAmount(), publicTiers(r),
+                        r.getValidUntil() == null ? null : r.getValidUntil().atZone(BUSINESS_ZONE).toInstant()))
                 .toList();
     }
 

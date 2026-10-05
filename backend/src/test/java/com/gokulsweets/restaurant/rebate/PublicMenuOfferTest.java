@@ -53,6 +53,14 @@ class PublicMenuOfferTest {
         assertThat(service.publicOffers(7).getFirst().rebateValue()).isEqualByComparingTo("10");
     }
 
+    @Test void publishesExpiryAsAnUnambiguousInstantFromBusinessTime() {
+        var r=offer(1,RebateScope.GENERAL);
+        r.setValidUntil(java.time.LocalDateTime.of(2026,10,5,18,0));
+        when(rebates.findActivePublicCandidates(eq(7L),any())).thenReturn(List.of(r));
+        assertThat(service.publicOffers(7).getFirst().validUntil())
+                .isEqualTo(java.time.Instant.parse("2026-10-05T12:30:00Z"));
+    }
+
     @Test void coalescesTiersBelowTheOfferMinimumUsingCheckoutSlabOrder() {
         var r=offer(1,RebateScope.GENERAL); r.setRebateType(RebateType.SLAB);
         r.setMinimumOrderAmount(new BigDecimal("500"));
