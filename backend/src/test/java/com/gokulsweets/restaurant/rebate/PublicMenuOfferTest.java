@@ -53,6 +53,19 @@ class PublicMenuOfferTest {
         assertThat(service.publicOffers(7).getFirst().rebateValue()).isEqualByComparingTo("10");
     }
 
+    @Test void coalescesTiersBelowTheOfferMinimumUsingCheckoutSlabOrder() {
+        var r=offer(1,RebateScope.GENERAL); r.setRebateType(RebateType.SLAB);
+        r.setMinimumOrderAmount(new BigDecimal("500"));
+        var first=new RebateSlab();first.setMinimumOrderAmount(new BigDecimal("300"));first.setRebateAmount(new BigDecimal("60"));
+        var second=new RebateSlab();second.setMinimumOrderAmount(new BigDecimal("400"));second.setRebateAmount(new BigDecimal("40"));
+        when(rebates.findActivePublicCandidates(eq(7L),any())).thenReturn(List.of(r));
+        when(slabs.findByRebateIdOrderByMinimumOrderAmountAsc(1L)).thenReturn(List.of(first,second));
+        var tiers=service.publicOffers(7).getFirst().tiers();
+        assertThat(tiers).hasSize(1);
+        assertThat(tiers.getFirst().minimumOrderAmount()).isEqualByComparingTo("500");
+        assertThat(tiers.getFirst().rebateAmount()).isEqualByComparingTo("40");
+    }
+
     @Test void disabledFeatureDoesNotReadOffers() {
         var eligibility=mock(RebateEligibilityService.class);
         assertThat(new PublicMenuOfferController(eligibility,new EnhancementProperties()).offers(7)).isEmpty();

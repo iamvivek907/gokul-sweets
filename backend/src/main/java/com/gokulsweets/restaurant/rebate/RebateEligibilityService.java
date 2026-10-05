@@ -64,14 +64,21 @@ public class RebateEligibilityService {
                         r.getRebateType(), r.getRebateType() == RebateType.FIXED_AMOUNT && r.getMaximumDiscountAmount() != null
                                 ? r.getRebateValue().min(r.getMaximumDiscountAmount()) : r.getRebateValue(),
                         defaultZero(r.getMinimumOrderAmount()),
-                        r.getMaximumDiscountAmount(), r.getRebateType() == RebateType.SLAB
-                        ? rebateSlabRepository.findByRebateIdOrderByMinimumOrderAmountAsc(r.getId()).stream()
-                            .map(s -> new PublicTier(s.getMinimumOrderAmount().max(defaultZero(r.getMinimumOrderAmount())),
-                                    s.getRebateAmount().min(s.getMinimumOrderAmount().max(defaultZero(r.getMinimumOrderAmount())))
-                                            .min(r.getMaximumDiscountAmount() == null ? s.getRebateAmount() : r.getMaximumDiscountAmount())))
-                            .toList()
-                        : List.of()))
+                        r.getMaximumDiscountAmount(), publicTiers(r)))
                 .toList();
+    }
+
+    private List<PublicTier> publicTiers(Rebate rebate) {
+        if (rebate.getRebateType() != RebateType.SLAB) return List.of();
+        var tiers = new java.util.TreeMap<BigDecimal, BigDecimal>();
+        for (var slab : rebateSlabRepository.findByRebateIdOrderByMinimumOrderAmountAsc(rebate.getId())) {
+            var minimum = slab.getMinimumOrderAmount().max(defaultZero(rebate.getMinimumOrderAmount()));
+            var saving = slab.getRebateAmount().min(minimum);
+            if (rebate.getMaximumDiscountAmount() != null) saving = saving.min(rebate.getMaximumDiscountAmount());
+            // Match checkout: the last qualifying configured slab wins.
+            tiers.put(minimum, saving);
+        }
+        return tiers.entrySet().stream().map(t -> new PublicTier(t.getKey(), t.getValue())).toList();
     }
 
     @Transactional(readOnly = true)
