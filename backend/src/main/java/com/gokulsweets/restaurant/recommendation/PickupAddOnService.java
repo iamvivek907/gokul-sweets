@@ -97,6 +97,7 @@ public class PickupAddOnService {
   var ranked=new LinkedHashMap<Long,String>();
   best.values().stream().sorted(Comparator.comparingDouble(Pair::confidence).reversed().thenComparing(Comparator.comparingLong(Pair::count).reversed()).thenComparingLong(Pair::candidate)).forEach(p->ranked.put(p.candidate(),"Often ordered with "+products.get(p.seed()).name()));
   jdbc.query("SELECT product_id,SUM(order_count) n FROM analytics_product_daily WHERE branch_id=? AND business_date BETWEEN ? AND ? GROUP BY product_id HAVING SUM(order_count)>=3 ORDER BY n DESC,product_id ASC",(rs,n)->rs.getLong(1),branch,today.minusDays(29),today).stream().filter(id->products.containsKey(id)&&!cart.contains(id)).forEach(id->ranked.putIfAbsent(id,"A branch favourite"));
+  if(browse)products.keySet().stream().sorted().filter(id->!cart.contains(id)).forEach(id->ranked.putIfAbsent(id,"From the branch menu"));
   // Checkout gets a bounded mix in one request; switching tabs needs no network read.
   var chosen=new LinkedHashSet<Long>();
   if(browse){
