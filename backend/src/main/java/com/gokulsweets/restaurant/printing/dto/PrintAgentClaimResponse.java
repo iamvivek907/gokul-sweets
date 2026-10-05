@@ -88,7 +88,13 @@ public record PrintAgentClaimResponse(
 
             Integer quantity,
 
-            Integer displayOrder
+            Integer displayOrder,
+            String saleMode,
+            Integer weightGrams,
+            String quantityLabel
     ) {
+        public Item(String productName, Integer quantity, Integer displayOrder) {
+            this(productName,quantity,displayOrder,"UNIT",null,quantity+" pcs");
+        }
     }
 }

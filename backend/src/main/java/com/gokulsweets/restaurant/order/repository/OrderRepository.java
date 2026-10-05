@@ -155,6 +155,11 @@ public interface OrderRepository
                             )
                         )
                     )
+                    OR (ps.slotDate=:earlyDate
+                        AND EXISTS(SELECT i.id FROM OrderItem i WHERE i.order=o)
+                        AND NOT EXISTS(SELECT i.id FROM OrderItem i WHERE i.order=o
+                            AND NOT EXISTS(SELECT bp.id FROM BranchProduct bp WHERE bp.branch=b
+                                AND bp.product=i.product AND bp.earlyPreparationAllowed=true)))
               )
             ORDER BY
                 ps.slotDate ASC,
@@ -196,6 +201,8 @@ public interface OrderRepository
 
             @Param("adminOverrideCutoffTime")
             LocalTime adminOverrideCutoffTime,
+
+            @Param("earlyDate") LocalDate earlyDate,
 
             Pageable pageable
     );
@@ -241,6 +248,11 @@ public interface OrderRepository
                             )
                         )
                     )
+                    OR (ps.slotDate=:earlyDate
+                        AND EXISTS(SELECT i.id FROM OrderItem i WHERE i.order=o)
+                        AND NOT EXISTS(SELECT i.id FROM OrderItem i WHERE i.order=o
+                            AND NOT EXISTS(SELECT bp.id FROM BranchProduct bp WHERE bp.branch=b
+                                AND bp.product=i.product AND bp.earlyPreparationAllowed=true)))
               )
             """)
     long countPreparationQueueCandidates(
@@ -276,7 +288,9 @@ public interface OrderRepository
             LocalDate adminOverrideCutoffDate,
 
             @Param("adminOverrideCutoffTime")
-            LocalTime adminOverrideCutoffTime
+            LocalTime adminOverrideCutoffTime,
+
+            @Param("earlyDate") LocalDate earlyDate
     );
 
 

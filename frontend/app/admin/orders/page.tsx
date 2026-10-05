@@ -1,8 +1,9 @@
 "use client";
+import Link from "next/link";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T} from "@/lib/language";
 
-import KitchenBoard from "@/components/admin/KitchenBoard";
+
 import PickupHandoverAction from "@/components/admin/PickupHandoverAction";
 import {formatWeight} from "@/lib/orderQuantity";
 
@@ -2910,7 +2911,7 @@ export default function AdminOrdersPage() {
                     }
 
 
-                    {useKitchenBoard && selectedBranchId!==null && authorization!==null && <KitchenBoard key={selectedBranchId} branchId={selectedBranchId} authorization={authorization} canStart={canStartPreparation} canReady={hasPermission("ORDER_MARK_READY")} canPickup={hasPermission("ORDER_MARK_PICKED_UP")} onView={openOrderDetail} onChanged={()=>{void refreshPreparationQueue();void refreshOrders();}}/>}
+                    {useKitchenBoard && <Link href="/admin/order-desk" className="mt-6 flex min-h-12 items-center justify-between rounded-2xl bg-[#7a1625] px-5 py-4 font-semibold text-white"><T text="Open order desk"/><span aria-hidden="true">→</span></Link>}
                     {/* OPERATIONAL PREPARATION QUEUE */}
 
                     {!useKitchenBoard && <>

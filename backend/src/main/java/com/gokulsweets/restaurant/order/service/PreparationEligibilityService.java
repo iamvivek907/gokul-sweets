@@ -159,6 +159,16 @@ public class PreparationEligibilityService {
                 );
 
 
+        // Counter-only orders may be packed early on their service day. Mixed baskets
+        // and missing policies keep the existing preparation window.
+        if (order.getId() != null && order.getBranch() != null &&
+                Boolean.TRUE.equals(jdbc.queryForObject("""
+                    SELECT COUNT(*)>0 AND BOOL_AND(COALESCE(bp.early_preparation_allowed,FALSE))
+                    FROM order_items i LEFT JOIN branch_products bp
+                      ON bp.product_id=i.product_id AND bp.branch_id=? WHERE i.order_id=?
+                    """, Boolean.class, order.getBranch().getId(), order.getId()))) {
+            leadMinutes = Math.max(leadMinutes, pickupAt.getHour()*60+pickupAt.getMinute());
+        }
         return eligibility(pickupAt, leadMinutes, now);
     }
 

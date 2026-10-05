@@ -496,7 +496,9 @@ public class KotService {
                                                         .getId(),
                                                 item.getProductName(),
                                                 item.getQuantity(),
-                                                item.getDisplayOrder()
+                                                item.getDisplayOrder(),
+                                                item.getSaleMode(),
+                                                item.getWeightGrams()
                                         )
                         )
                         .toList();
@@ -590,6 +592,9 @@ public class KotService {
                     orderItem.getQuantity()
             );
 
+
+            kotItem.setSaleMode(orderItem.getSaleMode().name());
+            kotItem.setWeightGrams(orderItem.getWeightGrams());
 
             kotItem.setDisplayOrder(
                     displayOrder

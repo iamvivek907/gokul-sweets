@@ -48,6 +48,10 @@ public class BranchProduct {
     @Column(nullable = false)
     private boolean available = true;
 
+    /** Explicit counter-only policy; never infer safe early packing from a category name. */
+    @Column(name = "early_preparation_allowed", nullable = false)
+    private boolean earlyPreparationAllowed;
+
     @Column(nullable = false)
     private Integer displayOrder = 0;
 

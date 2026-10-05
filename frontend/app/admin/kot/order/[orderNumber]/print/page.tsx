@@ -1,4 +1,5 @@
 "use client";
+import {formatWeight} from "@/lib/orderQuantity";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T} from "@/lib/language";
 
@@ -518,20 +519,10 @@ export default function AdminKotPrintPage() {
     }
 
 
-    const totalQuantity =
-        kot
-            ? kot.items.reduce(
-                (
-                    total,
-                    item
-                ) =>
-                    total
-                    +
-                    item.quantity,
-                0
-            )
-            : 0;
-
+    const totalQuantity = kot ? [
+        kot.items.filter(item=>item.saleMode!=="WEIGHT").reduce((n,item)=>n+item.quantity,0)+" pcs",
+        formatWeight(kot.items.filter(item=>item.saleMode==="WEIGHT").reduce((n,item)=>n+(item.weightGrams??0),0))
+    ].filter(value=>value!=="0 pcs"&&value!=="0 g").join(" · ") : "";
 
     const waitingForKot =
         ready
@@ -1078,7 +1069,7 @@ export default function AdminKotPrintPage() {
                     <div
                         className="
                             grid
-                            grid-cols-[10mm_1fr]
+                            grid-cols-[20mm_1fr]
                             gap-2
                             text-[11px]
                             font-black
@@ -1124,7 +1115,7 @@ export default function AdminKotPrintPage() {
                                         }
                                         className="
                                             grid
-                                            grid-cols-[10mm_1fr]
+                                            grid-cols-[20mm_1fr]
                                             gap-2
                                             text-[14px]
                                             font-bold
@@ -1140,7 +1131,7 @@ export default function AdminKotPrintPage() {
                                             "
                                         >
                                             {
-                                                item.quantity
+                                                item.saleMode === "WEIGHT" ? formatWeight(item.weightGrams) : `${item.quantity} pcs`
                                             }
                                         </span>
 

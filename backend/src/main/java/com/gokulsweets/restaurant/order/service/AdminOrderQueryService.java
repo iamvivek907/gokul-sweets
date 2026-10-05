@@ -281,6 +281,7 @@ public class AdminOrderQueryService {
                                         .toLocalDate(),
                                 cutoffs.adminOverride()
                                         .toLocalTime(),
+                                now.toLocalDate(),
 
                                 queuePage
                         );
@@ -423,7 +424,8 @@ public class AdminOrderQueryService {
                                 cutoffs.adminOverride()
                                         .toLocalDate(),
                                 cutoffs.adminOverride()
-                                        .toLocalTime()
+                                        .toLocalTime(),
+                                now.toLocalDate()
                         ) + deliveryPreparationQueue.eligibleCount(branchId, now);
 
 

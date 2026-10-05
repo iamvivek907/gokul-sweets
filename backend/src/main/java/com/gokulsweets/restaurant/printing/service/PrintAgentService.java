@@ -638,9 +638,14 @@ public class PrintAgentService {
     ) {
 
         return new PrintAgentClaimResponse.Item(
-                item.getProductName(),
+                "WEIGHT".equals(item.getSaleMode()) && item.getWeightGrams()!=null
+                    ? item.getProductName()+" · "+(item.getWeightGrams()>=1000 ? java.math.BigDecimal.valueOf(item.getWeightGrams()).divide(java.math.BigDecimal.valueOf(1000)).stripTrailingZeros().toPlainString()+" kg" : item.getWeightGrams()+" g")
+                    : item.getProductName(),
                 item.getQuantity(),
-                item.getDisplayOrder()
+                item.getDisplayOrder(),item.getSaleMode(),item.getWeightGrams(),
+                "WEIGHT".equals(item.getSaleMode()) && item.getWeightGrams()!=null
+                    ? (item.getWeightGrams()>=1000 ? java.math.BigDecimal.valueOf(item.getWeightGrams()).divide(java.math.BigDecimal.valueOf(1000)).stripTrailingZeros().toPlainString()+" kg" : item.getWeightGrams()+" g")
+                    : item.getQuantity()+" pcs"
         );
     }
 

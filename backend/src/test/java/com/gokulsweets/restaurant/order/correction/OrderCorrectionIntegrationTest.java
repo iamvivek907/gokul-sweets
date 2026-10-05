@@ -86,6 +86,7 @@ class OrderCorrectionIntegrationTest {
                 + " name='MANAGER')) RETURNING id",
             Long.class,
             "correction-" + UUID.randomUUID()));
+    var role=new com.gokulsweets.restaurant.staff.Role();role.setName("MANAGER");user.setRole(role);
     when(staff.getCurrentStaff()).thenReturn(user);
     reference = ("FIX-" + UUID.randomUUID()).toUpperCase(Locale.ROOT);
     subject = UUID.randomUUID();
@@ -214,6 +215,18 @@ class OrderCorrectionIntegrationTest {
 
   long branchOf() {
     return jdbc.queryForObject("SELECT branch_id FROM orders WHERE id=?", Long.class, order);
+  }
+
+  @Test
+  void customerRequestedPickupTimingChangePreservesPaymentAndIsIdempotent() {
+    long next=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity,booked_count) VALUES (?,DATE '2026-10-05','16:00','16:30',20,0) RETURNING id",Long.class,source);
+    var input=new OrderCorrectionService.Reschedule(UUID.randomUUID(),next,"Customer asked for a later pickup");
+    corrections.reschedule(reference,input);corrections.reschedule(reference,input);
+    assertThat(jdbc.queryForObject("SELECT pickup_slot_id FROM orders WHERE id=?",Long.class,order)).isEqualTo(next);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM order_corrections WHERE order_id=? AND kind='RESCHEDULE'",Integer.class,order)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT payment_status FROM payments WHERE id=?",String.class,payment)).isEqualTo("PAID");
+    jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?",order);
+    assertThatThrownBy(()->corrections.reschedule(reference,new OrderCorrectionService.Reschedule(UUID.randomUUID(),sourceSlot,"Customer asked"))).hasMessageContaining("before preparation");
   }
 
   @Test

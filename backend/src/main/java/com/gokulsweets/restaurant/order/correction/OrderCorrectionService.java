@@ -266,8 +266,24 @@ public class OrderCorrectionService {
     return new ResponseStatusException(HttpStatus.CONFLICT, text);
   }
 
+  public record Reschedule(UUID requestKey, long targetSlotId, String reason) {}
+
+  @Transactional
+  public Summary reschedule(String number, Reschedule input) {
+    var order=locked(number);
+    if(!Set.of("OWNER_ADMIN","MANAGER").contains(staff.getCurrentStaff().getRole().getName()))
+      throw new org.springframework.security.access.AccessDeniedException("Only admin or manager can change pickup timing.");
+    if(input==null)throw new IllegalArgumentException("Choose a pickup slot and reason.");
+    return movePickup(number,new Transfer(input.requestKey(),order.getBranch().getId(),input.targetSlotId(),input.reason()),true);
+  }
+
   @Transactional
   public Summary transfer(String number, Transfer input) {
+    return movePickup(number,input,false);
+  }
+
+  private Summary movePickup(String number, Transfer input, boolean reschedule) {
+    String kind=reschedule?"RESCHEDULE":"TRANSFER";
     var order = locked(number);
     staff.requirePermission(PermissionName.ORDER_CANCEL);
     staff.requirePermission(PermissionName.ORDER_VIEW);
@@ -282,16 +298,19 @@ public class OrderCorrectionService {
             input.requestKey());
     if (!replay.isEmpty()) {
       var row = replay.getFirst();
-      if (!"TRANSFER".equals(row.get("kind"))
+      if (!kind.equals(row.get("kind"))
           || ((Number) row.get("target_branch_id")).longValue() != input.targetBranchId()
           || ((Number) row.get("target_slot_id")).longValue() != input.targetSlotId()
           || !input.reason().trim().equals(row.get("reason")))
         throw conflict("This request key was already used for another action.");
       return summary(order, true);
     }
-    if (!summary(order, true).canTransfer() || order.getBranch().getId() == input.targetBranchId())
+    if (!summary(order, true).canTransfer() || (!reschedule && order.getBranch().getId() == input.targetBranchId())
+        || Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM kot WHERE order_id=?)",Boolean.class,order.getId())))
       throw conflict(
-          "Only a confirmed pickup order before preparation can move to another branch.");
+          "Pickup can change only before preparation starts and before a KOT exists.");
+    if(reschedule && order.getPickupSlot().getId()==input.targetSlotId())
+      throw conflict("Choose a different pickup slot.");
     // Lock both parent policy rows in stable order to serialize closures and pricing changes.
     jdbc.queryForList(
         "SELECT id FROM branches WHERE id IN (?,?) ORDER BY id FOR SHARE",
@@ -381,9 +400,10 @@ public class OrderCorrectionService {
     jdbc.update(
         "INSERT INTO"
             + " order_corrections(order_id,request_key,kind,source_branch_id,target_branch_id,target_slot_id,actor,reason)"
-            + " VALUES (?,?,'TRANSFER',?,?,?,?,?)",
+            + " VALUES (?,?,?,?,?,?,?,?)",
         order.getId(),
         input.requestKey(),
+        kind,
         oldBranch,
         input.targetBranchId(),
         input.targetSlotId(),
@@ -393,7 +413,7 @@ public class OrderCorrectionService {
     notifications.correction(
         order.getId(),
         input.requestKey(),
-        "Pickup branch changed",
+        reschedule?"Pickup time changed":"Pickup branch changed",
         "Collect this order only at "
             + order.getBranch().getName()
             + ". Your order number and pickup code stay the same. Check the updated pickup time in"

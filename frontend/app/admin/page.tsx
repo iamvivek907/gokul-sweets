@@ -28,13 +28,13 @@ const dashboardActions:
 
     {
         title:
-            "Live Orders",
+            "Order desk",
 
         description:
             "View incoming paid orders and manage preparation and pickup status.",
 
         href:
-            "/admin/orders",
+            "/admin/order-desk",
 
         permissions: [
             "ORDER_VIEW",
