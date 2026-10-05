@@ -331,79 +331,19 @@ function NavigationIcon({
     }
 
 
-    if (
-        icon === "menu"
-    ) {
-
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-                className={className}
-            >
-                <path
-                    d="M5 10.5h14a7 7 0 0 0-14 0Z"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-                <path
-                    d="M3.5 10.5h17"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-                <path
-                    d="M7 14h10"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-                <path
-                    d="M9 17.5h6"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-                <path
-                    d="M12 3.5v1"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-            </svg>
-        );
+    if (icon === "menu") {
+        return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="5.5" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="M2 4v5h3V4M3.5 4v16M21 4v16M21 4c-3 3-3 7 0 7" />
+        </svg>;
     }
 
-
-    if (
-        icon === "cart"
-    ) {
-
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-                className={className}
-            >
-                <path
-                    d="M3.5 5h2l1.7 9.1a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 1.9-1.5L20.5 8H6.1"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-                <circle
-                    cx="9.5"
-                    cy="19"
-                    r="1"
-                    strokeWidth="1.8"
-                />
-                <circle
-                    cx="17"
-                    cy="19"
-                    r="1"
-                    strokeWidth="1.8"
-                />
-            </svg>
-        );
+    if (icon === "cart") {
+        return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 7h14l1 12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2L5 7ZM9 7V5a3 3 0 0 1 6 0v2" />
+            <path d="M8.5 14a3.5 3.5 0 0 1 7 0h-7ZM8.5 17h7" />
+        </svg>;
     }
 
 

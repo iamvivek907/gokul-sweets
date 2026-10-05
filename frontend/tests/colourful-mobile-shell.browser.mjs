@@ -41,6 +41,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[1280,true],[
  }else assert.equal(await page.getByRole('button',{name:'Refresh',exact:true}).count(),1,'desktop and flag-OFF refresh retained');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
  await page.goto(`${base}/about`);await page.getByRole('contentinfo',{name:'Customer footer'}).waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+ const adminLink=page.getByRole('contentinfo',{name:'Customer footer'}).getByRole('link',{name:'Admin sign in',exact:true});assert.equal(await adminLink.getAttribute('href'),'/admin');assert.equal(await adminLink.evaluate(n=>new URL(n.href).origin),base,'admin entry follows the current deployment domain');
  if(compact){assert.ok((await page.locator('.customer-site-footer').evaluate(n=>getComputedStyle(n).backgroundImage)).includes('gradient'));assert.equal(await page.locator('.customer-footer-brand-mark').isVisible(),true);if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-shell-${width}.png`,fullPage:true});}
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await context.close();console.log(`Colourful shell ${width}px enabled=${enabled} passed`);
 }}finally{await browser.close();}
