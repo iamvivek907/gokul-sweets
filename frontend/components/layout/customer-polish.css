@@ -200,7 +200,7 @@
 .future-storefront[data-customer-route] .gokul-product-card.gokul-menu-product-card>.product-card-image{order:0;width:100%;height:140px;margin:0;border-radius:12px}
 .future-storefront[data-customer-route] .gokul-product-card>.product-card-copy{order:1;padding:8px 0}
 .future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy h3{font-size:12px;line-height:1.4;min-height:34px}
-.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy>p{display:none}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy>p:not([role="status"]){display:none}
 .future-storefront[data-customer-route] .gokul-menu-product-card .product-card-controls{bottom:5px;right:0;width:100%;min-height:40px}
 .future-storefront .menu-availability-chip{font-size:9px;max-width:100%;top:5px;right:5px}
 }
