@@ -37,7 +37,18 @@ try{
   if(compact){assert.ok((await page.locator('.customer-site-header').boundingBox()).height<=110,'header is at most two short rows');assert.equal(await page.locator('.branch-rated-grid article').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ')[0]),'88px');}
   else assert.equal(await page.locator('.branch-rated-grid article').evaluate(e=>getComputedStyle(e).display),'block');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-  if(compact){for(const box of await page.locator('.branch-home .gokul-branch-tabs :is(a,button):visible').all()){const b=await box.boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width,'branch tabs fit without clipping');}assert.equal(await page.locator('.gokul-branch-tabs [aria-current=page]').evaluate(e=>getComputedStyle(e).color),'rgb(255, 255, 255)','active tab remains readable');assert.equal(await page.locator('.gokul-branch-tabs [aria-current=page]').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(8, 127, 66)','active tab uses the approved action surface');assert.equal(await page.locator('.branch-request-desktop').isVisible(),false);assert.equal(await page.locator('.branch-welcome-mobile').isVisible(),true);}
+  if(compact){
+   for(const box of await page.locator('.branch-home .gokul-branch-tabs :is(a,button):visible').all()){const b=await box.boundingBox();assert.ok(b.x>=0&&b.x+b.width<=width,'branch tabs fit without clipping');}
+   const tabs=page.getByRole('navigation',{name:'Branch pages'});
+   assert.equal(await tabs.getByRole('button',{name:'Home',exact:true}).isVisible(),false,'current Home action is not duplicated');
+   assert.equal(await page.locator('.branch-request-desktop').isVisible(),false);assert.equal(await page.locator('.branch-welcome-mobile').isVisible(),false,'duplicate branch welcome is omitted');
+   await tabs.getByRole('button',{name:'Branch details',exact:true}).click();
+   const active=tabs.locator('[aria-current=page]:visible');await active.waitFor();
+   assert.equal(await active.evaluate(e=>getComputedStyle(e).color),'rgb(143, 24, 56)','active tab uses readable maroon ink');
+   assert.equal(await active.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(248, 237, 241)','active tab uses the approved rose surface');
+   assert.equal(await tabs.getByRole('button',{name:'Home',exact:true}).isVisible(),true,'Home remains accessible from details');
+   await tabs.getByRole('button',{name:'Home',exact:true}).click();await page.locator('.branch-rated-grid article').waitFor();
+  }
   if(process.env.SCREENSHOT_DIR&&compact){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/branch-home-${width}.png`,fullPage:true});}
   await page.goto(`${base}/branches/2`);await page.locator('.branch-rated-grid article').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   const celebration=page.getByRole('button',{name:'Explore this branch · Bulk order · Other Gokul branch',exact:true});
