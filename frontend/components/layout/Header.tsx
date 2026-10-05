@@ -1,4 +1,5 @@
 "use client";
+import CustomerIcon from "@/components/customer/CustomerIcon";
 import {T} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -95,7 +96,7 @@ export default function Header() {
                     {features?.cartSwitchPreview || cart.isEmpty
                         ? <BranchSelector locationControl />
                         : <Link href="/cart" className="gokul-location-control future-branch-review" aria-label="Review cart before changing branch">
-                            <span className="gokul-location-pin" aria-hidden="true">●</span>
+                            <span className="gokul-location-pin" aria-hidden="true"><CustomerIcon kind="pin"/></span>
                             <span className="gokul-location-name"><small><T text="PICKUP BRANCH" /></small><strong>{branch?.name ?? "Choose branch"}</strong></span>
                             <span className="gokul-location-chevron" aria-hidden="true">⌄</span>
                         <LinkFeedback /></Link>}

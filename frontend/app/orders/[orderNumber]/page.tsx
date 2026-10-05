@@ -358,7 +358,7 @@ export default function OrderDetailPage() {
 
     if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
         <NotificationReadOnOpen orderNumber={orderNumber} />
-        <MobileOrderDetail order={order} status={status} refreshing={refreshing} onRefresh={() => void handleRefresh()} trackingEnabled={trackingEnabled} pastPickupWindow={pastPickupWindow} />
+        <MobileOrderDetail order={order} status={status} onRefresh={() => void handleRefresh()} trackingEnabled={trackingEnabled} pastPickupWindow={pastPickupWindow} />
     </AppShell>;
 
     return (

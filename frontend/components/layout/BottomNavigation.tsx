@@ -164,6 +164,7 @@ export default function BottomNavigation() {
                                     href={
                                         item.icon === "home" ? homeHref : item.href
                                     }
+                                    data-nav-icon={item.icon}
                                     aria-current={
                                         active
                                             ? "page"

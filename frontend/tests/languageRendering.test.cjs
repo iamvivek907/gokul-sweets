@@ -6,7 +6,8 @@ const React=require('react');
 const {renderToStaticMarkup}=require('react-dom/server');
 function load(file,dependencies={}){const exports={};const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText;new Function('require','exports',code)(name=>dependencies[name]??require(name),exports);return exports;}
 const dictionary=load('lib/hindi.ts');
-const {T,translate}=load('lib/language.tsx',{'./hindi':dictionary});
+const customerIcon=load('components/customer/CustomerIcon.tsx');
+const {T,translate}=load('lib/language.tsx',{'./hindi':dictionary,'@/components/customer/CustomerIcon':customerIcon});
 test('translated fragments preserve punctuation and inline values',()=>{
  const fragment=React.createElement(React.Fragment,null,'Choose another time',React.createElement(T,{text:'. Your cart is unchanged.'}));
  assert.equal(renderToStaticMarkup(fragment),'Choose another time. Your cart is unchanged.');

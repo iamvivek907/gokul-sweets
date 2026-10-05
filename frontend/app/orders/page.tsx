@@ -1,4 +1,5 @@
 "use client";
+import CustomerIcon from "@/components/customer/CustomerIcon";
 import OrderRatingLink from "@/components/order/OrderRatingLink";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T,useTranslation} from "@/lib/language";
@@ -118,6 +119,14 @@ export default function OrdersPage() {
         window.addEventListener("gokul-customer-identity-changed", refresh);
         return () => window.removeEventListener("gokul-customer-identity-changed", refresh);
     }, []);
+
+    useEffect(() => {
+        if (!compact) return;
+        const refresh = () => {if (document.visibilityState === "visible" && navigator.onLine) setReloadVersion(value => value + 1);};
+        document.addEventListener("visibilitychange", refresh);
+        window.addEventListener("online", refresh);
+        return () => {document.removeEventListener("visibilitychange", refresh);window.removeEventListener("online", refresh);};
+    }, [compact]);
 
     const requestKey =
         useMemo(
@@ -311,7 +320,7 @@ export default function OrdersPage() {
                         </p>
                     </div>
 
-                    {hasOrders && (
+                    {hasOrders && !compact && (
                         <button
                             type="button"
                             disabled={loading}
@@ -426,7 +435,7 @@ export default function OrdersPage() {
                                 const status = getOrderStatusPresentation(order.orderStatus, order.fulfillmentType);
 
                                 if (compact) return <article className="mobile-order-card" data-order-tone={status.tone} key={order.orderNumber}>
-                                    <div className="mobile-order-card-heading"><strong>{order.branchName}</strong><Link href="/menu">View menu</Link></div>
+                                    <div className="mobile-order-card-heading"><strong><span className="mobile-order-card-icon"><CustomerIcon kind="receipt"/></span>{order.branchName}</strong><Link href="/menu">View menu</Link></div>
                                     <p>{formatBusinessTimestamp(order.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST</p>
                                     <p>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} · {order.pickupDate ? formatOrderDate(order.pickupDate) : order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending"}</p>
                                     <div><span className={getStatusClasses(status.tone)}>{status.label}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
