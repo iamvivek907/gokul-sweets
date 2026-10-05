@@ -20,7 +20,10 @@ try {
         else if (path === "/api/customer/identity/notifications") {
             if (failLoad) return route.abort("failed");
             json = {messages: [{...message, readAt: read ? "2026-09-29T18:40:00Z" : null},
-                {...message, id: 43, title: "Occasion deposit received", targetType: "OCCASION", targetId: "request-43", readAt: "2026-09-29T18:40:00Z"}, {...message,id:44,kind:"PICKED_UP",targetId:"COMPLETED",title:"Pickup completed",readAt:"2026-09-29T18:40:00Z"}], unreadCount: read ? 0 : 1, nextBefore: null, readThrough: 44};
+                {...message, id: 43, title: "Occasion deposit received", targetType: "OCCASION", targetId: "request-43", readAt: "2026-09-29T18:40:00Z"}, {...message,id:44,kind:"PICKED_UP",targetId:"COMPLETED",title:"Pickup completed",readAt:"2026-09-29T18:40:00Z"}, {...message,id:41,title:"Order confirmed",readAt:"2026-09-29T18:40:00Z"}], unreadCount: read ? 0 : 1, nextBefore: null, readThrough: 44};
+            const params = new URL(route.request().url()).searchParams;
+            if (params.get("unreadOnly") === "true") json.messages = json.messages.filter(item => !item.readAt);
+            if (params.get("search")) json.messages = json.messages.filter(item => (item.title + item.targetId).toLowerCase().includes(params.get("search").toLowerCase()));
         } else if (path.endsWith("/notifications/read-target") || path.endsWith("/notifications/read-all")) {
             const input = route.request().postDataJSON();
             if (path.endsWith("read-target")) assert.equal(input.targetId, "GKS-EXACT-42");
@@ -62,6 +65,32 @@ try {
     assert.equal(await page.getByRole("link", {name: "View bulk request"}).getAttribute("href"), "/occasions/requests?enquiry=request-43");
     assert.match(await page.locator("time").first().textContent(), /30 Sept|30 Sep/);
     assert.match(await page.locator("time").first().textContent(), /12:05.*am.*IST/i);
+    assert.equal(await page.getByRole('region', {name:'Unread updates', exact:true}).locator('.notification-group').count(), 1);
+    assert.equal(await page.getByRole('region', {name:'Read updates', exact:true}).locator('.notification-group').count(), 2);
+    assert.equal(await page.locator('.notification-earlier').getAttribute('open'), null);
+    await page.getByText('Earlier updates · 1', {exact:true}).click();
+    await page.getByText('Order confirmed · Read', {exact:true}).waitFor();
+    await page.getByText('Earlier updates · 1', {exact:true}).click();
+    await page.getByRole('button',{name:'Unread',exact:true}).click();
+    await page.getByRole('link',{name:'View bulk request'}).waitFor({state:'hidden'});
+    assert.equal(await page.getByRole('button',{name:'Unread',exact:true}).getAttribute('aria-pressed'),'true');
+    await page.getByRole('button',{name:'All updates',exact:true}).click();
+    await page.getByRole('link',{name:'View bulk request'}).waitFor();
+    await page.getByRole('searchbox',{name:'Search all updates'}).fill('no-matching-order');
+    await page.getByText('No updates match this view. Try All updates or another search.').waitFor();
+    await page.getByRole('searchbox',{name:'Search all updates'}).fill('');
+    await page.getByRole('heading',{name:'Payment received'}).waitFor();
+    for (const width of [320,390,640,1440]) {
+        await page.setViewportSize({width,height:900});
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+        assert.equal(await page.getByRole('button',{name:'Refresh inbox'}).isVisible(),false);
+        await page.getByRole('heading',{name:'Notifications',exact:true}).click();
+        if(process.env.NOTIFICATION_SCREENSHOT_DIR) {
+            await page.evaluate(()=>scrollTo(0,0));
+            await page.screenshot({path:`${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-${width}.png`});
+        }
+    }
+    await page.setViewportSize({width:390,height:844});
     await page.getByText("Notification settings", {exact: true}).click();
     assert.equal(await page.getByRole("checkbox", {name: "Include optional offers in my inbox when available"}).isDisabled(), true);
     const review=page.getByRole("link",{name:"Share an optional review"});
@@ -82,6 +111,7 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
     if (process.env.NOTIFICATION_SCREENSHOT_DIR) {await page.evaluate(() => window.scrollTo(0, 0)); await page.screenshot({path: `${process.env.NOTIFICATION_SCREENSHOT_DIR}/notifications-mobile.png`, fullPage:true});}
     read = false;
+    await page.getByText("More options",{exact:true}).click();
     await page.getByRole("button", {name: "Refresh inbox"}).click();
     await page.getByRole("heading", {name: /Notification inbox.*1 unread/}).waitFor();
     await page.locator('a[href="/orders/GKS-EXACT-42"]').evaluate(link => link.addEventListener("click", event => event.preventDefault(), {once:true}));

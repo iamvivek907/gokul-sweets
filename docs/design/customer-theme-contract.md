@@ -125,3 +125,8 @@ Below 641px, the enabled shared shell uses a maroon brand with a pale rose heade
 The shared footer includes Admin sign in at `/admin`, relative to the current deployment host, with prefetch disabled. It retains the existing admin authentication and permission checks. Menu uses a plate with cutlery and Cart a takeaway food bag; labels, routes and cart count remain unchanged.
 
 Mobile navigation keeps a white shared surface, restrained pastel icon tiles and dark inactive labels. The current route alone receives a solid purpose-colour tile with a white icon, a subtle tinted background, a top selection bar and a bold label. Selection therefore remains identifiable without colour alone. Labels wrap instead of truncating at narrow widths or in Hindi. Text contrast is checked at 4.5:1 and icon contrast at 3:1 on rendered backgrounds; 44px targets and reduced-motion treatment remain.
+
+
+## Focused customer notification inbox
+
+The enabled customer shell uses maroon All updates/Unread filters, visible search and separate Unread/Read sections. Each order or bulk request has one latest-event card, with its earlier loaded events collapsed behind a labelled disclosure. A blue dot and explicit section identify unread groups; pastel green progress, amber exception and blue general-update icons supplement the real event title. Complete messages, IST dates, exact order links, optional reviews, read acknowledgements, pagination, verified-account isolation and notification consent remain available. Refresh and retention help sit inside More options; settings stay collapsed. Colours are scoped to the effective customer shell.

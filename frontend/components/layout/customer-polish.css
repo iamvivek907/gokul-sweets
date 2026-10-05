@@ -300,3 +300,46 @@
 .future-storefront[data-customer-route] .gokul-floating-cart{bottom:calc(96px + env(safe-area-inset-bottom))}
 .future-storefront[data-customer-route] .mobile-items-picker{bottom:calc(236px + env(safe-area-inset-bottom))}
 }
+
+/* Focused inbox: order groups and secondary tools with restrained status colour. */
+.future-storefront[data-customer-route] .notification-toolbar{align-items:center;gap:12px}
+.future-storefront[data-customer-route] .notification-toolbar h2{font-size:14px;color:#454b55}
+.future-storefront[data-customer-route] .notification-toolbar .notification-toolbar-actions{width:auto;display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.future-storefront[data-customer-route] .notification-tools{max-width:100%;font-size:13px}
+.future-storefront[data-customer-route] .notification-tools summary{color:#454b55;border-color:#e7e9ed;background:#fff;list-style:none;display:flex;align-items:center;padding:8px 12px}
+.future-storefront[data-customer-route] .notification-tools[open]{flex-basis:100%;border:1px solid #e7e9ed;border-radius:12px;background:#fff;padding:8px}
+.future-storefront[data-customer-route] .notification-tools[open] summary{margin-bottom:8px}
+.future-storefront[data-customer-route] .notification-help{max-width:48ch;color:#454b55;padding:0 4px}
+.future-storefront[data-customer-route] .notification-filters{background:transparent;padding:0}
+.future-storefront[data-customer-route] .notification-view-switch{background:#eceef3;padding:4px;border-radius:14px}
+.future-storefront[data-customer-route] .notification-view-switch button{color:#454b55;border:0;background:transparent;border-radius:10px}
+.future-storefront[data-customer-route] .notification-view-switch button[aria-pressed=true]{background:#8f1838!important;color:#fff!important;box-shadow:0 2px 6px #20242b12}
+.future-storefront[data-customer-route] .notification-filters input{background:#fff;border-color:#e0e4ec;color:#20242b}
+.future-storefront[data-customer-route] .notification-section-heading{color:#454b55;display:flex;align-items:center;gap:6px}
+.future-storefront[data-customer-route] .notification-section-heading span{color:#656b75;font-weight:400}
+.future-storefront[data-customer-route] .notification-group{border-left:3px solid #dbe2ee}
+.future-storefront[data-customer-route] .notification-group[data-unread=true]{border-left-color:#2359ac}
+.future-storefront[data-customer-route] .notification-card .notification-kind-icon{background:#eef4ff!important;color:#2359ac!important;border-radius:13px!important}
+.future-storefront[data-customer-route] .notification-group[data-notification-tone=success] .notification-kind-icon{background:#e4f5e9!important;color:#087443!important}
+.future-storefront[data-customer-route] .notification-group[data-notification-tone=attention] .notification-kind-icon{background:#fff1dc!important;color:#8e570c!important}
+.future-storefront[data-customer-route] .notification-unread-dot{margin-top:5px;background:#2359ac!important}
+.future-storefront[data-customer-route] .notification-kind-label{color:#656b75;font-size:11px;margin-bottom:3px}
+.future-storefront[data-customer-route] .notification-card .notification-title{font-size:15px;line-height:1.45;color:#20242b;overflow-wrap:anywhere}
+.future-storefront[data-customer-route] .notification-message{color:#454b55;overflow-wrap:anywhere}
+.future-storefront[data-customer-route] .notification-earlier{background:#fafbfe;border-color:#eceef3;color:#454b55}
+.future-storefront[data-customer-route] .notification-earlier summary{min-height:32px;display:flex;align-items:center}
+.future-storefront[data-customer-route] .notification-actions{gap:8px}
+.future-storefront[data-customer-route] .notification-actions a{overflow-wrap:anywhere;max-width:100%}
+.future-storefront[data-customer-route] .notification-actions button{font-size:12px;color:#454b55}
+@media(max-width:640px){
+ .future-storefront[data-customer-route] .notification-toolbar{display:block}
+ .future-storefront[data-customer-route] .notification-toolbar h2{margin-bottom:10px}
+ .future-storefront[data-customer-route] .notification-toolbar .notification-toolbar-actions{width:100%;justify-content:space-between}
+ .future-storefront[data-customer-route] .notification-tools[open]{width:100%}
+}
+.future-storefront[data-customer-route] :is(.notification-tools,.notification-earlier)>summary::after{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin-left:10px;flex:none}
+.future-storefront[data-customer-route] :is(.notification-tools,.notification-earlier)[open]>summary::after{transform:rotate(225deg)}
+@media(max-width:640px){
+ .future-storefront[data-customer-route] .customer-notifications{padding-left:16px!important;padding-right:16px!important}
+ .future-storefront[data-customer-route] .customer-notification-inbox{background:transparent!important}
+}
