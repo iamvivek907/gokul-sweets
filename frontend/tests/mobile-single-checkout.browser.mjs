@@ -78,7 +78,19 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  const ready=async()=>{await page.getByRole('button',{name:'Pay now',exact:true}).waitFor();const branch=page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true});if(await branch.count())await branch.check();return page.getByRole('button',{name:'Pay now',exact:true}).waitFor().then(()=>page.waitForFunction(()=>{const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Pay now');return !!button&&!button.disabled;},null,{timeout:15000}));};
  assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).getAttribute('data-payment-ready'),'false');
  await page.getByRole('button',{name:'Pay now',exact:true}).click();await page.getByRole('status').filter({hasText:'Confirm this collection branch'}).waitFor();assert.equal(orders.length,0);await page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true}).check();
- await ready();if(scenario==='pincode-change'){
+ await ready();
+ if(scenario==='cart-removal'){
+  const cart=page.getByRole('region',{name:'Cart items',exact:true});
+  assert.equal(await cart.evaluate(node=>node.nextElementSibling?.getAttribute('aria-label')),'Pickup add-ons','Complete your meal immediately follows items');
+  for(const button of [page.getByRole('button',{name:'Clear cart',exact:true}),page.getByRole('button',{name:'Remove Paneer meal Half from cart',exact:true})]){
+   const metrics=await button.evaluate(node=>{const lum=c=>{const x=c.match(/\d+/g).slice(0,3).map(Number).map(v=>{const s=v/255;return s<=.04045?s/12.92:((s+.055)/1.055)**2.4;});return x[0]*.2126+x[1]*.7152+x[2]*.0722;};const style=getComputedStyle(node),fg=lum(style.color),bg=lum(style.backgroundColor);return {contrast:(Math.max(fg,bg)+.05)/(Math.min(fg,bg)+.05),height:node.getBoundingClientRect().height};});
+   assert.ok(metrics.contrast>=4.5);assert.ok(metrics.height>=44);
+  }
+  assert.equal(await cart.locator('.mobile-cart-row').evaluateAll(rows=>rows.every(row=>parseFloat(getComputedStyle(row).borderRadius)>=12&&getComputedStyle(row).borderTopStyle==='solid')),true,'items retain separate visible card boundaries');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await cart.evaluate(node=>scrollTo({top:node.getBoundingClientRect().top+scrollY-100,behavior:'instant'}));await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/checkout-cart-cards.png`});}
+ }
+ if(scenario==='pincode-change'){
   await page.evaluate(()=>{const branch=JSON.parse(localStorage.getItem('gokul-selected-branch'));branch.pincode='274408';localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));window.dispatchEvent(new Event('storage'));});
   await page.locator('.mobile-branch-review').getByText(/274408/).waitFor();
   assert.equal(await page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true}).isChecked(),false);

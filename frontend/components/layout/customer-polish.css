@@ -343,3 +343,22 @@
  .future-storefront[data-customer-route] .customer-notifications{padding-left:16px!important;padding-right:16px!important}
  .future-storefront[data-customer-route] .customer-notification-inbox{background:transparent!important}
 }
+
+/* Quiet checkout hierarchy: separate food cards, rose removal and blue savings. */
+@media(max-width:640px){
+ .future-storefront[data-customer-route] .mobile-checkout .mobile-cart-section{background:transparent!important;padding:0!important;box-shadow:none;border-radius:0}
+ .future-storefront[data-customer-route] .mobile-cart-section .mobile-cart-toolbar{padding:0 2px 8px;gap:8px;align-items:center;flex-wrap:wrap}
+ .future-storefront[data-customer-route] .mobile-cart-toolbar>h2{margin-right:auto}
+ .future-storefront[data-customer-route] .mobile-cart-toolbar>button{color:#2359ac!important;min-height:44px;padding:8px;border-radius:10px}
+ .future-storefront[data-customer-route] .mobile-cart-toolbar .mobile-clear-cart{background:#fcebf0!important;color:#8f1838!important;border:1px solid #efd0d9}
+ .future-storefront[data-customer-route] .mobile-cart-section .mobile-cart-row{background:#fff!important;border:1px solid #e2e6ed!important;border-radius:16px;margin:8px 0 0;padding:14px;gap:10px;box-shadow:0 3px 12px #20242b05}
+ .future-storefront[data-customer-route] .mobile-cart-item-meta{flex-wrap:wrap;gap:4px 8px}
+ .future-storefront[data-customer-route] .mobile-cart-item-meta .mobile-remove-item{background:#fff1f4!important;color:#a52242!important;border:0;border-radius:9px;min-height:44px;padding:6px 8px;gap:4px}
+ .future-storefront[data-customer-route] .mobile-remove-item svg{stroke:currentColor;flex:none}
+ .future-storefront[data-customer-route] .mobile-checkout .mobile-checkout-offers{background:linear-gradient(120deg,#eef4ff,#f9fbff)!important;border:1px solid #dbe6fa;border-radius:18px}
+ .future-storefront[data-customer-route] .mobile-checkout-offers h2{display:flex;align-items:center;gap:9px;color:#2359ac!important}
+ .future-storefront[data-customer-route] .mobile-offers-mark{display:grid;place-items:center;width:30px;height:30px;flex:none;border-radius:10px;background:#dce9ff;color:#2359ac;font-size:17px}
+ .future-storefront[data-customer-route] .mobile-checkout-offers .checkout-change-offer{background:#fff!important;color:#2359ac!important;border-color:#c5d7f4!important}
+ .future-storefront[data-customer-route] .mobile-checkout>section[aria-label="Pickup add-ons"]{background:#fffaf3!important;border:1px solid #eddfc8!important;border-radius:18px;margin-top:14px}
+ .future-storefront[data-customer-route] .mobile-checkout>section[aria-label="Pickup add-ons"] h2{font-size:14px!important;letter-spacing:0!important;text-transform:none!important;color:#654a27!important}
+}

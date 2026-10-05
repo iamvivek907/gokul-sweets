@@ -136,3 +136,6 @@ Mobile order history checks active orders in the selected branch every 15 second
 
 
 Navigation feedback uses one fixed 3px maroon progress line after a 350ms delay, with a screen-reader status and static reduced-motion treatment. Link labels and dimensions never change. Tapping the current primary navigation URL or repeating its in-flight destination is ignored; modified/new-tab navigation remains native. Individual Link completion tokens prevent an older completion from hiding a newer transition. Route completion and a 15-second safety timeout clear pending feedback and tap deduplication.
+
+
+Phone checkout separates each cart item into its own white bordered card. Remove uses rose/red, Clear cart uses a restrained maroon tint and Select items remains blue; all retain 44px targets. Offers & total uses a pale blue panel and a percent mark, while Complete your meal uses a quiet warm tint immediately below cart items. Add-on exclusion, pickup checks, verified quotes, pending-order/attempt suppression and payment locking remain unchanged. Styling is scoped to the enabled phone shell.
