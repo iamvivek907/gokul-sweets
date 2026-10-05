@@ -30,13 +30,11 @@ test('Hindi localizes dynamic add-on and kitchen copy while preserving the produ
  assert.equal(translate('Often ordered with Kaju Katli','en'),'Often ordered with Kaju Katli');
 });
 
-test('inline navigation feedback stays visual while the shared announcer handles speech',()=>{
+test('link completion feedback leaves the link geometry unchanged',()=>{
  const {default:LinkFeedback}=load('components/common/LinkFeedback.tsx',{
   'next/link':{useLinkStatus:()=>({pending:true})},
   '@/lib/language':{useTranslation:()=>text=>text}
  });
  const markup=renderToStaticMarkup(React.createElement(LinkFeedback));
- assert.match(markup,/^<span aria-hidden="true"/);
- assert.match(markup,/Opening…/);
- assert.doesNotMatch(markup,/role="status"|aria-live=/);
+ assert.equal(markup,'');
 });

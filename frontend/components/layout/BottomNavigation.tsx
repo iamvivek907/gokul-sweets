@@ -275,7 +275,7 @@ export default function BottomNavigation() {
                                         {translate(item.label)}
                                     </span>
 
-                                <LinkFeedback /></Link>
+                                <LinkFeedback href={item.icon === "home" ? homeHref : item.href} /></Link>
                             );
                         }
                     )

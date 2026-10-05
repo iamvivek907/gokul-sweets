@@ -133,3 +133,6 @@ The enabled customer shell uses maroon All updates/Unread filters, visible searc
 
 
 Mobile order history checks active orders in the selected branch every 15 seconds while visible and online. Refreshes never overlap; the last successful cards, search, filter and page stay in place during background reads and temporary failures. An error explains failed updates and retains retry. Periodic reads stop once the selected branch has no active orders; visible resume and reconnection still refresh immediately. Identity/history changes invalidate the retained view. Desktop and flag-OFF retain their existing manual refresh.
+
+
+Navigation feedback uses one fixed 3px maroon progress line after a 350ms delay, with a screen-reader status and static reduced-motion treatment. Link labels and dimensions never change. Tapping the current primary navigation URL or repeating its in-flight destination is ignored; modified/new-tab navigation remains native. Individual Link completion tokens prevent an older completion from hiding a newer transition. Route completion and a 15-second safety timeout clear pending feedback and tap deduplication.
