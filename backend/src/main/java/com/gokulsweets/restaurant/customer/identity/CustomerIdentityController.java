@@ -141,6 +141,24 @@ public class CustomerIdentityController {
                 .body(orders.getCustomerOrderHistory(ownership.orderNumbers(environment.name(), subject)));
     }
 
+    public record OrderHistoryPage(List<CustomerOrderSummaryResponse> orders, String nextBefore) { }
+
+    @GetMapping("/orders/page")
+    public ResponseEntity<OrderHistoryPage> orderPage(HttpServletRequest request,
+            @RequestParam(required = false) String before, @RequestParam(defaultValue = "10") int limit) {
+        var environment = enabledEnvironment();
+        var subject = requiredSubject(request, environment);
+        var references = ownership.orderNumberPage(environment.name(), subject, before, limit);
+        var visible = references.stream().limit(limit).toList();
+        var summaries = orders.getCustomerOrderHistory(visible);
+        // Retain the cursor query's deterministic id tie-breaker when creation times match.
+        var byReference = summaries.stream().collect(java.util.stream.Collectors.toMap(
+                CustomerOrderSummaryResponse::orderNumber, java.util.function.Function.identity()));
+        var ordered = visible.stream().map(byReference::get).filter(java.util.Objects::nonNull).toList();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new OrderHistoryPage(
+                ordered, references.size() > limit ? visible.getLast() : null));
+    }
+
     @GetMapping("/orders/{orderNumber}")
     public ResponseEntity<CustomerOrderResponse> order(@PathVariable String orderNumber,
                                                          HttpServletRequest request) {

@@ -3,6 +3,7 @@ import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import dynamic from "next/dynamic";
 const OccasionRequests=dynamic(()=>import("@/components/occasion/OccasionRequests"),{loading:()=> <p role="status">Loading your requests…</p>});
+import ReorderDialog from "./ReorderDialog";
 import CustomerRewards from "./CustomerRewards";
 import AddressLocationAssist from "./AddressLocationAssist";
 import AccountTierMark from "./AccountTierMark";
@@ -17,16 +18,11 @@ import LogoutConfirmation from "./LogoutConfirmation";
 import {Suspense, useCallback, useEffect, useRef, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
-import {apiClient} from "@/services/apiClient";
+import {apiClient,ApiError} from "@/services/apiClient";
 import {getMenu} from "@/services/menuApi";
-import {getVerifiedCustomerOrders} from "@/services/orderApi";
+import {getVerifiedOrderPage, type VerifiedOrderPage} from "@/services/orderApi";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
-import {useCart} from "@/hooks/useCart";
-import {previewCartSwitch, type CartSwitchPreview} from "@/services/cartSwitchPreview";
-import {getCartSnapshot} from "@/lib/cartStorage";
-import {clearPickupSlot} from "@/lib/checkoutStorage";
-import {saveCart} from "@/lib/cartStorage";
 import {accountMilestones, currentMilestone} from "@/lib/accountMilestones";
 import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import type {CustomerOrderSummaryResponse, CustomerOrderResponse} from "@/types/order";
@@ -37,8 +33,6 @@ const base = "/api/customer/identity/account";
 type Address = {id: number; label: string; addressLine: string; locality: string; postalCode: string};
 type Account = {completedOrders?:number;paidOrders: number; favouriteProductIds: number[]; addresses: Address[];
     preferences: {dietaryNotes: string | null; preferredBranchId: number | null}};
-type Preview = {orderNumber: string; items: Array<{product: MenuProduct; quantity: number; weightGrams: number | null}>;
-    changed: string[]; unavailable: string[]; stock: CartSwitchPreview; cartSnapshot: string; date: string};
 export type AccountSection = "badges" | "orders" | "favourites" | "addresses" | "preferences" | "details" | "notifications";
 
 export default function CustomerAccountHub({session, onSessionChange, initialSection}: {initialSection?:AccountSection;session: CustomerSession | null;
@@ -49,7 +43,6 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     const compact=phone===true&&(features?.futuristicStorefrontV2===true||features?.checkoutExperienceV2===true);
     const enabled = features?.customerAccountHub === true;
     const {branch} = useSelectedBranch();
-    const {items: cartItems, branchId: cartBranchId} = useCart();
     const router = useRouter();
     const [account, setAccount] = useState<Account | null>(null);
     const [orders, setOrders] = useState<CustomerOrderSummaryResponse[]>([]);
@@ -63,7 +56,13 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     const [dietary, setDietary] = useState("");
     const [address, setAddress] = useState({label: "", addressLine: "", locality: "", postalCode: ""});
     const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
-    const [preview, setPreview] = useState<Preview | null>(null);
+    const [reorder,setReorder]=useState<CustomerOrderSummaryResponse|null>(null);
+    const closeReorder=useCallback(()=>setReorder(null),[]);
+    const [pages,setPages]=useState<VerifiedOrderPage[]>([]);
+    const [pageIndex,setPageIndex]=useState(0);
+    const [paging,setPaging]=useState(false);
+    const pageRequest=useRef<AbortController|null>(null);
+    useEffect(()=>()=>pageRequest.current?.abort(),[]);
     const [menu, setMenu] = useState<MenuProduct[]>([]);
     const [activeSection, setActiveSection] = useState<AccountSection>(initialSection??"badges");
     const [orderType,setOrderType]=useState<"pickup"|"bulk">("pickup");
@@ -85,18 +84,19 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     }, [router]);
 
     const reload = useCallback(async () => {
+        pageRequest.current?.abort();setPaging(false);
         const [next, history] = await Promise.all([
-            apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedCustomerOrders(AbortSignal.timeout(8000))
+            apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedOrderPage(null,AbortSignal.timeout(8000))
         ]);
-        setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history);
+        setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history.orders);setPages([history]);setPageIndex(0);
         setStatus("ready");
     }, []);
 
     useEffect(() => {
         if (!enabled || !session?.authenticated) return;
         let active = true;
-        void Promise.all([apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedCustomerOrders(AbortSignal.timeout(8000))])
-            .then(([next, history]) => {if (active) {setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history); setStatus("ready");}})
+        void Promise.all([apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedOrderPage(null,AbortSignal.timeout(8000))])
+            .then(([next, history]) => {if (active) {setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history.orders);setPages([history]);setPageIndex(0); setStatus("ready");}})
             .catch(() => {if (active) setStatus("error");});
         return () => {active = false;};
     }, [enabled, session?.authenticated, session?.phone]);
@@ -115,46 +115,6 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
         finally {setBusy(false);}
     }
 
-    async function prepareReorder(order: CustomerOrderSummaryResponse) {
-        if (!branch || branch.name !== order.branchName || cartItems.length && cartBranchId !== branch.id || !features?.today) {
-            setMessage("Select the order's branch and resolve your current cart before reordering. Your cart has not changed.");
-            return;
-        }
-        setBusy(true); setPreview(null); setMessage("");
-        try {
-            const [detail, categories] = await Promise.all([apiClient<CustomerOrderResponse>(`/api/customer/identity/orders/${encodeURIComponent(order.orderNumber)}`, {credentials: "include"}), getMenu(branch.id)]);
-            const products = categories.flatMap(category => category.products);
-            const unavailable: string[] = [], changed: string[] = [];
-            const lines = detail.items.flatMap(item => {
-                const product = products.find(candidate => candidate.id === item.productId);
-                if (!product?.available || product.saleMode !== item.saleMode ||
-                    product.saleMode === "WEIGHT" && (item.weightGrams == null || item.weightGrams < (product.minimumWeightGrams ?? 250) ||
-                    (item.weightGrams - (product.minimumWeightGrams ?? 250)) % (product.weightStepGrams ?? 50) !== 0)) {
-                    unavailable.push(item.productName); return [];
-                }
-                if (Number(product.price) !== Number(item.unitPrice)) changed.push(item.productName);
-                return [{product, quantity: item.quantity, weightGrams: item.weightGrams}];
-            });
-            if (!detail.items.length) unavailable.push("No items in this order");
-            const cartSnapshot = getCartSnapshot();
-            const combined = [...cartItems];
-            for (const line of lines) {
-                const index = combined.findIndex(item => item.product.id === line.product.id);
-                if (index >= 0) combined[index] = line.product.saleMode === "WEIGHT"
-                    ? line : {...line, quantity: combined[index].quantity + line.quantity};
-                else combined.push(line);
-            }
-            const stock = await previewCartSwitch(branch.id, features.today, combined, AbortSignal.timeout(10000));
-            if (getCartSnapshot() !== cartSnapshot) throw new Error("Cart changed");
-            unavailable.push(...stock.lines.filter(line => !line.orderable).map(line => line.item.product.name));
-            if (!stock.availableSlots) unavailable.push("No available pickup slots today");
-            setMenu(products);
-            setPreview({orderNumber: order.orderNumber, items: lines, changed,
-                unavailable: [...new Set(unavailable)], stock, cartSnapshot, date: features.today});
-        } catch {setMessage("We could not recheck this order. Please try again.");}
-        finally {setBusy(false);}
-    }
-
     async function showOrderDetails(orderNumber: string) {
         setSelectedOrder(null); setDetailError(""); setDetailLoading(true);
         detailDialog.current?.showModal();
@@ -167,26 +127,16 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
         } finally {setDetailLoading(false);}
     }
 
-    async function confirmReorder() {
-        if (!preview || !branch || preview.unavailable.length || cartItems.length && cartBranchId !== branch.id) return;
-        setBusy(true);
-        try {
-            if (getCartSnapshot() !== preview.cartSnapshot) {
-                setPreview(null); setMessage("Your cart changed. Review the order again."); return;
-            }
-            const latest = await previewCartSwitch(branch.id, preview.date, preview.stock.lines.map(line => line.item), AbortSignal.timeout(10000));
-            if (latest.conflicts || JSON.stringify(latest) !== JSON.stringify(preview.stock)) {
-                setPreview(null); setMessage("Price, stock or pickup times changed. Review the order again."); return;
-            }
-            const merged = latest.lines.map(line => ({...line.item, product: line.proposed!}));
-            if (getCartSnapshot() !== preview.cartSnapshot) {
-                setPreview(null); setMessage("Your cart changed. Review the order again."); return;
-            }
-            saveCart({branchId: branch.id, items: merged});
-            clearPickupSlot();
-            router.push("/cart");
-        } catch {setMessage("The menu could not be refreshed. Your cart has not changed.");}
-        finally {setBusy(false);}
+    async function changeOrderPage(index:number) {
+        if(paging)return;
+        if(pages[index]){setPageIndex(index);setOrders(pages[index].orders);requestAnimationFrame(()=>document.getElementById("account-orders")?.scrollIntoView({block:"start"}));return;}
+        const before=pages[pageIndex]?.nextBefore;if(index!==pageIndex+1||!before)return;
+        const controller=new AbortController();pageRequest.current=controller;setPaging(true);setMessage("");
+        try{const next=await getVerifiedOrderPage(before,AbortSignal.any([controller.signal,AbortSignal.timeout(8000)]));
+            if(controller.signal.aborted)return;
+            setPages(current=>[...current,next]);setOrders(next.orders);setPageIndex(index);requestAnimationFrame(()=>document.getElementById("account-orders")?.scrollIntoView({block:"start"}));
+        }catch(error){if(!controller.signal.aborted){if(error instanceof ApiError&&[401,403].includes(error.status)){setOrders([]);setPages([]);setStatus("error");}else setMessage("The next page could not load. Your current orders are saved. Try Next again.");}}
+        finally{if(!controller.signal.aborted)setPaging(false);}
     }
 
     function showSection(section: AccountSection) {
@@ -227,6 +177,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     const maskedPhone = session.phone ? `+91 •••••• ${session.phone.replace(/\D/g, "").slice(-4)}` : "Phone verified";
     return <div className={`account-hub mt-6 ${initialSection?"account-focused":"account-overview"}`}>
         {initialSection&&<MobilePageBack href="/profile" label="Back to profile" className="account-focused-back"/>}
+        {reorder&&features&&<ReorderDialog key={`${session.phone}:${reorder.orderNumber}`} order={reorder} phone={session.phone} features={features} compact={compact} onClose={closeReorder}/>}
         <LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={signOut} />
         <header className="account-cover relative overflow-hidden rounded-3xl p-6 sm:p-9">
             <div className="account-cover-art" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span></div>
@@ -282,14 +233,14 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 <p className="mt-1 text-sm text-[#756763]"><T text="Only orders placed while signed in to this account." /></p></div>
                 <span className="text-sm text-[#756763]"><T text="All branches" /></span></div>
             {orders.length ? <div className="profile-history-list mt-4 space-y-3">{orders.map(order => {
-                if(!modern)return <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3"><div><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{orderDisplayNumber(order)}</button><p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_"," ")}</p></div><div className="flex gap-2"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Details"/></button><button type="button" disabled={busy} onClick={()=>{void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50"><T text="Reorder"/></button></div></div>;
+                if(!modern)return <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3"><div><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{orderDisplayNumber(order)}</button><p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_"," ")}</p></div><div className="flex gap-2"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Details"/></button><button type="button" disabled={busy} onClick={()=>{setReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50"><T text="Reorder"/></button></div></div>;
                 const presentation=getOrderStatusPresentation(order.orderStatus,order.fulfillmentType);
                 const date=order.pickupDate??order.deliveryDate;
                 return <article key={order.orderNumber} className="profile-order-card">
                     <div className="profile-order-top"><strong className="profile-order-number" title={order.orderNumber}>{order.customerOrderNumber!=null?`Order #${order.customerOrderNumber}`:`Reference …${order.orderNumber.slice(-6)}`}</strong><span className={`profile-order-status tone-${presentation.tone}`}><T text={presentation.label}/></span></div>
                     <p className="profile-order-branch">{order.branchName}</p>
                     <div className="profile-order-meta"><span>{order.fulfillmentType==="DELIVERY"?"Delivery":"Pickup"}{date?` · ${formatOrderDate(date)}`:""}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
-                    <div className="profile-order-actions"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}}><T text="Details"/><span aria-hidden="true"> →</span></button><button type="button" disabled={busy} onClick={()=>{void prepareReorder(order);}}><T text="Reorder"/></button></div>
+                    <div className="profile-order-actions"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}}><T text="Details"/><span aria-hidden="true"> →</span></button><button type="button" disabled={busy} onClick={()=>{setReorder(order);}}><T text="Reorder"/></button></div>
                 </article>;
             })}</div> : <p className="mt-5 text-sm text-[#756763]"><T text="No orders belong to this verified account yet." /></p>}
             <dialog ref={detailDialog} onClose={() => {setSelectedOrder(null); setDetailError("");}}
@@ -319,12 +270,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 </div>}
                 </div>
             </dialog>
-            {preview && <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-[#fff8ef] p-5" role="status"><h3 className="font-bold text-[#241715]"><T text="Review this reorder" /></h3>
-                <p className="mt-2 text-sm text-[#756763]">{preview.items.map(line => line.product.name).join(", ") || "No available items"}</p>
-                {preview.changed.length > 0 && <p className="mt-2 text-sm text-[#7a1625]"><T text="Prices changed:" />{" "}{preview.changed.join(", ")}<T text=". Current menu prices will apply." /></p>}
-                {preview.unavailable.length > 0 && <p className="mt-2 text-sm text-[#9e2732]"><T text="Unavailable or changed:" />{" "}{preview.unavailable.join(", ")}<T text=". Browse the menu to choose alternatives." /></p>}
-                <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={busy || preview.unavailable.length > 0} onClick={() => {void confirmReorder();}} className="min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50"><T text="Add to cart" /></button>
-                    <button type="button" onClick={() => setPreview(null)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm"><T text="Cancel" /></button></div></div>}
+            <nav className="profile-history-pagination" aria-label="Order history pages"><button type="button" disabled={paging||pageIndex===0} onClick={()=>void changeOrderPage(pageIndex-1)}>Previous</button><span aria-live="polite">Page {pageIndex+1}</span><button type="button" disabled={paging||!pages[pageIndex]?.nextBefore} onClick={()=>void changeOrderPage(pageIndex+1)}>{paging?"Loading…":"Next"}</button></nav>
         </>}</section>}
         {activeSection === "preferences" && <section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]"><T text="Your preferences" /></h2>
             <p className="mt-1 text-sm text-[#756763]"><T text="Dietary notes are for your reference; check ingredients with the branch for each order." /></p>
