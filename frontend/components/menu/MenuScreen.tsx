@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import MobileMenuHighlights from "./MobileMenuHighlights";
+import MenuOffers from "./MenuOffers";
 const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
 import MobileMenuSuggestions from "./MobileMenuSuggestions";
 import {useMenuServiceRefresh} from "@/hooks/useMenuServiceRefresh";
@@ -749,7 +750,7 @@ export default function MenuScreen() {
     const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
-    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions branchId={branch.id} products={allProducts} onTarget={onMenuTarget}/></div>:null;
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions branchId={branch.id} products={allProducts}/></div>:null;
 
     function handleAddToCart(
         product: MenuProduct
@@ -1006,6 +1007,7 @@ export default function MenuScreen() {
 
             <section
                 className={`
+                    ${phoneMenu?"menu-products-first":""}
                     ${pickupCheck.features?.contextualStorefrontV2 ? "gokul-editorial-menu" : ""}
                     ${branchTab === "details" ? "branch-details-active" : ""}
                     mx-auto
@@ -1146,7 +1148,7 @@ export default function MenuScreen() {
 
                     </div>}
 
-                {pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
+                {!phoneMenu && pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
                     <NewBranchItems branch={branch} products={allProducts} portionGroups={phoneMenu?portionGroups:undefined} onSelect={product => {
                         setSearch("");
                         setSelectedCategoryId(product.categoryId);
@@ -1202,9 +1204,7 @@ export default function MenuScreen() {
 
                 </header>
 
-                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} ratingsLoading={ratingsLoading} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
-                <div className={phoneMenu&&mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>
-                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
+                {!phoneMenu&&<PickupContext check={pickupCheck} />}
 
                 <div
                     className="gokul-menu-tools
@@ -1259,6 +1259,9 @@ export default function MenuScreen() {
 
                 </div>
 
+                {phoneMenu&&<div className={mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>}
+                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
+                {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
 
                 <div
                     id="gokul-menu-items"
@@ -1314,7 +1317,7 @@ export default function MenuScreen() {
                             <>
 
                                 <div
-                                    className="
+                                    className="menu-result-heading
                                         mb-4
                                         flex
                                         items-end
@@ -1556,6 +1559,7 @@ export default function MenuScreen() {
 
                 </div>
 
+                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} ratingsLoading={ratingsLoading} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
             </section>
 
 
