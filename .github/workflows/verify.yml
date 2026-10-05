@@ -68,6 +68,7 @@ jobs:
           done
           mkdir -p /tmp/gokul-scrum111-layouts
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/colourful-mobile-shell.browser.mjs
+          node tests/mobile-order-history-refresh.browser.mjs
           node tests/stable-checkout-entry.browser.mjs
           node tests/reference-review.browser.mjs
           node tests/reference-ordering.browser.mjs

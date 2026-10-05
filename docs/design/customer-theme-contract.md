@@ -130,3 +130,6 @@ Mobile navigation keeps a white shared surface, restrained pastel icon tiles and
 ## Focused customer notification inbox
 
 The enabled customer shell uses maroon All updates/Unread filters, visible search and separate Unread/Read sections. Each order or bulk request has one latest-event card, with its earlier loaded events collapsed behind a labelled disclosure. A blue dot and explicit section identify unread groups; pastel green progress, amber exception and blue general-update icons supplement the real event title. Complete messages, IST dates, exact order links, optional reviews, read acknowledgements, pagination, verified-account isolation and notification consent remain available. Refresh and retention help sit inside More options; settings stay collapsed. Colours are scoped to the effective customer shell.
+
+
+Mobile order history checks active orders in the selected branch every 15 seconds while visible and online. Refreshes never overlap; the last successful cards, search, filter and page stay in place during background reads and temporary failures. An error explains failed updates and retains retry. Periodic reads stop once the selected branch has no active orders; visible resume and reconnection still refresh immediately. Identity/history changes invalidate the retained view. Desktop and flag-OFF retain their existing manual refresh.
