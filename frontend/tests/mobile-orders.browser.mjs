@@ -7,16 +7,18 @@ const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BA
 const branch={id:1,name:'Gokul Test branch',code:'TEST',address:'Test address',phone:'9876543210',active:true,pickupAvailable:true};
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 try {
- for (const [width,enabled,paymentStatus,fulfillment='PICKUP',legacyNavigation=false,stalled=false,stalledRefresh=false] of [[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[640,true,'PENDING'],[1280,true,'PENDING'],[390,false,'PENDING'],[390,true,'PENDING','DELIVERY'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY'],[390,true,'PENDING','PICKUP',true],[390,true,'PENDING','PICKUP',true,true],[390,true,'PENDING','PICKUP',true,false,true]]) {
+ for (const [width,enabled,paymentStatus,fulfillment='PICKUP',legacyNavigation=false,stalled=false,stalledRefresh=false,completed=false] of [[390,true,'PAID','PICKUP',false,false,false,true],[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[640,true,'PENDING'],[1280,true,'PENDING'],[390,false,'PENDING'],[390,true,'PENDING','DELIVERY'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY'],[390,true,'PENDING','PICKUP',true],[390,true,'PENDING','PICKUP',true,true],[390,true,'PENDING','PICKUP',true,false,true]]) {
+  if(process.env.ORDERS_ONLY_RATED&&!completed)continue;
   if(process.env.ORDERS_ONLY_PENDING && !(width===390&&enabled&&paymentStatus==='PENDING'&&fulfillment==='PICKUP'))continue;
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
   if(legacyNavigation)await context.addInitScript(()=>Object.defineProperty(window,'navigation',{value:undefined}));
-  const order={orderNumber:'TEST-ORDER',customerOrderNumber:paymentStatus==='PAID'?1:null,branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
+  const order={orderNumber:'TEST-ORDER',customerOrderNumber:paymentStatus==='PAID'?1:null,branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:completed?'PICKED_UP':paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   // Customer responses may have no branch address; both forms must still download a paid invoice.
   if(width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP')order.branchAddress=null;
   if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
   if(fulfillment==='DELIVERY'){Object.assign(order,{fulfillmentType:'DELIVERY',pickupDate:null,pickupStartTime:null,pickupEndTime:null,pickupType:null,deliveryDate:date,deliveryStartTime:'18:00:00',deliveryEndTime:'19:00:00',deliveryAddressLine:'12 Main Road',deliveryLocality:'Test locality',deliveryPostalCode:'226001',deliveryFee:30,totalAmount:122});}
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
+  let rating=4;
   let mutations=0,cancels=0,cancelError=true,cancelPaid=false,failRefresh=false,refreshes=0,stallCancellation=stalled,stallRefresh=false;
   let fontError=width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP';
   await context.route('**/fonts/invoice-v1/**',route=>fontError?route.fulfill({status:503,body:'Unavailable'}):route.continue());
@@ -29,6 +31,11 @@ try {
    else if(path==='/api/customer/identity/me')json={authenticated:true,phone:'+919876543210'};
    else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
    else if(path==='/api/orders/TEST-ORDER')json=order;
+   else if(path==='/api/orders/TEST-ORDER/review'){
+    if(req.method()==='PUT')rating=req.postDataJSON().overallRating;
+    const review={id:1,overallRating:rating,comment:null,status:'PUBLISHED',itemRatings:[]};
+    json=req.method()==='PUT'?review:{eligible:true,products:[{productId:1,productName:'Milk sweet'}],review};
+   }
    else if(path==='/api/customer/identity/orders/TEST-ORDER/correction')json={orderNumber:order.orderNumber,branchName:branch.name,serverTime:new Date().toISOString(),cancellationDeadline:new Date(Date.now()+300000).toISOString(),canCancel:paymentStatus==='PAID',canTransfer:false,refundAmount:Math.max(0,order.totalAmount-(order.convenienceFee??0)-(order.paymentFee??0)-(order.deliveryFee??0)),retainedCharges:(order.convenienceFee??0)+(order.paymentFee??0)+(order.deliveryFee??0),refundStatus:'NOT_REQUESTED',explanation:'Food refund only'};
    else if(path==='/api/orders/TEST-ORDER/pickup-code')json={code:'1234'};
    else if(path==='/api/customer/identity/orders')json=[order];
@@ -53,7 +60,7 @@ try {
    if(paymentStatus==='FAILED')assert.equal(await page.getByRole('link',{name:'Retry checkout',exact:true}).getAttribute('href'),'/checkout/payment/TEST-ORDER');
    assert.equal(await page.getByRole('button',{name:'Download invoice',exact:true}).count(),paymentStatus==='PAID'?1:0);
    if(paymentStatus==='PAID'){
-    if(fulfillment==='PICKUP')await page.getByLabel('Pickup code: 1 2 3 4',{exact:true}).waitFor();
+    if(fulfillment==='PICKUP'&&!completed)await page.getByLabel('Pickup code: 1 2 3 4',{exact:true}).waitFor();
     if(fulfillment==='DELIVERY')await page.getByText('Delivery fee',{exact:true}).waitFor();
     await page.getByText('Offer savings',{exact:true}).waitFor();
     if(fontError){await page.getByRole('button',{name:'Download invoice',exact:true}).click();await page.getByRole('alert').filter({hasText:'Unable to download the invoice'}).waitFor();fontError=false;}
@@ -79,11 +86,17 @@ try {
     if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await download.saveAs(`${process.env.SCREENSHOT_DIR}/order-invoice-${width}-${fulfillment}.pdf`);}
    }
   }
+  if(completed){
+   const review=page.locator('.customer-order-review');await review.waitFor();
+   await review.getByRole('group',{name:'Overall order rating'}).getByRole('button',{name:'5 stars',exact:true}).click();
+   await review.getByRole('button',{name:'Update Review',exact:true}).click();await review.getByRole('status').getByText('Thank you for your valuable feedback!',{exact:true}).waitFor();assert.equal(rating,5);
+  }
   await page.evaluate(()=>window.scrollTo(0,0));
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/order-${width}-${enabled}-${paymentStatus}.png`,fullPage:true});}
   await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();
   await page.locator(compact?'.mobile-order-card':'article').first().waitFor();
   assert.equal(await page.locator('.mobile-order-card').count(),compact?1:0);
+  if(completed)await page.getByLabel('5 out of 5 stars',{exact:true}).waitFor();
   await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   const historyCard=page.locator(compact?'.mobile-order-card':'article').first(),search=page.getByLabel('Find an order',{exact:true});
   for(const term of [' test-order ','test-ord',...(order.customerOrderNumber?['#1','1']:[])]){
