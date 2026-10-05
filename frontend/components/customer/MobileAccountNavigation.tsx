@@ -1,5 +1,6 @@
 "use client";
 
+import SocialFollowLinks from "@/components/customer/SocialFollowLinks";
 import Link from "next/link";
 import MobilePageBack from "./MobilePageBack";
 import {useEffect, useState} from "react";
@@ -27,10 +28,10 @@ export default function MobileAccountNavigation() {
         <nav className="mobile-account-links" aria-label="Explore Gokul">
             <Link href="/about"><T text="About Gokul Sweets" /></Link>
             <Link href="/profile/privacy"><T text="Privacy and data" /></Link>
-            <a href="https://www.instagram.com/_gokulsweets" target="_blank" rel="noopener noreferrer">Instagram</a>
-            <a href="https://www.facebook.com/visitgokulsweets" target="_blank" rel="noopener noreferrer">Facebook</a>
+
             {staffAccess && <Link href="/admin"><T text="Staff dashboard" /></Link>}
         </nav>
+        <SocialFollowLinks/>
     </div>;
 }
 
