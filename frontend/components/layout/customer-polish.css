@@ -380,3 +380,9 @@
  .future-storefront[data-customer-route="/menu"] .menu-recommended-rating:not(.has-rating){color:#59616d!important}
 }
 .mobile-items-picker>button:focus-visible{outline:3px solid #2359ac;outline-offset:3px}
+
+@media(max-width:640px){
+ /* Reserve rating space before the optional read settles, including badge borders. */
+ .future-storefront[data-customer-route="/menu"] .gokul-menu-product-card .product-card-rating{min-height:28px}
+ .future-storefront[data-customer-route="/menu"] .menu-recommended-grid .menu-recommended-rating{display:flex;align-items:center;min-height:28px;height:28px;box-sizing:border-box}
+}

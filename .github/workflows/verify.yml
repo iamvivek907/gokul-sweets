@@ -70,6 +70,7 @@ jobs:
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/colourful-mobile-shell.browser.mjs
           node tests/navigation-feedback.browser.mjs
           node tests/mobile-order-history-refresh.browser.mjs
+          node tests/order-handover-navigation.browser.mjs
           node tests/stable-checkout-entry.browser.mjs
           node tests/reference-review.browser.mjs
           node tests/reference-ordering.browser.mjs

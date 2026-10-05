@@ -142,3 +142,6 @@ Phone checkout separates each cart item into its own white bordered card. Remove
 
 
 Phone menu ratings use pale green badges only for real published ratings; unrated/loading labels stay neutral. The maroon floating Items action uses the shared plate-and-cutlery icon. It opens a native modal category sheet with white rows and rose counts, keyboard/outside dismissal and focus restoration. Menu discovery sheets fix the background body at its saved scroll position, contain their own scrolling and restore the prior page position and styles on dismissal/unmount. Category selection then navigates to and expands the chosen section without filtering away other categories.
+
+
+Order-detail reads share one in-flight request, have a 15-second deadline and abort on order changes or page departure, including a pending handover response. Hidden/offline pages skip periodic reads. Failed background reads retain the last successful order with an explicit retry notice; a successful read clears that notice. Completion stops active polling and removes the pickup code.
