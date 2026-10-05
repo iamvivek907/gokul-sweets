@@ -22,6 +22,7 @@ import static org.mockito.Mockito.*;
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 class KitchenPlanningIntegrationTest {
  @Autowired KitchenPlanningService service;
+ @Autowired com.gokulsweets.restaurant.order.repository.OrderRepository orders;
  @Autowired JdbcTemplate jdbc;
  @Autowired EnhancementProperties flags;
  @MockitoBean StaffAuthorizationService staff;
@@ -39,6 +40,9 @@ class KitchenPlanningIntegrationTest {
   for(int i=0;i<23;i++)order("CONFIRMED",branch,slot);
   order("PREPARING",branch,slot);order("READY_FOR_PICKUP",branch,slot);order("CANCELLED",branch,slot);order("PENDING_PAYMENT",branch,slot);
   var first=service.get(branch,KitchenPlanningService.Filter.ELIGIBLE,LocalDate.of(2026,10,1),null,0);
+  assertThat(queue(LocalDate.of(2026,10,1),LocalTime.of(18,0),0)).hasSize(20);
+  assertThat(queue(LocalDate.of(2026,10,1),LocalTime.of(18,0),1)).hasSize(3);
+  assertThat(queueCount(LocalDate.of(2026,10,1),LocalTime.of(18,0))).isEqualTo(23);
   assertThat(first.total()).isEqualTo(23);assertThat(first.orders()).hasSize(20);assertThat(first.slots()).hasSize(1);
   assertThat(first.slots().getFirst().total()).isEqualTo(25);assertThat(first.counts().get("PREPARING")).isEqualTo(1);
   assertThat(service.get(branch,KitchenPlanningService.Filter.ELIGIBLE,null,null,1).orders()).hasSize(3);
@@ -91,6 +95,16 @@ class KitchenPlanningIntegrationTest {
   jdbc.update("INSERT INTO order_items(order_id,product_id,product_name,sale_mode,quantity,unit_price,tax_rate,tax_amount,line_total) VALUES (?,?,'Samosa','UNIT',4,10,0,0,40)",ids.getLast(),kitchen);
   doReturn(LocalDateTime.of(2026,10,1,12,0)).when(clock).now();
   var waiting=service.get(branch,KitchenPlanningService.Filter.WAITING,null,null,0);
+  var earlyQueue=queue(LocalDate.of(2026,10,1),LocalTime.NOON,0);
+  assertThat(earlyQueue).hasSize(1);assertThat(earlyQueue.getFirst().getId()).isEqualTo(ids.getFirst());
+  assertThat(org.hibernate.Hibernate.isInitialized(earlyQueue.getFirst().getBranch())).isTrue();
+  assertThat(org.hibernate.Hibernate.isInitialized(earlyQueue.getFirst().getPickupSlot())).isTrue();
+  assertThat(queueCount(LocalDate.of(2026,10,1),LocalTime.NOON)).isEqualTo(1);
+  // Empty baskets and absent policies must not accidentally qualify for early packing.
+  order("CONFIRMED",branch,slot);jdbc.update("DELETE FROM branch_products WHERE branch_id=? AND product_id=?",branch,kitchen);
+  assertThat(queueCount(LocalDate.of(2026,10,1),LocalTime.NOON)).isEqualTo(1);
+  assertThat(queue(LocalDate.of(2026,9,30),LocalTime.NOON,0)).isEmpty();
+  jdbc.update("DELETE FROM orders WHERE branch_id=? AND id NOT IN (?,?)",branch,ids.getFirst(),ids.getLast());
   assertThat(waiting.orders()).hasSize(1);assertThat(waiting.orders().getFirst().earlyPreparation()).isTrue();
   assertThat(waiting.orders().getFirst().items().getFirst().weightGrams()).isEqualTo(2000);
   assertThat(service.get(branch,KitchenPlanningService.Filter.SCHEDULED,null,null,0).orders()).hasSize(1);
@@ -104,4 +118,18 @@ class KitchenPlanningIntegrationTest {
   assertThat(result.total()).isEqualTo(1);verify(staff).requireBranchAccess(branch);
   assertThat(service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(19,0),0).orders()).isEmpty();
  }
+ java.util.List<com.gokulsweets.restaurant.order.entity.Order> queue(LocalDate day,LocalTime cutoff,int page){
+  return orders.findPreparationQueueCandidates(branch,com.gokulsweets.restaurant.order.enums.OrderStatus.CONFIRMED,
+   com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.PRIORITY,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.ADMIN_OVERRIDE,day,cutoff,day,
+   org.springframework.data.domain.PageRequest.of(page,20));
+ }
+ long queueCount(LocalDate day,LocalTime cutoff){
+  return orders.countPreparationQueueCandidates(branch,com.gokulsweets.restaurant.order.enums.OrderStatus.CONFIRMED,
+   com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.PRIORITY,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.ADMIN_OVERRIDE,day,cutoff,day);
+ }
+
 }
