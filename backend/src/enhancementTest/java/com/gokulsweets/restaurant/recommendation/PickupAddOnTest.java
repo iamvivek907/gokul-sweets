@@ -22,7 +22,7 @@ class PickupAddOnTest {
  private final OrderRepository orders=mock(OrderRepository.class);
  private final OrderValidationService validation=mock(OrderValidationService.class);
  private final EnhancementProperties flags=new EnhancementProperties();
- private final PickupAddOnService service=new PickupAddOnService(jdbc,menu,inventory,orders,validation,flags,Clock.fixed(Instant.parse("2026-10-01T04:00:00Z"),ZoneOffset.UTC));
+ private final PickupAddOnService service=new PickupAddOnService(jdbc,menu,inventory,orders,validation,flags,Clock.fixed(Instant.parse("2026-10-01T04:00:00Z"),ZoneOffset.UTC),mock(com.gokulsweets.restaurant.order.service.CartAvailabilityService.class));
  private final CustomerInventoryCheckRequest request=new CustomerInventoryCheckRequest(LocalDate.of(2026,10,1),List.of(new CustomerInventoryCheckRequest.Item(1L,1,null)));
  private Order owned(){var b=new Branch();b.setId(1L);var slot=new PickupSlot();slot.setId(2L);slot.setSlotDate(request.serviceDate());var order=new Order();order.setBranch(b);order.setPickupSlot(slot);order.setPickupType(PickupType.NORMAL);order.setFulfillmentType(FulfillmentType.PICKUP);order.setOrderStatus(OrderStatus.PENDING_PAYMENT);when(orders.findByOrderNumber("GKS-OWN")).thenReturn(Optional.of(order));return order;}
  @Test void ownStockIsCheckedThroughReservationUpdateRatherThanSubtractingItTwice(){var own=owned();assertThat(service.check(1,request,"GKS-OWN").orderable()).isTrue();verify(validation).validateExistingReservationUpdate(eq(own),eq(2L),eq(PickupType.NORMAL),anyList());verifyNoInteractions(inventory);}

@@ -69,13 +69,18 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         alive.current = true;
         void (async () => {
             try {
-                const config = await apiClient<{enabled: boolean; guestCheckoutEnabled?: boolean}>("/api/storefront/customer-identity", {signal: AbortSignal.timeout(5000)});
+                const [configuration, identity] = await Promise.allSettled([
+                    apiClient<{enabled: boolean; guestCheckoutEnabled?: boolean}>("/api/storefront/customer-identity", {signal: AbortSignal.timeout(5000)}),
+                    apiClient<CustomerSession>("/api/customer/identity/me", {credentials: "include", signal: AbortSignal.timeout(5000)})
+                ]);
+                if (configuration.status === "rejected") throw configuration.reason;
+                const config = configuration.value;
                 if (!alive.current) return;
                 setGuestAllowed(config.guestCheckoutEnabled !== false);
                 onGuestCheckoutChange?.(config.guestCheckoutEnabled !== false);
                 if (!config.enabled) {setAvailability("disabled"); onSessionChange?.({authenticated: false}); return;}
-                const session = await apiClient<CustomerSession>(
-                    "/api/customer/identity/me", {credentials: "include", signal: AbortSignal.timeout(5000)});
+                if (identity.status === "rejected") throw identity.reason;
+                const session = identity.value;
                 if (alive.current) {setSession(session); setNameDraft(session.name ?? ""); onSessionChange?.(session); setAvailability("ready");}
             } catch {
                 if (alive.current) {setAvailability("error"); setGuestAllowed(false); onGuestCheckoutChange?.(false); onSessionChange?.({authenticated: false});}
@@ -101,6 +106,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         return () => pwaInstall.blockPromotion(source, false);
     }, [busy]);
 
+    if (availability === "loading" && mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" aria-label={translate("Phone verification")}><h2><T text="Verify your phone"/></h2><p role="status"><T text="Checking phone verification…"/></p><button type="button" disabled><T text="Verify with SMS"/></button></section>;
     if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status"><T text="Checking phone verification…" /></p>;
     if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" && guestAllowed ? null : <section
         className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"
@@ -220,7 +226,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
     </section>;
 
-    if (mode === "mobileCheckout") return <section className="mobile-checkout-section" aria-label={translate("Phone verification")}>
+    if (mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" aria-label={translate("Phone verification")}>
         <h2><T text={session.authenticated ? "Phone verified" : "Verify your phone"} /></h2>
         <p>{session.authenticated ? session.phone : translate("Verify your phone to place orders and see your pickup code.")}</p>
         {!session.authenticated && <button type="button" disabled={busy} onClick={() => void start()} className="mt-2 min-h-11 rounded-xl bg-[#7a1625] px-4 text-white">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>}

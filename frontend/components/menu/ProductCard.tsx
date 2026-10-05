@@ -259,7 +259,7 @@ export default function ProductCard({
                     product.description
                     && (!refined || product.description.trim().toLowerCase() !== product.name.trim().toLowerCase())
                     && (
-                        <p className="
+                        <p className="product-card-description
                             mt-1
                             line-clamp-2
                             text-[11px]

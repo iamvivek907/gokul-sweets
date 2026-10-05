@@ -67,6 +67,9 @@ jobs:
             sleep 1
           done
           mkdir -p /tmp/gokul-scrum111-layouts
+          node tests/reference-review.browser.mjs
+          node tests/reference-ordering.browser.mjs
+          node tests/menu-pairings-speed.browser.mjs
           node tests/menu-offer-freshness.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/menu-discovery.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-polish.browser.mjs

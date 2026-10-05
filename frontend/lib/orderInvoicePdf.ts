@@ -32,6 +32,11 @@ export async function createInvoicePdf(lines: string[], orderNumber: string, fon
         pdfVersion: "1.7", tagged: true, lang: "en-IN", displayTitle: true,
         info: {Title: `Gokul Sweets invoice ${orderNumber}`, Author: "Gokul Sweets"}});
     for (const script of ["latin", "devanagari", "tamil"] as const) doc.registerFont(script, embedded[script]);
+    doc.on("pageAdded", () => {
+        doc.markContent("Artifact");
+        doc.save().rect(0, 0, doc.page.width, 10).fill("#087f42");
+        doc.restore(); doc.endMarkedContent();
+    });
     doc.font("latin"); doc.addPage();
     const chunks: Uint8Array<ArrayBuffer>[] = [];
     const output = new Promise<Blob>((resolve, reject) => {
@@ -58,8 +63,10 @@ export async function createInvoicePdf(lines: string[], orderNumber: string, fon
             if (runs.at(-1)?.script === script) runs[runs.length - 1].text += character;
             else runs.push({script, text: character});
         }
-        const size = type === "H1" ? 22 : type === "H2" ? 15 : 11;
-        doc.fontSize(size).fillColor("#173c39");
+        const total = line.startsWith("PAID TOTAL:");
+        const detail = line.includes(" @ INR ");
+        const size = type === "H1" ? 27 : type === "H2" ? 13 : total ? 16 : detail ? 10 : 11;
+        doc.fontSize(size).fillColor(type === "H1" || total ? "#087f42" : detail ? "#68717d" : "#20242b");
         let height = Math.max(...runs.map(run => doc.font(run.script).heightOfString(line, {lineGap: 3}))) + size * 3;
         const next = paragraphs[index + 1];
         // Keep headings with their first line, and item names with the following quantity/price.
@@ -67,6 +74,11 @@ export async function createInvoicePdf(lines: string[], orderNumber: string, fon
             height += doc.font("latin").heightOfString(next, {lineGap: 3}) + size;
         }
         if (doc.y + height > doc.page.height - doc.page.margins.bottom) doc.addPage();
+        if (type === "H2" || total) {
+            doc.markContent("Artifact");
+            doc.save().roundedRect(42, doc.y - 7, doc.page.width - 84, size + 23, 6).fill(total ? "#e9f7ef" : "#f2f3f6");
+            doc.restore(); doc.endMarkedContent();
+        }
         const paragraph = doc.struct(type); root.add(paragraph);
         // Marked ActualText retains the original logical Unicode sequence for search/copy and readers.
         paragraph.add(doc.markStructureContent("Span", {actual: `${line} `}));
@@ -76,7 +88,7 @@ export async function createInvoicePdf(lines: string[], orderNumber: string, fon
             doc.endMarkedContent();
         });
         doc.endMarkedContent();
-        doc.moveDown(type === "P" ? .35 : .6);
+        doc.moveDown(total ? 1 : type === "P" ? .4 : 1);
         paragraph.end();
     }
     root.end(); doc.end();

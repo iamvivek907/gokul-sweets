@@ -29,7 +29,8 @@ public class PickupAddOnService {
  private final OrderValidationService validation;
  private final EnhancementProperties flags;
  private final Clock inventoryClock;
- public record Suggestion(MenuProductResponse product,Integer weightGrams,BigDecimal portionPrice,BigDecimal portionTotal,String reason) {}
+ private final com.gokulsweets.restaurant.order.service.CartAvailabilityService slotAvailability;
+ public record Suggestion(MenuProductResponse product,Integer weightGrams,BigDecimal portionPrice,BigDecimal portionTotal,String reason,boolean slotVerified) {}
  public record Availability(boolean orderable) {}
  record Pair(long seed,long candidate,double confidence,long count) {}
 
@@ -41,7 +42,7 @@ public class PickupAddOnService {
   return order;
  }
  private boolean fits(long branch,CustomerInventoryCheckRequest request,Order order) {
-  if(order==null)return inventory.check(branch,request).orderable();
+  if(order==null)return inventory.checkRequestedDate(branch,request).orderable();
   try {
    validation.validateExistingReservationUpdate(order,order.getPickupSlot().getId(),order.getPickupType(),request.items().stream().map(i->new CreateOrderItemRequest(i.productId(),i.quantity(),i.weightGrams())).toList());
    return true;
@@ -53,11 +54,23 @@ public class PickupAddOnService {
  }
  @Transactional(readOnly=true)
  public List<Suggestion> recommend(long branch,CustomerInventoryCheckRequest request,String number) {
+  return recommend(branch,request,number,null,null);
+ }
+ @Transactional(readOnly=true)
+ public List<Suggestion> recommend(long branch,CustomerInventoryCheckRequest request,String number,Long pickupSlotId,PickupType pickupType) {
+  return recommend(branch,request,number,pickupSlotId,pickupType,false);
+ }
+ @Transactional(readOnly=true)
+ public List<Suggestion> recommend(long branch,CustomerInventoryCheckRequest request,String number,Long pickupSlotId,PickupType pickupType,boolean browse) {
+  if((pickupSlotId==null)!=(pickupType==null))throw new IllegalArgumentException("Choose both pickup slot and type.");
+  if(pickupSlotId!=null&&!flags.isSmartAvailability())throw new IllegalArgumentException("Slot availability is not enabled.");
   if(!flags.isPickupAddOns())return List.of();
   LocalDate today=LocalDate.now(inventoryClock.withZone(ZoneId.of("Asia/Kolkata")));
   if(request.serviceDate()==null || request.serviceDate().isBefore(today) || request.serviceDate().isAfter(today.plusDays(flags.getFutureOrderingDays())))throw new IllegalArgumentException("Choose an available pickup date in India.");
   if(request.items()==null || request.items().isEmpty() || request.items().size()>30)throw new IllegalArgumentException("Choose between one and thirty cart items.");
   Order order=ownedPending(branch,request,number);
+  if(order!=null&&pickupSlotId!=null&&(!order.getPickupSlot().getId().equals(pickupSlotId)||order.getPickupType()!=pickupType))
+   throw new IllegalArgumentException("Review the reserved pickup slot.");
   var products=new HashMap<Long,MenuProductResponse>();
   menu.getMenu(branch).forEach(c->c.products().forEach(p->{if(p.available() && p.price().signum()>0)products.put(p.id(),p);}));
   boolean collectTax=Boolean.TRUE.equals(jdbc.queryForObject("SELECT enabled FROM tax_collection_settings WHERE id=1",Boolean.class));
@@ -84,8 +97,41 @@ public class PickupAddOnService {
   var ranked=new LinkedHashMap<Long,String>();
   best.values().stream().sorted(Comparator.comparingDouble(Pair::confidence).reversed().thenComparing(Comparator.comparingLong(Pair::count).reversed()).thenComparingLong(Pair::candidate)).forEach(p->ranked.put(p.candidate(),"Often ordered with "+products.get(p.seed()).name()));
   jdbc.query("SELECT product_id,SUM(order_count) n FROM analytics_product_daily WHERE branch_id=? AND business_date BETWEEN ? AND ? GROUP BY product_id HAVING SUM(order_count)>=3 ORDER BY n DESC,product_id ASC",(rs,n)->rs.getLong(1),branch,today.minusDays(29),today).stream().filter(id->products.containsKey(id)&&!cart.contains(id)).forEach(id->ranked.putIfAbsent(id,"A branch favourite"));
-  var result=new ArrayList<Suggestion>();int checked=0;
-  for(var entry:ranked.entrySet()) {if(result.size()==3 || checked++>=8)break;var p=products.get(entry.getKey());Integer grams=p.saleMode()==ProductSaleMode.WEIGHT?(p.minimumWeightGrams()==null?250:p.minimumWeightGrams()):null;var combined=new ArrayList<>(request.items());combined.add(new CustomerInventoryCheckRequest.Item(p.id(),grams==null?1:null,grams));if(!fits(branch,new CustomerInventoryCheckRequest(request.serviceDate(),combined),order))continue;BigDecimal base=(grams==null?p.price():p.price().multiply(BigDecimal.valueOf(grams)).divide(BigDecimal.valueOf(1000))).setScale(2,RoundingMode.HALF_UP);BigDecimal total=base.add(base.multiply(tax.get(p.id())).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP));result.add(new Suggestion(p,grams,base,total,entry.getValue()));}
+  if(browse)products.keySet().stream().sorted().filter(id->!cart.contains(id)).forEach(id->ranked.putIfAbsent(id,"From the branch menu"));
+  // Checkout gets a bounded mix in one request; switching tabs needs no network read.
+  var chosen=new LinkedHashSet<Long>();
+  if(browse){
+   ranked.keySet().stream().limit(3).forEach(chosen::add);
+   for(String pattern:List.of("^(beverages?|drinks?|cold drinks|juices?)$","^(sides?|snacks?|starters?|accompaniments?)$"))
+    ranked.keySet().stream().filter(id->products.get(id).categoryName().trim().toLowerCase(Locale.ROOT).matches(pattern)).limit(2).forEach(chosen::add);
+  }
+  ranked.keySet().stream().filter(id->!chosen.contains(id)).limit(8-chosen.size()).forEach(chosen::add);
+  var candidates=List.copyOf(chosen);
+  if(candidates.isEmpty())return List.of();
+  var combined=new ArrayList<>(request.items());
+  for(var id:candidates){var p=products.get(id);combined.add(new CustomerInventoryCheckRequest.Item(id,p.saleMode()==ProductSaleMode.WEIGHT?null:1,p.saleMode()==ProductSaleMode.WEIGHT?(p.minimumWeightGrams()==null?250:p.minimumWeightGrams()):null));}
+  var allowed=new HashSet<Long>();
+  if(order==null&&pickupSlotId!=null){
+   var checked=slotAvailability.check(branch,request.serviceDate(),1,combined.stream().map(i->new CreateOrderItemRequest(i.productId(),i.quantity(),i.weightGrams())).toList());
+   var slot=checked.dates().stream().filter(d->d.date().equals(request.serviceDate())).flatMap(d->d.slots().stream()).filter(v->v.slot().id().equals(pickupSlotId)).findFirst().orElse(null);
+   boolean capacity=slot!=null&&slot.slot().active()&&slot.slot().slotDate().atTime(slot.slot().startTime()).isAfter(LocalDateTime.now(inventoryClock.withZone(ZoneId.of("Asia/Kolkata"))))&&(pickupType==PickupType.PRIORITY?slot.slot().priorityEnabled()&&slot.slot().priorityRemainingCapacity()>0:slot.slot().remainingCapacity()>0);
+   if(capacity&&!"PICKUP_WINDOW".equals(slot.code())&&!slot.issues().stream().anyMatch(i->cart.contains(i.productId())&&!i.available()))
+    candidates.stream().filter(id->slot.issues().stream().noneMatch(i->i.productId().equals(id)&&!i.available())).forEach(allowed::add);
+  }else if(order==null){
+   var checked=inventory.checkRequestedDate(branch,new CustomerInventoryCheckRequest(request.serviceDate(),combined));
+   if(!checked.enforcementEnabled())allowed.addAll(candidates);
+   else if(cart.stream().allMatch(id->checked.items().stream().anyMatch(i->i.productId().equals(id)&&i.orderable())))
+    checked.items().stream().filter(i->i.orderable()&&candidates.contains(i.productId())).map(i->i.productId()).forEach(allowed::add);
+  }else{
+   // Reserved stock belongs to this order: retain reservation-aware validation.
+   for(var id:candidates){var single=new ArrayList<>(request.items());single.add(combined.stream().filter(i->i.productId().equals(id)).findFirst().orElseThrow());if(fits(branch,new CustomerInventoryCheckRequest(request.serviceDate(),single),order))allowed.add(id);}
+  }
+  var result=new ArrayList<Suggestion>();
+  for(var id:candidates){if(!allowed.contains(id))continue;if(result.size()==(browse?8:3))break;var p=products.get(id);Integer grams=p.saleMode()==ProductSaleMode.WEIGHT?(p.minimumWeightGrams()==null?250:p.minimumWeightGrams()):null;
+   BigDecimal base=(grams==null?p.price():p.price().multiply(BigDecimal.valueOf(grams)).divide(BigDecimal.valueOf(1000))).setScale(2,RoundingMode.HALF_UP);
+   BigDecimal total=base.add(base.multiply(tax.get(id)).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP));
+   result.add(new Suggestion(p,grams,base,total,ranked.get(id),pickupSlotId!=null));
+  }
   return List.copyOf(result);
  }
 }

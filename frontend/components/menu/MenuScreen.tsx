@@ -1,6 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import MobileMenuHighlights from "./MobileMenuHighlights";
+import MenuCategorySection from "./MenuCategorySection";
 import MenuOffers from "./MenuOffers";
 const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
 import MobileMenuSuggestions from "./MobileMenuSuggestions";
@@ -1392,9 +1393,8 @@ export default function MenuScreen() {
                                 </div>
 
 
-                                {pickupCheck.features?.contextualStorefrontV2 ? groupMenuProducts(categories, filteredProducts).map(group => <section key={group.id} id={`menu-category-${group.id}`} className="gokul-menu-category-section" aria-label={`${group.name} menu items`}>
-                                    <div className="gokul-menu-category-heading"><h3>{group.name}</h3><span>{group.products.length} {group.products.length === 1 ? translate("item") : "items"}</span></div>
-                                    {group.description && <p>{group.description}</p>}
+                                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} ratingsLoading={ratingsLoading} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
+                                {pickupCheck.features?.contextualStorefrontV2 ? groupMenuProducts(categories, filteredProducts).map(group => <MenuCategorySection key={group.id} id={group.id} name={group.name} count={group.products.length} description={group.description} collapsible={phoneMenu}>
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={pairing}
@@ -1428,7 +1428,7 @@ export default function MenuScreen() {
                                         handleAddToCart
                                     }
                                 />
-                                </section>) : (
+                                </MenuCategorySection>) : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={pairing}
@@ -1559,7 +1559,6 @@ export default function MenuScreen() {
 
                 </div>
 
-                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} ratingsLoading={ratingsLoading} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
             </section>
 
 

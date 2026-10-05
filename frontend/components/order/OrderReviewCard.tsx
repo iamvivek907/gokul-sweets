@@ -124,7 +124,7 @@ export default function OrderReviewCard({orderNumber}: Props) {
     if (!context.eligible) return null;
 
     return (
-        <div className="mt-7 rounded-2xl border border-[#eadfd6] bg-[#fffaf3] p-5 sm:p-6">
+        <div className="customer-order-review mt-7 rounded-2xl border border-[#eadfd6] bg-[#fffaf3] p-5 sm:p-6">
             <h2 className="text-lg font-bold text-[#241715]">
                 {context.review ? "Your review" : "How was your order?"}
             </h2>
@@ -138,8 +138,8 @@ export default function OrderReviewCard({orderNumber}: Props) {
             </div>
 
             {context.products.length > 0 && (
-                <div className="mt-5 border-t border-[#eadfd6] pt-5">
-                    <p className="text-sm font-bold text-[#241715]">Rate individual items (optional)</p>
+                <details className="mt-5 border-t border-[#eadfd6] pt-5" open>
+                    <summary className="text-sm font-bold text-[#241715]">Rate your ordered dishes (optional)</summary>
                     <div className="mt-3 space-y-4">
                         {context.products.map(product => (
                             <div key={product.productId} className="rounded-xl bg-white p-3">
@@ -155,9 +155,10 @@ export default function OrderReviewCard({orderNumber}: Props) {
                             </div>
                         ))}
                     </div>
-                </div>
+                </details>
             )}
 
+            <details className="review-comment-details"><summary>Add a detailed review</summary>
             <label className="mt-5 block text-sm font-bold text-[#241715]" htmlFor="review-comment">
                 Tell us more (optional)
             </label>
@@ -170,10 +171,10 @@ export default function OrderReviewCard({orderNumber}: Props) {
                 placeholder="What did you enjoy? What can we improve?"
                 className="mt-2 w-full rounded-xl border border-[#d8cbc3] bg-white p-3 text-[#241715] outline-none focus:border-[#7a1625]"
             />
-            <p className="mt-1 text-right text-xs text-[#756763]">{comment.length}/1000</p>
+            <p className="mt-1 text-right text-xs text-[#756763]">{comment.length}/1000</p></details>
 
             {error && <p className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
-            {saved && <p className="mt-3 text-sm font-semibold text-green-700">Thank you. Your review has been saved.</p>}
+            {saved && <div className="review-thanks" role="status"><span aria-hidden="true">♥</span><p>Thank you for your valuable feedback!</p></div>}
             {context.review?.status === "HIDDEN" && (
                 <p className="mt-3 text-sm text-amber-800">This review is currently being checked by our team.</p>
             )}
