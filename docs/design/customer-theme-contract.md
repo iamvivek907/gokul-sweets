@@ -145,3 +145,6 @@ Phone menu ratings use pale green badges only for real published ratings; unrate
 
 
 Order-detail reads share one in-flight request, have a 15-second deadline and abort on order changes or page departure, including a pending handover response. Hidden/offline pages skip periodic reads. Failed background reads retain the last successful order with an explicit retry notice; a successful read clears that notice. Completion stops active polling and removes the pickup code.
+
+
+Verified phone cards fit their content; the loading verification panel retains its reserved height until identity resolves. Order details clear on account changes and 401/403/404 or other permanent read failures, while transient network, timeout, rate-limit and server failures retain the last successful view. Order-history reads have a 15-second deadline and expose retry without discarding previously loaded cards. Same-tab and cross-tab identity changes invalidate both order views.

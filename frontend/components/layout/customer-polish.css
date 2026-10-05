@@ -175,6 +175,7 @@
 .future-storefront .mobile-items-picker nav button:hover{background:#292c34}
 .future-storefront .mobile-items-picker nav button span{color:#c7cad1}
 .future-storefront .mobile-phone-entry{padding:16px;background:#fff;border-radius:14px;min-height:184px}
+.future-storefront .mobile-phone-entry[data-verified="true"]{min-height:0}
 .future-storefront .mobile-phone-action-placeholder{display:block;height:44px;margin-top:12px;border-radius:8px;background:#f2edf0}
 .future-storefront[data-customer-route] .mobile-phone-entry button{width:100%;min-height:44px;border-radius:8px;background:#8f1838!important;color:white!important;font-weight:700;margin-top:12px}
 .future-storefront .mobile-phone-entry button:disabled{opacity:.5}

@@ -1,4 +1,5 @@
 "use client";
+import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import CustomerIcon from "@/components/customer/CustomerIcon";
 import OrderRatingLink from "@/components/order/OrderRatingLink";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
@@ -117,9 +118,7 @@ export default function OrdersPage() {
         useState(0);
 
     useEffect(() => {
-        const refresh = () => setReloadVersion(value => value + 1);
-        window.addEventListener("gokul-customer-identity-changed", refresh);
-        return () => window.removeEventListener("gokul-customer-identity-changed", refresh);
+        return subscribeCustomerIdentityChanges(() => setReloadVersion(value => value + 1), {revalidateOnResume: false});
     }, []);
 
     const [refreshVersion, setRefreshVersion] = useState(0);
@@ -147,6 +146,8 @@ export default function OrdersPage() {
     useEffect(() => {
 
         const controller = new AbortController();
+        let timedOut = false;
+        const timeout = window.setTimeout(() => {timedOut = true; controller.abort();}, 15000);
         activeHistoryRequest.current = controller;
         const activeHistoryKey = historyKey;
 
@@ -168,9 +169,9 @@ export default function OrdersPage() {
                         if (session.authenticated) verifiedOrders = await getVerifiedCustomerOrders(controller.signal);
                     }
                 } catch (identityError) {
-                    if (controller.signal.aborted) return;
+                    if (controller.signal.aborted && !timedOut) return;
                     console.error("Unable to recover verified orders:", identityError);
-                    if (compact) throw identityError;
+                    if (compact || timedOut) throw identityError;
                 }
 
                 const orders = Array.from(new Map([...localOrders, ...verifiedOrders]
@@ -189,7 +190,7 @@ export default function OrdersPage() {
 
             } catch (exception) {
 
-                if (controller.signal.aborted) {
+                if (controller.signal.aborted && !timedOut) {
                     return;
                 }
 
@@ -201,9 +202,10 @@ export default function OrdersPage() {
                 setLoadedHistory(previous => ({
                     historyKey: activeHistoryKey,
                     orders: compact ? previous?.historyKey === activeHistoryKey ? previous.orders : localOrders : [],
-                    error: exception instanceof Error ? exception.message : "Unable to load your orders."
+                    error: timedOut ? "Order updates took too long. Please try again." : exception instanceof Error ? exception.message : "Unable to load your orders."
                 }));
             } finally {
+                window.clearTimeout(timeout);
                 if (activeHistoryRequest.current === controller) activeHistoryRequest.current = null;
             }
         }
@@ -211,6 +213,7 @@ export default function OrdersPage() {
         void loadHistory();
 
         return () => {
+            window.clearTimeout(timeout);
             controller.abort();
             if (activeHistoryRequest.current === controller) activeHistoryRequest.current = null;
         };
@@ -405,7 +408,7 @@ export default function OrdersPage() {
                         <p className="mt-1 text-sm text-red-700">{currentHistory.error}</p>
                         <button
                             type="button"
-                            onClick={() => setReloadVersion(value => value + 1)}
+                            onClick={() => setRefreshVersion(value => value + 1)}
                             className="mt-4 text-sm font-bold text-[#7a1625]"
                         >
                             <T text="Try again" /></button>
