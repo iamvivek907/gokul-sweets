@@ -63,9 +63,9 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('.gokul-menu-product-card').first().waitFor();
  if(width>640){assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.locator('.mobile-menu-filters').count(),0);await page.getByRole('button',{name:'Add Paneer meal Half to cart',exact:true}).click();assert.equal(await page.locator('.gokul-floating-cart a').getAttribute('href'),'/cart');await page.goto(`${base}/checkout/mobile`);await page.waitForURL('**/cart');assert.equal(previews,0);assert.equal(orders.length,0);await context.close();continue;}
  const portion=page.locator('.mobile-portion-card');await portion.waitFor();
- assert.equal(await page.getByRole('button',{name:'View Paneer meal on the menu',exact:true}).count(),1);
+ assert.equal(await page.getByRole('button',{name:'View Paneer meal on the menu',exact:true}).count(),0);
  assert.equal(await page.getByRole('button',{name:'View Paneer meal Full on the menu',exact:true}).count(),0);
- await page.getByRole('button',{name:'View Paneer meal on the menu',exact:true}).click();
+ await page.getByLabel('Find a favourite',{exact:true}).fill('Paneer meal');
  await portion.waitFor();await page.locator('#gokul-menu-items').getByRole('button',{name:'Clear filters',exact:true}).click();assert.equal(await page.locator('.gokul-menu-product-card').count(),2);
  const menuDocument=await page.evaluate(()=>{window.__menuDocument=crypto.randomUUID();return window.__menuDocument;});
  const menuRows=page.locator('.gokul-menu-product-card');const firstRow=await menuRows.first().elementHandle();
