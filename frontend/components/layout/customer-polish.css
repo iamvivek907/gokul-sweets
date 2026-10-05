@@ -387,3 +387,34 @@
  .future-storefront[data-customer-route="/menu"] .gokul-menu-product-card .product-card-rating{min-height:28px}
  .future-storefront[data-customer-route="/menu"] .menu-recommended-grid .menu-recommended-rating{display:flex;align-items:center;min-height:28px;height:28px;box-sizing:border-box}
 }
+
+/* Keep initial branch discovery a complete page state rather than a card above the footer. */
+.customer-page-state{flex:1;min-height:calc(100dvh - 200px);display:grid;place-items:center;padding:32px 24px 110px;text-align:center;background:#fff;color:#20242b}
+.customer-page-state>div,.customer-page-state>section{max-width:440px}
+.customer-page-state-brand{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 18px;border-radius:18px;background:#8f1838;color:white;font-family:Georgia,serif;font-size:38px;font-weight:700}
+.customer-page-state-spinner{display:block;width:24px;height:24px;margin:0 auto 14px;border:3px solid #ead4db;border-top-color:#8f1838;border-radius:50%;animation:customer-page-spin .8s linear infinite}
+.customer-page-state h1{font-size:22px;font-weight:700;margin-bottom:12px}
+.customer-page-state p{line-height:1.6}
+.customer-page-state :is(button,a){display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;margin:16px 4px 0;border-radius:10px;background:#8f1838;color:#fff;font-weight:600}
+@keyframes customer-page-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.customer-page-state-spinner{animation:none}}
+@media(max-width:640px){
+ .future-storefront[data-customer-route] .notification-page-heading{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+ .future-storefront[data-customer-route] .notification-page-heading .notification-back{flex:none;font-size:0;gap:0;padding:0;margin:0;min-width:44px;min-height:44px;border:0}
+ .future-storefront[data-customer-route] .notification-page-heading h1{font-size:23px;line-height:1.25;margin:0}
+ .future-storefront[data-customer-route] .notification-toolbar{display:flex;flex-wrap:wrap;gap:8px}
+ .future-storefront[data-customer-route] .notification-toolbar h2{margin:0;white-space:nowrap}
+ .future-storefront[data-customer-route] .notification-toolbar .notification-toolbar-actions{width:auto;gap:6px;justify-content:flex-end}
+ .future-storefront[data-customer-route] .notification-toolbar :is(button,summary){font-size:12px;padding:8px;min-height:44px}
+ .future-storefront[data-customer-route] .notification-filters{margin-top:10px}
+ .future-storefront[data-customer-route] .notification-timeline{margin-top:14px}
+ .future-storefront[data-customer-route] .notification-page-heading .mobile-page-back svg{width:44px;height:44px}
+}
+
+.app-container:has(.customer-menu-loading) .customer-site-footer,.page-content:has(.customer-menu-loading) :is(.gokul-customer-breadcrumbs,.install-app-banner){display:none}
+
+@media(max-width:640px){
+ .future-storefront[data-customer-route] .notification-page-heading .notification-back{width:44px;max-width:44px;flex-basis:44px}
+ .future-storefront[data-customer-route] .notification-page-heading .page-back-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+ .future-storefront[data-customer-route] .notification-page-heading h1{min-width:0;overflow-wrap:anywhere}
+}

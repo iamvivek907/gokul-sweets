@@ -1003,6 +1003,8 @@ export default function MenuScreen() {
     }
 
 
+    if (isLoading) return <section className="customer-page-state customer-menu-loading" aria-busy="true"><div role="status"><span className="customer-page-state-brand" aria-hidden="true">G</span><span className="customer-page-state-spinner" aria-hidden="true"/><p><T text="Loading your page…"/></p></div></section>;
+
     return (
         <>
 

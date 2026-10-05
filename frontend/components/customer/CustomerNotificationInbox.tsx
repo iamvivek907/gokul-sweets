@@ -9,6 +9,11 @@ import CustomerAlertPreferences from "@/components/customer/CustomerAlertPrefere
 import {apiClient, ApiError} from "@/services/apiClient";
 import {formatBusinessTimestamp} from "@/lib/businessTime";
 
+function inboxRequest<T>(path: string, options: Parameters<typeof apiClient<T>>[1] = {}): Promise<T> {
+    const deadline = AbortSignal.timeout(8000);
+    return apiClient<T>(path, {...options, signal: options.signal ? AbortSignal.any([options.signal, deadline]) : deadline});
+}
+
 const base = "/api/customer/identity";
 type Message = {id: number; eventKey: string; kind: string; targetType: "ORDER" | "OCCASION";
     targetId: string; title: string; message: string; deliveryState: string; createdAt: string; readAt: string | null};
@@ -27,16 +32,16 @@ export default function CustomerNotificationInbox() {
     const [unavailable, setUnavailable] = useState(false);
     const load = useCallback(async (signal?: AbortSignal) => {
         const [next, choices] = await Promise.all([
-            apiClient<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal}),
-            apiClient<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal})
+            inboxRequest<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal}),
+            inboxRequest<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal})
         ]);
         setInbox(next); setPreferences(choices); setError(""); window.dispatchEvent(new Event("gokul-inbox-changed"));
     }, [query]);
     useEffect(() => {
         const controller = new AbortController();
         void Promise.all([
-            apiClient<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal: controller.signal}),
-            apiClient<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal: controller.signal})
+            inboxRequest<Inbox>(`${base}/notifications?${query}`, {credentials: "include", signal: controller.signal}),
+            inboxRequest<Preferences>(`${base}/notification-preferences`, {credentials: "include", signal: controller.signal})
         ]).then(([next, choices]) => {
             if (!controller.signal.aborted) {setInbox(next); setPreferences(choices); setError("");}
         }).catch(reason => {
@@ -55,7 +60,7 @@ export default function CustomerNotificationInbox() {
     async function acknowledgeTarget(item: Message) {
         setError("");
         try {
-            await apiClient<void>(`${base}/notifications/read-target`, {method: "PUT", credentials: "include", keepalive: true,
+            await inboxRequest<void>(`${base}/notifications/read-target`, {method: "PUT", credentials: "include", keepalive: true,
                 body: JSON.stringify({targetType: item.targetType, targetId: item.targetId, throughId: item.id})});
             await load();
         } catch {setError("Your order can still be opened. We could not confirm the read acknowledgement; refresh the inbox when connected.");}
@@ -65,19 +70,20 @@ export default function CustomerNotificationInbox() {
             .sort((a, b) => b.id - a.id)}));
     if (unavailable) return <section className="rounded-3xl border border-[#eadfd6] bg-white p-6">
         <h2 className="text-xl font-semibold"><T text="Notification inbox" /></h2><p className="mt-2 text-sm">The inbox is not available yet. Check Order history for current updates.</p></section>;
+    if (!inbox && !error) return <section className="customer-page-state customer-inbox-loading" aria-label="Notification inbox" aria-busy="true"><div role="status"><span className="customer-page-state-spinner" aria-hidden="true"/><p>Loading your inbox…</p></div></section>;
     return <section className="customer-notification-inbox rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8" aria-label="Notification inbox">
         <div className="notification-toolbar flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold"><span className="sr-only"><T text="Notification inbox" /></span>{" "}{inbox && <span className="text-sm font-normal">{inbox.unreadCount} unread</span>}</h2>
             <div className="notification-toolbar-actions flex flex-wrap gap-2"><button type="button" disabled={busy || !inbox?.unreadCount} onClick={() => void perform(async () => {
                 const throughId = inbox?.readThrough || Math.max(0, ...(inbox?.messages.map(item => item.id) ?? []));
-                await apiClient<void>(`${base}/notifications/read-all`, {method: "PUT", credentials: "include", body: JSON.stringify({throughId})});
+                await inboxRequest<void>(`${base}/notifications/read-all`, {method: "PUT", credentials: "include", body: JSON.stringify({throughId})});
                 await load();
             })} className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50">Mark all read</button>
             <details className="notification-tools"><summary className="min-h-11 cursor-pointer rounded-xl border px-4 py-3 text-sm font-semibold">More options</summary><button type="button" disabled={busy} onClick={() => void perform(() => load())}
                 className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50">Refresh inbox</button>
             <p className="notification-help mt-2 text-sm leading-6 text-[#756763]">Opening an order marks its existing updates read. Completed orders clear automatically. Routine unread updates expire after seven days; payment and refund exceptions remain. Times are in IST.</p></details></div>
         </div>
-        {error && <p role="alert" className="mt-4 rounded-xl border border-[#c76752] p-3 text-sm">{error}</p>}
+        {error && <p role="alert" className="mt-4 rounded-xl border border-[#c76752] p-3 text-sm">{error} <button type="button" disabled={busy} onClick={()=>void perform(()=>load())} className="min-h-11 px-3 font-semibold underline"><T text="Try again"/></button></p>}
         {!inbox && !error && <p role="status" className="mt-4">Loading your inbox…</p>}
         {inbox?.messages.length === 0 && <p className="mt-5 rounded-xl bg-[#fffaf2] p-4 text-sm">{search || unreadOnly ? "No updates match this view. Try All updates or another search." : "You’re all caught up. Your order updates will appear here."}</p>}
         <div className="notification-filters mt-5 space-y-3">
@@ -114,7 +120,7 @@ export default function CustomerNotificationInbox() {
                                         {item.targetType === "ORDER" ? "View order" : "View bulk request"}</Link>
                                     {["PICKED_UP", "DELIVERED"].includes(item.kind) && <Link href={`/orders/${encodeURIComponent(item.targetId)}#order-review`} onClick={() => void acknowledgeTarget(item)} className="notification-review-action flex min-h-11 items-center rounded-full bg-[#143936] px-4 text-sm font-semibold text-white">Share an optional review</Link>}
                                     {!item.readAt && <button type="button" disabled={busy} className="min-h-11 text-sm underline disabled:opacity-50" onClick={() => void perform(async () => {
-                                        await apiClient<void>(`${base}/notifications/${item.id}/read`, {method: "PUT", credentials: "include"}); await load();
+                                        await inboxRequest<void>(`${base}/notifications/${item.id}/read`, {method: "PUT", credentials: "include"}); await load();
                                     })}>Mark as read</button>}
                                 </div>
                             </article>
@@ -123,7 +129,7 @@ export default function CustomerNotificationInbox() {
                                 <ol className="mt-3 space-y-3">{events.slice(1).map(event => <li key={event.id} className="border-l-2 border-[#dfc4ab] pl-3">
                                     <p className="text-sm font-semibold">{event.title} · {event.readAt ? "Read" : "Unread"}</p><p className="text-sm">{event.message}</p>
                                     <time dateTime={event.createdAt} className="text-xs">{formatBusinessTimestamp(event.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST</time>
-                                    {!event.readAt && <button disabled={busy} type="button" className="ml-3 min-h-11 text-sm underline" onClick={() => void perform(async () => {await apiClient<void>(`${base}/notifications/${event.id}/read`, {method: "PUT", credentials: "include"}); await load();})}>Mark as read</button>}
+                                    {!event.readAt && <button disabled={busy} type="button" className="ml-3 min-h-11 text-sm underline" onClick={() => void perform(async () => {await inboxRequest<void>(`${base}/notifications/${event.id}/read`, {method: "PUT", credentials: "include"}); await load();})}>Mark as read</button>}
                                 </li>)}</ol>
                             </details>}
                         </li>;
@@ -133,7 +139,7 @@ export default function CustomerNotificationInbox() {
         </div>
         {inbox?.nextBefore && <button type="button" disabled={busy} className="mt-4 min-h-11 rounded-xl border px-4 text-sm"
             onClick={() => void perform(async () => {
-                const older = await apiClient<Inbox>(`${base}/notifications?${query}&before=${inbox.nextBefore}`, {credentials: "include"});
+                const older = await inboxRequest<Inbox>(`${base}/notifications?${query}&before=${inbox.nextBefore}`, {credentials: "include"});
                 setInbox(current => current ? {...older, messages: [...current.messages, ...older.messages.filter(item => !current.messages.some(existing => existing.id === item.id))]} : older);
             })}>Load older messages</button>}
         <details className="mt-6 rounded-2xl border p-4"><summary className="cursor-pointer font-semibold">Notification settings</summary>
@@ -145,7 +151,7 @@ export default function CustomerNotificationInbox() {
                     aria-describedby="offer-inbox-help" onChange={event => {
                         const enabled = event.target.checked;
                         void perform(async () => {
-                            const choices = await apiClient<Preferences>(`${base}/notification-preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({offerInboxEnabled: enabled})});
+                            const choices = await inboxRequest<Preferences>(`${base}/notification-preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({offerInboxEnabled: enabled})});
                             setPreferences(choices); setSaved("Notification preference saved.");
                         });
                     }} /> Include optional offers in my inbox when available

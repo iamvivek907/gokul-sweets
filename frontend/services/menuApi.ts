@@ -130,6 +130,8 @@ function waitForWarmMenu(request: Promise<MenuCategory[]>, signal?: AbortSignal)
     });
 }
 export async function getMenu(branchId: number, signal?: AbortSignal): Promise<MenuCategory[]> {
+    const deadline = AbortSignal.timeout(8000);
+    signal = signal ? AbortSignal.any([signal, deadline]) : deadline;
     const entry = warmedMenus.get(branchId);
     const warm = entry && !entry.consumed ? entry : undefined;
     if (warm) {

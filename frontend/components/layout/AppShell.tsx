@@ -75,6 +75,7 @@ export default function AppShell({
             <Header />
             <CustomerAlertRuntime />
 
+            <BranchOperationalGuard>
             {showConnectionNotice && <ConnectionNotice />}
             <PickupJourneyContext />
 
@@ -91,15 +92,16 @@ export default function AppShell({
             >
                 {futuristic && <CustomerBreadcrumbs />}
                 {futuristic && <InstallAppBanner compact />}
-                <BranchOperationalGuard>{children}</BranchOperationalGuard>
+                {children}
             </main>
 
             <CustomerFooter />
 
+            {showSocialPopup && <SocialFollowPopup />}
+            </BranchOperationalGuard>
+
             <BottomNavigation />
 
-
-            {showSocialPopup && <SocialFollowPopup />}
 
         </div>
     );

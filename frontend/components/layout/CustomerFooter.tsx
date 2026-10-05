@@ -6,7 +6,7 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 import {useEffect, useState} from "react";
 import Link from "next/link";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
-import {getBranch} from "@/services/branchApi";
+import {checkOperationalBranch} from "@/lib/branchOperationalCache";
 
 export default function CustomerFooter() {
     const {branch} = useSelectedBranch();
@@ -16,7 +16,7 @@ export default function CustomerFooter() {
     useEffect(() => {
         if (!branchId) return;
         const controller = new AbortController();
-        void getBranch(branchId, controller.signal)
+        void checkOperationalBranch(branchId)
             .then(current => {
                 if (!controller.signal.aborted) setLicence({branchId, number: current.fssaiLicenceNumber});
             })

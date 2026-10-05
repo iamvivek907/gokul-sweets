@@ -148,3 +148,6 @@ Order-detail reads share one in-flight request, have a 15-second deadline and ab
 
 
 Verified phone cards fit their content; the loading verification panel retains its reserved height until identity resolves. Order details clear on account changes and 401/403/404 or other permanent read failures, while transient network, timeout, rate-limit and server failures retain the last successful view. Order-history reads have a 15-second deadline and expose retry without discarding previously loaded cards. Same-tab and cross-tab identity changes invalidate both order views.
+
+
+Initial branch discovery uses a centered full content-area loading state with no footer or partial page content. A shared bounded branch check reuses successful results for 15 seconds across navigation, retains at most eight branch snapshots and checks again during visible activity. Requests time out after eight seconds and expose retry/branch selection. Notification header/back and unread tools share compact rows on phones, preserving accessible Back labels and 44px targets. Inbox reads and actions have eight-second deadlines with explicit retry on failure.
