@@ -139,3 +139,6 @@ Navigation feedback uses one fixed 3px maroon progress line after a 350ms delay,
 
 
 Phone checkout separates each cart item into its own white bordered card. Remove uses rose/red, Clear cart uses a restrained maroon tint and Select items remains blue; all retain 44px targets. Offers & total uses a pale blue panel and a percent mark, while Complete your meal uses a quiet warm tint immediately below cart items. Add-on exclusion, pickup checks, verified quotes, pending-order/attempt suppression and payment locking remain unchanged. Styling is scoped to the enabled phone shell.
+
+
+Phone menu ratings use pale green badges only for real published ratings; unrated/loading labels stay neutral. The maroon floating Items action uses the shared plate-and-cutlery icon. It opens a native modal category sheet with white rows and rose counts, keyboard/outside dismissal and focus restoration. Menu discovery sheets fix the background body at its saved scroll position, contain their own scrolling and restore the prior page position and styles on dismissal/unmount. Category selection then navigates to and expands the chosen section without filtering away other categories.

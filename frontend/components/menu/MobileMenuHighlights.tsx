@@ -21,7 +21,7 @@ export default function MobileMenuHighlights({products,ratings,ratingsLoading=fa
     return <article key={p.id}>
      <div className="mobile-menu-pairing-photo">{p.imageUrl?<Image src={p.imageUrl} alt={p.name} fill sizes="(max-width: 640px) 45vw, 180px"/>:<span aria-hidden="true">G</span>}</div>
      <h4>{p.name}</h4>
-     <p className="menu-recommended-rating">{rating&&rating.ratingCount>0?`★ ${rating.averageRating.toFixed(1)} (${rating.ratingCount})`:<T text={ratingsLoading?"Loading product rating":"New · No ratings yet"}/>}</p>
+     <p className={`menu-recommended-rating${rating&&rating.ratingCount>0?" has-rating":""}`}>{rating&&rating.ratingCount>0?`★ ${rating.averageRating.toFixed(1)} (${rating.ratingCount})`:<T text={ratingsLoading?"Loading product rating":"New · No ratings yet"}/>}</p>
      <small>{p.saleMode==="WEIGHT"?`${p.minimumWeightGrams??250} g`:"1 piece"}</small>
      <div className="menu-recommended-purchase"><strong>₹{(p.saleMode==="WEIGHT"?p.price*(p.minimumWeightGrams??250)/1000:p.price).toLocaleString("en-IN",{maximumFractionDigits:2})}</strong><button type="button" disabled={checking||!!availabilityError||unavailable} aria-label={`Add ${p.name} from recommendations`} onClick={()=>onAdd(p)} aria-describedby={statusId}><T text="Add"/></button></div>
     </article>;
