@@ -1,3 +1,4 @@
+import "@/lib/abortSignalCompatibility";
 import {API_BASE_URL} from "@/lib/constants";
 import {retryAfterDelayMs} from "@/lib/paymentPolling";
 

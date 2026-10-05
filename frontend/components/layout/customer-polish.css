@@ -420,6 +420,9 @@
 }
 
 .mobile-header-branch-name{display:none}
+.customer-branch-refresh-dialog{inset:0;width:100%;max-width:none;height:100dvh;max-height:none;margin:0;padding:0;border:0;background:#fff;color:#20242b}
+.customer-branch-refresh-dialog::backdrop{background:#fff}
+.customer-branch-refresh-dialog .customer-page-state{min-height:100dvh;box-sizing:border-box}
 @media(max-width:640px){
  .future-storefront[data-customer-route] .customer-site-header{background:#fff!important;border-color:#ece7e9!important;box-shadow:0 2px 10px #20242b06}
  .future-storefront[data-customer-route] .customer-site-header>div{display:grid!important;grid-template-columns:minmax(0,1fr) 44px auto;gap:0 4px;padding:4px 12px}
