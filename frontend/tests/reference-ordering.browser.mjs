@@ -11,7 +11,7 @@ const favourite={...tea,id:4,name:'Masala chai',price:35};
 const sold={...tea,id:3,name:'Sold-out samosa',available:false};
 const slot={id:7,branchId:1,slotDate:date,startTime:'15:00:00',endTime:'16:00:00',active:true,remainingCapacity:10,priorityEnabled:false,priorityRemainingCapacity:0,priorityCharge:0};
 const offer={rebateId:1,code:'SAVE',name:'Sweet saving',description:'Eligible food only',scope:'GENERAL',rebateType:'SLAB',rebateAmount:0,payableAfterRebate:100,minimumOrderAmount:150,maximumDiscountAmount:20,nextSlabMinimumOrderAmount:150,nextSlabRebateAmount:10,amountNeededForNextSlab:25};
-try{for(const [width,enabled,constrained] of [[390,true,false]]){
+try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],[640,true,false]]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  let branchReads=0,releaseHistory,releaseRatings,releaseAvailability,releasePreview;
  const historyGate=new Promise(r=>releaseHistory=r),ratingsGate=new Promise(r=>releaseRatings=r),availabilityGate=new Promise(r=>releaseAvailability=r),previewGate=new Promise(r=>releasePreview=r);
@@ -41,9 +41,26 @@ try{for(const [width,enabled,constrained] of [[390,true,false]]){
  if(constrained)await context.addInitScript(()=>Object.defineProperty(navigator,'connection',{configurable:true,value:{effectiveType:'3g',saveData:false}}));
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
 
- await page.screenshot({path:'/tmp/reference-menu-debug.png',fullPage:true});
+ const recommended=page.getByRole('region',{name:'Recommended menu items',exact:true}),sweets=page.getByRole('region',{name:'Sweets menu items',exact:true});
+ assert.equal(await page.locator('.menu-category-disclosure:not([open])').count(),0,'all menu sections start expanded');
+ assert.equal(await recommended.locator('.menu-recommended-grid').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length),2);
+ assert.equal(await sweets.locator('.gokul-menu-product-grid').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length),1,'categories use full-width rows');
+ const card=sweets.locator('.gokul-product-card').first();
+ const photo=await card.locator('.product-card-image').boundingBox(),copy=await card.locator('.product-card-copy').boundingBox();
+ assert.ok(copy.x<photo.x&&copy.y<photo.y+photo.height,'description sits left of the photo');
+ await card.getByText('Fresh milk sweet.',{exact:true}).waitFor();
+ await recommended.locator('summary').click();assert.equal(await recommended.getByRole('button',{name:'Add Fresh peda from recommendations',exact:true}).isVisible(),false);
+ releaseRatings();await page.waitForFunction(()=>document.querySelector('#menu-category-1 .product-card-rating')?.textContent.includes('4.8'));
+ assert.equal(await recommended.locator('details').evaluate(n=>n.open),false,'late ratings do not reopen a collapsed section');
+ await sweets.locator('summary').click();assert.equal(await card.isVisible(),false);
+ await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await card.waitFor();
+ assert.equal(await page.locator('.menu-category-disclosure:not([open])').count(),0,'refresh opens every section again');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ await page.screenshot({path:`/tmp/reference-menu-${width}.png`,fullPage:true});
+ const drinks=page.getByRole('region',{name:'Drinks menu items',exact:true});await drinks.locator('summary').click();
  await page.locator('.mobile-items-picker summary').click();const categories=page.getByRole('navigation',{name:'Item categories',exact:true});await categories.waitFor();
  await categories.getByRole('button',{name:/Drinks/}).click();assert.equal(await categories.isVisible(),false);
+ await drinks.locator('details[open]').waitFor();assert.equal(await sweets.isVisible(),true,'Items navigates without filtering away other sections');
  await page.locator('.mobile-items-picker summary').click();await page.keyboard.press('Escape');assert.equal(await categories.isVisible(),false);
  await page.goto(`${base}/checkout/mobile`);
  await page.getByRole('heading',{name:'Verify your phone',exact:true}).waitFor();

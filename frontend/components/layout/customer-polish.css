@@ -194,15 +194,42 @@
 .mobile-items-picker button:focus-visible,.mobile-items-picker summary:focus-visible{outline:3px solid #ff8b52;outline-offset:3px}
 
 @media(max-width:640px){
-.future-storefront[data-customer-route] .gokul-menu-product-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 12px}
+.future-storefront[data-customer-route] .gokul-menu-product-grid{grid-template-columns:minmax(0,1fr);gap:0}
 .future-storefront .menu-grid-pairing{grid-column:1/-1;min-width:0}
-.future-storefront[data-customer-route] .gokul-product-card.gokul-menu-product-card{display:flex;flex-direction:column;min-height:268px;position:relative;border:0;padding-bottom:48px}
-.future-storefront[data-customer-route] .gokul-product-card.gokul-menu-product-card>.product-card-image{order:0;width:100%;height:140px;margin:0;border-radius:12px}
-.future-storefront[data-customer-route] .gokul-product-card>.product-card-copy{order:1;padding:8px 0}
-.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy h3{font-size:12px;line-height:1.4;min-height:34px}
-.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy>p:not([role="status"]){display:none}
-.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-controls{bottom:5px;right:0;width:100%;min-height:40px}
+.future-storefront[data-customer-route] .gokul-product-card.gokul-menu-product-card{display:flex;flex-direction:row;min-height:226px;position:relative;border:0;border-bottom:1px solid #e5e5e8;padding:18px 0 34px;align-items:flex-start;overflow:visible}
+.future-storefront[data-customer-route] .gokul-product-card.gokul-menu-product-card>.product-card-image{order:2;width:44%;height:164px;aspect-ratio:1;margin:0 0 18px;border-radius:16px}
+.future-storefront[data-customer-route] .gokul-product-card>.product-card-copy{order:1;padding:6px 14px 0 0}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy h3{font-size:17px;line-height:1.4;min-height:0;-webkit-line-clamp:3}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-purchase{order:1;margin-top:6px;padding-top:0}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-rating{order:2;margin-top:10px}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-description{order:3;margin-top:12px;line-height:1.55;color:#8b8e94}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy>p[role="status"],.future-storefront[data-customer-route] .gokul-menu-product-card .mobile-selected-weight-price{order:4}
+.future-storefront[data-customer-route] .gokul-menu-product-card .mobile-portion-choices{order:5}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy>p:first-child{display:none}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-copy>p[role="status"],.future-storefront[data-customer-route] .gokul-menu-product-card .mobile-selected-weight-price{display:block}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-controls{bottom:32px;right:4%;width:36%;min-height:40px;background:#fff!important;border-color:#d7d7dc;border-radius:9px}
+.future-storefront[data-customer-route] .gokul-menu-product-card .product-card-controls>button{background:#fff!important;font-size:17px;text-transform:uppercase}
 .future-storefront .menu-availability-chip{font-size:9px;max-width:100%;top:5px;right:5px}
+.future-storefront[data-customer-route] .menu-category-disclosure>summary{list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;cursor:pointer;min-height:64px;margin:0;padding:14px 0}
+.future-storefront .menu-category-disclosure>summary::-webkit-details-marker{display:none}
+.future-storefront .menu-section-chevron{width:11px;height:11px;border-right:2px solid #93969b;border-bottom:2px solid #93969b;transform:rotate(45deg);flex:none;margin-right:4px}
+.future-storefront .menu-category-disclosure[open]>summary .menu-section-chevron{transform:rotate(225deg)}
+.future-storefront[data-customer-route] .gokul-menu-category-heading :is(h2,h3){font-size:20px!important;font-weight:800;line-height:1.4;margin:0;letter-spacing:-.02em;color:#20242b}
+.future-storefront[data-customer-route] .gokul-menu-category-heading h3 span{font:inherit;color:inherit}
+.future-storefront[data-customer-route] .gokul-menu-category-section{border-top:1px solid #e5e5e8;margin:16px 0 0;scroll-margin-top:100px}
+.future-storefront[data-customer-route] .menu-category-description{color:#8b8e94;font-size:13px;line-height:1.5;margin-bottom:12px}
+.future-storefront[data-customer-route] .mobile-menu-highlights{display:block;background:#fff;padding:0;border:0;border-radius:0;margin:0;contain:none;min-height:0}
+.future-storefront .menu-recommended-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 16px;padding:12px 0 24px}
+.future-storefront .menu-recommended-grid article{min-width:0;display:flex;flex-direction:column}
+.future-storefront .menu-recommended-grid .mobile-menu-pairing-photo{width:100%;height:auto;aspect-ratio:1;border-radius:16px;margin-bottom:10px;overflow:hidden}
+.future-storefront .menu-recommended-grid h4{font-size:13px;font-weight:750;line-height:1.4;min-height:38px}
+.future-storefront .menu-recommended-grid .menu-recommended-rating{font-size:11px;line-height:16px;min-height:16px;color:#16a477;margin:4px 0}
+.future-storefront .menu-recommended-grid small{font-size:10px;line-height:16px;color:#75787d}
+.future-storefront .menu-recommended-purchase{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-top:auto;padding-top:10px}
+.future-storefront .menu-recommended-purchase strong{font-size:14px;color:#45474c}
+.future-storefront .menu-recommended-purchase button{min-height:40px;width:76px;background:#fff;color:#16a477;border:1px solid #d7d7dc;border-radius:8px;font-weight:800;font-size:15px;text-transform:uppercase}
+.future-storefront .menu-recommended-purchase button:disabled{background:#f2f3f5;color:#8b8e94}
+.future-storefront .menu-category-disclosure>summary:focus-visible{outline:3px solid #2367c9;outline-offset:3px}
 }
 
 @media(max-width:640px){.future-storefront[data-customer-route] .mobile-checkout-pay button,.future-storefront .mobile-phone-entry button,.future-storefront .customer-order-review>button{font-size:20px;font-weight:700}}
