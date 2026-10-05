@@ -58,6 +58,10 @@ public class PickupAddOnService {
  }
  @Transactional(readOnly=true)
  public List<Suggestion> recommend(long branch,CustomerInventoryCheckRequest request,String number,Long pickupSlotId,PickupType pickupType) {
+  return recommend(branch,request,number,pickupSlotId,pickupType,false);
+ }
+ @Transactional(readOnly=true)
+ public List<Suggestion> recommend(long branch,CustomerInventoryCheckRequest request,String number,Long pickupSlotId,PickupType pickupType,boolean browse) {
   if((pickupSlotId==null)!=(pickupType==null))throw new IllegalArgumentException("Choose both pickup slot and type.");
   if(pickupSlotId!=null&&!flags.isSmartAvailability())throw new IllegalArgumentException("Slot availability is not enabled.");
   if(!flags.isPickupAddOns())return List.of();
@@ -93,7 +97,15 @@ public class PickupAddOnService {
   var ranked=new LinkedHashMap<Long,String>();
   best.values().stream().sorted(Comparator.comparingDouble(Pair::confidence).reversed().thenComparing(Comparator.comparingLong(Pair::count).reversed()).thenComparingLong(Pair::candidate)).forEach(p->ranked.put(p.candidate(),"Often ordered with "+products.get(p.seed()).name()));
   jdbc.query("SELECT product_id,SUM(order_count) n FROM analytics_product_daily WHERE branch_id=? AND business_date BETWEEN ? AND ? GROUP BY product_id HAVING SUM(order_count)>=3 ORDER BY n DESC,product_id ASC",(rs,n)->rs.getLong(1),branch,today.minusDays(29),today).stream().filter(id->products.containsKey(id)&&!cart.contains(id)).forEach(id->ranked.putIfAbsent(id,"A branch favourite"));
-  var candidates=ranked.keySet().stream().limit(8).toList();
+  // Checkout gets a bounded mix in one request; switching tabs needs no network read.
+  var chosen=new LinkedHashSet<Long>();
+  if(browse){
+   ranked.keySet().stream().limit(3).forEach(chosen::add);
+   for(String pattern:List.of("^(beverages?|drinks?|cold drinks|juices?)$","^(sides?|snacks?|starters?|accompaniments?)$"))
+    ranked.keySet().stream().filter(id->products.get(id).categoryName().trim().toLowerCase(Locale.ROOT).matches(pattern)).limit(2).forEach(chosen::add);
+  }
+  ranked.keySet().stream().filter(id->!chosen.contains(id)).limit(8-chosen.size()).forEach(chosen::add);
+  var candidates=List.copyOf(chosen);
   if(candidates.isEmpty())return List.of();
   var combined=new ArrayList<>(request.items());
   for(var id:candidates){var p=products.get(id);combined.add(new CustomerInventoryCheckRequest.Item(id,p.saleMode()==ProductSaleMode.WEIGHT?null:1,p.saleMode()==ProductSaleMode.WEIGHT?(p.minimumWeightGrams()==null?250:p.minimumWeightGrams()):null));}
@@ -114,7 +126,7 @@ public class PickupAddOnService {
    for(var id:candidates){var single=new ArrayList<>(request.items());single.add(combined.stream().filter(i->i.productId().equals(id)).findFirst().orElseThrow());if(fits(branch,new CustomerInventoryCheckRequest(request.serviceDate(),single),order))allowed.add(id);}
   }
   var result=new ArrayList<Suggestion>();
-  for(var id:candidates){if(!allowed.contains(id))continue;if(result.size()==3)break;var p=products.get(id);Integer grams=p.saleMode()==ProductSaleMode.WEIGHT?(p.minimumWeightGrams()==null?250:p.minimumWeightGrams()):null;
+  for(var id:candidates){if(!allowed.contains(id))continue;if(result.size()==(browse?8:3))break;var p=products.get(id);Integer grams=p.saleMode()==ProductSaleMode.WEIGHT?(p.minimumWeightGrams()==null?250:p.minimumWeightGrams()):null;
    BigDecimal base=(grams==null?p.price():p.price().multiply(BigDecimal.valueOf(grams)).divide(BigDecimal.valueOf(1000))).setScale(2,RoundingMode.HALF_UP);
    BigDecimal total=base.add(base.multiply(tax.get(id)).divide(BigDecimal.valueOf(100),2,RoundingMode.HALF_UP));
    result.add(new Suggestion(p,grams,base,total,ranked.get(id),pickupSlotId!=null));

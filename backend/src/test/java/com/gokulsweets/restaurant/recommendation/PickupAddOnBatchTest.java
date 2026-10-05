@@ -62,6 +62,11 @@ class PickupAddOnBatchTest {
         selectedSlot(0,true);assertThat(service.recommend(1,request,null,7L,PickupType.NORMAL)).isEmpty();
         selectedSlot(10,false);assertThat(service.recommend(1,request,null,7L,PickupType.NORMAL)).isEmpty();
     }
+    @Test void checkoutBrowseIncludesMoreCandidatesWithoutMoreInventoryReads() {
+        when(inventory.checkRequestedDate(eq(1L),any())).thenReturn(new CustomerInventoryCheckResponse(true,date,true,null,false,List.of(stock(1,true),stock(2,true),stock(3,true),stock(4,true),stock(5,true))));
+        assertThat(service.recommend(1,request,null,null,null,true)).extracting(s->s.product().id()).containsExactly(2L,3L,4L,5L);
+        verify(inventory,times(1)).checkRequestedDate(eq(1L),argThat(r->r.items().size()==5));
+    }
     @Test void partialSlotContextIsRejected() {
         assertThatThrownBy(()->service.recommend(1,request,null,7L,null)).isInstanceOf(IllegalArgumentException.class);
     }

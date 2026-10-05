@@ -1,4 +1,5 @@
 "use client";
+import OrderRatingLink from "@/components/order/OrderRatingLink";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T,useTranslation} from "@/lib/language";
 
@@ -430,6 +431,7 @@ export default function OrdersPage() {
                                     <p>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} · {order.pickupDate ? formatOrderDate(order.pickupDate) : order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending"}</p>
                                     <div><span className={getStatusClasses(status.tone)}>{status.label}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
                                     {trackingEnabled && order.delayReportedAt && <p>Ready time updated — open for details.</p>}
+                                    {["PICKED_UP","DELIVERED"].includes(order.orderStatus)&&<OrderRatingLink orderNumber={order.orderNumber}/>}
                                     <Link className="mobile-order-open" href={`/orders/${encodeURIComponent(order.orderNumber)}`}><span>View order</span>{" "}<span data-copyable>{orderDisplayNumber(order)}</span></Link>
                                 </article>;
                                 return (

@@ -26,12 +26,11 @@ export function usePublicMenuOffers(branchId: number, retry: number) {
             timer = setTimeout(load, Math.max(1, delay));
         };
         async function load() {
-            if (!active || controller) return; // Deduplicate focus/visibility/online events.
+            if (!active || controller || document.visibilityState !== "visible") return; // Deduplicate focus/visibility/online events.
             clearTimeout(timer);
             // Never keep stale promotion claims while a refresh is pending or failed.
             const currentRevision = ++revision;
             setCatalog({branchId, offers: [], failed: false, loading: true, revision: currentRevision});
-            if (document.visibilityState !== "visible") return;
             const c = new AbortController(); controller = c;
             try {
                 const value = await apiClient<PublicOffer[]>(`/api/menu/offers?branchId=${branchId}`, {
