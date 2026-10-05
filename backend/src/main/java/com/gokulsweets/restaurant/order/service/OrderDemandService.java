@@ -3,7 +3,7 @@ package com.gokulsweets.restaurant.order.service;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import lombok.RequiredArgsConstructor;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -67,15 +67,24 @@ public class OrderDemandService {
     @Transactional(readOnly=true,isolation=org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public byte[] export(long branchId,LocalDate from,LocalDate to) {
         authorize(branchId);range(from,to);
-        try(var workbook=new XSSFWorkbook();var output=new ByteArrayOutputStream()) {
+        try(var workbook=new SXSSFWorkbook(100);var output=new ByteArrayOutputStream()) {
             var totals=workbook.createSheet("Daily quantities");
             write(totals,0,List.of("Branch ID","Pickup date (IST)","Product ID","Item","Unit","Ordered","Not started","Preparing","Ready","Completed or dispatched","Orders containing item"));
             int index=1;for(var d:read(branchId,from,to))write(totals,index++,List.of(branchId,d.date().toString(),d.productId(),d.productName(),d.saleMode().equals("WEIGHT")?"g":"pcs",d.ordered(),d.waiting(),d.preparing(),d.ready(),d.completed(),d.orderCount()));
             var details=workbook.createSheet("Order lines");
             write(details,0,List.of("Branch ID","Pickup date (IST)","Pickup time (IST)","Order number","Item","Product ID","Unit","Quantity","Status"));
-            var lines=jdbc.queryForList("WITH lines AS ("+LINES+") SELECT * FROM lines WHERE service_date BETWEEN ? AND ? ORDER BY service_date,pickup_time,order_number,product_id",branchId,from,to);
-            index=1;for(var d:lines)write(details,index++,Arrays.asList(branchId,String.valueOf(d.get("service_date")),String.valueOf(d.get("pickup_time")),Objects.toString(d.get("customer_order_number"),d.get("order_number").toString()),d.get("product_name"),d.get("product_id"),"WEIGHT".equals(d.get("sale_mode"))?"g":"pcs",d.get("amount"),d.get("order_status")));
-            for(var sheet:List.of(totals,details)){sheet.createFreezePane(0,1);for(int col=0;col<sheet.getRow(0).getLastCellNum();col++)sheet.setColumnWidth(col,22*256);}
+            // Stream both PostgreSQL rows and spreadsheet rows; busy branches must not
+            // retain an entire month of order lines and workbook cells in heap memory.
+            int[] nextRow={1};
+            jdbc.query(connection->{
+                var statement=connection.prepareStatement("WITH lines AS ("+LINES+") SELECT * FROM lines WHERE service_date BETWEEN ? AND ? ORDER BY service_date,pickup_time,order_number,product_id");
+                statement.setLong(1,branchId);statement.setObject(2,from);statement.setObject(3,to);statement.setFetchSize(500);return statement;
+            },rs->{write(details,nextRow[0]++,Arrays.asList(branchId,rs.getObject("service_date").toString(),rs.getObject("pickup_time").toString(),
+                Objects.toString(rs.getObject("customer_order_number"),rs.getString("order_number")),rs.getString("product_name"),rs.getLong("product_id"),
+                "WEIGHT".equals(rs.getString("sale_mode"))?"g":"pcs",rs.getLong("amount"),rs.getString("order_status")));});
+            totals.createFreezePane(0,1);details.createFreezePane(0,1);
+            for(int col=0;col<11;col++)totals.setColumnWidth(col,22*256);
+            for(int col=0;col<9;col++)details.setColumnWidth(col,22*256);
             workbook.write(output);return output.toByteArray();
         }catch(IOException e){throw new IllegalStateException("Could not create the demand export. Try again.",e);}
     }

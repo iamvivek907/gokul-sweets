@@ -520,9 +520,10 @@ export default function AdminKotPrintPage() {
 
 
     const totalQuantity = kot ? [
-        kot.items.filter(item=>item.saleMode!=="WEIGHT").reduce((n,item)=>n+item.quantity,0)+" pcs",
-        formatWeight(kot.items.filter(item=>item.saleMode==="WEIGHT").reduce((n,item)=>n+(item.weightGrams??0),0))
-    ].filter(value=>value!=="0 pcs"&&value!=="0 g").join(" · ") : "";
+        kot.items.filter(item=>item.saleMode==="UNIT").reduce((n,item)=>n+item.quantity,0)+" pcs",
+        formatWeight(kot.items.filter(item=>item.saleMode==="WEIGHT").reduce((n,item)=>n+(item.weightGrams??0),0)),
+        kot.items.some(item=>item.saleMode==null)?"Legacy units need confirmation":""
+    ].filter(value=>value!=="0 pcs"&&value!=="0 g"&&value!=="").join(" · ") : "";
 
     const waitingForKot =
         ready
@@ -1131,7 +1132,7 @@ export default function AdminKotPrintPage() {
                                             "
                                         >
                                             {
-                                                item.saleMode === "WEIGHT" ? formatWeight(item.weightGrams) : `${item.quantity} pcs`
+                                                item.saleMode === "WEIGHT" ? formatWeight(item.weightGrams) : item.saleMode === "UNIT" ? `${item.quantity} pcs` : `${item.quantity} (check unit)`
                                             }
                                         </span>
 

@@ -41,13 +41,13 @@ class OrderDemandIntegrationTest {
   jdbc.update("INSERT INTO order_items(order_id,product_id,product_name,sale_mode,quantity,weight_grams,unit_price,tax_rate,tax_amount,line_total) VALUES (?,?,'=1+1',?,?,?,100,0,0,100)",order,product,mode,qty,grams);
  }
  @Test void totalsAndExcelCoverEveryPageWithoutCombiningUnitsOrExportingPhones()throws Exception{
-  for(int i=0;i<24;i++)add("CONFIRMED","WEIGHT",1,500);
+  for(int i=0;i<124;i++)add("CONFIRMED","WEIGHT",1,500);
   add("PREPARING","UNIT",3,null);add("PICKED_UP","WEIGHT",1,1000);add("CANCELLED","WEIGHT",1,2000);add("PENDING_PAYMENT","WEIGHT",1,2000);
   var rows=demand.get(branch,date,date);assertThat(rows).hasSize(2);
   var weighted=rows.stream().filter(r->r.saleMode().equals("WEIGHT")).findFirst().orElseThrow();
-  assertThat(weighted.ordered()).isEqualTo(13000);assertThat(weighted.waiting()).isEqualTo(12000);assertThat(weighted.completed()).isEqualTo(1000);
+  assertThat(weighted.ordered()).isEqualTo(63000);assertThat(weighted.waiting()).isEqualTo(62000);assertThat(weighted.completed()).isEqualTo(1000);
   try(var book=new XSSFWorkbook(new ByteArrayInputStream(demand.export(branch,date,date)))){
-   assertThat(book.getSheet("Order lines").getLastRowNum()).isEqualTo(26);
+   assertThat(book.getSheet("Order lines").getLastRowNum()).isEqualTo(126);
    assertThat(book.getSheet("Daily quantities").getRow(1).getCell(3).getCellType()).isEqualTo(org.apache.poi.ss.usermodel.CellType.STRING);
    assertThat(book.getSheet("Order lines").getRow(0).getLastCellNum()).isEqualTo((short)9);
   }

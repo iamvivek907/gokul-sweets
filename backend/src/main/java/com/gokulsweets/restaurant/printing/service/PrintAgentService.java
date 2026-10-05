@@ -637,16 +637,18 @@ public class PrintAgentService {
             KotItem item
     ) {
 
-        return new PrintAgentClaimResponse.Item(
-                "WEIGHT".equals(item.getSaleMode()) && item.getWeightGrams()!=null
-                    ? item.getProductName()+" · "+(item.getWeightGrams()>=1000 ? java.math.BigDecimal.valueOf(item.getWeightGrams()).divide(java.math.BigDecimal.valueOf(1000)).stripTrailingZeros().toPlainString()+" kg" : item.getWeightGrams()+" g")
-                    : item.getProductName(),
-                item.getQuantity(),
-                item.getDisplayOrder(),item.getSaleMode(),item.getWeightGrams(),
-                "WEIGHT".equals(item.getSaleMode()) && item.getWeightGrams()!=null
-                    ? (item.getWeightGrams()>=1000 ? java.math.BigDecimal.valueOf(item.getWeightGrams()).divide(java.math.BigDecimal.valueOf(1000)).stripTrailingZeros().toPlainString()+" kg" : item.getWeightGrams()+" g")
-                    : item.getQuantity()+" pcs"
-        );
+        String label;
+        if ("WEIGHT".equals(item.getSaleMode()) && item.getWeightGrams()!=null) {
+            label=item.getWeightGrams()>=1000
+                ? java.math.BigDecimal.valueOf(item.getWeightGrams()).divide(java.math.BigDecimal.valueOf(1000)).stripTrailingZeros().toPlainString()+" kg"
+                : item.getWeightGrams()+" g";
+        } else if ("UNIT".equals(item.getSaleMode())) label=item.getQuantity()+" pcs";
+        else label=item.getQuantity()+" (confirm unit)";
+        // Older print agents still consume name + quantity. Include the weight in
+        // the name too so those agents cannot silently print 1 instead of 2 kg.
+        String name="UNIT".equals(item.getSaleMode())?item.getProductName():item.getProductName()+" · "+label;
+        return new PrintAgentClaimResponse.Item(name,item.getQuantity(),item.getDisplayOrder(),
+            item.getSaleMode(),item.getWeightGrams(),label);
     }
 
 

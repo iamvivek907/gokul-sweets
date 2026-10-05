@@ -89,7 +89,7 @@ for(const width of [1280,390]){
  await page.waitForURL('**/checkout/payment/TEST-CHECKOUT');assert.equal(mutations,1);assert.equal(bestOffers,1);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-pending-order')).totalAmount),width===390?200:180);
  await page.goto(`${base}/admin/order-desk`);await page.getByRole('heading',{name:'Order desk',exact:true}).waitFor();
- await page.getByRole('button',{name:'Scheduled',exact:true}).click();await page.waitForURL('**desk=scheduled',{waitUntil:'domcontentloaded'});await page.getByText('2 kg',{exact:true}).waitFor();assert.equal(await page.getByRole('checkbox',{name:'Select #42'}).count(),0);
+ await page.getByRole('button',{name:'Scheduled',exact:true}).click();await page.waitForURL(url=>url.searchParams.get('desk')==='scheduled');await page.getByText('2 kg',{exact:true}).waitFor();assert.equal(await page.getByRole('checkbox',{name:'Select #42'}).count(),0);
  await page.reload();assert.match(page.url(),/desk=scheduled/);await page.getByRole('heading',{name:'Order desk',exact:true}).waitFor();
  await chooseLanguage(page,'hi');await page.getByRole('heading',{name:'ऑर्डर कार्य-पटल',exact:true}).waitFor();await page.getByRole('button',{name:'रसोई का अलार्म चालू करें'}).waitFor();await chooseLanguage(page,'en');
  await page.getByRole('button',{name:'Enable kitchen alarm'}).click();await page.waitForFunction(()=>window.__chimes>=6);
