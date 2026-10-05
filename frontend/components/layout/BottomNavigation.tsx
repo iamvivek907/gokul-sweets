@@ -267,8 +267,9 @@ export default function BottomNavigation() {
                                     <span
                                         className="
                                             max-w-full
-                                            truncate
-                                            leading-none
+                                            whitespace-normal
+                                            text-center
+                                            leading-tight
                                         "
                                     >
                                         {translate(item.label)}

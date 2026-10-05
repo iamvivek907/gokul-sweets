@@ -251,16 +251,18 @@
 .future-storefront[data-customer-route] .gokul-location-pin{width:30px;height:30px;border-radius:10px;background:#2359ac!important;color:#fff!important;transform:none}
 .future-storefront[data-customer-route] .gokul-location-pin svg{width:20px;height:20px}
 .future-storefront[data-customer-route] .gokul-location-name small{color:#2359ac!important}
-.future-storefront[data-customer-route] .customer-bottom-navigation{background:linear-gradient(100deg,#fffaf4,#fff5f8 50%,#f5f3ff)!important;border-color:#e8d7e1!important;box-shadow:0 -4px 22px #8f183811!important}
-.future-storefront[data-customer-route] .customer-bottom-navigation a{--nav-ink:#087443;--nav-tint:#e3f5e9;color:var(--nav-ink)!important;font-weight:700;gap:5px}
+.future-storefront[data-customer-route] .customer-bottom-navigation{background:#fff!important;border-color:#e4e7ed!important;box-shadow:0 -4px 18px #20242b0d!important}
+.future-storefront[data-customer-route] .customer-bottom-navigation a{--nav-ink:#087443;--nav-tint:#e3f5e9;color:#454b55!important;font-weight:600;gap:4px;min-height:72px;padding:7px 2px;font-size:12px}
 .future-storefront[data-customer-route] .customer-bottom-navigation a[data-nav-icon=menu]{--nav-ink:#ad4a0b;--nav-tint:#fff0df}
 .future-storefront[data-customer-route] .customer-bottom-navigation a[data-nav-icon=cart]{--nav-ink:#8f1838;--nav-tint:#fce4ec}
 .future-storefront[data-customer-route] .customer-bottom-navigation a[data-nav-icon=orders]{--nav-ink:#2359ac;--nav-tint:#e6eeff}
 .future-storefront[data-customer-route] .customer-bottom-navigation a[data-nav-icon=profile]{--nav-ink:#6743a4;--nav-tint:#eee8ff}
 .future-storefront[data-customer-route] .customer-bottom-navigation a>span:first-child{background:var(--nav-tint)!important;border:1px solid transparent;transition:transform .18s ease-out,box-shadow .18s ease-out}
 .future-storefront[data-customer-route] .customer-bottom-navigation a svg{stroke:var(--nav-ink)!important;width:23px;height:23px}
-.future-storefront[data-customer-route] .customer-bottom-navigation a[aria-current=page]{background:#ffffffa8!important}
-.future-storefront[data-customer-route] .customer-bottom-navigation a[aria-current=page]>span:first-child{box-shadow:0 3px 8px #20242b12;border-color:currentColor;transform:translateY(-2px)}
+.future-storefront[data-customer-route] .customer-bottom-navigation a[aria-current=page]{background:var(--nav-tint)!important;font-weight:800}
+.future-storefront[data-customer-route] .customer-bottom-navigation a[aria-current=page]>span:first-child{background:var(--nav-ink)!important;color:#fff!important;border-color:var(--nav-ink);box-shadow:0 2px 6px #20242b18;transform:none}
+.future-storefront[data-customer-route] .customer-bottom-navigation a[aria-current=page] svg{stroke:#fff!important}
+.future-storefront[data-customer-route] .customer-bottom-navigation a[aria-current=page]::before{content:"";position:absolute;top:2px;width:18px;height:3px;border-radius:4px;background:var(--nav-ink)}
 .future-storefront[data-customer-route] .customer-bottom-navigation a:focus-visible{outline:3px solid var(--nav-ink);outline-offset:-3px}
 .future-storefront[data-customer-route] .customer-site-footer{background:linear-gradient(135deg,#75122c,#451c3d)!important;border-color:#75122c!important}
 .future-storefront[data-customer-route] .customer-site-footer :is(h2,h3,p,a,span){color:#fff1e2!important}
@@ -292,4 +294,9 @@
 .future-storefront[data-customer-route] .future-brand-mark{flex:none}
 .future-storefront[data-customer-route] .future-brand>span:nth-child(2){min-width:0;overflow:hidden;text-overflow:ellipsis}
 }
-@media(max-width:640px){.future-storefront[data-customer-route] .customer-bottom-navigation a>span:nth-child(2){color:var(--nav-ink)!important}}
+@media(max-width:640px){.future-storefront[data-customer-route] .customer-bottom-navigation a>span:nth-child(2){color:#454b55!important;white-space:normal;overflow:visible;text-overflow:clip;text-align:center;line-height:1.25;overflow-wrap:anywhere}
+.future-storefront[data-customer-route] .customer-bottom-navigation a[aria-current=page]>span:nth-child(2){color:var(--nav-ink)!important}}
+@media(max-width:640px){
+.future-storefront[data-customer-route] .gokul-floating-cart{bottom:calc(96px + env(safe-area-inset-bottom))}
+.future-storefront[data-customer-route] .mobile-items-picker{bottom:calc(236px + env(safe-area-inset-bottom))}
+}
