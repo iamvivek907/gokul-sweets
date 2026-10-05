@@ -174,10 +174,11 @@
 .future-storefront .mobile-items-picker nav button{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;width:100%;text-align:left;color:#fff;font-size:13px;padding:8px 10px;border-radius:8px}
 .future-storefront .mobile-items-picker nav button:hover{background:#292c34}
 .future-storefront .mobile-items-picker nav button span{color:#c7cad1}
-.future-storefront .mobile-phone-entry{padding:16px;background:#fff;border-radius:14px}
-.future-storefront[data-customer-route] .mobile-phone-entry button{width:100%;min-height:44px;border-radius:8px;background:#ff5200!important;color:white!important;font-weight:700;margin-top:12px}
+.future-storefront .mobile-phone-entry{padding:16px;background:#fff;border-radius:14px;min-height:184px}
+.future-storefront .mobile-phone-action-placeholder{display:block;height:44px;margin-top:12px;border-radius:8px;background:#f2edf0}
+.future-storefront[data-customer-route] .mobile-phone-entry button{width:100%;min-height:44px;border-radius:8px;background:#8f1838!important;color:white!important;font-weight:700;margin-top:12px}
 .future-storefront .mobile-phone-entry button:disabled{opacity:.5}
-.future-storefront[data-customer-route] .mobile-checkout-pay button{background:#ff5200!important;border-color:#ff5200;border-radius:8px}
+.future-storefront[data-customer-route] .mobile-checkout-pay button{background:#8f1838!important;border-color:#75122c;border-radius:8px}
 .future-storefront .mobile-order-card{border-radius:14px;box-shadow:none;border:1px solid #eee;background:white}
 .future-storefront .mobile-order-rate{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #f0f0f2;margin-top:10px;color:#60646c;font-size:12px}
 .future-storefront .mobile-order-rate span:last-child{font-size:23px;color:#b9bdc5}
@@ -232,4 +233,4 @@
 .future-storefront .menu-category-disclosure>summary:focus-visible{outline:3px solid #2367c9;outline-offset:3px}
 }
 
-@media(max-width:640px){.future-storefront[data-customer-route] .mobile-checkout-pay button,.future-storefront .mobile-phone-entry button,.future-storefront .customer-order-review>button{font-size:20px;font-weight:700}}
+@media(max-width:640px){.future-storefront[data-customer-route] .mobile-checkout-pay button{font-size:16px;font-weight:700;min-height:64px;line-height:20px;padding:12px 16px}.future-storefront .mobile-phone-entry button{font-size:16px;font-weight:700}.future-storefront .customer-order-review>button{font-size:20px;font-weight:700}}

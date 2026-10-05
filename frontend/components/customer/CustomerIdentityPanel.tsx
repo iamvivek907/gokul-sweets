@@ -3,7 +3,7 @@ import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {pwaInstall} from "@/lib/pwaInstall";
 import {T,useTranslation} from "@/lib/language";
 
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useImperativeHandle, useRef, useState, type Ref} from "react";
 import {apiClient} from "@/services/apiClient";
 import {ApiError} from "@/services/apiClient";
 import {proofFromWidget} from "@/lib/msg91Proof";
@@ -21,6 +21,8 @@ type Msg91Window = Window & {initSendOTP?: (configuration: {
     success: (result: unknown) => void;
     failure: () => void;
 }) => void};
+
+export type PhoneVerificationAction = {start: () => void; available: boolean};
 
 export type CustomerSession = {authenticated: boolean; phone?: string; name?: string};
 
@@ -43,7 +45,9 @@ async function loadWidget(): Promise<Msg91Window> {
     return sdk;
 }
 
-export default function CustomerIdentityPanel({mode = "profile", onSessionChange, onGuestCheckoutChange,sessionRevision=0}: {
+export default function CustomerIdentityPanel({mode = "profile", onSessionChange, onGuestCheckoutChange,sessionRevision=0,verificationRef,onVerificationBusyChange}: {
+    verificationRef?: Ref<PhoneVerificationAction>;
+    onVerificationBusyChange?: (busy: boolean) => void;
     sessionRevision?: number;
     mode?: "profile" | "checkout" | "occasion" | "mobileCheckout";
     onSessionChange?: (session: CustomerSession) => void;
@@ -106,10 +110,13 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         return () => pwaInstall.blockPromotion(source, false);
     }, [busy]);
 
-    if (availability === "loading" && mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" aria-label={translate("Phone verification")}><h2><T text="Verify your phone"/></h2><p role="status"><T text="Checking phone verification…"/></p><button type="button" disabled><T text="Verify with SMS"/></button></section>;
+    useImperativeHandle(verificationRef, () => ({start: () => {void start();}, available: availability === "ready" && !!widgetId && !!widgetToken && !busy}));
+    useEffect(() => {onVerificationBusyChange?.(busy);}, [busy,onVerificationBusyChange]);
+
+    if (availability === "loading" && mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" aria-label={translate("Phone verification")} aria-busy="true"><h2><T text="Phone verification"/></h2><p role="status"><T text="Checking phone verification…"/></p><span className="mobile-phone-action-placeholder" aria-hidden="true"/></section>;
     if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status"><T text="Checking phone verification…" /></p>;
     if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" && guestAllowed ? null : <section
-        className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"
+        className={mode === "mobileCheckout" ? "mobile-checkout-section mobile-phone-entry" : "mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"}
         aria-label={translate("Phone verification")}>
         <h2 className="text-xl font-semibold text-[#241715]"><T text="Phone verification is unavailable" /></h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
@@ -229,7 +236,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     if (mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" aria-label={translate("Phone verification")}>
         <h2><T text={session.authenticated ? "Phone verified" : "Verify your phone"} /></h2>
         <p>{session.authenticated ? session.phone : translate("Verify your phone to place orders and see your pickup code.")}</p>
-        {!session.authenticated && <button type="button" disabled={busy} onClick={() => void start()} className="mt-2 min-h-11 rounded-xl bg-[#7a1625] px-4 text-white">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>}
+        {!session.authenticated && <p role="status"><T text={busy ? "Verifying your phone…" : "Use the button below to verify your phone and continue."}/></p>}
         {error && <p role="alert">{translate(error)}</p>}
     </section>;
 
