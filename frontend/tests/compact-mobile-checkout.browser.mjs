@@ -46,7 +46,7 @@ try {
   if(width<=640){await launch.waitFor({state:'visible'});assert.equal(await launch.getByRole('button').count(),0,'launch requires no tap');if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/mobile-launch-${width}.png`});}await launch.waitFor({state:'hidden'});assert.ok(Date.now()-started<6000,'launch ends independently of optional data');}
   else assert.equal(await launch.isVisible(),false);
   await page.locator('.gokul-product-card').first().waitFor();
-  if(contextual)assert.equal(await page.locator('.gokul-menu-product-grid').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),width<=640?1:4);
+  if(contextual)assert.equal(await page.locator('.gokul-menu-product-grid').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').length),width<=640?2:4);
   else assert.equal(await page.locator('.product-card-controls').first().evaluate(e=>getComputedStyle(e).position),'relative');
   const action=page.locator('.gokul-floating-cart a');assert.equal(await action.getAttribute('href'),width<=640?(checkout&&acceptedQuote&&simplified?'/checkout/mobile':simplified?'/checkout/pickup':'/cart'):'/cart');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/compact-menu-${width}.png`,fullPage:true});
