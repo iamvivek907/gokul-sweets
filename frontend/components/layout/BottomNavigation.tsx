@@ -1,4 +1,5 @@
 "use client";
+import {useEffect,useRef,useState} from "react";
 import {useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -83,6 +84,29 @@ export default function BottomNavigation() {
         usePathname();
     const features = useStorefrontFeatures();
     const checkoutExperienceV2 = features?.checkoutExperienceV2 === true;
+    const navRef=useRef<HTMLElement>(null);
+    const [scrollHidden,setScrollHidden]=useState(false);
+    const modern=features?.futuristicStorefrontV2===true||checkoutExperienceV2;
+    useEffect(()=>{
+        if(!modern||checkoutExperienceV2&&pathname.startsWith("/checkout/"))return;
+        let active=true,lastY=window.scrollY;
+        let timer:ReturnType<typeof setTimeout>|undefined;
+        const show=()=>{clearTimeout(timer);if(active)setScrollHidden(false);};
+        queueMicrotask(show);
+        const scroll=()=>{
+            const next=window.scrollY,delta=Math.abs(next-lastY);lastY=next;
+            if(!window.matchMedia("(max-width:640px)").matches||window.matchMedia("(prefers-reduced-motion:reduce)").matches||next<24||(navRef.current?.contains(document.activeElement)&&document.activeElement?.matches(":focus-visible"))||document.querySelector("dialog[open]")){show();return;}
+            if(delta<2)return;
+            setScrollHidden(true);clearTimeout(timer);timer=setTimeout(show,450);
+        };
+        const keyboard=(event:KeyboardEvent)=>{if(event.key==="Tab"||event.key==="Escape")show();};
+        window.addEventListener("scroll",scroll,{passive:true});
+        window.addEventListener("keydown",keyboard);
+        navRef.current?.addEventListener("focusin",show);
+        const nav=navRef.current;
+        return()=>{active=false;clearTimeout(timer);window.removeEventListener("scroll",scroll);window.removeEventListener("keydown",keyboard);nav?.removeEventListener("focusin",show);};
+    },[pathname,modern,checkoutExperienceV2]);
+
     const selectedBranch = useSelectedBranch().branch;
     const homeHref = features?.branchExperience === true
         ? selectedBranch ? `/branches/${selectedBranch.id}` : "/branches"
@@ -117,6 +141,8 @@ export default function BottomNavigation() {
 
     return (
         <nav
+            ref={navRef}
+            data-scroll-hidden={scrollHidden}
             aria-label="Primary navigation"
             className="customer-bottom-navigation
                 fixed

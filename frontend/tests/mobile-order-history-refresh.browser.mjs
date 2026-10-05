@@ -30,7 +30,7 @@ try {for(const [width,enabled] of [[390,true],[1280,true],[390,false]]) {
    json=authenticated?[order]:[];
   }
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  return route.fulfill({headers,json});
+  return route.fulfill({headers,json}).catch(()=>{});
  });
  await page.clock.install();
  await page.goto(`${base}/orders`);
@@ -48,10 +48,14 @@ try {for(const [width,enabled] of [[390,true],[1280,true],[390,false]]) {
   assert.equal(reads,previous+1);
   assert.equal(await page.locator('.mobile-order-card').count(),1,'cards stay visible during refresh');
   assert.equal(await page.getByText('Loading your orders...', {exact:true}).count(),0);
-  await page.clock.fastForward(60000);
-  assert.equal(reads,previous+1,'slow requests are never overlapped or repeatedly aborted');
+  await page.clock.fastForward(15001);
+  await page.getByText('Order updates took too long. Please try again.',{exact:true}).waitFor();
+  assert.equal(reads,previous+1,'history reads do not overlap before the deadline');
+  assert.equal(await page.locator('.mobile-order-card').count(),1,'timeout keeps existing cards');
   hold=false;release();
+  await page.getByRole('button',{name:'Try again',exact:true}).click();
   await page.getByText('Ready for Pickup',{exact:true}).waitFor();
+  assert.equal(reads,previous+2,'retry recovers immediately after timeout');
   assert.equal(await page.getByRole('searchbox',{name:'Find an order'}).inputValue(),'REFRESH-1');
   assert.equal(await page.getByRole('tab',{name:'Active',exact:true}).getAttribute('aria-selected'),'true');
   let count=reads;

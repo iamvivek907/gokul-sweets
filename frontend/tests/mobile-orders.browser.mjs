@@ -48,9 +48,12 @@ try {
   });
   await context.addInitScript(({branch})=>localStorage.setItem('gokul-selected-branch',JSON.stringify(branch)),{branch});
   await page.goto(`${base}/orders/TEST-ORDER`);
+  // Order data can arrive before feature settings; wait for the expected layout, not text shared with the fallback.
+  const compact=width<=640&&enabled;
+  await page.locator('.future-storefront').waitFor();
+  if(compact)await page.locator('.mobile-order-detail').waitFor();
   await page.getByText('Milk sweet',{exact:false}).first().waitFor();
   assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'order detail never shows splash');
-  const compact=width<=640&&enabled;
   assert.equal(await page.locator('.mobile-order-detail').count(),compact?1:0);
   if(compact){
    const reference=page.locator('.mobile-order-detail header [data-copyable]');
@@ -112,7 +115,7 @@ try {
     await page.getByRole('link',{name:'Continue payment',exact:true}).click();await page.waitForURL('**/checkout/payment/TEST-ORDER');
    }else await page.goto(`${base}/checkout/payment/TEST-ORDER`);
    assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false);
-   if(paymentStatus==='PAID'){await page.waitForURL('**/orders/TEST-ORDER');await page.locator('.mobile-order-detail').waitFor();}
+   if(paymentStatus==='PAID'){await page.waitForURL('**/orders/TEST-ORDER');await page.locator('.future-storefront').waitFor();if(compact)await page.locator('.mobile-order-detail').waitFor();await page.getByText('Milk sweet',{exact:false}).first().waitFor();assert.equal(await page.locator('.mobile-order-detail').count(),compact?1:0);}
    else if(paymentStatus==='PENDING'){await page.getByRole('heading',{name:compact?'Checking your payment…':'Payment',exact:true}).waitFor();if(compact)assert.equal(await page.getByRole('heading',{name:'Payment',exact:true}).count(),0);await page.getByRole('button',{name:'Check Payment Status',exact:true}).waitFor();
     if(stalledRefresh){
      stallRefresh=true;const previous=refreshes;await page.getByRole('button',{name:'Check Payment Status',exact:true}).click();

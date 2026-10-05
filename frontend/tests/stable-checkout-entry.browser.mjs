@@ -38,7 +38,11 @@ try{for(const [width,mode] of [[320,'guest'],[390,'verified'],[640,'outage']]){
  if(mode==='guest'){await identity.getByRole('heading',{name:'Verify your phone',exact:true}).waitFor();assert.equal(await identity.getByRole('button',{name:'Verify with SMS',exact:true}).count(),0);assert.equal(await page.getByRole('button',{name:'Verify phone to continue',exact:true}).isEnabled(),true);}
  else if(mode==='verified'){await identity.getByRole('heading',{name:'Phone verified',exact:true}).waitFor();await page.locator('.mobile-checkout-savings').getByText(/₹12.00/).waitFor();}
  else await identity.getByRole('heading',{name:'Phone verification is unavailable',exact:true}).waitFor();
- assert.ok(Math.abs((await cart.boundingBox()).y-top)<=1,'initial identity and savings settlement preserves cart position');
+ if(mode==='verified'){
+  const panel=await identity.boundingBox();
+  assert.ok(panel.height<125,'verified phone card fits its content instead of reserving action space');
+  assert.ok((await cart.boundingBox()).y<top-50,'verified checkout releases the unused phone-verification space');
+ }else assert.ok(Math.abs((await cart.boundingBox()).y-top)<=1,'unverified settlement preserves cart position');
  const celebration=page.locator('dialog.offer-arrival');
  if(mode==='verified'){
   await celebration.waitFor({state:'visible'});await celebration.getByRole('heading',{name:'SAVE12 applied',exact:true}).waitFor();

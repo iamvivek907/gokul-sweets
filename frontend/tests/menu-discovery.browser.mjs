@@ -42,7 +42,10 @@ try{for(const [width,mode] of [[320,'offer'],[390,'offer'],[640,'offer'],[390,'n
  if(mode==='stale')await page.goto(`${base}/checkout/mobile`);else await page.locator('.gokul-floating-cart>a').click();await page.waitForURL('**/checkout/mobile');
  await page.getByRole('heading',{name:'Your order',exact:true}).waitFor();
  const cartSection=page.getByRole('region',{name:'Cart items',exact:true});await cartSection.waitFor();
- const cartTop=(await cartSection.boundingBox()).y;
+ await page.getByRole('heading',{name:'Phone verified',exact:true}).waitFor();
+ await page.locator('.mobile-phone-entry[data-verified="true"]').waitFor();
+ await page.waitForFunction(()=>{const card=document.querySelector('.mobile-phone-entry[data-verified="true"]');return card&&card.getBoundingClientRect().height<125;});
+ const cartTop=await cartSection.evaluate(n=>n.getBoundingClientRect().top+window.scrollY);
  for(let i=0;i<50&&!started;i++)await page.waitForTimeout(100);assert.equal(started,true,'checkout preview loads without an entry modal');assert.ok(checkoutReads>0);
  assert.equal(await page.locator('dialog.offer-arrival').isVisible(),false,'checking savings never covers checkout');assert.equal(await page.locator('.offer-confetti').count(),0);
  if(mode==='slow')await page.waitForTimeout(5500);
@@ -59,7 +62,8 @@ try{for(const [width,mode] of [[320,'offer'],[390,'offer'],[640,'offer'],[390,'n
   await arrival.getByRole('button',{name:'Woohoo! Thanks',exact:true}).click();await arrival.waitFor({state:'hidden'});
  }
 
- assert.ok(Math.abs((await cartSection.boundingBox()).y-cartTop)<=1,'identity and savings discovery do not move cart items');
+ const finalCartTop=await cartSection.evaluate(n=>n.getBoundingClientRect().top+window.scrollY);
+ assert.ok(Math.abs(finalCartTop-cartTop)<=1,`savings discovery does not move cart items after verified identity settles (${mode}: ${cartTop} to ${finalCartTop})`);
  assert.equal(await page.locator('.mobile-checkout-pay button').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(143, 24, 56)');
  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/checkout-inline-${width}-${mode}.png`});
  assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-offer-arrival')),null,'legacy arrival markers are cleared');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);await context.close();console.log(`Menu discovery ${width}px ${mode} passed`);

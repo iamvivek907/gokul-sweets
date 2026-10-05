@@ -5,10 +5,10 @@ const test = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
 const code=ts.transpileModule(fs.readFileSync(path.join(__dirname,'../services/menuApi.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-function setup(constrained=false){
+function setup(constrained=false,onCombinedSignal=()=>{}){
  let now=0,nextTimer=0;const timers=new Map(),requests=[],images=[];const exports={};
  const advance=milliseconds=>{now+=milliseconds;for(const [id,timer] of timers){if(timer.at<=now){timers.delete(id);timer.callback();}}};
- vm.runInNewContext(code,{exports,process:{env:{}},Date:{now:()=>now},DOMException,AbortController,Image:class{set src(value){images.push(value);}},
+ vm.runInNewContext(code,{exports,process:{env:{}},Date:{now:()=>now},DOMException,AbortController,AbortSignal:{timeout:AbortSignal.timeout,any:signals=>{const signal=AbortSignal.any(signals);onCombinedSignal(signal);return signal;}},Image:class{set src(value){images.push(value);}},
   setTimeout:(callback,delay)=>{const id=++nextTimer;timers.set(id,{callback,at:now+delay});return id;},clearTimeout:id=>timers.delete(id),
   require:name=>name.includes('mobileConnection')?{constrainedPhoneConnection:()=>constrained}:name.includes('apiClient')?{apiClient:(_,options)=>new Promise((resolve,reject)=>{
    requests.push({resolve,signal:options.signal});options.signal?.addEventListener('abort',()=>reject(new DOMException('Request aborted','AbortError')),{once:true});
@@ -53,11 +53,13 @@ test('request deadline releases a waiting consumer into one fresh live fetch',as
  f.resolve([{products:[]}]);assert.equal((await result).length,1);assert.equal(f.timers,0);
 });
 test('warm menu settlement removes the consumer abort listener',async()=>{
- const fixture=setup(),warming=fixture.api.warmMenu(1),controller=new AbortController(),listeners=new Set();
- const signal=controller.signal,add=signal.addEventListener.bind(signal),remove=signal.removeEventListener.bind(signal);
- signal.addEventListener=(type,listener,options)=>{listeners.add(listener);add(type,listener,options);};
- signal.removeEventListener=(type,listener)=>{listeners.delete(listener);remove(type,listener);};
- const result=fixture.api.getMenu(1,signal);assert.equal(listeners.size,1);
+ const listeners=new Set();
+ const fixture=setup(false,signal=>{
+  const add=signal.addEventListener.bind(signal),remove=signal.removeEventListener.bind(signal);
+  signal.addEventListener=(type,listener,options)=>{listeners.add(listener);add(type,listener,options);};
+  signal.removeEventListener=(type,listener)=>{listeners.delete(listener);remove(type,listener);};
+ }),warming=fixture.api.warmMenu(1),controller=new AbortController();
+ const result=fixture.api.getMenu(1,controller.signal);assert.equal(listeners.size,1);
  fixture.resolve([]);await result;await warming;assert.equal(listeners.size,0);assert.equal(fixture.requests,1);
 });
 

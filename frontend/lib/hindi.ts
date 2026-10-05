@@ -161,6 +161,7 @@ export const hindi: Record<string,string> = {
   "Starting…": "शुरू हो रहा है…",
   "Confirm start": "शुरू करने की पुष्टि करें",
   "Kitchen alarm enabled": "रसोई का अलार्म चालू है",
+  "Loading your page…": "आपका पेज लोड हो रहा है…",
   "Checking branch availability…": "शाखा की उपलब्धता जाँची जा रही है…",
   "Branch unavailable": "शाखा उपलब्ध नहीं है",
   "This branch": "यह शाखा",

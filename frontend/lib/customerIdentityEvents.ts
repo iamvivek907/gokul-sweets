@@ -8,9 +8,9 @@ export function notifyCustomerIdentityChanged() {
  catch { /* Resume revalidation still works when storage is unavailable. */ }
 }
 
-export function subscribeCustomerIdentityChanges(onChange: () => void) {
+export function subscribeCustomerIdentityChanges(onChange: () => void, {revalidateOnResume = true}: {revalidateOnResume?: boolean} = {}) {
  const storage = (event: StorageEvent) => { if (event.key === revisionKey || event.key === null) onChange(); };
- const resume = () => { if (document.visibilityState === "visible") onChange(); };
+ const resume = () => { if (revalidateOnResume && document.visibilityState === "visible") onChange(); };
  const pageshow = (event: PageTransitionEvent) => { if (event.persisted) resume(); };
  window.addEventListener(eventName, onChange);
  window.addEventListener("storage", storage);

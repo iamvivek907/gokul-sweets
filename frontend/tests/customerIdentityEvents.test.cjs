@@ -21,3 +21,11 @@ test('resume revalidates identity with hidden-page and cleanup guards',()=>{
  f.window.dispatchEvent(Object.assign(new Event('pageshow'),{persisted:true}));assert.equal(calls,3);
  stop();f.window.dispatchEvent(new Event('focus'));f.document.dispatchEvent(new Event('visibilitychange'));assert.equal(calls,3);
 });
+
+test('order views invalidate on account changes without clearing retained data merely on focus',()=>{
+ const f=fixture();let calls=0;const stop=f.subscribeCustomerIdentityChanges(()=>calls++,{revalidateOnResume:false});
+ f.window.dispatchEvent(new Event('focus'));f.document.dispatchEvent(new Event('visibilitychange'));assert.equal(calls,0);
+ f.notifyCustomerIdentityChanged();assert.equal(calls,1);
+ f.window.dispatchEvent(Object.assign(new Event('storage'),{key:'gokul-customer-identity-revision'}));assert.equal(calls,2);
+ stop();f.notifyCustomerIdentityChanged();assert.equal(calls,2);
+});

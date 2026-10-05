@@ -1,26 +1,60 @@
 "use client";
-import {useEffect,useState,type ReactNode} from "react";
+import {useEffect,useRef,useState,type ReactNode} from "react";
 import {usePathname} from "next/navigation";
 import Link from "next/link";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
-import {apiClient} from "@/services/apiClient";
+import {cachedOperationalBranch,checkOperationalBranch} from "@/lib/branchOperationalCache";
 import {useTranslation} from "@/lib/language";
 import type {Branch} from "@/types/branch";
+
+function BranchRefreshNotice({retrying,onRetry}:{retrying:boolean;onRetry:()=>void}) {
+ const translate=useTranslation(),dialog=useRef<HTMLDialogElement>(null);
+ useEffect(()=>{
+  const element=dialog.current,previous=document.activeElement as HTMLElement|null;
+  element?.showModal();
+  return()=>{element?.close();previous?.focus({preventScroll:true});};
+ },[]);
+ return <dialog ref={dialog} className="customer-branch-refresh-dialog" aria-label={translate("Branch availability could not be checked")} onCancel={event=>event.preventDefault()}>
+  <section className="customer-page-state" aria-busy={retrying}>
+   <div>{retrying?<><span className="customer-page-state-spinner" aria-hidden="true"/><p role="status">{translate("Loading your page…")}</p></>:<>
+    <h1>{translate("Branch availability could not be checked")}</h1>
+    <p>{translate("Please reconnect and try again, or choose another branch.")}</p>
+    <button type="button" onClick={onRetry}>{translate("Try again")}</button>
+    <Link href="/branches">{translate("Choose another branch")}</Link>
+   </>}</div>
+  </section>
+ </dialog>;
+}
+
 export default function BranchOperationalGuard({children}:{children:ReactNode}){
  const translate=useTranslation();
  const pathname=usePathname(),{branch}=useSelectedBranch();
  const routed=pathname.match(/^\/branches\/(\d+)(?:\/|$)/);
  const id=routed?Number(routed[1]):pathname==="/"||pathname==="/menu"||pathname==="/occasions"?branch?.id:null;
  const [status,setStatus]=useState<{id:number;branch:Branch|null;error:boolean}|null>(null);
+ const [revision,setRevision]=useState(0);
+ const [retrying,setRetrying]=useState(false);
  useEffect(()=>{
-  if(!id)return;const controller=new AbortController();
-  const refresh=async()=>{try{const result=await apiClient<Branch>(`/api/branches/${id}`,{signal:controller.signal,cache:"no-store"});if(!controller.signal.aborted)setStatus({id,branch:result,error:false});}catch{if(!controller.signal.aborted)setStatus(current=>current?.id===id&&current.branch?current:{id,branch:null,error:true});}};
-  void refresh();const timer=setInterval(()=>{if(document.visibilityState==="visible")void refresh();},15000);
-  const resume=()=>{if(document.visibilityState==="visible")void refresh();};document.addEventListener("visibilitychange",resume);window.addEventListener("online",resume);
-  return()=>{controller.abort();clearInterval(timer);document.removeEventListener("visibilitychange",resume);window.removeEventListener("online",resume);};
- },[id]);
+  if(!id)return;
+  let active=true,refreshing=false;
+  const refresh=async(force=false)=>{
+   if(refreshing)return;refreshing=true;
+   const previousBranch=cachedOperationalBranch(id);
+   try{const result=await checkOperationalBranch(id,force);if(active)setStatus({id,branch:result,error:false});}
+   catch{if(active)setStatus(previous=>({id,branch:previous?.id===id?previous.branch:previousBranch,error:true}));}
+   finally{refreshing=false;if(active)setRetrying(false);}
+  };
+  void refresh(revision > 0);
+  const timer=setInterval(()=>{if(document.visibilityState==="visible"&&navigator.onLine)void refresh(true);},15000);
+  const resume=()=>{if(document.visibilityState==="visible"&&navigator.onLine)void refresh(true);};
+  document.addEventListener("visibilitychange",resume);window.addEventListener("online",resume);
+  return()=>{active=false;clearInterval(timer);document.removeEventListener("visibilitychange",resume);window.removeEventListener("online",resume);};
+ },[id,revision]);
  if(!id)return children;
- if(status?.id!==id)return <p role="status" className="m-5 rounded-2xl border bg-[#fffaf2] p-6 text-sm">{translate("Checking branch availability…")}</p>;
- if(status.error||status.branch?.operational===false)return <section className="mx-auto my-6 max-w-xl rounded-3xl border bg-[#fffaf2] p-6 text-[#143936]" aria-label={translate("Branch unavailable")}><p className="text-sm font-bold">{status.branch?.name??translate("This branch")}</p><h1 className="mt-3 text-2xl font-bold">{translate(status.error?"Branch availability could not be checked":"Currently not operational")}</h1><p className="mt-3 text-sm leading-6">{translate(status.error?"Please reconnect and try again, or choose another branch.":"This branch is temporarily closed for customer visits and new orders. Please choose another branch. Your placed orders remain available in order history.")}</p><Link href="/branches" className="mt-5 inline-flex min-h-12 items-center rounded-xl bg-[#143936] px-5 font-bold text-[#fffaf2]">{translate("Choose another branch")}</Link></section>;
- return children;
+ const current=status?.id===id?status:null;
+ const checked=current?.branch??(!current?cachedOperationalBranch(id):null);
+ const retry=()=>{setRetrying(true);if(!checked)setStatus(null);setRevision(value=>value+1);};
+ if(!current&&!checked)return <main className="customer-page-state" aria-busy="true"><div role="status"><span className="customer-page-state-brand" aria-hidden="true">G</span><span className="customer-page-state-spinner" aria-hidden="true"/><p>{translate("Loading your page…")}</p></div></main>;
+ if(current?.error&&!checked||checked?.operational===false)return <main className="customer-page-state"><section aria-label={translate("Branch unavailable")}><h1>{translate(current?.error?"Branch availability could not be checked":"Currently not operational")}</h1><p>{translate(current?.error?"Please reconnect and try again, or choose another branch.":"This branch is temporarily closed for customer visits and new orders. Please choose another branch. Your placed orders remain available in order history.")}</p>{current?.error&&<button type="button" onClick={retry}>{translate("Try again")}</button>}<Link href="/branches">{translate("Choose another branch")}</Link></section></main>;
+ return <><div style={{display:"contents"}} inert={current?.error===true}>{children}</div>{current?.error&&<BranchRefreshNotice retrying={retrying} onRetry={retry}/>}</>;
 }

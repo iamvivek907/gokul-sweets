@@ -233,7 +233,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
     </section>;
 
-    if (mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" aria-label={translate("Phone verification")}>
+    if (mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" data-verified={session.authenticated} aria-label={translate("Phone verification")}>
         <h2><T text={session.authenticated ? "Phone verified" : "Verify your phone"} /></h2>
         <p>{session.authenticated ? session.phone : translate("Verify your phone to place orders and see your pickup code.")}</p>
         {!session.authenticated && <p role="status"><T text={busy ? "Verifying your phone…" : "Use the button below to verify your phone and continue."}/></p>}

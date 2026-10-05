@@ -1,4 +1,5 @@
 "use client";
+import MobilePageBack from "@/components/customer/MobilePageBack";
 import {T} from "@/lib/language";
 
 
@@ -10,7 +11,7 @@ import BranchSelector from "@/components/branch/BranchSelector";
 import BranchDiscovery from "@/components/branch/BranchDiscovery";
 import BranchDetails from "@/components/branch/BranchDetails";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
-import {getBranch} from "@/services/branchApi";
+import {checkOperationalBranch} from "@/lib/branchOperationalCache";
 import type {Branch} from "@/types/branch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
@@ -25,27 +26,27 @@ export default function BranchHomePage() {
     useEffect(() => {
         if (!Number.isSafeInteger(id) || id < 1) return;
         const controller = new AbortController();
-        getBranch(id, controller.signal).then(data => {if (!controller.signal.aborted) setBranch(data);})
+        checkOperationalBranch(id).then(data => {if (!controller.signal.aborted) setBranch(data);})
             .catch(() => {if (!controller.signal.aborted) setError("This branch is unavailable right now.");});
         return () => controller.abort();
     }, [id]);
     return <AppShell editorial showSocialPopup={false}>
         <article className="branch-home mx-auto max-w-6xl px-4 py-8 text-[#173a37] sm:px-6">
-            <Link href="/branches" className="text-sm font-semibold underline">← All branches</Link>
+
             {!branch && !error && <p role="status" className="mt-10">Loading branch…</p>}
             {(error || !Number.isSafeInteger(id) || id < 1) && <p role="alert" className="mt-10">{error || "Branch not found."}</p>}
             {branch && <>
                 <header className="branch-home-hero">
-                    <p className="gokul-overline">Your Gokul branch</p><h1>{branch.name}</h1>
+                    <div className="branch-home-heading"><MobilePageBack href="/branches" label="All branches" className="branch-home-back"/><div><p className="gokul-overline">Your Gokul branch</p><h1>{branch.name}</h1></div></div>
                     <p>{branch.description || "Fresh sweets, snacks and meals from your neighbourhood Gokul branch."}</p>
                     <div className="branch-home-actions">
-                        {selected?.id === branch.id ? <Link href="/menu">Browse this branch’s menu →</Link>
+                        {selected?.id === branch.id ? <Link href="/menu"><T text="Browse menu"/> →</Link>
                             : <BranchSelector cardBranch={branch} destination="menu" />}
                     </div>
                 </header>
                 <nav className="gokul-branch-tabs" aria-label="Branch pages">
-                    <button type="button" aria-current={tab === "home" ? "page" : undefined} onClick={() => setTab("home")}><T text="Home" /></button>
-                    {selected?.id === branch.id ? <Link href="/menu"><T text="Menu" /></Link> : <BranchSelector cardBranch={branch} destination="menu" />}
+                    <button className="branch-home-tab" type="button" aria-current={tab === "home" ? "page" : undefined} onClick={() => setTab("home")}><T text="Home" /></button>
+                    <span className="branch-home-menu-tab">{selected?.id === branch.id ? <Link href="/menu"><T text="Menu" /></Link> : <BranchSelector cardBranch={branch} destination="menu" />}</span>
                     {occasionEnquiries && (selected?.id === branch.id ? <Link href="/occasions"><span className="desktop-celebration-label"><T text="Occasions & gifting" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></Link> : <BranchSelector cardBranch={branch} destination="occasions" />)}
                     {occasionEnquiries && <Link className="branch-request-desktop" href="/occasions/requests">My requests & quotes</Link>}
                     <button type="button" aria-current={tab === "details" ? "page" : undefined} onClick={() => setTab("details")}><T text="Branch details" /></button>

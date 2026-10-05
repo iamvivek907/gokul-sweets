@@ -1,4 +1,6 @@
 "use client";
+import {ApiError} from "@/services/apiClient";
+import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import MobileOrderDetail from "@/components/order/MobileOrderDetail";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
@@ -56,6 +58,7 @@ interface LoadedOrder {
     error: string | null;
     checkedAt: number;
     refreshError?: string;
+    retainOnError?: boolean;
 }
 
 
@@ -147,8 +150,16 @@ export default function OrderDetailPage() {
         useState(false);
 
     const activeRequest = useRef<AbortController | null>(null);
+    const [identityRevision, setIdentityRevision] = useState(0);
+    useEffect(() => subscribeCustomerIdentityChanges(() => {
+        activeRequest.current?.abort();
+        activeRequest.current = null;
+        setLoadedOrder(null);
+        setRefreshing(false);
+        setIdentityRevision(value => value + 1);
+    }, {revalidateOnResume: false}), []);
     const applyResult = useCallback((result: LoadedOrder) => {
-        setLoadedOrder(previous => result.error && previous?.orderNumber === result.orderNumber && previous.order
+        setLoadedOrder(previous => result.error && result.retainOnError && previous?.orderNumber === result.orderNumber && previous.order
             ? {...previous, refreshError: result.error}
             : result);
     }, []);
@@ -210,6 +221,7 @@ export default function OrderDetailPage() {
                     return {
                         orderNumber,
                         order: null,
+                        retainOnError: timedOut || exception instanceof ApiError && (exception.status === 0 || exception.status === 408 || exception.status === 429 || exception.status >= 500),
                         checkedAt: Date.now(),
                         error:
                             timedOut ? "Order status took too long to update. Please try again." : exception instanceof Error
@@ -265,7 +277,7 @@ export default function OrderDetailPage() {
             activeRequest.current?.abort();
             activeRequest.current = null;
         };
-    }, [fetchOrder, applyResult]);
+    }, [fetchOrder, applyResult, identityRevision]);
 
     const shouldPoll =
         order !== null
