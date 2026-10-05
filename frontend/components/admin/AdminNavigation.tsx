@@ -11,7 +11,8 @@ interface Item {href: string; label: string; permissions?: string[]; ownerOnly?:
 export const adminGroups: {label: string; items: Item[]}[] = [
     {label: "Orders & customers", items: [
         {href: "/admin/delivery-dispatch", label: "Delivery dispatch", permissions: ["ORDER_VIEW"]},
-        {href: "/admin/orders", label: "Live orders", permissions: ["ORDER_VIEW", "ORDER_START_PREPARATION", "ORDER_MARK_READY", "ORDER_MARK_PICKED_UP", "ORDER_CANCEL"]},
+        {href: "/admin/order-desk", label: "Order desk", permissions: ["ORDER_VIEW"]},
+        {href: "/admin/orders", label: "Orders & history", permissions: ["ORDER_VIEW", "ORDER_START_PREPARATION", "ORDER_MARK_READY", "ORDER_MARK_PICKED_UP", "ORDER_CANCEL"]},
         {href: "/admin/occasion-enquiries", label: "Occasion enquiries", permissions: ["ORDER_VIEW", "APPROVAL_MANAGE"]},
         {href: "/admin/printing", label: "Printer queue", permissions: ["ORDER_VIEW"]},
         {href: "/admin/customers", label: "Customers", permissions: ["CUSTOMER_VIEW"]},

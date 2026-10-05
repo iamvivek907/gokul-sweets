@@ -33,6 +33,8 @@ export interface AdminKotItem {
     productName: string;
 
     quantity: number;
+    saleMode?: "UNIT" | "WEIGHT" | null;
+    weightGrams?: number | null;
 
     displayOrder: number;
 }

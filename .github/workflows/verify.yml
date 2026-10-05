@@ -87,6 +87,7 @@ jobs:
           MOBILE_CHECKOUT_SCENARIOS=stalled-offer node tests/mobile-single-checkout.browser.mjs
           MOBILE_CHECKOUT_SCENARIOS=cart-removal,clear-cart node tests/mobile-single-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/simple-checkout-kitchen.browser.mjs
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/staff-order-desk.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/branch-discovery.browser.mjs
           node tests/customer-notification-inbox.browser.mjs
           node tests/customer-alerts.browser.mjs

@@ -23,9 +23,10 @@ public class KitchenPlanningService {
     private final EnhancementProperties flags;
     private final PreparationWindowProperties windows;
     private final ApplicationClock clock;
-    public enum Filter {ALL, OVERDUE, ELIGIBLE, SCHEDULED, PREPARING, READY}
+    public enum Filter {ALL, OVERDUE, ELIGIBLE, SCHEDULED, PREPARING, READY, WAITING, IN_PROGRESS, HANDOVER}
     public record Row(String orderNumber, Long customerOrderNumber, String customerName, String fulfillmentType, String orderStatus,
-                      String bucket, LocalDate date, LocalTime start, LocalTime end, LocalDateTime preparationAt) {}
+                      String bucket, LocalDate date, LocalTime start, LocalTime end, LocalDateTime preparationAt, boolean earlyPreparation, List<Item> items) {}
+    public record Item(long productId, String productName, String saleMode, int quantity, Integer weightGrams) {}
     public record Slot(LocalDate date, LocalTime start, LocalTime end, String fulfillmentType,
                        long waiting, long preparing, long ready, long total) {}
     public record Plan(List<Row> orders, List<Slot> slots, Map<String,Long> counts, int page, long total, LocalDateTime generatedAt) {}
@@ -33,6 +34,9 @@ public class KitchenPlanningService {
     private static final String BASE="""
         WITH timed AS (
           SELECT o.id,o.order_number,o.customer_order_number,o.customer_name,o.fulfillment_type,o.order_status,
+           (o.fulfillment_type<>'DELIVERY' AND EXISTS(SELECT 1 FROM order_items i WHERE i.order_id=o.id)
+             AND NOT EXISTS(SELECT 1 FROM order_items i LEFT JOIN branch_products bp ON bp.branch_id=o.branch_id AND bp.product_id=i.product_id
+                WHERE i.order_id=o.id AND NOT COALESCE(bp.early_preparation_allowed,FALSE))) early_preparation,
            CASE WHEN o.fulfillment_type='DELIVERY' THEN w.service_date ELSE s.slot_date END service_date,
            CASE WHEN o.fulfillment_type='DELIVERY' THEN w.starts_at ELSE s.start_time END starts_at,
            CASE WHEN o.fulfillment_type='DELIVERY' THEN w.ends_at ELSE s.end_time END ends_at,
@@ -44,11 +48,12 @@ public class KitchenPlanningService {
           WHERE o.branch_id=? AND o.order_status IN ('CONFIRMED','PREPARING','READY_FOR_PICKUP','READY_FOR_DELIVERY')
             AND (o.fulfillment_type<>'DELIVERY' OR z.id IS NOT NULL)
         ), planned AS (
-          SELECT *, service_date+starts_at-(lead*INTERVAL '1 minute') preparation_at,
+          SELECT *, CASE WHEN early_preparation THEN LEAST(service_date::timestamp,service_date+starts_at-(lead*INTERVAL '1 minute'))
+            ELSE service_date+starts_at-(lead*INTERVAL '1 minute') END preparation_at,
             CASE WHEN order_status IN ('READY_FOR_PICKUP','READY_FOR_DELIVERY') THEN 'READY'
             WHEN service_date+starts_at<=? THEN 'OVERDUE'
             WHEN order_status='PREPARING' THEN 'PREPARING'
-            WHEN service_date+starts_at-(lead*INTERVAL '1 minute')<=? THEN 'ELIGIBLE' ELSE 'SCHEDULED' END bucket
+            WHEN CASE WHEN early_preparation THEN LEAST(service_date::timestamp,service_date+starts_at-(lead*INTERVAL '1 minute')) ELSE service_date+starts_at-(lead*INTERVAL '1 minute') END<=? THEN 'ELIGIBLE' ELSE 'SCHEDULED' END bucket
           FROM timed WHERE service_date IS NOT NULL AND starts_at IS NOT NULL
         )
         """;
@@ -68,10 +73,25 @@ public class KitchenPlanningService {
         var counts=new LinkedHashMap<String,Long>();for(var value:Filter.values())counts.put(value.name(),0L);
         jdbc.query(BASE+"SELECT bucket,COUNT(*) FROM planned"+scope+" GROUP BY bucket",rs->{counts.put(rs.getString(1),rs.getLong(2));},params.toArray());
         counts.put("ALL",counts.values().stream().mapToLong(Long::longValue).sum());
-        if(filter!=Filter.ALL){scope+=" AND bucket=?";params.add(filter.name());}
+        jdbc.query(BASE+"SELECT COUNT(*) FILTER(WHERE order_status='CONFIRMED' AND bucket IN ('ELIGIBLE','OVERDUE')),COUNT(*) FILTER(WHERE order_status='PREPARING'),COUNT(*) FILTER(WHERE order_status='READY_FOR_PICKUP' AND fulfillment_type='PICKUP') FROM planned"+scope,
+            rs->{counts.put("WAITING",rs.getLong(1));counts.put("IN_PROGRESS",rs.getLong(2));counts.put("HANDOVER",rs.getLong(3));},params.toArray());
+        switch(filter) {
+            case WAITING -> scope+=" AND order_status='CONFIRMED' AND bucket IN ('ELIGIBLE','OVERDUE')";
+            case IN_PROGRESS -> scope+=" AND order_status='PREPARING'";
+            case HANDOVER -> scope+=" AND order_status='READY_FOR_PICKUP' AND fulfillment_type='PICKUP'";
+            case ALL -> { }
+            default -> {scope+=" AND bucket=?";params.add(filter.name());}
+        }
         long total=counts.get(filter.name());params.add(20);params.add(page*20);
-        var rows=jdbc.query(BASE+"SELECT order_number,customer_name,fulfillment_type,order_status,bucket,service_date,starts_at,ends_at,preparation_at,customer_order_number FROM planned"+scope+" ORDER BY service_date,starts_at,id LIMIT ? OFFSET ?",
-            (rs,n)->new Row(rs.getString(1),rs.getObject(10,Long.class),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getObject(6,LocalDate.class),rs.getObject(7,LocalTime.class),rs.getObject(8,LocalTime.class),rs.getObject(9,LocalDateTime.class)),params.toArray());
+        var rows=jdbc.query(BASE+"SELECT order_number,customer_name,fulfillment_type,order_status,bucket,service_date,starts_at,ends_at,preparation_at,customer_order_number,early_preparation FROM planned"+scope+" ORDER BY service_date,starts_at,id LIMIT ? OFFSET ?",
+            (rs,n)->new Row(rs.getString(1),rs.getObject(10,Long.class),rs.getString(2),rs.getString(3),rs.getString(4),rs.getString(5),rs.getObject(6,LocalDate.class),rs.getObject(7,LocalTime.class),rs.getObject(8,LocalTime.class),rs.getObject(9,LocalDateTime.class),rs.getBoolean(11),List.of()),params.toArray());
+        if(!rows.isEmpty()) {
+            var items=new HashMap<String,List<Item>>();
+            jdbc.query("SELECT o.order_number,i.product_id,i.product_name,i.sale_mode,i.quantity,i.weight_grams FROM order_items i JOIN orders o ON o.id=i.order_id WHERE o.branch_id=? AND o.order_number IN ("+String.join(",",Collections.nCopies(rows.size(),"?"))+") ORDER BY i.id",
+                rs->{items.computeIfAbsent(rs.getString(1),key->new ArrayList<>()).add(new Item(rs.getLong(2),rs.getString(3),rs.getString(4),rs.getInt(5),rs.getObject(6,Integer.class)));},
+                java.util.stream.Stream.concat(java.util.stream.Stream.of(branchId),rows.stream().map(Row::orderNumber)).toArray());
+            rows=rows.stream().map(r->new Row(r.orderNumber(),r.customerOrderNumber(),r.customerName(),r.fulfillmentType(),r.orderStatus(),r.bucket(),r.date(),r.start(),r.end(),r.preparationAt(),r.earlyPreparation(),items.getOrDefault(r.orderNumber(),List.of()))).toList();
+        }
         return new Plan(rows,slots,counts,page,total,now);
     }
 

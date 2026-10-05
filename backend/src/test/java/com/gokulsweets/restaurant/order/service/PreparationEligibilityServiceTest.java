@@ -57,6 +57,18 @@ class PreparationEligibilityServiceTest {
     }
 
     @Test
+    void earlyPackingUsesExplicitWholeBasketPolicyAndOnlyThePickupDay() {
+        var branch=new Branch();branch.setId(1L);
+        var slot=new PickupSlot();slot.setSlotDate(LocalDate.of(2026,10,5));slot.setStartTime(LocalTime.of(20,0));
+        var order=new Order();order.setId(11L);order.setBranch(branch);order.setPickupSlot(slot);order.setPickupType(PickupType.NORMAL);order.setOrderStatus(OrderStatus.CONFIRMED);
+        when(jdbc.queryForObject(anyString(),eq(Boolean.class),eq(1L),eq(11L))).thenReturn(true);
+        assertEquals(PreparationEligibilityStatus.ELIGIBLE,service.evaluate(order,LocalDateTime.of(2026,10,5,12,0)).status());
+        assertEquals(PreparationEligibilityStatus.SCHEDULED,service.evaluate(order,LocalDateTime.of(2026,10,4,12,0)).status());
+        when(jdbc.queryForObject(anyString(),eq(Boolean.class),eq(1L),eq(11L))).thenReturn(false);
+        assertEquals(PreparationEligibilityStatus.SCHEDULED,service.evaluate(order,LocalDateTime.of(2026,10,5,12,0)).status());
+    }
+
+    @Test
     void deliveryUsesSelectedIstWindowAtItsExactPreparationBoundary() {
         var order = new Order();
         order.setOrderStatus(OrderStatus.CONFIRMED);

@@ -71,6 +71,32 @@ class KitchenPlanningIntegrationTest {
   assertThatThrownBy(()->service.alerts(branch)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
   assertThatThrownBy(()->service.get(branch,KitchenPlanningService.Filter.ALL,null,null,0)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
  }
+
+ @Test void operationalFiltersKeepOverduePreparationAndReadyPickupInTheirOwnLanes(){
+  order("CONFIRMED",branch,slot);order("PREPARING",branch,slot);order("READY_FOR_PICKUP",branch,slot);
+  doReturn(LocalDateTime.of(2026,10,1,18,5)).when(clock).now();
+  assertThat(service.get(branch,KitchenPlanningService.Filter.WAITING,null,null,0).orders()).extracting(KitchenPlanningService.Row::orderStatus).containsExactly("CONFIRMED");
+  assertThat(service.get(branch,KitchenPlanningService.Filter.IN_PROGRESS,null,null,0).orders()).extracting(KitchenPlanningService.Row::orderStatus).containsExactly("PREPARING");
+  assertThat(service.get(branch,KitchenPlanningService.Filter.HANDOVER,null,null,0).orders()).extracting(KitchenPlanningService.Row::orderStatus).containsExactly("READY_FOR_PICKUP");
+ }
+ @Test void counterOnlyOrdersOpenEarlyButMixedBasketsAndFutureDaysStayScheduled(){
+  long category=jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?,'Desk') RETURNING id",Long.class,"DESK-"+UUID.randomUUID());
+  long tax=jdbc.queryForObject("INSERT INTO tax_categories(code,name,cgst_rate,sgst_rate) VALUES (?,'Desk',0,0) RETURNING id",Long.class,"DESK-"+UUID.randomUUID());
+  long sweet=jdbc.queryForObject("INSERT INTO products(code,name,category_id,tax_category_id,base_price,sale_mode) VALUES (?,'Sweet',?,?,100,'WEIGHT') RETURNING id",Long.class,"DESK-"+UUID.randomUUID(),category,tax);
+  long kitchen=jdbc.queryForObject("INSERT INTO products(code,name,category_id,tax_category_id,base_price,sale_mode) VALUES (?,'Samosa',?,?,10,'UNIT') RETURNING id",Long.class,"DESK-"+UUID.randomUUID(),category,tax);
+  jdbc.update("INSERT INTO branch_products(branch_id,product_id,early_preparation_allowed) VALUES (?,?,TRUE),(?,?,FALSE)",branch,sweet,branch,kitchen);
+  order("CONFIRMED",branch,slot);order("CONFIRMED",branch,slot);
+  var ids=jdbc.queryForList("SELECT id FROM orders WHERE branch_id=? ORDER BY id",Long.class,branch);
+  for(long id:ids)jdbc.update("INSERT INTO order_items(order_id,product_id,product_name,sale_mode,quantity,weight_grams,unit_price,tax_rate,tax_amount,line_total) VALUES (?,?,'Sweet','WEIGHT',1,2000,100,0,0,200)",id,sweet);
+  jdbc.update("INSERT INTO order_items(order_id,product_id,product_name,sale_mode,quantity,unit_price,tax_rate,tax_amount,line_total) VALUES (?,?,'Samosa','UNIT',4,10,0,0,40)",ids.getLast(),kitchen);
+  doReturn(LocalDateTime.of(2026,10,1,12,0)).when(clock).now();
+  var waiting=service.get(branch,KitchenPlanningService.Filter.WAITING,null,null,0);
+  assertThat(waiting.orders()).hasSize(1);assertThat(waiting.orders().getFirst().earlyPreparation()).isTrue();
+  assertThat(waiting.orders().getFirst().items().getFirst().weightGrams()).isEqualTo(2000);
+  assertThat(service.get(branch,KitchenPlanningService.Filter.SCHEDULED,null,null,0).orders()).hasSize(1);
+  doReturn(LocalDateTime.of(2026,9,30,12,0)).when(clock).now();
+  assertThat(service.get(branch,KitchenPlanningService.Filter.SCHEDULED,null,null,0).orders()).hasSize(2);
+ }
  @Test void excludesOtherBranchOrdersAndHonoursTimeFilter(){
   long other=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Other kitchen') RETURNING id",Long.class,"KITCHEN-"+UUID.randomUUID());
   order("CONFIRMED",branch,slot);order("READY_FOR_PICKUP",other,slot);

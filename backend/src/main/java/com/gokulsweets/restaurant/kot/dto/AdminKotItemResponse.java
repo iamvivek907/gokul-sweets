@@ -10,7 +10,11 @@ public record AdminKotItemResponse(
 
         Integer quantity,
 
-        Integer displayOrder
+        Integer displayOrder,
+
+        String saleMode,
+
+        Integer weightGrams
 
 ) {
 }

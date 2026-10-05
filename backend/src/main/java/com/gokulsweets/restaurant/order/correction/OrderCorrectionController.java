@@ -45,6 +45,11 @@ public class OrderCorrectionController {
     return result(corrections.transfer(number, input));
   }
 
+  @PostMapping("/api/admin/orders/{number}/reschedule")
+  public ResponseEntity<OrderCorrectionService.Summary> reschedule(@PathVariable String number,@RequestBody OrderCorrectionService.Reschedule input) {
+    return result(corrections.reschedule(number,input));
+  }
+
   private ResponseEntity<OrderCorrectionService.Summary> result(
       OrderCorrectionService.Summary value) {
     return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(value);

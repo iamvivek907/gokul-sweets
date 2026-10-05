@@ -72,6 +72,12 @@ public class KotItem {
     )
     private Integer quantity;
 
+    @Column(name = "sale_mode", length = 20)
+    private String saleMode;
+
+    @Column(name = "weight_grams")
+    private Integer weightGrams;
+
 
     @Column(
             name = "display_order",
