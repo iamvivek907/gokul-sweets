@@ -43,6 +43,37 @@ public class RebateEligibilityService {
 
     private final RebateRedemptionRepository rebateRedemptionRepository;
 
+    public record PublicTier(BigDecimal minimumOrderAmount, BigDecimal rebateAmount) {}
+    public record PublicOffer(Long rebateId, String code, String name, String description,
+                              RebateType rebateType, BigDecimal rebateValue,
+                              BigDecimal minimumOrderAmount, BigDecimal maximumDiscountAmount,
+                              List<PublicTier> tiers) {}
+
+    /** Advertise unrestricted public terms without exposing customer-specific codes or eligibility. */
+    @Transactional(readOnly = true)
+    public List<PublicOffer> publicOffers(long branchId) {
+        if (branchId <= 0) throw new IllegalArgumentException("Choose a valid branch.");
+        var candidates = rebateRepository.findActivePublicCandidates(branchId, LocalDateTime.now(BUSINESS_ZONE))
+                .stream().filter(r -> r.getScope() == RebateScope.GENERAL).toList();
+        var visitEligible = visitEligibleOffers(candidates, new Order(), SelectionMode.PREVIEW);
+        return candidates.stream()
+                .filter(r -> visitEligible.contains(r.getId()))
+                .filter(r -> r.getMaxTotalUses() == null
+                        || rebateRedemptionRepository.countByRebateId(r.getId()) < r.getMaxTotalUses())
+                .map(r -> new PublicOffer(r.getId(), r.getCode(), r.getName(), r.getDescription(),
+                        r.getRebateType(), r.getRebateType() == RebateType.FIXED_AMOUNT && r.getMaximumDiscountAmount() != null
+                                ? r.getRebateValue().min(r.getMaximumDiscountAmount()) : r.getRebateValue(),
+                        defaultZero(r.getMinimumOrderAmount()),
+                        r.getMaximumDiscountAmount(), r.getRebateType() == RebateType.SLAB
+                        ? rebateSlabRepository.findByRebateIdOrderByMinimumOrderAmountAsc(r.getId()).stream()
+                            .map(s -> new PublicTier(s.getMinimumOrderAmount().max(defaultZero(r.getMinimumOrderAmount())),
+                                    s.getRebateAmount().min(s.getMinimumOrderAmount().max(defaultZero(r.getMinimumOrderAmount())))
+                                            .min(r.getMaximumDiscountAmount() == null ? s.getRebateAmount() : r.getMaximumDiscountAmount())))
+                            .toList()
+                        : List.of()))
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<AvailableRebateResponse> getAvailableRebates(
             String orderNumber

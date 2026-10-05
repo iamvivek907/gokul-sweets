@@ -20,7 +20,7 @@ export default function MenuSearch({
 
     return (
         <div
-            className="
+            className="menu-search
                 relative
                 w-full
             "
@@ -37,7 +37,7 @@ export default function MenuSearch({
                     text-[#756763]
                 "
             >
-                ⌕
+                <span className="menu-search-legacy-icon" aria-hidden="true">⌕</span><svg className="menu-search-modern-icon" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg>
             </div>
 
 
