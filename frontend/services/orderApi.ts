@@ -99,3 +99,9 @@ export async function getCustomerOrderHistory(
         }
     );
 }
+
+export interface VerifiedOrderPage {orders:CustomerOrderSummaryResponse[];nextBefore:string|null}
+export function getVerifiedOrderPage(before:string|null=null,signal?:AbortSignal):Promise<VerifiedOrderPage>{
+    const query=new URLSearchParams({limit:"10"});if(before)query.set("before",before);
+    return apiClient<VerifiedOrderPage>(`/api/customer/identity/orders/page?${query}`,{credentials:"include",signal});
+}

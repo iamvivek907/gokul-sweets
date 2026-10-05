@@ -16,6 +16,7 @@ try {
         if (path === "/api/storefront/features") json = {customerAccountHub: true, customerHomeV2: true, notificationInbox: enabled, futuristicStorefrontV2: true};
         else if (path === "/api/storefront/customer-identity") json = {enabled: true};
         else if (path === "/api/customer/identity/me") json = {authenticated, phone: "+919876543210", name: "Test customer"};
+        else if (path === "/api/customer/identity/orders/page") json = {orders: [], nextBefore: null};
         else if (path === "/api/customer/identity/account") json = {paidOrders: 0, favouriteProductIds: [], addresses: [], preferences: {dietaryNotes: null, preferredBranchId: null}};
         else if (path === "/api/customer/identity/notifications") {
             if (failLoad) return route.abort("failed");

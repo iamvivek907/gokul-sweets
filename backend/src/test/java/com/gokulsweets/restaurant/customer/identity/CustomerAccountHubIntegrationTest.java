@@ -17,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CustomerAccountHubIntegrationTest {
     @Autowired CustomerAccountHub hub;
     @Autowired JdbcTemplate jdbc;
+    @Autowired VerifiedOrderOwnership ownership;
 
     @Test
     void savedChoicesRemainScopedToSubjectAndEnvironmentAndDeletedAddressCannotBeRead() {
@@ -72,6 +73,33 @@ class CustomerAccountHubIntegrationTest {
         assertThat(hub.snapshot("PROD", subject).paidOrders()).isZero();
         jdbc.update("UPDATE orders SET order_status = 'CANCELLED' WHERE id = ?", paid);
         assertThat(hub.snapshot("DEV", subject).paidOrders()).isZero();
+    }
+
+    @Test
+    void historyCursorIsBoundedStableAndOwnerScopedWithEqualTimestamps() {
+        var subject=UUID.randomUUID();
+        jdbc.update("INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES (?, 'DEV', '+919876543210')",subject);
+        var branch=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?, 'Paging') RETURNING id",Long.class,"PAGE-"+UUID.randomUUID().toString().substring(0,8));
+        var slot=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,CURRENT_DATE,'10:00','10:30',20) RETURNING id",Long.class,branch);
+        var expected=new java.util.ArrayList<String>();
+        for(int i=0;i<12;i++){
+            var id=order(branch,slot,"CONFIRMED");
+            jdbc.update("INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id) VALUES (?, 'DEV', ?)",id,subject);
+            expected.addFirst(jdbc.queryForObject("SELECT order_number FROM orders WHERE id=?",String.class,id));
+        }
+        var first=ownership.orderNumberPage("DEV",subject,null,5);
+        assertThat(first).containsExactlyElementsOf(expected.subList(0,6));
+        // An inserted order cannot shift the next page behind the existing cursor.
+        var newer=order(branch,slot,"CONFIRMED");
+        jdbc.update("INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id) VALUES (?, 'DEV', ?)",newer,subject);
+        assertThat(ownership.orderNumberPage("DEV",subject,first.get(4),5)).containsExactlyElementsOf(expected.subList(5,11));
+        assertThat(ownership.orderNumberPage("DEV",subject,expected.get(9),5)).containsExactlyElementsOf(expected.subList(10,12));
+        assertThat(ownership.orderNumberPage("PROD",subject,null,5)).isEmpty();
+        assertThat(ownership.orderNumberPage("DEV",UUID.randomUUID(),null,5)).isEmpty();
+        var guest=order(branch,slot,"CONFIRMED");
+        var foreign=jdbc.queryForObject("SELECT order_number FROM orders WHERE id=?",String.class,guest);
+        assertThatThrownBy(()->ownership.orderNumberPage("DEV",subject,foreign,5)).isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(()->ownership.orderNumberPage("DEV",subject,null,51)).isInstanceOf(ResponseStatusException.class);
     }
 
     private Long order(Long branch, Long slot, String status) {

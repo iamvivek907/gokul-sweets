@@ -1,4 +1,10 @@
 export const hindi: Record<string,string> = {
+  "Your favourites, again": "आपके पसंदीदा स्वाद, फिर से",
+  "Reorder for pickup": "पिकअप के लिए फिर ऑर्डर करें",
+  "Current menu prices apply. The final price and offers are confirmed at checkout.": "मेन्यू की मौजूदा कीमतें लागू होंगी। अंतिम कीमत और ऑफ़र चेकआउट पर तय होंगे।",
+  "Continue to checkout": "चेकआउट पर जाएँ",
+  "Checking pickup…": "पिकअप की जाँच हो रही है…",
+  "Weight (g)": "वज़न (ग्राम)",
   "A little Gokul in your feed": "आपकी फ़ीड में गोकुल की मिठास",
   "Fresh sweets, new favourites and moments from our kitchen.": "ताज़ी मिठाइयाँ, नए पसंदीदा स्वाद और हमारी रसोई की झलकियाँ।",
  "Choose where you’ll collect": "अपना पिकअप स्थान चुनें",

@@ -36,6 +36,7 @@ await context.route("**/api/**", async route => {
     if (path === "/api/storefront/features") json = {customerAccountHub: true, customerHomeV2: true, notificationInbox: true, notificationAlerts: enabled, futuristicStorefrontV2: true};
     else if (path === "/api/storefront/customer-identity") json = {enabled: true};
     else if (path === "/api/customer/identity/me") json = {authenticated: true, phone: "+919876543210", name: "Alert customer"};
+    else if (path === "/api/customer/identity/orders/page") json = {orders: [], nextBefore: null};
     else if (path === "/api/customer/identity/account") json = {paidOrders: 0, favouriteProductIds: [], addresses: [], preferences: {dietaryNotes: null, preferredBranchId: null}};
     else if (path === "/api/customer/identity/notification-preferences") json = {offerInboxEnabled: false, marketingConsentGranted: false};
     else if (path === "/api/customer/identity/notifications") json = {messages: [{id: nextId, kind: "READY_FOR_PICKUP", targetType: "ORDER", targetId: "TEST-ORDER", title: "Your order is ready for pickup", message: "Order TEST-ORDER · Main branch. Your order is ready. Open your order for branch and booked pickup details.", createdAt: new Date().toISOString(), readAt: null}], unreadCount: 1, nextBefore: null};

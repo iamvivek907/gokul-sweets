@@ -22,6 +22,7 @@ async function setup({width=390,ios=false,standalone=false,themed=true,stored=fa
   else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
   else if(path==='/api/customer/identity/me')json={authenticated,name:'Install customer',phone:authenticated?'+919876543210':undefined};
   else if(path==='/api/customer/identity/start')return route.fulfill({status:204});
+  else if(path==='/api/customer/identity/orders/page')json={orders:[],nextBefore:null};
   else if(path==='/api/customer/identity/account')json={paidOrders:0,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
   else if(path==='/api/customer/identity/notifications')json={messages:[],unreadCount:0,nextBefore:null};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;

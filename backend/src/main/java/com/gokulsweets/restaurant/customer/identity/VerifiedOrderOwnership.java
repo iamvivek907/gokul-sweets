@@ -110,6 +110,20 @@ public class VerifiedOrderOwnership {
                 """, (rs, row) -> rs.getString(1), environment, subjectId);
     }
 
+    /** Stable owner-scoped cursor: new orders do not shift subsequent pages. */
+    public List<String> orderNumberPage(String environment, UUID subjectId, String before, int limit) {
+        if (limit < 1 || limit > 50 || before != null && (before.length() > 100 || !owns(environment, subjectId, before)))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid history page.");
+        return jdbc.query("""
+                SELECT o.order_number FROM verified_order_ownership ownership
+                JOIN orders o ON o.id = ownership.order_id
+                WHERE ownership.environment = ? AND ownership.verified_subject_id = ?
+                  AND (CAST(? AS TEXT) IS NULL OR (o.created_at, o.id) <
+                      (SELECT c.created_at, c.id FROM orders c WHERE c.order_number = ?))
+                ORDER BY o.created_at DESC, o.id DESC LIMIT ?
+                """, (rs, row) -> rs.getString(1), environment, subjectId, before, before, limit + 1);
+    }
+
     public boolean owns(String environment, UUID subjectId, String orderNumber) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS (

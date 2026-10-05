@@ -106,6 +106,7 @@ jobs:
           node tests/loyalty-admin.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-orders.browser.mjs
           node tests/cart-settings-recovery.browser.mjs
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/profile-reorder.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-pages-account.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/pwa-install.browser.mjs
           node tests/menu-service-hours.browser.mjs

@@ -20,6 +20,7 @@ try{
    else if(path==='/api/customer/identity/me')json={authenticated:true,phone:'+919876543210',name};
    else if(path==='/api/customer/identity/start'){otp++;return route.fulfill({status:204});}
    else if(path==='/api/customer/identity/me/name'){name=req.postDataJSON().name;return route.fulfill({status:204});}
+   else if(path==='/api/customer/identity/orders/page')json={orders:[],nextBefore:null};
    else if(path==='/api/customer/identity/account')json={paidOrders:8,completedOrders:5,favouriteProductIds:[],addresses,preferences:{dietaryNotes:null,preferredBranchId:null}};
    else if(path==='/api/customer/identity/account/location'){if(req.method()==='POST'){location++;json={addressLine:'Station Road, Tamkuhi',locality:'Tamkuhi Road',postalCode:'274407',attribution:'Google Maps'};}else json={enabled:true};}
    else if(path==='/api/customer/identity/account/addresses'){saved++;json={id:1,...req.postDataJSON()};addresses=[json];}
