@@ -2,7 +2,7 @@
 import dynamic from "next/dynamic";
 import MobileMenuHighlights from "./MobileMenuHighlights";
 const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
-const MobileMenuSuggestions=dynamic(()=>import("./MobileMenuSuggestions"));
+import MobileMenuSuggestions from "./MobileMenuSuggestions";
 import {useMenuServiceRefresh} from "@/hooks/useMenuServiceRefresh";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -777,6 +777,16 @@ export default function MenuScreen() {
             return;
         }
 
+
+        const anchor=document.getElementById(`gokul-product-${product.id}`);
+        const anchorTop=anchor?.getBoundingClientRect().top;
+        // Adding/moving the inline rail must not dislodge the control the customer tapped.
+        requestAnimationFrame(()=>{
+            if(anchor?.isConnected&&anchorTop!==undefined){
+                const delta=anchor.getBoundingClientRect().top-anchorTop;
+                if(Math.abs(delta)>1)window.scrollBy({top:delta,behavior:"instant"});
+            }
+        });
 
         const liveProduct=categories.flatMap(category=>category.products).find(item=>item.id===product.id);
         if(!liveProduct?.available){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
@@ -1578,7 +1588,7 @@ export default function MenuScreen() {
 
 
             <FloatingCartButton
-                offerEnabled={!!pairing} offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
+                offerEnabled={phoneMenu&&!!mobileFeatures?.pickupAddOns} offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
                 itemCount={
                     itemCount
                 }

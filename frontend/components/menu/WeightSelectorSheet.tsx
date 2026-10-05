@@ -182,7 +182,7 @@ function WeightSelectorDialog({
         dialog?.addEventListener("keydown", trapFocus);
         return () => {
             dialog?.removeEventListener("keydown", trapFocus);
-            if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+            if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus({preventScroll:true});
         };
     }, []);
 

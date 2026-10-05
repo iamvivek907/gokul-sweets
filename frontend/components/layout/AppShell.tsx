@@ -29,6 +29,8 @@ import "./customer-journey.css";
 import "./compact-mobile.css";
 import "./mobile-account-refinement.css";
 import "./reference-storefront.css";
+import "./customer-polish.css";
+import MobileEdgeBack from "./MobileEdgeBack";
 
 
 interface AppShellProps {
@@ -69,6 +71,7 @@ export default function AppShell({
             `}
         >
 
+            {futuristic&&<MobileEdgeBack />}
             <Header />
             <CustomerAlertRuntime />
 
