@@ -49,6 +49,16 @@ public class CustomerInventoryAvailabilityService {
             Long branchId,
             CustomerInventoryCheckRequest request
     ) {
+        return check(branchId, request, true);
+    }
+
+    /** Discovery only needs this date; do not scan future dates for every candidate. */
+    @Transactional(readOnly = true)
+    public CustomerInventoryCheckResponse checkRequestedDate(Long branchId, CustomerInventoryCheckRequest request) {
+        return check(branchId, request, false);
+    }
+
+    private CustomerInventoryCheckResponse check(Long branchId, CustomerInventoryCheckRequest request, boolean suggestDate) {
         Branch branch = requireActiveBranch(branchId);
         LocalDate today = LocalDate.now(inventoryClock);
 
@@ -101,7 +111,7 @@ public class CustomerInventoryAvailabilityService {
         );
 
         LocalDate suggestedDate = null;
-        if (!requestedResult.orderable()) {
+        if (suggestDate && !requestedResult.orderable()) {
             int searchDays = maximumSearchDays(policies.values());
             LocalDate lastDate = today.plusDays(searchDays);
 

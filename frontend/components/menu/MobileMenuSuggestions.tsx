@@ -22,7 +22,7 @@ import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel"
 import type {PickupSelection} from "@/types/pickup";
 import type {MenuProduct} from "@/types/menu";
 type Visit={branchId:number;orderStatus:string;paymentStatus:string;items:{productId:number}[]};
-type Suggestion={includesTax?:boolean;product:MenuProduct;weightGrams:number|null;portionPrice:number;portionTotal:number;reason:string};
+type Suggestion={slotVerified?:boolean;includesTax?:boolean;product:MenuProduct;weightGrams:number|null;portionPrice:number;portionTotal:number;reason:string};
 const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(value);
 export default function MobileMenuSuggestions({branchId,products}:{branchId:number;products:MenuProduct[]}){
  const features=useStorefrontFeatures(),smartAvailability=features?.smartAvailability===true;
@@ -40,6 +40,17 @@ export default function MobileMenuSuggestions({branchId,products}:{branchId:numb
  const serviceDate=intent.date??features?.today;
  const request=JSON.stringify({serviceDate,items:availabilityItems(cart.items)});
  const key=JSON.stringify([branchId,request,selected?.slot.id,selected?.pickupType,smartAvailability,identityRevision]);
+ const [branchResult,setBranchResult]=useState<{key:string;items:Suggestion[]}|null>(null);
+ // Branch recommendations do not restart when optional customer history arrives.
+ useEffect(()=>{
+  if(!features?.pickupAddOns||!serviceDate||!cart.items.length||cart.branchId!==branchId)return;
+  const c=new AbortController();
+  const slotQuery=smartAvailability&&selected?`&pickupSlotId=${selected.slot.id}&pickupType=${selected.pickupType}`:"";
+  void apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}${slotQuery}`,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([c.signal,AbortSignal.timeout(8000)])})
+   .then(items=>{if(!c.signal.aborted)setBranchResult({key,items:Array.isArray(items)?items:[]});})
+   .catch(()=>{if(!c.signal.aborted)setBranchResult({key,items:[]});});
+  return()=>c.abort();
+ },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,selected,smartAvailability,features?.pickupAddOns]);
  const message=feedback?.key===key?feedback.text:"";
  const setMessage=(text:string)=>setFeedback(text?{key,text}:null);
  useEffect(()=>()=>{addition.current?.abort();},[key]);
@@ -73,9 +84,9 @@ export default function MobileMenuSuggestions({branchId,products}:{branchId:numb
        .then(value=>candidates.filter(s=>value.enforcementEnabled===false||value.items.some(item=>item.productId===s.product.id&&item.orderable))).catch(()=>[])
     : Promise.resolve(candidates);
    let verified:Suggestion[]=[];
-   const publish=async(candidates:Suggestion[])=>{
+   const publish=async(candidates:Suggestion[],alreadyVerified=false)=>{
     let items=candidates.filter(s=>products.some(p=>p.id===s.product.id&&p.available)&&!cart.items.some(i=>i.product.id===s.product.id)).slice(0,5);
-    if(smartAvailability&&selected&&items.length){
+    if(smartAvailability&&selected&&items.length&&!alreadyVerified){
      const combined=[...JSON.parse(request).items,...items.map(s=>({productId:s.product.id,quantity:s.weightGrams===null?1:null,weightGrams:s.weightGrams}))];
      const available=await checkCartAvailability(branchId,selected.date,1,combined,AbortSignal.any([c.signal,AbortSignal.timeout(8000)])).catch(()=>null);
      const option=available&&menuPickupOptions(available,combined.map(i=>i.productId)).find(s=>s.slot.id===selected.slot.id&&s.pickupType===selected.pickupType);
@@ -88,13 +99,13 @@ export default function MobileMenuSuggestions({branchId,products}:{branchId:numb
    };
    // Historical stock/identity reads must not hold verified branch pairings hostage.
    await Promise.all([
-    apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}`,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([c.signal,AbortSignal.timeout(8000)])}).catch(()=>[]).then(publish),
-    favouritesCheck.then(publish)
+    publish(branchResult?.key===key?branchResult.items:[],smartAvailability&&!!selected&&branchResult?.key===key&&branchResult.items.every(s=>s.slotVerified===true)),
+    favouritesCheck.then(items=>publish(items))
    ]);
-   if(!c.signal.aborted)setResult(previous=>({key,items:stableSuggestions(previous?.key===key?previous.items:[],verified)}));
+   if(!c.signal.aborted&&(branchResult?.key===key||verified.length))setResult(previous=>({key,items:stableSuggestions(previous?.key===key?previous.items:[],verified)}));
   })(),0);
   return()=>{clearTimeout(timer);c.abort();};
- },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,cart.items,products,visits,selected,smartAvailability,features]);
+ },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,cart.items,products,visits,selected,smartAvailability,features,branchResult]);
  const current=result?.key===key?result:null;
  const live=new Map(products.map(p=>[p.id,p]));
  const suggestions=(current?.items??[]).filter(s=>live.get(s.product.id)?.available&&!cart.items.some(i=>i.product.id===s.product.id));
