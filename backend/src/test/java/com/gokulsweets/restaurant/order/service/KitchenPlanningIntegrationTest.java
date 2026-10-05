@@ -83,6 +83,17 @@ class KitchenPlanningIntegrationTest {
   assertThat(service.get(branch,KitchenPlanningService.Filter.IN_PROGRESS,null,null,0).orders()).extracting(KitchenPlanningService.Row::orderStatus).containsExactly("PREPARING");
   assertThat(service.get(branch,KitchenPlanningService.Filter.HANDOVER,null,null,0).orders()).extracting(KitchenPlanningService.Row::orderStatus).containsExactly("READY_FOR_PICKUP");
  }
+ @Test void combinedCountsDoNotDoubleCountOverlappingLanesAndRespectEmptyScopes(){
+  order("CONFIRMED",branch,slot);order("PREPARING",branch,slot);order("READY_FOR_PICKUP",branch,slot);
+  doReturn(LocalDateTime.of(2026,10,1,18,5)).when(clock).now();
+  var plan=service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(18,0),0);
+  assertThat(plan.total()).isEqualTo(3);
+  assertThat(plan.counts()).containsEntry("ALL",3L).containsEntry("OVERDUE",2L).containsEntry("READY",1L)
+   .containsEntry("WAITING",1L).containsEntry("IN_PROGRESS",1L).containsEntry("HANDOVER",1L)
+   .containsEntry("SCHEDULED",0L).containsEntry("PREPARING",0L);
+  var empty=service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,2),null,0);
+  assertThat(empty.total()).isZero();assertThat(empty.counts().values()).allMatch(count->count==0L);
+ }
  @Test void counterOnlyOrdersOpenEarlyButMixedBasketsAndFutureDaysStayScheduled(){
   long category=jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?,'Desk') RETURNING id",Long.class,"DESK-"+UUID.randomUUID());
   long tax=jdbc.queryForObject("INSERT INTO tax_categories(code,name,cgst_rate,sgst_rate) VALUES (?,'Desk',0,0) RETURNING id",Long.class,"DESK-"+UUID.randomUUID());

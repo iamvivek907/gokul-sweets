@@ -71,10 +71,22 @@ public class KitchenPlanningService {
         if(date!=null){scope+=" AND service_date=?";params.add(date);}
         if(start!=null){scope+=" AND starts_at=?";params.add(start);}
         var counts=new LinkedHashMap<String,Long>();for(var value:Filter.values())counts.put(value.name(),0L);
-        jdbc.query(BASE+"SELECT bucket,COUNT(*) FROM planned"+scope+" GROUP BY bucket",rs->{counts.put(rs.getString(1),rs.getLong(2));},params.toArray());
-        counts.put("ALL",counts.values().stream().mapToLong(Long::longValue).sum());
-        jdbc.query(BASE+"SELECT COUNT(*) FILTER(WHERE order_status='CONFIRMED' AND bucket IN ('ELIGIBLE','OVERDUE')),COUNT(*) FILTER(WHERE order_status='PREPARING'),COUNT(*) FILTER(WHERE order_status='READY_FOR_PICKUP' AND fulfillment_type='PICKUP') FROM planned"+scope,
-            rs->{counts.put("WAITING",rs.getLong(1));counts.put("IN_PROGRESS",rs.getLong(2));counts.put("HANDOVER",rs.getLong(3));},params.toArray());
+        // Bucket and operational-lane totals share one classification scan. Lane counts overlap
+        // bucket counts, so accumulate ALL from bucket totals only.
+        jdbc.query(BASE+"""
+            SELECT bucket,COUNT(*),
+                   COUNT(*) FILTER(WHERE order_status='CONFIRMED' AND bucket IN ('ELIGIBLE','OVERDUE')),
+                   COUNT(*) FILTER(WHERE order_status='PREPARING'),
+                   COUNT(*) FILTER(WHERE order_status='READY_FOR_PICKUP' AND fulfillment_type='PICKUP')
+            FROM planned
+            """+scope+" GROUP BY bucket",rs->{
+                long bucketTotal=rs.getLong(2);
+                counts.put(rs.getString(1),bucketTotal);
+                counts.merge("ALL",bucketTotal,Long::sum);
+                counts.merge("WAITING",rs.getLong(3),Long::sum);
+                counts.merge("IN_PROGRESS",rs.getLong(4),Long::sum);
+                counts.merge("HANDOVER",rs.getLong(5),Long::sum);
+            },params.toArray());
         switch(filter) {
             case WAITING -> scope+=" AND order_status='CONFIRMED' AND bucket IN ('ELIGIBLE','OVERDUE')";
             case IN_PROGRESS -> scope+=" AND order_status='PREPARING'";
