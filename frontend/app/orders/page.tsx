@@ -424,13 +424,13 @@ export default function OrdersPage() {
                             {monthOrders.map(order => {
                                 const status = getOrderStatusPresentation(order.orderStatus, order.fulfillmentType);
 
-                                if (compact) return <article className="mobile-order-card" key={order.orderNumber}>
-                                    <div><strong>{order.branchName}</strong><Link href="/menu">View menu</Link></div>
+                                if (compact) return <article className="mobile-order-card" data-order-tone={status.tone} key={order.orderNumber}>
+                                    <div className="mobile-order-card-heading"><strong>{order.branchName}</strong><Link href="/menu">View menu</Link></div>
                                     <p>{formatBusinessTimestamp(order.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST</p>
                                     <p>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} · {order.pickupDate ? formatOrderDate(order.pickupDate) : order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending"}</p>
                                     <div><span className={getStatusClasses(status.tone)}>{status.label}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
                                     {trackingEnabled && order.delayReportedAt && <p>Ready time updated — open for details.</p>}
-                                    <Link className="mobile-order-open" href={`/orders/${encodeURIComponent(order.orderNumber)}`}>View order {orderDisplayNumber(order)} →</Link>
+                                    <Link className="mobile-order-open" href={`/orders/${encodeURIComponent(order.orderNumber)}`}><span>View order</span>{" "}<span data-copyable>{orderDisplayNumber(order)}</span></Link>
                                 </article>;
                                 return (
                                     <article

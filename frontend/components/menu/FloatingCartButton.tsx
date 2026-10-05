@@ -5,6 +5,8 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 
 import Link from "next/link";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useSelectedBranch} from "@/hooks/useSelectedBranch";
+import {usePickupIntent} from "@/hooks/usePickupIntent";
 import type {AvailableRebateResponse} from "@/types/rebate";
 import {useState, useEffect} from "react";
 
@@ -49,6 +51,8 @@ export default function FloatingCartButton({
 }: FloatingCartButtonProps) {
 
     const features = useStorefrontFeatures();
+    const {branch}=useSelectedBranch();
+    const pickup=usePickupIntent(branch?.id);
     const [mobile, setMobile] = useState(false);
     useEffect(() => {
         const media = window.matchMedia("(max-width: 640px)");
@@ -56,6 +60,8 @@ export default function FloatingCartButton({
         update(); media.addEventListener("change", update);
         return () => media.removeEventListener("change", update);
     }, []);
+    const threshold=offerTarget?.nextSlabMinimumOrderAmount??0;
+    const progress=threshold>0?Math.min(1,Math.max(0,1-(offerTarget?.amountNeededForNextSlab??threshold)/threshold)):0;
     const quick = mobile && features?.simplifiedCheckout;
     const consolidated=quick&&features?.checkoutExperienceV2&&features.acceptedCheckoutQuote;
     if (
@@ -79,7 +85,7 @@ export default function FloatingCartButton({
             "
         >
 
-            {consolidated&&offerEnabled&&<div className="mobile-cart-offer-slot">{offerTarget&&<button type="button" className="mobile-cart-offer-target" onClick={()=>document.getElementById("mobile-menu-pairings-open")?.click()} aria-haspopup="dialog"><span aria-hidden="true">%</span><span><strong><T text="Unlock"/> {formatCurrency(offerTarget.nextSlabRebateAmount!)} <T text="off"/></strong><small><T text="Add"/> {formatCurrency(offerTarget.amountNeededForNextSlab!)} <T text="in eligible items"/></small></span><span aria-hidden="true">⌃</span></button>}</div>}
+            {consolidated&&offerEnabled&&<div className="mobile-cart-offer-slot"><button type="button" className="mobile-cart-offer-target" onClick={()=>{const pickupButton=!pickup.selection?document.querySelector<HTMLButtonElement>(".mobile-menu-pickup button"):null;const pairings=document.getElementById("mobile-menu-pairings-open") as HTMLButtonElement|null;if(pickupButton)pickupButton.click();else if(pairings&&!pairings.disabled)pairings.click();else document.querySelector<HTMLAnchorElement>(".gokul-floating-cart>a")?.click();}}><span className="mobile-cart-offer-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="17" fill="none" stroke="#d7e5fc" strokeWidth="3"/><circle cx="20" cy="20" r="17" fill="none" stroke="#2e68c7" strokeWidth="3" strokeLinecap="round" strokeDasharray="106.82" strokeDashoffset={106.82*(1-progress)} transform="rotate(-90 20 20)"/></svg><span>%</span></span><span>{offerTarget?<><strong><T text="Unlock"/> {formatCurrency(offerTarget.nextSlabRebateAmount!)} <T text="off"/></strong><small><T text="Add"/> {formatCurrency(offerTarget.amountNeededForNextSlab!)} <T text="in eligible items"/></small></>:<><strong><T text="Make your meal more rewarding"/></strong><small><T text={!pickup.selection&&features?.smartAvailability?"Choose pickup to check your savings":"Explore pairings · eligible savings checked at checkout"}/></small></>}</span><span aria-hidden="true">⌃</span></button></div>}
             <Link
                 href={consolidated ? "/checkout/mobile" : quick ? "/checkout/pickup" : "/cart"}
                 className="
@@ -128,7 +134,7 @@ export default function FloatingCartButton({
                             text-[#7a1625]
                         "
                     >
-                        {itemCount}
+                        <span key={itemCount} className="mobile-cart-count">{itemCount}</span>
                     </div>
 
 

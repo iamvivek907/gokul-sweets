@@ -88,11 +88,11 @@ try {
   const historyCard=page.locator(compact?'.mobile-order-card':'article').first(),search=page.getByLabel('Find an order',{exact:true});
   for(const term of [' test-order ','test-ord',...(order.customerOrderNumber?['#1','1']:[])]){
    await search.fill(term);assert.equal(await search.inputValue(),term);await historyCard.waitFor();
-   if(order.customerOrderNumber){await historyCard.getByText(compact?'View order #1 →':'#1',{exact:true}).waitFor();assert.equal((await historyCard.textContent()).includes(order.orderNumber),false,'matching an opaque reference still displays only the short number');}
+   if(order.customerOrderNumber){await historyCard.getByText(compact?'View order #1':'#1',{exact:true}).waitFor();assert.equal((await historyCard.textContent()).includes(order.orderNumber),false,'matching an opaque reference still displays only the short number');}
   }
   await search.fill('missing-order-reference');assert.equal(await search.inputValue(),'missing-order-reference');await historyCard.waitFor({state:'hidden'});
   await search.fill('');await historyCard.waitFor();
-  if(compact){await page.getByRole('link',{name:`View order ${order.customerOrderNumber ? '#'+order.customerOrderNumber : order.orderNumber} →`,exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
+  if(compact){await page.getByRole('link',{name:`View order ${order.customerOrderNumber ? '#'+order.customerOrderNumber : order.orderNumber}`,exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
   if((width<=640&&enabled)||paymentStatus==='PENDING'){
    if(compact&&paymentStatus==='PENDING'){
     await page.locator('a[href="/orders/TEST-ORDER"]').first().click();await page.locator('.mobile-order-detail').waitFor();

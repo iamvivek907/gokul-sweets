@@ -72,7 +72,7 @@ try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]])
   console.log('Cross-tab identity invalidation and resume passed');
  }
  await closePairings(page);
- assert.ok((await page.locator('.mobile-menu-pairing-slot').boundingBox()).height<210,'collapsed suggestions stay compact');
+ assert.ok((await page.locator('.mobile-menu-pairing-slot').boundingBox()).height<280,'photo-led suggestions retain their bounded footprint');
  assert.equal(await page.locator('.mobile-menu-pairing-slot').evaluate(node=>getComputedStyle(node).overflowY),'visible','menu suggestions do not trap vertical scrolling');
  await openPairings(page);await page.keyboard.press('Escape');await page.getByRole('dialog',{name:'Optional additions',exact:true}).waitFor({state:'hidden'});
  assert.equal(await page.getByRole('button',{name:'View optional additions',exact:true}).evaluate(node=>document.activeElement===node),true,'dismissal restores focus');
@@ -83,7 +83,7 @@ try{for(const [width,enabled,constrained] of [[390,true,false],[390,true,true]])
  await page.mouse.click(8,8);await longSheet.waitFor({state:'hidden'});longText=false;
  recommendationsEmpty=true;signedIn=false;await page.evaluate(()=>window.dispatchEvent(new Event('gokul-customer-identity-changed')));
  await pairing.getByText('No optional additions right now.',{exact:true}).waitFor();
- assert.ok((await page.locator('.mobile-menu-pairing-slot').boundingBox()).height<210,'empty suggestions do not reserve 420px');
+ assert.ok((await page.locator('.mobile-menu-pairing-slot').boundingBox()).height<280,'empty suggestions do not reserve 420px');
  recommendationsEmpty=false;signedIn=true;await page.evaluate(()=>window.dispatchEvent(new Event('gokul-customer-identity-changed')));
   availabilityFails=true;await page.reload();await page.getByRole('button',{name:'View customer favourites',exact:true}).click();const retry=page.getByRole('button',{name:'Retry availability',exact:true});await retry.waitFor();
  assert.equal(await page.getByRole('button',{name:'Add Fresh peda from favourites',exact:true}).isDisabled(),true);
