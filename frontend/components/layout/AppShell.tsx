@@ -30,6 +30,7 @@ import "./compact-mobile.css";
 import "./mobile-account-refinement.css";
 import "./reference-storefront.css";
 import "./customer-polish.css";
+import "./profile-history-polish.css";
 import MobileEdgeBack from "./MobileEdgeBack";
 
 

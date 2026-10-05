@@ -9,9 +9,9 @@ const sweet={id:1,name:'Gulab Jamun',description:'Fresh sweets for your celebrat
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 try{
  for(const [width,themed] of [[320,true],[390,true],[601,true],[640,true],[641,true],[1280,true],[390,false]]){
-  let authenticated=true,logoutError=true,logoutCalls=0,staffChecks=0,orders=0,customerName='Vivek Chaurasia',branchExperience=true;
+  let authenticated=true,logoutError=true,logoutCalls=0,staffChecks=0,orders=0,customerName='Vivek Chaurasia',branchExperience=true,bulkFailure=false;
   const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',timezoneId:'America/Los_Angeles'}),page=await context.newPage();
-  await context.addInitScript(branch=>{if(!sessionStorage.getItem('test-branch-initialized')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('test-branch-initialized','true');}window.initSendOTP=config=>config.success({accessToken:'test-provider-proof'});},branch);
+  await context.addInitScript(branch=>{if(!sessionStorage.getItem('test-branch-initialized')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('test-branch-initialized','true');}localStorage.setItem('gokul-social-follow-popup-seen','true');window.initSendOTP=config=>config.success({accessToken:'test-provider-proof'});},branch);
   await context.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;let json=[];
    if(path==='/api/storefront/features')json={futuristicStorefrontV2:themed,checkoutExperienceV2:themed,simplifiedCheckout:themed,acceptedCheckoutQuote:themed,customerAccountHub:true,notificationInbox:true,branchExperience,occasionEnquiries:true,today};
@@ -21,6 +21,9 @@ try{
    else if(path==='/api/customer/identity/exchange'){authenticated=true;json={authenticated,name:customerName,phone:'+919876543210'};}
    else if(path==='/api/customer/identity/logout'){logoutCalls++;if(logoutError)return route.fulfill({status:503,json:{message:'Unavailable'}});authenticated=false;return route.fulfill({status:204});}
    else if(path==='/api/customer/identity/notifications')json={messages:[],unreadCount:1,nextBefore:null,readThrough:0};
+   else if(path==='/api/customer/identity/orders')json=[{orderNumber:'GKS-LONG-OPAQUE-REFERENCE',customerOrderNumber:100,orderStatus:'CONFIRMED',branchId:1,branchName:branch.name,fulfillmentType:'PICKUP',pickupDate:today,totalAmount:250,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()},{orderNumber:'GKS-UNNUMBERED-REFERENCE-VERY-LONG',orderStatus:'CANCELLED',branchId:1,branchName:branch.name,fulfillmentType:'PICKUP',pickupDate:today,totalAmount:150,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}];
+   else if(path==='/api/occasion-enquiries'&&bulkFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});
+   else if(path==='/api/occasion-enquiries')json=[{id:'11111111-1111-4111-8111-111111111111',branchId:1,occasionType:'Family celebration',serviceDate:today,guestCount:20,status:'REQUESTED',quotedAmount:null,depositAmount:null,paidAmount:0,nextStep:'Our branch is reviewing your request.',fulfilment:'PICKUP',items:[{productId:1,productName:'Gulab Jamun',quantity:20,unit:'PIECE'}],pricedLines:[],orderNumber:null,balancePaymentOpen:false}];
    else if(path==='/api/customer/identity/account')json={completedOrders:1,paidOrders:1,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
    else if(path==='/api/branches')json=[branch,otherBranch];else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=otherBranch;
    else if(/^\/api\/branches\/[12]\/discovery$/.test(path))json={overallExperience:{average:4.8,count:2},offerings:[{title:'Fresh sweets',description:'Made at this branch'}],topRatedItems:[{productId:1,name:'Gulab Jamun',imageUrl:null,average:5,count:2,reviews:[]}]};
@@ -79,10 +82,27 @@ try{
    assert.equal(await page.locator('.mobile-account-links a[href="/menu"],.mobile-account-links a[href="/cart"],.mobile-account-links a[href="/occasions"]').count(),0);
    assert.equal(await page.locator('.mobile-profile-rewards').isVisible(),true);
    await page.getByRole('button',{name:'Order history',exact:true}).click();
-   await page.locator('.mobile-profile-order-types').getByRole('link',{name:'Bulk order requests',exact:true}).waitFor();
-   assert.equal(await page.locator('.mobile-profile-order-types a').getAttribute('href'),'/occasions/requests');
+   await page.locator('.profile-order-card').first().waitFor();
+   assert.equal(await page.locator('.mobile-account-logout').count(),0,'history has no logout');
+   assert.equal(await page.locator('.profile-order-card').first().getByText('Order #100',{exact:true}).isVisible(),true);
+   assert.equal(await page.locator('.profile-order-card').nth(1).getByText('Reference …Y-LONG',{exact:true}).isVisible(),true,'opaque references do not dominate cards');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'history fits phone');
+   if(process.env.SCREENSHOT_DIR&&width===390)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/order-history.png`,fullPage:true});
+   if(width===390)bulkFailure=true;
+   await page.locator('.mobile-profile-order-types').getByRole('button',{name:'Bulk order requests',exact:true}).click();
+   if(width===390){await page.getByText("We couldn't load your enquiries. Please retry.",{exact:false}).waitFor();bulkFailure=false;await page.getByRole('button',{name:'Try again',exact:true}).click();}
+   await page.locator('.profile-bulk-history article').waitFor();
+   assert.ok(page.url().endsWith('/profile/orders'),'bulk requests remain in history');
+   assert.equal(await page.locator('.profile-bulk-history .customer-identity').count(),0,'no duplicate verification');
+   await page.locator('.profile-bulk-history summary').first().click();
+   await page.getByText('Gulab Jamun · 20 pieces',{exact:false}).waitFor();
+   assert.equal(await page.locator('.profile-bulk-history details').first().getAttribute('open'),'','request details open inline');
+   if(process.env.SCREENSHOT_DIR&&width===390)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/bulk-history.png`,fullPage:true});
+   await page.locator('.mobile-profile-order-types').getByRole('button',{name:'Pickup orders',exact:true}).click();
+   await page.locator('.profile-order-card').first().waitFor();
    await page.getByRole('link',{name:'Back to profile',exact:true}).click();await page.waitForURL('**/profile');await page.getByRole('button',{name:'Badges',exact:true}).click();await page.waitForURL('**/profile/badges');await page.getByRole('link',{name:'Back to profile',exact:true}).click();await page.waitForURL('**/profile');
-   const lastLink=page.locator('.mobile-account-links a').last();
+   assert.equal(await page.locator('a[href="/profile/privacy"]:visible').count(),1,'one privacy link');
+   const lastLink=page.locator('.profile-social-actions a').last();
    await lastLink.scrollIntoViewIfNeeded();await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
    const lastBox=await lastLink.boundingBox(),navigationBox=await page.locator('.customer-bottom-navigation').boundingBox();
    assert.ok(lastBox.y+lastBox.height<=navigationBox.y,'last profile link scrolls fully above fixed navigation');
@@ -138,6 +158,11 @@ try{
    if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/profile-${width}.png`,fullPage:true});
    await page.goto(`${base}/cart`);await page.waitForURL('**/checkout/mobile');await page.locator('.mobile-empty-cart').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
    assert.equal(await page.locator('.mobile-checkout-nav').getByRole('link',{name:'Branch home',exact:true}).getAttribute('href'),'/branches/2');
+   assert.equal(await page.locator('.mobile-empty-cart .empty-meal-illustration').count(),1,'food illustration replaces lettermark');
+   await page.emulateMedia({reducedMotion:'reduce'});
+   assert.equal(await page.locator('.empty-meal-lid').evaluate(e=>getComputedStyle(e).animationName),'none','reduced motion stops animation');
+   await page.emulateMedia({reducedMotion:'no-preference'});
+   assert.equal(await page.locator('.empty-meal-lid').evaluate(e=>getComputedStyle(e).animationIterationCount),'2','animation ends instead of looping forever');
    if(width===390){
     branchExperience=false;await page.reload();await page.locator('.mobile-empty-cart').waitFor();
     assert.equal(await page.locator('.mobile-checkout-nav a[href^="/branches"]').count(),0,'empty cart does not advertise disabled branch home');

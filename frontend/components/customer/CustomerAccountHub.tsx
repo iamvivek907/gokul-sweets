@@ -1,6 +1,8 @@
 "use client";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
+import dynamic from "next/dynamic";
+const OccasionRequests=dynamic(()=>import("@/components/occasion/OccasionRequests"),{loading:()=> <p role="status">Loading your requests…</p>});
 import CustomerRewards from "./CustomerRewards";
 import AddressLocationAssist from "./AddressLocationAssist";
 import AccountTierMark from "./AccountTierMark";
@@ -12,7 +14,7 @@ import {formatWeight} from "@/lib/orderQuantity";
 
 import CustomerNotificationLink from "./CustomerNotificationLink";
 import LogoutConfirmation from "./LogoutConfirmation";
-import {useCallback, useEffect, useRef, useState} from "react";
+import {Suspense, useCallback, useEffect, useRef, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {apiClient} from "@/services/apiClient";
@@ -29,7 +31,7 @@ import {accountMilestones, currentMilestone} from "@/lib/accountMilestones";
 import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import type {CustomerOrderSummaryResponse, CustomerOrderResponse} from "@/types/order";
 import type {MenuProduct} from "@/types/menu";
-import {formatOrderCurrency, formatOrderDate, formatOrderTime} from "@/lib/orderTracking";
+import {formatOrderCurrency, formatOrderDate, formatOrderTime, getOrderStatusPresentation} from "@/lib/orderTracking";
 
 const base = "/api/customer/identity/account";
 type Address = {id: number; label: string; addressLine: string; locality: string; postalCode: string};
@@ -43,6 +45,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     onSessionChange: (session: CustomerSession) => void}) {
     const features = useStorefrontFeatures();
     const phone=usePhoneViewport();
+    const modern=features?.futuristicStorefrontV2===true||features?.checkoutExperienceV2===true;
     const compact=phone===true&&(features?.futuristicStorefrontV2===true||features?.checkoutExperienceV2===true);
     const enabled = features?.customerAccountHub === true;
     const {branch} = useSelectedBranch();
@@ -63,6 +66,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     const [preview, setPreview] = useState<Preview | null>(null);
     const [menu, setMenu] = useState<MenuProduct[]>([]);
     const [activeSection, setActiveSection] = useState<AccountSection>(initialSection??"badges");
+    const [orderType,setOrderType]=useState<"pickup"|"bulk">("pickup");
     const [logoutOpen, setLogoutOpen] = useState(false);
     const [editingDetails, setEditingDetails] = useState(false);
     const [nameDraft, setNameDraft] = useState(session?.name ?? "");
@@ -82,7 +86,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
 
     const reload = useCallback(async () => {
         const [next, history] = await Promise.all([
-            apiClient<Account>(base, {credentials: "include"}), getVerifiedCustomerOrders()
+            apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedCustomerOrders(AbortSignal.timeout(8000))
         ]);
         setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history);
         setStatus("ready");
@@ -91,7 +95,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     useEffect(() => {
         if (!enabled || !session?.authenticated) return;
         let active = true;
-        void Promise.all([apiClient<Account>(base, {credentials: "include"}), getVerifiedCustomerOrders()])
+        void Promise.all([apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedCustomerOrders(AbortSignal.timeout(8000))])
             .then(([next, history]) => {if (active) {setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history); setStatus("ready");}})
             .catch(() => {if (active) setStatus("error");});
         return () => {active = false;};
@@ -253,7 +257,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                     .map(([section, label]) => <button key={section} type="button" aria-pressed={activeSection === section}
                         onClick={() => compact?router.push(`/profile/${section}`):showSection(section)}><span>{label}</span><svg className="account-nav-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" strokeWidth="1.8"/></svg></button>)}
                 {features?.notificationInbox && <CustomerNotificationLink><T text="Notification inbox" /></CustomerNotificationLink>}
-                <Link href="/profile/privacy"><T text="Privacy and data" /></Link>
+                {!compact&&<Link href="/profile/privacy"><T text="Privacy and data" /></Link>}
             </nav>
             <div id="account-content" className="account-panels min-w-0 scroll-mt-28 space-y-6" aria-live="polite">
                 {activeSection === "badges" && <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
@@ -272,16 +276,22 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                     })}</div>
                     <p className="mt-4 text-xs text-[#756763]"><T text="Badges recognise visits. They are not points or discounts." /></p>
                 </section>}
-        {activeSection === "orders" && <section id="account-orders" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
-            {features?.occasionEnquiries && <nav className="mobile-profile-order-types" aria-label="Order history types"><span><T text="Pickup orders" /></span><Link href="/occasions/requests"><T text="Bulk order requests" /></Link></nav>}
-            <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]"><T text="Your orders" /></h2>
+        {activeSection === "orders" && <section id="account-orders" className="profile-history rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+            {features?.occasionEnquiries && <nav className="mobile-profile-order-types" aria-label="Order history types"><button type="button" aria-pressed={orderType==="pickup"} onClick={()=>setOrderType("pickup")}><T text="Pickup orders" /></button><button type="button" aria-pressed={orderType==="bulk"} onClick={()=>setOrderType("bulk")}><T text="Bulk order requests" /></button></nav>}
+            {orderType==="bulk"&&features?.occasionEnquiries?<Suspense fallback={<p role="status">Loading your requests…</p>}><OccasionRequests key={session.phone} embeddedSession={session}/></Suspense>:<><div className="profile-history-heading flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]"><T text="Your orders" /></h2>
                 <p className="mt-1 text-sm text-[#756763]"><T text="Only orders placed while signed in to this account." /></p></div>
                 <span className="text-sm text-[#756763]"><T text="All branches" /></span></div>
-            {orders.length ? <div className="mt-4 max-h-[36rem] space-y-3 overflow-y-auto">{orders.map(order => <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3">
-                <div><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{orderDisplayNumber(order)}</button>
-                <p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_", " ")}</p></div>
-                <div className="flex gap-2"><button type="button" onClick={() => {void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Details" /></button>
-                <button type="button" disabled={busy} onClick={() => {void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50"><T text="Reorder" /></button></div></div>)}</div> : <p className="mt-5 text-sm text-[#756763]"><T text="No orders belong to this verified account yet." /></p>}
+            {orders.length ? <div className="profile-history-list mt-4 space-y-3">{orders.map(order => {
+                if(!modern)return <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3"><div><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{orderDisplayNumber(order)}</button><p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_"," ")}</p></div><div className="flex gap-2"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Details"/></button><button type="button" disabled={busy} onClick={()=>{void prepareReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50"><T text="Reorder"/></button></div></div>;
+                const presentation=getOrderStatusPresentation(order.orderStatus,order.fulfillmentType);
+                const date=order.pickupDate??order.deliveryDate;
+                return <article key={order.orderNumber} className="profile-order-card">
+                    <div className="profile-order-top"><strong className="profile-order-number" title={order.orderNumber}>{order.customerOrderNumber!=null?`Order #${order.customerOrderNumber}`:`Reference …${order.orderNumber.slice(-6)}`}</strong><span className={`profile-order-status tone-${presentation.tone}`}><T text={presentation.label}/></span></div>
+                    <p className="profile-order-branch">{order.branchName}</p>
+                    <div className="profile-order-meta"><span>{order.fulfillmentType==="DELIVERY"?"Delivery":"Pickup"}{date?` · ${formatOrderDate(date)}`:""}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
+                    <div className="profile-order-actions"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}}><T text="Details"/><span aria-hidden="true"> →</span></button><button type="button" disabled={busy} onClick={()=>{void prepareReorder(order);}}><T text="Reorder"/></button></div>
+                </article>;
+            })}</div> : <p className="mt-5 text-sm text-[#756763]"><T text="No orders belong to this verified account yet." /></p>}
             <dialog ref={detailDialog} onClose={() => {setSelectedOrder(null); setDetailError("");}}
                 className="account-order-dialog m-auto max-h-[85dvh] w-[min(38rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-[#d9e5dc] bg-[#fffaf2] p-0 text-[#172e2c] shadow-2xl backdrop:bg-[#092725b3]"
                 aria-label="Order details">
@@ -315,7 +325,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 {preview.unavailable.length > 0 && <p className="mt-2 text-sm text-[#9e2732]"><T text="Unavailable or changed:" />{" "}{preview.unavailable.join(", ")}<T text=". Browse the menu to choose alternatives." /></p>}
                 <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={busy || preview.unavailable.length > 0} onClick={() => {void confirmReorder();}} className="min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50"><T text="Add to cart" /></button>
                     <button type="button" onClick={() => setPreview(null)} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm"><T text="Cancel" /></button></div></div>}
-        </section>}
+        </>}</section>}
         {activeSection === "preferences" && <section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]"><T text="Your preferences" /></h2>
             <p className="mt-1 text-sm text-[#756763]"><T text="Dietary notes are for your reference; check ingredients with the branch for each order." /></p>
             <label htmlFor="dietary-notes" className="mt-5 block text-sm font-semibold"><T text="Dietary notes" /></label>
@@ -379,6 +389,6 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
         {message && <p role="status" aria-live="polite" className="rounded-xl border border-[#eadfd6] bg-white p-4 text-sm">{message}</p>}
             </div>
         </div>
-        <button type="button" disabled={busy} onClick={() => setLogoutOpen(true)} className="mobile-account-logout"><T text="Log out" /></button>
+        {!initialSection&&activeSection!=="orders"&&<button type="button" disabled={busy} onClick={() => setLogoutOpen(true)} className="mobile-account-logout"><T text="Log out" /></button>}
     </div>;
 }

@@ -1,3 +1,4 @@
+import EmptyMealIllustration from "./EmptyMealIllustration";
 import {T} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 import Link
@@ -9,6 +10,7 @@ export default function EmptyCart() {
     return (
         <div
             className="
+                empty-cart-card
                 w-full
                 min-w-0
                 rounded-3xl
@@ -37,7 +39,7 @@ export default function EmptyCart() {
                     text-4xl
                 "
             >
-                🛍️
+                <span className="empty-cart-legacy-icon">🛍️</span><span className="empty-cart-food-icon"><EmptyMealIllustration/></span>
             </div>
 
 

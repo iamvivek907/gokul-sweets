@@ -1,4 +1,6 @@
 export const hindi: Record<string,string> = {
+  "A little Gokul in your feed": "आपकी फ़ीड में गोकुल की मिठास",
+  "Fresh sweets, new favourites and moments from our kitchen.": "ताज़ी मिठाइयाँ, नए पसंदीदा स्वाद और हमारी रसोई की झलकियाँ।",
  "Choose where you’ll collect": "अपना पिकअप स्थान चुनें",
  "I will collect my order at this branch.": "मैं इसी शाखा से अपना ऑर्डर लूँगा।",
  "YOUR PICKUP BRANCH": "आपकी पिकअप शाखा",
