@@ -10,7 +10,7 @@ const branch={id:1,code:'ONE',name:'Original branch',active:true,operational:tru
 const products=[{id:1,categoryId:1,categoryName:'Sweets',name:'Peda',description:null,price:20,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},{id:2,categoryId:1,categoryName:'Sweets',name:'Kaju Barfi',description:null,price:1000,imageUrl:null,available:true,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:50}];
 const history=Array.from({length:13},(_,i)=>({orderNumber:`HISTORY-${13-i}`,customerOrderNumber:13-i,orderStatus:'PICKED_UP',branchId:1,branchName:branch.name,pickupDate:today,totalAmount:1040,fulfillmentType:'PICKUP',createdAt:`${today}T09:00:00`,updatedAt:`${today}T09:00:00`}));
 try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1280,false]]){
- let pageFailure=false,availabilityFailure=false,slotLost=false,priceChanged=false,postCount=0,pages=0,checks=[],smartCalls=0;
+ let pageFailure=false,availabilityFailure=false,slotLost=false,priceChanged=false,postCount=0,pages=0,checks=[],smartCalls=0,enforcement=true;
  const context=await browser.newContext({viewport:{width,height:844},isMobile:width<=640,hasTouch:width<=640,serviceWorkers:'block'}),page=await context.newPage();
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');},other);
  await context.route('**/api/**',async route=>{
@@ -27,9 +27,10 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
   else if(path==='/api/branches/1/inventory/check'){
    const body=request.postDataJSON();checks.push(body);if(availabilityFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});
    const orderable=body.items.every(item=>item.quantity==null||item.quantity<=3);
-   json={orderable,items:body.items.map(item=>({productId:item.productId,orderable}))};
+   json=enforcement?{enforcementEnabled:true,orderable,items:body.items.map(item=>({productId:item.productId,orderable}))}:{enforcementEnabled:false,orderable:true,items:[]};
   }else if(path==='/api/branches/1/pickup-slots'){
    const date=url.searchParams.get('date');json=date===today?[]:[{id:date===tomorrow?1:2,branchId:1,slotDate:date,startTime:'09:00:00',endTime:'09:30:00',active:true,remainingCapacity:slotLost?0:5,priorityEnabled:false,priorityCharge:0}];
+  if(json.length)json.push({...json[0],id:99,startTime:'17:00:00',endTime:'17:30:00'});
   }else if(path==='/api/branches/1/availability'){
    smartCalls++;if(!smart)return route.fulfill({status:404,body:''});
    const body=request.postDataJSON();checks.push(body);if(availabilityFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});
@@ -51,9 +52,11 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
   assert.equal(await continueButton.isDisabled(),true,'no legacy slots today');
   await dialog.locator('input[type="date"]').fill(tomorrow);
   await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
+  const lateSlot=dialog.getByRole('button',{name:/5:00.*5:30/i});await lateSlot.click();await dialog.getByLabel('Peda quantity',{exact:true}).fill('3');await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);assert.equal(await lateSlot.getAttribute('aria-pressed'),'true','quantity edit preserves selected pickup');
   await dialog.getByLabel('Peda quantity',{exact:true}).fill('4');
   await dialog.getByText('These quantities are unavailable.',{exact:false}).waitFor();assert.equal(await continueButton.isDisabled(),true);
   await dialog.getByLabel('Peda quantity',{exact:true}).fill('3');
+  await lateSlot.waitFor();assert.equal(await continueButton.isDisabled(),true,'invalidated slot requires explicit reselection');await lateSlot.click();
   await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
   await dialog.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);
   availabilityFailure=true;await open();await dialog.getByText('Pickup availability could not load.',{exact:false}).waitFor();
@@ -61,8 +64,11 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
   await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
   slotLost=true;await continueButton.click();await dialog.getByText('That pickup is no longer available.',{exact:false}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);
   slotLost=false;await dialog.locator('input[type="date"]').fill(later);await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
+  enforcement=false;await dialog.getByRole('button',{name:/5:00.*5:30/i}).click();await dialog.getByLabel('Peda quantity',{exact:true}).fill('4');await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
+  assert.equal(await dialog.getByRole('button',{name:/5:00.*5:30/i}).getAttribute('aria-pressed'),'true');
   await continueButton.click();await page.waitForURL(width<=640?'**/checkout/mobile':'**/checkout/pickup');
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),later);
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).slot.id),99,'selected evening pickup reaches checkout');
   assert.equal(smartCalls,0,'legacy never calls the disabled endpoint');assert.equal(postCount,0);
   await context.close();console.log(`Legacy reorder ${width}px passed`);continue;
  }

@@ -11,7 +11,7 @@ export async function checkReorderAvailability(branchId:number, date:string, day
         getPickupSlots(branchId,date,signal)
     ]);
     const orderable = stock.orderable && items.every(item=>item.product.available &&
-        stock.items.some(line=>line.productId===item.product.id && line.orderable));
+        (stock.enforcementEnabled===false || stock.items.some(line=>line.productId===item.product.id && line.orderable)));
     const choices = slots.map(slot=>({slot,
         normalAvailable:orderable && slot.active && slot.remainingCapacity>0,
         priorityAvailable:orderable && slot.active && slot.priorityEnabled && slot.priorityRemainingCapacity>0,
