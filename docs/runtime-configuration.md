@@ -496,3 +496,24 @@ without exposing the mailbox to other staff. Subject/reply-to validation rejects
 The generated VAPID pair was checked for valid P-256 encoding and a matching public/private
 pair. Configure both together and re-register devices if rotating keys. Use a separate pair
 for PROD. Enable provider configuration only after this PR is merged/deployed to DEV.
+
+### Backend Docker heap budget
+
+The runtime image defaults to `JAVA_TOOL_OPTIONS="-Xmx192m -XX:+ExitOnOutOfMemoryError"`.
+CI boots this exact default inside a 512 MB container and checks database-backed health.
+The 192 MB limit applies to the Java heap, not total process memory: class metadata,
+thread stacks, direct buffers and other native allocations use the remaining container budget.
+The build stage is unaffected.
+
+Render or another container host can override `JAVA_TOOL_OPTIONS` at deployment time.
+An existing environment override replaces the image default; preserve required monitoring
+agent options when updating it. If a smaller container is used, validate its startup and load
+budget explicitly. Increasing heap alone does not allocate more container RAM.
+
+This startup test is not an orders-per-day or concurrency capacity guarantee. Order desk
+lanes request 20 rows per page, selected preparation is capped at 50 orders, and demand
+exports use bounded spreadsheet/database row buffers. Runtime capacity depends on simultaneous
+requests, line counts per order, export workload, background jobs, and total process memory.
+A production-like load test and heap/process-memory measurements are needed before stating
+an order threshold. The observed repository parser failure happened during startup before
+any customer orders were loaded.

@@ -22,7 +22,8 @@ import static org.mockito.Mockito.*;
 @DirtiesContext(classMode=DirtiesContext.ClassMode.AFTER_CLASS)
 class KitchenPlanningIntegrationTest {
  @Autowired KitchenPlanningService service;
- @Autowired JdbcTemplate jdbc;
+ @Autowired com.gokulsweets.restaurant.order.repository.OrderRepository orders;
+ @MockitoSpyBean JdbcTemplate jdbc;
  @Autowired EnhancementProperties flags;
  @MockitoBean StaffAuthorizationService staff;
  @MockitoSpyBean ApplicationClock clock;
@@ -39,6 +40,9 @@ class KitchenPlanningIntegrationTest {
   for(int i=0;i<23;i++)order("CONFIRMED",branch,slot);
   order("PREPARING",branch,slot);order("READY_FOR_PICKUP",branch,slot);order("CANCELLED",branch,slot);order("PENDING_PAYMENT",branch,slot);
   var first=service.get(branch,KitchenPlanningService.Filter.ELIGIBLE,LocalDate.of(2026,10,1),null,0);
+  assertThat(queue(LocalDate.of(2026,10,1),LocalTime.of(18,0),0)).hasSize(20);
+  assertThat(queue(LocalDate.of(2026,10,1),LocalTime.of(18,0),1)).hasSize(3);
+  assertThat(queueCount(LocalDate.of(2026,10,1),LocalTime.of(18,0))).isEqualTo(23);
   assertThat(first.total()).isEqualTo(23);assertThat(first.orders()).hasSize(20);assertThat(first.slots()).hasSize(1);
   assertThat(first.slots().getFirst().total()).isEqualTo(25);assertThat(first.counts().get("PREPARING")).isEqualTo(1);
   assertThat(service.get(branch,KitchenPlanningService.Filter.ELIGIBLE,null,null,1).orders()).hasSize(3);
@@ -79,6 +83,17 @@ class KitchenPlanningIntegrationTest {
   assertThat(service.get(branch,KitchenPlanningService.Filter.IN_PROGRESS,null,null,0).orders()).extracting(KitchenPlanningService.Row::orderStatus).containsExactly("PREPARING");
   assertThat(service.get(branch,KitchenPlanningService.Filter.HANDOVER,null,null,0).orders()).extracting(KitchenPlanningService.Row::orderStatus).containsExactly("READY_FOR_PICKUP");
  }
+ @Test void combinedCountsDoNotDoubleCountOverlappingLanesAndRespectEmptyScopes(){
+  order("CONFIRMED",branch,slot);order("PREPARING",branch,slot);order("READY_FOR_PICKUP",branch,slot);
+  doReturn(LocalDateTime.of(2026,10,1,18,5)).when(clock).now();
+  var plan=service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(18,0),0);
+  assertThat(plan.total()).isEqualTo(3);
+  assertThat(plan.counts()).containsEntry("ALL",3L).containsEntry("OVERDUE",2L).containsEntry("READY",1L)
+   .containsEntry("WAITING",1L).containsEntry("IN_PROGRESS",1L).containsEntry("HANDOVER",1L)
+   .containsEntry("SCHEDULED",0L).containsEntry("PREPARING",0L);
+  var empty=service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,2),null,0);
+  assertThat(empty.total()).isZero();assertThat(empty.counts().values()).allMatch(count->count==0L);
+ }
  @Test void counterOnlyOrdersOpenEarlyButMixedBasketsAndFutureDaysStayScheduled(){
   long category=jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?,'Desk') RETURNING id",Long.class,"DESK-"+UUID.randomUUID());
   long tax=jdbc.queryForObject("INSERT INTO tax_categories(code,name,cgst_rate,sgst_rate) VALUES (?,'Desk',0,0) RETURNING id",Long.class,"DESK-"+UUID.randomUUID());
@@ -91,6 +106,16 @@ class KitchenPlanningIntegrationTest {
   jdbc.update("INSERT INTO order_items(order_id,product_id,product_name,sale_mode,quantity,unit_price,tax_rate,tax_amount,line_total) VALUES (?,?,'Samosa','UNIT',4,10,0,0,40)",ids.getLast(),kitchen);
   doReturn(LocalDateTime.of(2026,10,1,12,0)).when(clock).now();
   var waiting=service.get(branch,KitchenPlanningService.Filter.WAITING,null,null,0);
+  var earlyQueue=queue(LocalDate.of(2026,10,1),LocalTime.NOON,0);
+  assertThat(earlyQueue).hasSize(1);assertThat(earlyQueue.getFirst().getId()).isEqualTo(ids.getFirst());
+  assertThat(org.hibernate.Hibernate.isInitialized(earlyQueue.getFirst().getBranch())).isTrue();
+  assertThat(org.hibernate.Hibernate.isInitialized(earlyQueue.getFirst().getPickupSlot())).isTrue();
+  assertThat(queueCount(LocalDate.of(2026,10,1),LocalTime.NOON)).isEqualTo(1);
+  // Empty baskets and absent policies must not accidentally qualify for early packing.
+  order("CONFIRMED",branch,slot);jdbc.update("DELETE FROM branch_products WHERE branch_id=? AND product_id=?",branch,kitchen);
+  assertThat(queueCount(LocalDate.of(2026,10,1),LocalTime.NOON)).isEqualTo(1);
+  assertThat(queue(LocalDate.of(2026,9,30),LocalTime.NOON,0)).isEmpty();
+  jdbc.update("DELETE FROM orders WHERE branch_id=? AND id NOT IN (?,?)",branch,ids.getFirst(),ids.getLast());
   assertThat(waiting.orders()).hasSize(1);assertThat(waiting.orders().getFirst().earlyPreparation()).isTrue();
   assertThat(waiting.orders().getFirst().items().getFirst().weightGrams()).isEqualTo(2000);
   assertThat(service.get(branch,KitchenPlanningService.Filter.SCHEDULED,null,null,0).orders()).hasSize(1);
@@ -104,4 +129,33 @@ class KitchenPlanningIntegrationTest {
   assertThat(result.total()).isEqualTo(1);verify(staff).requireBranchAccess(branch);
   assertThat(service.get(branch,KitchenPlanningService.Filter.ALL,LocalDate.of(2026,10,1),LocalTime.of(19,0),0).orders()).isEmpty();
  }
+ @Test void excludesOrdersTransferredOrStartedBetweenIdSelectionAndEntityFetch(){
+  order("CONFIRMED",branch,slot);order("CONFIRMED",branch,slot);order("CONFIRMED",branch,slot);
+  var ids=jdbc.queryForList("SELECT id FROM orders WHERE branch_id=? ORDER BY id",Long.class,branch);
+  long other=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Transfer target') RETURNING id",Long.class,"RACE-"+UUID.randomUUID());
+  long otherSlot=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,'2026-10-01','18:00','18:30',100) RETURNING id",Long.class,other);
+  // Deterministic interleaving at the real JDBC/JPA boundary, without timing-dependent threads.
+  doAnswer(invocation->{
+   var selected=invocation.callRealMethod();
+   jdbc.update("UPDATE orders SET branch_id=?,pickup_slot_id=? WHERE id=?",other,otherSlot,ids.get(0));
+   jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?",ids.get(1));
+   return selected;
+  }).when(jdbc).queryForList(startsWith("SELECT o.id "),eq(Long.class),any(Object[].class));
+  assertThat(queue(LocalDate.of(2026,10,1),LocalTime.of(18,0),0))
+   .extracting(com.gokulsweets.restaurant.order.entity.Order::getId).containsExactly(ids.get(2));
+ }
+ java.util.List<com.gokulsweets.restaurant.order.entity.Order> queue(LocalDate day,LocalTime cutoff,int page){
+  return orders.findPreparationQueueCandidates(branch,com.gokulsweets.restaurant.order.enums.OrderStatus.CONFIRMED,
+   com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.PRIORITY,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.ADMIN_OVERRIDE,day,cutoff,day,
+   org.springframework.data.domain.PageRequest.of(page,20));
+ }
+ long queueCount(LocalDate day,LocalTime cutoff){
+  return orders.countPreparationQueueCandidates(branch,com.gokulsweets.restaurant.order.enums.OrderStatus.CONFIRMED,
+   com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.PRIORITY,day,cutoff,
+   com.gokulsweets.restaurant.order.enums.PickupType.ADMIN_OVERRIDE,day,cutoff,day);
+ }
+
 }

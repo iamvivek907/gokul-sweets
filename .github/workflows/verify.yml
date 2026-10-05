@@ -213,6 +213,7 @@ jobs:
       - name: Start deployment image and verify database-backed health
         run: |
           docker run --detach --name gokul-render-smoke --network host \
+            --memory=512m \
             --env DATABASE_URL --env DATABASE_USERNAME --env DATABASE_PASSWORD \
             --env R2_ACCOUNT_ID --env R2_ACCESS_KEY_ID --env R2_SECRET_ACCESS_KEY \
             --env PHONEPE_CLIENT_ID --env PHONEPE_CLIENT_SECRET --env PHONEPE_REDIRECT_URL \
