@@ -102,6 +102,8 @@ export default function Header() {
                         <LinkFeedback /></Link>}
                 </div>}
 
+                {futuristic && pathname !== "/branches" && !pathname.startsWith("/checkout/") && <p className="mobile-header-branch-name">{branch?.name ?? "Choose pickup branch"}</p>}
+
                 <div className="customer-header-actions ml-auto flex shrink-0 flex-row-reverse items-center gap-3 sm:flex-row">
                     <MobileMenu />
                     <LanguagePicker />

@@ -132,7 +132,7 @@ export default function ProductGrid({
                     const unavailable = dateAware && pickup?.available === false;
                     return (
                         <Fragment key={product.id}><div id={`gokul-product-${product.id}`} className="relative min-w-0 scroll-mt-24">
-                            {dateAware && (pickup || pickupChecking) && (
+                            {dateAware && (pickup || pickupChecking) && !(refined && unavailable) && (
                                 <span className={`menu-availability-chip ${unavailable ? "menu-availability-chip--unavailable" : pickupChecking && !pickup ? "menu-availability-chip--checking" : ""}`}>
                                     <span aria-hidden="true">{unavailable ? "!" : pickupChecking && !pickup ? "◌" : "✓"}</span>
                                     {unavailable ? "Date unavailable" : pickupChecking && !pickup ? "Checking date" : "Date preview"}
@@ -150,7 +150,7 @@ export default function ProductGrid({
                                 onDecrease={onDecrease}
                                 onAdd={onAdd}
                             />
-                            {unavailable && (
+                            {unavailable && (!refined || pickup?.code === "QUANTITY_TOO_LARGE") && (
                                 <p role="status" className="menu-availability-note">
                                     {describePickupAvailability(pickup, false)}
                                 </p>

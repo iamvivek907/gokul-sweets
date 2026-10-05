@@ -17,13 +17,14 @@ export default function MobileMenuHighlights({products,ratings,ratingsLoading=fa
    <p id={statusId} role="status" className="sr-only"><T text={availabilityError?"Retry availability":checking?"Checking favourites…":"From this branch’s menu"}/></p>
    {availabilityError&&<div role="alert"><p>{availabilityError}</p><button type="button" className="mobile-menu-suggestions-open" onClick={onRetry}><T text="Retry availability"/></button></div>}
    <div className="menu-recommended-grid">{picks.map(p=>{
-    const rating=ratings[p.id],unavailable=pickupItems?.find(i=>i.productId===p.id)?.available===false;
+    const rating=ratings[p.id],pickup=pickupItems?.find(i=>i.productId===p.id),unavailable=pickup?.available===false;
+    const itemStatusId=`${statusId}-${p.id}`;
     return <article key={p.id}>
-     <div className="mobile-menu-pairing-photo">{p.imageUrl?<Image src={p.imageUrl} alt={p.name} fill sizes="(max-width: 640px) 45vw, 180px"/>:<span aria-hidden="true">G</span>}</div>
+     <div className="mobile-menu-pairing-photo">{p.imageUrl?<Image src={p.imageUrl} alt={p.name} fill sizes="(max-width: 640px) 45vw, 180px"/>:<span aria-hidden="true">G</span>}{unavailable&&<p id={itemStatusId} className="menu-recommended-unavailable"><T text={pickup?.code==="QUANTITY_TOO_LARGE"?"Not enough for this portion":"Try another pickup date"}/></p>}</div>
      <h4>{p.name}</h4>
      <p className={`menu-recommended-rating${rating&&rating.ratingCount>0?" has-rating":""}`}>{rating&&rating.ratingCount>0?`★ ${rating.averageRating.toFixed(1)} (${rating.ratingCount})`:<T text={ratingsLoading?"Loading product rating":"New · No ratings yet"}/>}</p>
      <small>{p.saleMode==="WEIGHT"?`${p.minimumWeightGrams??250} g`:"1 piece"}</small>
-     <div className="menu-recommended-purchase"><strong>₹{(p.saleMode==="WEIGHT"?p.price*(p.minimumWeightGrams??250)/1000:p.price).toLocaleString("en-IN",{maximumFractionDigits:2})}</strong><button type="button" disabled={checking||!!availabilityError||unavailable} aria-label={`Add ${p.name} from recommendations`} onClick={()=>onAdd(p)} aria-describedby={statusId}><T text="Add"/></button></div>
+     <div className="menu-recommended-purchase"><strong>₹{(p.saleMode==="WEIGHT"?p.price*(p.minimumWeightGrams??250)/1000:p.price).toLocaleString("en-IN",{maximumFractionDigits:2})}</strong><button type="button" disabled={checking||!!availabilityError||unavailable} aria-label={`Add ${p.name} from recommendations`} onClick={()=>onAdd(p)} aria-describedby={unavailable?`${statusId} ${itemStatusId}`:statusId}><T text="Add"/></button></div>
     </article>;
    })}</div>
    {!picks.length&&!availabilityError&&<p role="status"><T text="No items available right now"/></p>}
