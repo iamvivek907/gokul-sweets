@@ -10,6 +10,7 @@ import {
     useCallback,
     useEffect,
     useMemo,
+    useRef,
     useState
 } from "react";
 
@@ -54,6 +55,7 @@ interface LoadedOrder {
     order: CustomerOrderResponse | null;
     error: string | null;
     checkedAt: number;
+    refreshError?: string;
 }
 
 
@@ -144,6 +146,13 @@ export default function OrderDetailPage() {
     const [refreshing, setRefreshing] =
         useState(false);
 
+    const activeRequest = useRef<AbortController | null>(null);
+    const applyResult = useCallback((result: LoadedOrder) => {
+        setLoadedOrder(previous => result.error && previous?.orderNumber === result.orderNumber && previous.order
+            ? {...previous, refreshError: result.error}
+            : result);
+    }, []);
+
     const currentOrder =
         loadedOrder?.orderNumber === orderNumber
             ? loadedOrder
@@ -162,14 +171,21 @@ export default function OrderDetailPage() {
             async (
                 signal?: AbortSignal
             ): Promise<LoadedOrder | null> => {
+                if (signal?.aborted || activeRequest.current) return null;
+                const request = new AbortController();
+                activeRequest.current = request;
+                let timedOut = false;
+                const abort = () => request.abort();
+                signal?.addEventListener("abort", abort, {once: true});
+                const timeout = window.setTimeout(() => {timedOut = true; request.abort();}, 15000);
                 try {
                     const response =
                         await getCustomerOrder(
                             orderNumber,
-                            signal
+                            request.signal
                         );
 
-                    if (signal?.aborted) {
+                    if (request.signal.aborted && !timedOut) {
                         return null;
                     }
 
@@ -182,7 +198,7 @@ export default function OrderDetailPage() {
 
                 } catch (exception) {
 
-                    if (signal?.aborted) {
+                    if (request.signal.aborted && !timedOut) {
                         return null;
                     }
 
@@ -196,10 +212,14 @@ export default function OrderDetailPage() {
                         order: null,
                         checkedAt: Date.now(),
                         error:
-                            exception instanceof Error
+                            timedOut ? "Order status took too long to update. Please try again." : exception instanceof Error
                                 ? exception.message
                                 : "Unable to load this order."
                     };
+                } finally {
+                    window.clearTimeout(timeout);
+                    signal?.removeEventListener("abort", abort);
+                    if (activeRequest.current === request) activeRequest.current = null;
                 }
             },
             [orderNumber]
@@ -218,7 +238,7 @@ export default function OrderDetailPage() {
                 await fetchOrder();
 
             if (result) {
-                setLoadedOrder(result);
+                applyResult(result);
             }
         } finally {
             setRefreshing(false);
@@ -236,14 +256,16 @@ export default function OrderDetailPage() {
                     &&
                     !controller.signal.aborted
                 ) {
-                    setLoadedOrder(result);
+                    applyResult(result);
                 }
             });
 
         return () => {
             controller.abort();
+            activeRequest.current?.abort();
+            activeRequest.current = null;
         };
-    }, [fetchOrder]);
+    }, [fetchOrder, applyResult]);
 
     const shouldPoll =
         order !== null
@@ -258,13 +280,15 @@ export default function OrderDetailPage() {
             return;
         }
 
+        const controller = new AbortController();
         const timer = window.setInterval(
             () => {
-                void fetchOrder()
+                if (document.visibilityState !== "visible" || !navigator.onLine) return;
+                void fetchOrder(controller.signal)
                     .then(result => {
 
-                        if (result) {
-                            setLoadedOrder(result);
+                        if (result && !controller.signal.aborted) {
+                            applyResult(result);
                         }
                     });
             },
@@ -272,10 +296,11 @@ export default function OrderDetailPage() {
         );
 
         return () => {
+            controller.abort();
             window.clearInterval(timer);
         };
 
-    }, [fetchOrder, shouldPoll]);
+    }, [fetchOrder, shouldPoll, applyResult]);
 
     const currentTimelineIndex =
         order
@@ -358,12 +383,14 @@ export default function OrderDetailPage() {
 
     if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
         <NotificationReadOnOpen orderNumber={orderNumber} />
-        <MobileOrderDetail order={order} status={status} refreshing={refreshing} onRefresh={() => void handleRefresh()} trackingEnabled={trackingEnabled} pastPickupWindow={pastPickupWindow} />
+        {currentOrder.refreshError && <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">{currentOrder.refreshError} <button type="button" disabled={refreshing} onClick={() => void handleRefresh()}><T text="Try again" /></button></p>}
+        <MobileOrderDetail order={order} status={status} onRefresh={() => void handleRefresh()} trackingEnabled={trackingEnabled} pastPickupWindow={pastPickupWindow} />
     </AppShell>;
 
     return (
         <AppShell>
             <NotificationReadOnOpen orderNumber={orderNumber} />
+            {currentOrder.refreshError && <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">{currentOrder.refreshError} <button type="button" disabled={refreshing} onClick={() => void handleRefresh()}><T text="Try again" /></button></p>}
             {order.paymentStatus==="PAID" && order.fulfillmentType!=="DELIVERY" && ["CONFIRMED","PREPARING","READY_FOR_PICKUP","PICKUP_WINDOW_EXPIRED"].includes(order.orderStatus) && <div className="mx-auto w-full max-w-3xl px-4 sm:px-6"><PickupCodeCard orderNumber={orderNumber}/></div>}
             <section className="mx-auto w-full max-w-3xl px-4 pb-28 pt-5 sm:px-6 sm:pt-7">
 

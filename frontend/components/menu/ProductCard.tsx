@@ -303,7 +303,7 @@ export default function ProductCard({
                                 ? (
                                     <div
                                         aria-label={`${ratingSummary.averageRating.toFixed(1)} out of 5 from ${ratingSummary.ratingCount} ratings`}
-                                        className="
+                                        className="product-rating-summary
                                             flex
                                             items-center
                                             gap-1

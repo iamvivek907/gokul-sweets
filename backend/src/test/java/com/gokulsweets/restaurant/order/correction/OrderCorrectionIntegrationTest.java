@@ -36,6 +36,15 @@ class OrderCorrectionIntegrationTest {
   @TestBean(name = "inventoryClock", methodName = "testClock")
   Clock clock;
 
+  @TestBean(name = "pickupSlotValidationService", methodName = "testPickupValidation")
+  com.gokulsweets.restaurant.pickup.PickupSlotValidationService pickupValidation;
+
+  static com.gokulsweets.restaurant.pickup.PickupSlotValidationService testPickupValidation() {
+    // Pickup validation owns its clock independently of inventoryClock.
+    return new com.gokulsweets.restaurant.pickup.PickupSlotValidationService(
+        Clock.fixed(NOW, ZoneId.of("Asia/Kolkata")));
+  }
+
   long source,
       target,
       sourceSlot,

@@ -13,8 +13,8 @@ import PickupCodeCard from "./PickupCodeCard";
 import OrderReviewCard from "./OrderReviewCard";
 import {T} from "@/lib/language";
 
-export default function MobileOrderDetail({order, status, refreshing, onRefresh, trackingEnabled, pastPickupWindow}: {
-    order: CustomerOrderResponse; status: ReturnType<typeof getOrderStatusPresentation>; refreshing: boolean;
+export default function MobileOrderDetail({order, status, onRefresh, trackingEnabled, pastPickupWindow}: {
+    order: CustomerOrderResponse; status: ReturnType<typeof getOrderStatusPresentation>;
     onRefresh: () => void; trackingEnabled: boolean; pastPickupWindow: boolean;
 }) {
     const [invoiceError, setInvoiceError] = useState("");
@@ -35,7 +35,7 @@ export default function MobileOrderDetail({order, status, refreshing, onRefresh,
     return <section className="mobile-order-detail">
         <nav><MobilePageBack href="/orders" label="My orders" /><Link href="/menu">View menu</Link></nav>
         <header><h1><T text="Order details" /></h1><p><span data-copyable>{orderDisplayNumber(order)}</span> · {formatBusinessTimestamp(order.createdAt, {day:"numeric", month:"short", hour:"numeric", minute:"2-digit"})} IST</p></header>
-        <section className={`mobile-order-status ${getStatusClasses(status.tone)}`} aria-label="Order status"><h2>{status.label}</h2><p>{status.message}</p><p>Payment: {order.paymentStatus ? order.paymentStatus.replaceAll("_", " ") : "No payment attempt recorded"}</p></section>
+        <section data-order-tone={status.tone} className={`mobile-order-status ${getStatusClasses(status.tone)}`} aria-label="Order status"><h2>{status.label}</h2><p>{status.message}</p><p>Payment: {order.paymentStatus ? order.paymentStatus.replaceAll("_", " ") : "No payment attempt recorded"}</p></section>
         {trackingEnabled && order.delayReportedAt && order.estimatedReadyAt && <section role="status" className="mobile-order-note"><strong>Ready time update</strong><p>{formatBusinessTimestamp(order.estimatedReadyAt, {day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})} IST · {order.delayReason}</p><p>Reported {formatBusinessTimestamp(order.delayReportedAt, {hour:"numeric",minute:"2-digit"})} IST. Confirm collection changes with the branch.</p></section>}
         {trackingEnabled && pastPickupWindow && !order.estimatedReadyAt && <p className="mobile-order-note">Your booked pickup window has passed. Contact the branch before travelling; no revised ready time has been reported.</p>}
         {pickupCode && <PickupCodeCard orderNumber={order.orderNumber} />}
@@ -52,7 +52,7 @@ export default function MobileOrderDetail({order, status, refreshing, onRefresh,
         {["PAID","REFUND_PENDING","REFUNDED","REFUND_FAILED"].includes(order.paymentStatus??"") && <OrderCancellation orderNumber={order.orderNumber} onChanged={onRefresh} />}
         {order.branchFssaiLicenceNumber && <p className="mobile-order-licence">Gokul Sweets · FSSAI {order.branchFssaiLicenceNumber}</p>}
         {completed && <div id="order-review"><OrderReviewCard orderNumber={order.orderNumber} /></div>}
-        <div className="mobile-order-actions">{order.paymentStatus === "PENDING" && <Link href={`/checkout/payment/${encodeURIComponent(order.orderNumber)}`}>Continue payment</Link>}{paid && <button type="button" disabled={downloading} onClick={() => void invoice()}>{downloading ? "Downloading…" : "Download invoice"}</button>}{!paid && ["FAILED", "EXPIRED"].includes(order.paymentStatus ?? "") && <Link href={`/checkout/payment/${encodeURIComponent(order.orderNumber)}`}>Retry checkout</Link>}<button type="button" disabled={refreshing} onClick={onRefresh}>{refreshing ? "Refreshing…" : "Refresh status"}</button></div>
+        <div className="mobile-order-actions">{order.paymentStatus === "PENDING" && <Link href={`/checkout/payment/${encodeURIComponent(order.orderNumber)}`}>Continue payment</Link>}{paid && <button type="button" disabled={downloading} onClick={() => void invoice()}>{downloading ? "Downloading…" : "Download invoice"}</button>}{!paid && ["FAILED", "EXPIRED"].includes(order.paymentStatus ?? "") && <Link href={`/checkout/payment/${encodeURIComponent(order.orderNumber)}`}>Retry checkout</Link>}</div>
         {invoiceError && <p role="alert">{invoiceError}</p>}<p className="mobile-order-licence">Updated {formatBusinessTimestamp(order.updatedAt, {day:"numeric",month:"short",hour:"numeric",minute:"2-digit"})} IST</p>
     </section>;
 }

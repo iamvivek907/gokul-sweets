@@ -29,10 +29,10 @@ export default function CustomerFooter() {
     const fssaiLicenceNumber = branch && licence?.branchId === branch.id ? licence.number : null;
     return <footer aria-label="Customer footer" className="customer-site-footer border-t border-[#eadfd6] bg-white px-4 pt-6 pb-[calc(90px+env(safe-area-inset-bottom))]">
         <div className="gokul-footer-grid">
-            <div><h2><T text="Gokul Sweets" /></h2><p><T text="Freshly made for the moments that matter. Order online, then collect from your chosen branch." /></p></div>
+            <div><h2><span className="customer-footer-brand-mark" aria-hidden="true">G</span><T text="Gokul Sweets" /></h2><p><T text="Freshly made for the moments that matter. Order online, then collect from your chosen branch." /></p></div>
             <div><h3><T text="EXPLORE" /></h3><Link href="/menu"><T text="Menu" /><LinkFeedback /></Link><Link href="/branches"><T text="Branches" /><LinkFeedback /></Link><Link href="/about"><T text="Our story" /><LinkFeedback /></Link></div>
             <div><h3><T text="YOUR ORDER" /></h3><Link href="/orders"><T text="Orders" /><LinkFeedback /></Link><Link href="/profile"><T text="Profile" /><LinkFeedback /></Link><span><T text="Pickup only" /></span></div>
-            <div><h3><T text="GOOD TO KNOW" /></h3><span><T text="Choose a branch to see its live menu." /></span><span><T text="Pickup times and the full price are confirmed before payment." /></span></div>
+            <div><h3><T text="GOOD TO KNOW" /></h3><Link href="/admin" prefetch={false}><T text="Admin sign in" /><LinkFeedback /></Link><span><T text="Choose a branch to see its live menu." /></span><span><T text="Pickup times and the full price are confirmed before payment." /></span></div>
         </div>
         {fssaiLicenceNumber && <div className="gokul-fssai" aria-label={`FSSAI licence number for ${branch?.name}: ${fssaiLicenceNumber}`}>
             <span className="gokul-fssai-business">Gokul Sweets · {branch?.name}</span>

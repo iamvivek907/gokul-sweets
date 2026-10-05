@@ -1,4 +1,5 @@
 "use client";
+import CustomerIcon from "@/components/customer/CustomerIcon";
 import OrderRatingLink from "@/components/order/OrderRatingLink";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T,useTranslation} from "@/lib/language";
@@ -6,6 +7,7 @@ import {T,useTranslation} from "@/lib/language";
 import {
     useEffect,
     useMemo,
+    useRef,
     useState,
     useSyncExternalStore
 } from "react";
@@ -36,7 +38,8 @@ import {
     getOrderMonthLabel,
     getOrderStatusPresentation,
     getStatusClasses,
-    matchesOrderFilter
+    matchesOrderFilter,
+    isActiveOrderStatus
 } from "@/lib/orderTracking";
 
 import {
@@ -59,7 +62,7 @@ const MAX_HISTORY_ORDERS = 500;
 
 
 interface LoadedHistory {
-    requestKey: string;
+    historyKey: string;
     orders: CustomerOrderSummaryResponse[];
     error: string | null;
 }
@@ -119,7 +122,10 @@ export default function OrdersPage() {
         return () => window.removeEventListener("gokul-customer-identity-changed", refresh);
     }, []);
 
-    const requestKey =
+    const [refreshVersion, setRefreshVersion] = useState(0);
+    const activeHistoryRequest = useRef<AbortController | null>(null);
+
+    const historyKey =
         useMemo(
             () =>
                 `${reloadVersion}:${orderNumbers.join("|")}`,
@@ -141,12 +147,13 @@ export default function OrdersPage() {
     useEffect(() => {
 
         const controller = new AbortController();
-        const activeRequestKey = requestKey;
+        activeHistoryRequest.current = controller;
+        const activeHistoryKey = historyKey;
 
         async function loadHistory(): Promise<void> {
-
+            let localOrders: CustomerOrderSummaryResponse[] = [];
             try {
-                const localOrders = orderNumbers.length > 0
+                localOrders = orderNumbers.length > 0
                     ? await getCustomerOrderHistory(orderNumbers, controller.signal)
                     : [];
                 let verifiedOrders: CustomerOrderSummaryResponse[] = [];
@@ -163,6 +170,7 @@ export default function OrdersPage() {
                 } catch (identityError) {
                     if (controller.signal.aborted) return;
                     console.error("Unable to recover verified orders:", identityError);
+                    if (compact) throw identityError;
                 }
 
                 const orders = Array.from(new Map([...localOrders, ...verifiedOrders]
@@ -174,7 +182,7 @@ export default function OrdersPage() {
                 }
 
                 setLoadedHistory({
-                    requestKey: activeRequestKey,
+                    historyKey: activeHistoryKey,
                     orders,
                     error: null
                 });
@@ -190,14 +198,13 @@ export default function OrdersPage() {
                     exception
                 );
 
-                setLoadedHistory({
-                    requestKey: activeRequestKey,
-                    orders: [],
-                    error:
-                        exception instanceof Error
-                            ? exception.message
-                            : "Unable to load your orders."
-                });
+                setLoadedHistory(previous => ({
+                    historyKey: activeHistoryKey,
+                    orders: compact ? previous?.historyKey === activeHistoryKey ? previous.orders : localOrders : [],
+                    error: exception instanceof Error ? exception.message : "Unable to load your orders."
+                }));
+            } finally {
+                if (activeHistoryRequest.current === controller) activeHistoryRequest.current = null;
             }
         }
 
@@ -205,12 +212,13 @@ export default function OrdersPage() {
 
         return () => {
             controller.abort();
+            if (activeHistoryRequest.current === controller) activeHistoryRequest.current = null;
         };
 
-    }, [orderNumbers, requestKey]);
+    }, [orderNumbers, historyKey, refreshVersion, compact]);
 
     const currentHistory =
-        loadedHistory?.requestKey === requestKey
+        loadedHistory?.historyKey === historyKey
             ? loadedHistory
             : null;
 
@@ -218,6 +226,26 @@ export default function OrdersPage() {
     const branchOrders = useMemo(() => (currentHistory?.orders ?? [])
         .filter(order => branch !== null && order.branchId === branch.id), [currentHistory, branch]);
     const hasOrders = branchOrders.length > 0;
+    const hasActiveOrders = branchOrders.some(order => isActiveOrderStatus(order.orderStatus));
+
+    useEffect(() => {
+        if (!compact) return;
+        const refresh = () => {
+            if (document.visibilityState === "visible" && navigator.onLine && !activeHistoryRequest.current) {
+                setRefreshVersion(value => value + 1);
+            }
+        };
+        // Resume immediately; poll only while this branch has an active order.
+        const timer = hasActiveOrders ? window.setInterval(refresh, 15000) : null;
+        document.addEventListener("visibilitychange", refresh);
+        window.addEventListener("online", refresh);
+        return () => {
+            if (timer !== null) window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", refresh);
+            window.removeEventListener("online", refresh);
+        };
+    }, [compact, hasActiveOrders, historyKey]);
+
 
     const normalizedQuery =
         query.trim().toLowerCase();
@@ -311,7 +339,7 @@ export default function OrdersPage() {
                         </p>
                     </div>
 
-                    {hasOrders && (
+                    {hasOrders && !compact && (
                         <button
                             type="button"
                             disabled={loading}
@@ -373,7 +401,7 @@ export default function OrdersPage() {
 
                 {!loading && currentHistory?.error && (
                     <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-5">
-                        <p className="font-bold text-red-800">Unable to load orders</p>
+                        <p className="font-bold text-red-800">{hasOrders ? "Your orders could not be updated" : "Unable to load orders"}</p>
                         <p className="mt-1 text-sm text-red-700">{currentHistory.error}</p>
                         <button
                             type="button"
@@ -426,7 +454,7 @@ export default function OrdersPage() {
                                 const status = getOrderStatusPresentation(order.orderStatus, order.fulfillmentType);
 
                                 if (compact) return <article className="mobile-order-card" data-order-tone={status.tone} key={order.orderNumber}>
-                                    <div className="mobile-order-card-heading"><strong>{order.branchName}</strong><Link href="/menu">View menu</Link></div>
+                                    <div className="mobile-order-card-heading"><strong><span className="mobile-order-card-icon"><CustomerIcon kind="receipt"/></span>{order.branchName}</strong><Link href="/menu">View menu</Link></div>
                                     <p>{formatBusinessTimestamp(order.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST</p>
                                     <p>{order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} · {order.pickupDate ? formatOrderDate(order.pickupDate) : order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Window pending"}</p>
                                     <div><span className={getStatusClasses(status.tone)}>{status.label}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>

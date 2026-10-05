@@ -38,11 +38,29 @@ try{for(const [width,mode] of [[320,'offer'],[390,'offer'],[640,'offer'],[390,'n
  await page.getByLabel('Find a favourite',{exact:true}).fill('Fresh meal 3');await page.locator('#gokul-product-3').waitFor();assert.equal(await page.locator('#gokul-product-2').count(),0);await page.getByLabel('Find a favourite',{exact:true}).fill('');
  await page.locator('.mobile-cart-offer-target').click();const offers=page.getByRole('dialog',{name:'Offers & savings',exact:true});await offers.getByText('Bigger saving',{exact:true}).waitFor();await offers.locator('.menu-offer-card').getByText('Add ₹200.00 in eligible items',{exact:true}).waitFor();assert.equal(await offers.getByText('Meal saving',{exact:true}).count(),mode==='none'?0:1);await page.keyboard.press('Escape');
  if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/menu-discovery-${width}-${mode}.png`});}
- if(mode==='stale'){await page.evaluate(()=>sessionStorage.setItem('gokul-offer-arrival',JSON.stringify({context:'outdated basket',at:Date.now()})));release();await page.goto(`${base}/checkout/mobile`);await page.locator('.mobile-checkout-savings').waitFor();assert.equal(await page.locator('dialog.offer-arrival').isVisible(),false,'stale context does not celebrate');await context.close();console.log('Stale arrival context passed');continue;}
- await page.locator('.gokul-floating-cart>a').click();await page.waitForURL('**/checkout/mobile');const arrival=page.locator('dialog.offer-arrival');await arrival.waitFor({state:'visible'});
- await page.waitForFunction(()=>document.querySelector('.mobile-checkout'));for(let i=0;i<50&&!started;i++)await page.waitForTimeout(100);assert.equal(started,true,'checkout preview loads while the arrival overlay is visible');assert.ok(checkoutReads>0);
- if(mode==='dismiss'){await arrival.getByRole('button',{name:'View checkout',exact:true}).click();release();await page.locator('.mobile-checkout-savings').waitFor();assert.equal(await arrival.isVisible(),false,'dismissed animation cannot reopen');}
- else if(mode==='slow'){await arrival.waitFor({state:'hidden',timeout:6000});release();await page.waitForTimeout(300);assert.equal(await arrival.isVisible(),false,'slow preview cannot reopen the dismissed animation');}
- else{release();if(mode==='none'||mode==='failure'){await arrival.waitFor({state:'hidden'});assert.equal(await page.locator('.offer-confetti').count(),0,'no verified discount means no celebration');}else{await arrival.getByRole('heading',{name:'SAVE10 applied',exact:true}).waitFor();await arrival.getByText('You saved ₹10.00',{exact:true}).waitFor();assert.equal(await page.locator('.mobile-checkout-pay button').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(255, 82, 0)');if(mode==='reduced')assert.equal(await page.locator('.offer-confetti').evaluate(n=>getComputedStyle(n).display),'none');if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/offer-celebration-${width}-${mode}.png`});await arrival.getByRole('button',{name:'Woohoo! Thanks',exact:true}).click();await arrival.waitFor({state:'hidden'});}}
- assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-offer-arrival')),null,'arrival request is consumed once');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);await context.close();console.log(`Menu discovery ${width}px ${mode} passed`);
+ if(mode==='stale')await page.evaluate(()=>sessionStorage.setItem('gokul-offer-arrival',JSON.stringify({context:'outdated basket',at:Date.now()})));
+ if(mode==='stale')await page.goto(`${base}/checkout/mobile`);else await page.locator('.gokul-floating-cart>a').click();await page.waitForURL('**/checkout/mobile');
+ await page.getByRole('heading',{name:'Your order',exact:true}).waitFor();
+ const cartSection=page.getByRole('region',{name:'Cart items',exact:true});await cartSection.waitFor();
+ const cartTop=(await cartSection.boundingBox()).y;
+ for(let i=0;i<50&&!started;i++)await page.waitForTimeout(100);assert.equal(started,true,'checkout preview loads without an entry modal');assert.ok(checkoutReads>0);
+ assert.equal(await page.locator('dialog.offer-arrival').isVisible(),false,'checking savings never covers checkout');assert.equal(await page.locator('.offer-confetti').count(),0);
+ if(mode==='slow')await page.waitForTimeout(5500);
+ release();
+ if(mode==='failure')await page.getByText('We couldn’t confirm your price or offers. Review pickup and verification, then try again.',{exact:true}).waitFor();
+ else if(mode==='none')await page.getByText('Your current menu price',{exact:true}).waitFor();
+ else await page.locator('.mobile-checkout-savings').getByText(/₹10.00/).waitFor();
+ const arrival=page.locator('dialog.offer-arrival');
+ if(mode==='none'||mode==='failure'||mode==='stale')assert.equal(await arrival.isVisible(),false,'no unverified or stale savings celebration');
+ else{
+  await arrival.waitFor({state:'visible'});await arrival.getByRole('heading',{name:'SAVE10 applied',exact:true}).waitFor();await arrival.getByText('You saved ₹10.00',{exact:true}).waitFor();
+  assert.equal(await arrival.locator('.offer-confetti i').count(),24);
+  if(mode==='reduced')assert.equal(await arrival.locator('.offer-confetti').evaluate(n=>getComputedStyle(n).display),'none');
+  await arrival.getByRole('button',{name:'Woohoo! Thanks',exact:true}).click();await arrival.waitFor({state:'hidden'});
+ }
+
+ assert.ok(Math.abs((await cartSection.boundingBox()).y-cartTop)<=1,'identity and savings discovery do not move cart items');
+ assert.equal(await page.locator('.mobile-checkout-pay button').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(143, 24, 56)');
+ if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/checkout-inline-${width}-${mode}.png`});
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-offer-arrival')),null,'legacy arrival markers are cleared');assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);await context.close();console.log(`Menu discovery ${width}px ${mode} passed`);
 }}finally{await browser.close();}

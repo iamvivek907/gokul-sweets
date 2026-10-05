@@ -76,7 +76,7 @@ try{
    const lastBox=await lastLink.boundingBox(),navigationBox=await page.locator('.customer-bottom-navigation').boundingBox();
    assert.ok(lastBox.y+lastBox.height<=navigationBox.y,'last profile link scrolls fully above fixed navigation');
    if(width===390){
-    customerName=undefined;await page.reload();await page.locator('.customer-account-mobile-label svg').waitFor();
+    customerName=undefined;await page.reload();await page.getByRole('link',{name:/Open profile for.*3210/}).waitFor();await page.locator('.customer-account-mobile-label svg').waitFor();
     assert.equal(await page.locator('.customer-account-mobile-label').textContent(),'','no-name session uses a neutral account icon');
     assert.match(await page.locator('.customer-account-link').getAttribute('aria-label'),/3210/);
     customerName='Vivek Chaurasia';branchExperience=false;await page.reload();
@@ -114,7 +114,7 @@ try{
    await page.locator('.mobile-account-logout').click();await logoutDialog.getByRole('button',{name:'Log out',exact:true}).click();
    await logoutDialog.getByRole('alert').filter({hasText:'Could not sign out'}).waitFor();assert.equal(authenticated,true);assert.equal(logoutCalls,1);
    logoutError=false;await logoutDialog.getByRole('button',{name:'Log out',exact:true}).click();await page.locator('.account-hub').waitFor({state:'detached'});assert.equal(logoutCalls,2);
-   await page.locator('.customer-account-mobile-label').getByText('Log in',{exact:true}).waitFor();
+   await page.getByRole('link',{name:'Log in to your account',exact:true}).waitFor();await page.locator('.customer-account-mobile-label svg').waitFor();
    assert.equal(await page.locator('.mobile-account-navigation').isVisible(),true,'public menu remains after logout');
    assert.equal(await page.locator('.account-navigation').count(),0,'private profile sections disappear');
    await page.getByRole('button',{name:'Verify with SMS',exact:true}).click();await page.locator('.account-hub').waitFor();

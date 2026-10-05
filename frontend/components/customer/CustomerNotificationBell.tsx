@@ -38,7 +38,7 @@ export default function CustomerNotificationBell() {
     }, [features?.notificationInbox]);
     if (!features?.notificationInbox || count === null) return null;
     return <CustomerNotificationLink label={`Notifications, ${count} unread`}
-        className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#eadfd6] bg-white text-[#7a1625] shadow-sm transition-colors hover:bg-[#fff0dc] focus-visible:outline-2 focus-visible:outline-offset-2">
+        className="customer-notification-bell relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#eadfd6] bg-white text-[#7a1625] shadow-sm transition-colors hover:bg-[#fff0dc] focus-visible:outline-2 focus-visible:outline-offset-2">
         <NotificationIcon />
         {count > 0 && <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#7a1625] px-1 text-center text-[10px] font-bold leading-5 text-white" aria-hidden="true">{count > 9 ? "9+" : count}</span>}
     </CustomerNotificationLink>;

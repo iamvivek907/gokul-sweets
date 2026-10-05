@@ -1,4 +1,5 @@
 "use client";
+import CustomerIcon from "@/components/customer/CustomerIcon";
 import {T} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -55,10 +56,10 @@ export default function Header() {
                 "
             >
 
-                {futuristic ? <Link href="/" className="future-brand" aria-label="Gokul Sweets · Home">
+                {futuristic ? <Link href="/" data-navigation-link className="future-brand" aria-label="Gokul Sweets · Home">
                     <span className="future-brand-mark" aria-hidden="true">G</span>
                     <span><T text="Gokul Sweets" /><small><T text="FRESH FOR YOUR MOMENTS" /></small></span>
-                <LinkFeedback /></Link> : <Link href="/" aria-label="Gokul Sweets · Home"
+                <LinkFeedback href="/" /></Link> : <Link href="/" data-navigation-link aria-label="Gokul Sweets · Home"
                     className="
                         min-w-0
                     "
@@ -88,14 +89,14 @@ export default function Header() {
                     >
                         <T text="Gokul Sweets" /></h1>
 
-                <LinkFeedback /></Link>}
+                <LinkFeedback href="/" /></Link>}
 
 
                 {futuristic && pathname !== "/branches" && !pathname.startsWith("/checkout/") && <div className="future-branch-control">
                     {features?.cartSwitchPreview || cart.isEmpty
                         ? <BranchSelector locationControl />
                         : <Link href="/cart" className="gokul-location-control future-branch-review" aria-label="Review cart before changing branch">
-                            <span className="gokul-location-pin" aria-hidden="true">●</span>
+                            <span className="gokul-location-pin" aria-hidden="true"><CustomerIcon kind="pin"/></span>
                             <span className="gokul-location-name"><small><T text="PICKUP BRANCH" /></small><strong>{branch?.name ?? "Choose branch"}</strong></span>
                             <span className="gokul-location-chevron" aria-hidden="true">⌄</span>
                         <LinkFeedback /></Link>}

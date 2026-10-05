@@ -1,4 +1,5 @@
 "use client";
+import CustomerIcon from "@/components/customer/CustomerIcon";
 import {useCallback,useEffect,useLayoutEffect,useId,useRef,useState,useSyncExternalStore} from "react";
 import {createPortal} from "react-dom";
 import {hindi} from "./hindi";
@@ -53,5 +54,5 @@ export function LanguagePicker(){
   document.addEventListener('pointerdown',close);document.addEventListener('keydown',escape);
   return()=>{document.removeEventListener('pointerdown',close);document.removeEventListener('keydown',escape);};
  },[shown]);
- return <div ref={container} className="language-control"><button ref={trigger} type="button" aria-label="Language / भाषा" aria-expanded={open} aria-controls={shown?optionsId:undefined} onClick={()=>setOpen(!open)} className="language-trigger"><span aria-hidden="true">अ/A</span><span>{locale==='hi'?'हिन्दी':'EN'}</span></button>{shown&&createPortal(<div ref={popover} id={optionsId} className="language-popover" role="group" aria-label="Language / भाषा" style={{position:'fixed',...position}}><strong>Choose language · भाषा चुनें</strong>{([['en','English','Order with ease'],['hi','हिन्दी','अपनी भाषा में ऑर्डर करें']] as const).map(([code,label,hint])=><button key={code} type="button" aria-pressed={locale===code} onClick={()=>{setLanguage(code);setOpen(false);trigger.current?.focus();}}><span><b>{label}</b><small>{hint}</small></span><span aria-hidden="true">{locale===code?'✓':'→'}</span></button>)}</div>,document.body)}</div>;
+ return <div ref={container} className="language-control"><button ref={trigger} type="button" aria-label="Language / भाषा" aria-expanded={open} aria-controls={shown?optionsId:undefined} onClick={()=>setOpen(!open)} className="language-trigger"><span aria-hidden="true"><CustomerIcon kind="globe"/></span><span>{locale==='hi'?'हिन्दी':'EN'}</span></button>{shown&&createPortal(<div ref={popover} id={optionsId} className="language-popover" role="group" aria-label="Language / भाषा" style={{position:'fixed',...position}}><strong>Choose language · भाषा चुनें</strong>{([['en','English','Order with ease'],['hi','हिन्दी','अपनी भाषा में ऑर्डर करें']] as const).map(([code,label,hint])=><button key={code} type="button" aria-pressed={locale===code} onClick={()=>{setLanguage(code);setOpen(false);trigger.current?.focus();}}><span><b>{label}</b><small>{hint}</small></span><span aria-hidden="true">{locale===code?'✓':'→'}</span></button>)}</div>,document.body)}</div>;
 }
