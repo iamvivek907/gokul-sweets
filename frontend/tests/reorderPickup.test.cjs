@@ -13,3 +13,12 @@ test('reorder rejects empty, fractional, nonfinite and incompatible pack quantit
  assert.equal(validReorderItems([]),false);for(const n of [0,-1,NaN,Infinity,1.5])assert.equal(validReorderItems([unit(n)]),false);
  assert.equal(validReorderItems([unit(2),weight(1000)]),true);for(const n of [200,275,NaN,Infinity])assert.equal(validReorderItems([weight(n)]),false);
 });
+
+test('single-day pickup loss preserves alternate dates and replaces stale slots',()=>{
+ const first={date:'2026-10-06',slots:[slot(1,'09:00:00')]},later={date:'2026-10-07',slots:[slot(2,'09:00:00')]};
+ const previous={today:'2026-10-05',maximumDate:'2026-10-07',dates:[first,later]};
+ const result=exportsObject.mergeReorderAvailability(previous,{dates:[{...first,slots:[]}]});
+ assert.deepEqual(Array.from(result.dates,d=>d.date),['2026-10-06','2026-10-07']);
+ assert.equal(result.dates[0].slots.length,0);assert.equal(result.dates[1],later);assert.equal(previous.dates[0],first);
+ assert.equal(result.maximumDate,previous.maximumDate);
+});

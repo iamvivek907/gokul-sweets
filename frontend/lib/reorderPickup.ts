@@ -1,6 +1,13 @@
 import type {CartAvailability} from "@/services/availabilityApi";
 import type {PickupSelection} from "@/types/pickup";
 import type {CartItem} from "@/types/cart";
+/** A one-day recheck must not discard the rest of the loaded pickup calendar. */
+export function mergeReorderAvailability(previous:CartAvailability|null, fresh:CartAvailability):CartAvailability {
+ if(!previous)return fresh;
+ const dates=new Map(previous.dates.map(day=>[day.date,day]));
+ fresh.dates.forEach(day=>dates.set(day.date,day));
+ return {...previous,dates:Array.from(dates.values()).sort((a,b)=>a.date.localeCompare(b.date))};
+}
 /** Availability already includes item stock, readiness, date windows and slot capacity. */
 export function reorderPickupOptions(value:CartAvailability,now=Date.now()):PickupSelection[]{
  return value.dates.flatMap(day=>day.slots.flatMap<PickupSelection>(option=>{

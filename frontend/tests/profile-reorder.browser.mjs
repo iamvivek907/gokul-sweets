@@ -9,13 +9,13 @@ const tomorrow=shift(1),later=shift(2),phone='+919876543210';
 const branch={id:1,code:'ONE',name:'Original branch',active:true,operational:true,pickupAvailable:true},other={...branch,id:2,name:'Other branch'};
 const products=[{id:1,categoryId:1,categoryName:'Sweets',name:'Peda',description:null,price:20,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},{id:2,categoryId:1,categoryName:'Sweets',name:'Kaju Barfi',description:null,price:1000,imageUrl:null,available:true,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:50}];
 const history=Array.from({length:13},(_,i)=>({orderNumber:`HISTORY-${13-i}`,customerOrderNumber:13-i,orderStatus:'PICKED_UP',branchId:1,branchName:branch.name,pickupDate:today,totalAmount:1040,fulfillmentType:'PICKUP',createdAt:`${today}T09:00:00`,updatedAt:`${today}T09:00:00`}));
-try{for(const width of [320,390,1280]){
- let pageFailure=false,availabilityFailure=false,slotLost=false,priceChanged=false,postCount=0,pages=0,checks=[];
+try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1280,false]]){
+ let pageFailure=false,availabilityFailure=false,slotLost=false,priceChanged=false,postCount=0,pages=0,checks=[],smartCalls=0;
  const context=await browser.newContext({viewport:{width,height:844},isMobile:width<=640,hasTouch:width<=640,serviceWorkers:'block'}),page=await context.newPage();
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');},other);
  await context.route('**/api/**',async route=>{
   const request=route.request(),url=new URL(request.url()),path=url.pathname;let json=[];
-  if(path==='/api/storefront/features')json={today,futureOrderingDays:30,smartAvailability:true,futuristicStorefrontV2:true,checkoutExperienceV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,customerAccountHub:true,branchExperience:true};
+  if(path==='/api/storefront/features')json={today,futureOrderingDays:30,smartAvailability:smart,futuristicStorefrontV2:true,checkoutExperienceV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,customerAccountHub:true,branchExperience:true};
   else if(path==='/api/storefront/customer-identity')json={enabled:true};
   else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone};
   else if(path==='/api/customer/identity/account')json={completedOrders:13,paidOrders:13,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
@@ -24,7 +24,14 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/branches')json=[branch,other];
   else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=other;
   else if(path==='/api/menu')json=[{id:1,name:'Sweets',products:products.map(p=>({...p,price:p.id===1&&priceChanged?25:p.price}))}];
-  else if(path==='/api/branches/1/availability'){
+  else if(path==='/api/branches/1/inventory/check'){
+   const body=request.postDataJSON();checks.push(body);if(availabilityFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});
+   const orderable=body.items.every(item=>item.quantity==null||item.quantity<=3);
+   json={orderable,items:body.items.map(item=>({productId:item.productId,orderable}))};
+  }else if(path==='/api/branches/1/pickup-slots'){
+   const date=url.searchParams.get('date');json=date===today?[]:[{id:date===tomorrow?1:2,branchId:1,slotDate:date,startTime:'09:00:00',endTime:'09:30:00',active:true,remainingCapacity:slotLost?0:5,priorityEnabled:false,priorityCharge:0}];
+  }else if(path==='/api/branches/1/availability'){
+   smartCalls++;if(!smart)return route.fulfill({status:404,body:''});
    const body=request.postDataJSON();checks.push(body);if(availabilityFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});
    const day=date=>({date,available:date!==today,slots:date===today?[]:[{slot:{id:date===tomorrow?1:2,branchId:1,slotDate:date,startTime:'09:00:00',endTime:'09:30:00',active:true,remainingCapacity:5,priorityEnabled:false,priorityCharge:0},normalAvailable:!(slotLost&&body.days===1)&&body.items.every(item=>item.quantity==null||item.quantity<=3),priorityAvailable:false}],reason:'No pickup time can fulfil these quantities.'});
    json={today,maximumDate:later,dates:(body.days===1?[body.startDate]:[today,tomorrow,later]).map(day)};
@@ -39,6 +46,26 @@ try{for(const width of [320,390,1280]){
  const pageReads=pages;await nav.getByRole('button',{name:'Previous',exact:true}).click();await nav.getByText('Page 1',{exact:true}).waitFor();assert.equal(pages,pageReads,'previous uses its cached bounded page');
  const open=async()=>{await page.locator('.profile-order-card').first().getByRole('button',{name:'Reorder',exact:true}).click();await page.getByRole('dialog',{name:'Reorder for pickup'}).waitFor();};
  const dialog=page.getByRole('dialog',{name:'Reorder for pickup'}),continueButton=dialog.getByRole('button',{name:'Continue to checkout',exact:true});
+ if(!smart){
+  await open();await dialog.locator('input[type="date"]').waitFor();
+  assert.equal(await continueButton.isDisabled(),true,'no legacy slots today');
+  await dialog.locator('input[type="date"]').fill(tomorrow);
+  await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
+  await dialog.getByLabel('Peda quantity',{exact:true}).fill('4');
+  await dialog.getByText('These quantities are unavailable.',{exact:false}).waitFor();assert.equal(await continueButton.isDisabled(),true);
+  await dialog.getByLabel('Peda quantity',{exact:true}).fill('3');
+  await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
+  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);
+  availabilityFailure=true;await open();await dialog.getByText('Pickup availability could not load.',{exact:false}).waitFor();
+  availabilityFailure=false;await dialog.getByRole('button',{name:'Try again',exact:true}).click();await dialog.locator('input[type="date"]').waitFor();await dialog.locator('input[type="date"]').fill(tomorrow);
+  await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
+  slotLost=true;await continueButton.click();await dialog.getByText('That pickup is no longer available.',{exact:false}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);
+  slotLost=false;await dialog.locator('input[type="date"]').fill(later);await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
+  await continueButton.click();await page.waitForURL(width<=640?'**/checkout/mobile':'**/checkout/pickup');
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),later);
+  assert.equal(smartCalls,0,'legacy never calls the disabled endpoint');assert.equal(postCount,0);
+  await context.close();console.log(`Legacy reorder ${width}px passed`);continue;
+ }
  await open();await dialog.locator('select').waitFor();assert.equal(await dialog.locator('select').inputValue(),tomorrow,'earliest whole-cart slot skips today');
  await dialog.getByLabel('Peda quantity',{exact:true}).fill('3');await dialog.getByLabel('Kaju Barfi weight in grams',{exact:true}).fill('1500');
  await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
@@ -50,8 +77,8 @@ try{for(const width of [320,390,1280]){
  availabilityFailure=false;await dialog.getByRole('button',{name:'Try again',exact:true}).click();await dialog.locator('select').waitFor();
  // An unfinished payment blocks replacing the cart.
  await page.evaluate(()=>localStorage.setItem('gokul-pending-order','saved-payment'));await continueButton.click();await dialog.getByText('Resolve your unfinished checkout',{exact:false}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);await page.evaluate(()=>localStorage.removeItem('gokul-pending-order'));
- slotLost=true;await continueButton.click();await dialog.getByText('That pickup is no longer available.',{exact:false}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);slotLost=false;
- await dialog.getByRole('button',{name:'Try again',exact:true}).click();await dialog.getByRole('button',{name:/9:00.*9:30/i}).click();
+ slotLost=true;await continueButton.click();await dialog.getByText('That pickup is no longer available.',{exact:false}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);assert.equal(await dialog.locator('select option').count(),3,'lost-slot recheck retains the full calendar');await dialog.locator('select').selectOption(later);assert.equal(await continueButton.isEnabled(),true,'another loaded date is immediately selectable');slotLost=false;
+ await dialog.getByRole('button',{name:'Try again',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);await dialog.locator('select').selectOption(tomorrow);await dialog.getByRole('button',{name:/9:00.*9:30/i}).click();
  priceChanged=true;await continueButton.click();await dialog.getByText('Prices changed.',{exact:false}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),null);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
  // Explicit replacement consent; cross-tab edits reject stale continuation.
  const existing={branchId:2,items:[{product:products[0],quantity:1,weightGrams:null}]};await page.evaluate(cart=>localStorage.setItem('gokul-cart',JSON.stringify(cart)),existing);
