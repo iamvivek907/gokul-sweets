@@ -495,3 +495,6 @@
 @media(max-width:640px){
  .future-storefront[data-customer-route="/menu"] .mobile-menu-pickup>p[role="status"]{flex-basis:100%;margin:4px 0 0;font-size:12px;line-height:1.5;color:#59676a}
 }
+
+/* Preserve the cart anchor while a saved pickup is checked in the background. */
+.future-storefront .mobile-pickup-status{min-height:3em;min-height:2lh}
