@@ -44,8 +44,8 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   else if(p==='/api/branches')json=[branch];else if(p==='/api/branches/1')json=branch;
   else if(p==='/api/menu')json=[{id:1,name:'Meals',displayOrder:0,products:[half,full]},{id:2,name:'Drinks',displayOrder:1,products:[drink]}];
   else if(p==='/api/menu/portion-groups')json={version:1,groups:[{key:'paneer',title:'Paneer meal',choices:[{productId:10,label:'Half'},{productId:11,label:'Full'}]}]};
-  else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&scenario==='pickup-network')return route.fulfill({status:503,json:{message:'Availability unavailable'},headers});
-  else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&scenario==='pickup-unavailable')json={today:date,maximumDate:secondDate,dates:[{date:secondDate,available:false,slots:[]}]};
+  else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&req.postDataJSON().startDate===secondDate&&scenario==='pickup-network')return route.fulfill({status:503,json:{message:'Availability unavailable'},headers});
+  else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&req.postDataJSON().startDate===secondDate&&scenario==='pickup-unavailable')json={today:date,maximumDate:secondDate,dates:[{date:secondDate,available:false,slots:[]}]};
   else if(p.endsWith('/availability')&&pickupRegression){
    const items=req.postDataJSON().items??[];
    const conflict=scenario!=='menu-pickup-expired'&&(scenario!=='menu-pickup-quantity'||items.some(item=>item.quantity>1));
