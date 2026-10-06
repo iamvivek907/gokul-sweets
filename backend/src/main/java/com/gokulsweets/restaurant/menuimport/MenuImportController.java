@@ -14,6 +14,11 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class MenuImportController {
 
+    private final MenuImportJobs jobs;
+
+    @GetMapping("/import/jobs/{jobId}")
+    public MenuImportJobs.Job job(@PathVariable long branchId,@PathVariable java.util.UUID jobId) {return jobs.get(branchId,jobId);}
+
     private final MenuImportService
             menuImportService;
 
@@ -54,7 +59,7 @@ public class MenuImportController {
             value = "/import/validate",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    public ResponseEntity<MenuImportValidationResponse>
+    public ResponseEntity<?>
     validateImport(
 
             @PathVariable
@@ -64,6 +69,7 @@ public class MenuImportController {
             MultipartFile file
     ) {
 
+        if(jobs.enabled())return ResponseEntity.accepted().body(jobs.enqueue(branchId,file,"VALIDATE"));
         return ResponseEntity.ok(
                 menuImportService
                         .validate(
@@ -78,7 +84,7 @@ public class MenuImportController {
             value = "/import",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE
     )
-    public ResponseEntity<MenuImportResultResponse>
+    public ResponseEntity<?>
     importMenu(
 
             @PathVariable
@@ -88,6 +94,7 @@ public class MenuImportController {
             MultipartFile file
     ) {
 
+        if(jobs.enabled())return ResponseEntity.accepted().body(jobs.enqueue(branchId,file,"IMPORT"));
         return ResponseEntity.ok(
                 menuImportService
                         .importMenu(

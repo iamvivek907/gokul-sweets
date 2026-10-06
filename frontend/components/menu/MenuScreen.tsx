@@ -1240,12 +1240,10 @@ export default function MenuScreen() {
                         categories.length > 0
                         && (
                             <div
-                                className="
-                                    mt-4
-                                "
+                                className={phoneMenu ? "mobile-menu-category-entry" : "mt-4"}
                             >
 
-                                {phoneMenu?<MobileMenuFilters categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={setMobileCategories} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly}/>:<CategoryTabs
+                                {phoneMenu?<MobileMenuFilters categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={setMobileCategories} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
                                     categories={
                                         categories
                                     }

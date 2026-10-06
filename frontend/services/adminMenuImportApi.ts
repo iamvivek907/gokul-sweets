@@ -294,9 +294,7 @@ export async function validateMenuImport(
     }
 
 
-    const result:
-        MenuImportValidationResponse =
-        await response.json();
+    const result: MenuImportValidationResponse = await readImportResult(response,branchId,authorization,"VALIDATE",signal);
 
 
     return result;
@@ -394,10 +392,98 @@ export async function importMenuFile(
     }
 
 
-    const result:
-        MenuImportResultResponse =
-        await response.json();
+    const result: MenuImportResultResponse = await readImportResult(response,branchId,authorization,"IMPORT",signal);
 
 
     return result;
+}
+interface ImportJob {id: string; status: "QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED"; result: string | null; error: string | null}
+export interface PendingMenuImportJob {id: string; operation: "VALIDATE" | "IMPORT"}
+const pendingKey = (branchId: number) => `gokul-menu-import-job:${branchId}`;
+
+export function getPendingMenuImportJob(branchId: number): PendingMenuImportJob | null {
+    try {
+        const stored = sessionStorage.getItem(pendingKey(branchId));
+        if (!stored) return null;
+        const job = JSON.parse(stored) as PendingMenuImportJob;
+        return /^[a-f0-9-]{36}$/i.test(job.id) && ["VALIDATE", "IMPORT"].includes(job.operation) ? job : null;
+    } catch { return null; }
+}
+function rememberJob(branchId: number, job: PendingMenuImportJob | null) {
+    try {
+        if (job) sessionStorage.setItem(pendingKey(branchId), JSON.stringify(job));
+        else sessionStorage.removeItem(pendingKey(branchId));
+    } catch { /* Status polling still works when browser storage is unavailable. */ }
+}
+function waitForPoll(signal: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const abort = () => { clearTimeout(timer); reject(signal.reason); };
+        const timer = setTimeout(() => { signal.removeEventListener("abort", abort); resolve(); }, 2000);
+        if (signal.aborted) abort();
+        else signal.addEventListener("abort", abort, {once: true});
+    });
+}
+async function pollImportJob<T>(job: ImportJob, branchId: number, authorization: string, signal?: AbortSignal): Promise<T> {
+    const deadline = new AbortController();
+    let timedOut = false;
+    const deadlineTimer = setTimeout(() => { timedOut = true; deadline.abort(); }, 10 * 60 * 1000);
+    const abortOverall = () => deadline.abort(signal?.reason);
+    if (signal?.aborted) abortOverall();
+    else signal?.addEventListener("abort", abortOverall, {once: true});
+    const overall = deadline.signal;
+    let resumable = true;
+    try {
+        while (job.status === "QUEUED" || job.status === "PROCESSING") {
+            await waitForPoll(overall);
+            const request = new AbortController();
+            const requestTimer = setTimeout(() => request.abort(), 8000);
+            const abortRequest = () => request.abort(overall.reason);
+            if (overall.aborted) abortRequest();
+            else overall.addEventListener("abort", abortRequest, {once: true});
+            try {
+                const status = await adminFetch(`/api/admin/branches/${branchId}/menu/import/jobs/${job.id}`, authorization,
+                    {signal: request.signal});
+                if (!status.ok) {
+                    if ([401, 403, 404].includes(status.status)) {
+                        resumable = false;
+                        rememberJob(branchId, null);
+                    }
+                    throw new Error(`Unable to read menu job ${job.id}.`);
+                }
+                // Both timers remain active until the response body has been consumed.
+                job = await status.json();
+            } finally {
+                clearTimeout(requestTimer);
+                overall.removeEventListener("abort", abortRequest);
+            }
+        }
+        rememberJob(branchId, null);
+        if (job.status !== "SUCCEEDED" || !job.result)
+            throw new Error(job.error ?? "The menu job failed. Check the file and try again.");
+        return JSON.parse(job.result) as T;
+    } catch (failure) {
+        if (resumable && (job.status === "QUEUED" || job.status === "PROCESSING")) {
+            const reason = timedOut ? "Status checking reached its ten-minute limit."
+                : overall.aborted ? "Status checking was stopped." : "Unable to read the job status.";
+            throw new Error(`${reason} Menu job ${job.id} may still be running. Use Resume status check before uploading again.`, {cause: failure});
+        }
+        throw failure;
+    } finally {
+        clearTimeout(deadlineTimer);
+        signal?.removeEventListener("abort", abortOverall);
+    }
+}
+async function readImportResult<T>(response: Response, branchId: number, authorization: string,
+    operation: PendingMenuImportJob["operation"], signal?: AbortSignal): Promise<T> {
+    if (response.status !== 202) return response.json();
+    const job: ImportJob = await response.json();
+    rememberJob(branchId, {id: job.id, operation});
+    return pollImportJob(job, branchId, authorization, signal);
+}
+export async function resumeMenuImportJob(branchId: number, authorization: string, signal?: AbortSignal) {
+    const pending = getPendingMenuImportJob(branchId);
+    if (!pending) throw new Error("No pending menu job was found for this branch.");
+    const result = await pollImportJob<MenuImportValidationResponse | MenuImportResultResponse>(
+        {id: pending.id, status: "PROCESSING", result: null, error: null}, branchId, authorization, signal);
+    return {operation: pending.operation, result};
 }

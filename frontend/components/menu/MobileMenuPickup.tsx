@@ -5,7 +5,7 @@ import {savePickupSlot,getPickupSlotSnapshot,clearPickupSlot} from "@/lib/checko
 import {savePickupIntent} from "@/hooks/usePickupIntent";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
-import {availabilityItems,checkCartAvailability,type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems,checkCartAvailability,discoverPickupDates,type CartAvailability} from "@/services/availabilityApi";
 import {menuPickupOptions} from "@/lib/menuPickupOptions";
 import {T} from "@/lib/language";
 import type {MenuProduct} from "@/types/menu";
@@ -23,7 +23,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
  async function choose(){
   if(busy)return;
   setBusy(true);setError("");const c=new AbortController();controller.current=c;
-  try{const value=await checkCartAvailability(branchId,today,days+1,JSON.parse(request),AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);if(!c.signal.aborted){setData(value);setOpen(true);}}
+  try{const value=await discoverPickupDates(branchId,today,days+1,AbortSignal.any([c.signal,AbortSignal.timeout(15000)]));if(!c.signal.aborted){setData(value);setOpen(true);}}
   catch{if(!c.signal.aborted)setError("We couldn’t load pickup times. Your cart is saved. Try again.");}
   finally{if(!c.signal.aborted)setBusy(false);}
  }
@@ -33,7 +33,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
  {!expired&&selection&&<p><T text="Some items may need another time. Change time to explore availability."/></p>}
  {selectionUnavailable&&<p role="status"><T text="Your saved pickup time no longer fits your cart. Adjust items or choose another time. Your cart is saved."/></p>}
  {error&&<p role="alert">{error}</p>}
- {open&&data&&<Dialog dates={data.dates} options={menuPickupOptions(data,ids)} chosen={selection??menuPickupOptions(data,ids)[0]??null} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);}} onConfirm={async value=>{
+ {open&&data&&<Dialog advisory dates={data.dates} options={menuPickupOptions(data,ids)} chosen={selection??menuPickupOptions(data,ids)[0]??null} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);}} onConfirm={async value=>{
   const branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot(),cartSnapshot=getCartSnapshot();
   const cart=parseCart(cartSnapshot);
   if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");
@@ -42,15 +42,15 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
   if(cartItems.length>100)throw new Error("Review this large cart at checkout before changing pickup. Your previous pickup is saved.");
   const amounts=new Map(cartItems.map(item=>[item.productId,item]));
   const menuItems=JSON.parse(request) as ReturnType<typeof availabilityItems>;
-  const requested=[...cartItems,...menuItems.filter(item=>!amounts.has(item.productId))].slice(0,100);
+  const requested=cartItems.length?cartItems:menuItems;
   const c=new AbortController();controller.current=c;
   const fresh=await checkCartAvailability(branchId,value.date,1,requested,AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);
   if(c.signal.aborted||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return false;
-  const checked=menuPickupOptions(fresh,requested.map(item=>item.productId)).find(s=>s.slot.id===value.slot.id&&s.date===value.date&&s.pickupType===value.pickupType);
-  if(!checked){setData(previous=>previous?{...previous,dates:previous.dates.map(d=>fresh.dates.find(f=>f.date===d.date)??d)}:fresh);return false;}
   const slot=fresh.dates.find(day=>day.date===value.date)?.slots.find(slot=>slot.slot.id===value.slot.id);
   const conflict=slot?.issues?.find(issue=>!issue.available&&amounts.has(issue.productId));
   if(conflict)throw new Error(`${conflict.productName}: ${conflict.reason??"Not available for this pickup."} Adjust your cart or choose another time. Your previous pickup is saved.`);
+  const checked=menuPickupOptions(fresh,requested.map(item=>item.productId)).find(s=>s.slot.id===value.slot.id&&s.date===value.date&&s.pickupType===value.pickupType);
+  if(!checked){setData(previous=>previous?{...previous,dates:previous.dates.map(d=>fresh.dates.find(f=>f.date===d.date)??d)}:fresh);return false;}
   clearPickupSlot();savePickupIntent(branchId,checked.date);savePickupSlot(checked);setOpen(false);return true;
  }}/>}</section>;
 }

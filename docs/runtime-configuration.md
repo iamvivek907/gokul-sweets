@@ -499,8 +499,9 @@ for PROD. Enable provider configuration only after this PR is merged/deployed to
 
 ### Backend Docker heap budget
 
-The runtime image defaults to `JAVA_TOOL_OPTIONS="-Xmx192m -XX:+ExitOnOutOfMemoryError"`.
-CI boots this exact default inside a 512 MB container and checks database-backed health.
+The runtime image defaults to `JAVA_TOOL_OPTIONS="-Xms64m -Xmx192m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=32m -XX:+ExitOnOutOfMemoryError"`.
+CI boots this exact default inside a 512 MB container, checks database-backed health,
+and repeatedly requests the seeded public menu for three minutes with reporting refresh enabled.
 The 192 MB limit applies to the Java heap, not total process memory: class metadata,
 thread stacks, direct buffers and other native allocations use the remaining container budget.
 The build stage is unaffected.
@@ -517,3 +518,110 @@ requests, line counts per order, export workload, background jobs, and total pro
 A production-like load test and heap/process-memory measurements are needed before stating
 an order threshold. The observed repository parser failure happened during startup before
 any customer orders were loaded.
+
+### Memory incident diagnostics and bounds
+
+The small-container profile uses Serial GC, a 64 MB code cache and a 32 MB direct-buffer cap.
+HTTP workers default to 24 (4 spare), and Hikari defaults to 5 connections (1 idle).
+These controls reduce overhead; they do not cap total process memory or prove public traffic capacity.
+Deployments can override the pool sizes using GOKUL_HTTP_MAX_THREADS, GOKUL_HTTP_MIN_THREADS,
+GOKUL_DB_POOL_SIZE and GOKUL_DB_MIN_IDLE. Review throughput before using these values on larger instances.
+
+Set GOKUL_MEMORY_DIAGNOSTICS_ENABLED=true temporarily to log aggregate heap, non-heap,
+buffer, thread and cgroup memory every 30 seconds. A container memory value of -1 means
+the cgroup usage file is unavailable. Container usage includes more than JVM allocations;
+non-heap plus buffer measurements do not account for all native memory. No public endpoint is exposed.
+Disable after collecting an idle baseline and menu/admin workload samples. Compare the logs
+with Render memory metrics before attributing an incident to a specific request.
+
+Menu imports reject files above 2 MB. A streaming ZIP/XML preflight runs before POI loads a workbook: every worksheet is limited to 500 data rows plus its header and 17 columns (A–Q), at most two worksheets (Menu_Upload and Reference_Data in the template), 17,034 cells total, 60,000 XML elements, 1 MiB of XML text, and XML depth 32. ZIP expansion is capped at 8 MiB per part and 12 MiB total. These limits include content that is not imported. Async job status checks have an eight-second request timeout and a ten-minute overall deadline, including response-body reads. Pending job IDs are retained in session storage so staff can use Resume status check after a timeout or page refresh without uploading again.
+The parser still uses an in-memory workbook; these are guardrails, not a streaming parser
+or a bound on decompressed workbook memory. Keep Apache POI ZIP safety defaults enabled.
+An import remains one atomic transaction. Further batching must preserve rollback and
+existing product/category update semantics.
+
+### Mixed workload coverage and remaining capacity limits
+
+The memory workload script runs only against the disposable localhost CI instance. It exercises
+1, 10, 50 and 100 concurrent clients with an 80/20 customer/staff split at the larger stages.
+Customer requests include the 379-item menu, inventory date suggestions and seven-day cart
+availability. Staff reads use validated cookie sessions with branch permissions, a 500-order
+fixture and 2,500 order items. It reports p50/p95/max response times and fails on request errors.
+The fixture deliberately has no allocations today and approved inventory tomorrow; date
+suggestions must return tomorrow. No real payment, OTP or print-provider calls are made.
+This is not an endurance or checkout overselling test. The CI runner CPU and local PostgreSQL
+latency differ from Render/Neon; a passing run cannot certify their production response times.
+
+Inventory date suggestions load at most seven candidate days in each database batch instead
+of querying every date separately. Bulk import name-conflict lookups use one query per entity
+type instead of one per row. Both preserve validation and atomic checkout/import semantics.
+
+Production architecture should keep catalogue reads cheap and separate them from live
+quantity/date availability checks. Cached catalogue snapshots need branch/product/timing
+invalidation; checkout must always reserve inventory and pickup capacity atomically using the
+current database state. Moving large imports/exports and provider jobs to bounded workers can
+isolate spikes from customer traffic. A bounded queue alone in the same JVM does not isolate
+its memory. Do not replace authoritative inventory reservations with cached stock values.
+
+## Versioned menu and worker deployment
+
+The frontend reads the live `/api/menu?branchId=...&view=availability` overlay and only
+fetches `/api/menu/catalog/{branchId}/{revision}` when its revision changes. The versioned
+catalog response is public and immutable for one year; browser caching works immediately.
+Configure Cloudflare to cache successful GET responses **only** for this versioned route.
+Never cache availability, inventory, authenticated APIs, checkout or errors. Include the request Origin in the CDN cache key (or otherwise serve correct per-origin CORS headers). A previously
+cached catalog may remain readable after closure; live branch/availability checks and
+server-side order validation must block ordering. No personal data belongs in the catalog.
+
+Catalog snapshots are immutable, lazily built once per revision, and bounded to 16 branches
+and approximately 8 MiB of DTO data per API process. PostgreSQL statement triggers advance
+a global UUID revision token transactionally for branch, category, product, branch-product and menu
+service rule changes, including direct SQL and imports. UUID tokens prevent version reuse after database restore and subsequent edits. Global invalidation is intentionally
+conservative for this small multi-branch business. Read-only callers share snapshots;
+write transactions never publish their uncommitted data. Checkout does not use this cache.
+The availability overlay can share an immutable server result for at most one second, expires
+at earlier service-window boundaries and checks the catalog revision/branch before reuse.
+It is bounded to 16 branches and approximately 4 MiB. Dated stock quantities and reservations
+are never cached here. Browser/CDN availability responses remain `no-store`.
+
+Pickup discovery returns only branch dates/slot capacity. Product stock, preparation and
+actual cart quantities are checked for the chosen date before saving a time. A date on the
+calendar is not a promise that every menu item can be ordered. Actual reservations still
+use PostgreSQL row locks; the cart itself does not reserve stock.
+
+Deploy the same backend image as an API service and a separate worker process:
+
+| Setting | API | Worker |
+| --- | --- | --- |
+| `GOKUL_IMPORTS_ASYNC_ENABLED` | `true` | `false` |
+| `GOKUL_JOBS_WORKER_ENABLED` | `false` | `true` |
+| `GOKUL_BACKGROUND_JOBS_ENABLED` | `false` | `true` |
+| `GOKUL_REPORTING_AUTOMATIC_REFRESH` | `true` | `true` |
+| `INVENTORY_AUTOMATION_SCHEDULER_ENABLED` | existing setting | `false` |
+| `SPRING_MAIN_WEB_APPLICATION_TYPE` | `servlet` | `none` |
+
+The worker must share the same database, provider credentials and encryption settings.
+Use a background-worker hosting service, not a publicly exposed second API. Worker imports
+are serialized per process, at most ten jobs remain active globally, and only one active
+job is accepted per branch. Files are at most 2 MiB; ZIP expansion is checked before POI
+loads XML (12 MiB total, 8 MiB per entry, 1,000 entries). Imports remain atomic, not streamed.
+Enqueue retries for the same requester/file/operation reuse the active job. A claim has a
+ten-minute recovery lease; a row lock protects execution beyond that lease. The import and
+success result commit together. Process death rolls both back; abandoned claims can recover
+up to three attempts. Permissions are rechecked at execution. Terminal jobs release upload
+bytes. `GET /api/admin/branches/{branchId}/menu/import/jobs/{jobId}` returns authorized status.
+The admin upload flow polls this status rather than holding a parsing request open.
+Closing the browser does not cancel an accepted import. Never enable async admission before
+the worker is healthy. Defaults preserve the current single-service synchronous deployment.
+
+Refund reconciliation and scheduled analytics refresh move to the worker with the above
+settings. Dedicated import workers skip the other API maintenance/notification schedules to avoid duplicate execution. Inventory maintenance stays on one API instance until its existing coordination
+is verified for more replicas. On-demand report exports are still synchronous; this change
+does not claim isolation for those exports or every scheduler. Monitor those separately.
+
+The disposable CI workload now measures 100, 500 and 1,000 concurrent clients, including
+staff reads, live menu availability, inventory suggestions, selected-cart availability and
+lightweight 31-day pickup discovery. It is a capacity experiment on CI CPU/local PostgreSQL,
+not a Render/Neon SLO. Last-stock concurrency, cancellation release, import rollback/claim
+recovery, SQL cache invalidation and menu-window regressions have dedicated tests. Real
+network/browser measurements and a sustained deployment test remain necessary.

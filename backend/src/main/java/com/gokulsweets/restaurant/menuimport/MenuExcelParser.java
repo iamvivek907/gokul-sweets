@@ -40,15 +40,25 @@ public class MenuExcelParser {
                     "branch_display_order"
             );
 
-    private final DataFormatter dataFormatter =
-            new DataFormatter(Locale.ENGLISH);
+    private static final long MAX_FILE_BYTES = 2 * 1024 * 1024;
+    private static final int MAX_ROWS = MenuWorkbookLimits.MAX_DATA_ROWS;
+    private final DataFormatter dataFormatter = new DataFormatter(Locale.ENGLISH);
 
+
+    private void validateWorkbookLimits(MultipartFile file) {
+        try (var input = file.getInputStream()) {
+            MenuWorkbookLimits.validate(input);
+        } catch (IOException failure) {
+            throw new MenuImportValidationException("Unable to read the Excel file.", failure);
+        }
+    }
 
     public List<MenuImportRow> parse(
             MultipartFile file
     ) {
 
         validateFile(file);
+        validateWorkbookLimits(file);
 
         try (
                 InputStream inputStream =
@@ -67,11 +77,15 @@ public class MenuExcelParser {
 
             if (sheet == null) {
 
-                throw new IllegalArgumentException(
+                throw new MenuImportValidationException(
                         "Workbook must contain a sheet named "
                                 + SHEET_NAME
                                 + "."
                 );
+            }
+
+            if (sheet.getLastRowNum() > MAX_ROWS) {
+                throw new MenuImportValidationException("Menu upload supports at most 500 data rows.");
             }
 
             Row headerRow =
@@ -79,7 +93,7 @@ public class MenuExcelParser {
 
             if (headerRow == null) {
 
-                throw new IllegalArgumentException(
+                throw new MenuImportValidationException(
                         "Menu_Upload sheet is missing its header row."
                 );
             }
@@ -98,7 +112,7 @@ public class MenuExcelParser {
                         requiredHeader
                 )) {
 
-                    throw new IllegalArgumentException(
+                    throw new MenuImportValidationException(
                             "Missing required column: "
                                     + requiredHeader
                     );
@@ -259,7 +273,7 @@ public class MenuExcelParser {
                     file.getOriginalFilename()
             );
 
-            throw new IllegalArgumentException(
+            throw new MenuImportValidationException(
                     "Unable to read the uploaded Excel file.",
                     exception
             );
@@ -274,9 +288,13 @@ public class MenuExcelParser {
         if (file == null
                 || file.isEmpty()) {
 
-            throw new IllegalArgumentException(
+            throw new MenuImportValidationException(
                     "Excel file is required."
             );
+        }
+
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new MenuImportValidationException("Menu Excel file must be 2 MB or smaller.");
         }
 
         String filename =
@@ -287,7 +305,7 @@ public class MenuExcelParser {
                 Locale.ROOT
         ).endsWith(".xlsx")) {
 
-            throw new IllegalArgumentException(
+            throw new MenuImportValidationException(
                     "Only .xlsx menu files are supported."
             );
         }
@@ -578,7 +596,7 @@ public class MenuExcelParser {
             String reason
     ) {
 
-        return new IllegalArgumentException(
+        return new MenuImportValidationException(
                 "Row "
                         + excelRow
                         + ", column "

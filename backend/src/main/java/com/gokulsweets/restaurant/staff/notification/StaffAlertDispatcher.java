@@ -11,6 +11,9 @@ import java.util.UUID;
 
 @Component @RequiredArgsConstructor
 public class StaffAlertDispatcher {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
     private final StaffOrderAlerts alerts;
     private final StaffAlertProperties properties;
     private final StaffAlertEmail email;
@@ -20,6 +23,7 @@ public class StaffAlertDispatcher {
 
     @Scheduled(fixedDelay = 30000, initialDelay = 30000)
     public void scheduled() {
+        if(dedicatedImportWorker)return;
         if (!properties.isSchedulerEnabled() || !alerts.enabled()) return;
         alerts.generateReminders(); dispatchBatch();
     }

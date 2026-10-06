@@ -1,7 +1,6 @@
 "use client";
 import {useEffect, type Dispatch, type SetStateAction} from "react";
-import {stampMenuServiceAvailability} from "@/services/menuApi";
-import {apiClient} from "@/services/apiClient";
+import {refreshMenuAvailability} from "@/services/menuApi";
 import type {MenuCategory} from "@/types/menu";
 
 /** Refresh server decisions at the next IST service boundary; never trust the device's hour. */
@@ -21,7 +20,7 @@ export function useMenuServiceRefresh(branchId:number|undefined,categories:MenuC
    if(expired)setCategories(current=>current.map(c=>({...c,products:c.products.map(p=>p.serviceAvailability?.nextChangeAt&&Date.parse(p.serviceAvailability.nextChangeAt)<=serverStart+elapsed()?{...p,available:false,serviceAvailability:{...p.serviceAvailability,code:"CHECKING",message:"Checking current availability…"}}:p)})));
    if(busy||!navigator.onLine||document.visibilityState!=="visible")return;
    busy=true;
-   try{const fresh=await apiClient<MenuCategory[]>(`/api/menu?branchId=${branchId}`,{signal:controller.signal,cache:"no-store"});if(!controller.signal.aborted)setCategories(stampMenuServiceAvailability(fresh));}catch{/* A failed refresh keeps cart and last menu; expired items remain blocked. */}finally{busy=false;}
+   try{const fresh=await refreshMenuAvailability(branchId!,AbortSignal.any([controller.signal,AbortSignal.timeout(8000)]));if(!controller.signal.aborted)setCategories(fresh);}catch{/* A failed refresh keeps cart and last menu; expired items remain blocked. */}finally{busy=false;}
   }
   const timer=window.setInterval(()=>void refresh(expired()),30000);
   const transition=boundary===null?null:window.setTimeout(()=>void refresh(true),Math.max(0,boundary-serverStart-elapsed()+100));

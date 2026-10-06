@@ -1,6 +1,8 @@
 package com.gokulsweets.restaurant.product;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
 import java.util.List;
@@ -25,6 +27,9 @@ public interface ProductRepository
 
     List<Product>
     findByCodeIn(Collection<String> codes);
+
+    @Query("select e from Product e where lower(e.name) in :names")
+    List<Product> findByNormalizedNames(@Param("names") Collection<String> names);
 
     boolean
     existsByCode(String code);

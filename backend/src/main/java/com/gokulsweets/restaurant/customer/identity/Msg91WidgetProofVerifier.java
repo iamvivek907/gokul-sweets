@@ -22,6 +22,8 @@ import java.util.Locale;
 @Slf4j
 public class Msg91WidgetProofVerifier {
     private static final URI VERIFY_URL = URI.create("https://control.msg91.com/api/v5/widget/verifyAccessToken");
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(3)).build();
     private final EnhancementProperties features;
     private final Environment environment;
     private final ObjectMapper mapper;
@@ -43,8 +45,7 @@ public class Msg91WidgetProofVerifier {
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString(body))
                     .build();
-            var response = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3))
-                    .build().send(request, HttpResponse.BodyHandlers.ofString());
+            var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
                 log.warn("MSG91 verification unavailable: provider HTTP status {}", response.statusCode());
                 throw new IllegalStateException("MSG91 verification failed");

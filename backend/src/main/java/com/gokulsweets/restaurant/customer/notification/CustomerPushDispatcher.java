@@ -15,6 +15,9 @@ import java.util.UUID;
 @Component
 @RequiredArgsConstructor
 public class CustomerPushDispatcher {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
     private final JdbcTemplate jdbc;
     private final CustomerAlertPreferences alerts;
     private final WebPushTransport transport;
@@ -24,7 +27,8 @@ public class CustomerPushDispatcher {
     private final Clock inventoryClock;
 
     @Scheduled(fixedDelay = 30000, initialDelay = 30000)
-    public void scheduled() {if (properties.isSchedulerEnabled()) dispatchBatch();}
+    public void scheduled() {
+        if(dedicatedImportWorker)return;if (properties.isSchedulerEnabled()) dispatchBatch();}
 
     public void dispatchBatch() {
         if (!alerts.enabled() || !transport.configured()) return;

@@ -20,21 +20,26 @@ const slot={id:7,branchId:1,slotDate:date,startTime:'15:00:00',endTime:'16:00:00
 const offer={rebateId:1,code:'SAVE',name:'Sweet saving',description:'Eligible food only',scope:'GENERAL',rebateType:'SLAB',rebateAmount:0,payableAfterRebate:100,minimumOrderAmount:150,maximumDiscountAmount:20,nextSlabMinimumOrderAmount:150,nextSlabRebateAmount:10,amountNeededForNextSlab:50};
 try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[390,false]]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
- let previewCalls=0,addonChecks=0,confirmationFails=true,cartConflict=true,availabilityCalls=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let previewCalls=0,addonChecks=0,confirmationFails=true,cartConflict=true,availabilityCalls=0,catalogReads=0,discoveryCalls=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{const p=new URL(route.request().url()).pathname;let json=[];
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(p==='/api/storefront/features')json={futuristicStorefrontV2:enabled,checkoutExperienceV2:enabled,contextualStorefrontV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,branchExperience:true,preHomeIntentGateway:true,smartAvailability:true,pickupAddOns:true,gokulRewards:true,futureOrderingDays:30,today};
   else if(p==='/api/branches')json=[branch];else if(p==='/api/branches/1')json=branch;
-  else if(p==='/api/menu')json=[{id:1,name:'Sweets',products:[sweet]},{id:2,name:'Drinks',products:[tea,sold,favourite]}];
+  else if(p==='/api/menu')json=enabled&&new URL(route.request().url()).searchParams.get('view')==='availability'?{revision:'test-v1',serviceWindowsEnabled:true,items:[sweet,tea,sold,favourite].map(product=>({productId:product.id,available:product.available,serviceAvailability:null}))}:[{id:1,name:'Sweets',products:[sweet]},{id:2,name:'Drinks',products:[tea,sold,favourite]}];
+  else if(p==='/api/menu/catalog/1/test-v1'){catalogReads++;json={revision:'test-v1',categories:[{id:1,name:'Sweets',products:[sweet]},{id:2,name:'Drinks',products:[tea,sold,favourite]}]};}
   else if(p==='/api/menu/portion-groups')json={groups:[]};
   else if(p==='/api/reviews/product-summaries')json=[{productId:1,averageRating:4.8,ratingCount:12}];
   else if(p==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
   else if(p==='/api/customer/identity/orders')json=[{orderNumber:'PREVIOUS',branchId:1,orderStatus:'PICKED_UP'},{orderNumber:'UNPAID',branchId:1,orderStatus:'CONFIRMED'}];
   else if(p==='/api/customer/identity/orders/PREVIOUS')json={branchId:1,orderStatus:'PICKED_UP',paymentStatus:'PAID',items:[{productId:4}]};
   else if(p==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone:'+919876543210'};
+  else if(p==='/api/branches/1/pickup-discovery'){
+   discoveryCalls++;
+   json={today,maximumDate:date,dates:[{date:today,available:false,items:[],slots:[]},{date,available:true,items:[],slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};
+  }
   else if(p==='/api/branches/1/availability'){
-   availabilityCalls++;const body=route.request().postDataJSON();const valid=body.startDate===date;
+   availabilityCalls++;const body=route.request().postDataJSON();if(page.url().includes('/menu'))assert.equal(body.days,1,'menu stock checks only the selected date');const valid=body.startDate===date;
    json={today,maximumDate:date,dates:[{date:body.startDate,available:valid,items:[{productId:1,available:true},{productId:2,available:true}],slots:valid?[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]:[]},...(body.days>1?[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]}]:[])]};
    if(body.days===1&&body.startDate===date&&confirmationFails&&page.url().includes('/menu')&&await page.getByRole('dialog').count())json.dates[0].slots=[];
    if(body.startDate===date&&cartConflict&&body.items.some(item=>item.productId===1&&item.weightGrams===750))json.dates[0].slots=[{slot,normalAvailable:false,priorityAvailable:false,issues:[{productId:1,productName:sweet.name,available:false,code:'QUANTITY_TOO_LARGE',reason:'Only 500 g remain.'}]}];
@@ -46,6 +51,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
  });
  await context.addInitScript(({branch,sweet,today})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:sweet,quantity:0,weightGrams:250}]}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date:today,slot:{id:1,branchId:1,slotDate:today,startTime:'00:01:00',endTime:'00:02:00',active:true,remainingCapacity:10},pickupType:'NORMAL'}));},{branch,sweet,today});
  await page.goto(`${base}/menu`);await page.locator('.gokul-product-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+ if(enabled)assert.equal(catalogReads,1,'first menu visit loads one versioned catalog');
  const compact=width<=640&&enabled;
  assert.equal(await page.locator('.mobile-menu-pickup').count(),compact?1:0);
  if(compact){
@@ -73,6 +79,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
   await page.getByRole('button',{name:'Add offer code',exact:true}).click();const offers=page.getByRole('dialog',{name:'Choose an offer'});const box=await offers.boundingBox();assert.ok(Math.abs(box.y+box.height-900)<3,'offers rest at bottom');if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/offers-guidance-${width}.png`});await page.keyboard.press('Escape');
   await page.getByRole('button',{name:/Price details/}).click();await page.getByRole('dialog',{name:'Bill summary'}).getByText('Total to pay',{exact:true}).waitFor();await page.keyboard.press('Escape');
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/checkout-guidance-${width}.png`,fullPage:true});}
+  assert.ok(discoveryCalls>0,"pickup dates use lightweight discovery");
   await page.goto(`${base}/`);await page.locator('#gokul-branches article').first().waitFor();const card=page.locator('.arrival-pickup-copy').first();await card.getByText('Main Road, opposite the bus stand, Tamkuhi Road, 274407',{exact:true}).waitFor();assert.equal(await card.evaluate(e=>getComputedStyle(e).position),'relative');
  }
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

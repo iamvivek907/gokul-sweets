@@ -22,6 +22,9 @@ import java.time.LocalDate;
 )
 @Slf4j
 public class InventoryAutomationScheduler {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
     private final InventoryAutomationRuleRepository ruleRepository;
     private final InventoryAutomationGenerationService generationService;
     private final InventoryAutomationProperties properties;
@@ -33,6 +36,7 @@ public class InventoryAutomationScheduler {
             zone = "${inventory.business-zone:Asia/Kolkata}"
     )
     public void generateDailyAllocations() {
+        if(dedicatedImportWorker)return;
         LocalDate today = LocalDate.now(inventoryClock);
         ruleRepository.findByActiveTrue().stream()
                 .map(rule -> rule.getBranchProduct().getBranch().getId())

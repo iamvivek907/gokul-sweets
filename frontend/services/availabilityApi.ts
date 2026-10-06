@@ -39,3 +39,8 @@ export function checkCartAvailability(
         method: "POST", signal, body: JSON.stringify({startDate, days, items, fulfilmentType: "PICKUP"})
     });
 }
+
+/** Branch capacity only; item validation follows on the selected date. */
+export function discoverPickupDates(branchId:number,startDate:string,days:number,signal?:AbortSignal) {
+    return apiClient<CartAvailability>(`/api/branches/${branchId}/pickup-discovery?startDate=${encodeURIComponent(startDate)}&days=${days}`,{signal});
+}

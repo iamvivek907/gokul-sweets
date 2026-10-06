@@ -3,7 +3,7 @@ import {API_BASE_URL} from "@/lib/constants";
 import {retryAfterDelayMs} from "@/lib/paymentPolling";
 
 interface ApiRequestOptions extends RequestInit {
-    cacheMode?: "no-store" | "force-cache";
+    cacheMode?: "no-store" | "force-cache" | "default";
 }
 
 export interface ApiErrorBody {

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name="gokul.jobs.background-enabled",havingValue="true",matchIfMissing=true)
 @Component
 @RequiredArgsConstructor
 @Slf4j

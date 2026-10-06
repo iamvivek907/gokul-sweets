@@ -10,12 +10,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @RequiredArgsConstructor
 public class CustomerNotificationMaintenance {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
     private final JdbcTemplate jdbc;
     private final CustomerNotificationInbox inbox;
     private final org.springframework.core.env.Environment settings;
     @Scheduled(fixedDelay=300000,initialDelay=300000)
     @Transactional
     public void archiveRoutineUpdates() {
+        if(dedicatedImportWorker)return;
         if (!inbox.enabled()) return;
         jdbc.update("""
             UPDATE customer_notification_events SET read_at=CURRENT_TIMESTAMP,auto_acknowledged=FALSE

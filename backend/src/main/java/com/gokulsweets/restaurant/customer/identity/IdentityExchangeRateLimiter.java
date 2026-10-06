@@ -19,6 +19,9 @@ import java.util.Objects;
 @Service
 @RequiredArgsConstructor
 public class IdentityExchangeRateLimiter {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
     private final JdbcTemplate jdbc;
     private final Environment settings;
 
@@ -99,6 +102,7 @@ public class IdentityExchangeRateLimiter {
 
     @Scheduled(cron = "0 0 * * * *", zone = "UTC")
     public void removeExpiredWindows() {
+        if(dedicatedImportWorker)return;
         jdbc.update("DELETE FROM identity_exchange_limits WHERE window_start < ?",
                 Timestamp.from(Instant.now().minus(Duration.ofHours(2))));
     }

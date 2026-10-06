@@ -11,7 +11,7 @@ RUN ./gradlew --no-daemon clean bootJar
 FROM eclipse-temurin:21-jre
 
 # Tested with a 512 MB container; deployments may override this environment value.
-ENV JAVA_TOOL_OPTIONS="-Xmx192m -XX:+ExitOnOutOfMemoryError"
+ENV JAVA_TOOL_OPTIONS="-Xms64m -Xmx192m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=32m -XX:+ExitOnOutOfMemoryError"
 
 WORKDIR /app
 

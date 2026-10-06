@@ -17,6 +17,13 @@ import java.util.List;
 public class CartAvailabilityController {
     private final EnhancementProperties features;
     private final CartAvailabilityService service;
+    private final com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService discovery;
+
+    @GetMapping("/api/branches/{branchId}/pickup-discovery")
+    public ResponseEntity<CartAvailabilityService.Availability> discover(@PathVariable long branchId,@RequestParam LocalDate startDate,@RequestParam(defaultValue="31") int days) {
+        if(!features.isSmartAvailability())return ResponseEntity.notFound().build();
+        return ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(discovery.discover(branchId,startDate,days));
+    }
 
     @PostMapping("/api/branches/{branchId}/availability")
     public ResponseEntity<CartAvailabilityService.Availability> check(@PathVariable Long branchId, @Valid @RequestBody Request request,
