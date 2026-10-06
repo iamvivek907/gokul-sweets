@@ -5,7 +5,7 @@ import {savePickupSlot,getPickupSlotSnapshot,clearPickupSlot} from "@/lib/checko
 import {savePickupIntent} from "@/hooks/usePickupIntent";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
-import {availabilityItems,checkCartAvailability,discoverPickupDates,type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems,checkCartAvailability,checkMenuAvailability,discoverPickupDates,type CartAvailability} from "@/services/availabilityApi";
 import {menuPickupOptions} from "@/lib/menuPickupOptions";
 import {T,useLanguage,translate} from "@/lib/language";
 import type {MenuProduct} from "@/types/menu";
@@ -18,7 +18,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
  const namedDate=displayDate===today?translate("Today",locale):dateLabel;
  const timeLabel=(time:string)=>new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"}).format(new Date(`2000-01-01T${time}+05:30`));
  const [data,setData]=useState<CartAvailability|null>(null),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
- const request=JSON.stringify(products.filter(p=>p.available).slice(0,100).map(p=>({productId:p.id,quantity:p.saleMode==="UNIT"?1:null,weightGrams:p.saleMode==="WEIGHT"?p.minimumWeightGrams??250:null})));
+ const request=JSON.stringify(products.filter(p=>p.available).map(p=>({productId:p.id,quantity:p.saleMode==="UNIT"?1:null,weightGrams:p.saleMode==="WEIGHT"?p.minimumWeightGrams??250:null})));
  const controller=useRef<AbortController|null>(null);
  useEffect(()=>{
   let active=true;
@@ -42,14 +42,14 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
   const branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot(),cartSnapshot=getCartSnapshot();
   const cart=parseCart(cartSnapshot);
   if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");
-  // One response covers discovery and the actual cart, including larger weights and quantities.
+  // Keep actual cart validation together; batch unchosen catalogue items.
   const cartItems=availabilityItems(cart.items);
   if(cartItems.length>100)throw new Error("Review this large cart at checkout before changing pickup. Your previous pickup is saved.");
   const amounts=new Map(cartItems.map(item=>[item.productId,item]));
   const menuItems=JSON.parse(request) as ReturnType<typeof availabilityItems>;
   const requested=cartItems.length?cartItems:menuItems;
   const c=new AbortController();controller.current=c;
-  const fresh=await checkCartAvailability(branchId,value.date,1,requested,AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);
+  const fresh=await (cartItems.length?checkCartAvailability:checkMenuAvailability)(branchId,value.date,1,requested,AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);
   if(c.signal.aborted||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return false;
   const slot=fresh.dates.find(day=>day.date===value.date)?.slots.find(slot=>slot.slot.id===value.slot.id);
   const conflict=slot?.issues?.find(issue=>!issue.available&&amounts.has(issue.productId));

@@ -83,6 +83,7 @@ jobs:
           node tests/menu-offer-freshness.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/menu-discovery.browser.mjs
           node tests/menu-pickup-guidance.browser.mjs
+          node tests/menu-review-regressions.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/premium-menu.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/premium-reference.browser.mjs
           node tests/admin-product-groups.browser.mjs

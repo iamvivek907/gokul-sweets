@@ -732,7 +732,7 @@ export default function MenuScreen() {
 
                         return (
                             categoryMatch
-                            && (!phoneMenu||!activeBrowse||(menuFamily(product.categoryName)===menuFamily(activeBrowse.name)))
+                            && (!phoneMenu||!!query||!activeBrowse||(menuFamily(product.categoryName)===menuFamily(activeBrowse.name)))
                             &&
                             searchMatch
                             && (!phoneMenu||matchesMobileFilters(product,null,maximumPrice,portionsOnly,portionGroups))

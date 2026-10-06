@@ -11,7 +11,7 @@ import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
-import {availabilityItems, checkCartAvailability, type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems, checkCartAvailability, checkMenuAvailability, type CartAvailability} from "@/services/availabilityApi";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
 import {clearPickupSlot} from "@/lib/checkoutStorage";
 import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
@@ -32,7 +32,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
         productId: product.id, quantity: product.saleMode === "WEIGHT" ? null : 1,
         weightGrams: product.saleMode === "WEIGHT" ? product.minimumWeightGrams : null
     })) ?? [];
-    const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))].slice(0,100);
+    const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))];
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
     const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability,menuPreview]);
@@ -44,7 +44,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
         if (!features?.smartAvailability || !branch || !intent.date || !validDate || !JSON.parse(itemsJson).length) return;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
-            void checkCartAvailability(branch.id, intent.date!, 1, JSON.parse(itemsJson),
+            void (menuPreview ? checkMenuAvailability : checkCartAvailability)(branch.id, intent.date!, 1, JSON.parse(itemsJson),
                 AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),menuPreview)
                 .then(data => {if (!controller.signal.aborted) setResult({key, scope, data});})
                 .catch(error => {if (!controller.signal.aborted) {
