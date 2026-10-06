@@ -15,6 +15,7 @@ import {useCart} from "@/hooks/useCart";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import CustomerNotificationBell from "@/components/customer/CustomerNotificationBell";
 import CustomerAccountLink from "@/components/customer/CustomerAccountLink";
+import ReferenceWordmark from "./ReferenceWordmark";
 
 
 export default function Header() {
@@ -57,6 +58,7 @@ export default function Header() {
             >
 
                 {futuristic ? <Link href="/" data-navigation-link className="future-brand" aria-label="Gokul Sweets · Home">
+                    <ReferenceWordmark />
                     <span className="future-brand-mark" aria-hidden="true">G</span>
                     <span><T text="Gokul Sweets" /><small><T text="FRESH FOR YOUR MOMENTS" /></small></span>
                 <LinkFeedback href="/" /></Link> : <Link href="/" data-navigation-link aria-label="Gokul Sweets · Home"

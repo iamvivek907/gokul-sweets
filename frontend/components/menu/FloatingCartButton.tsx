@@ -10,6 +10,8 @@ import {usePickupIntent} from "@/hooks/usePickupIntent";
 import type {AvailableRebateResponse} from "@/types/rebate";
 import {useState, useEffect} from "react";
 import {startOfferArrival} from "@/lib/offerArrival";
+import Image from "next/image";
+import {useCart} from "@/hooks/useCart";
 
 
 interface FloatingCartButtonProps {
@@ -52,6 +54,7 @@ export default function FloatingCartButton({
 }: FloatingCartButtonProps) {
 
     const features = useStorefrontFeatures();
+    const cart = useCart();
     const {branch}=useSelectedBranch();
     const pickup=usePickupIntent(branch?.id);
     const [mobile, setMobile] = useState(false);
@@ -112,7 +115,13 @@ export default function FloatingCartButton({
                     sm:px-5
                 "
             >
-
+                {premium ? <>
+                    <span className="reference-cart-summary">
+                        <span className="reference-cart-photos" aria-hidden="true">{cart.items.slice(0,2).map(item=><span key={item.product.id}>{item.product.imageUrl?<Image src={item.product.imageUrl} alt="" fill sizes="36px"/>:<span>G</span>}</span>)}</span>
+                        <strong>{itemCount} <T text={itemCount===1?"item":"items"}/> · {formatCurrency(total)}</strong>
+                    </span>
+                    <span className="reference-cart-action"><T text="View cart"/> <span aria-hidden="true">→</span></span>
+                </> : <>
                 <div
                     className="
                         flex
@@ -206,7 +215,7 @@ export default function FloatingCartButton({
                     </p>
 
                 </div>
-
+                </>}
             <LinkFeedback /></Link>
 
         </div>

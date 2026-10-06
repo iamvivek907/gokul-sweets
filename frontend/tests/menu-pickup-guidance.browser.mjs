@@ -30,7 +30,7 @@ try{
   });
   await context.addInitScript(branch=>localStorage.setItem('gokul-selected-branch',JSON.stringify(branch)),branch);
   await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  const pickup=page.getByRole('region',{name:'Menu pickup time'});await pickup.getByText('No pickup selected',{exact:true}).waitFor();
+  const pickup=page.getByRole('region',{name:'Menu pickup time'});await pickup.getByText('Choose pickup date & time',{exact:true}).waitFor();
   const recommendations=page.locator('#gokul-menu-items');
   await recommendations.getByRole('button',{name:'Add Meal 1 to cart'}).waitFor();
   assert.equal(await recommendations.getByText('Unavailable for selected pickup',{exact:true}).count(),0);assert.equal(checks,0);
