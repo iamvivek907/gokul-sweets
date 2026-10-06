@@ -30,6 +30,7 @@ function setup(mode = 'success') {
     if (mode === 'initial-request-stall') return pending(options.signal);
     if (mode === 'initial-body-stall') return {status: 202, ok: true, json: () => pending(options.signal)};
     if (mode === 'initial-error-body-stall') return {status: 400, ok: false, json: () => pending(options.signal)};
+    if (mode === 'initial-proxy-timeout') return {status: 408, ok: false, json: async () => ({})};
     if (mode === 'sync-body-stall') return {status: 200, ok: true, json: () => pending(options.signal)};
     if (mode === 'sync-success') return {status: 200, ok: true, json: async () => ({valid: true})};
     return {status: 202, ok: true, json: async () => ({id, status: 'QUEUED'})};
@@ -156,4 +157,9 @@ test('a successful acknowledgement removes the upload timer while long polling u
  await f.tick(600000); assert.match((await outcome).message, /ten-minute limit/);
  assert.equal(f.api.getPendingMenuImportJob(1).submission, undefined);
  assert.equal(f.calls[0].options.signal.aborted, false); assert.equal(f.timers.size, 0);
+});
+test('a proxy timeout preserves the submission because the backend may already have accepted it', async () => {
+ const f = setup('initial-proxy-timeout'); f.storage.clear();
+ await assert.rejects(f.api.importMenuFile(1, {}, 'staff'), /Resume status check/);
+ assert.equal(f.api.getPendingMenuImportJob(1).submission, true); assert.equal(f.timers.size, 0);
 });

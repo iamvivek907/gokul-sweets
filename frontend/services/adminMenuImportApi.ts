@@ -234,7 +234,8 @@ async function submitMenuImport<T>(branchId: number, file: File, authorization: 
         const response = await adminFetch(path, authorization, {method: "POST", body: formData, signal: request.signal});
         if (!response.ok) {
             // A definitive client rejection means this submission was not accepted.
-            if (response.status >= 400 && response.status < 500) rememberJob(branchId, null);
+            // Proxy request timeouts (408/499) are uncertain outcomes too.
+            if ([400, 401, 403, 404, 409, 413, 415, 422, 429].includes(response.status)) rememberJob(branchId, null);
             const fallback = response.status === 401 ? "Your admin session is no longer valid."
                 : response.status === 403 ? "You do not have permission to upload menus for this branch."
                 : response.status === 404 ? "Branch not found."
