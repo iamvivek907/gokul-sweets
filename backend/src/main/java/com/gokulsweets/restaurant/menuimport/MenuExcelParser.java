@@ -40,8 +40,9 @@ public class MenuExcelParser {
                     "branch_display_order"
             );
 
-    private final DataFormatter dataFormatter =
-            new DataFormatter(Locale.ENGLISH);
+    private static final long MAX_FILE_BYTES = 2 * 1024 * 1024;
+    private static final int MAX_ROWS = 2000;
+    private final DataFormatter dataFormatter = new DataFormatter(Locale.ENGLISH);
 
 
     public List<MenuImportRow> parse(
@@ -72,6 +73,10 @@ public class MenuExcelParser {
                                 + SHEET_NAME
                                 + "."
                 );
+            }
+
+            if (sheet.getLastRowNum() > MAX_ROWS) {
+                throw new IllegalArgumentException("Menu upload supports at most 2000 rows.");
             }
 
             Row headerRow =
@@ -277,6 +282,10 @@ public class MenuExcelParser {
             throw new IllegalArgumentException(
                     "Excel file is required."
             );
+        }
+
+        if (file.getSize() > MAX_FILE_BYTES) {
+            throw new IllegalArgumentException("Menu Excel file must be 2 MB or smaller.");
         }
 
         String filename =

@@ -199,8 +199,8 @@ jobs:
       PHONEPE_CLIENT_ID: ci-only
       PHONEPE_CLIENT_SECRET: ci-only
       PHONEPE_REDIRECT_URL: https://ci.example.invalid/checkout
-      INVENTORY_AUTOMATION_SCHEDULER_ENABLED: 'false'
-      GOKUL_REPORTING_AUTOMATIC_REFRESH: 'false'
+      INVENTORY_AUTOMATION_SCHEDULER_ENABLED: 'true'
+      GOKUL_REPORTING_AUTOMATIC_REFRESH: 'true'
       GOKUL_ENVIRONMENT_ISOLATION_ENABLED: 'false'
       GOKUL_ENVIRONMENT_CORS_ENABLED: 'false'
       # Test-only 32-byte key so ON-by-default staff sessions can bootstrap in CI.
@@ -227,7 +227,21 @@ jobs:
             fi
             if curl --silent --show-error --fail --max-time 5 http://127.0.0.1:10000/actuator/health > /tmp/gokul-health.json; then
               if python3 -c 'import json; assert json.load(open("/tmp/gokul-health.json"))["status"] == "UP"'; then
-                echo 'Deployment image started successfully with Flyway and PostgreSQL'
+                docker exec -i "$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')" psql -U gokul_test -d restaurant_test -v ON_ERROR_STOP=1 <<'SQL'
+          INSERT INTO branches(id,code,name) VALUES (10001,'MEMORY_CI','Memory workload');
+          INSERT INTO categories(id,code,name) VALUES (10001,'MEMORY_CI','Memory workload');
+          INSERT INTO products(code,category_id,name,base_price)
+          SELECT 'MEMORY_CI_'||n,10001,'Menu item '||n,100 FROM generate_series(1,379) n;
+          INSERT INTO branch_products(branch_id,product_id)
+          SELECT 10001,id FROM products WHERE category_id=10001;
+          SQL
+                echo 'Deployment image started; exercising 379-item menu and scheduled tasks for three minutes'
+                for sample in $(seq 1 36); do
+                  curl --silent --show-error --fail --max-time 10 'http://127.0.0.1:10000/api/menu?branchId=10001' > /tmp/gokul-menu.json || exit 1
+                  docker stats --no-stream --format '{{.MemUsage}} {{.PIDs}}' gokul-render-smoke
+                  if [ "$(docker inspect --format '{{.State.Running}}' gokul-render-smoke)" != true ]; then exit 1; fi
+                  sleep 5
+                done
                 exit 0
               fi
             fi

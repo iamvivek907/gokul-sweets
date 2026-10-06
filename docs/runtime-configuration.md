@@ -499,8 +499,9 @@ for PROD. Enable provider configuration only after this PR is merged/deployed to
 
 ### Backend Docker heap budget
 
-The runtime image defaults to `JAVA_TOOL_OPTIONS="-Xmx192m -XX:+ExitOnOutOfMemoryError"`.
-CI boots this exact default inside a 512 MB container and checks database-backed health.
+The runtime image defaults to `JAVA_TOOL_OPTIONS="-Xms64m -Xmx192m -XX:+UseSerialGC -XX:ReservedCodeCacheSize=64m -XX:MaxDirectMemorySize=32m -XX:+ExitOnOutOfMemoryError"`.
+CI boots this exact default inside a 512 MB container, checks database-backed health,
+and repeatedly requests the seeded public menu for three minutes with reporting refresh enabled.
 The 192 MB limit applies to the Java heap, not total process memory: class metadata,
 thread stacks, direct buffers and other native allocations use the remaining container budget.
 The build stage is unaffected.
@@ -517,3 +518,24 @@ requests, line counts per order, export workload, background jobs, and total pro
 A production-like load test and heap/process-memory measurements are needed before stating
 an order threshold. The observed repository parser failure happened during startup before
 any customer orders were loaded.
+
+### Memory incident diagnostics and bounds
+
+The small-container profile uses Serial GC, a 64 MB code cache and a 32 MB direct-buffer cap.
+HTTP workers default to 24 (4 spare), and Hikari defaults to 5 connections (1 idle).
+These controls reduce overhead; they do not cap total process memory or prove public traffic capacity.
+Deployments can override the pool sizes using GOKUL_HTTP_MAX_THREADS, GOKUL_HTTP_MIN_THREADS,
+GOKUL_DB_POOL_SIZE and GOKUL_DB_MIN_IDLE. Review throughput before using these values on larger instances.
+
+Set GOKUL_MEMORY_DIAGNOSTICS_ENABLED=true temporarily to log aggregate heap, non-heap,
+buffer, thread and cgroup memory every 30 seconds. A container memory value of -1 means
+the cgroup usage file is unavailable. Container usage includes more than JVM allocations;
+non-heap plus buffer measurements do not account for all native memory. No public endpoint is exposed.
+Disable after collecting an idle baseline and menu/admin workload samples. Compare the logs
+with Render memory metrics before attributing an incident to a specific request.
+
+Menu imports now reject files above 2 MB and sheet ranges beyond 2000 data rows.
+The parser still uses an in-memory workbook; these are guardrails, not a streaming parser
+or a bound on decompressed workbook memory. Keep Apache POI ZIP safety defaults enabled.
+An import remains one atomic transaction. Further batching must preserve rollback and
+existing product/category update semantics.
