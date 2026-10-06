@@ -17,6 +17,31 @@ const USE_MOCK_MENU =
     === "true";
 
 
+type Catalog = {revision:number;categories:MenuCategory[]};
+type Availability = {revision:number;serviceWindowsEnabled:boolean;items:{productId:number;available:boolean;serviceAvailability?:MenuCategory["products"][number]["serviceAvailability"]}[]};
+const catalogs = new Map<number,Catalog>();
+function rememberCatalog(branchId:number,catalog:Catalog) {
+    catalogs.delete(branchId);catalogs.set(branchId,catalog);
+    while(catalogs.size>3)catalogs.delete(catalogs.keys().next().value!);
+}
+export async function refreshMenuAvailability(branchId:number,signal?:AbortSignal):Promise<MenuCategory[]> {
+    const live=await apiClient<Availability|MenuCategory[]>(`/api/menu?branchId=${encodeURIComponent(branchId)}&view=availability`,{signal});
+    if(Array.isArray(live))return stampMenuServiceAvailability(live);
+    let catalog=catalogs.get(branchId);
+    if(!catalog||catalog.revision!==live.revision) {
+        const fresh=await apiClient<Catalog|MenuCategory[]>(`/api/menu/catalog/${encodeURIComponent(branchId)}/${live.revision}`,{signal,cacheMode:"default"});
+        if(Array.isArray(fresh))return stampMenuServiceAvailability(fresh);
+        rememberCatalog(branchId,fresh);catalog=fresh;
+        if(catalog.revision!==live.revision)throw new Error("Menu changed while checking availability. Please retry.");
+    }
+    const states=new Map(live.items.map(item=>[item.productId,item]));
+    return stampMenuServiceAvailability(catalog.categories.map(category=>({...category,products:category.products.flatMap(product=>{
+        const state=states.get(product.id);
+        if(!state||!live.serviceWindowsEnabled&&!state.available)return [];
+        return [{...product,available:state.available,serviceAvailability:state.serviceAvailability}];
+    })})).filter(category=>category.products.length));
+}
+
 export function stampMenuServiceAvailability(data:MenuCategory[]):MenuCategory[] {
     if(!data.some(category=>category.products.some(product=>product.serviceAvailability)))return data;
     const receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now();
@@ -68,13 +93,8 @@ async function loadMenu(
      * =========================================================
      */
 
-    return apiClient<MenuCategory[]>(
-        `/api/menu?branchId=${encodeURIComponent(branchId)}`,
-        {
-            method: "GET",
-            signal
-        }
-    ).then(stampMenuServiceAvailability);
+    return refreshMenuAvailability(branchId,signal);
+
 }
 // Consume a launch prefetch once; later visits always reload live availability.
 const WARM_MENU_TTL = 15_000;

@@ -33,6 +33,9 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
   else if(p==='/api/customer/identity/orders')json=[{orderNumber:'PREVIOUS',branchId:1,orderStatus:'PICKED_UP'},{orderNumber:'UNPAID',branchId:1,orderStatus:'CONFIRMED'}];
   else if(p==='/api/customer/identity/orders/PREVIOUS')json={branchId:1,orderStatus:'PICKED_UP',paymentStatus:'PAID',items:[{productId:4}]};
   else if(p==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone:'+919876543210'};
+  else if(p==='/api/branches/1/pickup-discovery'){
+   json={today,maximumDate:date,dates:[{date:today,available:false,items:[],slots:[]},{date,available:true,items:[],slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};
+  }
   else if(p==='/api/branches/1/availability'){
    availabilityCalls++;const body=route.request().postDataJSON();const valid=body.startDate===date;
    json={today,maximumDate:date,dates:[{date:body.startDate,available:valid,items:[{productId:1,available:true},{productId:2,available:true}],slots:valid?[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]:[]},...(body.days>1?[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]}]:[])]};

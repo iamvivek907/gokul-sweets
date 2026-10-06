@@ -294,9 +294,7 @@ export async function validateMenuImport(
     }
 
 
-    const result:
-        MenuImportValidationResponse =
-        await response.json();
+    const result: MenuImportValidationResponse = await readImportResult(response,branchId,authorization,signal);
 
 
     return result;
@@ -394,10 +392,28 @@ export async function importMenuFile(
     }
 
 
-    const result:
-        MenuImportResultResponse =
-        await response.json();
+    const result: MenuImportResultResponse = await readImportResult(response,branchId,authorization,signal);
 
 
     return result;
+}
+interface ImportJob {id:string;status:"QUEUED"|"PROCESSING"|"SUCCEEDED"|"FAILED";result:string|null;error:string|null}
+async function readImportResult<T>(response:Response,branchId:number,authorization:string,signal?:AbortSignal):Promise<T> {
+    if(response.status!==202)return response.json();
+    let job:ImportJob=await response.json();
+    const deadline=Date.now()+10*60*1000;
+    while(job.status==="QUEUED"||job.status==="PROCESSING") {
+        if(signal?.aborted)throw new DOMException(`Menu job ${job.id} continues in the worker.`,"AbortError");
+        if(Date.now()>deadline)throw new Error(`Menu job ${job.id} is still running. Check its status before uploading again.`);
+        await new Promise<void>((resolve,reject)=>{
+            const abort=()=>{clearTimeout(timer);reject(new DOMException("Request aborted","AbortError"));};
+            const timer=setTimeout(()=>{signal?.removeEventListener("abort",abort);resolve();},2000);
+            signal?.addEventListener("abort",abort,{once:true});
+        });
+        const status=await adminFetch(`/api/admin/branches/${branchId}/menu/import/jobs/${job.id}`,authorization,{signal});
+        if(!status.ok)throw new Error(`Unable to read menu job ${job.id}. It may still be running; check before uploading again.`);
+        job=await status.json();
+    }
+    if(job.status!=="SUCCEEDED"||!job.result)throw new Error(job.error??"The menu job failed. Check the file and try again.");
+    return JSON.parse(job.result) as T;
 }

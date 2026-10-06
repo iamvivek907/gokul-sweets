@@ -19,9 +19,9 @@ def request(user, iteration):
     staff = user % 5 == 0
     if staff:
         path = '/api/admin/orders/queue/counts?branchId=10001' if iteration % 2 else '/api/admin/orders?branchId=10001&page=0&size=20'
-        headers = {'Cookie': 'gokul_staff=memory_ci_' + str(user + 1).zfill(33)}
+        headers = {'Cookie': 'gokul_staff=memory_ci_' + str(user % 100 + 1).zfill(33)}
     else:
-        path = '/api/menu?branchId=10001'
+        path = '/api/menu?branchId=10001&view=availability'
         headers = {}
     payload = None
     if not staff and iteration % 3 == 1:
@@ -34,9 +34,9 @@ def request(user, iteration):
         headers['Content-Type'] = 'application/json'
     started = time.monotonic()
     try:
-        with urllib.request.urlopen(urllib.request.Request(BASE + path, data=payload, headers=headers), timeout=10) as response:
+        with urllib.request.urlopen(urllib.request.Request(BASE + path, data=payload, headers=headers), timeout=30) as response:
             data = json.load(response)
-            if not staff and payload is None and sum(len(category['products']) for category in data) != 379:
+            if not staff and payload is None and len(data.get('items', [])) != 379:
                 raise ValueError('Incomplete menu')
             if path.endswith('/inventory/check') and data.get('suggestedServiceDate', data.get('suggestedDate')) != (TODAY + datetime.timedelta(days=1)).isoformat():
                 raise ValueError('Incorrect inventory date suggestion')
@@ -48,7 +48,7 @@ def request(user, iteration):
 
 
 failed = False
-for users in (1, 10, 50, 100):
+for users in (1, 10, 50, 100, 500, 1000):
     timings = []
     errors = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=users) as pool:
@@ -66,26 +66,22 @@ for users in (1, 10, 50, 100):
     failed |= bool(errors)
 def discovery(_):
     started = time.monotonic()
-    items = [dict(productId=p['id'], quantity=1) for category in menu for p in category['products']][:100]
-    body = json.dumps(dict(startDate=TODAY.isoformat(), days=31, items=items)).encode()
     try:
-        with urllib.request.urlopen(urllib.request.Request(
-                BASE + '/api/branches/10001/availability?menuPreview=true', data=body,
-                headers={'Content-Type': 'application/json'}), timeout=15) as response:
+        path = '/api/branches/10001/pickup-discovery?startDate=' + TODAY.isoformat() + '&days=31'
+        with urllib.request.urlopen(BASE + path, timeout=30) as response:
             result = json.load(response)
-            if not result.get('dates'):
-                raise ValueError('Missing menu discovery dates')
+            if not result.get('dates') or any(day.get('items') for day in result['dates']):
+                raise ValueError('Expected lightweight pickup dates without item inventory matrix')
         return time.monotonic() - started, None
     except Exception as error:
         return time.monotonic() - started, str(error)
 
-# Exercise the actual expensive mobile-picker shape separately from small carts.
-for users in (10, 50, 100):
+for users in (10, 100, 500, 1000):
     with concurrent.futures.ThreadPoolExecutor(max_workers=users) as pool:
         results = list(pool.map(discovery, range(users)))
     timings = sorted(duration for duration, error in results)
     errors = [error for duration, error in results if error]
-    print(json.dumps(dict(scenario='100-products-31-days-menu-discovery', users=users,
+    print(json.dumps(dict(scenario='lightweight-31-day-pickup-discovery', users=users,
                          requests=users, errors=len(errors), p95_seconds=round(timings[int(users*.95)-1], 3),
                          max_seconds=round(max(timings), 3), error_samples=errors[:3])), flush=True)
     failed |= bool(errors)

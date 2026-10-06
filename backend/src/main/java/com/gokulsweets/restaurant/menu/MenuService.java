@@ -1,225 +1,27 @@
 package com.gokulsweets.restaurant.menu;
 
-import com.gokulsweets.restaurant.branch.Branch;
-import com.gokulsweets.restaurant.branch.BranchRepository;
-import com.gokulsweets.restaurant.branchproduct.BranchProduct;
-import com.gokulsweets.restaurant.branchproduct.BranchProductRepository;
-import com.gokulsweets.restaurant.category.Category;
-import com.gokulsweets.restaurant.menu.dto.MenuCategoryResponse;
-import com.gokulsweets.restaurant.menu.dto.MenuProductResponse;
-import com.gokulsweets.restaurant.product.Product;
+import com.gokulsweets.restaurant.menu.dto.*;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.*;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-
-@Service
-@RequiredArgsConstructor
-@Slf4j
+/** Legacy combined endpoint remains compatible; new clients refresh only the availability overlay. */
+@Service @RequiredArgsConstructor
 public class MenuService {
-
-    private final BranchRepository branchRepository;
-    private final MenuServiceWindows serviceWindows;
-
-    private final BranchProductRepository branchProductRepository;
-
-
-    @Transactional(readOnly = true)
-    public List<MenuCategoryResponse> getMenu(
-            Long branchId
-    ) {
-
-        Branch branch =
-                validateBranch(
-                        branchId
-                );
-
-        var service = serviceWindows.snapshot(branchId);
-        List<BranchProduct> branchProducts = service.enabled()
-                ? branchProductRepository.findAdminMenu(branchId).stream().filter(bp -> bp.getProduct().isActive() && bp.getProduct().getCategory().isActive() && !bp.isOccasionOnly()).toList()
-                : branchProductRepository.findAvailableMenu(branchId);
-
-        Map<Long, CategoryBucket> categories =
-                new LinkedHashMap<>();
-
-
-        for (
-                BranchProduct branchProduct :
-                branchProducts
-        ) {
-
-            Product product =
-                    branchProduct.getProduct();
-
-            Category category =
-                    product.getCategory();
-
-            CategoryBucket bucket =
-                    categories.computeIfAbsent(
-                            category.getId(),
-                            ignored ->
-                                    new CategoryBucket(
-                                            category
-                                    )
-                    );
-
-
-            bucket.products().add(
-                    toMenuProduct(
-                            branchProduct,
-                            product,
-                            category,
-                            service.status(product.getId())
-                    )
-            );
+    private final MenuCatalogService catalog;
+    private final MenuAvailabilityService availability;
+    @Transactional(readOnly=true)
+    public List<MenuCategoryResponse> getMenu(Long branchId) {
+        if(branchId==null)throw new IllegalArgumentException("Branch ID is required.");
+        for(int attempt=0;attempt<3;attempt++) {
+            var snapshot=catalog.get(branchId);var live=availability.get(branchId);
+            if(snapshot.revision()!=live.revision())continue;
+            var states=new HashMap<Long,MenuAvailabilityService.Item>();live.items().forEach(i->states.put(i.productId(),i));
+            return snapshot.categories().stream().map(c->new MenuCategoryResponse(c.id(),c.name(),c.description(),c.displayOrder(),c.products().stream().filter(p->live.serviceWindowsEnabled()||states.get(p.id()).available()).map(p->{
+                var state=states.get(p.id());return new MenuProductResponse(p.id(),p.categoryId(),p.categoryName(),p.name(),p.description(),p.price(),p.imageUrl(),state.available(),p.saleMode(),p.minimumWeightGrams(),p.weightStepGrams(),state.serviceAvailability());
+            }).toList())).filter(c->!c.products().isEmpty()).toList();
         }
-
-
-        List<MenuCategoryResponse> response =
-                categories.values()
-                        .stream()
-                        .map(
-                                bucket ->
-                                        new MenuCategoryResponse(
-                                                bucket.category().getId(),
-                                                bucket.category().getName(),
-                                                bucket.category().getDescription(),
-                                                bucket.category().getDisplayOrder(),
-                                                List.copyOf(
-                                                        bucket.products()
-                                                )
-                                        )
-                        )
-                        .toList();
-
-
-        log.debug(
-                "Loaded customer menu: branchId={}, categoryCount={}, productCount={}",
-                branch.getId(),
-                response.size(),
-                branchProducts.size()
-        );
-
-
-        return response;
-    }
-
-
-    private Branch validateBranch(
-            Long branchId
-    ) {
-
-        if (branchId == null) {
-
-            throw new IllegalArgumentException(
-                    "Branch ID is required."
-            );
-        }
-
-
-        Branch branch =
-                branchRepository
-                        .findById(branchId)
-                        .orElseThrow(
-                                () -> {
-
-                                    log.warn(
-                                            "Menu requested for unknown branch: branchId={}",
-                                            branchId
-                                    );
-
-                                    return new IllegalArgumentException(
-                                            "Selected branch does not exist."
-                                    );
-                                }
-                        );
-
-
-        if (!branch.isActive()) {
-
-            log.warn(
-                    "Menu requested for inactive branch: branchId={}",
-                    branchId
-            );
-
-            throw new IllegalArgumentException(
-                    "Selected branch is currently unavailable."
-            );
-        }
-
-
-        if (!branch.isOperational()) {
-            log.warn("Menu requested for non-operational branch: branchId={}", branchId);
-            throw new IllegalArgumentException("This branch is currently not operational.");
-        }
-
-        return branch;
-    }
-
-
-    private MenuProductResponse toMenuProduct(
-            BranchProduct branchProduct,
-            Product product,
-            Category category,
-            MenuServiceWindows.Status serviceAvailability
-    ) {
-
-        BigDecimal effectivePrice =
-                branchProduct.getPriceOverride() != null
-                        ? branchProduct.getPriceOverride()
-                        : product.getBasePrice();
-
-
-        return new MenuProductResponse(
-
-                product.getId(),
-
-                category.getId(),
-
-                category.getName(),
-
-                product.getName(),
-
-                product.getDescription(),
-
-                effectivePrice,
-
-                /*
-                 * Cloudflare R2 public URL.
-                 */
-                product.getImageUrl(),
-
-                branchProduct.isAvailable() && (serviceAvailability == null || serviceAvailability.available()),
-
-                product.getSaleMode(),
-
-                product.getMinimumWeightGrams(),
-
-                product.getWeightStepGrams(),
-                serviceAvailability
-        );
-    }
-
-
-    private record CategoryBucket(
-            Category category,
-            List<MenuProductResponse> products
-    ) {
-
-        private CategoryBucket(
-                Category category
-        ) {
-
-            this(
-                    category,
-                    new ArrayList<>()
-            );
-        }
+        throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"Menu is updating. Please try again.");
     }
 }

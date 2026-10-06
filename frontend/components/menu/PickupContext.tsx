@@ -27,10 +27,12 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const [revision, setRevision] = useState(0);
     const [result, setResult] = useState<{key: string; data?: CartAvailability; error?: string} | null>(null);
     const amounts = new Map((cart.branchId === branch?.id ? availabilityItems(cart.items) : []).map(item => [item.productId, item]));
-    const requested = products ? products.filter(product => product.available).slice(0, 100).map(product => amounts.get(product.id) ?? {
+    // Always include the real cart, even when search/category filters hide its products.
+    const candidates = products?.filter(product => product.available).map(product => ({
         productId: product.id, quantity: product.saleMode === "WEIGHT" ? null : 1,
         weightGrams: product.saleMode === "WEIGHT" ? product.minimumWeightGrams : null
-    }) : [...amounts.values()];
+    })) ?? [];
+    const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))].slice(0,100);
     const itemsJson = JSON.stringify(requested);
     const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability]);
     const validDate = intent.date && features && validPickupDate(intent.date,today,features.futureOrderingDays);
@@ -39,7 +41,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             void checkCartAvailability(branch.id, intent.date!, 1, JSON.parse(itemsJson),
-                AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]))
+                AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),!!products)
                 .then(data => {if (!controller.signal.aborted) setResult({key, data});})
                 .catch(error => {if (!controller.signal.aborted) {
                     console.warn("Date availability check failed.", error);

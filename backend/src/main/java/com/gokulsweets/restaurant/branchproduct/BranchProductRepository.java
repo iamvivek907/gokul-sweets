@@ -60,6 +60,10 @@ public interface BranchProductRepository
             """)
     List<BranchProduct> findAdminMenu(@Param("branchId") Long branchId);
 
+    @EntityGraph(attributePaths={"product","product.category"})
+    @Query("SELECT bp FROM BranchProduct bp WHERE bp.branch.id=:branchId ORDER BY bp.product.category.displayOrder ASC,bp.displayOrder ASC,bp.product.name ASC")
+    List<BranchProduct> findCatalog(@Param("branchId") Long branchId);
+
     @EntityGraph(attributePaths = {"product", "product.taxCategory"})
     @Query("""
             SELECT bp FROM BranchProduct bp

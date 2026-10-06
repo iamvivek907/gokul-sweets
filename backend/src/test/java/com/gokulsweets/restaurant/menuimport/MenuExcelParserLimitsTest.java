@@ -10,6 +10,17 @@ class MenuExcelParserLimitsTest {
     private final MenuExcelParser parser = new MenuExcelParser();
 
     @Test
+    void rejectsCompressedExpansionBeforePoiLoadsIt() throws Exception {
+        var bytes=new ByteArrayOutputStream();
+        try(var zip=new java.util.zip.ZipOutputStream(bytes)) {
+            zip.putNextEntry(new java.util.zip.ZipEntry("xl/worksheets/sheet1.xml"));
+            zip.write(new byte[8*1024*1024+1]);zip.closeEntry();
+        }
+        var file=new MockMultipartFile("file","menu.xlsx",null,bytes.toByteArray());
+        assertThatThrownBy(()->parser.parse(file)).hasMessageContaining("expanded workbook");
+    }
+
+    @Test
     void rejectsOversizedFileBeforeOpeningWorkbook() {
         var file = new MockMultipartFile("file", "menu.xlsx", null, new byte[2 * 1024 * 1024 + 1]);
         assertThatThrownBy(() -> parser.parse(file)).isInstanceOf(IllegalArgumentException.class)

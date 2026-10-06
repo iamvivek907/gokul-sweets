@@ -45,11 +45,28 @@ public class MenuExcelParser {
     private final DataFormatter dataFormatter = new DataFormatter(Locale.ENGLISH);
 
 
+    // Bound ZIP expansion before POI materializes XML, including sheets we do not import.
+    private void validateExpandedSize(MultipartFile file) {
+        try(var zip=new java.util.zip.ZipInputStream(file.getInputStream())) {
+            byte[] buffer=new byte[8192];long total=0;int entries=0;
+            while(zip.getNextEntry()!=null) {
+                if(++entries>1000)throw new IllegalArgumentException("The workbook contains too many entries.");
+                long entry=0;int count;
+                while((count=zip.read(buffer))!=-1) {
+                    entry+=count;total+=count;
+                    if(entry>8*1024*1024||total>12*1024*1024)throw new IllegalArgumentException("The expanded workbook is too large. Upload a smaller menu file.");
+                }
+                zip.closeEntry();
+            }
+        }catch(IOException failure){throw new IllegalArgumentException("Unable to read the Excel file.");}
+    }
+
     public List<MenuImportRow> parse(
             MultipartFile file
     ) {
 
         validateFile(file);
+        validateExpandedSize(file);
 
         try (
                 InputStream inputStream =
