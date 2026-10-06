@@ -747,6 +747,26 @@ export default function MenuScreen() {
         );
 
 
+    const [browseScroll,setBrowseScroll]=useState<{branchId:number;id:number;revision:number}|null>(null);
+    const completedBrowseScroll=useRef<object|null>(null);
+    function browseMenu(id:number|null){
+        setBrowseCategory(id===null||!branch?null:{branchId:branch.id,id});
+        setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);setSearch("");
+        setBrowseScroll(previous=>id===null||!branch?null:{branchId:branch.id,id,revision:(previous?.revision??0)+1});
+    }
+    // Scroll only after React has committed the cleared search and destination collection.
+    useEffect(()=>{
+        if(!phoneMenu||!browseScroll||completedBrowseScroll.current===browseScroll||browseScroll.branchId!==branch?.id)return;
+        const frame=requestAnimationFrame(()=>{
+            const section=document.getElementById(`menu-category-${browseScroll.id}`);
+            if(!section)return;
+            completedBrowseScroll.current=browseScroll;
+            const disclosure=section.querySelector("details");if(disclosure)disclosure.open=true;
+            section.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});
+        });
+        return()=>cancelAnimationFrame(frame);
+    },[phoneMenu,browseScroll,branch?.id,filteredProducts]);
+
     const hasActiveFilters =
         search.trim().length > 0
         ||
@@ -887,7 +907,7 @@ export default function MenuScreen() {
 
 
     function clearFilters() {
-        setMobileCategories([]); setMaximumPrice(null); setPortionsOnly(false);
+        setBrowseCategory(null);setBrowseScroll(null);setMobileCategories([]); setMaximumPrice(null); setPortionsOnly(false);
 
         setSearch(
             ""
@@ -1253,7 +1273,7 @@ export default function MenuScreen() {
                                 className={phoneMenu ? "mobile-menu-category-entry" : "mt-4"}
                             >
 
-                                {phoneMenu?<MobileMenuFilters showChips={!activeBrowse||!(/sweet|mithai|snack|dairy|drink|beverage|biscuit|namkeen/i.test(activeBrowse.name))} onBrowse={id=>setBrowseCategory(id===null?null:{branchId:branch.id,id})} offersAvailable={!!mobileFeatures?.pickupAddOns} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={setMobileCategories} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
+                                {phoneMenu?<MobileMenuFilters showChips={!activeBrowse||!(/sweet|mithai|snack|dairy|drink|beverage|biscuit|namkeen/i.test(activeBrowse.name))} activeId={activeBrowseId} onBrowse={browseMenu} offersAvailable={!!mobileFeatures?.pickupAddOns} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={ids=>{setBrowseCategory(null);setBrowseScroll(null);setMobileCategories(ids);}} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
                                     categories={
                                         categories
                                     }
@@ -1404,7 +1424,7 @@ export default function MenuScreen() {
                                 </div>
 
 
-                                {phoneMenu&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse}/>}
+                                {phoneMenu&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? (phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories, filteredProducts)).map(group => <MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>
                                 <ProductGrid
@@ -1478,7 +1498,7 @@ export default function MenuScreen() {
                                 />
                                 )}
 
-                                {phoneMenu&&retailBrowse&&!search.trim()&&<RetailSweetRail products={allProducts} onBrowse={id=>{setBrowseCategory({branchId:branch.id,id});setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);requestAnimationFrame(()=>document.querySelector(".gokul-menu-tools")?.scrollIntoView({block:"start",behavior:"smooth"}));}}/>}
+                                {phoneMenu&&retailBrowse&&!search.trim()&&<RetailSweetRail products={allProducts} onBrowse={browseMenu}/>}
                             </>
                         )}
 

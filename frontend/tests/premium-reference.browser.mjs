@@ -33,7 +33,27 @@ try{for(const width of [320,390,640]){
  await mkdir(screenshotDir,{recursive:true});
  const capture=async name=>{await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].filter(img=>img.complete).map(img=>img.decode().catch(()=>{})));window.scrollTo({top:0,behavior:'instant'});});await page.waitForTimeout(600);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:`${screenshotDir}/${name}-${width}.png`});};
  await capture('food');
+ await page.getByRole('button',{name:'Browse Food',exact:true}).click();
+ await page.locator('#gokul-product-1').waitFor({state:'detached'});
+ await page.getByRole('button',{name:'Explore sweets',exact:true}).click();
+ await page.locator('#gokul-product-1').waitFor();
+ assert.equal(await page.getByRole('button',{name:'Browse Sweets',exact:true}).getAttribute('aria-current'),'true','banner selects the actual sweets family');
+ await page.getByRole('button',{name:'Browse Food',exact:true}).click();
+ await page.getByRole('button',{name:'Browse all item categories',exact:true}).click();
+ const filters=page.getByRole('dialog',{name:'Filter menu',exact:true});
+ await filters.getByRole('checkbox',{name:/Sweets/}).check();
+ await filters.getByRole('button',{name:'Show items',exact:true}).click();
+ await page.locator('#gokul-product-1').waitFor();
+ assert.equal(await page.locator('#gokul-product-11').count(),0,'explicit category filter replaces the Food constraint');
+ await page.getByRole('button',{name:'All',exact:true}).click();
+ assert.equal(await page.locator('.menu-category-tile[aria-current=true]').count(),0,'All does not highlight a single family');
+
  await page.evaluate(({date,slot})=>{localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));window.dispatchEvent(new Event('gokul-pickup-slot-change'));window.dispatchEvent(new Event('gokul-pickup-intent-change'));},{date,slot});
  await page.getByRole('button',{name:'Browse Sweets',exact:true}).click();await page.locator('#gokul-product-11').waitFor({state:'detached'});await page.locator('#gokul-product-1').getByRole('button',{name:'Add Rasgulla to cart',exact:true}).click();await page.locator('.mobile-menu-pairings-inline').getByRole('heading',{name:'Namkeen',exact:true}).waitFor();await page.locator('.reference-cart-summary').getByText('1 item · ₹15',{exact:true}).waitFor();assert.equal(await page.locator('.menu-editorial-feature').count(),0);await capture('pairings');
- await page.getByRole('button',{name:'Browse Snacks',exact:true}).click();await page.locator('.menu-editorial-feature--mint').waitFor();await page.locator('#gokul-product-3').getByRole('button',{name:'Choose options for Dahi',exact:true}).click();const sizes=page.getByRole('dialog',{name:'Dahi',exact:true});await sizes.getByRole('button',{name:'Add Dahi 200 g pack to cart',exact:true}).click();await sizes.getByRole('button',{name:'Done',exact:true}).click();await page.locator('#gokul-product-7').getByRole('button',{name:'Add Butter biscuits to cart',exact:true}).click();await page.locator('.reference-cart-summary').getByText('3 items · ₹80',{exact:true}).waitFor();await page.getByRole('heading',{name:'Cola',exact:true}).waitFor();await page.locator('.menu-retail-collection-title').waitFor();await capture('retail');assert.deepEqual(errors,[]);await context.close();console.log(`Reference states ${width}px: passed`);
+ await page.getByRole('button',{name:'Browse Snacks',exact:true}).click();await page.locator('.menu-editorial-feature--mint').waitFor();await page.locator('#gokul-product-3').getByRole('button',{name:'Choose options for Dahi',exact:true}).click();const sizes=page.getByRole('dialog',{name:'Dahi',exact:true});await sizes.getByRole('button',{name:'Add Dahi 200 g pack to cart',exact:true}).click();await sizes.getByRole('button',{name:'Done',exact:true}).click();await page.locator('#gokul-product-7').getByRole('button',{name:'Add Butter biscuits to cart',exact:true}).click();await page.locator('.reference-cart-summary').getByText('3 items · ₹80',{exact:true}).waitFor();await page.getByRole('heading',{name:'Cola',exact:true}).waitFor();await page.locator('.menu-retail-collection-title').waitFor();await capture('retail');
+ await page.locator('.menu-sweet-rail').getByRole('button',{name:'Browse Rasgulla',exact:true}).click();
+ await page.locator('#gokul-product-1').waitFor();
+ assert.equal(await page.getByRole('button',{name:'Browse Sweets',exact:true}).getAttribute('aria-current'),'true','discovery rail shares shortcut selection');
+ assert.equal(await page.getByRole('button',{name:'Browse Snacks',exact:true}).getAttribute('aria-current'),null);
+ assert.deepEqual(errors,[]);await context.close();console.log(`Reference states ${width}px: passed`);
 }}finally{await browser.close();}
