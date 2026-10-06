@@ -527,14 +527,16 @@ These controls reduce overhead; they do not cap total process memory or prove pu
 Deployments can override the pool sizes using GOKUL_HTTP_MAX_THREADS, GOKUL_HTTP_MIN_THREADS,
 GOKUL_DB_POOL_SIZE and GOKUL_DB_MIN_IDLE. Review throughput before using these values on larger instances.
 
-Set GOKUL_MEMORY_DIAGNOSTICS_ENABLED=true temporarily to log aggregate heap, non-heap,
+Memory diagnostics temporarily default to enabled for dev observation. Set
+GOKUL_MEMORY_DIAGNOSTICS_ENABLED=false after testing (and explicitly for production).
+When enabled, they log aggregate heap, non-heap,
 buffer, thread and cgroup memory every 30 seconds. A container memory value of -1 means
 the cgroup usage file is unavailable. Container usage includes more than JVM allocations;
 non-heap plus buffer measurements do not account for all native memory. No public endpoint is exposed.
 Disable after collecting an idle baseline and menu/admin workload samples. Compare the logs
 with Render memory metrics before attributing an incident to a specific request.
 
-Menu imports reject files above 2 MB. A streaming ZIP/XML preflight runs before POI loads a workbook: every worksheet is limited to 500 data rows plus its header and 17 columns (A–Q), at most two worksheets (Menu_Upload and Reference_Data in the template), 17,034 cells total, 60,000 XML elements, 1 MiB of XML text, and XML depth 32. ZIP expansion is capped at 8 MiB per part and 12 MiB total. These limits include content that is not imported. Async job status checks have an eight-second request timeout and a ten-minute overall deadline, including response-body reads. Pending job IDs are retained in session storage so staff can use Resume status check after a timeout or page refresh without uploading again.
+Menu imports reject files above 2 MB. A streaming ZIP/XML preflight runs before POI loads a workbook: every worksheet is limited to 500 data rows plus its header and 17 columns (A–Q), at most two worksheets (Menu_Upload and Reference_Data in the template), 17,034 cells total, 60,000 XML elements, 1 MiB of XML text, and XML depth 32. ZIP expansion is capped at 8 MiB per part and 12 MiB total. These limits include content that is not imported. Async job status checks have an eight-second request timeout and a ten-minute overall deadline, including response-body reads. Pending job IDs are retained in session storage so staff can use Resume status check after a timeout or page refresh without uploading again. Initial upload requests and all acknowledgement/result/error bodies have a one-minute deadline. The browser saves a random submission UUID before POST; async admission links it atomically to the durable job, including reused active jobs. Resume can query the submission alias if the acknowledgement was lost. Reusing a submission UUID returns the same job even after completion, while a different file, operation or requester is rejected. Submission recovery requires the original requester and current branch access. An initial 404 keeps recovery available because admission may still be committing. Clearing the browser recovery record explicitly does not cancel a backend job. Synchronous unknown outcomes cannot be recovered as jobs: the UI tells staff to check the menu before uploading again.
 The parser still uses an in-memory workbook; these are guardrails, not a streaming parser
 or a bound on decompressed workbook memory. Keep Apache POI ZIP safety defaults enabled.
 An import remains one atomic transaction. Further batching must preserve rollback and

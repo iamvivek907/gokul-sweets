@@ -19,6 +19,9 @@ public class MenuImportController {
     @GetMapping("/import/jobs/{jobId}")
     public MenuImportJobs.Job job(@PathVariable long branchId,@PathVariable java.util.UUID jobId) {return jobs.get(branchId,jobId);}
 
+    @GetMapping("/import/submissions/{submissionId}")
+    public MenuImportJobs.Job submission(@PathVariable long branchId,@PathVariable java.util.UUID submissionId) {return jobs.getSubmission(branchId,submissionId);}
+
     private final MenuImportService
             menuImportService;
 
@@ -66,10 +69,11 @@ public class MenuImportController {
             Long branchId,
 
             @RequestPart("file")
-            MultipartFile file
+            MultipartFile file,
+            @RequestParam(required=false) java.util.UUID submissionId
     ) {
 
-        if(jobs.enabled())return ResponseEntity.accepted().body(jobs.enqueue(branchId,file,"VALIDATE"));
+        if(jobs.enabled())return ResponseEntity.accepted().body(jobs.enqueue(branchId,file,"VALIDATE",submissionId));
         return ResponseEntity.ok(
                 menuImportService
                         .validate(
@@ -91,10 +95,11 @@ public class MenuImportController {
             Long branchId,
 
             @RequestPart("file")
-            MultipartFile file
+            MultipartFile file,
+            @RequestParam(required=false) java.util.UUID submissionId
     ) {
 
-        if(jobs.enabled())return ResponseEntity.accepted().body(jobs.enqueue(branchId,file,"IMPORT"));
+        if(jobs.enabled())return ResponseEntity.accepted().body(jobs.enqueue(branchId,file,"IMPORT",submissionId));
         return ResponseEntity.ok(
                 menuImportService
                         .importMenu(

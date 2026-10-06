@@ -18,6 +18,7 @@ import {
 import {
     downloadMenuImportTemplate,
     getPendingMenuImportJob,
+    discardMenuImportRecovery,
     resumeMenuImportJob,
     type PendingMenuImportJob,
     importMenuFile,
@@ -933,6 +934,14 @@ export default function AdminMenuImportPage() {
                             className="mt-3 min-h-12 rounded-xl bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-60">
                             {importing ? "Checking status..." : "Resume status check"}
                         </button>
+                        {pendingJob.submission && <button type="button" disabled={validating || importing}
+                            className="ml-3 min-h-12 px-3 text-sm underline disabled:opacity-60"
+                            onClick={() => {
+                                if (selectedBranchId !== null && window.confirm("Clear this recovery record? This does not cancel an upload that the backend may still be processing. Check the menu and job status before uploading again.")) {
+                                    discardMenuImportRecovery(selectedBranchId);
+                                    setPendingJob(null);
+                                }
+                            }}>Clear recovery record</button>}
                     </section>
                 )}
 

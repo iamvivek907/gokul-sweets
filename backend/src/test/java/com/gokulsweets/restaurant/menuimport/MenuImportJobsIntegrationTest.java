@@ -47,6 +47,31 @@ class MenuImportJobsIntegrationTest {
         assertThat(jobs.get(branch,job.id()).status()).isEqualTo("SUCCEEDED");verify(imports,times(1)).validate(eq(branch),any());
         assertThat(jdbc.queryForObject("SELECT payload IS NULL FROM menu_import_jobs WHERE id=?",Boolean.class,job.id())).isTrue();
     }
+    @Test void lostAcknowledgementCanRecoverTheSameJobAfterItHasCompleted(){
+        UUID submission=UUID.randomUUID();
+        var job=jobs.enqueue(branch,file,"VALIDATE",submission);
+        when(imports.validate(eq(branch),any())).thenReturn(new MenuImportValidationResponse(true,1,List.of()));
+        worker.process();
+        assertThat(jobs.getSubmission(branch,submission).id()).isEqualTo(job.id());
+        assertThat(jobs.getSubmission(branch,submission).status()).isEqualTo("SUCCEEDED");
+        assertThat(jobs.enqueue(branch,file,"VALIDATE",submission).id()).isEqualTo(job.id());
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM menu_import_jobs WHERE staff_id=?",Long.class,staffId)).isEqualTo(1);
+        verify(imports,times(1)).validate(eq(branch),any());
+    }
+    @Test void anotherAcknowledgementAliasRecoversTheDeduplicatedActiveJob(){
+        var first=jobs.enqueue(branch,file,"IMPORT",UUID.randomUUID());
+        UUID second=UUID.randomUUID();
+        assertThat(jobs.enqueue(branch,file,"IMPORT",second).id()).isEqualTo(first.id());
+        assertThat(jobs.getSubmission(branch,second).id()).isEqualTo(first.id());
+        assertThatThrownBy(()->jobs.enqueue(branch,file,"VALIDATE",second)).hasMessageContaining("different submission");
+        assertThatThrownBy(()->jobs.enqueue(branch,new MockMultipartFile("file","other.xlsx",null,new byte[]{4}),"IMPORT",second)).hasMessageContaining("different submission");
+    }
+    @Test void submissionRecoveryIsScopedToBothBranchAndRequester(){
+        UUID submission=UUID.randomUUID();jobs.enqueue(branch,file,"IMPORT",submission);
+        assertThatThrownBy(()->jobs.getSubmission(branch+1,submission)).hasMessageContaining("not been acknowledged");
+        var other=mock(StaffUser.class);when(other.getId()).thenReturn(staffId+1);when(authorization.getCurrentStaff()).thenReturn(other);
+        assertThatThrownBy(()->jobs.getSubmission(branch,submission)).hasMessageContaining("not been acknowledged");
+    }
     @Test void expiredClaimRecoversAfterWorkerDeathAndFailureRollsBackMenuWrites(){
         var job=jobs.enqueue(branch,file,"IMPORT");
         jdbc.update("UPDATE menu_import_jobs SET status='PROCESSING',lease_until=CURRENT_TIMESTAMP-INTERVAL '1 minute',attempts=1 WHERE id=?",job.id());
