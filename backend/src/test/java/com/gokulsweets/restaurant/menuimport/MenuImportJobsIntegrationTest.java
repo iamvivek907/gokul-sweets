@@ -55,6 +55,16 @@ class MenuImportJobsIntegrationTest {
         assertThat(jobs.get(branch,job.id()).status()).isEqualTo("FAILED");
         assertThat(jdbc.queryForObject("SELECT name FROM branches WHERE id=?",String.class,branch)).isEqualTo("Worker");
     }
+    @Test void rowValidationErrorsSurviveWorkerRollbackButUnexpectedErrorsStayGeneric(){
+        var job=jobs.enqueue(branch,file,"IMPORT");
+        String detail="Menu import failed validation. Row 7, column base_price: must be greater than zero.";
+        when(imports.importMenu(eq(branch),any())).thenThrow(new IllegalArgumentException(detail));
+        worker.process();assertThat(jobs.get(branch,job.id()).error()).isEqualTo(detail);
+        assertThat(MenuImportWorker.safeFailureMessage(new IllegalStateException("database password secret")))
+                .doesNotContain("database", "secret");
+        assertThat(MenuImportWorker.safeFailureMessage(new IllegalArgumentException("Internal parser details")))
+                .doesNotContain("Internal parser");
+    }
     @Test void currentPermissionRevocationBlocksAnAlreadyQueuedImport(){
         var job=jobs.enqueue(branch,file,"IMPORT");when(users.loadUserByUsername(username)).thenReturn(User.withUsername(username).password("disabled").authorities("ORDER_VIEW").build());
         worker.process();assertThat(jobs.get(branch,job.id()).status()).isEqualTo("FAILED");verify(imports,never()).importMenu(anyLong(),any());

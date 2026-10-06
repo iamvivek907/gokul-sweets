@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.*;
 
 @SpringBootTest
 class MenuCatalogIntegrationTest {
-    @Autowired MenuCatalogService catalog;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean MenuCatalogService catalog;
     @Autowired MenuAvailabilityService live;
     @Autowired MenuService menu;
     @Autowired MenuServiceWindows windows;
@@ -39,6 +39,25 @@ class MenuCatalogIntegrationTest {
         assertThat(next.categories().getFirst().products().getFirst().price()).isEqualByComparingTo("500");
         assertThat(first.categories().getFirst().products().getFirst().price()).isEqualByComparingTo("400");
         jdbc.update("UPDATE categories SET active=false WHERE id=?",category);assertThat(catalog.get(branch).categories()).isEmpty();
+    }
+    @Test void editCommittedBetweenBuildAndRevisionCheckIsRebuiltWithFreshValues() throws Exception {
+        var calls=new java.util.concurrent.atomic.AtomicInteger();
+        try(var executor=Executors.newSingleThreadExecutor()) {
+            org.mockito.Mockito.doAnswer(invocation->{
+                if(calls.incrementAndGet()==2)executor.submit(()->{
+                    jdbc.update("UPDATE products SET base_price=550,name='Edited sweet' WHERE id=?",product);
+                    jdbc.update("UPDATE branch_products SET available=false WHERE id=?",bp);
+                }).get(5,TimeUnit.SECONDS);
+                return invocation.callRealMethod();
+            }).when(catalog).revision();
+            var result=catalog.get(branch);
+            var item=result.categories().getFirst().products().getFirst();
+            assertThat(item.price()).isEqualByComparingTo("550");
+            assertThat(item.name()).isEqualTo("Edited sweet");
+            assertThat(item.available()).isFalse();
+            assertThat(result.revision()).isEqualTo(catalog.revision());
+            assertThat(catalog.get(branch)).isSameAs(result);
+        } finally { org.mockito.Mockito.doCallRealMethod().when(catalog).revision(); }
     }
     @Test void soldOutAndClosureNeverReuseAnOldAvailableDecision(){
         catalog.get(branch);jdbc.update("UPDATE branch_products SET available=false WHERE id=?",bp);

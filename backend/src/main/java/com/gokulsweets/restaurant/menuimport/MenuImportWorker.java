@@ -58,8 +58,17 @@ public class MenuImportWorker {
             });
         }catch(Exception failure){
             log.warn("Menu job failed: jobId={}",claim.id(),failure);
-            transaction.executeWithoutResult(status->jdbc.update("UPDATE menu_import_jobs SET status='FAILED',error=?,payload=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND claim_token=? AND status='PROCESSING'","Menu job failed. Check the file and your current branch permissions, then try again.",claim.id(),claim.token()));
+            transaction.executeWithoutResult(status->jdbc.update("UPDATE menu_import_jobs SET status='FAILED',error=?,payload=NULL,lease_until=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND claim_token=? AND status='PROCESSING'",safeFailureMessage(failure),claim.id(),claim.token()));
         }finally{SecurityContextHolder.setContext(previous);}
+    }
+    static String safeFailureMessage(Exception failure) {
+        // Preserve only our known row/column validation format. Infrastructure,
+        // authorization and unexpected parser failures must not expose internals.
+        String message=failure.getMessage();
+        if(failure instanceof IllegalArgumentException && message!=null &&
+                message.matches("(?s)(Menu import failed validation\\. )?Row [0-9]+, column [A-Za-z_]+.*"))
+            return message.substring(0,Math.min(message.length(),500));
+        return "Menu job failed. Check the file and your current branch permissions, then try again.";
     }
     record Upload(String filename,byte[] bytes) implements MultipartFile {
         public String getName(){return "file";}public String getOriginalFilename(){return filename;}public String getContentType(){return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";}

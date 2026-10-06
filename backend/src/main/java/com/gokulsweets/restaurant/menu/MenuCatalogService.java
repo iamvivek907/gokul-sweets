@@ -1,6 +1,6 @@
 package com.gokulsweets.restaurant.menu;
 
-import com.gokulsweets.restaurant.branchproduct.BranchProductRepository;
+import com.gokulsweets.restaurant.product.ProductSaleMode;
 import com.gokulsweets.restaurant.menu.dto.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -12,7 +12,6 @@ import java.util.*;
 @Service @RequiredArgsConstructor
 public class MenuCatalogService {
     private final JdbcTemplate jdbc;
-    private final BranchProductRepository products;
     private final Map<Long,Catalog> cache = new LinkedHashMap<>(16, .75f, true);
     public record Catalog(String revision, List<MenuCategoryResponse> categories) {}
     public String revision() { return jdbc.queryForObject("SELECT token::text FROM menu_catalog_revision WHERE id=true", String.class); }
@@ -48,12 +47,27 @@ public class MenuCatalogService {
     private Catalog build(long branchId,String revision) {
         var categories=new LinkedHashMap<Long,MenuCategoryResponse>();
         var grouped=new LinkedHashMap<Long,List<MenuProductResponse>>();
-        for(var bp:products.findCatalog(branchId)) {
-            var p=bp.getProduct(); var c=p.getCategory();
-            if(!p.isActive()||!c.isActive()||bp.isOccasionOnly())continue;
-            categories.putIfAbsent(c.getId(),new MenuCategoryResponse(c.getId(),c.getName(),c.getDescription(),c.getDisplayOrder(),List.of()));
-            grouped.computeIfAbsent(c.getId(),id->new ArrayList<>()).add(new MenuProductResponse(p.getId(),c.getId(),c.getName(),p.getName(),p.getDescription(),bp.getPriceOverride()!=null?bp.getPriceOverride():p.getBasePrice(),p.getImageUrl(),bp.isAvailable(),p.getSaleMode(),p.getMinimumWeightGrams(),p.getWeightStepGrams()));
-        }
+        // Scalar JDBC reads bypass Hibernate's first-level cache on every retry.
+        // The revision bracket rejects any concurrent committed edit during this query.
+        jdbc.query("""
+                SELECT c.id AS category_id,c.name AS category_name,c.description AS category_description,
+                       c.display_order AS category_order,p.id,p.name,p.description,
+                       COALESCE(bp.price_override,p.base_price) AS price,p.image_url,bp.available,
+                       p.sale_mode,p.minimum_weight_grams,p.weight_step_grams
+                FROM branch_products bp JOIN products p ON p.id=bp.product_id
+                JOIN categories c ON c.id=p.category_id
+                WHERE bp.branch_id=? AND p.active AND c.active AND NOT bp.occasion_only
+                ORDER BY c.display_order,bp.display_order,p.name
+                """, (org.springframework.jdbc.core.RowCallbackHandler) r -> {
+            long id=r.getLong("category_id");
+            String name=r.getString("category_name");
+            categories.putIfAbsent(id,new MenuCategoryResponse(id,name,r.getString("category_description"),r.getInt("category_order"),List.of()));
+            grouped.computeIfAbsent(id,key->new ArrayList<>()).add(new MenuProductResponse(
+                    r.getLong("id"),id,name,r.getString("name"),r.getString("description"),
+                    r.getBigDecimal("price"),r.getString("image_url"),r.getBoolean("available"),
+                    ProductSaleMode.valueOf(r.getString("sale_mode")),
+                    r.getObject("minimum_weight_grams",Integer.class),r.getObject("weight_step_grams",Integer.class)));
+        },branchId);
         return new Catalog(revision,categories.values().stream().map(c->new MenuCategoryResponse(c.id(),c.name(),c.description(),c.displayOrder(),List.copyOf(grouped.get(c.id())))).toList());
     }
 }
