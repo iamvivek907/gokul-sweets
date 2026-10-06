@@ -408,13 +408,13 @@
 }
 
 @media(max-width:640px){
- .future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .gokul-menu-product-card{padding-bottom:34px}
- .future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .product-card-copy{padding:5px 8px 0}
- .future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .product-card-copy h3{font-size:12px!important;line-height:15px}
- .future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .product-card-purchase{margin:0!important;gap:0}
- .future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .product-card-purchase>span:first-child{font-size:11px;line-height:14px}
- .future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .product-card-description{font-size:10px;line-height:12px;margin-top:0!important}
- .future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .product-card-controls,.future-storefront[data-premium-menu=true] [data-menu-retail-kind=photo] .product-card-controls>button{height:28px;min-height:28px}
+ .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .gokul-menu-product-card{padding-bottom:34px}
+ .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-copy{padding:5px 8px 0}
+ .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-copy h3{font-size:12px!important;line-height:15px}
+ .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-purchase{margin:0!important;gap:0}
+ .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-purchase>span:first-child{font-size:11px;line-height:14px}
+ .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-description{font-size:10px;line-height:12px;margin-top:0!important}
+ .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-controls,.future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-controls>button{height:28px;min-height:28px}
  .future-storefront[data-premium-menu=true] .menu-sweet-rail>div>button{flex-basis:180px;min-height:62px}
  .future-storefront[data-premium-menu=true] .menu-sweet-rail>div>button>span:first-child{height:62px;width:70px}
 }
