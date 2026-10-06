@@ -6,9 +6,11 @@ const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BA
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,code:'TEST',name:'Test Gokul branch',active:true,address:'Test address',city:'Test city',phone:'9876543210',pickupAvailable:true};
 const half={id:10,name:'Paneer meal Half',categoryId:1,categoryName:'Meals',description:'Fresh paneer with rice.',price:100,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},full={...half,id:11,name:'Paneer meal Full',price:180},drink={...half,id:12,name:'Fresh drink',categoryId:2,categoryName:'Drinks',price:40};
-const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,capacity:50,remainingCapacity:50,priorityEnabled:true,priorityCharge:25};
-try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
+const baseSlot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,capacity:50,remainingCapacity:50,priorityEnabled:true,priorityCharge:25};
+try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
  console.log('Scenario:',scenario);
+ const pickupRegression=scenario.startsWith('menu-pickup-');
+ const slot=pickupRegression?{...baseSlot,startTime:'20:30:00',endTime:'21:00:00'}:baseSlot;
  const secondDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+2*86400000));
  const emptyDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+3*86400000));
  const width=scenario==='desktop'?1280:scenario==='boundary'?640:390;
@@ -16,6 +18,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  const handoffEvents=[];page.on("console",message=>{if(message.text().startsWith("GOKUL_HANDOFF:"))handoffEvents.push(JSON.parse(message.text().slice(14)));});
  const errors=[];page.on("pageerror",e=>errors.push(e.message));page.on("console",m=>{if(m.type()==="error"&&/hydration|hydrated/i.test(m.text()))errors.push(m.text());});
  page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(15000);
+ if(pickupRegression)await page.clock.setFixedTime(new Date(`${date}T18:00:00+05:30`));
  let signedIn=false,orders=[],payments=0,previews=0,previewRequests=[],firstAttempt=true,liveItems=[],livePickup="NORMAL",checkoutRequest=null,paymentStatus="PENDING",cancels=0,offerCommitted=false,holdOffers=false,releaseOffers;
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  const subtotal=()=>liveItems.reduce((sum,i)=>sum+({10:100,11:180,12:40,13:80}[i.productId]??0)*(i.weightGrams?i.weightGrams/1000:i.quantity),0);
@@ -27,8 +30,8 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  let releaseRebate,releaseGateway,rebateStarted,gatewayStarted;
  const rebateGate=new Promise(resolve=>{releaseRebate=resolve;}),gatewayGate=new Promise(resolve=>{releaseGateway=resolve;});
  const rebateReady=new Promise(resolve=>{rebateStarted=resolve;}),gatewayReady=new Promise(resolve=>{gatewayStarted=resolve;});
- const payment=()=>({paymentId:10,orderNumber:"TEST-SINGLE",provider:"PHONEPE",paymentStatus,amount:finalTotal(),currency:"INR",paymentUrl:"https://gateway.example.invalid/pay",expiresAt:new Date(Date.now()+600000).toISOString()});
- const order=()=>({id:1,orderNumber:'TEST-SINGLE',branchId:1,pickupSlotId:1,pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:livePickup,customerName:'Verified customer',customerPhone:'9876543210',orderStatus:paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus:scenario==='stalled-offer'&&!payments?null:paymentStatus,fulfillmentType:'PICKUP',branchName:branch.name,subtotal:subtotal(),taxAmount:0,priorityCharge:livePickup==="PRIORITY"?25:0,totalAmount:scenario==='stalled-offer'&&offerCommitted?finalTotal():payable()+fee(payable()),items:[],reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString()});
+ const payment=()=>({paymentId:10,orderNumber:"TEST-SINGLE",provider:"PHONEPE",paymentStatus,amount:finalTotal(),currency:"INR",paymentUrl:"https://gateway.example.invalid/pay",expiresAt:new Date(Date.now()+(pickupRegression?172800000:600000)).toISOString()});
+ const order=()=>({id:1,orderNumber:'TEST-SINGLE',branchId:1,pickupSlotId:1,pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:livePickup,customerName:'Verified customer',customerPhone:'9876543210',orderStatus:paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus:scenario==='stalled-offer'&&!payments?null:paymentStatus,fulfillmentType:'PICKUP',branchName:branch.name,subtotal:subtotal(),taxAmount:0,priorityCharge:livePickup==="PRIORITY"?25:0,totalAmount:scenario==='stalled-offer'&&offerCommitted?finalTotal():payable()+fee(payable()),items:[],reservationExpiresAt:new Date(Date.now()+(pickupRegression?172800000:600000)).toISOString(),createdAt:new Date().toISOString()});
  await context.route('https://gateway.example.invalid/**',async route=>{if(scenario==='gateway-loading'){gatewayStarted();await gatewayGate;}return route.fulfill({contentType:'text/html',body:'<h1>Secure provider checkout</h1>'});});
  await context.route('**/api/**',async route=>{
   const req=route.request(),p=new URL(req.url()).pathname;let json=[];
@@ -43,9 +46,17 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   else if(p==='/api/menu/portion-groups')json={version:1,groups:[{key:'paneer',title:'Paneer meal',choices:[{productId:10,label:'Half'},{productId:11,label:'Full'}]}]};
   else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&scenario==='pickup-network')return route.fulfill({status:503,json:{message:'Availability unavailable'},headers});
   else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&scenario==='pickup-unavailable')json={today:date,maximumDate:secondDate,dates:[{date:secondDate,available:false,slots:[]}]};
+  else if(p.endsWith('/availability')&&pickupRegression){
+   const items=req.postDataJSON().items??[];
+   const conflict=scenario!=='menu-pickup-quantity'||items.some(item=>item.quantity>1);
+   const sameDate=scenario==='menu-pickup-later'||scenario==='menu-pickup-priority';
+   const alternative={...slot,id:scenario==='menu-pickup-priority'?1:2,slotDate:sameDate?date:secondDate,startTime:scenario==='menu-pickup-priority'?'20:30:00':sameDate?'21:30:00':'10:00:00',endTime:scenario==='menu-pickup-priority'?'21:00:00':sameDate?'22:00:00':'11:00:00'};
+   const initial={slot,normalAvailable:!conflict,priorityAvailable:scenario==='menu-pickup-priority'};
+   json={today:date,maximumDate:secondDate,dates:[{date,available:!conflict||sameDate,slots:[initial,...(scenario==='menu-pickup-later'?[{slot:alternative,normalAvailable:true,priorityAvailable:false}]:[])]},...(!sameDate?[{date:secondDate,available:true,slots:[{slot:alternative,normalAvailable:true,priorityAvailable:false}]}]:[])]};
+  }
   else if(p.endsWith('/availability'))json={today:date,maximumDate:date,dates:[{date,available:true,slots:[{slot,normalAvailable:scenario!=='priority-only',priorityAvailable:true}]},...(scenario.startsWith('pickup-')?[{date:secondDate,available:true,slots:[{slot:{...slot,id:2,slotDate:secondDate,startTime:'10:00:00',endTime:'11:00:00'},normalAvailable:true,priorityAvailable:false}]},{date:emptyDate,available:false,slots:[],reason:'No pickup times for this cart on this date.'}]:[])]};
   else if(p==='/api/menu/pickup-addons')json=[{product:drink,weightGrams:null,portionPrice:40,portionTotal:40,reason:'Pairs well with your order'}];else if(p==='/api/menu/pickup-addons/check')json={orderable:true};
-  else if(p==='/api/orders/mobile-preview'){previews++;previewRequests.push(req.postDataJSON());liveItems=req.postDataJSON().items;livePickup=req.postDataJSON().pickupType;json={quote:{token:'signed-quote',subtotal:String(subtotal()),taxAmount:'0',priorityCharge:req.postDataJSON().pickupType==='PRIORITY'?'25':'0',convenienceFee:'0',paymentFeeRate:scenario.startsWith('fee-')?'2':'0',paymentFee:String(fee(payable())),paymentFeeTax:String(feeTax(fee(payable()))),totalAmount:String(payable()+fee(payable())),currency:'INR',items:[],expiresAt:new Date(Date.now()+600000).toISOString()},paymentFee:fee(payable()-rebate),paymentFeeTax:feeTax(fee(payable()-rebate)),offers:rebate?[{code:'SAVE20',name:'Save 20',rebateAmount:rebate,payableAfterRebate:finalTotal()}]:[]};}
+  else if(p==='/api/orders/mobile-preview'){previews++;previewRequests.push(req.postDataJSON());liveItems=req.postDataJSON().items;livePickup=req.postDataJSON().pickupType;json={quote:{token:'signed-quote',subtotal:String(subtotal()),taxAmount:'0',priorityCharge:req.postDataJSON().pickupType==='PRIORITY'?'25':'0',convenienceFee:'0',paymentFeeRate:scenario.startsWith('fee-')?'2':'0',paymentFee:String(fee(payable())),paymentFeeTax:String(feeTax(fee(payable()))),totalAmount:String(payable()+fee(payable())),currency:'INR',items:[],expiresAt:new Date(Date.now()+(pickupRegression?172800000:600000)).toISOString()},paymentFee:fee(payable()-rebate),paymentFeeTax:feeTax(fee(payable()-rebate)),offers:rebate?[{code:'SAVE20',name:'Save 20',rebateAmount:rebate,payableAfterRebate:finalTotal()}]:[]};}
   else if(p==='/api/orders'&&req.method()==='POST'){orders.push({key:req.headers()['idempotency-key'],request:req.postDataJSON()});checkoutRequest=req.postDataJSON();if(scenario.startsWith('uncertain-')&&firstAttempt){firstAttempt=false;return route.abort('failed');}if(scenario==='uncertain-identity'&&orders.length===2){signedIn=false;return route.fulfill({status:401,json:{message:'Verify your phone'},headers});}json=order();}
   else if(p==='/api/orders/TEST-SINGLE')json=order();
   else if(p==='/api/orders/TEST-SINGLE/available-rebates'){if(holdOffers)await new Promise(r=>releaseOffers=r);try{return await route.fulfill({json:[],headers});}catch{return;}}
@@ -55,18 +66,19 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   else if(p==='/api/payments/10/cancel-checkout'){cancels++;paymentStatus='FAILED';json=payment();}
   else if(p==='/api/orders/TEST-SINGLE/rebate'&&req.method()==='POST'){offerCommitted=true;rebateStarted();await rebateGate;try{return await route.fulfill({json:{totalAmount:finalTotal(),rebateAmount:rebate},headers});}catch{return;}}
   else if(p==='/api/orders/TEST-SINGLE/rebate/best'){if(scenario==='gateway-loading'){rebateStarted();await rebateGate;}json={totalAmount:finalTotal()+(scenario==='changed-total'?5:0),rebateAmount:rebate};}
-  else if(p==='/api/payments'&&req.method()==='POST'){payments++;json={paymentId:10,orderNumber:'TEST-SINGLE',provider:'PHONEPE',paymentStatus:'PENDING',amount:finalTotal(),currency:'INR',paymentUrl:'https://gateway.example.invalid/pay',expiresAt:new Date(Date.now()+600000).toISOString()};}
+  else if(p==='/api/payments'&&req.method()==='POST'){payments++;json={paymentId:10,orderNumber:'TEST-SINGLE',provider:'PHONEPE',paymentStatus:'PENDING',amount:finalTotal(),currency:'INR',paymentUrl:'https://gateway.example.invalid/pay',expiresAt:new Date(Date.now()+(pickupRegression?172800000:600000)).toISOString()};}
   return route.fulfill({json,headers});
  });
  await context.addInitScript(({branch})=>{if(!localStorage.getItem('gokul-selected-branch'))localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));window.initSendOTP=options=>options.success({type:'success',accessToken:'synthetic-test-proof'});},{branch});
+ if(pickupRegression)await context.addInitScript(({date,slot})=>{if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{date,slot});
  if(scenario==='stored-priority')await context.addInitScript(({date,slot})=>localStorage.setItem("gokul-selected-pickup-slot",JSON.stringify({date,slot,pickupType:"PRIORITY"})),{date,slot});
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('.gokul-menu-product-card').first().waitFor();
  if(width>640){assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.locator('.mobile-menu-filters').count(),0);await page.getByRole('button',{name:'Add Paneer meal Half to cart',exact:true}).click();assert.equal(await page.locator('.gokul-floating-cart a').getAttribute('href'),'/cart');await page.goto(`${base}/checkout/mobile`);await page.waitForURL('**/cart');assert.equal(previews,0);assert.equal(orders.length,0);await context.close();continue;}
  const portion=page.locator('.mobile-portion-card');await portion.waitFor();
  assert.equal(await page.getByRole('button',{name:'View Paneer meal on the menu',exact:true}).count(),0);
  assert.equal(await page.getByRole('button',{name:'View Paneer meal Full on the menu',exact:true}).count(),0);
- await page.getByLabel('Find a favourite',{exact:true}).fill('Paneer meal');
- await portion.waitFor();await page.locator('#gokul-menu-items').getByRole('button',{name:'Clear filters',exact:true}).click();assert.equal(await page.locator('.gokul-menu-product-card').count(),2);
+ if(!pickupRegression){await page.getByLabel('Find a favourite',{exact:true}).fill('Paneer meal');
+ await portion.waitFor();await page.locator('#gokul-menu-items').getByRole('button',{name:'Clear filters',exact:true}).click();assert.equal(await page.locator('.gokul-menu-product-card').count(),2);}
  const menuDocument=await page.evaluate(()=>{window.__menuDocument=crypto.randomUUID();return window.__menuDocument;});
  const menuRows=page.locator('.gokul-menu-product-card');const firstRow=await menuRows.first().elementHandle();
  await portion.getByRole('radio',{name:/Full/}).check();await portion.getByRole('button',{name:'Add Paneer meal to cart',exact:true}).click();await portion.getByRole('radio',{name:/Half/}).check();await portion.getByRole('button',{name:'Add Paneer meal to cart',exact:true}).click();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.map(i=>i.product.id).sort()),[10,11]);
@@ -78,6 +90,37 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  const ready=async()=>{await page.getByRole('button',{name:'Pay now',exact:true}).waitFor();const branch=page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true});if(await branch.count())await branch.check();return page.getByRole('button',{name:'Pay now',exact:true}).waitFor().then(()=>page.waitForFunction(()=>{const button=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Pay now');return !!button&&!button.disabled;},null,{timeout:15000}));};
  assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).getAttribute('data-payment-ready'),'false');
  await page.getByRole('button',{name:'Pay now',exact:true}).click();await page.getByRole('status').filter({hasText:'Confirm this collection branch'}).waitFor();assert.equal(orders.length,0);await page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true}).check();
+ if(pickupRegression){
+  const before=await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot'));
+  if(scenario==='menu-pickup-quantity'){await ready();await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();}
+  const warning=page.getByRole('alert').filter({hasText:'We have not changed your pickup.'});
+  await warning.waitFor();
+  assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before);
+  assert.equal(orders.length,0);assert.equal(payments,0);
+  await page.reload();await warning.waitFor();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before,'reload preserves customer intent');
+  await page.getByRole('heading',{name:'Phone verified',exact:true}).waitFor();
+  await page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true}).check();
+  assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);
+  if(scenario==='menu-pickup-quantity'){await page.getByRole('button',{name:'Remove one Paneer meal Half',exact:true}).click();await ready();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before);await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();await warning.waitFor();assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);}
+  const open=()=>page.getByRole('button',{name:'Choose pickup',exact:true}).click();
+  const dialog=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});
+  await open();await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before,'cancel does not select an alternative');
+  await open();
+  const targetDate=scenario==='menu-pickup-later'||scenario==='menu-pickup-priority'?date:secondDate;
+  await dialog.getByRole('button',{name:targetDate,exact:true}).click();
+  await dialog.getByRole('button',{name:scenario==='menu-pickup-priority'?/20:30–21:00.*Priority/:scenario==='menu-pickup-later'?'21:30–22:00 Standard':'10:00–11:00 Standard',exact:scenario!=='menu-pickup-priority'}).click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before,'draft remains uncommitted');
+  await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.waitFor({state:'hidden'});await ready();
+  const selected=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));
+  assert.equal(selected.date,targetDate);assert.equal(selected.pickupType,scenario==='menu-pickup-priority'?'PRIORITY':'NORMAL');
+  assert.equal(orders.length,0);assert.equal(payments,0);
+  await page.getByRole('button',{name:'Pay now',exact:true}).click();await page.waitForURL('https://gateway.example.invalid/**');
+  assert.equal(orders.length,1);assert.equal(payments,1);assert.equal(orders[0].request.pickupSlotId,selected.slot.id);assert.equal(orders[0].request.pickupType,selected.pickupType);
+  assert.deepEqual(errors,[]);await context.close();continue;
+ }
  await ready();
  if(scenario==='cart-removal'){
   const cart=page.getByRole('region',{name:'Cart items',exact:true});

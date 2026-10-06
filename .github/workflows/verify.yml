@@ -86,6 +86,7 @@ jobs:
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-guidance.browser.mjs
           node tests/mobile-ordering-resilience.browser.mjs
           node tests/review-quote-race.browser.mjs
+          MOBILE_CHECKOUT_SCENARIOS=menu-pickup-tomorrow,menu-pickup-later,menu-pickup-quantity,menu-pickup-priority node tests/mobile-single-checkout.browser.mjs
           MOBILE_CHECKOUT_SCENARIOS=stalled-offer node tests/mobile-single-checkout.browser.mjs
           MOBILE_CHECKOUT_SCENARIOS=cart-removal,clear-cart node tests/mobile-single-checkout.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/simple-checkout-kitchen.browser.mjs
