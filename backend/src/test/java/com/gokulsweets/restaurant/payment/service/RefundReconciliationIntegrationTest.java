@@ -33,7 +33,7 @@ class RefundReconciliationIntegrationTest {
         String ref = "refund-" + UUID.randomUUID();
         branch = jdbc.queryForObject("INSERT INTO branches(code,name) VALUES(?,'Refund test') RETURNING id",Long.class,ref);
         slot = jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES(?,CURRENT_DATE,TIME '10:00',TIME '11:00',100) RETURNING id",Long.class,branch);
-        order = jdbc.queryForObject("INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,subtotal,total_amount) VALUES(?,?,?,'Test','9876543210','NORMAL','CANCELLED',100,100) RETURNING id",Long.class,ref,branch,slot);
+        order = jdbc.queryForObject("INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,reservation_expires_at,subtotal,total_amount) VALUES(?,?,?,'Test','9876543210','NORMAL','CANCELLED',CURRENT_TIMESTAMP,100,100) RETURNING id",Long.class,ref,branch,slot);
         payment = jdbc.queryForObject("INSERT INTO payments(order_id,provider,amount,refund_amount,payment_status,provider_order_id,refund_reference_id) VALUES(?,'PHONEPE',100,100,'REFUND_PENDING',?,?) RETURNING id",Long.class,order,ref,ref);
         provider = mock(PaymentProvider.class);
         when(registry.require(PaymentProviderType.PHONEPE)).thenReturn(provider);
