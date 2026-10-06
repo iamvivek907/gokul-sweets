@@ -145,6 +145,19 @@ public class Payment {
     @Column(name = "refund_last_checked_at")
     private LocalDateTime refundLastCheckedAt;
 
+    // Written before any provider submission, including attempts with a lost acknowledgement.
+    @Column(name = "refund_submission_attempted_at")
+    private LocalDateTime refundSubmissionAttemptedAt;
+
+    @Column(name = "refund_next_check_at")
+    private LocalDateTime refundNextCheckAt;
+
+    @Column(name = "refund_check_failures", nullable = false)
+    private int refundCheckFailures;
+
+    @Column(name = "refund_review_required", nullable = false)
+    private boolean refundReviewRequired;
+
     @Column(name = "refunded_at")
     private LocalDateTime refundedAt;
 

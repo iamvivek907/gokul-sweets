@@ -149,10 +149,13 @@ public class PhonePePaymentProvider implements PaymentProvider {
     @Override
     public RefundResult refund(Payment payment) {
         requireRefundReference(payment);
-        // Check first: a prior successful POST may have lost its response.
-        try {return mapRefund(payment,client.refundStatus(payment.getRefundReferenceId()),true);}
-        catch(com.gokulsweets.restaurant.payment.exception.PaymentGatewayException missing) {
-            if(!"PHONEPE_REFUND_NOT_FOUND".equals(missing.getCode()))throw missing;
+        // Only new, durably marked submissions skip the lookup of a nonexistent refund.
+        // Legacy pending refunds and lost acknowledgements must check first.
+        if (payment.getRefundSubmissionAttemptedAt() != null || payment.getProviderRefundId() != null) {
+            try {return mapRefund(payment,client.refundStatus(payment.getRefundReferenceId()),true);}
+            catch(com.gokulsweets.restaurant.payment.exception.PaymentGatewayException missing) {
+                if(!"PHONEPE_REFUND_NOT_FOUND".equals(missing.getCode()))throw missing;
+            }
         }
         return mapRefund(payment,client.refund(payment.getRefundReferenceId(),requireProviderOrderId(payment),payment.requestedRefundAmount()),false);
     }
@@ -161,6 +164,11 @@ public class PhonePePaymentProvider implements PaymentProvider {
         requireRefundReference(payment);
         return mapRefund(payment,client.refundStatus(payment.getRefundReferenceId()),true);
     }
+    public RefundResult verifyRefundCallback(Payment payment, PhonePeClient.RefundResponse response) {
+        requireRefundReference(payment);
+        return mapRefund(payment, response, true);
+    }
+
     private void requireRefundReference(Payment payment) {
         if(payment.getRefundReferenceId()==null||payment.getRefundReferenceId().isBlank())throw new IllegalStateException("Refund reference is missing.");
         requireProviderOrderId(payment);

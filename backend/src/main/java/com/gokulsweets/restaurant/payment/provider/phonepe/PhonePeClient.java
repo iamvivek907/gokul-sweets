@@ -337,9 +337,25 @@ public class PhonePeClient {
     public RefundResponse refundStatus(String reference) {
         return refundResponse(sendApiRequest("GET","/payments/v2/refund/"+URLEncoder.encode(reference,StandardCharsets.UTF_8)+"/status",null));
     }
-    private RefundResponse refundResponse(JsonNode value) {
-        if(!value.path("amount").isIntegralNumber()||!value.path("amount").canConvertToLong()||value.path("amount").asLong()<=0||textOrNull(value,"state")==null)throw new IllegalStateException("PhonePe did not return a complete refund response.");
-        return new RefundResponse(textOrNull(value,"refundId"),value.path("amount").asLong(),textOrNull(value,"state"),textOrNull(value,"merchantRefundId"),textOrNull(value,"originalMerchantOrderId"));
+    public RefundResponse refundResponse(JsonNode value) {
+        if (value == null || !value.isObject()
+                || !value.path("amount").isIntegralNumber()
+                || !value.path("amount").canConvertToLong()
+                || value.path("amount").asLong() <= 0
+                || !value.path("state").isTextual()
+                || textOrNull(value, "state") == null) {
+            // Describe only known field types; never log arbitrary response values or bodies.
+            log.warn("PhonePe refund response schema mismatch: object={}, amountIntegral={}, stateText={}, refundIdText={}",
+                    value != null && value.isObject(),
+                    value != null && value.path("amount").isIntegralNumber(),
+                    value != null && value.path("state").isTextual(),
+                    value != null && value.path("refundId").isTextual());
+            throw new PaymentGatewayException("PHONEPE_REFUND_INVALID_RESPONSE",
+                    "PhonePe did not return a complete refund response.", true);
+        }
+        return new RefundResponse(textOrNull(value, "refundId"), value.path("amount").asLong(),
+                textOrNull(value, "state"), textOrNull(value, "merchantRefundId"),
+                textOrNull(value, "originalMerchantOrderId"));
     }
 
     private JsonNode sendApiRequest(
@@ -425,7 +441,7 @@ public class PhonePeClient {
                 );
             }
 
-            return handleApiResponse(response);
+            return handleApiResponse(response, method, path);
 
         } catch (PaymentGatewayException exception) {
             throw exception;
@@ -506,7 +522,7 @@ public class PhonePeClient {
                             )
                     );
 
-            return handleApiResponse(response);
+            return handleApiResponse(response, method, path);
 
         } catch (PaymentGatewayException exception) {
             throw exception;
@@ -532,8 +548,13 @@ public class PhonePeClient {
     }
 
     private JsonNode handleApiResponse(
-            HttpResponse<String> response
+            HttpResponse<String> response, String method, String path
     ) {
+        if (path.startsWith("/payments/v2/refund")) {
+            log.info("PhonePe refund API response: operation={}, httpStatus={}, providerCode={}",
+                    "GET".equals(method) ? "STATUS" : "SUBMIT", response.statusCode(),
+                    safeProviderCode(response.body()));
+        }
         if (response.statusCode() < 200
                 || response.statusCode() >= 300) {
 
@@ -547,7 +568,8 @@ public class PhonePeClient {
                     );
 
             throw new PaymentGatewayException(
-                    refundNotFound(response) ? "PHONEPE_REFUND_NOT_FOUND" : "PHONEPE_REQUEST_REJECTED",
+                    "GET".equals(method) && path.startsWith("/payments/v2/refund/")
+                            && path.endsWith("/status") && refundNotFound(response) ? "PHONEPE_REFUND_NOT_FOUND" : "PHONEPE_REQUEST_REJECTED",
                     providerMessage == null
                             ? (
                             retryable
@@ -732,6 +754,16 @@ public class PhonePeClient {
         if (current != null
                 && current.value().equals(token)) {
             accessToken = null;
+        }
+    }
+
+    private String safeProviderCode(String body) {
+        try {
+            String code = textOrNull(objectMapper.readTree(body), "code");
+            if (code == null) return "NONE";
+            return code.matches("[A-Z][A-Z0-9_]{0,63}") ? code : "UNRECOGNIZED";
+        } catch (Exception ignored) {
+            return "UNREADABLE";
         }
     }
 
