@@ -58,8 +58,10 @@ class MenuImportJobsIntegrationTest {
     @Test void rowValidationErrorsSurviveWorkerRollbackButUnexpectedErrorsStayGeneric(){
         var job=jobs.enqueue(branch,file,"IMPORT");
         String detail="Menu import failed validation. Row 7, column base_price: must be greater than zero.";
-        when(imports.importMenu(eq(branch),any())).thenThrow(new IllegalArgumentException(detail));
+        when(imports.importMenu(eq(branch),any())).thenThrow(new MenuImportValidationException(detail));
         worker.process();assertThat(jobs.get(branch,job.id()).error()).isEqualTo(detail);
+        assertThat(MenuImportWorker.safeFailureMessage(new MenuImportValidationException("Missing required column: base_price")))
+                .isEqualTo("Missing required column: base_price");
         assertThat(MenuImportWorker.safeFailureMessage(new IllegalStateException("database password secret")))
                 .doesNotContain("database", "secret");
         assertThat(MenuImportWorker.safeFailureMessage(new IllegalArgumentException("Internal parser details")))

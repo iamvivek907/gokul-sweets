@@ -43,6 +43,7 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
 
  const button=page.getByRole('button',{name:'Browse all item categories',exact:true});
  await page.locator('#menu-category-10').waitFor();
+ assert.equal(await page.locator('.mobile-menu-filters,.mobile-filter-chips').count(),0,'no duplicate filter row under search');
  const before={menu:menuReads,pickup:pickupReads};const timings=[];
  for(let i=0;i<12;i++){
   const started=Date.now();await button.click();
@@ -57,6 +58,13 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
  assert.equal(menuReads,before.menu,'jumps never refetch the catalog');
  assert.equal(pickupReads,before.pickup,'jumps never restart pending pickup checks');
  assert.deepEqual(errors,[],'large-menu repeated taps produce no page errors');
+ await page.getByLabel('Find a favourite',{exact:true}).fill('Item 1-1');
+ await button.click();await page.getByRole('dialog',{name:'Items',exact:true}).getByRole('button',{name:/Category 10/}).click();
+ await page.waitForFunction(()=>document.getElementById('menu-category-10')?.getBoundingClientRect().top<200);
+ assert.equal(await page.getByLabel('Find a favourite',{exact:true}).inputValue(),'','jump clears a search that would hide the category');
+ await button.click();await page.getByRole('dialog',{name:'Items',exact:true}).getByRole('button',{name:/Recommended/}).click();
+ await page.waitForFunction(()=>document.querySelector('.mobile-menu-highlights')?.getBoundingClientRect().top<200);
+ assert.equal(await page.locator('.mobile-menu-highlights details').evaluate(n=>n.open),true);
  await button.click();const panel=page.getByRole('dialog',{name:'Items',exact:true});await panel.waitFor();
  await page.screenshot({path:`/tmp/menu-category-panel-${width}.png`});await page.keyboard.press('Escape');
  assert.equal(await button.evaluate(n=>n===document.activeElement),true);

@@ -62,11 +62,10 @@ public class MenuImportWorker {
         }finally{SecurityContextHolder.setContext(previous);}
     }
     static String safeFailureMessage(Exception failure) {
-        // Preserve only our known row/column validation format. Infrastructure,
-        // authorization and unexpected parser failures must not expose internals.
+        // Only application-authored validation errors may be shown to staff.
+        // Database, authorization and unexpected parser failures remain generic.
         String message=failure.getMessage();
-        if(failure instanceof IllegalArgumentException && message!=null &&
-                message.matches("(?s)(Menu import failed validation\\. )?Row [0-9]+, column [A-Za-z_]+.*"))
+        if(failure instanceof MenuImportValidationException && message!=null)
             return message.substring(0,Math.min(message.length(),500));
         return "Menu job failed. Check the file and your current branch permissions, then try again.";
     }

@@ -26,7 +26,7 @@ class MenuImportWorkbookWorkerIntegrationTest {
     @MockitoBean StaffUserDetailsService users;
     long branch,staffId;String code;
     @BeforeEach void setup(){
-        code="BOOK-"+UUID.randomUUID();
+        code="BOOK_"+UUID.randomUUID().toString().replace("-", "").toUpperCase(Locale.ROOT);
         branch=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES(?,'Workbook worker') RETURNING id",Long.class,code);
         staffId=jdbc.queryForObject("INSERT INTO staff_users(username,password_hash,full_name,role_id) SELECT ?,'disabled','Workbook worker',id FROM roles WHERE name='OWNER_ADMIN' RETURNING id",Long.class,code);
         jdbc.update("INSERT INTO tax_categories(code,name) VALUES(?,'Workbook zero tax')",code);
@@ -45,7 +45,8 @@ class MenuImportWorkbookWorkerIntegrationTest {
     }
     @Test void validWorkbookCommitsProductsAndJobResultTogether() throws Exception {
         var job=jobs.enqueue(branch,workbook("42.50"),"IMPORT");worker.process();
-        assertThat(jobs.get(branch,job.id()).status()).isEqualTo("SUCCEEDED");
+        var completed=jobs.get(branch,job.id());
+        assertThat(completed.status()).as("worker error: %s",completed.error()).isEqualTo("SUCCEEDED");
         assertThat(jobs.get(branch,job.id()).result()).contains("productsCreated");
         assertThat(jdbc.queryForObject("SELECT p.base_price FROM products p JOIN branch_products bp ON bp.product_id=p.id WHERE bp.branch_id=? AND p.code=?",java.math.BigDecimal.class,branch,code)).isEqualByComparingTo("42.50");
         assertThat(jdbc.queryForObject("SELECT payload IS NULL FROM menu_import_jobs WHERE id=?",Boolean.class,job.id())).isTrue();

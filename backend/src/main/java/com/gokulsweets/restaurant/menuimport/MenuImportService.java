@@ -132,7 +132,7 @@ public class MenuImportService {
             MenuImportErrorResponse first =
                     errors.getFirst();
 
-            throw new IllegalArgumentException(
+            throw new MenuImportValidationException(
                     "Menu import failed validation. Row "
                             + first.row()
                             + ", column "

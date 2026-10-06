@@ -50,15 +50,15 @@ public class MenuExcelParser {
         try(var zip=new java.util.zip.ZipInputStream(file.getInputStream())) {
             byte[] buffer=new byte[8192];long total=0;int entries=0;
             while(zip.getNextEntry()!=null) {
-                if(++entries>1000)throw new IllegalArgumentException("The workbook contains too many entries.");
+                if(++entries>1000)throw new MenuImportValidationException("The workbook contains too many entries.");
                 long entry=0;int count;
                 while((count=zip.read(buffer))!=-1) {
                     entry+=count;total+=count;
-                    if(entry>8*1024*1024||total>12*1024*1024)throw new IllegalArgumentException("The expanded workbook is too large. Upload a smaller menu file.");
+                    if(entry>8*1024*1024||total>12*1024*1024)throw new MenuImportValidationException("The expanded workbook is too large. Upload a smaller menu file.");
                 }
                 zip.closeEntry();
             }
-        }catch(IOException failure){throw new IllegalArgumentException("Unable to read the Excel file.");}
+        }catch(IOException failure){throw new MenuImportValidationException("Unable to read the Excel file.");}
     }
 
     public List<MenuImportRow> parse(
@@ -85,7 +85,7 @@ public class MenuExcelParser {
 
             if (sheet == null) {
 
-                throw new IllegalArgumentException(
+                throw new MenuImportValidationException(
                         "Workbook must contain a sheet named "
                                 + SHEET_NAME
                                 + "."
@@ -93,7 +93,7 @@ public class MenuExcelParser {
             }
 
             if (sheet.getLastRowNum() > MAX_ROWS) {
-                throw new IllegalArgumentException("Menu upload supports at most 2000 rows.");
+                throw new MenuImportValidationException("Menu upload supports at most 2000 rows.");
             }
 
             Row headerRow =
@@ -101,7 +101,7 @@ public class MenuExcelParser {
 
             if (headerRow == null) {
 
-                throw new IllegalArgumentException(
+                throw new MenuImportValidationException(
                         "Menu_Upload sheet is missing its header row."
                 );
             }
@@ -120,7 +120,7 @@ public class MenuExcelParser {
                         requiredHeader
                 )) {
 
-                    throw new IllegalArgumentException(
+                    throw new MenuImportValidationException(
                             "Missing required column: "
                                     + requiredHeader
                     );
@@ -281,7 +281,7 @@ public class MenuExcelParser {
                     file.getOriginalFilename()
             );
 
-            throw new IllegalArgumentException(
+            throw new MenuImportValidationException(
                     "Unable to read the uploaded Excel file.",
                     exception
             );
@@ -296,13 +296,13 @@ public class MenuExcelParser {
         if (file == null
                 || file.isEmpty()) {
 
-            throw new IllegalArgumentException(
+            throw new MenuImportValidationException(
                     "Excel file is required."
             );
         }
 
         if (file.getSize() > MAX_FILE_BYTES) {
-            throw new IllegalArgumentException("Menu Excel file must be 2 MB or smaller.");
+            throw new MenuImportValidationException("Menu Excel file must be 2 MB or smaller.");
         }
 
         String filename =
@@ -313,7 +313,7 @@ public class MenuExcelParser {
                 Locale.ROOT
         ).endsWith(".xlsx")) {
 
-            throw new IllegalArgumentException(
+            throw new MenuImportValidationException(
                     "Only .xlsx menu files are supported."
             );
         }
@@ -604,7 +604,7 @@ public class MenuExcelParser {
             String reason
     ) {
 
-        return new IllegalArgumentException(
+        return new MenuImportValidationException(
                 "Row "
                         + excelRow
                         + ", column "
