@@ -7,10 +7,14 @@ import org.springframework.stereotype.Component;
 /** Repairs interrupted lifecycle callbacks. Enrolment snapshot excludes historical/guest orders. */
 @Component @RequiredArgsConstructor @Slf4j
 public class LoyaltyReconciler {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
  private final JdbcTemplate jdbc;
  private final LoyaltyService loyalty;
  @Scheduled(fixedDelayString="${gokul.loyalty.reconcile-delay-ms:15000}")
  public void reconcile(){
+        if(dedicatedImportWorker)return;
   var ids=jdbc.queryForList("""
    SELECT o.id FROM orders o WHERE
     (EXISTS(SELECT 1 FROM loyalty_holds h WHERE h.order_id=o.id AND h.state<>'RELEASED') AND

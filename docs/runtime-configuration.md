@@ -615,7 +615,7 @@ Closing the browser does not cancel an accepted import. Never enable async admis
 the worker is healthy. Defaults preserve the current single-service synchronous deployment.
 
 Refund reconciliation and scheduled analytics refresh move to the worker with the above
-settings. Inventory maintenance stays on one API instance until its existing coordination
+settings. Dedicated import workers skip the other API maintenance/notification schedules to avoid duplicate execution. Inventory maintenance stays on one API instance until its existing coordination
 is verified for more replicas. On-demand report exports are still synchronous; this change
 does not claim isolation for those exports or every scheduler. Monitor those separately.
 

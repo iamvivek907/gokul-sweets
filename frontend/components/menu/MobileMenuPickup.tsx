@@ -46,11 +46,11 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
   const c=new AbortController();controller.current=c;
   const fresh=await checkCartAvailability(branchId,value.date,1,requested,AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);
   if(c.signal.aborted||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return false;
-  const checked=menuPickupOptions(fresh,requested.map(item=>item.productId)).find(s=>s.slot.id===value.slot.id&&s.date===value.date&&s.pickupType===value.pickupType);
-  if(!checked){setData(previous=>previous?{...previous,dates:previous.dates.map(d=>fresh.dates.find(f=>f.date===d.date)??d)}:fresh);return false;}
   const slot=fresh.dates.find(day=>day.date===value.date)?.slots.find(slot=>slot.slot.id===value.slot.id);
   const conflict=slot?.issues?.find(issue=>!issue.available&&amounts.has(issue.productId));
   if(conflict)throw new Error(`${conflict.productName}: ${conflict.reason??"Not available for this pickup."} Adjust your cart or choose another time. Your previous pickup is saved.`);
+  const checked=menuPickupOptions(fresh,requested.map(item=>item.productId)).find(s=>s.slot.id===value.slot.id&&s.date===value.date&&s.pickupType===value.pickupType);
+  if(!checked){setData(previous=>previous?{...previous,dates:previous.dates.map(d=>fresh.dates.find(f=>f.date===d.date)??d)}:fresh);return false;}
   clearPickupSlot();savePickupIntent(branchId,checked.date);savePickupSlot(checked);setOpen(false);return true;
  }}/>}</section>;
 }

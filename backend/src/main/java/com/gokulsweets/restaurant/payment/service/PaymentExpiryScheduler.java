@@ -9,6 +9,9 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class PaymentExpiryScheduler {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
 
     private final PaymentExpiryService paymentExpiryService;
 
@@ -17,6 +20,7 @@ public class PaymentExpiryScheduler {
                     "${payment.expiry-check-interval-ms:60000}"
     )
     public void expirePendingPayments() {
+        if(dedicatedImportWorker)return;
 
         int expiredCount =
                 paymentExpiryService

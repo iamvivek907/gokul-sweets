@@ -18,6 +18,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class InventoryHoldExpiryScheduler {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
 
     private final InventoryReservationRepository reservationRepository;
     private final InventoryReservationService reservationService;
@@ -29,6 +32,7 @@ public class InventoryHoldExpiryScheduler {
                     "${inventory.hold-expiry-check-milliseconds:30000}"
     )
     public void releaseExpiredHolds() {
+        if(dedicatedImportWorker)return;
         List<String> reservationKeys =
                 reservationRepository.findExpiredHoldKeys(
                         InventoryReservationStatus.TEMPORARY_HOLD,

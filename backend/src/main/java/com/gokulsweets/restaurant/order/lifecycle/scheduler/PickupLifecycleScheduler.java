@@ -18,6 +18,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class PickupLifecycleScheduler {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
 
     private final PickupLifecycleOrderRepository orderRepository;
     private final PickupLifecycleProcessor processor;
@@ -26,6 +29,7 @@ public class PickupLifecycleScheduler {
 
     @Scheduled(fixedDelayString = "${order.pickup-lifecycle.check-milliseconds:60000}")
     public void processPickupWindows() {
+        if(dedicatedImportWorker)return;
         if (!properties.isAutomaticExpiryEnabled()) return;
 
         LocalDateTime now = LocalDateTime.now(inventoryClock);

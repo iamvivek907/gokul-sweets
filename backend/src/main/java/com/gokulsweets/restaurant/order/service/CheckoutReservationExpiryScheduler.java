@@ -16,6 +16,9 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 public class CheckoutReservationExpiryScheduler {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
 
     private static final ZoneId BUSINESS_ZONE =
             ZoneId.of(
@@ -39,6 +42,7 @@ public class CheckoutReservationExpiryScheduler {
                     "${checkout.reservation-expiry-check-interval-ms:60000}"
     )
     public void expirePendingCheckoutReservations() {
+        if(dedicatedImportWorker)return;
 
         LocalDateTime now =
                 LocalDateTime.now(

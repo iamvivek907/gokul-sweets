@@ -22,6 +22,7 @@ class MenuCatalogIntegrationTest {
     @Autowired MenuPickupDiscoveryService discovery;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager manager;
+    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(name="inventoryClock") java.time.Clock clock;
     @MockitoBean StaffAuthorizationService authorization;
     long branch,category,product,bp;
     @BeforeEach void setup(){
@@ -58,6 +59,14 @@ class MenuCatalogIntegrationTest {
             var tasks=new ArrayList<Callable<MenuCatalogService.Catalog>>();for(int i=0;i<20;i++)tasks.add(()->catalog.get(branch));
             var responses=executor.invokeAll(tasks);var first=responses.getFirst().get();for(var result:responses)assertThat(result.get()).isSameAs(first);
         }
+    }
+    @Test void sharedAvailabilityExpiresAtBoundaryAndRejectsClockReversal(){
+        windows.save(branch,new MenuServiceWindows.Settings(true,0,List.of(new MenuServiceWindows.Item(bp,java.time.LocalTime.of(10,0),java.time.LocalTime.of(17,0),127,false,null))));
+        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.500Z"));
+        var before=live.get(branch);assertThat(before.items().getFirst().available()).isFalse();
+        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.750Z"));assertThat(live.get(branch)).isSameAs(before);
+        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:30:00Z"));assertThat(live.get(branch).items().getFirst().available()).isTrue();
+        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.900Z"));assertThat(live.get(branch).items().getFirst().available()).isFalse();
     }
     @Test void dateDiscoveryDoesNotNeedAnyProductInventory(){
         var tomorrow=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).plusDays(1);

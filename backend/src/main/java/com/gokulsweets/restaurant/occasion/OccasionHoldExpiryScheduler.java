@@ -9,10 +9,14 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 @Slf4j
 public class OccasionHoldExpiryScheduler {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
     private final OccasionCommitmentService commitments;
 
     @Scheduled(fixedDelayString = "${gokul.occasion.hold-expiry-check-milliseconds:30000}")
     public void releaseDueHolds() {
+        if(dedicatedImportWorker)return;
         try {
             commitments.expireDue();
         } catch (RuntimeException failure) {

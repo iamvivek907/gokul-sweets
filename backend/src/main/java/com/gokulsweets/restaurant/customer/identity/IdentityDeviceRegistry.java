@@ -16,6 +16,9 @@ import java.util.HexFormat;
 @Service
 @RequiredArgsConstructor
 public class IdentityDeviceRegistry {
+    @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
+    private boolean dedicatedImportWorker;
+
     private static final Duration LIFETIME = Duration.ofDays(30);
     private final JdbcTemplate jdbc;
     private final SecureRandom random = new SecureRandom();
@@ -43,6 +46,7 @@ public class IdentityDeviceRegistry {
 
     @Scheduled(cron = "0 15 * * * *", zone = "UTC")
     public void removeExpired() {
+        if(dedicatedImportWorker)return;
         jdbc.update("DELETE FROM identity_devices WHERE expires_at <= ?", Timestamp.from(Instant.now()));
     }
 }
