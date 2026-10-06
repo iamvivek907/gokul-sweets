@@ -33,7 +33,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
  {!expired&&selection&&<p><T text="Some items may need another time. Change time to explore availability."/></p>}
  {selectionUnavailable&&<p role="status"><T text="Your saved pickup time no longer fits your cart. Adjust items or choose another time. Your cart is saved."/></p>}
  {error&&<p role="alert">{error}</p>}
- {open&&data&&<Dialog advisory dates={data.dates} options={menuPickupOptions(data,ids)} chosen={selection??menuPickupOptions(data,ids)[0]??null} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);}} onConfirm={async value=>{
+ {open&&data&&<Dialog advisory today={today} dates={data.dates} options={menuPickupOptions(data,ids)} chosen={selection??menuPickupOptions(data,ids)[0]??null} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);}} onConfirm={async value=>{
   const branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot(),cartSnapshot=getCartSnapshot();
   const cart=parseCart(cartSnapshot);
   if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");

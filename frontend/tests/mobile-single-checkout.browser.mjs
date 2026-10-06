@@ -7,7 +7,7 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 const branch={id:1,code:'TEST',name:'Test Gokul branch',active:true,address:'Test address',city:'Test city',phone:'9876543210',pickupAvailable:true};
 const half={id:10,name:'Paneer meal Half',categoryId:1,categoryName:'Meals',description:'Fresh paneer with rice.',price:100,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},full={...half,id:11,name:'Paneer meal Full',price:180},drink={...half,id:12,name:'Fresh drink',categoryId:2,categoryName:'Drinks',price:40};
 const baseSlot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,capacity:50,remainingCapacity:50,priorityEnabled:true,priorityCharge:25};
-try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
+try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority','menu-pickup-date-only','menu-pickup-no-selection'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
  console.log('Scenario:',scenario);
  const pickupRegression=scenario.startsWith('menu-pickup-');
  const slot=pickupRegression?{...baseSlot,startTime:'20:30:00',endTime:'21:00:00'}:baseSlot;
@@ -70,7 +70,8 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   return route.fulfill({json,headers});
  });
  await context.addInitScript(({branch})=>{if(!localStorage.getItem('gokul-selected-branch'))localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));window.initSendOTP=options=>options.success({type:'success',accessToken:'synthetic-test-proof'});},{branch});
- if(pickupRegression)await context.addInitScript(({date,slot})=>{if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{date,slot});
+ if(pickupRegression&&scenario!=='menu-pickup-date-only'&&scenario!=='menu-pickup-no-selection')await context.addInitScript(({date,slot})=>{if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{date,slot});
+ if(scenario==='menu-pickup-date-only')await context.addInitScript(({date})=>{if(!localStorage.getItem('gokul-pickup-intent'))localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));},{date});
  if(scenario==='stored-priority')await context.addInitScript(({date,slot})=>localStorage.setItem("gokul-selected-pickup-slot",JSON.stringify({date,slot,pickupType:"PRIORITY"})),{date,slot});
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('.gokul-menu-product-card').first().waitFor();
  if(width>640){assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.locator('.mobile-menu-filters').count(),0);await page.getByRole('button',{name:'Add Paneer meal Half to cart',exact:true}).click();assert.equal(await page.locator('.gokul-floating-cart a').getAttribute('href'),'/cart');await page.goto(`${base}/checkout/mobile`);await page.waitForURL('**/cart');assert.equal(previews,0);assert.equal(orders.length,0);await context.close();continue;}
@@ -93,20 +94,21 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  if(pickupRegression){
   const before=await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot'));
   if(scenario==='menu-pickup-quantity'){await ready();await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();}
-  const warning=page.getByRole('alert').filter({hasText:'We have not changed your pickup.'});
+  const warning=page.getByRole('alert').filter({hasText:/Your pickup hasn’t changed|Choose when you’ll collect your order/});
+  if(scenario==='menu-pickup-date-only')await page.getByRole('region',{name:'Checkout pickup'}).getByText(/Today ·/).waitFor();
   await warning.waitFor();
-  assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);
+  assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).getAttribute('data-payment-ready'),'false');assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).isEnabled(),true);
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before);
   assert.equal(orders.length,0);assert.equal(payments,0);
   await page.reload();await warning.waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before,'reload preserves customer intent');
   await page.getByRole('heading',{name:'Phone verified',exact:true}).waitFor();
   await page.getByRole('checkbox',{name:'I will collect my order at this branch.',exact:true}).check();
-  assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);
-  if(scenario==='menu-pickup-quantity'){await page.getByRole('button',{name:'Remove one Paneer meal Half',exact:true}).click();await ready();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before);await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();await warning.waitFor();assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);}
-  const open=()=>page.getByRole('button',{name:'Choose pickup',exact:true}).click();
+  assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).getAttribute('data-payment-ready'),'false');assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).isEnabled(),true);
+  if(scenario==='menu-pickup-quantity'){await page.getByRole('button',{name:'Remove one Paneer meal Half',exact:true}).click();await ready();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before);await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();await warning.waitFor();assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).getAttribute('data-payment-ready'),'false');assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).isEnabled(),true);}
+  const open=()=>page.getByRole('button',{name:'Choose pickup time',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});
-  await open();await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+  await open();if(scenario==='menu-pickup-date-only')assert.equal(await dialog.getByRole('button',{name:date,exact:true}).getAttribute('aria-pressed'),'true');await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before,'cancel does not select an alternative');
   await open();
   const targetDate=scenario==='menu-pickup-later'||scenario==='menu-pickup-priority'?date:secondDate;
@@ -121,6 +123,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   assert.equal(orders.length,1);assert.equal(payments,1);assert.equal(orders[0].request.pickupSlotId,selected.slot.id);assert.equal(orders[0].request.pickupType,selected.pickupType);
   assert.deepEqual(errors,[]);await context.close();continue;
  }
+ if(!await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot'))){await page.getByRole('button',{name:'Choose pickup',exact:true}).click();const picker=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});await picker.getByRole('button',{name:scenario==='priority-only'?/Priority/:'18:00–19:00 Standard',exact:scenario!=='priority-only'}).click();await picker.getByRole('button',{name:'Use this pickup',exact:true}).click();await picker.waitFor({state:'hidden'});}
  await ready();
  if(scenario==='cart-removal'){
   const cart=page.getByRole('region',{name:'Cart items',exact:true});
