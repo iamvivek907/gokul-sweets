@@ -33,15 +33,16 @@ export function useDateAvailability(products?: MenuProduct[]) {
         weightGrams: product.saleMode === "WEIGHT" ? product.minimumWeightGrams : null
     })) ?? [];
     const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))].slice(0,100);
+    const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
-    const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability]);
+    const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability,menuPreview]);
     const validDate = intent.date && features && validPickupDate(intent.date,today,features.futureOrderingDays);
     useEffect(() => {
         if (!features?.smartAvailability || !branch || !intent.date || !validDate || !JSON.parse(itemsJson).length) return;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             void checkCartAvailability(branch.id, intent.date!, 1, JSON.parse(itemsJson),
-                AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),!!products)
+                AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),menuPreview)
                 .then(data => {if (!controller.signal.aborted) setResult({key, data});})
                 .catch(error => {if (!controller.signal.aborted) {
                     console.warn("Date availability check failed.", error);
@@ -49,7 +50,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
                 }});
         }, 350);
         return () => {controller.abort(); window.clearTimeout(timer);};
-    }, [features?.smartAvailability, branch, intent.date, validDate, itemsJson, key]);
+    }, [features?.smartAvailability, branch, intent.date, validDate, itemsJson, key,menuPreview]);
     const data = result?.key === key ? result.data : undefined;
     const day = data?.dates[0];
     const selectedSlot = day?.slots.find(value => value.slot.id === intent.selection?.slot.id);

@@ -569,7 +569,7 @@ The frontend reads the live `/api/menu?branchId=...&view=availability` overlay a
 fetches `/api/menu/catalog/{branchId}/{revision}` when its revision changes. The versioned
 catalog response is public and immutable for one year; browser caching works immediately.
 Configure Cloudflare to cache successful GET responses **only** for this versioned route.
-Never cache availability, inventory, authenticated APIs, checkout or errors. A previously
+Never cache availability, inventory, authenticated APIs, checkout or errors. Include the request Origin in the CDN cache key (or otherwise serve correct per-origin CORS headers). A previously
 cached catalog may remain readable after closure; live branch/availability checks and
 server-side order validation must block ordering. No personal data belongs in the catalog.
 
@@ -579,6 +579,10 @@ a global UUID revision token transactionally for branch, category, product, bran
 service rule changes, including direct SQL and imports. UUID tokens prevent version reuse after database restore and subsequent edits. Global invalidation is intentionally
 conservative for this small multi-branch business. Read-only callers share snapshots;
 write transactions never publish their uncommitted data. Checkout does not use this cache.
+The availability overlay can share an immutable server result for at most one second, expires
+at earlier service-window boundaries and checks the catalog revision/branch before reuse.
+It is bounded to 16 branches and approximately 4 MiB. Dated stock quantities and reservations
+are never cached here. Browser/CDN availability responses remain `no-store`.
 
 Pickup discovery returns only branch dates/slot capacity. Product stock, preparation and
 actual cart quantities are checked for the chosen date before saving a time. A date on the

@@ -47,6 +47,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type=org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
     public org.springframework.boot.web.servlet.FilterRegistrationBean<com.gokulsweets.restaurant.security.StaffSessionFilter>
             staffSessionFilterRegistration(com.gokulsweets.restaurant.security.StaffSessionFilter filter) {
         var registration = new org.springframework.boot.web.servlet.FilterRegistrationBean<>(filter);
@@ -99,6 +100,7 @@ public class SecurityConfig {
     }
 
     @Bean
+    @org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication(type=org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type.SERVLET)
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             AuthenticationProvider authenticationProvider,

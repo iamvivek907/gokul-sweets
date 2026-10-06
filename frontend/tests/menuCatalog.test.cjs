@@ -4,14 +4,14 @@ const vm=require('node:vm');
 const test=require('node:test');
 const ts=require('typescript');
 const code=ts.transpileModule(fs.readFileSync(require('node:path').join(__dirname,'../services/menuApi.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-function setup(){
- const calls=[];let revision=1,available=true,enabled=true;
+function setup(catalogDelay=0){
+ const calls=[];let revision=1,available=true,enabled=true,now=0;
  const categories=[{id:1,name:'Sweets',products:[{id:1,name:'Sweet',price:400,available:true,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:250}]}];
  const exports={};
- vm.runInNewContext(code,{exports,process:{env:{}},performance,Date,DOMException,AbortController,AbortSignal,setTimeout,clearTimeout,require:name=>name.includes('apiClient')?{apiClient:async(path,options)=>{
+ vm.runInNewContext(code,{exports,process:{env:{}},performance:{now:()=>now},Date,DOMException,AbortController,AbortSignal,setTimeout,clearTimeout,require:name=>name.includes('apiClient')?{apiClient:async(path,options)=>{
   calls.push({path,options});
   if(path.includes('view=availability'))return {revision,serviceWindowsEnabled:enabled,items:[{productId:1,available,serviceAvailability:{available,code:available?'AVAILABLE':'SOLD_OUT'}}]};
-  return {revision,categories:categories.map(c=>({...c,products:c.products.map(p=>({...p,price:revision*400}))}))};
+  now+=catalogDelay;return {revision,categories:categories.map(c=>({...c,products:c.products.map(p=>({...p,price:revision*400}))}))};
  }}:name.includes('mobileConnection')?{constrainedPhoneConnection:()=>true}:{getMockMenu:()=>[]}});
  return {api:exports,calls,change:value=>{revision=value;},sold:()=>{available=false;},disable:()=>{enabled=false;}};
 }
@@ -29,4 +29,9 @@ test('branch catalogs stay isolated and bounded across navigation',async()=>{
  const f=setup();for(let branch=1;branch<=4;branch++)await f.api.getMenu(branch);
  const before=f.calls.length;await f.api.getMenu(1);assert.equal(f.calls.length,before+2,'evicted branch must reload its catalog');
  const count=f.calls.length;await f.api.getMenu(4);assert.equal(f.calls.length,count+1,'retained branch only checks availability');
+});
+
+test('slow catalog loading does not extend the live service decision receipt time',async()=>{
+ const f=setup(5000);const menu=await f.api.getMenu(1);
+ assert.equal(menu[0].products[0].serviceAvailability.receivedMonotonic,0,'service timing starts at availability receipt, before catalog delivery');
 });

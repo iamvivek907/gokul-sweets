@@ -1,6 +1,5 @@
 package com.gokulsweets.restaurant.menu;
 
-import com.gokulsweets.restaurant.branch.BranchRepository;
 import com.gokulsweets.restaurant.branchproduct.BranchProductRepository;
 import com.gokulsweets.restaurant.menu.dto.*;
 import lombok.RequiredArgsConstructor;
@@ -13,15 +12,15 @@ import java.util.*;
 @Service @RequiredArgsConstructor
 public class MenuCatalogService {
     private final JdbcTemplate jdbc;
-    private final BranchRepository branches;
     private final BranchProductRepository products;
     private final Map<Long,Catalog> cache = new LinkedHashMap<>(16, .75f, true);
     public record Catalog(String revision, List<MenuCategoryResponse> categories) {}
     public String revision() { return jdbc.queryForObject("SELECT token::text FROM menu_catalog_revision WHERE id=true", String.class); }
     public void requireBranch(long id) {
-        var branch=branches.findById(id).orElseThrow(()->new IllegalArgumentException("Selected branch does not exist."));
-        if(!branch.isActive())throw new IllegalArgumentException("Selected branch is currently unavailable.");
-        if(!branch.isOperational())throw new IllegalArgumentException("This branch is currently not operational.");
+        var states=jdbc.query("SELECT active,operational FROM branches WHERE id=?",(r,n)->new boolean[]{r.getBoolean(1),r.getBoolean(2)},id);
+        if(states.isEmpty())throw new IllegalArgumentException("Selected branch does not exist.");
+        if(!states.getFirst()[0])throw new IllegalArgumentException("Selected branch is currently unavailable.");
+        if(!states.getFirst()[1])throw new IllegalArgumentException("This branch is currently not operational.");
     }
     @Transactional(readOnly=true)
     public Catalog get(long branchId) {

@@ -30,6 +30,7 @@ export function refreshMenuAvailability(branchId:number,signal?:AbortSignal):Pro
 async function readAvailability(branchId:number,signal:AbortSignal|undefined,attempt:number):Promise<MenuCategory[]> {
     const live=await apiClient<Availability|MenuCategory[]>(`/api/menu?branchId=${encodeURIComponent(branchId)}&view=availability`,{signal});
     if(Array.isArray(live))return stampMenuServiceAvailability(live);
+    const receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now();
     let catalog=catalogs.get(branchId);
     if(!catalog||catalog.revision!==live.revision) {
         let fresh:Catalog|MenuCategory[];
@@ -44,12 +45,11 @@ async function readAvailability(branchId:number,signal:AbortSignal|undefined,att
         const state=states.get(product.id);
         if(!state||!live.serviceWindowsEnabled&&!state.available)return [];
         return [{...product,available:state.available,serviceAvailability:state.serviceAvailability}];
-    })})).filter(category=>category.products.length));
+    })})).filter(category=>category.products.length),receivedMonotonic);
 }
 
-export function stampMenuServiceAvailability(data:MenuCategory[]):MenuCategory[] {
+export function stampMenuServiceAvailability(data:MenuCategory[],receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now()):MenuCategory[] {
     if(!data.some(category=>category.products.some(product=>product.serviceAvailability)))return data;
-    const receivedMonotonic=typeof performance!=="undefined"?performance.now():Date.now();
     return data.map(category=>({...category,products:category.products.map(product=>product.serviceAvailability?{...product,serviceAvailability:{...product.serviceAvailability,receivedMonotonic}}:product)}));
 }
 

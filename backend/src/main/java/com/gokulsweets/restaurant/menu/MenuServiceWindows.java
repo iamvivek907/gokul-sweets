@@ -41,9 +41,11 @@ public class MenuServiceWindows {
         if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM branches WHERE id=?)",Boolean.class,branchId)))
             throw new IllegalArgumentException("Branch not found.");
     }
-    private Settings readSettings(long branchId) {
+    private Settings readSettings(long branchId) {return readSettings(branchId,true);}
+    private Settings readSettings(long branchId,boolean includeDisabledItems) {
         var policy=jdbc.query("SELECT enabled,revision FROM menu_service_policies WHERE branch_id=?",
                 (r,n)->new Settings(r.getBoolean(1),r.getLong(2),List.of()),branchId);
+        if(!includeDisabledItems&&(policy.isEmpty()||!policy.getFirst().enabled()))return new Settings(false,policy.isEmpty()?0:policy.getFirst().revision(),List.of());
         var items=jdbc.query("SELECT s.* FROM menu_service_items s JOIN branch_products b ON b.id=s.branch_product_id WHERE b.branch_id=? ORDER BY s.branch_product_id",
                 (r,n)->new Item(r.getLong("branch_product_id"),r.getObject("starts_at",LocalTime.class),r.getObject("ends_at",LocalTime.class),r.getInt("weekdays"),r.getBoolean("sold_out"),(Long)r.getObject("requires_branch_product_id")),branchId);
         return new Settings(!policy.isEmpty()&&policy.getFirst().enabled(),policy.isEmpty()?0:policy.getFirst().revision(),items);
@@ -80,7 +82,7 @@ public class MenuServiceWindows {
             jdbc.queryForObject("SELECT id FROM branches WHERE id=? FOR SHARE",Long.class,branchId);
         Boolean operational=jdbc.queryForObject("SELECT operational FROM branches WHERE id=?",Boolean.class,branchId);
         if(!Boolean.TRUE.equals(operational))throw new IllegalArgumentException("This branch is currently not operational.");
-        var settings=readSettings(branchId);
+        var settings=readSettings(branchId,false);
         if(!settings.enabled())return new Snapshot(false,Map.of());
         var states=jdbc.query("SELECT b.id,b.product_id,b.available AND p.active AND c.active available,p.name FROM branch_products b JOIN products p ON p.id=b.product_id JOIN categories c ON c.id=p.category_id WHERE b.branch_id=?",
                 (r,n)->Map.entry(r.getLong("product_id"),new ProductState(r.getLong("id"),r.getBoolean("available"),r.getString("name"))),branchId);
