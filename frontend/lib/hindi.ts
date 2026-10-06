@@ -1,4 +1,9 @@
 export const hindi: Record<string,string> = {
+  "Sweets you’ll love": "आपकी पसंद की मिठाइयाँ",
+  "Choose weight": "वज़न चुनें",
+  "/ piece": "/ पीस",
+  "piece": "पीस",
+  "pieces": "पीस",
   "Made fresh.": "ताज़ा बनाया।",
   "Loved daily.": "हर दिन पसंद किया।",
   "Little extras.": "छोटी खुशियाँ।",

@@ -202,3 +202,10 @@ Screenshot capture tests verify navigation and geometry; they do not assert pixe
 
 
 The owner requested a single compact mobile menu header row: wordmark left, accessible branch-pin control, then language, notification and profile aligned at the same vertical centre. All controls retain 44px touch targets at 320–640px; the header is about 52px tall. The branch name stays in its accessible label rather than creating a second header row.
+
+
+### Reference fidelity follow-up
+
+When a Food family exists, its collection is the initial phone menu view and its shortcut is highlighted; All still explicitly opens the complete catalogue. Selected Sweets uses the reference heading “Sweets you’ll love” while keeping the actual category and count accessible. Product rows show actual per-piece pricing and selected quantity/weight totals beneath the overlapping purchase control; grouped SKUs keep their own size labels. Retail cards omit the per-piece suffix.
+
+Food/photo proportions, lavender pairing cards, mint banner, compact retail rows and discovery rail are tightened against the reference. Pairing placeholders and loaded cards both occupy 104px so late availability cannot move following products. Screenshot viewport aspect ratios match the reference crop, avoiding misleading bottom-navigation comparisons between different screen heights. Original artwork/font/logo and genuine Bestsellers/diet data remain unresolved; exact visual acceptance stays open.

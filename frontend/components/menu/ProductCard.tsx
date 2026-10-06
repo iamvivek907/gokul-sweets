@@ -399,6 +399,7 @@ export default function ProductCard({
                     ">
                         {premium&&(isWeighted||priceFrom)&&<><T text="From"/> </>}
                         {formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}
+                        {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
 
                         {
                             isWeighted && !premium
@@ -420,6 +421,8 @@ export default function ProductCard({
                         <T text="From" />{" "}{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{" "}{formatWeight(product.minimumWeightGrams ?? 250)}
                     </span>}
 
+
+                    {premium&&!purchaseControl&&(isInCart||isWeighted)&&<small className="menu-product-caption">{isInCart?<>{isWeighted?selectionLabel:<>{quantity} <T text={quantity===1?"piece":"pieces"}/></>} · {formatCurrency(product.price*(isWeighted?(weightGrams??0)/1000:quantity),true,true)}</>:<T text="Choose weight"/>}</small>}
 
                     {purchaseControl ?? <div
                         className={`

@@ -10,7 +10,7 @@ const sweets=[product(1,'Rasgulla',1,'Sweets',15),{...product(2,'Kaju Katli',1,'
 const groups=[{key:"cola",title:"Cola",choices:drinks.map(p=>({productId:p.id,label:p.name.replace("Cola ","")}))},{key:'dahi',title:'Dahi',choices:dairy.map(p=>({productId:p.id,label:p.name.replace('Dahi ','')+' pack'}))}],slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'18:30:00',active:true,remainingCapacity:20,priorityEnabled:false};
 const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,640]){
- const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let blockRasgulla=false,delay=false;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const context=await browser.newContext({viewport:{width,height:Math.round(width*886/420)},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let blockRasgulla=false,delay=false;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/_next/image**',async route=>{const src=new URL(route.request().url()).searchParams.get('url');if(!src?.startsWith('/visual-fixture/'))return route.continue();await route.fulfill({contentType:'image/webp',body:await readFile(new URL(`./fixtures/premium-menu/${src.split('/').at(-1)}`,import.meta.url))});});
  await context.route('**/api/**' ,async route=>{const path=new URL(route.request().url()).pathname;let json=[];
@@ -34,6 +34,8 @@ try{for(const width of [320,390,640]){
  for(const control of ['.language-trigger','.customer-notification-bell','.customer-account-link']){const box=await page.locator(control).boundingBox();assert.ok(Math.abs(brandBox.y+brandBox.height/2-box.y-box.height/2)<3,'brand and customer controls share a row');}
  await mkdir(screenshotDir,{recursive:true});
  const capture=async name=>{await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].filter(img=>img.complete).map(img=>img.decode().catch(()=>{})));window.scrollTo({top:0,behavior:'instant'});});await page.waitForTimeout(600);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:`${screenshotDir}/${name}-${width}.png`});};
+ assert.equal(await page.getByRole('button',{name:'Browse Food',exact:true}).getAttribute('aria-current'),'true','initial Food collection reflects the reference');
+ assert.equal(await page.locator('#gokul-product-1').count(),0,'initial Food collection excludes other families');
  await capture('food');
  await page.getByRole('button',{name:'Browse Food',exact:true}).click();
  await page.locator('#gokul-product-1').waitFor({state:'detached'});
