@@ -252,8 +252,8 @@ jobs:
           VALUES (10001,10001,CURRENT_DATE,'00:00','23:59',1000);
           INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)
           SELECT 10001,CURRENT_DATE+n,'00:00','23:59',1000 FROM generate_series(1,30) n;
-          INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,subtotal,total_amount)
-          SELECT 'MEMORY_CI_ORDER_'||n,10001,10001,'Synthetic customer','9999999999','NORMAL','CONFIRMED',500,500 FROM generate_series(1,500) n;
+          INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,subtotal,total_amount,reservation_expires_at)
+          SELECT 'MEMORY_CI_ORDER_'||n,10001,10001,'Synthetic customer','9999999999','NORMAL','CONFIRMED',500,500,CURRENT_TIMESTAMP+INTERVAL '1 hour' FROM generate_series(1,500) n;
           INSERT INTO order_items(order_id,product_id,product_name,quantity,unit_price,line_total)
           SELECT o.id,p.id,p.name,1,100,100 FROM orders o CROSS JOIN
           (SELECT id,name FROM products WHERE category_id=10001 ORDER BY id LIMIT 5) p WHERE o.branch_id=10001;
