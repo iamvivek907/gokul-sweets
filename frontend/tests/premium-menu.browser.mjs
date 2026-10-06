@@ -24,8 +24,23 @@ try{for(const width of [320,390,640,1024]){
  });
  await context.addInitScript(({branch,date,slot})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{branch,date,slot});
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('#gokul-product-1').waitFor();
- if(width>640){assert.equal(await page.locator('.menu-editorial-feature').count(),0);assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.getByRole('heading',{name:'Dahi 400 g',exact:true}).count(),1);await context.close();console.log('Premium menu desktop preserved');continue;}
+ if(width>640){assert.equal(await page.locator('.menu-editorial-feature').count(),0);assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.getByRole('heading',{name:'Dahi 400 g',exact:true}).count(),1);assert.equal(await page.locator('.customer-bottom-navigation a').count(),5);assert.equal(await page.locator('.customer-bottom-navigation').getAttribute('data-reference-menu'),null);await context.close();console.log('Premium menu desktop preserved');continue;}
  await page.locator('.menu-editorial-feature').waitFor();assert.equal(await page.locator('.menu-category-tile').count(),3);assert.equal(await page.locator('.customer-notification-bell').isVisible(),true);assert.equal(await page.locator('.customer-account-link').isVisible(),true);
+ const nav=page.getByRole('navigation',{name:'Primary navigation'});
+ await page.waitForFunction(()=>document.querySelector('.customer-bottom-navigation')?.dataset.referenceMenu==='true');
+ assert.deepEqual(await nav.locator('a').evaluateAll(nodes=>nodes.map(node=>node.dataset.navIcon)),['home','menu','orders','profile']);
+ assert.equal(await nav.locator('[data-nav-icon=menu]').getAttribute('aria-current'),'page');
+ const navBox=await nav.boundingBox();assert.equal(navBox.x,0);assert.equal(navBox.width,width);assert.equal(await nav.evaluate(node=>getComputedStyle(node).borderRadius),'0px');
+ for(const link of await nav.locator('a').all()){
+  assert.equal(await link.evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0)');
+  assert.equal(await link.locator('span').first().evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0)');
+  assert.ok((await link.boundingBox()).height>=44);
+ }
+ assert.equal(await nav.locator('[data-nav-icon=menu] svg rect').count(),4);
+ assert.equal(await nav.locator('[data-nav-icon=orders] svg rect').count(),1);
+ assert.equal(await nav.locator('[data-nav-icon=menu] svg').evaluate(node=>getComputedStyle(node).stroke),'rgb(152, 12, 49)');
+ assert.equal(await nav.locator('[data-nav-icon=profile] svg').evaluate(node=>getComputedStyle(node).stroke),'rgb(100, 112, 128)');
+ await mkdir('/tmp/gokul-premium',{recursive:true});await nav.screenshot({path:`/tmp/gokul-premium/navigation-${width}.png`});
  const rasgulla=page.locator('#gokul-product-1');await rasgulla.getByRole('button',{name:'Add Rasgulla to cart',exact:true}).click();await rasgulla.getByRole('group',{name:'Rasgulla quantity: 1',exact:true}).waitFor();
  await page.locator('.mobile-menu-suggestions').waitFor();const paired=page.locator('.mobile-menu-pairings-inline');await paired.getByRole('button',{name:'Add Butter biscuits from pairings',exact:true}).click();await paired.getByRole('group',{name:'Butter biscuits quantity: 1',exact:true}).waitFor();const biscuitCount=paired.getByRole('group',{name:'Butter biscuits quantity: 1',exact:true});const qtyBox=await biscuitCount.locator('span').boundingBox(),subtractBox=await biscuitCount.getByRole('button',{name:'Remove one Butter biscuits'}).boundingBox(),addBox=await biscuitCount.getByRole('button',{name:'Add one more Butter biscuits'}).boundingBox();assert.ok(subtractBox.x+subtractBox.width<=qtyBox.x&&qtyBox.x+qtyBox.width<=addBox.x,'pairing quantity stays between the buttons');assert.equal(await page.locator('#gokul-product-7').getByRole('group',{name:'Butter biscuits quantity: 1',exact:true}).count(),1);
  await paired.getByRole('heading',{name:'Dahi',exact:true}).waitFor();assert.equal(await paired.getByRole('heading',{name:'Dahi',exact:true}).count(),1,'paired variants appear as one product family');const groupButton=paired.getByRole('button',{name:'Choose options for Dahi from pairings',exact:true});const groupBox=await groupButton.boundingBox(),photoBox=await groupButton.locator('..').boundingBox();assert.ok(groupBox.x>=photoBox.x+photoBox.width,'grouped pairing actions stay beside the photo');assert.ok(groupBox.y+groupBox.height<=photoBox.y+photoBox.height,'grouped pairing actions are not clipped');

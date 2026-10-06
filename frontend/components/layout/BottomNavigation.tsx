@@ -16,6 +16,7 @@ import {
 } from "@/hooks/useCart";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 
 
 interface NavigationItem {
@@ -87,6 +88,10 @@ export default function BottomNavigation() {
     const navRef=useRef<HTMLElement>(null);
     const [scrollHidden,setScrollHidden]=useState(false);
     const modern=features?.futuristicStorefrontV2===true||checkoutExperienceV2;
+    const phone = usePhoneViewport();
+    const referenceMenu = pathname === "/menu" && modern
+        && features?.contextualStorefrontV2 === true && phone === true;
+    const visibleItems = referenceMenu ? items.filter(item => item.icon !== "cart") : items;
     useEffect(()=>{
         if(!modern||checkoutExperienceV2&&pathname.startsWith("/checkout/"))return;
         let active=true,lastY=window.scrollY;
@@ -143,6 +148,7 @@ export default function BottomNavigation() {
         <nav
             ref={navRef}
             data-scroll-hidden={scrollHidden}
+            data-reference-menu={referenceMenu || undefined}
             aria-label="Primary navigation"
             className="customer-bottom-navigation
                 fixed
@@ -166,14 +172,14 @@ export default function BottomNavigation() {
                     grid
                     w-full
                     max-w-[600px]
-                    grid-cols-5
                     px-1
                     pb-[env(safe-area-inset-bottom)]
                 "
+                style={{gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))`}}
             >
 
                 {
-                    items.map(
+                    visibleItems.map(
                         item => {
 
                             const active =
@@ -249,6 +255,7 @@ export default function BottomNavigation() {
                                             active={
                                                 active
                                             }
+                                            referenceMenu={referenceMenu}
                                         />
 
 
@@ -316,10 +323,12 @@ export default function BottomNavigation() {
 
 function NavigationIcon({
     icon,
-    active
+    active,
+    referenceMenu = false
 }: {
     icon: NavigationItem["icon"];
     active: boolean;
+    referenceMenu?: boolean;
 }) {
 
     const className =
@@ -359,6 +368,12 @@ function NavigationIcon({
 
 
     if (icon === "menu") {
+        if (referenceMenu) return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.7" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.6" />
+            <rect x="14" y="3" width="7" height="7" rx="1.6" />
+            <rect x="3" y="14" width="7" height="7" rx="1.6" />
+            <rect x="14" y="14" width="7" height="7" rx="1.6" />
+        </svg>;
         return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="5.5" />
             <circle cx="12" cy="12" r="3" />
@@ -377,6 +392,12 @@ function NavigationIcon({
     if (
         icon === "orders"
     ) {
+
+        if (referenceMenu) return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+            <rect x="9" y="2" width="6" height="4" rx="1.4" />
+            <path d="M8 10h8M8 14h8M8 18h5" />
+        </svg>;
 
         return (
             <svg
