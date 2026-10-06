@@ -19,9 +19,9 @@ public class MenuController {
     private final MenuAvailabilityService availability;
 
     @GetMapping("/catalog/{branchId}/{revision}")
-    public org.springframework.http.ResponseEntity<MenuCatalogService.Catalog> versionedCatalog(@org.springframework.web.bind.annotation.PathVariable long branchId,@org.springframework.web.bind.annotation.PathVariable long revision) {
+    public org.springframework.http.ResponseEntity<MenuCatalogService.Catalog> versionedCatalog(@org.springframework.web.bind.annotation.PathVariable long branchId,@org.springframework.web.bind.annotation.PathVariable String revision) {
         var snapshot=catalog.get(branchId);
-        if(snapshot.revision()!=revision)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"Menu changed. Refresh availability before loading its catalog.");
+        if(!snapshot.revision().equals(revision))throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.CONFLICT,"Menu changed. Refresh availability before loading its catalog.");
         // Historical display data is safe to reuse; availability and order acceptance always use live APIs.
         return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.maxAge(java.time.Duration.ofDays(365)).cachePublic().immutable()).body(snapshot);
     }
@@ -40,12 +40,13 @@ public class MenuController {
     }
 
     @GetMapping
-    public Object getMenu(@RequestParam Long branchId, @RequestParam(defaultValue="combined") String view) {
-        return switch(view) {
+    public org.springframework.http.ResponseEntity<?> getMenu(@RequestParam Long branchId, @RequestParam(defaultValue="combined") String view) {
+        Object body=switch(view) {
             case "catalog" -> catalog.get(branchId);
             case "availability" -> availability.get(branchId);
             case "combined" -> menuService.getMenu(branchId);
             default -> throw new IllegalArgumentException("Choose a valid menu view.");
         };
+        return org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(body);
     }
 }

@@ -575,8 +575,8 @@ server-side order validation must block ordering. No personal data belongs in th
 
 Catalog snapshots are immutable, lazily built once per revision, and bounded to 16 branches
 and approximately 8 MiB of DTO data per API process. PostgreSQL statement triggers advance
-a global revision transactionally for branch, category, product, branch-product and menu
-service rule changes, including direct SQL and imports. Global invalidation is intentionally
+a global UUID revision token transactionally for branch, category, product, branch-product and menu
+service rule changes, including direct SQL and imports. UUID tokens prevent version reuse after database restore and subsequent edits. Global invalidation is intentionally
 conservative for this small multi-branch business. Read-only callers share snapshots;
 write transactions never publish their uncommitted data. Checkout does not use this cache.
 

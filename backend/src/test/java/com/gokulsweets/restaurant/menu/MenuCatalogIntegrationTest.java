@@ -34,7 +34,7 @@ class MenuCatalogIntegrationTest {
     @Test void immutableSnapshotIsReusedAndDirectSqlEditsInvalidateItAcrossBranches(){
         var first=catalog.get(branch);assertThat(catalog.get(branch)).isSameAs(first);
         jdbc.update("UPDATE products SET base_price=500 WHERE id=?",product);
-        var next=catalog.get(branch);assertThat(next.revision()).isGreaterThan(first.revision());
+        var next=catalog.get(branch);assertThat(next.revision()).isNotEqualTo(first.revision());
         assertThat(next.categories().getFirst().products().getFirst().price()).isEqualByComparingTo("500");
         assertThat(first.categories().getFirst().products().getFirst().price()).isEqualByComparingTo("400");
         jdbc.update("UPDATE categories SET active=false WHERE id=?",category);assertThat(catalog.get(branch).categories()).isEmpty();

@@ -16,7 +16,7 @@ public class MenuService {
         if(branchId==null)throw new IllegalArgumentException("Branch ID is required.");
         for(int attempt=0;attempt<3;attempt++) {
             var snapshot=catalog.get(branchId);var live=availability.get(branchId);
-            if(snapshot.revision()!=live.revision())continue;
+            if(!snapshot.revision().equals(live.revision()))continue;
             var states=new HashMap<Long,MenuAvailabilityService.Item>();live.items().forEach(i->states.put(i.productId(),i));
             return snapshot.categories().stream().map(c->new MenuCategoryResponse(c.id(),c.name(),c.description(),c.displayOrder(),c.products().stream().filter(p->live.serviceWindowsEnabled()||states.get(p.id()).available()).map(p->{
                 var state=states.get(p.id());return new MenuProductResponse(p.id(),p.categoryId(),p.categoryName(),p.name(),p.description(),p.price(),p.imageUrl(),state.available(),p.saleMode(),p.minimumWeightGrams(),p.weightStepGrams(),state.serviceAvailability());

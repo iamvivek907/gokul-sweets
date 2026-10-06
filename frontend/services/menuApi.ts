@@ -1,6 +1,6 @@
 import {constrainedPhoneConnection} from "@/lib/mobileConnection";
 import {
-    apiClient
+    apiClient, ApiError
 } from "@/services/apiClient";
 
 import {
@@ -17,22 +17,27 @@ const USE_MOCK_MENU =
     === "true";
 
 
-type Catalog = {revision:number;categories:MenuCategory[]};
-type Availability = {revision:number;serviceWindowsEnabled:boolean;items:{productId:number;available:boolean;serviceAvailability?:MenuCategory["products"][number]["serviceAvailability"]}[]};
+type Catalog = {revision:string;categories:MenuCategory[]};
+type Availability = {revision:string;serviceWindowsEnabled:boolean;items:{productId:number;available:boolean;serviceAvailability?:MenuCategory["products"][number]["serviceAvailability"]}[]};
 const catalogs = new Map<number,Catalog>();
 function rememberCatalog(branchId:number,catalog:Catalog) {
     catalogs.delete(branchId);catalogs.set(branchId,catalog);
     while(catalogs.size>3)catalogs.delete(catalogs.keys().next().value!);
 }
-export async function refreshMenuAvailability(branchId:number,signal?:AbortSignal):Promise<MenuCategory[]> {
+export function refreshMenuAvailability(branchId:number,signal?:AbortSignal):Promise<MenuCategory[]> {
+    return readAvailability(branchId,signal,0);
+}
+async function readAvailability(branchId:number,signal:AbortSignal|undefined,attempt:number):Promise<MenuCategory[]> {
     const live=await apiClient<Availability|MenuCategory[]>(`/api/menu?branchId=${encodeURIComponent(branchId)}&view=availability`,{signal});
     if(Array.isArray(live))return stampMenuServiceAvailability(live);
     let catalog=catalogs.get(branchId);
     if(!catalog||catalog.revision!==live.revision) {
-        const fresh=await apiClient<Catalog|MenuCategory[]>(`/api/menu/catalog/${encodeURIComponent(branchId)}/${live.revision}`,{signal,cacheMode:"default"});
+        let fresh:Catalog|MenuCategory[];
+        try{fresh=await apiClient<Catalog|MenuCategory[]>(`/api/menu/catalog/${encodeURIComponent(branchId)}/${live.revision}`,{signal,cacheMode:"default"});}
+        catch(error){if(error instanceof ApiError&&error.status===409&&attempt<1)return readAvailability(branchId,signal,attempt+1);throw error;}
         if(Array.isArray(fresh))return stampMenuServiceAvailability(fresh);
         rememberCatalog(branchId,fresh);catalog=fresh;
-        if(catalog.revision!==live.revision)throw new Error("Menu changed while checking availability. Please retry.");
+        if(catalog.revision!==live.revision){if(attempt<1)return readAvailability(branchId,signal,attempt+1);throw new Error("Menu changed while checking availability. Please retry.");}
     }
     const states=new Map(live.items.map(item=>[item.productId,item]));
     return stampMenuServiceAvailability(catalog.categories.map(category=>({...category,products:category.products.flatMap(product=>{

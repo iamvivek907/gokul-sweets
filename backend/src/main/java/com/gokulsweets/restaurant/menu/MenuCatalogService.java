@@ -16,8 +16,8 @@ public class MenuCatalogService {
     private final BranchRepository branches;
     private final BranchProductRepository products;
     private final Map<Long,Catalog> cache = new LinkedHashMap<>(16, .75f, true);
-    public record Catalog(long revision, List<MenuCategoryResponse> categories) {}
-    public long revision() { return jdbc.queryForObject("SELECT revision FROM menu_catalog_revision WHERE id=true", Long.class); }
+    public record Catalog(String revision, List<MenuCategoryResponse> categories) {}
+    public String revision() { return jdbc.queryForObject("SELECT token::text FROM menu_catalog_revision WHERE id=true", String.class); }
     public void requireBranch(long id) {
         var branch=branches.findById(id).orElseThrow(()->new IllegalArgumentException("Selected branch does not exist."));
         if(!branch.isActive())throw new IllegalArgumentException("Selected branch is currently unavailable.");
@@ -30,11 +30,11 @@ public class MenuCatalogService {
         if(!org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly())return build(branchId,revision());
         synchronized(cache) {
             for(int attempt=0;attempt<3;attempt++) {
-                long revision=revision(); var existing=cache.get(branchId);
-                if(existing!=null && existing.revision()==revision)return existing;
+                String revision=revision(); var existing=cache.get(branchId);
+                if(existing!=null && existing.revision().equals(revision))return existing;
                 var snapshot=build(branchId,revision);
                 // Do not publish a snapshot assembled across a committed catalog change.
-                if(revision()!=revision)continue;
+                if(!revision().equals(revision))continue;
                 cache.put(branchId,snapshot);
                 while(cache.size()>16 || cache.values().stream().mapToLong(this::estimatedBytes).sum()>8*1024*1024)cache.remove(cache.keySet().iterator().next());
                 return snapshot;
@@ -46,7 +46,7 @@ public class MenuCatalogService {
         return value.categories().stream().mapToLong(c->256+c.products().stream().mapToLong(p->512+2L*(length(p.name())+length(p.description())+length(p.imageUrl())+length(p.categoryName()))).sum()).sum();
     }
     private int length(String value){return value==null?0:value.length();}
-    private Catalog build(long branchId,long revision) {
+    private Catalog build(long branchId,String revision) {
         var categories=new LinkedHashMap<Long,MenuCategoryResponse>();
         var grouped=new LinkedHashMap<Long,List<MenuProductResponse>>();
         for(var bp:products.findCatalog(branchId)) {

@@ -36,7 +36,7 @@ class SmartOrderingRulesTest {
         rules.validateWindow(slot(LocalDate.of(2025, 1, 1), LocalTime.NOON));
         verifyNoInteractions(settings);
         var service = mock(CartAvailabilityService.class);
-        var controller = new CartAvailabilityController(features, service);
+        var controller = new CartAvailabilityController(features, service, mock(com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService.class));
         var request = new CartAvailabilityController.Request(LocalDate.now(clock), 1,
                 List.of(new CreateOrderItemRequest(1L, 1, null)), null);
         assertThat(controller.check(1L, request, false).getStatusCode().value()).isEqualTo(404);
