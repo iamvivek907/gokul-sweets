@@ -683,7 +683,7 @@ export default function MenuScreen() {
     const mobileFeatures=useStorefrontFeatures();
     const phoneMenu=phone===true&&(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true;
     const [browseCategory,setBrowseCategory]=useState<{branchId:number;id:number}|null|undefined>(undefined);
-    const initialFoodId=browseCategory===undefined?categories.find(c=>menuFamily(c.name)==="Food")?.id:undefined;
+    const initialFoodId=browseCategory===undefined?(effectiveCategoryId??categories.find(c=>menuFamily(c.name)==="Food")?.id):undefined;
     const activeBrowseId=phoneMenu?(browseCategory?.branchId===branch?.id?browseCategory?.id:initialFoodId):undefined;
     const activeBrowse=categories.find(c=>c.id===activeBrowseId);
     const retailBrowse=!!activeBrowse&&/snack|dairy|drink|beverage|biscuit|namkeen/i.test(activeBrowse.name);

@@ -59,5 +59,8 @@ try{for(const width of [320,390,640]){
  await page.locator('#gokul-product-1').waitFor();
  assert.equal(await page.getByRole('button',{name:'Browse Sweets',exact:true}).getAttribute('aria-current'),'true','discovery rail shares shortcut selection');
  assert.equal(await page.getByRole('button',{name:'Browse Snacks',exact:true}).getAttribute('aria-current'),null);
+ await page.goto(`${base}/menu?category=1`);await page.locator('#gokul-product-1').waitFor();
+ assert.equal(await page.locator('#gokul-product-11').count(),0,'explicit category links override the initial Food collection');
+ assert.equal(await page.getByRole('button',{name:'Browse Sweets',exact:true}).getAttribute('aria-current'),'true','category link and shortcut selection agree');
  assert.deepEqual(errors,[]);await context.close();console.log(`Reference states ${width}px: passed`);
 }}finally{await browser.close();}
