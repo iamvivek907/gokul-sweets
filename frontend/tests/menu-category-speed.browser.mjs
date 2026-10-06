@@ -48,10 +48,10 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
  for(let i=0;i<12;i++){
   const started=Date.now();await button.click();
   await page.waitForFunction(()=>{const n=document.getElementById('menu-category-10');return n.getBoundingClientRect().top<200&&document.body.style.position!== 'fixed';});
-  timings.push(Date.now()-started);assert.equal(await page.locator('.gokul-menu-category-section').count(),10);
+  timings.push(Date.now()-started);assert.equal(await page.locator('.gokul-menu-category-section').count(),1);
  }
- assert.equal(menuReads,before.menu,'jumps never refetch the catalog');
- assert.equal(pickupReads,before.pickup,'jumps never restart pending pickup checks');
+ assert.equal(menuReads,before.menu,'collection switches never refetch the catalog');
+ assert.equal(pickupReads,before.pickup,'collection switches never restart pending pickup checks');
  assert.deepEqual(errors,[],'large-menu repeated taps produce no page errors');
  await page.getByLabel('Find a favourite',{exact:true}).fill('Item 1-1');
  await button.click();

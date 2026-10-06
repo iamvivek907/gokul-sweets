@@ -26,12 +26,16 @@ try{for(const width of [320,390,640,1024]){
  await context.addInitScript(({branch,date,slot})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{branch,date,slot});
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('#gokul-product-1').waitFor();
  if(width>640){assert.equal(await page.locator('.menu-editorial-feature').count(),0);assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.getByRole('heading',{name:'Dahi 400 g',exact:true}).count(),1);assert.equal(await page.locator('.customer-bottom-navigation a').count(),5);assert.equal(await page.locator('.customer-bottom-navigation').getAttribute('data-reference-menu'),null);await context.close();console.log('Premium menu desktop preserved');continue;}
- await page.locator('.menu-editorial-feature').waitFor();assert.equal(await page.locator('.menu-category-tile').count(),3);assert.equal(await page.locator('.customer-notification-bell').isVisible(),true);assert.equal(await page.locator('.customer-account-link').isVisible(),true);
+ await page.locator('.menu-editorial-feature').waitFor();assert.equal(await page.locator('.menu-category-tile').count(),2);assert.equal(await page.locator('.customer-notification-bell').isVisible(),true);assert.equal(await page.locator('.customer-account-link').isVisible(),true);
  const brand=await page.locator('.reference-wordmark').boundingBox();
  assert.ok(Math.abs(brand.x+brand.width/2-width/2)<=2,'wordmark is centered on the viewport');
  const account=await page.locator('.customer-account-link').boundingBox();
  const bell=await page.locator('.customer-notification-bell').boundingBox();
- assert.ok(brand.x+brand.width<=Math.min(account.x,bell.x),'header actions do not overlap the wordmark');
+ for(const action of [account,bell])assert.ok(brand.y+brand.height<=action.y||brand.x+brand.width<=action.x,'header actions do not overlap the wordmark');
+ const language=await page.locator('.language-trigger').boundingBox();
+ assert.ok(language.y<bell.y+bell.height&&bell.y<language.y+language.height&&language.x+language.width<=bell.x+1,'language sits beside the notification bell');
+ const pickup=await page.locator('.mobile-menu-pickup').boundingBox(),searchBox=await page.locator('.menu-search').boundingBox();
+ assert.ok(pickup.y+pickup.height<=searchBox.y,'pickup precedes search');
  await mkdir(screenshotDir,{recursive:true});await page.screenshot({path:`${screenshotDir}/reference-empty-${width}.png`});
  const nav=page.getByRole('navigation',{name:'Primary navigation'});
  await page.waitForFunction(()=>document.querySelector('.customer-bottom-navigation')?.dataset.referenceMenu==='true');

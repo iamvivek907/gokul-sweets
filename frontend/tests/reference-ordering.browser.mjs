@@ -43,7 +43,7 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
 
  const sweets=page.getByRole('region',{name:'Sweets menu items',exact:true});
  assert.equal(await page.locator('.menu-category-disclosure:not([open])').count(),0,'all menu sections start expanded');
- assert.equal(await page.locator('.menu-category-tile').count(),2);
+ await page.locator('.menu-category-tile').first().waitFor();assert.equal(await page.locator('.menu-category-tile').count(),2);
  assert.equal(await sweets.locator('.gokul-menu-product-grid').evaluate(n=>getComputedStyle(n).gridTemplateColumns.split(' ').length),1,'categories use full-width rows');
  const card=sweets.locator('.gokul-product-card').first();
  const photo=await card.locator('.product-card-image').boundingBox(),copy=await card.locator('.product-card-copy').boundingBox();
@@ -56,7 +56,7 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  await page.screenshot({path:`/tmp/reference-menu-${width}.png`,fullPage:true});
  const drinks=page.getByRole('region',{name:'Drinks menu items',exact:true});await drinks.locator('summary').click();
- await page.getByRole('button',{name:'Browse Drinks',exact:true}).click();await drinks.locator('details[open]').waitFor();assert.equal(await sweets.isVisible(),true,'category shortcuts navigate without filtering other sections');
+ await page.getByRole('button',{name:'Browse Snacks',exact:true}).click();await page.getByRole('region',{name:'Everyday favourites menu items',exact:true}).locator('details[open]').waitFor();assert.equal(await sweets.count(),0,'category shortcuts open the reference collection');await page.getByRole('button',{name:'Browse Sweets',exact:true}).click();await card.waitFor();await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await card.waitFor();
  await card.locator('.product-rating-summary').waitFor();
  await page.evaluate(()=>{document.documentElement.style.scrollBehavior='auto';window.scrollTo({top:500,behavior:'instant'});});
  await page.waitForTimeout(300);

@@ -15,7 +15,8 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
  const locale=useLanguage();
  const displayDate=selection?.date??date;
  const dateLabel=displayDate?new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",timeZone:"Asia/Kolkata"}).format(new Date(`${displayDate}T12:00:00+05:30`)):"";
- const namedDate=displayDate===today?`${translate("Today",locale)} · ${dateLabel}`:dateLabel;
+ const namedDate=displayDate===today?translate("Today",locale):dateLabel;
+ const timeLabel=(time:string)=>new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"}).format(new Date(`2000-01-01T${time}+05:30`));
  const [data,setData]=useState<CartAvailability|null>(null),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
  const request=JSON.stringify(products.filter(p=>p.available).slice(0,100).map(p=>({productId:p.id,quantity:p.saleMode==="UNIT"?1:null,weightGrams:p.saleMode==="WEIGHT"?p.minimumWeightGrams??250:null})));
  const controller=useRef<AbortController|null>(null);
@@ -32,7 +33,7 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
   finally{if(!c.signal.aborted)setBusy(false);}
  }
  const ids=JSON.parse(request).map((item:{productId:number})=>item.productId);
- return <section className="mobile-menu-pickup" aria-label="Menu pickup time"><svg className="reference-pickup-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><div><span><T text="PICKUP TIME"/></span><strong>{selection?`${namedDate} · ${selection.slot.startTime.slice(0,5)}–${selection.slot.endTime.slice(0,5)} IST`:displayDate?`${namedDate} · ${translate("Time not selected",locale)}`:<T text="Choose pickup date & time"/>}</strong></div><button type="button" disabled={busy||!ids.length} onClick={()=>void choose()}><T text={busy?"Checking times…":selection?"Change time":"Choose time"}/></button>
+ return <section className="mobile-menu-pickup" aria-label="Menu pickup time"><svg className="reference-pickup-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><div><span><T text="PICKUP TIME"/></span><strong>{selection?`${namedDate} · ${timeLabel(selection.slot.startTime)}–${timeLabel(selection.slot.endTime)} IST`:displayDate?`${namedDate} · ${translate("Time not selected",locale)}`:<T text="Choose pickup date & time"/>}</strong></div><button type="button" disabled={busy||!ids.length} onClick={()=>void choose()}><T text={busy?"Checking times…":selection?"Change time":"Choose time"}/></button>
  {expired&&<p className="menu-pickup-conflict" role="status"><T text="Your previous pickup has passed. Choose a new time; your cart is saved."/></p>}
  <p role="status"><T text={displayDate?"Item availability is checked for the date shown above. Confirm your pickup at checkout.":"Browse and add items. Choose a pickup date and time before payment."}/></p>
  {selectionUnavailable&&<p className="menu-pickup-conflict" role="status"><T text="Your saved pickup time no longer fits your cart. Adjust items or choose another time. Your cart is saved."/></p>}

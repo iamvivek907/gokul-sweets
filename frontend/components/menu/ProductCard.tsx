@@ -12,6 +12,8 @@ interface ProductCardProps {
     portionOptions?: ReactNode;
     purchaseControl?: ReactNode;
     refined?: boolean;
+    premium?: boolean;
+    priceFrom?: boolean;
     unavailableForPickup?: boolean;
     product: MenuProduct;
     ratingSummary: ProductRatingSummary | null;
@@ -24,13 +26,14 @@ interface ProductCardProps {
 }
 
 
-function formatCurrency(amount: number, exact = false): string {
+function formatCurrency(amount: number, exact = false, compact = false): string {
 
     return new Intl.NumberFormat(
         "en-IN",
         {
             style: "currency",
             currency: "INR",
+            minimumFractionDigits: compact ? 0 : exact ? 2 : 0,
             maximumFractionDigits: exact ? 2 : 0
         }
     ).format(amount);
@@ -64,6 +67,8 @@ export default function ProductCard({
     portionOptions,
     purchaseControl,
     refined = false,
+    premium = false,
+    priceFrom = false,
     unavailableForPickup = false,
     product,
     ratingSummary,
@@ -392,14 +397,11 @@ export default function ProductCard({
 
                         sm:text-base
                     ">
-                        {
-                            formatCurrency(
-                                product.price, refined
-                            )
-                        }
+                        {premium&&(isWeighted||priceFrom)&&<><T text="From"/> </>}
+                        {formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}
 
                         {
-                            isWeighted
+                            isWeighted && !premium
                             && (
                                 <span className="
                                     ml-1
@@ -414,7 +416,7 @@ export default function ProductCard({
                         }
                     </span>
 
-                    {refined && isWeighted && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
+                    {refined && isWeighted && !premium && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
                         <T text="From" />{" "}{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{" "}{formatWeight(product.minimumWeightGrams ?? 250)}
                     </span>}
 

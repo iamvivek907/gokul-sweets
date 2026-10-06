@@ -7,7 +7,7 @@ import type {PortionGroup} from "@/lib/mobileMenu";
 import type {MenuProduct} from "@/types/menu";
 import type {ProductRatingSummary} from "@/types/review";
 import type {ItemAvailability} from "@/services/availabilityApi";
-const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",maximumFractionDigits:2}).format(value);
+const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:0,maximumFractionDigits:2}).format(value);
 export default function MobilePortionCard({group,products,quantities,onAdd,onIncrease,onDecrease,ratings,loading,pickupItems,dateAware}:{group:PortionGroup;products:MenuProduct[];quantities:Record<number,number>;onAdd:(p:MenuProduct)=>void;onIncrease:(id:number)=>void;onDecrease:(id:number)=>void;ratings:Record<number,ProductRatingSummary>;loading:boolean;pickupItems?:ItemAvailability[];dateAware?:boolean}){
  const [open,setOpen]=useState(false);
  const product=products.find(p=>p.imageUrl)??products[0];
@@ -15,9 +15,10 @@ export default function MobilePortionCard({group,products,quantities,onAdd,onInc
  const total=products.reduce((sum,p)=>sum+p.price*(quantities[p.id]??0),0);
  const minimum=Math.min(...products.map(p=>p.price));
  const labels=products.map(p=>group.choices.find(c=>c.productId===p.id)?.label??p.name);
+ const portion=labels.every(label=>/half|full|portion|हाफ|फुल/i.test(label));
  return <div className="mobile-portion-card">
-  <ProductCard refined product={{...product,name:group.title,price:minimum,available:true,description:labels.join(" · ")}} quantity={0} weightGrams={null} ratingSummary={ratings[product.id]??null} ratingLoading={loading} purchaseControl={<button type="button" className="product-card-controls menu-group-control" onClick={()=>setOpen(true)} aria-label={`Choose options for ${group.title}`}><T text={count>0?"Manage":"Add"}/>{count>0&&<span> · {count}</span>}</button>} onAdd={()=>setOpen(true)} onIncrease={onIncrease} onDecrease={onDecrease}/>
-  <div className="menu-group-caption"><span>{count>0?`${count} · ${money(total)}`:<><T text="From"/> {money(minimum)}</>}</span><button type="button" onClick={()=>setOpen(true)}><T text={count>0?"Manage sizes":"Choose options"}/><span aria-hidden="true"> ›</span></button></div>
+  <ProductCard refined premium priceFrom product={{...product,name:group.title,price:minimum,available:true,description:portion?product.description:`${labels.length} sizes available`}} quantity={0} weightGrams={null} ratingSummary={ratings[product.id]??null} ratingLoading={loading} purchaseControl={<button type="button" className="product-card-controls menu-group-control" onClick={()=>setOpen(true)} aria-label={`Choose options for ${group.title}`}><T text={count>0?"Manage":portion?"Add":"Choose size"}/>{count>0&&<span> · {count}</span>}</button>} onAdd={()=>setOpen(true)} onIncrease={onIncrease} onDecrease={onDecrease}/>
+  <div className="menu-group-caption"><span>{count>0?`${count} · ${money(total)}`:<><T text="From"/> {money(minimum)}</>}</span><button type="button" onClick={()=>setOpen(true)}><T text={count>0?"Manage sizes":portion?labels.join(" / "):`${labels.length} sizes available`}/><span aria-hidden="true"> ›</span></button></div>
   {open&&<MenuVariantPicker group={group} products={products} quantities={quantities} pickupItems={pickupItems} dateAware={dateAware} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} onClose={()=>setOpen(false)}/>}
  </div>;
 }

@@ -141,6 +141,7 @@ export default function ProductGrid({
                                 </span>
                             )}
                             <ProductCard
+                                premium={portionGroups!==undefined}
                                 refined={refined}
                                 unavailableForPickup={refined && unavailable}
                                 product={product}
