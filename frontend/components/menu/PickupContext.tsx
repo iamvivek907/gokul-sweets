@@ -25,7 +25,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const cart = useCart();
     const intent = usePickupIntent(branch?.id);
     const [revision, setRevision] = useState(0);
-    const [result, setResult] = useState<{key: string; data?: CartAvailability; error?: string} | null>(null);
+    const [result, setResult] = useState<{key: string; scope: string; data?: CartAvailability; error?: string} | null>(null);
     const amounts = new Map((cart.branchId === branch?.id ? availabilityItems(cart.items) : []).map(item => [item.productId, item]));
     // Always include the real cart, even when search/category filters hide its products.
     const candidates = products?.filter(product => product.available).map(product => ({
@@ -36,6 +36,9 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
     const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability,menuPreview]);
+    // Retain the last preview while quantities refresh, but never across branch,
+    // date, slot, or catalogue changes. Checkout still checks the exact cart.
+    const scope = JSON.stringify([branch?.id,intent.date,intent.selection?.slot.id,intent.selection?.pickupType,features?.smartAvailability,menuPreview,candidates]);
     const validDate = intent.date && features && validPickupDate(intent.date,today,features.futureOrderingDays);
     useEffect(() => {
         if (!features?.smartAvailability || !branch || !intent.date || !validDate || !JSON.parse(itemsJson).length) return;
@@ -43,16 +46,17 @@ export function useDateAvailability(products?: MenuProduct[]) {
         const timer = window.setTimeout(() => {
             void checkCartAvailability(branch.id, intent.date!, 1, JSON.parse(itemsJson),
                 AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),menuPreview)
-                .then(data => {if (!controller.signal.aborted) setResult({key, data});})
+                .then(data => {if (!controller.signal.aborted) setResult({key, scope, data});})
                 .catch(error => {if (!controller.signal.aborted) {
                     console.warn("Date availability check failed.", error);
-                    setResult({key, error: "We couldn't check this pickup. Your cart is saved. Try again."});
+                    setResult({key, scope, error: "We couldn't check this pickup. Your cart is saved. Try again."});
                 }});
         }, 350);
         return () => {controller.abort(); window.clearTimeout(timer);};
-    }, [features?.smartAvailability, branch, intent.date, validDate, itemsJson, key,menuPreview]);
+    }, [features?.smartAvailability, branch, intent.date, validDate, itemsJson, key,scope,menuPreview]);
     const data = result?.key === key ? result.data : undefined;
-    const day = data?.dates[0];
+    const preview = data ?? (menuPreview && result?.scope === scope ? result.data : undefined);
+    const day = preview?.dates[0];
     const selectedSlot = day?.slots.find(value => value.slot.id === intent.selection?.slot.id);
     // Menu previews include unchosen products; only the actual cart can invalidate its saved pickup.
     const cartIds = new Set(cart.branchId === branch?.id ? cart.items.map(item => item.product.id) : []);

@@ -1,12 +1,12 @@
 import type {MenuProduct} from '@/types/menu';
 export type PortionGroup={key:string;title:string;choices:{productId:number;label:string}[]};
-export function mobileMenuRows(products:MenuProduct[],groups:PortionGroup[]){
+export function mobileMenuRows(products:MenuProduct[],groups:PortionGroup[],catalog:MenuProduct[]=products){
  const result:{product:MenuProduct;group?:PortionGroup;products?:MenuProduct[]}[]=[],shown=new Set<string>();
  for(const product of products){
   const group=groups.find(g=>g.choices.some(c=>c.productId===product.id));
   if(!group){result.push({product});continue;}
   if(shown.has(group.key))continue;shown.add(group.key);
-  const options=group.choices.flatMap(c=>products.filter(p=>p.id===c.productId));
+  const options=group.choices.flatMap(c=>catalog.filter(p=>p.id===c.productId));
   result.push({product:options[0],group,products:options});
  }
  return result;

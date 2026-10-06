@@ -10,6 +10,7 @@ import type { ProductRatingSummary } from "@/types/review";
 
 interface ProductCardProps {
     portionOptions?: ReactNode;
+    purchaseControl?: ReactNode;
     refined?: boolean;
     unavailableForPickup?: boolean;
     product: MenuProduct;
@@ -61,6 +62,7 @@ function formatWeight(
 
 export default function ProductCard({
     portionOptions,
+    purchaseControl,
     refined = false,
     unavailableForPickup = false,
     product,
@@ -202,7 +204,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                <T text={isAvailable ? "Try another pickup date" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
+                                <T text={isAvailable ? "Unavailable for selected pickup" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
                             </span>
                         </div>
                     )
@@ -281,7 +283,7 @@ export default function ProductCard({
 
                 {/* Rating */}
 
-                <div className="product-card-rating mt-1.5 flex min-h-5 items-center">
+                <div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">
 
                     {
                         ratingLoading
@@ -417,7 +419,7 @@ export default function ProductCard({
                     </span>}
 
 
-                    <div
+                    {purchaseControl ?? <div
                         className={`
                             product-card-controls
                             relative
@@ -661,7 +663,7 @@ export default function ProductCard({
 
                         </div>
 
-                    </div>
+                    </div>}
 
                 </div>
 

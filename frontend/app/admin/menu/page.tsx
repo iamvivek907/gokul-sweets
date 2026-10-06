@@ -294,7 +294,7 @@ export default function AdminMenuPage() {
                         </Link>
 
 
-                        <Link href="/admin/menu/portions" className="rounded-2xl border border-[#eadfd6] bg-white p-6"><h3 className="text-2xl font-bold">Mobile portion choices</h3><p className="mt-3 text-sm">Show Half and Full choices together in one mobile card. Each item keeps its own price and stock.</p></Link>
+                        <Link href="/admin/menu/portions" className="rounded-2xl border border-[#eadfd6] bg-white p-6"><h3 className="text-2xl font-bold">Product groups & sizes</h3><p className="mt-3 text-sm">Group pack sizes, flavours and Half / Full portions in one mobile card. Each option keeps its own price and stock.</p></Link>
                         {/* Excel Import */}
 
                         <Link

@@ -491,3 +491,7 @@
  .future-storefront[data-customer-route="/menu"] .mobile-items-categories button:is(:hover,:focus-visible){background:#22262e!important}
  .future-storefront[data-customer-route="/menu"] .mobile-items-categories button span{display:block;min-width:28px;min-height:0;text-align:right;background:transparent;color:inherit;font-size:16px;border-radius:0}
 }
+
+@media(max-width:640px){
+ .future-storefront[data-customer-route="/menu"] .mobile-menu-pickup>p[role="status"]{flex-basis:100%;margin:4px 0 0;font-size:12px;line-height:1.5;color:#59676a}
+}

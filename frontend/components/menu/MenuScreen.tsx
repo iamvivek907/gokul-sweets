@@ -11,7 +11,7 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {apiClient} from "@/services/apiClient";
-import {matchesMobileFilters,type PortionGroup} from "@/lib/mobileMenu";
+import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import MobileMenuFilters from "./MobileMenuFilters";
 import {T,useTranslation} from "@/lib/language";
 import {groupMenuProducts} from "@/lib/menuGroups";
@@ -745,13 +745,13 @@ export default function MenuScreen() {
         ||
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
-    const pickupCheck = useDateAvailability(filteredProducts);
+    const pickupCheck = useDateAvailability(allProducts);
     const [menuOffer,setMenuOffer]=useState<{key:string;target:AvailableRebateResponse|null}|null>(null);
     const offerContext=JSON.stringify([branch?.id,items,pickupCheck.intent.selection]);
     const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
     const [lastAdded,setLastAdded]=useState<number|null>(null);
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
-    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions branchId={branch.id} products={allProducts}/></div>:null;
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
 
     function handleAddToCart(
         product: MenuProduct
@@ -1209,6 +1209,8 @@ export default function MenuScreen() {
 
                 {!phoneMenu&&<PickupContext check={pickupCheck} />}
 
+                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
+
                 <div
                     className="gokul-menu-tools
                         mt-5
@@ -1243,7 +1245,7 @@ export default function MenuScreen() {
                                 className={phoneMenu ? "mobile-menu-category-entry" : "mt-4"}
                             >
 
-                                {phoneMenu?<MobileMenuFilters categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={setMobileCategories} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
+                                {phoneMenu?<MobileMenuFilters offersAvailable={!!mobileFeatures?.pickupAddOns} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={setMobileCategories} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
                                     categories={
                                         categories
                                     }
@@ -1261,7 +1263,8 @@ export default function MenuScreen() {
                 </div>
 
                 {phoneMenu&&<div className={mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>}
-                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
+
+                {phoneMenu&&pickupCheck.error&&<aside className="menu-date-error" role="alert"><p>{pickupCheck.error}</p><button type="button" onClick={pickupCheck.retry}><T text="Retry availability"/></button></aside>}
                 {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
 
                 <div
@@ -1393,12 +1396,13 @@ export default function MenuScreen() {
                                 </div>
 
 
-                                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts} ratings={ratingSummaries} ratingsLoading={ratingsLoading} pickupItems={pickupCheck.items} checking={!!mobileFeatures?.smartAvailability&&!!pickupCheck.intent.date&&!pickupCheck.data&&!pickupCheck.error} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry} onAdd={handleAddToCart}/>}
-                                {pickupCheck.features?.contextualStorefrontV2 ? groupMenuProducts(categories, filteredProducts).map(group => <MenuCategorySection key={group.id} id={group.id} name={group.name} count={group.products.length} description={group.description} collapsible={phoneMenu}>
+                                {phoneMenu&&!hasActiveFilters&&<MobileMenuHighlights products={allProducts}/>}
+                                {pickupCheck.features?.contextualStorefrontV2 ? groupMenuProducts(categories, filteredProducts).map(group => <MenuCategorySection key={group.id} id={group.id} name={group.name} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={pairing}
                                     portionGroups={phoneMenu?portionGroups:undefined}
+                                    catalogProducts={phoneMenu?allProducts:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
                                     pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
@@ -1433,6 +1437,7 @@ export default function MenuScreen() {
                                     pairingSeed={pairingSeed}
                                     pairing={pairing}
                                     portionGroups={phoneMenu?portionGroups:undefined}
+                                    catalogProducts={phoneMenu?allProducts:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
                                     pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
@@ -1567,7 +1572,7 @@ export default function MenuScreen() {
                     <div
                         role="status"
                         aria-live="polite"
-                        className="
+                        className={`${phoneMenu ? "menu-cart-announcement" : ""}
                             fixed
                             bottom-40
                             left-1/2
@@ -1583,7 +1588,7 @@ export default function MenuScreen() {
                             font-semibold
                             text-white
                             shadow-lg
-                        "
+                        `}
                     >
                         ✓ {cartNotice}
                     </div>

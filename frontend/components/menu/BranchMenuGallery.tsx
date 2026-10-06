@@ -27,7 +27,7 @@ export default function BranchMenuGallery({branch, products, activeTab, onTabCha
     const photos = products.filter(product => product.available && product.imageUrl && !failed.includes(product.imageUrl))
         .filter((product, index, list) => list.findIndex(candidate => candidate.imageUrl === product.imageUrl) === index).slice(0, 3);
 
-    return <div className="gokul-branch-gallery">
+    return <div className="gokul-branch-gallery" data-branch-tab={activeTab}>
         <div className="gokul-branch-intro">
             <p className="gokul-overline">Gokul Sweets &amp; Restaurants / Pickup menu</p>
             <h1>{branch.name}</h1>
