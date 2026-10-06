@@ -81,11 +81,11 @@ class MenuCatalogIntegrationTest {
     }
     @Test void sharedAvailabilityExpiresAtBoundaryAndRejectsClockReversal(){
         windows.save(branch,new MenuServiceWindows.Settings(true,0,List.of(new MenuServiceWindows.Item(bp,java.time.LocalTime.of(10,0),java.time.LocalTime.of(17,0),127,false,null))));
-        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.500Z"));
+        org.mockito.Mockito.doReturn(java.time.Instant.parse("2026-10-06T04:29:59.500Z")).when(clock).instant();
         var before=live.get(branch);assertThat(before.items().getFirst().available()).isFalse();
-        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.750Z"));var reused=live.get(branch);assertThat(reused.items()).isSameAs(before.items());assertThat(reused.observedAt()).isEqualTo(clock.instant());
-        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:30:00Z"));assertThat(live.get(branch).items().getFirst().available()).isTrue();
-        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.900Z"));assertThat(live.get(branch).items().getFirst().available()).isFalse();
+        org.mockito.Mockito.doReturn(java.time.Instant.parse("2026-10-06T04:29:59.750Z")).when(clock).instant();var reused=live.get(branch);assertThat(reused.items()).isSameAs(before.items());assertThat(reused.observedAt()).isEqualTo(clock.instant());
+        org.mockito.Mockito.doReturn(java.time.Instant.parse("2026-10-06T04:30:00Z")).when(clock).instant();assertThat(live.get(branch).items().getFirst().available()).isTrue();
+        org.mockito.Mockito.doReturn(java.time.Instant.parse("2026-10-06T04:29:59.900Z")).when(clock).instant();assertThat(live.get(branch).items().getFirst().available()).isFalse();
     }
     @Test void dateDiscoveryDoesNotNeedAnyProductInventory(){
         var tomorrow=java.time.LocalDate.now(java.time.ZoneId.of("Asia/Kolkata")).plusDays(1);

@@ -36,7 +36,8 @@ class MenuServiceWindowsIntegrationTest {
   samosa=product(code+"-S","Samosa");chola=product(code+"-C","Chola samosa");
   samosaBp=bp(samosa);cholaBp=bp(chola);
  }
- void time(String instant){when(clock.instant()).thenReturn(Instant.parse(instant));when(clock.getZone()).thenReturn(ZoneId.of("Asia/Kolkata"));}
+ // Stub the shared spy without invoking real clock methods while scheduled readers are active.
+ void time(String instant){doReturn(Instant.parse(instant)).when(clock).instant();doReturn(ZoneId.of("Asia/Kolkata")).when(clock).getZone();}
  long product(String code,String name){return jdbc.queryForObject("INSERT INTO products(code,name,category_id,sale_mode,base_price) VALUES (?, ?, ?, 'UNIT',20) RETURNING id",Long.class,code,name,category);}
  long bp(long product){return jdbc.queryForObject("INSERT INTO branch_products(branch_id,product_id) VALUES (?,?) RETURNING id",Long.class,branch,product);}
  MenuServiceWindows.Item rule(long id,boolean sold,Long dependency){return new MenuServiceWindows.Item(id,LocalTime.of(10,0),LocalTime.of(17,0),127,sold,dependency);}
