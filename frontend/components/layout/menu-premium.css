@@ -141,10 +141,10 @@
 .future-storefront[data-premium-menu=true] .mobile-menu-pairing-skeleton>div>span{height:18px;background:#eee8f5;border-radius:8px;width:75%}
 }
 @media(max-width:640px){.future-storefront[data-premium-menu=true] .mobile-menu-pairing-skeleton{position:static;inset:auto}.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline{min-height:139px}.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline article{height:136px}}
-@media(max-width:640px){.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline .menu-pairing-group-button{position:absolute;left:106px;right:auto;bottom:8px;width:110px;min-height:44px;margin:0;font-size:10px;background:#fff;color:#087f55;border:1px solid #ccdcd3;border-radius:12px}}
+@media(max-width:640px){.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline .mobile-menu-pairing-photo button.menu-pairing-group-button{position:absolute;left:106px;right:auto;bottom:8px;width:110px;min-height:44px;margin:0;font-size:10px;background:#fff;color:#087f55;border:1px solid #ccdcd3;border-radius:12px}}
 /* Legacy image-overlay button rules must not position the stepper's children. */
 @media(max-width:640px){
-.future-storefront[data-premium-menu=true] .mobile-menu-pairing-photo .menu-purchase-control button{position:static;inset:auto;width:auto;padding:0;scroll-margin-block:160px}
+.future-storefront[data-premium-menu=true] .mobile-menu-pairing-photo .menu-purchase-control button{position:static;inset:auto;width:auto;min-width:0;height:44px;padding:0;border:0!important;border-radius:0!important;box-shadow:none;background:#fff;color:#087f55;scroll-margin-block:160px}
 .future-storefront[data-premium-menu=true] .mobile-menu-pairing-photo .menu-purchase-control>button{width:100%}
 .future-storefront[data-premium-menu=true] .mobile-menu-pairing-photo .menu-purchase-control [role=group]>span{font-size:12px}
 }
