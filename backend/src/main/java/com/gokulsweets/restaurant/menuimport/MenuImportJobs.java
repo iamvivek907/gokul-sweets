@@ -27,6 +27,10 @@ public class MenuImportJobs {
     }
     @Transactional
     public Job enqueue(long branchId,MultipartFile file,String operation) {
+        return enqueue(branchId,file,operation,null);
+    }
+    @Transactional
+    public Job enqueue(long branchId,MultipartFile file,String operation,UUID submissionId) {
         long staff=authorize(branchId);
         if(!Set.of("VALIDATE","IMPORT").contains(operation))throw new IllegalArgumentException("Invalid menu operation.");
         if(file.isEmpty()||file.getSize()>2*1024*1024)throw new IllegalArgumentException("Choose an Excel file of at most 2 MB.");
@@ -35,16 +39,36 @@ public class MenuImportJobs {
         jdbc.queryForObject("SELECT pg_advisory_xact_lock(714114)",Object.class);
         byte[] bytes;String digest;
         try{bytes=file.getBytes();digest=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(IOException|NoSuchAlgorithmException e){throw new IllegalArgumentException("Unable to read the upload.");}
+        if(submissionId!=null) {
+            var prior=jdbc.query("SELECT j.* FROM menu_import_submissions s JOIN menu_import_jobs j ON j.id=s.job_id WHERE s.id=?",(r,n)->new Object[]{job(r),r.getLong("branch_id"),r.getLong("staff_id"),r.getString("file_digest")},submissionId);
+            if(!prior.isEmpty()) {
+                var value=prior.getFirst();var existing=(Job)value[0];
+                if(value[1].equals(branchId)&&value[2].equals(staff)&&value[3].equals(digest)&&existing.operation().equals(operation))return existing;
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"This upload identifier belongs to a different submission.");
+            }
+        }
         var active=jdbc.query("SELECT id,operation,status,result,error,file_digest,staff_id FROM menu_import_jobs WHERE branch_id=? AND status IN ('QUEUED','PROCESSING')",(r,n)->new Object[]{job(r),r.getString("file_digest"),r.getLong("staff_id")},branchId);
         if(!active.isEmpty()) {
             var value=active.getFirst();var job=(Job)value[0];
-            if(value[1].equals(digest)&&value[2].equals(staff)&&job.operation().equals(operation))return job;
+            if(value[1].equals(digest)&&value[2].equals(staff)&&job.operation().equals(operation))return linkSubmission(submissionId,job);
             throw new ResponseStatusException(HttpStatus.CONFLICT,"A menu job is already running for this branch. Wait for it to finish.");
         }
         if(jdbc.queryForObject("SELECT COUNT(*) FROM menu_import_jobs WHERE status IN ('QUEUED','PROCESSING')",Long.class)>=10)throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"The import queue is full. Please try later.");
         UUID id=UUID.randomUUID();String name=Optional.ofNullable(file.getOriginalFilename()).orElse("menu.xlsx");name=name.substring(0,Math.min(255,name.length()));
         jdbc.update("INSERT INTO menu_import_jobs(id,branch_id,staff_id,operation,filename,file_digest,payload) VALUES(?,?,?,?,?,?,?)",id,branchId,staff,operation,name,digest,bytes);
-        return new Job(id,operation,"QUEUED",null,null);
+        return linkSubmission(submissionId,new Job(id,operation,"QUEUED",null,null));
+    }
+    private Job linkSubmission(UUID id,Job job) {
+        if(id!=null)jdbc.update("INSERT INTO menu_import_submissions(id,job_id) VALUES(?,?)",id,job.id());
+        return job;
+    }
+    @Transactional(readOnly=true)
+    public Job getSubmission(long branchId,UUID submissionId) {
+        long staff=authorize(branchId);
+        var matches=jdbc.query("SELECT j.* FROM menu_import_submissions s JOIN menu_import_jobs j ON j.id=s.job_id WHERE s.id=? AND j.branch_id=? AND j.staff_id=?",(r,n)->job(r),submissionId,branchId,staff);
+        if(!matches.isEmpty())return matches.getFirst();
+        if(!enabled)throw new ResponseStatusException(HttpStatus.CONFLICT,"This backend uses synchronous uploads; their status cannot be recovered. Check the menu before uploading again.");
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND,"The upload has not been acknowledged yet. Check its status again before uploading another file.");
     }
     @Transactional(readOnly=true)
     public Job get(long branchId,UUID id) {
