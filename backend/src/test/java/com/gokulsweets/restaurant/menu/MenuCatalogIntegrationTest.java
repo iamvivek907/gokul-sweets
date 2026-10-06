@@ -64,7 +64,7 @@ class MenuCatalogIntegrationTest {
         windows.save(branch,new MenuServiceWindows.Settings(true,0,List.of(new MenuServiceWindows.Item(bp,java.time.LocalTime.of(10,0),java.time.LocalTime.of(17,0),127,false,null))));
         org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.500Z"));
         var before=live.get(branch);assertThat(before.items().getFirst().available()).isFalse();
-        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.750Z"));assertThat(live.get(branch)).isSameAs(before);
+        org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.750Z"));var reused=live.get(branch);assertThat(reused.items()).isSameAs(before.items());assertThat(reused.observedAt()).isEqualTo(clock.instant());
         org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:30:00Z"));assertThat(live.get(branch).items().getFirst().available()).isTrue();
         org.mockito.Mockito.when(clock.instant()).thenReturn(java.time.Instant.parse("2026-10-06T04:29:59.900Z"));assertThat(live.get(branch).items().getFirst().available()).isFalse();
     }

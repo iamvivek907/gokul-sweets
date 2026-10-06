@@ -14,7 +14,9 @@ public class MenuAvailabilityService {
     private final Clock inventoryClock;
     private final Map<Long,Cached> cache=new LinkedHashMap<>(16,.75f,true);
     public record Item(long productId,boolean available,MenuServiceWindows.Status serviceAvailability) {}
-    public record Availability(String revision,boolean serviceWindowsEnabled,List<Item> items) {}
+    public record Availability(String revision,boolean serviceWindowsEnabled,List<Item> items,Instant observedAt) {
+        public Availability(String revision,boolean serviceWindowsEnabled,List<Item> items){this(revision,serviceWindowsEnabled,items,null);}
+    }
     private record Cached(Instant evaluatedAt,Instant until,Availability value) {}
     @Transactional(readOnly=true)
     public Availability get(long branchId) {
@@ -23,13 +25,13 @@ public class MenuAvailabilityService {
         synchronized(cache) {
             for(int attempt=0;attempt<3;attempt++) {
                 var snapshot=catalog.get(branchId);Instant now=inventoryClock.instant();var cached=cache.get(branchId);
-                if(publish&&cached!=null&&cached.value().revision().equals(snapshot.revision())&&!now.isBefore(cached.evaluatedAt())&&now.isBefore(cached.until()))return cached.value();
+                if(publish&&cached!=null&&cached.value().revision().equals(snapshot.revision())&&!now.isBefore(cached.evaluatedAt())&&now.isBefore(cached.until()))return new Availability(cached.value().revision(),cached.value().serviceWindowsEnabled(),cached.value().items(),now);
                 var live=windows.snapshot(branchId);
                 var items=snapshot.categories().stream().flatMap(c->c.products().stream()).map(p->{
                     var status=live.status(p.id());return new Item(p.id(),p.available()&&(status==null||status.available()),status);
                 }).toList();
                 if(!catalog.revision().equals(snapshot.revision()))continue;
-                var result=new Availability(snapshot.revision(),live.enabled(),items);
+                var result=new Availability(snapshot.revision(),live.enabled(),items,now);
                 if(publish) {
                     Instant until=now.plusSeconds(1);
                     for(var item:items)if(item.serviceAvailability()!=null&&item.serviceAvailability().nextChangeAt()!=null&&item.serviceAvailability().nextChangeAt().isBefore(until))until=item.serviceAvailability().nextChangeAt();

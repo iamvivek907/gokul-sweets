@@ -10,7 +10,7 @@ function setup(catalogDelay=0){
  const exports={};
  vm.runInNewContext(code,{exports,process:{env:{}},performance:{now:()=>now},Date,DOMException,AbortController,AbortSignal,setTimeout,clearTimeout,require:name=>name.includes('apiClient')?{apiClient:async(path,options)=>{
   calls.push({path,options});
-  if(path.includes('view=availability'))return {revision,serviceWindowsEnabled:enabled,items:[{productId:1,available,serviceAvailability:{available,code:available?'AVAILABLE':'SOLD_OUT'}}]};
+  if(path.includes('view=availability'))return {revision,observedAt:"2026-10-06T04:29:59.750Z",serviceWindowsEnabled:enabled,items:[{productId:1,available,serviceAvailability:{available,code:available?'AVAILABLE':'SOLD_OUT'}}]};
   now+=catalogDelay;return {revision,categories:categories.map(c=>({...c,products:c.products.map(p=>({...p,price:revision*400}))}))};
  }}:name.includes('mobileConnection')?{constrainedPhoneConnection:()=>true}:{getMockMenu:()=>[]}});
  return {api:exports,calls,change:value=>{revision=value;},sold:()=>{available=false;},disable:()=>{enabled=false;}};
@@ -33,5 +33,6 @@ test('branch catalogs stay isolated and bounded across navigation',async()=>{
 
 test('slow catalog loading does not extend the live service decision receipt time',async()=>{
  const f=setup(5000);const menu=await f.api.getMenu(1);
+ assert.equal(menu[0].products[0].serviceAvailability.evaluatedAt,"2026-10-06T04:29:59.750Z","cached status uses the current server observation time");
  assert.equal(menu[0].products[0].serviceAvailability.receivedMonotonic,0,'service timing starts at availability receipt, before catalog delivery');
 });
