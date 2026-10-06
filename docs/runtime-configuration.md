@@ -534,7 +534,7 @@ non-heap plus buffer measurements do not account for all native memory. No publi
 Disable after collecting an idle baseline and menu/admin workload samples. Compare the logs
 with Render memory metrics before attributing an incident to a specific request.
 
-Menu imports now reject files above 2 MB and sheet ranges beyond 2000 data rows.
+Menu imports reject files above 2 MB. A streaming ZIP/XML preflight runs before POI loads a workbook: every worksheet is limited to 500 data rows plus its header and 17 columns (A–Q), at most two worksheets (Menu_Upload and Reference_Data in the template), 17,034 cells total, 60,000 XML elements, 1 MiB of XML text, and XML depth 32. ZIP expansion is capped at 8 MiB per part and 12 MiB total. These limits include content that is not imported. Async job status checks have an eight-second request timeout and a ten-minute overall deadline, including response-body reads. Pending job IDs are retained in session storage so staff can use Resume status check after a timeout or page refresh without uploading again.
 The parser still uses an in-memory workbook; these are guardrails, not a streaming parser
 or a bound on decompressed workbook memory. Keep Apache POI ZIP safety defaults enabled.
 An import remains one atomic transaction. Further batching must preserve rollback and

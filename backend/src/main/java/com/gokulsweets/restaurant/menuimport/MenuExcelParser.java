@@ -41,24 +41,16 @@ public class MenuExcelParser {
             );
 
     private static final long MAX_FILE_BYTES = 2 * 1024 * 1024;
-    private static final int MAX_ROWS = 2000;
+    private static final int MAX_ROWS = MenuWorkbookLimits.MAX_DATA_ROWS;
     private final DataFormatter dataFormatter = new DataFormatter(Locale.ENGLISH);
 
 
-    // Bound ZIP expansion before POI materializes XML, including sheets we do not import.
-    private void validateExpandedSize(MultipartFile file) {
-        try(var zip=new java.util.zip.ZipInputStream(file.getInputStream())) {
-            byte[] buffer=new byte[8192];long total=0;int entries=0;
-            while(zip.getNextEntry()!=null) {
-                if(++entries>1000)throw new MenuImportValidationException("The workbook contains too many entries.");
-                long entry=0;int count;
-                while((count=zip.read(buffer))!=-1) {
-                    entry+=count;total+=count;
-                    if(entry>8*1024*1024||total>12*1024*1024)throw new MenuImportValidationException("The expanded workbook is too large. Upload a smaller menu file.");
-                }
-                zip.closeEntry();
-            }
-        }catch(IOException failure){throw new MenuImportValidationException("Unable to read the Excel file.");}
+    private void validateWorkbookLimits(MultipartFile file) {
+        try (var input = file.getInputStream()) {
+            MenuWorkbookLimits.validate(input);
+        } catch (IOException failure) {
+            throw new MenuImportValidationException("Unable to read the Excel file.", failure);
+        }
     }
 
     public List<MenuImportRow> parse(
@@ -66,7 +58,7 @@ public class MenuExcelParser {
     ) {
 
         validateFile(file);
-        validateExpandedSize(file);
+        validateWorkbookLimits(file);
 
         try (
                 InputStream inputStream =
@@ -93,7 +85,7 @@ public class MenuExcelParser {
             }
 
             if (sheet.getLastRowNum() > MAX_ROWS) {
-                throw new MenuImportValidationException("Menu upload supports at most 2000 rows.");
+                throw new MenuImportValidationException("Menu upload supports at most 500 data rows.");
             }
 
             Row headerRow =
