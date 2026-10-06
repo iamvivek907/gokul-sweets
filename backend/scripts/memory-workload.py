@@ -64,4 +64,29 @@ for users in (1, 10, 50, 100):
                          p50_seconds=round(statistics.median(timings), 3), p95_seconds=round(p95, 3),
                          max_seconds=round(max(timings), 3), error_samples=errors[:3])), flush=True)
     failed |= bool(errors)
+def discovery(_):
+    started = time.monotonic()
+    items = [dict(productId=p['id'], quantity=1) for category in menu for p in category['products']][:100]
+    body = json.dumps(dict(startDate=TODAY.isoformat(), days=31, items=items)).encode()
+    try:
+        with urllib.request.urlopen(urllib.request.Request(
+                BASE + '/api/branches/10001/availability?menuPreview=true', data=body,
+                headers={'Content-Type': 'application/json'}), timeout=15) as response:
+            result = json.load(response)
+            if not result.get('dates'):
+                raise ValueError('Missing menu discovery dates')
+        return time.monotonic() - started, None
+    except Exception as error:
+        return time.monotonic() - started, str(error)
+
+# Exercise the actual expensive mobile-picker shape separately from small carts.
+for users in (10, 50, 100):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=users) as pool:
+        results = list(pool.map(discovery, range(users)))
+    timings = sorted(duration for duration, error in results)
+    errors = [error for duration, error in results if error]
+    print(json.dumps(dict(scenario='100-products-31-days-menu-discovery', users=users,
+                         requests=users, errors=len(errors), p95_seconds=round(timings[int(users*.95)-1], 3),
+                         max_seconds=round(max(timings), 3), error_samples=errors[:3])), flush=True)
+    failed |= bool(errors)
 raise SystemExit(1 if failed else 0)
