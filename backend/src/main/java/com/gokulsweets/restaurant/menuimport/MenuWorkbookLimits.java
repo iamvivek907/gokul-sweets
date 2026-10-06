@@ -35,8 +35,15 @@ final class MenuWorkbookLimits {
                 if (++entries > 1000) reject("The workbook contains too many entries.");
                 var part = new BoundedPart(zip, budget);
                 String name = entry.getName().toLowerCase(Locale.ROOT);
-                if (name.endsWith(".xml") || name.endsWith(".rels")) validateXml(factory, part, budget);
-                while (part.read(buffer) != -1) { /* Count non-XML parts and any trailing bytes. */ }
+                // POI follows content types/relationships, not filename extensions. Restrict
+                // menu templates to XML parts so no renamed part can escape XML budgets.
+                // Embedded media, binary parts and arbitrary extensions are unsupported.
+                if (!entry.isDirectory()) {
+                    if (!name.endsWith(".xml") && !name.endsWith(".rels"))
+                        reject("Unsupported workbook part filename. Use the .xlsx menu template without embedded media or binary parts.");
+                    validateXml(factory, part, budget);
+                }
+                while (part.read(buffer) != -1) { /* Count directories and any trailing bytes. */ }
                 zip.closeEntry();
             }
         }

@@ -11,11 +11,84 @@ class MenuExcelParserLimitsTest {
     private final MenuExcelParser parser = new MenuExcelParser();
 
     @Test
+    void rejectsRenamedWorksheetEvenWhenPoiResolvesItsContentTypeAndRelationship() throws Exception {
+        byte[] renamed = renamedWorksheet(false);
+        // A real OPC package: this is loadable by POI despite the .dat worksheet name.
+        try (var workbook = new XSSFWorkbook(new java.io.ByteArrayInputStream(renamed))) {
+            assertThat(workbook.getSheet("Menu_Upload").getLastRowNum()).isEqualTo(500);
+        }
+        assertRejectedBeforePoi(renamed);
+    }
+
+    @Test
+    void rejectsRenamed500RowWorksheetWithExcessiveCellsBeforePoiAllocation() throws Exception {
+        byte[] renamed = renamedWorksheet(true);
+        assertThat(renamed.length).isLessThan(2 * 1024 * 1024);
+        assertRejectedBeforePoi(renamed);
+    }
+
+    private void assertRejectedBeforePoi(byte[] bytes) {
+        var opens = new java.util.concurrent.atomic.AtomicInteger();
+        var file = new MockMultipartFile("file", "menu.xlsx", null, bytes) {
+            @Override public java.io.InputStream getInputStream() throws java.io.IOException {
+                opens.incrementAndGet();
+                return super.getInputStream();
+            }
+        };
+        assertThatThrownBy(() -> parser.parse(file)).isInstanceOf(MenuImportValidationException.class)
+                .hasMessageContaining("Unsupported workbook part filename");
+        // The second stream would construct XSSFWorkbook. Only preflight was entered.
+        assertThat(opens.get()).isEqualTo(1);
+    }
+
+    private byte[] renamedWorksheet(boolean excessiveCells) throws Exception {
+        var original = new ByteArrayOutputStream();
+        try (var workbook = new XSSFWorkbook()) {
+            var sheet = workbook.createSheet("Menu_Upload");
+            for (int r = 0; r <= 500; r++) sheet.createRow(r).createCell(0).setCellValue("Sweet");
+            workbook.write(original);
+        }
+        var result = new ByteArrayOutputStream();
+        try (var input = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(original.toByteArray()));
+             var output = new java.util.zip.ZipOutputStream(result)) {
+            java.util.zip.ZipEntry entry;
+            while ((entry = input.getNextEntry()) != null) {
+                String name = entry.getName();
+                String xml = new String(input.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                if (name.equals("[Content_Types].xml") || name.equals("xl/_rels/workbook.xml.rels"))
+                    xml = xml.replace("sheet1.xml", "sheet1.dat");
+                if (name.equals("xl/worksheets/sheet1.xml")) {
+                    name = "xl/worksheets/sheet1.dat";
+                    if (excessiveCells) {
+                        // 500 rows alone do not bound POI objects: repeated cell references
+                        // can allocate large graphs even though the compressed file is small.
+                        var payload = new StringBuilder("<worksheet xmlns='http://schemas.openxmlformats.org/spreadsheetml/2006/main'><sheetData><row r='1'/>");
+                        for (int r = 2; r <= 501; r++) {
+                            payload.append("<row r='").append(r).append("'>");
+                            for (int c = 0; c < 120; c++)
+                                payload.append("<c r='A").append(r).append("' t='inlineStr'><is><t>Sweet</t></is></c>");
+                            payload.append("</row>");
+                        }
+                        xml = payload.append("</sheetData></worksheet>").toString();
+                    }
+                }
+                output.putNextEntry(new java.util.zip.ZipEntry(name));
+                output.write(xml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                output.closeEntry();
+            }
+        }
+        return result.toByteArray();
+    }
+
+    @Test
     void rejectsCompressedExpansionBeforePoiLoadsIt() throws Exception {
         var bytes=new ByteArrayOutputStream();
         try(var zip=new java.util.zip.ZipOutputStream(bytes)) {
-            zip.putNextEntry(new java.util.zip.ZipEntry("xl/worksheets/payload.bin"));
-            zip.write(new byte[8*1024*1024+1]);zip.closeEntry();
+            zip.putNextEntry(new java.util.zip.ZipEntry("xl/worksheets/payload.xml"));
+            // Legal XML prolog whitespace reaches the byte limit before XML object/text limits.
+            zip.write(" ".repeat(8*1024*1024+1).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.write("<worksheet/>".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            zip.closeEntry();
         }
         var file=new MockMultipartFile("file","menu.xlsx",null,bytes.toByteArray());
         assertThatThrownBy(()->parser.parse(file)).hasMessageContaining("expanded workbook");
