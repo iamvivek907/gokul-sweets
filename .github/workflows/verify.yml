@@ -83,7 +83,7 @@ jobs:
           node tests/menu-offer-freshness.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/menu-discovery.browser.mjs
           node tests/menu-pickup-guidance.browser.mjs
-          node tests/premium-menu.browser.mjs
+          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/premium-menu.browser.mjs
           node tests/admin-product-groups.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-polish.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-guidance.browser.mjs
@@ -244,6 +244,8 @@ jobs:
           SELECT 10001,id FROM products WHERE category_id=10001;
           INSERT INTO branch_inventory_policies(branch_product_id,control_mode,inventory_unit,online_enabled,booking_horizon_days,created_at,updated_at)
           SELECT id,'DAILY_PRODUCTION','PIECE',true,30,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM branch_products WHERE branch_id=10001;
+          -- Align fixture service dates with the application's inventory clock, not UTC.
+          SET TIME ZONE 'Asia/Kolkata';
           INSERT INTO inventory_daily_allocations(branch_product_id,service_date,status,inventory_unit,approved_quantity,created_at,updated_at)
           SELECT b.id,CURRENT_DATE+n,'APPROVED','PIECE',1000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
           FROM branch_products b CROSS JOIN generate_series(1,30) n WHERE b.branch_id=10001;

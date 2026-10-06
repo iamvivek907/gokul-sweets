@@ -23,7 +23,7 @@ try{for(const missing of ['none','any','both']){
  // Preserve component identity as well as input value through a failed background read.
  await search.evaluate(n=>n.dataset.reviewMarker='retained');
  await page.getByRole('button',{name:'Browse all item categories',exact:true}).click();
- const picker=page.getByRole('dialog',{name:'Items',exact:true});await picker.waitFor({state:'visible'});
+ const picker=page.getByRole('dialog',{name:'Filter menu',exact:true});await picker.waitFor({state:'visible'});
  await page.clock.install();fail=true;await page.clock.fastForward(15001);
  const notice=page.getByRole('dialog',{name:'Branch availability could not be checked',exact:true});await notice.waitFor({state:'visible'});
  assert.equal(await search.inputValue(),'Fresh');assert.equal(await search.getAttribute('data-review-marker'),'retained');
