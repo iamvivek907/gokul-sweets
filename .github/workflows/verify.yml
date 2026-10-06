@@ -219,6 +219,7 @@ jobs:
             --env PHONEPE_CLIENT_ID --env PHONEPE_CLIENT_SECRET --env PHONEPE_REDIRECT_URL \
             --env INVENTORY_AUTOMATION_SCHEDULER_ENABLED --env GOKUL_REPORTING_AUTOMATIC_REFRESH \
             --env GOKUL_ENVIRONMENT_ISOLATION_ENABLED --env GOKUL_ENVIRONMENT_CORS_ENABLED \
+            --env GOKUL_MEMORY_DIAGNOSTICS_ENABLED=true \
             --env STAFF_MFA_ENCRYPTION_KEY --env PORT gokul-render-ci
           for attempt in $(seq 1 120); do
             if [ "$(docker inspect --format '{{.State.Running}}' gokul-render-smoke)" != true ]; then
@@ -230,10 +231,32 @@ jobs:
                 docker exec -i "$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')" psql -U gokul_test -d restaurant_test -v ON_ERROR_STOP=1 <<'SQL'
           INSERT INTO branches(id,code,name) VALUES (10001,'MEMORY_CI','Memory workload');
           INSERT INTO categories(id,code,name) VALUES (10001,'MEMORY_CI','Memory workload');
-          INSERT INTO products(code,category_id,name,base_price)
-          SELECT 'MEMORY_CI_'||n,10001,'Menu item '||n,100 FROM generate_series(1,379) n;
+          INSERT INTO tax_categories(id,code,name,cgst_rate,sgst_rate) VALUES (10001,'MEMORY_CI','Synthetic tax',2.5,2.5);
+          INSERT INTO products(code,category_id,name,base_price,tax_category_id)
+          SELECT 'MEMORY_CI_'||n,10001,'Menu item '||n,100,10001 FROM generate_series(1,379) n;
           INSERT INTO branch_products(branch_id,product_id)
           SELECT 10001,id FROM products WHERE category_id=10001;
+          INSERT INTO branch_inventory_policies(branch_product_id,control_mode,inventory_unit,online_enabled,booking_horizon_days,created_at,updated_at)
+          SELECT id,'DAILY_PRODUCTION','PIECE',true,30,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM branch_products WHERE branch_id=10001;
+          INSERT INTO inventory_daily_allocations(branch_product_id,service_date,status,inventory_unit,approved_quantity,created_at,updated_at)
+          SELECT b.id,CURRENT_DATE+n,'APPROVED','PIECE',1000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+          FROM branch_products b CROSS JOIN generate_series(1,30) n WHERE b.branch_id=10001;
+          INSERT INTO staff_users(id,username,password_hash,full_name,role_id)
+          SELECT 10000+n,'memory_ci_'||n,'disabled-ci-only','Memory staff '||n,r.id
+          FROM generate_series(1,100) n CROSS JOIN roles r WHERE r.name='KITCHEN_STAFF';
+          INSERT INTO staff_branch_access(staff_user_id,branch_id) SELECT id,10001 FROM staff_users WHERE id BETWEEN 10001 AND 10100;
+          INSERT INTO staff_sessions(token_hash,staff_id,csrf_hash,staff_updated_at,expires_at)
+          SELECT encode(sha256(convert_to('memory_ci_'||lpad((id-10000)::text,33,'0'),'UTF8')),'hex'),id,
+          repeat('0',64),updated_at,CURRENT_TIMESTAMP+INTERVAL '1 hour' FROM staff_users WHERE id BETWEEN 10001 AND 10100;
+          INSERT INTO pickup_slots(id,branch_id,slot_date,start_time,end_time,capacity)
+          VALUES (10001,10001,CURRENT_DATE,'00:00','23:59',1000);
+          INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)
+          SELECT 10001,CURRENT_DATE+n,'00:00','23:59',1000 FROM generate_series(1,30) n;
+          INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,subtotal,total_amount)
+          SELECT 'MEMORY_CI_ORDER_'||n,10001,10001,'Synthetic customer','9999999999','NORMAL','CONFIRMED',500,500 FROM generate_series(1,500) n;
+          INSERT INTO order_items(order_id,product_id,product_name,quantity,unit_price,line_total)
+          SELECT o.id,p.id,p.name,1,100,100 FROM orders o CROSS JOIN
+          (SELECT id,name FROM products WHERE category_id=10001 ORDER BY id LIMIT 5) p WHERE o.branch_id=10001;
           SQL
                 echo 'Deployment image started; exercising 379-item menu and scheduled tasks for three minutes'
                 for sample in $(seq 1 36); do
@@ -242,6 +265,8 @@ jobs:
                   if [ "$(docker inspect --format '{{.State.Running}}' gokul-render-smoke)" != true ]; then exit 1; fi
                   sleep 5
                 done
+                python3 backend/scripts/memory-workload.py
+                curl --silent --show-error --fail --max-time 10 http://127.0.0.1:10000/actuator/health
                 exit 0
               fi
             fi

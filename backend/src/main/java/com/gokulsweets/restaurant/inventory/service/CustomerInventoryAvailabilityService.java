@@ -107,7 +107,8 @@ public class CustomerInventoryAvailabilityService {
                 ));
 
         DateResult requestedResult = evaluateDate(
-                request.serviceDate(), requested, byProductId, policies
+                request.serviceDate(), requested, byProductId, policies,
+                allocationRepository.findByBranchProductIdInAndServiceDate(branchProductIds, request.serviceDate())
         );
 
         LocalDate suggestedDate = null;
@@ -115,12 +116,22 @@ public class CustomerInventoryAvailabilityService {
             int searchDays = maximumSearchDays(policies.values());
             LocalDate lastDate = today.plusDays(searchDays);
 
+            LocalDate batchThrough = request.serviceDate();
+            Map<LocalDate, List<InventoryDailyAllocation>> batch = Map.of();
             for (
                     LocalDate candidate = request.serviceDate().plusDays(1);
                     !candidate.isAfter(lastDate);
                     candidate = candidate.plusDays(1)
             ) {
-                if (evaluateDate(candidate, requested, byProductId, policies).orderable()) {
+                // Bounded seven-day batches avoid one remote query per candidate date.
+                if (candidate.isAfter(batchThrough)) {
+                    batchThrough = candidate.plusDays(6).isAfter(lastDate) ? lastDate : candidate.plusDays(6);
+                    batch = allocationRepository.findByBranchProductIdInAndServiceDateBetween(
+                            branchProductIds, candidate, batchThrough).stream()
+                            .collect(Collectors.groupingBy(InventoryDailyAllocation::getServiceDate));
+                }
+                if (evaluateDate(candidate, requested, byProductId, policies,
+                        batch.getOrDefault(candidate, List.of())).orderable()) {
                     suggestedDate = candidate;
                     break;
                 }
@@ -150,15 +161,10 @@ public class CustomerInventoryAvailabilityService {
             LocalDate date,
             Map<Long, CustomerInventoryCheckRequest.Item> requested,
             Map<Long, BranchProduct> byProductId,
-            Map<Long, BranchInventoryPolicy> policies
+            Map<Long, BranchInventoryPolicy> policies,
+            List<InventoryDailyAllocation> dateAllocations
     ) {
-        List<Long> branchProductIds = byProductId.values().stream()
-                .map(BranchProduct::getId)
-                .toList();
-
-        Map<Long, InventoryDailyAllocation> allocations = allocationRepository
-                .findByBranchProductIdInAndServiceDate(branchProductIds, date)
-                .stream()
+        Map<Long, InventoryDailyAllocation> allocations = dateAllocations.stream()
                 .collect(Collectors.toMap(
                         allocation -> allocation.getBranchProduct().getId(),
                         Function.identity()

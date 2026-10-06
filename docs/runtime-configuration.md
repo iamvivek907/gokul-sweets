@@ -539,3 +539,26 @@ The parser still uses an in-memory workbook; these are guardrails, not a streami
 or a bound on decompressed workbook memory. Keep Apache POI ZIP safety defaults enabled.
 An import remains one atomic transaction. Further batching must preserve rollback and
 existing product/category update semantics.
+
+### Mixed workload coverage and remaining capacity limits
+
+The memory workload script runs only against the disposable localhost CI instance. It exercises
+1, 10, 50 and 100 concurrent clients with an 80/20 customer/staff split at the larger stages.
+Customer requests include the 379-item menu, inventory date suggestions and seven-day cart
+availability. Staff reads use validated cookie sessions with branch permissions, a 500-order
+fixture and 2,500 order items. It reports p50/p95/max response times and fails on request errors.
+The fixture deliberately has no allocations today and approved inventory tomorrow; date
+suggestions must return tomorrow. No real payment, OTP or print-provider calls are made.
+This is not an endurance or checkout overselling test. The CI runner CPU and local PostgreSQL
+latency differ from Render/Neon; a passing run cannot certify their production response times.
+
+Inventory date suggestions load at most seven candidate days in each database batch instead
+of querying every date separately. Bulk import name-conflict lookups use one query per entity
+type instead of one per row. Both preserve validation and atomic checkout/import semantics.
+
+Production architecture should keep catalogue reads cheap and separate them from live
+quantity/date availability checks. Cached catalogue snapshots need branch/product/timing
+invalidation; checkout must always reserve inventory and pickup capacity atomically using the
+current database state. Moving large imports/exports and provider jobs to bounded workers can
+isolate spikes from customer traffic. A bounded queue alone in the same JVM does not isolate
+its memory. Do not replace authoritative inventory reservations with cached stock values.

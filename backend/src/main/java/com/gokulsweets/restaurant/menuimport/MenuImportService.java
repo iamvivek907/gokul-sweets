@@ -775,6 +775,16 @@ public class MenuImportService {
                         );
 
 
+        // One database round trip per entity type rather than per spreadsheet row.
+        Map<String, Category> categoriesByName = categoryRepository.findByNormalizedNames(
+                rows.stream().filter(row -> !existingCategories.containsKey(normalizeCode(row.categoryCode())))
+                        .map(row -> row.categoryName().trim().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(category -> category.getName().toLowerCase(Locale.ROOT), Function.identity()));
+        Map<String, Product> productsByName = productRepository.findByNormalizedNames(
+                rows.stream().filter(row -> !existingProducts.containsKey(normalizeCode(row.productCode())))
+                        .map(row -> row.productName().trim().toLowerCase(Locale.ROOT)).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(product -> product.getName().toLowerCase(Locale.ROOT), Function.identity()));
+
         for (
                 MenuImportRow row :
                 rows
@@ -835,11 +845,7 @@ public class MenuImportService {
 
             if (existingCategory == null) {
 
-                categoryRepository
-                        .findByNameIgnoreCase(
-                                row.categoryName()
-                                        .trim()
-                        )
+                Optional.ofNullable(categoriesByName.get(row.categoryName().trim().toLowerCase(Locale.ROOT)))
                         .filter(
                                 category ->
                                         !category.getCode()
@@ -890,11 +896,7 @@ public class MenuImportService {
 
             if (existingProduct == null) {
 
-                productRepository
-                        .findByNameIgnoreCase(
-                                row.productName()
-                                        .trim()
-                        )
+                Optional.ofNullable(productsByName.get(row.productName().trim().toLowerCase(Locale.ROOT)))
                         .filter(
                                 product ->
                                         !product.getCode()
