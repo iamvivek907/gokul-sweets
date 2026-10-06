@@ -514,9 +514,8 @@ public class PaymentStatusService {
     ) {
 
         Payment payment =
-                getPayment(
-                        paymentId
-                );
+                paymentRepository.findRefundByIdForUpdate(paymentId)
+                        .orElseThrow(() -> new IllegalArgumentException("Payment does not exist."));
 
         if (
                 payment.getPaymentStatus()
@@ -576,9 +575,8 @@ public class PaymentStatusService {
     ) {
 
         Payment payment =
-                getPayment(
-                        paymentId
-                );
+                paymentRepository.findRefundByIdForUpdate(paymentId)
+                        .orElseThrow(() -> new IllegalArgumentException("Payment does not exist."));
 
         if (
                 payment.getPaymentStatus()
@@ -696,6 +694,10 @@ public class PaymentStatusService {
                 null
         );
 
+        payment.setRefundNextCheckAt(null);
+        payment.setRefundCheckFailures(0);
+        payment.setRefundReviewRequired(false);
+
         paymentRepository.save(
                 payment
         );
@@ -776,6 +778,10 @@ public class PaymentStatusService {
                         failureReason
                 )
         );
+
+        payment.setRefundNextCheckAt(null);
+        payment.setRefundCheckFailures(0);
+        payment.setRefundReviewRequired(false);
 
         paymentRepository.save(
                 payment

@@ -3,7 +3,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {apiClient,ApiError} from "@/services/apiClient";
 import {formatOrderCurrency as money} from "@/lib/orderTracking";
 import {T} from "@/lib/language";
-export type CorrectionSummary={orderNumber:string;branchName:string;serverTime:string;cancellationDeadline:string|null;canCancel:boolean;canTransfer:boolean;refundAmount:number;retainedCharges:number;refundStatus:string;explanation:string};
+export type CorrectionSummary={orderNumber:string;branchName:string;serverTime:string;cancellationDeadline:string|null;canCancel:boolean;canTransfer:boolean;refundAmount:number;retainedCharges:number;refundStatus:string;refundReviewRequired?:boolean;explanation:string};
 type Cancellation={requestKey:string;reason:string;acceptedRefundAmount:number;acceptedRetainedCharges:number};
 export default function OrderCancellation({orderNumber,onChanged}:{orderNumber:string;onChanged:()=>void}){
  const [summary,setSummary]=useState<CorrectionSummary|null>(null),[error,setError]=useState(""),[busy,setBusy]=useState(false),[open,setOpen]=useState(false),[remaining,setRemaining]=useState(0);

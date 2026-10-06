@@ -5,6 +5,8 @@ import com.gokulsweets.restaurant.occasion.OccasionCommitmentService;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
 import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeClient;
+import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePePaymentProvider;
+import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 public class PhonePeCallbackService {
 
     private final PhonePeClient phonePeClient;
+    private final PhonePePaymentProvider phonePeProvider;
     private final ObjectMapper objectMapper;
     private final PaymentRepository paymentRepository;
     private final PaymentStatusService paymentStatusService;
@@ -50,6 +53,14 @@ public class PhonePeCallbackService {
             throw new IllegalArgumentException(
                     "PhonePe webhook payload is missing."
             );
+        }
+
+        if ("pg.refund.completed".equals(event) || "pg.refund.failed".equals(event)) {
+            processRefund(event, payload);
+            return;
+        }
+        if (!"checkout.order.completed".equals(event) && !"checkout.order.failed".equals(event)) {
+            return;
         }
 
         String merchantOrderId =
@@ -137,6 +148,24 @@ public class PhonePeCallbackService {
                     event,
                     state
             );
+        }
+    }
+
+    private void processRefund(String event, JsonNode payload) {
+        String reference = requiredText(payload, "merchantRefundId");
+        Payment payment = paymentRepository.findByRefundReferenceId(reference)
+                .filter(p -> p.getProvider() == PaymentProviderType.PHONEPE)
+                .orElseThrow(() -> new IllegalArgumentException("PhonePe refund does not match a local payment."));
+        var result = phonePeProvider.verifyRefundCallback(payment, phonePeClient.refundResponse(payload));
+        PaymentStatus expected = "pg.refund.completed".equals(event)
+                ? PaymentStatus.REFUNDED : PaymentStatus.REFUND_FAILED;
+        if (result.paymentStatus() != expected) {
+            throw new IllegalArgumentException("PhonePe refund event and state do not match.");
+        }
+        if (expected == PaymentStatus.REFUNDED) {
+            paymentStatusService.markRefunded(payment.getId(), result.providerRefundId());
+        } else {
+            paymentStatusService.markRefundFailed(payment.getId(), result.providerRefundId(), result.failureReason());
         }
     }
 

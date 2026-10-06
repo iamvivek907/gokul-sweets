@@ -4,6 +4,10 @@ import com.gokulsweets.restaurant.payment.entity.Payment;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.domain.Pageable;
+import org.springframework.transaction.annotation.Transactional;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -74,6 +78,55 @@ public interface PaymentRepository extends JpaRepository<Payment, Long> {
             PaymentStatus paymentStatus
     );
 
+
+    @Query("""
+            SELECT p.id FROM Payment p
+            WHERE p.paymentStatus = com.gokulsweets.restaurant.payment.enums.PaymentStatus.REFUND_PENDING
+              AND (p.refundNextCheckAt IS NULL OR p.refundNextCheckAt <= :now)
+            ORDER BY p.refundNextCheckAt ASC NULLS FIRST, p.id ASC
+            """)
+    List<Long> findDueRefundIds(@Param("now") LocalDateTime now, Pageable page);
+
+    // A short transaction claims the work; no DB connection is held during provider HTTP calls.
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Payment p SET p.refundNextCheckAt = :leaseUntil
+            WHERE p.id = :id
+              AND p.paymentStatus = com.gokulsweets.restaurant.payment.enums.PaymentStatus.REFUND_PENDING
+              AND (p.refundNextCheckAt IS NULL OR p.refundNextCheckAt <= :now)
+            """)
+    int claimRefundCheck(@Param("id") Long id, @Param("now") LocalDateTime now,
+                         @Param("leaseUntil") LocalDateTime leaseUntil);
+
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Payment p SET p.refundSubmissionAttemptedAt = :now
+            WHERE p.id = :id
+              AND p.paymentStatus = com.gokulsweets.restaurant.payment.enums.PaymentStatus.REFUND_PENDING
+              AND p.refundSubmissionAttemptedAt IS NULL
+            """)
+    int recordRefundSubmissionAttempt(@Param("id") Long id, @Param("now") LocalDateTime now);
+
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE Payment p SET p.refundNextCheckAt = :nextCheck,
+                p.refundCheckFailures = :failures, p.refundReviewRequired = :review,
+                p.refundFailureReason = :reason, p.refundLastCheckedAt = :now
+            WHERE p.id = :id
+              AND p.paymentStatus = com.gokulsweets.restaurant.payment.enums.PaymentStatus.REFUND_PENDING
+              AND p.refundNextCheckAt = :leaseUntil
+            """)
+    int finishRefundCheck(@Param("id") Long id, @Param("leaseUntil") LocalDateTime leaseUntil,
+                          @Param("nextCheck") LocalDateTime nextCheck, @Param("failures") int failures,
+                          @Param("review") boolean review, @Param("reason") String reason,
+                          @Param("now") LocalDateTime now);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Payment p WHERE p.id = :id")
+    Optional<Payment> findRefundByIdForUpdate(@Param("id") Long id);
 
     @EntityGraph(attributePaths = {"order"})
     @Query("""

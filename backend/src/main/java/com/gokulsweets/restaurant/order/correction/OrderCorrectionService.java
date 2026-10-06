@@ -58,6 +58,7 @@ public class OrderCorrectionService {
       BigDecimal refundAmount,
       BigDecimal retainedCharges,
       String refundStatus,
+      boolean refundReviewRequired,
       String explanation) {}
 
   public record Cancellation(
@@ -146,6 +147,7 @@ public class OrderCorrectionService {
         food,
         fees,
         state,
+        payment != null && payment.isRefundReviewRequired(),
         cancel
             ? "The food amount is refundable. Priority, delivery, convenience and payment"
                   + " processing charges, including their taxes, are not refunded."
