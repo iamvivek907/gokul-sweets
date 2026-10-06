@@ -490,6 +490,8 @@ export const hindi: Record<string,string> = {
   "Choose when you’ll collect your order. Check the date and time before continuing.": "ऑर्डर लेने की तारीख और समय चुनें। आगे बढ़ने से पहले दोनों जाँच लें।",
   "Choose a date, then tap a pickup time. Nothing changes until you confirm.": "पहले तारीख चुनें, फिर पिकअप समय पर टैप करें। आपकी पुष्टि के बाद ही बदलाव होगा।",
   "No pickup times available for these items on this date. Try another date or remove items.": "इस तारीख पर इन वस्तुओं के लिए पिकअप समय उपलब्ध नहीं है। दूसरी तारीख चुनें या वस्तुएँ हटाएँ।",
+  "Your pickup time has passed. Choose another time. Your pickup hasn’t changed.": "आपका पिकअप समय बीत चुका है। दूसरा समय चुनें। आपका पिकअप बदला नहीं गया है।",
+  "Choose a pickup time to see your final total.": "अंतिम कुल राशि देखने के लिए पिकअप का समय चुनें।",
   "Choose pickup time": "पिकअप समय चुनें",
   "Your selected pickup date": "आपकी चुनी हुई पिकअप तारीख",
   "Your selected pickup": "आपका चुना हुआ पिकअप",

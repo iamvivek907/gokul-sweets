@@ -7,7 +7,7 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 const branch={id:1,code:'TEST',name:'Test Gokul branch',active:true,address:'Test address',city:'Test city',phone:'9876543210',pickupAvailable:true};
 const half={id:10,name:'Paneer meal Half',categoryId:1,categoryName:'Meals',description:'Fresh paneer with rice.',price:100,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},full={...half,id:11,name:'Paneer meal Full',price:180},drink={...half,id:12,name:'Fresh drink',categoryId:2,categoryName:'Drinks',price:40};
 const baseSlot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,capacity:50,remainingCapacity:50,priorityEnabled:true,priorityCharge:25};
-try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority','menu-pickup-date-only','menu-pickup-no-selection'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
+try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority','menu-pickup-date-only','menu-pickup-no-selection','menu-pickup-expired'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
  console.log('Scenario:',scenario);
  const pickupRegression=scenario.startsWith('menu-pickup-');
  const slot=pickupRegression?{...baseSlot,startTime:'20:30:00',endTime:'21:00:00'}:baseSlot;
@@ -48,7 +48,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&scenario==='pickup-unavailable')json={today:date,maximumDate:secondDate,dates:[{date:secondDate,available:false,slots:[]}]};
   else if(p.endsWith('/availability')&&pickupRegression){
    const items=req.postDataJSON().items??[];
-   const conflict=scenario!=='menu-pickup-quantity'||items.some(item=>item.quantity>1);
+   const conflict=scenario!=='menu-pickup-expired'&&(scenario!=='menu-pickup-quantity'||items.some(item=>item.quantity>1));
    const sameDate=scenario==='menu-pickup-later'||scenario==='menu-pickup-priority';
    const alternative={...slot,id:scenario==='menu-pickup-priority'?1:2,slotDate:sameDate?date:secondDate,startTime:scenario==='menu-pickup-priority'?'20:30:00':sameDate?'21:30:00':'10:00:00',endTime:scenario==='menu-pickup-priority'?'21:00:00':sameDate?'22:00:00':'11:00:00'};
    const initial={slot,normalAvailable:!conflict,priorityAvailable:scenario==='menu-pickup-priority'};
@@ -94,9 +94,11 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  if(pickupRegression){
   const before=await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot'));
   if(scenario==='menu-pickup-quantity'){await ready();await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();}
+  if(scenario==='menu-pickup-expired'){await ready();await page.clock.setFixedTime(new Date(`${date}T21:01:00+05:30`));await page.getByText('Your pickup time has passed. Choose another time. Your pickup hasn’t changed.',{exact:true}).waitFor();}
   const warning=page.getByRole('alert').filter({hasText:/Your pickup hasn’t changed|Choose when you’ll collect your order/});
   if(scenario==='menu-pickup-date-only')await page.getByRole('region',{name:'Checkout pickup'}).getByText(/Today ·/).waitFor();
   await warning.waitFor();
+  await page.getByText('Choose a pickup time to see your final total.',{exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).getAttribute('data-payment-ready'),'false');assert.equal(await page.getByRole('button',{name:'Choose pickup time',exact:true}).isEnabled(),true);
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),before);
   assert.equal(orders.length,0);assert.equal(payments,0);
