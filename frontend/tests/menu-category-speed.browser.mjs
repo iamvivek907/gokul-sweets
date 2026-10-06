@@ -7,13 +7,12 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 const branch={id:1,code:'GUIDE',name:'Gokul Tamkuhi Road',active:true,operational:true,pickupAvailable:true,address:'Main Road, opposite the bus stand',city:'Tamkuhi Road',pincode:'274407',coverImageUrl:'/logo.png'};
 const sweet={id:1,categoryId:1,categoryName:'Sweets',name:'Fresh peda',description:'Fresh milk sweet.',price:400,imageUrl:null,available:true,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:50};
 const tea={...sweet,id:2,categoryId:2,categoryName:'Drinks',name:'Special tea',price:30,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null};
-const favourite={...tea,id:4,name:'Masala chai',price:35};
 const sold={...tea,id:3,name:'Sold-out samosa',available:false};
 const slot={id:7,branchId:1,slotDate:date,startTime:'15:00:00',endTime:'16:00:00',active:true,remainingCapacity:10,priorityEnabled:false,priorityRemainingCapacity:0,priorityCharge:0};
 const offer={rebateId:1,code:'SAVE',name:'Sweet saving',description:'Eligible food only',scope:'GENERAL',rebateType:'SLAB',rebateAmount:0,payableAfterRebate:100,minimumOrderAmount:150,maximumDiscountAmount:20,nextSlabMinimumOrderAmount:150,nextSlabRebateAmount:10,amountNeededForNextSlab:25};
 try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],[640,true,false]]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
- let branchReads=0,menuReads=0,pickupReads=0,releaseHistory,releaseRatings,releaseAvailability,releasePreview;
+ let menuReads=0,pickupReads=0,releaseHistory,releaseRatings,releaseAvailability,releasePreview;
  const historyGate=new Promise(r=>releaseHistory=r),ratingsGate=new Promise(r=>releaseRatings=r),availabilityGate=new Promise(r=>releaseAvailability=r),previewGate=new Promise(r=>releasePreview=r);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));const smart=true,signedIn=false;
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
@@ -33,7 +32,7 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
    await availabilityGate;const body=route.request().postDataJSON();const valid=body.startDate===date;
    json={today,maximumDate:date,dates:[{date:body.startDate,available:valid,items:[{productId:1,available:true},{productId:2,available:true}],slots:valid?[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]:[]},...(body.days>1?[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]}]:[])]};
   }
-  else if(p==='/api/menu/pickup-addons'){branchReads++;json=[{product:tea,slotVerified:true,weightGrams:null,portionPrice:30,portionTotal:30,reason:'Often ordered with Fresh peda'},{product:{...sold,available:true,categoryName:"Sides"},slotVerified:true,weightGrams:null,portionPrice:30,portionTotal:30,reason:'A branch favourite'}];}
+  else if(p==='/api/menu/pickup-addons'){json=[{product:tea,slotVerified:true,weightGrams:null,portionPrice:30,portionTotal:30,reason:'Often ordered with Fresh peda'},{product:{...sold,available:true,categoryName:"Sides"},slotVerified:true,weightGrams:null,portionPrice:30,portionTotal:30,reason:'A branch favourite'}];}
   else if(p==='/api/orders/mobile-preview'){await previewGate;json={quote:{token:'preview',expiresAt:new Date(Date.now()+600000).toISOString(),subtotal:100,taxAmount:0,totalAmount:100,convenienceFee:0,paymentFee:0},offers:[],spendTargets:[offer],totalBeforeOffer:100,rewards:{balance:27,pendingCoins:33,rewards:[{code:'SWEET_5',name:'₹5 sweet saving',coins:30,minimumSubtotal:149,eligible:false,unavailableReason:'Not enough coins'}],terms:'Fees are excluded.'}};}
   try{return await route.fulfill({json,headers});}catch{/* Navigation may abort a deliberately delayed request. */}
  });
