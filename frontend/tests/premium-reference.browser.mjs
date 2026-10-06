@@ -30,6 +30,8 @@ try{for(const width of [320,390,640]){
  assert.deepEqual(await page.locator('.menu-category-tile strong').allTextContents(),['Food','Sweets','Bakery','Snacks']);
  const pickup=await page.locator('.mobile-menu-pickup').boundingBox(),search=await page.locator('.menu-search').boundingBox();assert.ok(pickup.y+pickup.height<=search.y);
  const lang=await page.locator('.language-trigger').boundingBox(),bell=await page.locator('.customer-notification-bell').boundingBox();assert.ok(lang.x+lang.width<=bell.x+1&&Math.abs(lang.y-bell.y)<8);
+ const brandBox=await page.locator('.reference-wordmark').boundingBox();
+ for(const control of ['.language-trigger','.customer-notification-bell','.customer-account-link']){const box=await page.locator(control).boundingBox();assert.ok(Math.abs(brandBox.y+brandBox.height/2-box.y-box.height/2)<3,'brand and customer controls share a row');}
  await mkdir(screenshotDir,{recursive:true});
  const capture=async name=>{await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].filter(img=>img.complete).map(img=>img.decode().catch(()=>{})));window.scrollTo({top:0,behavior:'instant'});});await page.waitForTimeout(600);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:`${screenshotDir}/${name}-${width}.png`});};
  await capture('food');

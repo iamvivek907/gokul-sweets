@@ -28,12 +28,14 @@ try{for(const width of [320,390,640,1024]){
  if(width>640){assert.equal(await page.locator('.menu-editorial-feature').count(),0);assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.getByRole('heading',{name:'Dahi 400 g',exact:true}).count(),1);assert.equal(await page.locator('.customer-bottom-navigation a').count(),5);assert.equal(await page.locator('.customer-bottom-navigation').getAttribute('data-reference-menu'),null);await context.close();console.log('Premium menu desktop preserved');continue;}
  await page.locator('.menu-editorial-feature').waitFor();assert.equal(await page.locator('.menu-category-tile').count(),2);assert.equal(await page.locator('.customer-notification-bell').isVisible(),true);assert.equal(await page.locator('.customer-account-link').isVisible(),true);
  const brand=await page.locator('.reference-wordmark').boundingBox();
- assert.ok(Math.abs(brand.x+brand.width/2-width/2)<=2,'wordmark is centered on the viewport');
+
  const account=await page.locator('.customer-account-link').boundingBox();
  const bell=await page.locator('.customer-notification-bell').boundingBox();
  for(const action of [account,bell])assert.ok(brand.y+brand.height<=action.y||brand.x+brand.width<=action.x,'header actions do not overlap the wordmark');
  const language=await page.locator('.language-trigger').boundingBox();
  assert.ok(language.y<bell.y+bell.height&&bell.y<language.y+language.height&&language.x+language.width<=bell.x+1,'language sits beside the notification bell');
+ for(const action of [language,bell,account]){assert.ok(Math.abs(brand.y+brand.height/2-action.y-action.height/2)<3,'brand and all controls share one row');assert.ok(brand.x+brand.width<=action.x,'controls do not overlap brand');assert.ok(action.width>=44&&action.height>=44,'44px touch targets retained');}
+ assert.ok((await page.locator('.customer-site-header').boundingBox()).height<=54,'header remains one compact row');
  const pickup=await page.locator('.mobile-menu-pickup').boundingBox(),searchBox=await page.locator('.menu-search').boundingBox();
  assert.ok(pickup.y+pickup.height<=searchBox.y,'pickup precedes search');
  await mkdir(screenshotDir,{recursive:true});await page.screenshot({path:`${screenshotDir}/reference-empty-${width}.png`});

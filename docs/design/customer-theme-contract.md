@@ -199,3 +199,6 @@ Visual evidence is rendered from the production build using a controlled test ca
 Banner actions, family shortcuts and the retail discovery rail share the parent browse state. Explicit category filters replace a family constraint, All clears it, and the highlighted tile reflects that same branch-scoped state. Destination scrolling runs after the filtered collection commits, including when clearing an empty-result search, and honours reduced motion.
 
 Screenshot capture tests verify navigation and geometry; they do not assert pixel equality. Exact visual acceptance remains unresolved: header proportions, font/logo reconstruction, decorative artwork and the unavailable Bestsellers/diet metadata differ from the reference. The PR must not be described as visually approved or pixel exact, and must remain unmerged until the owner accepts actual side-by-side captures. Real catalogue prices, stock and images remain authoritative.
+
+
+The owner requested a single compact mobile menu header row: wordmark left, accessible branch-pin control, then language, notification and profile aligned at the same vertical centre. All controls retain 44px touch targets at 320–640px; the header is about 52px tall. The branch name stays in its accessible label rather than creating a second header row.
