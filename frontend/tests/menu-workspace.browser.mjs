@@ -22,6 +22,8 @@ try {
     page.setDefaultTimeout(15000);
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
+    let releaseBranch;
+    let delayBranch = false;
     let conflict = false,
       priceWrites = 0,
       creates = 0,
@@ -75,6 +77,15 @@ try {
       const req = route.request(),
         url = new URL(req.url()),
         path = url.pathname;
+      if (
+        delayBranch &&
+        path === "/api/admin/branches/2/menu/workspace" &&
+        req.method() === "GET"
+      ) {
+        await new Promise((resolve) => {
+          releaseBranch = resolve;
+        });
+      }
       const headers = {
         "Access-Control-Allow-Origin": base,
         "Access-Control-Allow-Credentials": "true",
@@ -164,10 +175,21 @@ try {
             `${i.name} ${i.code}`.toLowerCase().includes(search),
           );
           json = {
-            content: filtered,
+            content:
+              url.searchParams.get("filter") === "COUNT_SKU" &&
+              url.searchParams.get("page") === "1"
+                ? [
+                    {
+                      ...items[0],
+                      productId: 4,
+                      name: "Extra SKU",
+                      code: "SKU-4",
+                    },
+                  ]
+                : filtered,
             totalElements: filtered.length,
             page: 0,
-            totalPages: 1,
+            totalPages: url.searchParams.get("filter") === "COUNT_SKU" ? 2 : 1,
             categories: [{ id: 1, name: "Sweets" }],
             taxes: [{ id: 1, name: "Sweets tax" }],
           };
@@ -190,15 +212,52 @@ try {
       path: `${shots}/overview-${width}.png`,
       fullPage: true,
     });
-    const first = page
-      .locator("article")
-      .filter({
-        has: page.getByRole("heading", { name: "Kaju Katli", exact: true }),
-      });
+    const first = page.locator("article").filter({
+      has: page.getByRole("heading", { name: "Kaju Katli", exact: true }),
+    });
+    await page.locator('input[type="date"]').fill("2030-10-07");
+    delayBranch = true;
+    await page.getByLabel("Selected branch").selectOption("2");
+    assert.equal(
+      await page
+        .getByRole("button", { name: "+ Add product", exact: true })
+        .isDisabled(),
+      true,
+    );
+    assert.equal(
+      await page
+        .getByRole("heading", { name: "Kaju Katli", exact: true })
+        .count(),
+      0,
+    );
+    await page.waitForFunction(
+      () =>
+        document.querySelector('[aria-label="Selected branch"]').value === "2",
+    );
+    for (let i = 0; i < 50 && !releaseBranch; i++)
+      await page.waitForTimeout(20);
+    assert.ok(releaseBranch);
+    delayBranch = false;
+    releaseBranch();
+    await page
+      .getByRole("button", { name: "+ Add product", exact: true })
+      .waitFor();
+    await page.getByLabel("Selected branch").selectOption("1");
     await first.getByRole("button", { name: "Price", exact: true }).click();
     let dialog = page.getByRole("dialog");
     await dialog.waitFor();
     await dialog.getByLabel("Branch override").fill("125");
+    await page.reload();
+    dialog = page.getByRole("dialog");
+    await dialog.waitFor();
+    assert.equal(
+      await dialog.getByLabel("Branch override").inputValue(),
+      "125",
+    );
+    assert.equal(
+      await page.locator('input[type="date"]').inputValue(),
+      "2030-10-07",
+    );
     conflict = true;
     await dialog
       .getByRole("button", { name: "Save changes", exact: true })
@@ -286,15 +345,47 @@ try {
     await dialog
       .getByLabel("Customer-facing group name")
       .fill("Sweet portions");
+    await dialog
+      .getByRole("button", { name: "Next SKUs", exact: true })
+      .click();
+    await dialog.getByRole("button", { name: /Extra SKU.*Link/ }).waitFor();
+    await dialog
+      .getByRole("button", { name: "Previous SKUs", exact: true })
+      .click();
     await dialog.getByRole("button", { name: /Kaju Katli.*Link/ }).click();
     await dialog.getByRole("button", { name: /Samosa.*Link/ }).click();
+    await page.reload();
+    dialog = page.getByRole("dialog");
+    await dialog.waitFor();
+    assert.equal(
+      await dialog.getByLabel("Customer-facing group name").inputValue(),
+      "Sweet portions",
+    );
+    assert.equal(
+      await dialog.getByLabel("Option · SKU #1", { exact: true }).inputValue(),
+      "Kaju Katli",
+    );
     await page.screenshot({
       path: `${shots}/group-editor-${width}.png`,
       fullPage: true,
     });
     await dialog
-      .getByRole("button", { name: "Save group", exact: true })
+      .getByRole("button", { name: "Save & create next", exact: true })
       .click();
+    await page.waitForFunction(() =>
+      Array.from(document.querySelectorAll("dialog input")).some(
+        (input) => input.value === "" && input.maxLength === 100,
+      ),
+    );
+    assert.equal(
+      await dialog.getByLabel("Customer-facing group name").inputValue(),
+      "",
+    );
+    assert.equal(
+      await dialog.getByLabel("Option · SKU #1", { exact: true }).count(),
+      0,
+    );
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
     await page.getByRole("heading", { name: "Sweet portions" }).waitFor();
     assert.equal(groups.groups[0].choices.length, 2);
@@ -311,6 +402,13 @@ try {
     await dialog
       .getByLabel("Hindi title", { exact: true })
       .fill("हर खुशी में मिठास");
+    await page.reload();
+    dialog = page.getByRole("dialog");
+    await dialog.waitFor();
+    assert.equal(
+      await dialog.getByLabel("English title", { exact: true }).inputValue(),
+      "Made for your sweet moments",
+    );
     await page.screenshot({
       path: `${shots}/banner-preview-${width}.png`,
       fullPage: true,
@@ -338,7 +436,7 @@ try {
     );
     await context.close();
     console.log(
-      `Workspace ${width}px: popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,
+      `Workspace ${width}px: refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,
     );
   }
 } finally {

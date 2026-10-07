@@ -1,5 +1,10 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  readWorkspaceDraft,
+  writeWorkspaceDraft,
+  clearWorkspaceDraft,
+} from "@/lib/menuWorkspaceDraft";
 import WorkspaceDialog from "./WorkspaceDialog";
 import WorkspaceMediaEditor from "./WorkspaceMediaEditor";
 import {
@@ -24,9 +29,11 @@ export default function WorkspaceProductEditor({
   date,
   data,
   branches,
-  onClose,
-  onSaved,
+  draftKey,
+  onClose: close,
+  onSaved: saved,
 }: {
+  draftKey: string;
   item: WorkspaceItem | null;
   mode: EditMode;
   branch: number;
@@ -39,39 +46,114 @@ export default function WorkspaceProductEditor({
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState("");
-  const [name, setName] = useState(item?.name ?? "");
-  const [code, setCode] = useState(item?.code ?? "");
-  const [category, setCategory] = useState(
-    item?.categoryId ?? data.categories[0]?.id ?? 0,
-  );
-  const [description, setDescription] = useState(item?.description ?? "");
-  const [price, setPrice] = useState(String(item?.basePrice ?? ""));
-  const [override, setOverride] = useState(
-    item?.priceOverride == null ? "" : String(item.priceOverride),
-  );
-  const [sale, setSale] = useState<"UNIT" | "WEIGHT">(item?.saleMode ?? "UNIT");
-  const [minimum, setMinimum] = useState(item?.minimumWeightGrams ?? 250);
-  const [step, setStep] = useState(item?.weightStepGrams ?? 250);
-  const [tax, setTax] = useState(item?.taxCategoryId ?? 0);
-  const [assigned, setAssigned] = useState([branch]);
-  const [available, setAvailable] = useState(item?.available ?? false);
-  const [file, setFile] = useState<File | null>(null);
-  const [remove, setRemove] = useState(false);
-  const [quantity, setQuantity] = useState(
-    String(item?.allocation?.approvedQuantity ?? ""),
-  );
-  const [reason, setReason] = useState("");
-  const [createdId, setCreatedId] = useState<number | null>(null);
-  const [control, setControl] = useState(
-    item?.policy?.controlMode ?? "DAILY_PRODUCTION",
-  );
+  const [initialDraft] = useState(() => {
+    const defaults = {
+      productVersion: item?.productVersion ?? 0,
+      branchVersion: item?.branchVersion ?? 0,
+      allocationVersion: item?.allocationVersion ?? null,
+      policyVersion: item?.policyVersion ?? null,
+      name: item?.name ?? "",
+      code: item?.code ?? "",
+      category: item?.categoryId ?? data.categories[0]?.id ?? 0,
+      description: item?.description ?? "",
+      price: String(item?.basePrice ?? ""),
+      override: item?.priceOverride == null ? "" : String(item.priceOverride),
+      sale: item?.saleMode ?? "UNIT",
+      minimum: item?.minimumWeightGrams ?? 250,
+      step: item?.weightStepGrams ?? 250,
+      tax: item?.taxCategoryId ?? 0,
+      assigned: [branch],
+      available: item?.available ?? false,
+      remove: false,
+      quantity: String(item?.allocation?.approvedQuantity ?? ""),
+      reason: "",
+      createdId: null as number | null,
+      control: item?.policy?.controlMode ?? "DAILY_PRODUCTION",
+      readyRequired: item?.policy?.readyStockRequired ?? false,
+      ready: false,
+      readyQty: String(item?.allocation?.readyQuantity ?? 0),
+    };
+    return { ...defaults, ...readWorkspaceDraft<typeof defaults>(draftKey) };
+  });
+  const [name, setName] = useState(initialDraft.name);
+  const [code, setCode] = useState(initialDraft.code);
+  const [category, setCategory] = useState(initialDraft.category);
+  const [description, setDescription] = useState(initialDraft.description);
+  const [price, setPrice] = useState(initialDraft.price);
+  const [override, setOverride] = useState(initialDraft.override);
+  const [sale, setSale] = useState(initialDraft.sale);
+  const [minimum, setMinimum] = useState(initialDraft.minimum);
+  const [step, setStep] = useState(initialDraft.step);
+  const [tax, setTax] = useState(initialDraft.tax);
+  const [assigned, setAssigned] = useState(initialDraft.assigned);
+  const [available, setAvailable] = useState(initialDraft.available);
+  const [remove, setRemove] = useState(initialDraft.remove);
+  const [quantity, setQuantity] = useState(initialDraft.quantity);
+  const [reason, setReason] = useState(initialDraft.reason);
+  const [createdId, setCreatedId] = useState(initialDraft.createdId);
+  const [control, setControl] = useState(initialDraft.control);
   const [readyRequired, setReadyRequired] = useState(
-    item?.policy?.readyStockRequired ?? false,
+    initialDraft.readyRequired,
   );
-  const [ready, setReady] = useState(false);
-  const [readyQty, setReadyQty] = useState(
-    String(item?.allocation?.readyQuantity ?? 0),
-  );
+  const [ready, setReady] = useState(initialDraft.ready);
+  const [readyQty, setReadyQty] = useState(initialDraft.readyQty);
+  const [file, setFile] = useState<File | null>(null);
+  useEffect(() => {
+    writeWorkspaceDraft(draftKey, {
+      ...initialDraft,
+      name,
+      code,
+      category,
+      description,
+      price,
+      override,
+      sale,
+      minimum,
+      step,
+      tax,
+      assigned,
+      available,
+      remove,
+      quantity,
+      reason,
+      createdId,
+      control,
+      readyRequired,
+      ready,
+      readyQty,
+    });
+  }, [
+    draftKey,
+    initialDraft,
+    name,
+    code,
+    category,
+    description,
+    price,
+    override,
+    sale,
+    minimum,
+    step,
+    tax,
+    assigned,
+    available,
+    remove,
+    quantity,
+    reason,
+    createdId,
+    control,
+    readyRequired,
+    ready,
+    readyQty,
+  ]);
+  function onClose() {
+    clearWorkspaceDraft(draftKey);
+    close();
+  }
+  function onSaved(notice?: string) {
+    clearWorkspaceDraft(draftKey);
+    saved(notice);
+  }
   const full = mode === "add" || mode === "details";
   const title =
     mode === "add"
@@ -102,7 +184,7 @@ export default function WorkspaceProductEditor({
           minimumWeightGrams: sale === "WEIGHT" ? minimum : null,
           weightStepGrams: sale === "WEIGHT" ? step : null,
           taxCategoryId: tax || null,
-          version: item?.productVersion ?? 0,
+          version: initialDraft.productVersion,
         };
         if (mode === "add") {
           let productId = createdId;
@@ -141,7 +223,7 @@ export default function WorkspaceProductEditor({
           branch,
           `/${item!.productId}/branch`,
           jsonRequest("PATCH", {
-            version: item!.branchVersion,
+            version: initialDraft.branchVersion,
             ...(mode === "price"
               ? {
                   priceOverride: override === "" ? null : Number(override),
@@ -158,13 +240,13 @@ export default function WorkspaceProductEditor({
         if (remove)
           await workspaceRequest(
             branch,
-            `/${item!.productId}/image?version=${item!.productVersion}`,
+            `/${item!.productId}/image?version=${initialDraft.productVersion}`,
             { method: "DELETE" },
           );
         else {
           const body = new FormData();
           body.append("image", file!);
-          body.append("version", String(item!.productVersion));
+          body.append("version", String(initialDraft.productVersion));
           const result = await workspaceRequest<{ imageUrl: string }>(
             branch,
             `/${item!.productId}/image`,
@@ -205,8 +287,8 @@ export default function WorkspaceProductEditor({
           branch,
           `/${item!.productId}/stock/${date}`,
           jsonRequest("PUT", {
-            version: item!.allocationVersion,
-            policyVersion: item!.policyVersion,
+            version: initialDraft.allocationVersion,
+            policyVersion: initialDraft.policyVersion,
             reason,
             policy: item!.policy
               ? null
@@ -284,6 +366,10 @@ export default function WorkspaceProductEditor({
         </>
       }
     >
+      <p className={styles.muted}>
+        Text entries are restored after refresh. Re-select any unsaved image
+        file.
+      </p>
       <fieldset disabled={busy || (!!createdId && full)}>
         <div className={full ? styles.formGrid : undefined}>
           {full && (

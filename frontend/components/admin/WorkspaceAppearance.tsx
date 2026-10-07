@@ -1,11 +1,16 @@
 /* eslint-disable @next/next/no-img-element -- Preview must display the original managed upload and expose public URL failures. */
 "use client";
 import { useEffect, useRef, useState } from "react";
+import {
+  readWorkspaceDraft,
+  writeWorkspaceDraft,
+  clearWorkspaceDraft,
+} from "@/lib/menuWorkspaceDraft";
 import WorkspaceDialog from "./WorkspaceDialog";
 import CampaignFramingEditor from "./CampaignFramingEditor";
 import { workspaceRequest, jsonRequest } from "@/services/menuWorkspaceApi";
 import { fromIndiaDateTimeInput, toIndiaDateTimeInput } from "@/lib/campaigns";
-import {campaignFrameStyle, type CampaignFrame} from "@/lib/campaignFraming";
+import { campaignFrameStyle, type CampaignFrame } from "@/lib/campaignFraming";
 import styles from "./MenuWorkspace.module.css";
 export type MenuBanner = {
   key: string;
@@ -36,31 +41,64 @@ type Snapshot = {
 };
 export default function WorkspaceAppearance({
   branch,
+  draftKey,
   categories,
   onNotice,
 }: {
   branch: number;
+  draftKey: string;
   categories: { id: number; name: string }[];
   onNotice: (message: string) => void;
 }) {
+  const [restoredDraft] = useState(() =>
+    readWorkspaceDraft<{
+      editing: MenuBanner | null;
+      categoryEditor: boolean;
+      categoryDraft: AppearanceConfig["categories"];
+      version: number;
+    }>(draftKey),
+  );
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [editing, setEditing] = useState<MenuBanner | null>(null);
+  const [editing, setEditing] = useState<MenuBanner | null>(
+    restoredDraft?.editing ?? null,
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [categoryEditor, setCategoryEditor] = useState(false);
-  const [categoryDraft,setCategoryDraft] = useState<AppearanceConfig["categories"]>([]);
+  const [categoryEditor, setCategoryEditor] = useState(
+    restoredDraft?.categoryEditor ?? false,
+  );
+  const [categoryDraft, setCategoryDraft] = useState<
+    AppearanceConfig["categories"]
+  >(restoredDraft?.categoryDraft ?? []);
   const [confirm, setConfirm] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const lock = useRef(false);
   useEffect(() => {
     const c = new AbortController();
     workspaceRequest<Snapshot>(branch, "/appearance", { signal: c.signal })
-      .then(setSnapshot)
+      .then((result) => {
+        if (!c.signal.aborted)
+          setSnapshot(
+            restoredDraft &&
+              (restoredDraft.editing || restoredDraft.categoryEditor)
+              ? { ...result, version: restoredDraft.version }
+              : result,
+          );
+      })
       .catch((e) => {
         if (!c.signal.aborted) setError(e.message);
       });
     return () => c.abort();
-  }, [branch]);
+  }, [branch, restoredDraft]);
+  useEffect(() => {
+    if (snapshot)
+      writeWorkspaceDraft(draftKey, {
+        editing,
+        categoryEditor,
+        categoryDraft,
+        version: snapshot.version,
+      });
+  }, [draftKey, editing, categoryEditor, categoryDraft, snapshot]);
   async function save(config: AppearanceConfig, publish = false) {
     if (lock.current || !snapshot) return;
     lock.current = true;
@@ -72,6 +110,7 @@ export default function WorkspaceAppearance({
         "/appearance",
         jsonRequest("PUT", { version: snapshot.version, config, publish }),
       );
+      clearWorkspaceDraft(draftKey);
       setSnapshot(result);
       setEditing(null);
       setCategoryEditor(false);
@@ -102,7 +141,11 @@ export default function WorkspaceAppearance({
         contentType: string;
       }>(branch, "/appearance/media", { method: "POST", body });
       if (typeof target === "number") {
-        setCategoryDraft(items=>items.map(c=>c.id===target?{...c,imageUrl:result.url}:c));
+        setCategoryDraft((items) =>
+          items.map((c) =>
+            c.id === target ? { ...c, imageUrl: result.url } : c,
+          ),
+        );
       } else
         setEditing((b) =>
           b
@@ -178,7 +221,16 @@ export default function WorkspaceAppearance({
           <button
             disabled={busy}
             onClick={() => {
-              setCategoryDraft(categories.map((c,i)=>config.categories.find(x=>x.id===c.id)??{id:c.id,order:i,imageUrl:null}));
+              setCategoryDraft(
+                categories.map(
+                  (c, i) =>
+                    config.categories.find((x) => x.id === c.id) ?? {
+                      id: c.id,
+                      order: i,
+                      imageUrl: null,
+                    },
+                ),
+              );
               setCategoryEditor(true);
             }}
           >
@@ -370,15 +422,17 @@ export default function WorkspaceAppearance({
                     }}
                   />
                 </label>
-                <div className={styles.framing}><CampaignFramingEditor
-                  label="Menu banner framing"
-                  file={file}
-                  savedUrl={editing.mediaUrl}
-                  mediaType={editing.mediaType}
-                  portrait={false}
-                  frame={editing.frame}
-                  onChange={(frame) => setEditing({ ...editing, frame })}
-                /></div>
+                <div className={styles.framing}>
+                  <CampaignFramingEditor
+                    label="Menu banner framing"
+                    file={file}
+                    savedUrl={editing.mediaUrl}
+                    mediaType={editing.mediaType}
+                    portrait={false}
+                    frame={editing.frame}
+                    onChange={(frame) => setEditing({ ...editing, frame })}
+                  />
+                </div>
                 {editing.mediaType?.startsWith("video/") && (
                   <label>
                     Static poster · Required before publishing
@@ -394,8 +448,31 @@ export default function WorkspaceAppearance({
                 )}
                 <div className={styles.preview}>
                   <p className={styles.muted}>MOBILE MENU PREVIEW</p>
-                    {editing.mediaUrl && (editing.mediaType?.startsWith("video/") ? <video src={editing.mediaUrl} poster={editing.posterUrl??undefined} controls muted playsInline className={styles.bannerPreviewMedia} style={campaignFrameStyle(editing.frame)}/> : <img src={editing.mediaUrl} alt="Banner preview" className={styles.bannerPreviewMedia} style={campaignFrameStyle(editing.frame)} onError={()=>setError("Media uploaded, but its public URL cannot load. Check R2 public access and the public URL configuration.")}/>)}
-                    <strong>{editing.titleEn || "Mobile menu preview"}</strong>
+                  {editing.mediaUrl &&
+                    (editing.mediaType?.startsWith("video/") ? (
+                      <video
+                        src={editing.mediaUrl}
+                        poster={editing.posterUrl ?? undefined}
+                        controls
+                        muted
+                        playsInline
+                        className={styles.bannerPreviewMedia}
+                        style={campaignFrameStyle(editing.frame)}
+                      />
+                    ) : (
+                      <img
+                        src={editing.mediaUrl}
+                        alt="Banner preview"
+                        className={styles.bannerPreviewMedia}
+                        style={campaignFrameStyle(editing.frame)}
+                        onError={() =>
+                          setError(
+                            "Media uploaded, but its public URL cannot load. Check R2 public access and the public URL configuration.",
+                          )
+                        }
+                      />
+                    ))}
+                  <strong>{editing.titleEn || "Mobile menu preview"}</strong>
                   <p>{editing.subtitleEn}</p>
                   {editing.buttonLabel && (
                     <button disabled>{editing.buttonLabel}</button>
@@ -429,7 +506,9 @@ export default function WorkspaceAppearance({
               <button
                 className={styles.primary}
                 disabled={busy}
-                onClick={() => void save({...config,categories:categoryDraft})}
+                onClick={() =>
+                  void save({ ...config, categories: categoryDraft })
+                }
               >
                 Save draft
               </button>
@@ -447,7 +526,13 @@ export default function WorkspaceAppearance({
                     min={0}
                     value={c.order}
                     onChange={(e) =>
-                      setCategoryDraft(items=>items.map(x=>x.id===c.id?{...x,order:Number(e.target.value)}:x))
+                      setCategoryDraft((items) =>
+                        items.map((x) =>
+                          x.id === c.id
+                            ? { ...x, order: Number(e.target.value) }
+                            : x,
+                        ),
+                      )
                     }
                   />
                 </label>
@@ -465,7 +550,11 @@ export default function WorkspaceAppearance({
                 {c.imageUrl && (
                   <button
                     onClick={() =>
-                      setCategoryDraft(items=>items.map(x=>x.id===c.id?{...x,imageUrl:null}:x))
+                      setCategoryDraft((items) =>
+                        items.map((x) =>
+                          x.id === c.id ? { ...x, imageUrl: null } : x,
+                        ),
+                      )
                     }
                   >
                     Remove image

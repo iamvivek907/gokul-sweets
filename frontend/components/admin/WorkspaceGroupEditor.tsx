@@ -1,5 +1,10 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import {
+  readWorkspaceDraft,
+  writeWorkspaceDraft,
+  clearWorkspaceDraft,
+} from "@/lib/menuWorkspaceDraft";
 import WorkspaceDialog from "./WorkspaceDialog";
 import {
   workspaceRequest,
@@ -15,19 +20,26 @@ export default function WorkspaceGroupEditor({
   initial,
   selected,
   date,
-  onClose,
-  onSaved,
+  draftKey,
+  onClose: close,
+  onSaved: saved,
 }: {
+  draftKey: string;
   branch: number;
   version: number;
   initial: Group | null;
   selected: WorkspaceItem[];
   date: string;
   onClose: () => void;
-  onSaved: (next: boolean) => void;
+  onSaved: (next: boolean, version: number) => void;
 }) {
+  const [restoredDraft] = useState(() =>
+    readWorkspaceDraft<{ group: Group; version: number }>(draftKey),
+  );
+  const [draftVersion] = useState(restoredDraft?.version ?? version);
   const [draft, setDraft] = useState<Group>(
     () =>
+      restoredDraft?.group ??
       initial ?? {
         key: crypto.randomUUID(),
         title: "",
@@ -37,6 +49,22 @@ export default function WorkspaceGroupEditor({
           .map((p) => ({ productId: p.productId, label: p.name.slice(0, 30) })),
       },
   );
+  useEffect(
+    () =>
+      writeWorkspaceDraft(draftKey, { group: draft, version: draftVersion }),
+    [draftKey, draft, draftVersion],
+  );
+  function onClose() {
+    clearWorkspaceDraft(draftKey);
+    close();
+  }
+  function onSaved(next: boolean, version: number) {
+    clearWorkspaceDraft(draftKey);
+    saved(next, version);
+  }
+  const [candidatePage, setCandidatePage] = useState(0);
+  const [candidateTotalPages, setCandidateTotalPages] = useState(0);
+  const [candidateLoading, setCandidateLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [candidates, setCandidates] = useState<WorkspaceItem[]>([]);
   const [busy, setBusy] = useState(false);
@@ -46,23 +74,30 @@ export default function WorkspaceGroupEditor({
   useEffect(() => {
     const controller = new AbortController();
     const timer = setTimeout(() => {
+      setCandidateLoading(true);
       workspaceRequest<WorkspacePage>(
         branch,
-        `?date=${date}&search=${encodeURIComponent(search)}&size=25`,
+        `?date=${date}&search=${encodeURIComponent(search)}&size=25&filter=COUNT_SKU&page=${candidatePage}`,
         { signal: controller.signal },
       )
-        .then((p) =>
-          setCandidates(p.content.filter((x) => x.saleMode === "UNIT")),
-        )
+        .then((p) => {
+          if (!controller.signal.aborted) {
+            setCandidates(p.content);
+            setCandidateTotalPages(p.totalPages);
+          }
+        })
         .catch((e) => {
           if (!controller.signal.aborted) setError(e.message);
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setCandidateLoading(false);
         });
     }, 250);
     return () => {
       controller.abort();
       clearTimeout(timer);
     };
-  }, [branch, date, search]);
+  }, [branch, date, search, candidatePage]);
   async function save(next: boolean, remove = false) {
     if (lock.current) return;
     lock.current = true;
@@ -76,14 +111,14 @@ export default function WorkspaceGroupEditor({
           draft.choices.some((c) => !c.label.trim()))
       )
         throw new Error("Enter a name and 2–6 uniquely labelled options.");
-      await workspaceRequest(
+      const result = await workspaceRequest<{ version: number }>(
         branch,
-        remove ? `/groups/${draft.key}?version=${version}` : "/groups",
+        remove ? `/groups/${draft.key}?version=${draftVersion}` : "/groups",
         remove
           ? { method: "DELETE" }
-          : jsonRequest("PUT", { version, group: draft }),
+          : jsonRequest("PUT", { version: draftVersion, group: draft }),
       );
-      onSaved(next);
+      onSaved(next, result?.version ?? draftVersion + 1);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save group.");
     } finally {
@@ -190,7 +225,12 @@ export default function WorkspaceGroupEditor({
             type="search"
             placeholder="Search product name or code"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setCandidatePage(0);
+              setCandidates([]);
+              setCandidateLoading(true);
+            }}
           />
         </label>
         {candidates
@@ -201,7 +241,7 @@ export default function WorkspaceGroupEditor({
             <button
               className={styles.candidate}
               key={p.productId}
-              disabled={draft.choices.length >= 6}
+              disabled={candidateLoading || draft.choices.length >= 6}
               onClick={() =>
                 setDraft({
                   ...draft,
@@ -223,8 +263,31 @@ export default function WorkspaceGroupEditor({
             </button>
           ))}
         <p className={styles.muted}>
-          Search returns up to 25 products. Options must share a category;
-          products already in another group cannot be linked.
+          <button
+            disabled={candidateLoading || candidatePage === 0}
+            onClick={() => {
+              setCandidateLoading(true);
+              setCandidates([]);
+              setCandidatePage((n) => n - 1);
+            }}
+          >
+            Previous SKUs
+          </button>{" "}
+          Page {candidatePage + 1} of {Math.max(1, candidateTotalPages)}{" "}
+          <button
+            disabled={
+              candidateLoading || candidatePage + 1 >= candidateTotalPages
+            }
+            onClick={() => {
+              setCandidateLoading(true);
+              setCandidates([]);
+              setCandidatePage((n) => n + 1);
+            }}
+          >
+            Next SKUs
+          </button>
+          Options must share a category; products already in another group
+          cannot be linked.
         </p>
         <div className={styles.preview}>
           <h3>{draft.title || "Customer card preview"}</h3>

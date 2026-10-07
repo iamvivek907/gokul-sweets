@@ -1,5 +1,9 @@
 "use client";
 import Image from "next/image";
+import {
+  readWorkspaceDraft,
+  writeWorkspaceDraft,
+} from "@/lib/menuWorkspaceDraft";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAdminAuth } from "@/contexts/AdminAuthContext";
 import { apiClient } from "@/services/apiClient";
@@ -88,6 +92,7 @@ export default function MenuWorkspace() {
   const [groupEditor, setGroupEditor] = useState<{
     initial: Group | null;
     key: number;
+    version?: number;
   } | null>(null);
   const [bulk, setBulk] = useState(false);
   const [bulkAvailable, setBulkAvailable] = useState(false);
@@ -97,6 +102,21 @@ export default function MenuWorkspace() {
   >([]);
   const bulkLock = useRef(false);
   const restored = useRef(false);
+  const currentBranch = useRef<number | null>(null);
+  const scrollRestore = useRef<number | null>(null);
+  const [loadedContext, setLoadedContext] = useState("");
+  const queryContext = JSON.stringify([
+    branch,
+    date,
+    search,
+    category,
+    filter,
+    page,
+    tab,
+    revision,
+  ]);
+  const fresh = loadedContext === queryContext;
+  const workspaceKey = `menu-workspace:${profile?.staffId}`;
   const canMenu = hasPermission("MENU_MANAGE"),
     canStock = hasPermission("INVENTORY_MANAGE"),
     canView = hasPermission("INVENTORY_VIEW");
@@ -116,7 +136,9 @@ export default function MenuWorkspace() {
               profile.branchIds.includes(b.id)),
         );
         setBranches(permitted);
-        setBranch(preferredAdminBranchId(profile.staffId, permitted));
+        const preferred = preferredAdminBranchId(profile.staffId, permitted);
+        currentBranch.current = preferred;
+        setBranch(preferred);
         if (!restored.current) {
           restored.current = true;
           try {
@@ -129,6 +151,18 @@ export default function MenuWorkspace() {
               setCategory(p.category || "");
               setFilter(p.filter || "ALL");
               setPage(p.page || 0);
+              setTab(
+                ["items", "groups", "appearance"].includes(p.tab)
+                  ? p.tab
+                  : "items",
+              );
+              if (/^\d{4}-\d{2}-\d{2}$/.test(p.date)) setDate(p.date);
+              scrollRestore.current = p.scrollY || 0;
+              if (p.branch === preferred) {
+                setEditor(p.editor || null);
+                setGroupEditor(p.groupEditor || null);
+                setSelected(p.selected || []);
+              }
             }
           } catch {}
         }
@@ -143,10 +177,47 @@ export default function MenuWorkspace() {
     try {
       sessionStorage.setItem(
         `menu-workspace:${profile.staffId}`,
-        JSON.stringify({ search, category, filter, page }),
+        JSON.stringify({
+          search,
+          category,
+          filter,
+          page,
+          tab,
+          date,
+          branch,
+          editor,
+          groupEditor,
+          selected,
+          scrollY: window.scrollY,
+        }),
       );
     } catch {}
-  }, [profile, search, category, filter, page]);
+  }, [
+    profile,
+    search,
+    category,
+    filter,
+    page,
+    tab,
+    date,
+    branch,
+    editor,
+    groupEditor,
+    selected,
+  ]);
+  useEffect(() => {
+    if (!profile || !restored.current) return;
+    const saveScroll = () => {
+      const saved = readWorkspaceDraft<Record<string, unknown>>(workspaceKey);
+      if (saved)
+        writeWorkspaceDraft(workspaceKey, {
+          ...saved,
+          scrollY: window.scrollY,
+        });
+    };
+    window.addEventListener("scroll", saveScroll, { passive: true });
+    return () => window.removeEventListener("scroll", saveScroll);
+  }, [profile, workspaceKey]);
   useEffect(() => {
     if (!branch || !canMenu || !canView) return;
     const c = new AbortController();
@@ -175,6 +246,12 @@ export default function MenuWorkspace() {
           if (!c.signal.aborted) {
             setData(p);
             setGroups(g);
+            setLoadedContext(queryContext);
+            if (scrollRestore.current !== null) {
+              const y = scrollRestore.current;
+              scrollRestore.current = null;
+              requestAnimationFrame(() => window.scrollTo(0, y));
+            }
           }
         })
         .catch((e) => {
@@ -199,6 +276,7 @@ export default function MenuWorkspace() {
     tab,
     canMenu,
     canView,
+    queryContext,
   ]);
   async function openProductGroup(item: WorkspaceItem) {
     if (!branch) return;
@@ -207,9 +285,14 @@ export default function MenuWorkspace() {
         version: number;
         group: Group | null;
       }>(branch, `/groups/product/${item.productId}`);
+      if (currentBranch.current !== branch) return;
       setGroups((g) => ({ ...g, version: match.version }));
       setSelected([item]);
-      setGroupEditor({ initial: match.group, key: revision + 1 });
+      setGroupEditor({
+        initial: match.group,
+        key: revision + 1,
+        version: match.version,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to load group.");
     }
@@ -275,7 +358,7 @@ export default function MenuWorkspace() {
         </div>
         <button
           className={styles.primary}
-          disabled={!branch}
+          disabled={!branch || !fresh}
           onClick={() => setEditor({ mode: "add", item: null })}
         >
           + Add product
@@ -289,7 +372,22 @@ export default function MenuWorkspace() {
             value={branch ?? ""}
             onChange={(e) => {
               const id = Number(e.target.value);
+              currentBranch.current = id;
               setBranch(id);
+              setData(empty);
+              setGroups({
+                version: 0,
+                groups: [],
+                total: 0,
+                page: 0,
+                totalPages: 0,
+              });
+              setLoadedContext("");
+              setLoading(true);
+              setEditor(null);
+              setGroupEditor(null);
+              setBulk(false);
+              setResults([]);
               rememberAdminBranchId(profile!.staffId, id);
               setPage(0);
               setSelected([]);
@@ -420,16 +518,21 @@ export default function MenuWorkspace() {
             <div className={styles.row}>
               <button
                 disabled={
+                  !fresh ||
                   selected.filter((p) => p.saleMode === "UNIT").length < 2
                 }
                 onClick={() =>
-                  setGroupEditor({ initial: null, key: revision + 1 })
+                  setGroupEditor({
+                    initial: null,
+                    key: revision + 1,
+                    version: groups.version,
+                  })
                 }
               >
                 Group selected
               </button>
               <button
-                disabled={!selected.length}
+                disabled={!fresh || !selected.length}
                 onClick={() => {
                   setBulk(true);
                   setResults([]);
@@ -457,6 +560,7 @@ export default function MenuWorkspace() {
         <WorkspaceAppearance
           key={branch}
           branch={branch}
+          draftKey={`${workspaceKey}:appearance:${branch}`}
           categories={data.categories}
           onNotice={setNotice}
         />
@@ -475,6 +579,7 @@ export default function MenuWorkspace() {
                 </div>
                 <input
                   type="checkbox"
+                  disabled={!fresh}
                   aria-label={`Select ${p.name}`}
                   checked={selected.some((s) => s.productId === p.productId)}
                   onChange={(e) =>
@@ -496,8 +601,12 @@ export default function MenuWorkspace() {
                   Price override
                 </span>
               )}
-              {p.allocation && !p.allocation.orderable && <span className={`${styles.badge} ${styles.warning}`}>Stock not orderable</span>}
-                {!p.imageUrl && (
+              {p.allocation && !p.allocation.orderable && (
+                <span className={`${styles.badge} ${styles.warning}`}>
+                  Stock not orderable
+                </span>
+              )}
+              {!p.imageUrl && (
                 <span className={`${styles.badge} ${styles.warning}`}>
                   Missing photo
                 </span>
@@ -541,12 +650,17 @@ export default function MenuWorkspace() {
                   <button
                     key={mode}
                     onClick={() => setEditor({ mode, item: p })}
-                    disabled={loading || (mode === "stock" && !canStock)}
+                    disabled={
+                      !fresh || loading || (mode === "stock" && !canStock)
+                    }
                   >
                     {label}
                   </button>
                 ))}
-                <button onClick={() => void openProductGroup(p)}>
+                <button
+                  disabled={!fresh}
+                  onClick={() => void openProductGroup(p)}
+                >
                   Group / sizes
                 </button>
               </div>
@@ -558,8 +672,13 @@ export default function MenuWorkspace() {
           <div className={styles.row}>
             <button
               className={styles.primary}
+              disabled={!fresh}
               onClick={() =>
-                setGroupEditor({ initial: null, key: revision + 1 })
+                setGroupEditor({
+                  initial: null,
+                  key: revision + 1,
+                  version: groups.version,
+                })
               }
             >
               + New group
@@ -581,8 +700,13 @@ export default function MenuWorkspace() {
                 </div>
                 <div className={styles.actions}>
                   <button
+                    disabled={!fresh}
                     onClick={() =>
-                      setGroupEditor({ initial: g, key: revision + 1 })
+                      setGroupEditor({
+                        initial: g,
+                        key: revision + 1,
+                        version: groups.version,
+                      })
                     }
                   >
                     Edit group / options
@@ -627,7 +751,8 @@ export default function MenuWorkspace() {
       )}
       {editor && branch && (
         <WorkspaceProductEditor
-          key={`${editor.mode}-${editor.item?.productId ?? "new"}`}
+          key={`${branch}-${editor.mode}-${editor.item?.productId ?? "new"}`}
+          draftKey={`${workspaceKey}:product:${branch}:${editor.mode}:${editor.item?.productId ?? "new"}:${editor.mode === "stock" ? date : ""}`}
           item={editor.item}
           mode={editor.mode}
           branch={branch}
@@ -640,18 +765,27 @@ export default function MenuWorkspace() {
       )}
       {groupEditor && branch && (
         <WorkspaceGroupEditor
-          key={groupEditor.key}
+          key={`${branch}-${groupEditor.key}`}
+          draftKey={`${workspaceKey}:group:${branch}:${groupEditor.initial?.key ?? "new"}`}
           branch={branch}
           date={date}
-          version={groups.version}
+          version={groupEditor.version ?? groups.version}
           initial={groupEditor.initial}
           selected={selected}
           onClose={() => setGroupEditor(null)}
-          onSaved={(next) => {
+          onSaved={(next, version) => {
             setNotice("Group saved. Product stock and prices are unchanged.");
             setRevision((n) => n + 1);
             setSelected([]);
-            setGroupEditor(next ? { initial: null, key: revision + 1 } : null);
+            setGroupEditor((previous) =>
+              next
+                ? {
+                    initial: null,
+                    key: (previous?.key ?? revision) + 1,
+                    version,
+                  }
+                : null,
+            );
           }}
         />
       )}

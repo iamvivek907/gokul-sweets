@@ -6,6 +6,8 @@ Open Admin → Menu & inventory workspace (`/admin/menu/workspace`). Uses the ex
 
 - Product filtering and pagination run on the server, with 25 products per page and a hard maximum of 50. Photos use small lazy optimized thumbnails.
 - Shared product details and images require access to every assigned branch. Branch overrides, availability, inventory and appearance apply to the selected branch. MENU_MANAGE and INVENTORY_VIEW are required; stock saves also require INVENTORY_MANAGE.
+- Refresh restores the selected branch, tab, inventory date, search/filter/page, scroll position and open product/group/appearance text drafts within the same browser tab. Drafts retain their original conflict versions; Cancel discards them and successful saves clear them. Unsaved image/video files must be reselected after refresh.
+- Branch switches clear stale results immediately; item, group and bulk actions wait for data matching the selected context. Group SKU search filters count products on the server before pagination.
 - Add and edit actions use a native modal with its own scroll area and a visible footer. Search, filters and list position remain mounted. Entered data survives failed saves. Sale mode cannot change on existing SKUs because orders and stock units retain their original identity.
 - New products start unavailable. Stock policies, date allocations and ready quantities can be configured in the stock popup. Service hours remain managed by the existing service-hours tool and enforced at checkout.
 - Weight stock displays grams/kilograms; count stock displays pieces. Held, committed and sellable quantities come from the existing inventory calculator. Low stock means sellable quantity is at or below its safety buffer.
@@ -23,7 +25,7 @@ An upload response confirms object storage and DB save; the public media URL als
 
 Production frontend build, TypeScript, lint, 147 Node tests and the customer theme contract passed locally. Browser regression exercises the actual built frontend with intercepted API fixtures at 320, 390 and 1280px: failed-save recovery, add product, stock request, partial bulk results/retry, group editing and draft/publish isolation. Screenshots below are real browser captures with sample fixtures, not production data.
 
-Backend integration tests cover bounded queries, stale writes, cross-branch shared edits, preservation of other groups, retained stock commitments and draft/live isolation. Local backend execution was blocked by downloading the configured Gradle distribution; GitHub CI must validate compilation and those tests before merge.
+Backend CI for the initial implementation passed. Follow-up tests also cover count-SKU filtering before pagination. Backend integration tests cover bounded queries, stale writes, cross-branch shared edits, preservation of other groups, retained stock commitments and draft/live isolation. Local backend execution remains blocked by Java/Gradle availability; GitHub CI must validate follow-up changes before merge.
 
 ## QA on dev after manual deployment
 
