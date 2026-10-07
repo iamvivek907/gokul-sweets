@@ -63,9 +63,19 @@ class FrontendScopeTests(unittest.TestCase):
         self.assertTrue(any(map(scope.affects_frontend, self.push_paths(self.git("rev-parse", "HEAD")))))
 
     def test_ci_and_shared_build_inputs_trigger_checks(self):
-        for path in ["frontend/package-lock.json", ".github/workflows/verify.yml", ".github/scripts/run-browser-suite.mjs", "tools/next-lint-glob/index.js", "vercel.json", ".npmrc"]:
+        for path in ["frontend/package-lock.json", ".github/workflows/verify.yml", ".github/scripts/run-browser-suite.mjs", ".github/scripts/browser-suites.json", ".github/scripts/frontend-changes.py", ".github/scripts/test_frontend_changes.py", "tools/next-lint-glob/index.js", "vercel.json", ".npmrc"]:
             with self.subTest(path=path):
                 self.assertTrue(scope.affects_frontend(path))
+
+    def test_unrelated_github_files_do_not_trigger_frontend(self):
+        for path in [".github/PULL_REQUEST_TEMPLATE.md", ".github/ISSUE_TEMPLATE/bug.yml", ".github/workflows/backend.yml", ".github/scripts/backend-check.py", ".github/CODEOWNERS"]:
+            with self.subTest(path=path):
+                self.assertFalse(scope.affects_frontend(path))
+
+    def test_unrelated_github_push_range_skips_frontend(self):
+        self.commit(".github/workflows/backend.yml")
+        paths = self.push_paths(self.commit(".github/ISSUE_TEMPLATE/bug.yml"))
+        self.assertFalse(any(map(scope.affects_frontend, paths)))
 
     def test_unknown_ranges_and_manual_runs_do_not_skip(self):
         for event, payload in [("workflow_dispatch", {}), ("push", {"before": "0" * 40, "after": self.base}), ("push", {"before": "f" * 40, "after": self.base})]:

@@ -7,7 +7,13 @@ from pathlib import Path
 
 
 def affects_frontend(path):
-    return path.startswith(("frontend/", ".github/", "tools/")) or path in {
+    return path.startswith(("frontend/", "tools/")) or path in {
+        # Only frontend/shared CI inputs trigger the expensive frontend jobs.
+        ".github/workflows/verify.yml",
+        ".github/scripts/frontend-changes.py",
+        ".github/scripts/test_frontend_changes.py",
+        ".github/scripts/browser-suites.json",
+        ".github/scripts/run-browser-suite.mjs",
         "vercel.json", "package.json", "package-lock.json", ".npmrc",
         ".nvmrc", ".node-version",
     }
