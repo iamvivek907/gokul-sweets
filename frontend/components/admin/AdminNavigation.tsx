@@ -40,6 +40,7 @@ export const adminGroups: {label: string; items: Item[]}[] = [
     {label: "Inventory", items: [
         {href: "/admin/menu/workspace", label: "Menu & inventory workspace", permissions: ["MENU_MANAGE"]},
         {href: "/admin/inventory", label: "Daily availability", permissions: ["INVENTORY_VIEW", "INVENTORY_MANAGE"], exact: true},
+        {href: "/admin/inventory/centre", label: "Inventory control centre", permissions: ["MENU_MANAGE", "INVENTORY_VIEW", "INVENTORY_MANAGE"]},
         {href: "/admin/inventory/setup", label: "Product policies", permissions: ["INVENTORY_VIEW", "INVENTORY_MANAGE"]},
         {href: "/admin/inventory/automation", label: "Future production", permissions: ["INVENTORY_VIEW", "INVENTORY_MANAGE"]},
         {href: "/admin/inventory/production", label: "Production & ready stock", permissions: ["INVENTORY_VIEW", "INVENTORY_MANAGE"]}
