@@ -16,7 +16,7 @@ import {
 
 export const metadata: Metadata = {
     title: {
-        default: APP_NAME,
+        default: "Gokul Sweets | Fresh Sweets & Snacks",
         template: `%s | ${APP_NAME}`
     },
     description: APP_DESCRIPTION,
