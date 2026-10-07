@@ -113,6 +113,13 @@ public class R2StorageService {
         return false;
     }
 
+    public void validateManagedCampaignUrl(String url) {
+        String key = extractKeyFromPublicUrl(url);
+        if (key == null || !key.startsWith("campaigns/") || key.contains("..")) {
+            throw new IllegalArgumentException("Upload media through this workspace; do not enter external media URLs.");
+        }
+    }
+
     public void deleteCampaignMedia(String url) {
         String key = extractKeyFromPublicUrl(url);
         if (key == null || !key.startsWith("campaigns/") || key.contains("..")) {
@@ -142,6 +149,7 @@ public class R2StorageService {
                         + slug
                         + "-"
                         + productId
+                        + "-" + UUID.randomUUID()
                         + extension;
 
         try {

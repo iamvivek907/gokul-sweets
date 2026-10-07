@@ -52,6 +52,7 @@
     "tests/pwa-install.browser.mjs"
   ],
   "staff-bulk": [
+    "tests/menu-workspace.browser.mjs",
     "tests/admin-product-groups.browser.mjs",
     "tests/staff-order-desk.browser.mjs",
     "tests/customer-notification-inbox.browser.mjs",

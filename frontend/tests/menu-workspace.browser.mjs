@@ -1,0 +1,346 @@
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { mkdirSync } from "node:fs";
+const { chromium } = createRequire(import.meta.url)(
+  process.env.PLAYWRIGHT_MODULE ?? "playwright",
+);
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.CHROMIUM_PATH,
+});
+const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
+const shots =
+  process.env.WORKSPACE_SCREENSHOTS ?? "/tmp/gokul-workspace-screenshots";
+mkdirSync(shots, { recursive: true });
+try {
+  for (const width of [320, 390, 1280]) {
+    const context = await browser.newContext({
+      viewport: { width, height: 900 },
+      serviceWorkers: "block",
+    });
+    const page = await context.newPage();
+    page.setDefaultTimeout(15000);
+    const errors = [];
+    page.on("pageerror", (e) => errors.push(e.message));
+    let conflict = false,
+      priceWrites = 0,
+      creates = 0,
+      bulkFailures = true,
+      groups = { version: 0, groups: [], total: 0, page: 0, totalPages: 0 };
+    let appearance = {
+      version: 0,
+      draft: { banners: [], categories: [] },
+      live: { banners: [], categories: [] },
+      publishedAt: null,
+    };
+    const items = [1, 2, 3].map((id) => ({
+      branchProductId: id,
+      productId: id,
+      code: `SKU-${id}`,
+      name: ["Kaju Katli", "Samosa", "Rasmalai"][id - 1],
+      description: "Freshly prepared",
+      categoryId: 1,
+      categoryName: "Sweets",
+      basePrice: 100,
+      priceOverride: null,
+      effectivePrice: 100,
+      available: true,
+      active: true,
+      saleMode: "UNIT",
+      minimumWeightGrams: null,
+      weightStepGrams: null,
+      taxCategoryId: 1,
+      imageUrl: null,
+      productVersion: 0,
+      branchVersion: 0,
+      allocationVersion: 0,
+      policyVersion: 0,
+      policy: {
+        controlMode: "DAILY_PRODUCTION",
+        inventoryUnit: "PIECE",
+        readyStockRequired: false,
+      },
+      allocation: {
+        inventoryUnit: "PIECE",
+        approvedQuantity: 10,
+        readyQuantity: 10,
+        safetyBufferQuantity: 0,
+        heldQuantity: 2,
+        committedQuantity: 1,
+        availableQuantity: 7,
+        unavailableReason: null,
+      },
+    }));
+    await context.route("**/api/**", async (route) => {
+      const req = route.request(),
+        url = new URL(req.url()),
+        path = url.pathname;
+      const headers = {
+        "Access-Control-Allow-Origin": base,
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Headers": "content-type,x-staff-csrf",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+        "Access-Control-Expose-Headers": "X-Staff-CSRF",
+        "X-Staff-CSRF": "test-csrf",
+      };
+      if (req.method() === "OPTIONS")
+        return route.fulfill({ status: 204, headers });
+      let json = {};
+      if (path === "/api/admin/auth/me")
+        json = {
+          staffId: 77,
+          username: "manager",
+          fullName: "Menu Manager",
+          roleName: "OWNER_ADMIN",
+          branchIds: [1, 2],
+          permissions: ["MENU_MANAGE", "INVENTORY_VIEW", "INVENTORY_MANAGE"],
+        };
+      else if (path === "/api/branches")
+        json = [
+          { id: 1, name: "Tamkuhi Road", active: true },
+          { id: 2, name: "Seorahi", active: true },
+        ];
+      else if (path.endsWith("/workspace/groups")) {
+        if (req.method() === "PUT") {
+          const b = req.postDataJSON();
+          assert.equal(b.version, groups.version);
+          groups = {
+            ...groups,
+            version: groups.version + 1,
+            groups: [b.group],
+            total: 1,
+            totalPages: 1,
+          };
+          json = { version: groups.version };
+        } else json = groups;
+      } else if (path.includes("/groups/product/"))
+        json = { version: groups.version, group: null };
+      else if (path.endsWith("/appearance")) {
+        if (req.method() === "PUT") {
+          const b = req.postDataJSON();
+          assert.equal(b.version, appearance.version);
+          appearance = {
+            ...appearance,
+            version: appearance.version + 1,
+            draft: b.config,
+            ...(b.publish
+              ? { live: b.config, publishedAt: new Date().toISOString() }
+              : {}),
+          };
+        }
+        json = appearance;
+      } else if (path.endsWith("/branch")) {
+        const b = req.postDataJSON(),
+          id = Number(path.split("/").at(-2));
+        if (conflict || (b.available !== undefined && id === 2 && bulkFailures))
+          return route.fulfill({
+            status: 409,
+            headers,
+            json: { message: "Concurrent change; draft retained." },
+          });
+        assert.equal(b.version, items[id - 1].branchVersion);
+        if (b.priceOverride) {
+          items[id - 1].priceOverride = b.priceOverride;
+          items[id - 1].effectivePrice = b.priceOverride;
+          priceWrites++;
+        }
+        if (b.available !== undefined) items[id - 1].available = b.available;
+        items[id - 1].branchVersion++;
+        return route.fulfill({ status: 204, headers });
+      } else if (path.includes("/stock/")) {
+        const b = req.postDataJSON();
+        assert.equal(b.reason, "Fresh production");
+        assert.equal(b.version, 0);
+        return route.fulfill({ status: 204, headers });
+      } else if (path.endsWith("/workspace")) {
+        if (req.method() === "POST") {
+          creates++;
+          assert.equal(req.postDataJSON().details.name, "New sweet");
+          assert.deepEqual(req.postDataJSON().branchIds, [1]);
+          json = { productId: 99 };
+        } else {
+          const search = url.searchParams.get("search")?.toLowerCase() ?? "";
+          const filtered = items.filter((i) =>
+            `${i.name} ${i.code}`.toLowerCase().includes(search),
+          );
+          json = {
+            content: filtered,
+            totalElements: filtered.length,
+            page: 0,
+            totalPages: 1,
+            categories: [{ id: 1, name: "Sweets" }],
+            taxes: [{ id: 1, name: "Sweets tax" }],
+          };
+        }
+      } else if (path === "/api/storefront/features") json = {};
+      else json = [];
+      await route.fulfill({ headers, json });
+    });
+    await page.goto(`${base}/admin/menu/workspace`);
+    await page
+      .getByRole("heading", { name: "Kaju Katli", exact: true })
+      .waitFor();
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await page.screenshot({
+      path: `${shots}/overview-${width}.png`,
+      fullPage: true,
+    });
+    const first = page
+      .locator("article")
+      .filter({
+        has: page.getByRole("heading", { name: "Kaju Katli", exact: true }),
+      });
+    await first.getByRole("button", { name: "Price", exact: true }).click();
+    let dialog = page.getByRole("dialog");
+    await dialog.waitFor();
+    await dialog.getByLabel("Branch override").fill("125");
+    conflict = true;
+    await dialog
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await dialog.getByRole("alert").waitFor();
+    assert.equal(
+      await dialog.getByLabel("Branch override").inputValue(),
+      "125",
+    );
+    conflict = false;
+    await dialog
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    assert.equal(priceWrites, 1);
+    await first.getByText("₹125 / piece", { exact: true }).waitFor();
+    await page
+      .getByRole("button", { name: "+ Add product", exact: true })
+      .click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Name *", { exact: true }).fill("New sweet");
+    await dialog.getByLabel("Product code *", { exact: true }).fill("NEW-1");
+    await dialog.getByLabel("Base price").fill("200");
+    assert.equal(
+      await dialog
+        .getByRole("button", { name: "Create product", exact: true })
+        .isVisible(),
+      true,
+    );
+    const footer = await dialog
+      .getByRole("button", { name: "Create product", exact: true })
+      .boundingBox();
+    assert.ok(
+      footer.y + footer.height <= 900,
+      "Save button must stay inside viewport",
+    );
+    await page.screenshot({ path: `${shots}/add-product-${width}.png` });
+    await dialog
+      .getByRole("button", { name: "Create product", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    assert.equal(creates, 1);
+    await page.getByLabel("Select Kaju Katli", { exact: true }).check();
+    await page.getByLabel("Select Samosa", { exact: true }).check();
+    await page
+      .getByRole("button", { name: "Set availability", exact: true })
+      .click();
+    dialog = page.getByRole("dialog");
+    await dialog
+      .getByRole("button", { name: "Confirm update", exact: true })
+      .click();
+    await dialog
+      .getByText("Samosa: Concurrent change; draft retained.")
+      .waitFor();
+    await page.screenshot({
+      path: `${shots}/bulk-results-${width}.png`,
+      fullPage: true,
+    });
+    bulkFailures = false;
+    await dialog
+      .getByRole("button", { name: "Retry failed only", exact: true })
+      .click();
+    await dialog.getByText("Samosa: Updated").waitFor();
+    assert.equal(items[0].branchVersion, 2);
+    assert.equal(items[1].branchVersion, 1);
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await first.getByRole("button", { name: "Stock", exact: true }).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByLabel("Adjustment reason").fill("Fresh production");
+    await page.screenshot({
+      path: `${shots}/inventory-${width}.png`,
+      fullPage: true,
+    });
+    await dialog
+      .getByRole("button", { name: "Save changes", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    await page
+      .getByRole("button", { name: "Groups & sizes", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "+ New group", exact: true })
+      .click();
+    dialog = page.getByRole("dialog");
+    await dialog
+      .getByLabel("Customer-facing group name")
+      .fill("Sweet portions");
+    await dialog.getByRole("button", { name: /Kaju Katli.*Link/ }).click();
+    await dialog.getByRole("button", { name: /Samosa.*Link/ }).click();
+    await page.screenshot({
+      path: `${shots}/group-editor-${width}.png`,
+      fullPage: true,
+    });
+    await dialog
+      .getByRole("button", { name: "Save group", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    await page.getByRole("heading", { name: "Sweet portions" }).waitFor();
+    assert.equal(groups.groups[0].choices.length, 2);
+    await page
+      .getByRole("button", { name: "Menu appearance", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "+ Add banner", exact: true })
+      .click();
+    dialog = page.getByRole("dialog");
+    await dialog
+      .getByLabel("English title", { exact: true })
+      .fill("Made for your sweet moments");
+    await dialog
+      .getByLabel("Hindi title", { exact: true })
+      .fill("हर खुशी में मिठास");
+    await page.screenshot({
+      path: `${shots}/banner-preview-${width}.png`,
+      fullPage: true,
+    });
+    await dialog
+      .getByRole("button", { name: "Save draft", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    assert.equal(appearance.live.banners.length, 0);
+    await page
+      .getByRole("button", { name: "Review & publish", exact: true })
+      .click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Publish now", exact: true })
+      .click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    assert.equal(appearance.live.banners.length, 1);
+    assert.deepEqual(errors, []);
+    assert.equal(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+      true,
+    );
+    await context.close();
+    console.log(
+      `Workspace ${width}px: popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,
+    );
+  }
+} finally {
+  await browser.close();
+}

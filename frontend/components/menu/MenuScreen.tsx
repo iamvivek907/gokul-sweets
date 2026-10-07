@@ -22,6 +22,7 @@ import {groupMenuProducts} from "@/lib/menuGroups";
 
 import Link from "next/link";
 import BranchMenuGallery from "@/components/menu/BranchMenuGallery";
+import BranchMenuAppearance from "@/components/menu/BranchMenuAppearance";
 import NewBranchItems from "@/components/menu/NewBranchItems";
 import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
 
@@ -87,6 +88,7 @@ interface ProductRatingState {
 
 export default function MenuScreen() {
     const translate = useTranslation();
+    const [appearanceState, setAppearanceState] = useState<{branchId:number|null;orders:Record<number,number>}>({branchId:null,orders:{}});
     const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
     const {
@@ -94,6 +96,9 @@ export default function MenuScreen() {
     } =
         useSelectedBranch();
 
+
+    const appearanceOrder = appearanceState.branchId === branch?.id ? appearanceState.orders : {};
+    const saveAppearanceOrder = useCallback((orders:Record<number,number>)=>setAppearanceState({branchId:branch?.id??null,orders}),[branch?.id]);
 
     const {
         items,
@@ -1186,6 +1191,8 @@ export default function MenuScreen() {
 
                     </div>}
 
+                <BranchMenuAppearance key={branch.id} branchId={branch.id} categories={categories} onSelect={id=>jumpMenuCategory(id)} onOrder={saveAppearanceOrder}/>
+
                 {!phoneMenu && pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
                     <NewBranchItems branch={branch} products={allProducts} portionGroups={phoneMenu?portionGroups:undefined} onSelect={product => {
                         setSearch("");
@@ -1434,7 +1441,7 @@ export default function MenuScreen() {
 
                                 {phoneMenu&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
-                                {pickupCheck.features?.contextualStorefrontV2 ? (phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories, filteredProducts)).map(group => <MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>
+                                {pickupCheck.features?.contextualStorefrontV2 ? (phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories, filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group => <MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={retailBrowse?null:pairing}

@@ -62,11 +62,7 @@ public class ProductController {
             MultipartFile image
     ) {
 
-        return productService
-                .uploadImage(
-                        id,
-                        image
-                );
+        throw new org.springframework.security.access.AccessDeniedException("Use the secure admin image endpoint.");
     }
 
 
@@ -75,7 +71,6 @@ public class ProductController {
             @PathVariable Long id
     ) {
 
-        return productService
-                .removeImage(id);
+        throw new org.springframework.security.access.AccessDeniedException("Use the secure admin image endpoint.");
     }
 }
