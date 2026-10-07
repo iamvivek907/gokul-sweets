@@ -91,6 +91,36 @@ class MenuServiceWindowsIntegrationTest {
   assertThatThrownBy(()->validation.validate(new com.gokulsweets.restaurant.order.dto.CreateOrderRequest(branch,early,"Test customer","9876543210",com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,requested))).hasMessageContaining("unavailable for this pickup time");
   assertThatThrownBy(()->validation.validate(new com.gokulsweets.restaurant.order.dto.CreateOrderRequest(branch,closing,"Test customer","9876543210",com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,requested))).hasMessageContaining("unavailable for this pickup time");
  }
+ @Test void scopedCalendarChecksOnlyCartItemsButRetainsExternalDependencies(){
+  save(List.of(rule(samosaBp,false,null),rule(cholaBp,false,samosaBp)));
+  var requested=new HashSet<>(Set.of(chola));
+  var evaluate=windows.pickupEvaluator(branch,requested);
+  requested.add(samosa); // Caller mutation cannot widen a previously captured calendar.
+  var result=evaluate.apply(LocalDateTime.of(2026,10,5,12,0));
+  assertThat(result.products()).containsOnlyKeys(chola);
+  assertThat(result.status(chola).available()).isTrue();
+  assertThat(evaluate.apply(LocalDateTime.of(2026,10,5,9,0)).status(chola).available()).isFalse();
+  jdbc.update("UPDATE branch_products SET available=false WHERE id=?",samosaBp);
+  var refreshed=windows.pickupEvaluator(branch,Set.of(chola)).apply(LocalDateTime.of(2026,10,5,12,0));
+  assertThat(refreshed.products()).containsOnlyKeys(chola);
+  assertThat(refreshed.status(chola).code()).isEqualTo("SOLD_OUT");
+ }
+ @Test void reservationEditsUseOwnedOrRequestedPickupTimeBeforeOpening(){
+  var date=LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(1);
+  time(date.atTime(4,0).atZone(ZoneId.of("Asia/Kolkata")).toInstant().toString());
+  save(List.of(new MenuServiceWindows.Item(samosaBp,LocalTime.of(11,0),LocalTime.of(21,0),127,false,null)));
+  long early=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,?,'10:30','11:00',10) RETURNING id",Long.class,branch,date);
+  long later=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,?,'13:00','13:30',10) RETURNING id",Long.class,branch,date);
+  var selected=new com.gokulsweets.restaurant.branch.Branch();selected.setId(branch);selected.setActive(true);
+  var owned=new com.gokulsweets.restaurant.pickup.PickupSlot();owned.setId(Long.MAX_VALUE);owned.setBranch(selected);owned.setActive(true);owned.setSlotDate(date);owned.setStartTime(LocalTime.NOON);owned.setEndTime(LocalTime.of(12,30));owned.setCapacity(1);owned.setBookedCount(1);
+  var product=new com.gokulsweets.restaurant.product.Product();product.setId(samosa);
+  var item=new com.gokulsweets.restaurant.order.entity.OrderItem();item.setProduct(product);item.setQuantity(1);
+  var order=new com.gokulsweets.restaurant.order.entity.Order();order.setBranch(selected);order.setPickupSlot(owned);order.setPickupType(com.gokulsweets.restaurant.order.enums.PickupType.NORMAL);order.setItems(new ArrayList<>(List.of(item)));
+  var increased=List.of(new CreateOrderItemRequest(samosa,2,null));
+  assertThat(validation.validateExistingReservationUpdate(order,owned.getId(),order.getPickupType(),increased).items().getFirst().quantity()).isEqualTo(2);
+  assertThat(validation.validateExistingReservationUpdate(order,later,order.getPickupType(),increased).pickupSlot().getId()).isEqualTo(later);
+  assertThatThrownBy(()->validation.validateExistingReservationUpdate(order,early,order.getPickupType(),increased)).hasMessageContaining("unavailable for this pickup time");
+ }
  @Test void overnightPickupUsesTheOpeningWeekdayEvenWhenBookedEarlier(){
   time("2026-10-04T22:30:00Z");
   save(List.of(new MenuServiceWindows.Item(samosaBp,LocalTime.of(22,0),LocalTime.of(2,0),1,false,null)));

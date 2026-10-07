@@ -84,8 +84,15 @@ public class MenuServiceWindows {
     public Snapshot pickupSnapshot(long branchId, LocalDateTime pickupAt) {
         return pickupEvaluator(branchId).apply(pickupAt);
     }
+    public Snapshot pickupSnapshot(long branchId, LocalDateTime pickupAt, Set<Long> productIds) {
+        return pickupEvaluator(branchId,productIds).apply(pickupAt);
+    }
     /** Read rules once for an entire calendar; each slot uses its own server-owned IST timestamp. */
     public java.util.function.Function<LocalDateTime, Snapshot> pickupEvaluator(long branchId) {
+        return pickupEvaluator(branchId,null);
+    }
+    /** Evaluate only requested SKUs; dependencies may still reference any item in the branch. */
+    public java.util.function.Function<LocalDateTime, Snapshot> pickupEvaluator(long branchId, Set<Long> productIds) {
         if(TransactionSynchronizationManager.isActualTransactionActive() && !TransactionSynchronizationManager.isCurrentTransactionReadOnly())
             jdbc.queryForObject("SELECT id FROM branches WHERE id=? FOR SHARE",Long.class,branchId);
         Boolean operational=jdbc.queryForObject("SELECT operational FROM branches WHERE id=?",Boolean.class,branchId);
@@ -97,14 +104,18 @@ public class MenuServiceWindows {
         var products=new HashMap<Long,ProductState>();states.forEach(e->products.put(e.getKey(),e.getValue()));
         var byBranchProduct=new HashMap<Long,ProductState>();products.values().forEach(p->byBranchProduct.put(p.id(),p));
         var rules=new HashMap<Long,Item>();settings.items().forEach(i->rules.put(i.branchProductId(),i));
+        var requestedIds=productIds==null?Set.copyOf(products.keySet()):Set.copyOf(productIds);
         return pickupAt -> {
             var statuses=new HashMap<Long,Status>();
             var at=pickupAt==null?null:pickupAt.atZone(ZoneId.of("Asia/Kolkata"));
-            products.forEach((id,p)->{
-                var state=evaluate(p.id(),byBranchProduct,rules,at,new HashSet<>());
-                statuses.put(id,new Status(state.available(),state.code(),state.message(),state.nextChangeAt(),inventoryClock.instant()));
+            var observedAt=inventoryClock.instant();
+            requestedIds.forEach(id->{
+                var p=products.get(id);
+                var state=p==null?new Status(false,"DEPENDENCY_UNAVAILABLE","Required item is unavailable.",null)
+                        :evaluate(p.id(),byBranchProduct,rules,at,new HashSet<>());
+                statuses.put(id,new Status(state.available(),state.code(),state.message(),state.nextChangeAt(),observedAt));
             });
-            return new Snapshot(true,statuses);
+            return new Snapshot(true,Map.copyOf(statuses));
         };
     }
     private Status evaluate(long id,Map<Long,ProductState> products,Map<Long,Item> rules,ZonedDateTime now,Set<Long> visited) {

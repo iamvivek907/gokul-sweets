@@ -143,7 +143,7 @@ class CartAvailabilityServiceTest {
 
     private com.gokulsweets.restaurant.menu.MenuServiceWindows noServiceHours() {
         var windows = Mockito.mock(com.gokulsweets.restaurant.menu.MenuServiceWindows.class);
-        when(windows.pickupEvaluator(org.mockito.ArgumentMatchers.anyLong())).thenReturn(at ->
+        when(windows.pickupEvaluator(org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.anySet())).thenReturn(at ->
                 new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false, java.util.Map.of()));
         return windows;
     }

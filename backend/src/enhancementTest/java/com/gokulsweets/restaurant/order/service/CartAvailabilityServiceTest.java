@@ -45,7 +45,7 @@ class CartAvailabilityServiceTest {
         when(allocations.findByBranchProductIdInAndServiceDateBetween(List.of(22L), today, today.plusDays(1))).thenReturn(List.of(todayStock, tomorrowStock));
         when(slots.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(1L, today, today.plusDays(1))).thenReturn(List.of(first, full, available));
         var windows = mock(com.gokulsweets.restaurant.menu.MenuServiceWindows.class);
-        when(windows.pickupEvaluator(anyLong())).thenReturn(at ->
+        when(windows.pickupEvaluator(anyLong(), anySet())).thenReturn(at ->
                 new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false, java.util.Map.of()));
         var service = new CartAvailabilityService(features, inventory, validation, new SmartOrderingRules(features, settings, clock),
                 policies, allocations, new InventoryAvailabilityService(), slots, settings, clock, windows);

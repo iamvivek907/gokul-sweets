@@ -10,21 +10,21 @@ const browser=await chromium.launch({headless:true});
 try{
  for(const width of [320,390,640]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
-  page.setDefaultTimeout(15000);let checks=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.clock.install({time:new Date()});page.setDefaultTimeout(15000);let checks=0,menuRevision="v1",blocked=true;const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   await context.route('**/api/**',async route=>{
    const request=route.request(),path=new URL(request.url()).pathname;let json=[];
    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
    if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,smartAvailability:true,today:date,futureOrderingDays:30};
    else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-   else if(path==='/api/menu')json=[{id:1,name:'Meals',products}];
+   else if(path==='/api/menu')json=[{id:1,name:'Meals',products:products.map(product=>({...product,availabilityRevision:menuRevision}))}];
    else if(path==='/api/menu/portion-groups')json={groups:[]};
    else if(path==='/api/storefront/customer-identity')json={enabled:false};
    else if(path.endsWith('/pickup-discovery'))json={today:date,maximumDate:date,dates:[{date,available:true,items:[],slots:[{slot,normalAvailable:true,priorityAvailable:false}]}]};
    else if(path.endsWith('/availability')){
     checks++;const body=request.postDataJSON();assert.equal(body.days,1);
     assert.deepEqual(body.items.map(i=>i.productId).sort(),[1,2],'search must not hide recommended items from the check');
-    json={today:date,maximumDate:date,dates:[{date,available:false,items:products.map(p=>({productId:p.id,available:false})),slots:[{slot,normalAvailable:false,priorityAvailable:false,issues:products.map(p=>({productId:p.id,available:false}))}]}]};
+    json={today:date,maximumDate:date,dates:[{date,available:!blocked,items:products.map(p=>({productId:p.id,available:!blocked})),slots:[{slot,normalAvailable:!blocked,priorityAvailable:false,issues:blocked?products.map(p=>({productId:p.id,available:false})):[]}]}]};
    }
    await route.fulfill({json,headers});
   });
@@ -48,6 +48,18 @@ try{
   assert.equal(await recommendations.getByRole('button',{name:'Add Meal 1 to cart'}).isDisabled(),true);
   assert.equal(await recommendations.getByRole('button',{name:'Add Meal 2 to cart'}).isDisabled(),true);
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
+  await page.evaluate(({date,slot})=>{localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));window.dispatchEvent(new Event('gokul-pickup-slot-change'));},{date,slot});
+  await page.waitForFunction(()=>document.querySelector('.mobile-menu-pickup strong')?.textContent?.includes('6:00'));
+  // Staff change service hours without changing which products can be browsed.
+  // The lightweight live revision must invalidate the dated preview without a manual retry.
+  const before=checks;menuRevision='v2';blocked=false;await page.clock.fastForward(31000);
+  await page.waitForFunction(()=>{const button=document.querySelector('button[aria-label="Add Meal 2 to cart"]');return button&&!button.disabled;});
+  assert.ok(checks>before,'changed menu revision rechecks service hours for the selected date');
+  assert.equal(await recommendations.getByRole('button',{name:'Add Meal 2 to cart'}).isEnabled(),true);
+  menuRevision='v3';blocked=true;await page.clock.fastForward(31000);
+  await recommendations.getByText('Unavailable for selected pickup',{exact:true}).nth(1).waitFor();
+  assert.equal(await recommendations.getByRole('button',{name:'Add Meal 2 to cart'}).isDisabled(),true);
+  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))),{date,slot,pickupType:'NORMAL'},'background rechecks preserve the customer’s chosen pickup');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
   await context.close();console.log(`Pickup guidance ${width}px passed`);
  }

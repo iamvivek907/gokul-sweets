@@ -632,7 +632,7 @@ public class OrderValidationService {
     }
     private List<ValidatedOrderItem> validateProducts(Long branchId, Map<Long,RequestedOrderItem> requestedItems,
             boolean enforceService, java.time.LocalDateTime pickupAt) {
-        return validateProducts(branchId, requestedItems, enforceService ? serviceWindows.pickupSnapshot(branchId,pickupAt)
+        return validateProducts(branchId, requestedItems, enforceService ? serviceWindows.pickupSnapshot(branchId,pickupAt,requestedItems.keySet())
                 : new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false,Map.of()));
     }
     private List<ValidatedOrderItem> validateProducts(Long branchId, Map<Long,RequestedOrderItem> requestedItems,

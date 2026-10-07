@@ -77,7 +77,7 @@ public class CartAvailabilityService {
         Map<LocalDate, List<PickupSlot>> slotsByDate = slotRepository
                 .findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(branchId, startDate, lastDate).stream()
                 .collect(Collectors.groupingBy(PickupSlot::getSlotDate));
-        var serviceAt = serviceWindows.pickupEvaluator(branchId);
+        var serviceAt = serviceWindows.pickupEvaluator(branchId, items.stream().map(item -> item.product().getId()).collect(Collectors.toSet()));
         List<DateAvailability> dates = new ArrayList<>();
         for (LocalDate date = startDate; !date.isAfter(lastDate); date = date.plusDays(1)) {
             List<SlotAvailability> slots = new ArrayList<>();
