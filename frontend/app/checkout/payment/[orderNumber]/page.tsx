@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import ReferenceWordmark from "@/components/layout/ReferenceWordmark";
+
 import BrandLoading from "@/components/common/BrandLoading";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {T,useTranslation} from "@/lib/language";
@@ -1523,7 +1523,7 @@ export default function PaymentPage() {
      */
 
     if (phone && (loading || payment?.paymentStatus === "PAID") && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
-        <div className="mobile-payment-verifying" role="status" aria-live="polite"><ReferenceWordmark className="brand-loading-wordmark"/><h1><T text="Checking your payment…" /></h1><p><T text="Please keep this page open." /></p><div aria-hidden="true" /></div>
+        <BrandLoading fullscreen className="payment-status-loading" label="Checking your payment…" detail="Waiting for the payment provider to confirm your payment. Please keep this page open." />
     </AppShell>;
 
     if (
@@ -1554,7 +1554,7 @@ export default function PaymentPage() {
                         "
                     >
 
-                        <BrandLoading compact label="Preparing secure payment..." />
+                        <BrandLoading label="Preparing secure payment..." detail="Checking your order and connecting to the payment provider. Please keep this page open." />
 
 
                         <p

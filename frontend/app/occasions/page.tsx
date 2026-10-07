@@ -1,6 +1,7 @@
 
 /* eslint-disable @next/next/no-img-element -- Real catalogue URLs are rendered directly without transforming supplier photos. */
 "use client";
+import MobilePageBack from "@/components/customer/MobilePageBack";
 import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {T} from "@/lib/language";
@@ -105,7 +106,7 @@ export default function OccasionsPage() {
     const incompletePrice=prices.some(price=>price==null)||groups.some(group=>boxes.find(box=>box.id===group.boxId)?.price==null||group.includeSpoons);
     return <AppShell editorial showSocialPopup={false}>
         <div className="occasion-journey mx-auto max-w-7xl px-4 py-8 text-[#173a37] sm:px-6">
-            <nav className="mobile-occasion-navigation" aria-label="Celebration navigation"><Link href={home}><span aria-hidden="true">←</span> <T text={homeLabel} /></Link><Link href="/occasions/requests"><T text="Requests & quotes" /></Link></nav>
+            <nav className="mobile-occasion-navigation" aria-label="Celebration navigation"><MobilePageBack href={home} label={homeLabel} /><Link href="/occasions/requests"><T text="Requests & quotes" /></Link></nav>
             <header className="occasion-hero"><p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]"><span className="desktop-celebration-label">Occasions at Gokul</span><span className="mobile-celebration-label"><T text="Bulk order" /></span></p>
             <h1 className="mt-3 font-serif text-4xl sm:text-6xl">{campaign?.headline||"Sweet moments. Thoughtfully planned."}</h1>
             <p className="mt-4 max-w-2xl">{campaign?.description||"Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment."}</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div>{campaign?.imageUrl&&<img src={campaign.imageUrl} alt={`${branch?.name??"Gokul"} occasion collection`} className="occasion-campaign-photo" />}<div className="occasion-hero-actions"><a href="#occasion-plan" className="occasion-primary">Build your celebration</a><Link href="/occasions/requests" className="occasion-secondary">Track requests & quotes</Link></div></header>

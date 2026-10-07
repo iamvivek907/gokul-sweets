@@ -105,7 +105,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <span><T text="Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch." /></span>
                 <div className={styles.actions}>
                     <Link href="/branches" className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
-                    <Link href={occasionEnquiries ? "/occasions" : "/branches"}><T text="Plan an occasion" /><LinkFeedback /></Link>
+                    <Link href={occasionEnquiries ? "/occasions/branches" : "/branches"}><T text="Plan an occasion" /><LinkFeedback /></Link>
                 </div>
             </div>
             <a className={styles.scrollCue} href="#gokul-branches" onClick={event => {

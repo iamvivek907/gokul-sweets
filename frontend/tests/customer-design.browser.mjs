@@ -37,6 +37,10 @@ try{
    return route.fulfill({json,headers:{'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true'}});
   });
 
+  await page.goto(`${base}/occasions/branches`);await page.getByRole('heading',{name:'Choose a branch for your occasion',exact:true}).waitFor();
+  await page.getByRole('button',{name:`Plan at this branch · ${branch.name}`,exact:true}).waitFor();
+  assert.equal(new URL(page.url()).pathname,'/occasions/branches','stored branch does not bypass explicit occasion selection');
+  await page.getByRole('button',{name:`Plan at this branch · ${branch.name}`,exact:true}).click();await page.waitForURL('**/occasions');
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const routes=[['/branches/1','.branch-home-hero'],['/menu','#gokul-product-1'],['/profile','.account-cover'],['/profile/rewards','.customer-rewards-page'],['/profile/orders','.profile-focused-route'],['/notifications','.notification-page-heading'],['/orders','h1:visible'],[width<=640&&themed?'/checkout/mobile':'/cart',width<=640&&themed?'.mobile-empty-cart':'h1:visible'],['/occasions','.occasion-hero'],['/occasions/requests','#occasion-tracker'],['/about','h1:visible'],['/careers','h1:visible'],['/cancellation-policy','h1:visible'],['/profile/privacy','h1:visible'],['/','h1:visible']];
   for(const [route,ready] of routes){

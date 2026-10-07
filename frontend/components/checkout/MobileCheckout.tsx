@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import EmptyMealIllustration from "@/components/cart/EmptyMealIllustration";
 
 import Link from "next/link";
@@ -242,7 +243,7 @@ export default function MobileCheckout(){
   void pay();
  }
  useEffect(()=>{if(!handoff)return;const timer=setTimeout(()=>{setHandoff(false);setError("The payment page is taking longer to open. Continue your existing payment to try again.");},20000);return()=>clearTimeout(timer);},[handoff]);
- if(busy||handoff)return <div className="mobile-checkout-loading" role="status" aria-live="polite"><div><span className="mobile-checkout-loading-brand">Gokul Sweets</span><div className="mobile-checkout-loading-progress" aria-hidden="true"><span/></div><p><T text="Opening secure payment…" /></p><small><T text="Please keep this page open." /></small></div></div>;
+ if(busy||handoff)return <BrandLoading fullscreen className="mobile-checkout-loading" label="Opening secure payment…" detail="Confirming your order and connecting to secure payment. Please keep this page open." />;
  if(attemptLoaded&&cart.isEmpty&&!pending&&!attempt)return <div className="mobile-checkout mobile-empty-cart"><nav className="mobile-checkout-nav" aria-label="Checkout navigation"><MobilePageBack href="/menu" label="Back to menu"/>{features?.branchExperience&&branch&&<Link href={`/branches/${branch.id}`}><T text="Branch home" /></Link>}</nav><section><EmptyMealIllustration/><h1><T text="Your cart is empty" /></h1><p><T text="Choose your favourites from the menu to start your order." /></p><Link className="mobile-empty-cart-action" href="/menu"><T text="Browse menu" /></Link></section></div>;
  if(attemptLoaded&&(!branch||cart.branchId!==branch.id)&&!attempt&&!pending)return <div className="mobile-checkout"><h1><T text="Your order" /></h1><p><T text="Choose the matching branch before checking out." /></p><Link href="/menu"><T text="Back to menu" /></Link></div>;
  return <div className="mobile-checkout">

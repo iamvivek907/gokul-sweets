@@ -27,11 +27,11 @@ export default function FloatingMenuCategories({categories,selectedId,hasCart,on
             <T text="Categories" />
         </button>
         {open&&<MenuDiscoverySheet title="Jump to a category" onClose={()=>setOpen(false)} className="menu-floating-category-sheet">
-            <p><T text="Choose a category to see its items. This clears your search and filters." /></p>
+
             <nav aria-label="Jump to menu category">
-                <button type="button" onClick={()=>select(null)}><T text="All items" /><span aria-hidden="true">→</span></button>
+                <button type="button" onClick={()=>select(null)}><T text="All items" /><span>{categories.reduce((total,category)=>total+category.products.length,0)}</span></button>
                 {categories.map(category=><button type="button" key={category.id} aria-current={selectedId===category.id?"true":undefined} onClick={()=>select(category.id)}>
-                    <span>{category.name}<small>{category.products.length} <T text="items" /></small></span><span aria-hidden="true">→</span>
+                    <span>{category.name}</span><span>{category.products.length}</span>
                 </button>)}
             </nav>
         </MenuDiscoverySheet>}

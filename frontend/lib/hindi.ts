@@ -1,4 +1,15 @@
 export const hindi: Record<string,string> = {
+ "Choose a branch for your occasion": "अपने समारोह के लिए शाखा चुनें",
+ "Select the branch that will prepare your bulk order.": "अपना बड़ा ऑर्डर तैयार करने वाली शाखा चुनें।",
+ "Plan at this branch": "इस शाखा में योजना बनाएँ",
+ "Branch details could not be loaded.": "शाखाओं की जानकारी लोड नहीं हो सकी।",
+ "No branches are available right now.": "अभी कोई शाखा उपलब्ध नहीं है।",
+ "Connecting to the branch and loading the latest details.": "शाखा से जुड़कर नई जानकारी लोड हो रही है।",
+ "This is taking longer than usual. We are waiting for a response; please keep this page open.": "सामान्य से अधिक समय लग रहा है। हम जवाब की प्रतीक्षा कर रहे हैं; कृपया यह पेज खुला रखें।",
+ "Confirming your order and connecting to secure payment. Please keep this page open.": "आपके ऑर्डर की पुष्टि और सुरक्षित भुगतान से जुड़ने की प्रक्रिया चल रही है। कृपया यह पेज खुला रखें।",
+ "Waiting for the payment provider to confirm your payment. Please keep this page open.": "भुगतान सेवा से पुष्टि की प्रतीक्षा है। कृपया यह पेज खुला रखें।",
+ "Checking your order and connecting to the payment provider. Please keep this page open.": "आपका ऑर्डर जाँचकर भुगतान सेवा से जुड़ रहे हैं। कृपया यह पेज खुला रखें।",
+
     "Jump to a category": "श्रेणी पर जाएँ",
     "Choose a category to see its items. This clears your search and filters.": "सामान देखने के लिए श्रेणी चुनें। इससे खोज और फ़िल्टर हट जाएँगे।",
     "Preparing your visit…": "आपके स्वागत की तैयारी हो रही है…",

@@ -36,7 +36,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
  assert.equal(await page.locator('.customer-brand-loading .brand-loading-wordmark').evaluate(n=>getComputedStyle(n).color),'rgb(152, 12, 49)');
  holdBranch=false;releaseBranch();
  await page.locator('.customer-menu-loading').waitFor();
- if(width===640)assert.equal(await page.locator('.customer-brand-loading-spinner').evaluate(n=>getComputedStyle(n).animationName),'none');
+ if(width===640)assert.equal(await page.locator('.customer-brand-loading-spinner>span').evaluate(n=>getComputedStyle(n).animationName),'none');
  holdMenu=false;releaseMenu();await page.locator('#gokul-product-1').waitFor();
  const floating=page.getByRole('button',{name:'Categories',exact:true});
  if(width<=640&&themed){
@@ -50,6 +50,8 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   const cart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
   await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
   await floating.click();let sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});await sheet.waitFor();
+  assert.equal(await sheet.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(8, 11, 16)');
+  assert.ok((await sheet.boundingBox()).width<width,'category panel has side margins');
   await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await floating.evaluate(n=>n===document.activeElement),true);
   const y=await page.evaluate(()=>scrollY);await floating.click();
   await sheet.getByRole('button',{name:/Dairy/}).click();await page.locator('#gokul-product-3').waitFor();

@@ -94,3 +94,9 @@
 :global(.future-storefront[data-customer-design=reference]) .closing em{color:#155a48}
 :global(.future-storefront[data-customer-design=reference]) .closing a{background:#8f1838;color:#fff;border-radius:12px}
 @media(max-width:640px){:global(.future-storefront[data-customer-design=reference]) .scrim{background:linear-gradient(0deg,#491226ed,#49122688)}}
+
+/* Neutral scrim preserves the colours of the published food video. */
+:global(.future-storefront[data-customer-design=reference]) .scrim{background:linear-gradient(90deg,#101015d9,#10101570 60%,#10101535),linear-gradient(0deg,#101015b3,transparent 70%)}
+:global(.future-storefront[data-customer-design=reference]) .heroCopy,:global(.future-storefront[data-customer-design=reference]) .logo{color:#fffaf0}
+:global(.future-storefront[data-customer-design=reference]) .actions a:last-child{background:#ffffff14;color:#fff;border:1px solid #ffffffb3;border-radius:12px}
+@media(max-width:640px){:global(.future-storefront[data-customer-design=reference]) .scrim{background:linear-gradient(180deg,#10101580,#10101573 30%,#101015cc 100%)}}
