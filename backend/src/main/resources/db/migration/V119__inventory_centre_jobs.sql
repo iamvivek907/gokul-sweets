@@ -11,3 +11,6 @@ CREATE TABLE inventory_centre_tasks (
 CREATE INDEX inventory_centre_queue ON inventory_centre_tasks(id) WHERE status IN ('QUEUED','PROCESSING');
 CREATE INDEX inventory_centre_history ON inventory_centre_jobs(branch_id,created_at DESC);
 CREATE INDEX inventory_centre_expiry ON inventory_centre_tasks(finished_at,id) WHERE status='SUCCEEDED';
+-- Keep admission and retention scans bounded as completed history grows.
+CREATE INDEX inventory_centre_active_jobs ON inventory_centre_jobs(branch_id) WHERE succeeded+failed<total;
+CREATE INDEX inventory_centre_failure_expiry ON inventory_centre_tasks(finished_at,id) WHERE status='FAILED' AND payload IS NOT NULL;
