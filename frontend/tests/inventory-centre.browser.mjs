@@ -47,7 +47,8 @@ try{
   assert.equal(await page.getByLabel("From (IST)",{exact:true}).inputValue(),"2026-10-08");
   assert.equal(await page.getByLabel("Kaju Katli ready",{exact:true}).count(),0);
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();
-  await page.getByRole("button",{name:"Retry original plan",exact:true}).click();assert.equal(rawBodies[0],rawBodies[1]);
+  const retryResponse=page.waitForResponse(response=>response.request().method()==="POST" && new URL(response.url()).pathname.endsWith("/centre/jobs") && response.status()===200);
+  await page.getByRole("button",{name:"Retry original plan",exact:true}).click();await retryResponse;assert.equal(rawBodies[0],rawBodies[1]);
   await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,2);assert.deepEqual(bodies[0],bodies[1]);assert.equal(bodies[1].options.openPurchases,false);assert.equal(bodies[1].items[2].quantity,1250);assert.equal(bodies[1].items[2].readyQuantity,800);
   await page.reload();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();await page.getByText("3 succeeded · 0 failed · 0 remaining",{exact:true}).waitFor();assert.equal(bodies.length,2);
   await page.getByRole("button",{name:"Start a fresh plan"}).click();await page.getByLabel("From (IST)",{exact:true}).fill("2026-10-09");await page.getByLabel("Through (IST)",{exact:true}).fill("2026-10-09");await page.getByRole("button",{name:"Load branch items",exact:true}).click();await page.getByText("Kaju Katli",{exact:true}).waitFor();
