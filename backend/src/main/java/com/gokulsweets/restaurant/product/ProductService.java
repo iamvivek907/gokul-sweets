@@ -18,6 +18,26 @@ public class ProductService {
     private final ProductRepository productRepository;
 
     private final R2StorageService r2StorageService;
+    private final com.gokulsweets.restaurant.security.StaffAuthorizationService authorization;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    private void authorizeImage(Long productId) {
+        authorization.requirePermission(com.gokulsweets.restaurant.staff.PermissionName.MENU_MANAGE);
+        var branches = jdbc.queryForList("SELECT branch_id FROM branch_products WHERE product_id=?", Long.class, productId);
+        if (branches.isEmpty()) throw new org.springframework.security.access.AccessDeniedException("Product must be assigned to a permitted branch.");
+        branches.forEach(authorization::requireBranchAccess);
+    }
+    private void deleteAfterCommit(String url) {
+        if (url == null || url.isBlank()) return;
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    try { r2StorageService.deleteProductImage(url); }
+                    catch (Exception e) { log.warn("Unable to clean up replaced product media", e); }
+                }
+            });
+    }
+
 
 
     @Transactional(readOnly = true)
@@ -71,6 +91,8 @@ public class ProductService {
             Long productId,
             MultipartFile image
     ) {
+
+        authorizeImage(productId);
 
         Product product =
                 productRepository
@@ -135,31 +157,16 @@ public class ProductService {
          * that the upload failed because the new image and
          * database record are already valid.
          */
-        if (
-                oldImageUrl != null
-                        && !oldImageUrl.isBlank()
-                        && !oldImageUrl.equals(
-                        newImageUrl
-                )
-        ) {
-
-            try {
-
-                r2StorageService.deleteProductImage(
-                        oldImageUrl
-                );
-
-            } catch (Exception exception) {
-
-                log.warn(
-                        "Unable to delete previous product image for product {}: {}",
-                        productId,
-                        oldImageUrl,
-                        exception
-                );
-            }
-        }
-
+        if (!newImageUrl.equals(oldImageUrl)) deleteAfterCommit(oldImageUrl);
+        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+            new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCompletion(int status) {
+                    if (status != STATUS_COMMITTED) {
+                        try { r2StorageService.deleteProductImage(newImageUrl); }
+                        catch (Exception e) { log.warn("Unable to clean up rolled-back product media", e); }
+                    }
+                }
+            });
 
         return ProductResponse.from(
                 saved
@@ -171,6 +178,8 @@ public class ProductService {
     public ProductResponse removeImage(
             Long productId
     ) {
+
+        authorizeImage(productId);
 
         Product product =
                 productRepository
@@ -193,44 +202,8 @@ public class ProductService {
          *
          * This avoids any unnecessary R2 API call.
          */
-        if (
-                imageUrl != null
-                        && !imageUrl.isBlank()
-        ) {
+        deleteAfterCommit(imageUrl);
 
-            try {
-
-                r2StorageService.deleteProductImage(
-                        imageUrl
-                );
-
-            } catch (Exception exception) {
-
-                /*
-                 * Do not remove the database reference if the
-                 * R2 object could not be deleted.
-                 *
-                 * This prevents the database from saying that
-                 * an image does not exist when the R2 object
-                 * actually still exists.
-                 */
-                log.error(
-                        "Unable to delete product image for product {}",
-                        productId,
-                        exception
-                );
-
-                throw new IllegalStateException(
-                        "Unable to remove product image.",
-                        exception
-                );
-            }
-        }
-
-
-        /*
-         * R2 deletion succeeded, so clear the database URL.
-         */
         product.setImageUrl(
                 null
         );

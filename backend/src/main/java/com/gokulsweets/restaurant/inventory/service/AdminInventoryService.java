@@ -123,6 +123,27 @@ public class AdminInventoryService {
             AdminAllocationApprovalRequest request,
             String performedBy
     ) {
+        return saveAllocation(branchProductId, serviceDate, request, performedBy, false);
+    }
+
+    /** Adjust quantities without resuming paused stock or revoking existing readiness. */
+    @Transactional
+    public InventoryAllocationResponse adjustAllocation(
+            Long branchProductId,
+            LocalDate serviceDate,
+            AdminAllocationApprovalRequest request,
+            String performedBy
+    ) {
+        return saveAllocation(branchProductId, serviceDate, request, performedBy, true);
+    }
+
+    private InventoryAllocationResponse saveAllocation(
+            Long branchProductId,
+            LocalDate serviceDate,
+            AdminAllocationApprovalRequest request,
+            String performedBy,
+            boolean preserveReadiness
+    ) {
         BranchInventoryPolicy policy = getPolicy(branchProductId);
         validateServiceDate(serviceDate, policy);
         BigDecimal approvedQuantity =
@@ -173,9 +194,9 @@ public class AdminInventoryService {
         allocation.setNote(normalize(request.note()));
         allocation.setApprovedBy(performedBy);
         allocation.setApprovedAt(LocalDateTime.now(inventoryClock));
-        allocation.setStatus(
-                InventoryAllocationStatus.APPROVED
-        );
+        if (!preserveReadiness || allocation.getStatus() == InventoryAllocationStatus.DRAFT) {
+            allocation.setStatus(InventoryAllocationStatus.APPROVED);
+        }
 
         InventoryDailyAllocation saved = allocationRepository.save(allocation);
         jdbc.update("""

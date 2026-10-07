@@ -3,11 +3,19 @@ import type {
 } from "next";
 
 
+const configuredMediaUrl = process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
+const configuredMediaPattern = configuredMediaUrl ? (() => {
+    const url = new URL(configuredMediaUrl);
+    if (url.protocol !== "https:") throw new Error("NEXT_PUBLIC_MEDIA_BASE_URL must use HTTPS.");
+    return {protocol: "https" as const, hostname: url.hostname, port: url.port, pathname: "/**"};
+})() : null;
 const nextConfig: NextConfig = {
 
     images: {
 
         remotePatterns: [
+            ...(configuredMediaPattern ? [configuredMediaPattern] : []),
+            {protocol: "https", hostname: "**.r2.dev", pathname: "/**"},
 
             /*
              * Local development images/API-hosted images.

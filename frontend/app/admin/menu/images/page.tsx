@@ -1434,6 +1434,8 @@ function ProductImageCard({
     onRemove: () => void;
 }) {
 
+    const [failedUrl, setFailedUrl] = useState<string | null>(null);
+
     return (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md sm:rounded-2xl">
 
@@ -1442,7 +1444,7 @@ function ProductImageCard({
             <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 sm:aspect-[16/10]">
 
                 {
-                    product.imageUrl
+                    product.imageUrl && failedUrl !== product.imageUrl
                         ? (
 
                             <Image
@@ -1455,6 +1457,7 @@ function ProductImageCard({
                                 fill
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
                                 className="object-cover"
+                                onError={() => setFailedUrl(product.imageUrl)}
                             />
 
                         )
@@ -1468,7 +1471,7 @@ function ProductImageCard({
 
 
                                 <p className="mt-1 text-xs font-medium sm:mt-2 sm:text-sm">
-                                    No image
+                                    {failedUrl === product.imageUrl && product.imageUrl ? "Image URL cannot load" : "No image"}
                                 </p>
 
                             </div>
