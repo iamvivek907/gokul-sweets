@@ -60,19 +60,20 @@ test('unavailable cross-tab locking fails gracefully without leaving a dead prom
 test('all declared install and push icons exist at their advertised PNG sizes',()=>{
  const manifest=fs.readFileSync('app/manifest.ts','utf8');
  for(const src of [...manifest.matchAll(/src: "([^"]+\.png[^"]*)"/g)].map(match=>match[1])){
-  const path=src.split('?')[0];assert.match(src,/\?v=20261003$/);
+  const path=src.split('?')[0];assert.match(src,/\?v=20261007$/);
   const bytes=fs.readFileSync('public'+path),size=path.includes('192')?192:512;
   assert.equal(bytes.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);
  }
  assert.deepEqual(fs.readFileSync('public/icon-192.png'),fs.readFileSync('public/icons/icon-192.png'));
+ const apple=fs.readFileSync('app/apple-icon.png');assert.equal(apple.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(apple.readUInt32BE(16),180);assert.equal(apple.readUInt32BE(20),180);
 });
 
 test('existing image caches do not hide the versioned corrected install assets',async()=>{
  const handlers=new Map(),cached=new Map([['https://shop.example/icons/icon-192.png',new Response('old-icon')]]),requests=[];
  const cache={async match(request){return cached.get(request.url);},async put(request,response){cached.set(request.url,response);}};
  vm.runInNewContext(fs.readFileSync('public/sw.js','utf8'),{self:{location:{origin:'https://shop.example'},addEventListener(name,fn){handlers.set(name,fn);}},URL,Request,Response,caches:{async open(){return cache;}},async fetch(request){requests.push(request.url);return new Response('corrected-icon');}});
- let result;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/icons/icon-192.png?v=20261003',destination:'image'},respondWith(promise){result=promise;}});
- assert.equal(await (await result).text(),'corrected-icon');assert.deepEqual(requests,['https://shop.example/icons/icon-192.png?v=20261003']);
+ let result;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/icons/icon-192.png?v=20261007',destination:'image'},respondWith(promise){result=promise;}});
+ assert.equal(await (await result).text(),'corrected-icon');assert.deepEqual(requests,['https://shop.example/icons/icon-192.png?v=20261007']);
  assert.equal(await cached.get('https://shop.example/icons/icon-192.png').text(),'old-icon');
  let intercepted=false;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/api/orders/1',destination:''},respondWith(){intercepted=true;}});assert.equal(intercepted,false);
 });
