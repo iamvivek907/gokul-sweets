@@ -52,6 +52,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await floating.click();let sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});await sheet.waitFor();
   assert.equal(await sheet.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(8, 11, 16)');
   assert.ok((await sheet.boundingBox()).width<width,'category panel has side margins');
+  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/category-panel-${width}.png`});
   await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await floating.evaluate(n=>n===document.activeElement),true);
   const y=await page.evaluate(()=>scrollY);await floating.click();
   await sheet.getByRole('button',{name:/Dairy/}).click();await page.locator('#gokul-product-3').waitFor();
@@ -60,7 +61,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/floating-categories-${width}.png`});
-  await floating.click();await sheet.getByRole('button',{name:'All items',exact:true}).click();await page.locator('#gokul-product-7').waitFor();
+  await floating.click();await sheet.getByRole('button',{name:/^All items\s*\d+$/}).click();await page.locator('#gokul-product-7').waitFor();
   await page.locator('#gokul-menu-search').fill('No such item');await page.getByText('No matching items',{exact:true}).waitFor();
   await floating.click();await sheet.getByRole('button',{name:/Sweets/}).click();await page.locator('#gokul-product-1').waitFor();assert.equal(await page.locator('#gokul-menu-search').inputValue(),'');
   await page.locator('.customer-bottom-navigation a[data-nav-icon=home]').click();await page.waitForURL('**/branches/1');await page.locator('.branch-overview').waitFor();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');
@@ -72,7 +73,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await floating.click();const sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});
   await sheet.getByRole('button',{name:/Dairy/}).click();await page.locator('#gokul-product-3').waitFor();assert.equal(await page.locator('#gokul-product-1').count(),0);
   await page.waitForFunction(()=>{const n=document.querySelector('#menu-category-2');return n&&n.getBoundingClientRect().top>=52&&n.getBoundingClientRect().top<innerHeight/2;});
-  await floating.click();await sheet.getByRole('button',{name:'All items',exact:true}).click();await page.locator('#gokul-product-1').waitFor();
+  await floating.click();await sheet.getByRole('button',{name:/^All items\s*\d+$/}).click();await page.locator('#gokul-product-1').waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart);
   console.log(`Loading/category ${width}px: desktop dock separation, exact category, All and cart preservation passed`);
  }else{assert.equal(await floating.count(),0);console.log(`Loading ${width}px enabled=${themed}: shared brand; ordering layout preserved`);}

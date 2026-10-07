@@ -44,6 +44,7 @@ try{
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const routes=[['/branches/1','.branch-home-hero'],['/menu','#gokul-product-1'],['/profile','.account-cover'],['/profile/rewards','.customer-rewards-page'],['/profile/orders','.profile-focused-route'],['/notifications','.notification-page-heading'],['/orders','h1:visible'],[width<=640&&themed?'/checkout/mobile':'/cart',width<=640&&themed?'.mobile-empty-cart':'h1:visible'],['/occasions','.occasion-hero'],['/occasions/requests','#occasion-tracker'],['/about','h1:visible'],['/careers','h1:visible'],['/cancellation-policy','h1:visible'],['/profile/privacy','h1:visible'],['/','h1:visible']];
   for(const [route,ready] of routes){
+   console.log(`Checking customer design ${width}px themed=${themed} ${route}`);
    await page.goto(`${base}${route}`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator(ready).first().waitFor();
    if(themed){
     const shell=page.locator('[data-customer-design=reference]');await shell.waitFor();
