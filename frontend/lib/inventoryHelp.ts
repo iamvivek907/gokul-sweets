@@ -12,6 +12,22 @@ export interface InventoryHelpDefinition {
 }
 
 export const INVENTORY_HELP: InventoryHelpDefinition[] = [
+    {"key": "effectivePrice", "label": "Effective price", "context": ["SETUP"], "definition": "The price charged by this branch per kg or piece, using its override when present.", "guidance": "Base price is shared between branches. Use Price to change only this branch; customer tax and fee totals are calculated at checkout."},
+    {"key": "productName", "label": "Name", "context": ["SETUP"], "definition": "The customer-facing product name shared across assigned branches.", "guidance": "Use a clear name; update the shared Details popup rather than creating a duplicate."},
+    {"key": "productCode", "label": "Product code", "context": ["SETUP"], "definition": "The unique SKU used by imports and product matching.", "guidance": "Keep an existing code stable so future imports update the correct product."},
+    {"key": "category", "label": "Category", "context": ["SETUP"], "definition": "The shared category used to organise the customer menu.", "guidance": "Choose the appropriate category. Ungroup an item before changing its category."},
+    {"key": "description", "label": "Description", "context": ["SETUP"], "definition": "A short customer-facing description shared between branches.", "guidance": "Describe the product, portion or ingredients clearly; maximum 500 characters."},
+    {"key": "saleUnit", "label": "Sale unit", "context": ["SETUP"], "definition": "Whether customers buy the product by piece or by weight.", "guidance": "Choose this when creating the SKU. Existing stock and orders prevent changing it later."},
+    {"key": "minimumWeight", "label": "Minimum weight", "context": ["SETUP"], "definition": "The smallest weight a customer can order, in grams.", "guidance": "For example, 250 permits orders starting at 250 g."},
+    {"key": "weightStep", "label": "Weight step", "context": ["SETUP"], "definition": "The increment customers can add, in grams.", "guidance": "For example, a 250 g step allows 250 g, 500 g, 750 g quantities."},
+    {"key": "taxCategory", "label": "Tax category", "context": ["SETUP"], "definition": "The product tax category used when the effective tax policy is enabled.", "guidance": "Choose the correct configured category; verify a customer quote after changing it."},
+    {"key": "branchAssignment", "label": "Assigned branches", "context": ["SETUP"], "definition": "The branches where a new shared product is added.", "guidance": "Select only permitted branches that will sell the item. New items start unavailable until stock and service settings are configured."},
+    {"key": "branchOverride", "label": "Branch price override", "context": ["SETUP"], "definition": "A different selling price used only at this branch.", "guidance": "Leave blank to return to the shared base price."},
+    {"key": "purchaseAvailability", "label": "New purchases", "context": ["SETUP"], "definition": "Whether new customers may order this item from the selected branch.", "guidance": "Turning it off preserves existing orders and reservations. Turning it on does not create stock or bypass service hours."},
+    {key: "product", label: "Product", context: ["SETUP", "AUTOMATION", "PRODUCTION"], definition: "The branch menu item whose stock or production is being changed.", guidance: "Check the item name, code, branch and unit before saving. Weight is entered in kilograms; countable items use pieces."},
+    {key: "action", label: "Actions", context: ["SETUP", "AUTOMATION", "PRODUCTION"], definition: "Open the editor for the selected item without leaving this list.", guidance: "Use Quick inventory setup for routine batch work. Use the advanced editor for exceptions; changing quantity retains existing reservations."},
+    {key: "selection", label: "Select items", context: ["SETUP"], definition: "Choose which items a bulk action affects.", guidance: "Select visible items, then move through pages to build a larger selection. Review item quantities before applying changes."},
+    {key: "adjustmentReason", label: "Adjustment reason", context: ["SETUP", "PRODUCTION"], definition: "The explanation stored with the inventory change for later review.", guidance: "Describe the reason, for example a verified stock count, extra production or correction. Include enough context for another manager to understand it months later."},
     {
         key: "status",
         label: "Status",

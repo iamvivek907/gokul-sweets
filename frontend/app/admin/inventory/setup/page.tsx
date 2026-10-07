@@ -1186,8 +1186,8 @@ export default function AdminInventoryPage() {
                                                             <div key={item.branchProductId} className={`grid gap-3 p-4 lg:grid-cols-[minmax(180px,1.4fr)_150px_150px_150px_minmax(180px,1fr)] lg:items-start ${itemError ? "bg-red-50/40" : "bg-white"}`}>
                                                                 <div><p className="font-bold text-[#241715]">{item.productName}</p><p className="mt-1 text-xs text-[#756763]">{item.categoryName} · {policy?.controlMode.replaceAll("_", " ").toLowerCase()}</p></div>
                                                                 <div><p className="text-[10px] font-bold uppercase tracking-wide text-[#756763]">Daily maximum</p><p className="mt-2 text-sm font-semibold text-[#241715]">{policy?.maximumDailyAllocation === null ? "No maximum" : formatInventoryQuantity(policy?.maximumDailyAllocation, unit)}</p></div>
-                                                                <label className="text-[10px] font-bold uppercase tracking-wide text-[#756763]">Approved<input type="number" min="0" step={unit === "GRAM" ? ".05" : "1"} value={approvedDrafts[item.branchProductId] ?? ""} onChange={event => setApprovedDrafts(current => ({...current, [item.branchProductId]: event.target.value}))} className="mt-1 min-h-10 w-full rounded-lg border border-[#eadfd6] bg-white px-3 text-sm font-medium normal-case text-[#241715]" /></label>
-                                                                <label className="text-[10px] font-bold uppercase tracking-wide text-[#756763]">Ready now<input type="number" min="0" step={unit === "GRAM" ? ".05" : "1"} value={readyValue} onChange={event => setReadyDrafts(current => ({...current, [item.branchProductId]: event.target.value}))} className="mt-1 min-h-10 w-full rounded-lg border border-[#eadfd6] bg-white px-3 text-sm font-medium normal-case text-[#241715]" /></label>
+                                                                <label className="text-[10px] font-bold uppercase tracking-wide text-[#756763]">Approved <InventoryInfo helpKey="approved" /><input type="number" min="0" step={unit === "GRAM" ? ".05" : "1"} value={approvedDrafts[item.branchProductId] ?? ""} onChange={event => setApprovedDrafts(current => ({...current, [item.branchProductId]: event.target.value}))} className="mt-1 min-h-10 w-full rounded-lg border border-[#eadfd6] bg-white px-3 text-sm font-medium normal-case text-[#241715]" /></label>
+                                                                <label className="text-[10px] font-bold uppercase tracking-wide text-[#756763]">Ready now <InventoryInfo helpKey="ready" /><input type="number" min="0" step={unit === "GRAM" ? ".05" : "1"} value={readyValue} onChange={event => setReadyDrafts(current => ({...current, [item.branchProductId]: event.target.value}))} className="mt-1 min-h-10 w-full rounded-lg border border-[#eadfd6] bg-white px-3 text-sm font-medium normal-case text-[#241715]" /></label>
                                                                 <div><span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-bold ${readyNumber > 0 ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"}`}>{readyNumber > 0 ? "Will be ready" : "Approved · awaiting production"}</span>{itemError && <p className="mt-2 text-xs font-semibold leading-5 text-red-700">{itemError}</p>}</div>
                                                             </div>
                                                         );
@@ -1217,15 +1217,15 @@ export default function AdminInventoryPage() {
                     <table className="min-w-[1060px] w-full border-collapse text-left">
                         <thead className="bg-[#fffaf3] text-xs uppercase tracking-wide text-[#756763]">
                             <tr>
-                                <th className="px-5 py-3"><input type="checkbox" checked={Boolean(catalogue?.content.length) && catalogue!.content.every(item => selected.has(item.branchProductId))} onChange={toggleVisible} aria-label="Select visible products" /></th>
-                                <th className="px-3 py-3">Product</th>
+                                <th className="px-5 py-3"><input type="checkbox" checked={Boolean(catalogue?.content.length) && catalogue!.content.every(item => selected.has(item.branchProductId))} onChange={toggleVisible} aria-label="Select visible products" /><InventoryInfo helpKey="selection" /></th>
+                                <th className="px-3 py-3"><InventoryColumnHeader label="Product" helpKey="product" /></th>
                                 <th className="px-3 py-3"><InventoryColumnHeader label="Status" helpKey="status" /></th>
                                 <th className="px-3 py-3"><InventoryColumnHeader label="Approved" helpKey="approved" /></th>
                                 <th className="px-3 py-3"><InventoryColumnHeader label="Ready" helpKey="ready" /></th>
                                 <th className="px-3 py-3"><InventoryColumnHeader label="Held / committed" helpKey="held" /></th>
                                 <th className="px-3 py-3"><InventoryColumnHeader label="Available online" helpKey="available" /></th>
                                 <th className="px-5 py-3"><InventoryColumnHeader label="Attention" helpKey="attention" /></th>
-                                <th className="sticky right-0 z-20 w-24 border-l border-[#eadfd6] bg-[#fffaf3] px-3 py-3 text-center shadow-[-10px_0_18px_-16px_rgba(36,23,21,0.35)]">Action</th>
+                                <th className="sticky right-0 z-20 w-24 border-l border-[#eadfd6] bg-[#fffaf3] px-3 py-3 text-center shadow-[-10px_0_18px_-16px_rgba(36,23,21,0.35)]"><InventoryColumnHeader label="Action" helpKey="action" /></th>
                             </tr>
                         </thead>
                         <tbody>

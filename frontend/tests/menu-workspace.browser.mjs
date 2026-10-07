@@ -23,6 +23,7 @@ try {
     let imageCalls = 0;
     let deleteCalls = 0, deleted = false;
     let paginationDeletion = false, deletedLast = false;
+    const routineCalls = [];
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     let releaseBranch, releaseCatalogue;
@@ -124,6 +125,13 @@ try {
       if (paginationDeletion && /\/workspace\/3$/.test(path) && req.method() === "DELETE") {
         assert.equal(Number(url.searchParams.get("version")), items[2].branchVersion);
         deletedLast = true;
+        return route.fulfill({status: 204, headers});
+      }
+      if (/\/routine\/\d{4}-\d{2}-\d{2}$/.test(path) && req.method() === "PUT") {
+        const body = req.postDataJSON(), id = Number(path.split("/").at(-3));
+        routineCalls.push(id);
+        assert.equal(body.method, "DAILY_PRODUCTION"); assert.equal(body.quantity, 10); assert.equal(body.readyQuantity, null); assert.equal(body.repeatDaily, false);
+        if (id === 2 && routineCalls.filter(value => value === 2).length === 1) return route.fulfill({status: 503, headers, json: {message: "Temporary routine failure"}});
         return route.fulfill({status: 204, headers});
       }
       let json = {};
@@ -382,7 +390,7 @@ try {
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
     await first.getByRole("button", { name: "Stock", exact: true }).click();
     dialog = page.getByRole("dialog");
-    await dialog.getByLabel("Adjustment reason").fill("Fresh production");
+    await dialog.getByLabel("Adjustment reason *", {exact: true}).fill("Fresh production");
     await page.screenshot({
       path: `${shots}/inventory-${width}.png`,
       fullPage: true,
@@ -748,6 +756,22 @@ try {
     await page.getByRole("heading", {name: "Samosa", exact: true}).waitFor();
     assert.equal(await page.getByRole("button", {name: "Previous", exact: true}).isDisabled(), true);
     assert.equal(await page.getByRole("button", {name: "Next", exact: true}).isDisabled(), true);
+    paginationDeletion = false;
+    await page.reload();
+    await page.getByRole("button", {name: "Select all matching (up to 500)", exact: true}).click();
+    await page.getByRole("button", {name: "Quick inventory setup", exact: true}).click();
+    dialog = page.getByRole("dialog");
+    const quantities = dialog.getByRole("spinbutton");
+    await quantities.nth(0).fill("10"); await quantities.nth(1).fill("10");
+    await page.screenshot({path: `${shots}/quick-inventory-${width}.png`, fullPage: true});
+    await dialog.getByRole("button", {name: "Reviewed · save selected items", exact: true}).click();
+    await dialog.getByRole("alert").filter({hasText: "1 saved; 1 need attention"}).waitFor();
+    await page.reload();
+    dialog = page.getByRole("dialog");
+    await dialog.getByRole("button", {name: "Retry failed items", exact: true}).click();
+    await dialog.waitFor({state: "hidden"});
+    assert.equal(routineCalls.filter(id => id === 2).length, 2);
+    assert.equal(routineCalls.filter(id => id === 3).length, 1);
     await context.close();
     console.log(
       `Workspace ${width}px: branch categories, partial photo recovery, fit/rotated-fit/fill pixels, appearance loading/conflict recovery, refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,

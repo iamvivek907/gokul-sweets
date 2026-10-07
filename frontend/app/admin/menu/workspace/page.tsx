@@ -24,8 +24,10 @@ import WorkspaceProductEditor, {
   type EditMode,
 } from "@/components/admin/WorkspaceProductEditor";
 import WorkspaceGroupEditor from "@/components/admin/WorkspaceGroupEditor";
+import WorkspaceRoutine from "@/components/admin/WorkspaceRoutine";
 import WorkspaceAppearance from "@/components/admin/WorkspaceAppearance";
 import WorkspaceDialog from "@/components/admin/WorkspaceDialog";
+import {InventoryInfo} from "@/components/admin/inventory/InventoryHelp";
 import styles from "@/components/admin/MenuWorkspace.module.css";
 function Photo({ url, name }: { url: string | null; name: string }) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
@@ -95,6 +97,8 @@ export default function MenuWorkspace() {
     key: number;
     version?: number;
   } | null>(null);
+  const [routine, setRoutine] = useState(false);
+  const [selectingAll, setSelectingAll] = useState(false);
   const [bulk, setBulk] = useState(false);
   const [bulkAvailable, setBulkAvailable] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -117,6 +121,8 @@ export default function MenuWorkspace() {
     revision,
   ]);
   const fresh = loadedContext === queryContext;
+  const currentQuery = useRef(queryContext);
+  useEffect(() => {currentQuery.current = queryContext;}, [queryContext]);
   const workspaceKey = `menu-workspace:${profile?.staffId}`;
   const canMenu = hasPermission("MENU_MANAGE"),
     canStock = hasPermission("INVENTORY_MANAGE"),
@@ -163,6 +169,7 @@ export default function MenuWorkspace() {
                 setEditor(p.editor || null);
                 setGroupEditor(p.groupEditor || null);
                 setSelected(p.selected || []);
+                setRoutine(p.routine || false);
               }
             }
           } catch {}
@@ -189,6 +196,7 @@ export default function MenuWorkspace() {
           editor,
           groupEditor,
           selected,
+          routine,
           scrollY: window.scrollY,
         }),
       );
@@ -205,6 +213,7 @@ export default function MenuWorkspace() {
     editor,
     groupEditor,
     selected,
+    routine,
   ]);
   useEffect(() => {
     if (!profile || !restored.current) return;
@@ -314,6 +323,25 @@ export default function MenuWorkspace() {
     },
     [],
   );
+  async function selectMatchingItems() {
+    const context = queryContext;
+    setSelectingAll(true); setError("");
+    try {
+      if (data.totalElements > 500) throw new Error("Filter to 500 items or fewer before selecting all.");
+      const items: WorkspaceItem[] = [];
+      for (let index = 0; index < 10; index++) {
+        const params = new URLSearchParams({date, search, filter, page: String(index), size: "50"});
+        if (category) params.set("category", category);
+        const result = await workspaceRequest<WorkspacePage>(branch!, `?${params}`);
+        if (currentQuery.current !== context) return;
+        if (result.totalElements > 500) throw new Error("The catalogue changed. Filter to 500 items or fewer.");
+        items.push(...result.content);
+        if (index + 1 >= result.totalPages) break;
+      }
+      setSelected([...new Map(items.map(item => [item.productId, item])).values()]);
+    } catch (e) {if (currentQuery.current === context) setError(e instanceof Error ? e.message : "Unable to select items.");}
+    finally {setSelectingAll(false);}
+  }
   async function runBulk(failedOnly = false) {
     if (!branch || bulkLock.current) return;
     bulkLock.current = true;
@@ -392,6 +420,7 @@ export default function MenuWorkspace() {
               setLoadedContext("");
               setLoading(true);
               setEditor(null);
+              setRoutine(false);
               setGroupEditor(null);
               setBulk(false);
               setResults([]);
@@ -471,6 +500,7 @@ export default function MenuWorkspace() {
               }}
             />
             {tab === "items" && (
+
               <select
                 aria-label="Category filter"
                 value={category}
@@ -513,6 +543,7 @@ export default function MenuWorkspace() {
               </button>
             ))}
           </div>
+          <p className={styles.notice}>For routine work: select items across pages, then choose Quick inventory setup. Configure new items and their quantities together; daily repetition is optional. Use Stock for exceptions or existing custom policies.</p>
           <p className={styles.muted}>
             Low stock: sellable balance at or below the configured safety
             buffer. Availability remains subject to service hours and checkout
@@ -538,6 +569,9 @@ export default function MenuWorkspace() {
               >
                 Group selected
               </button>
+              <button disabled={!fresh || selectingAll} onClick={() => void selectMatchingItems()}>{selectingAll ? "Selecting items…" : "Select all matching (up to 500)"}</button>
+              <button disabled={!fresh || !selected.length || selectingAll} onClick={() => setSelected([])}>Clear selection</button>
+              <button disabled={!fresh || selectingAll || !canStock || !selected.length} onClick={() => setRoutine(true)}>Quick inventory setup</button>
               <button
                 disabled={!fresh || !selected.length}
                 onClick={() => {
@@ -621,7 +655,7 @@ export default function MenuWorkspace() {
               )}
               <div className={styles.numbers}>
                 <div>
-                  <span className={styles.muted}>Effective price</span>
+                  <span className={styles.muted}>Effective price <InventoryInfo helpKey="effectivePrice" /></span>
                   <div className={styles.value}>
                     ₹{p.effectivePrice} /{" "}
                     {p.saleMode === "WEIGHT" ? "kg" : "piece"}
@@ -629,7 +663,7 @@ export default function MenuWorkspace() {
                   <span className={styles.muted}>Base ₹{p.basePrice}</span>
                 </div>
                 <div>
-                  <span className={styles.muted}>Sellable · {date}</span>
+                  <span className={styles.muted}>Sellable · {date} <InventoryInfo helpKey="available" /></span>
                   <div className={styles.value}>
                     {p.allocation
                       ? stockQuantity(
@@ -757,6 +791,11 @@ export default function MenuWorkspace() {
             </button>
           </div>
         </div>
+      )}
+      {routine && branch && (
+        <WorkspaceRoutine key={`${branch}-${date}`} items={selected} branch={branch} date={date}
+          draftKey={`${workspaceKey}:routine:${branch}:${date}`} onClose={() => {setRoutine(false); reload();}}
+          onSaved={(notice) => {setRoutine(false); reload(notice);}} />
       )}
       {editor && branch && (
         <WorkspaceProductEditor

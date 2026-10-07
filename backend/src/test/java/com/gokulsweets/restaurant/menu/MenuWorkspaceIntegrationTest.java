@@ -99,4 +99,38 @@ class MenuWorkspaceIntegrationTest {
   workspace.deleteBranchItem(b,a,0);
   assertThat(groups.page(b,"",0).groups().getFirst().choices()).extracting(MobileMenuOptionsService.Choice::productId).containsExactly(d,e);
  }
+ @Test void simpleDailyRoutineCreatesPolicyAllocationAndRuleTogether(){
+  long b=branch(),c=category(),id=product(b,c);var date=LocalDate.now(inventoryClock);
+  workspace.routine(b,id,date,new MenuWorkspaceService.Routine(0L,null,null,"DAILY_PRODUCTION",BigDecimal.TEN,null,true,false,"Reliable daily capacity"));
+  entityManager.flush();entityManager.clear();
+  long bp=jdbc.queryForObject("SELECT id FROM branch_products WHERE branch_id=? AND product_id=?",Long.class,b,id);
+  assertThat(jdbc.queryForObject("SELECT ready_stock_required FROM branch_inventory_policies WHERE branch_product_id=?",Boolean.class,bp)).isFalse();
+  assertThat(jdbc.queryForObject("SELECT approved_quantity FROM inventory_daily_allocations WHERE branch_product_id=? AND service_date=?",BigDecimal.class,bp,date)).isEqualByComparingTo("10");
+  assertThat(jdbc.queryForObject("SELECT ready_quantity FROM inventory_daily_allocations WHERE branch_product_id=? AND service_date=?",BigDecimal.class,bp,date)).isEqualByComparingTo("0");
+  assertThat(jdbc.queryForObject("SELECT guaranteed_quantity FROM inventory_automation_rules WHERE branch_product_id=?",BigDecimal.class,bp)).isEqualByComparingTo("10");
+  assertThat(jdbc.queryForObject("SELECT available FROM branch_products WHERE id=?",Boolean.class,bp)).isTrue();
+ }
+ @Test void simplePreparedRoutineRequiresPhysicalQuantity(){
+  long b=branch(),c=category(),id=product(b,c);var date=LocalDate.now(inventoryClock);
+  assertThatThrownBy(()->workspace.routine(b,id,date,new MenuWorkspaceService.Routine(0L,null,null,"READY_STOCK",BigDecimal.TEN,null,false,false,"Stock count"))).isInstanceOf(IllegalArgumentException.class);
+  workspace.routine(b,id,date,new MenuWorkspaceService.Routine(0L,null,null,"READY_STOCK",BigDecimal.TEN,BigDecimal.valueOf(6),false,false,"Verified six prepared pieces"));
+  entityManager.flush();entityManager.clear();
+  var row=workspace.list(b,date,"",null,"ALL",0,25).content().getFirst();
+  var allocation=(com.gokulsweets.restaurant.inventory.dto.InventoryAllocationResponse)row.get("allocation");
+  assertThat(allocation.readyQuantity()).isEqualByComparingTo("6");assertThat(allocation.availableQuantity()).isEqualByComparingTo("6");
+ }
+ @Test void simpleRoutineDoesNotOverwriteAnExistingSchedule(){
+  long b=branch(),c=category(),id=product(b,c);var date=LocalDate.now(inventoryClock);
+  workspace.routine(b,id,date,new MenuWorkspaceService.Routine(0L,null,null,"DAILY_PRODUCTION",BigDecimal.TEN,null,true,false,"Daily plan"));
+  entityManager.flush();entityManager.clear();
+  var row=workspace.list(b,date,"",null,"ALL",0,25).content().getFirst();
+  assertThatThrownBy(()->workspace.routine(b,id,date,new MenuWorkspaceService.Routine(((Number)row.get("branchVersion")).longValue(),((Number)row.get("policyVersion")).longValue(),((Number)row.get("allocationVersion")).longValue(),"DAILY_PRODUCTION",BigDecimal.valueOf(20),null,true,false,"Replace"))).isInstanceOf(ResponseStatusException.class).hasMessageContaining("already has an automation rule");
+  long bp=((Number)row.get("branchProductId")).longValue();
+  assertThat(jdbc.queryForObject("SELECT guaranteed_quantity FROM inventory_automation_rules WHERE branch_product_id=?",BigDecimal.class,bp)).isEqualByComparingTo("10");
+ }
+ @Test void simpleRoutineRejectsStaleVersionBeforeChangingStock(){
+  long b=branch(),c=category(),id=product(b,c);var date=LocalDate.now(inventoryClock);
+  assertThatThrownBy(()->workspace.routine(b,id,date,new MenuWorkspaceService.Routine(1L,null,null,"DAILY_PRODUCTION",BigDecimal.TEN,null,false,false,"Plan"))).isInstanceOf(ResponseStatusException.class);
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM branch_inventory_policies p JOIN branch_products bp ON bp.id=p.branch_product_id WHERE bp.branch_id=?",Integer.class,b)).isZero();
+ }
 }

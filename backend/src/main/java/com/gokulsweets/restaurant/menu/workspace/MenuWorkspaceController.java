@@ -20,5 +20,6 @@ public class MenuWorkspaceController {
  @DeleteMapping("/{id}") public void deleteItem(@PathVariable long branch,@PathVariable long id,@RequestParam @Min(0) long version){service.deleteBranchItem(branch,id,version);}
  @PostMapping(value="/{id}/image",consumes="multipart/form-data") public Map<String,String> image(@PathVariable long branch,@PathVariable long id,@RequestParam long version,@RequestParam MultipartFile image){return Map.of("imageUrl",service.image(branch,id,version,image,false));}
  @DeleteMapping("/{id}/image") public void remove(@PathVariable long branch,@PathVariable long id,@RequestParam long version){service.image(branch,id,version,null,true);}
+ @PutMapping("/{id}/routine/{date}") public void routine(@PathVariable long branch,@PathVariable long id,@PathVariable @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,@Valid @RequestBody MenuWorkspaceService.Routine input){service.routine(branch,id,date,input);}
  @PutMapping("/{id}/stock/{date}") public void stock(@PathVariable long branch,@PathVariable long id,@PathVariable @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate date,@Valid @RequestBody MenuWorkspaceService.StockEdit input){service.stock(branch,id,date,input);}
 }

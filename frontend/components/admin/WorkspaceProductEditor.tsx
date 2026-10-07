@@ -5,6 +5,7 @@ import {
   writeWorkspaceDraft,
   clearWorkspaceDraft,
 } from "@/lib/menuWorkspaceDraft";
+import {InventoryInfo} from "./inventory/InventoryHelp";
 import WorkspaceDialog from "./WorkspaceDialog";
 import WorkspaceMediaEditor from "./WorkspaceMediaEditor";
 import {
@@ -396,26 +397,29 @@ export default function WorkspaceProductEditor({
               <fieldset disabled={!!createdId}>
                 <h3>Product details</h3>
                 <label>
-                  Name *
+                  Name * <InventoryInfo helpKey="productName" />
                   <input
                     required
                     maxLength={150}
+                    aria-label="Name *"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                   />
                 </label>
                 <label>
-                  Product code *
+                  Product code * <InventoryInfo helpKey="productCode" />
                   <input
                     required
                     maxLength={100}
+                    aria-label="Product code *"
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                   />
                 </label>
                 <label>
-                  Category *
+                  Category * <InventoryInfo helpKey="category" />
                   <select
+                    aria-label="Category *"
                     value={category}
                     onChange={(e) => setCategory(Number(e.target.value))}
                   >
@@ -427,17 +431,19 @@ export default function WorkspaceProductEditor({
                   </select>
                 </label>
                 <label>
-                  Description
+                  Description <InventoryInfo helpKey="description" />
                   <textarea
                     maxLength={500}
+                    aria-label="Description"
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                   />
                 </label>
                 <label>
-                  Sale unit
+                  Sale unit <InventoryInfo helpKey="saleUnit" />
                   <select
                     disabled={mode !== "add"}
+                    aria-label="Sale unit"
                     value={sale}
                     onChange={(e) =>
                       setSale(e.target.value as "UNIT" | "WEIGHT")
@@ -450,19 +456,21 @@ export default function WorkspaceProductEditor({
                 {sale === "WEIGHT" && (
                   <div className={styles.formGrid}>
                     <label>
-                      Minimum · g
+                      Minimum · g <InventoryInfo helpKey="minimumWeight" />
                       <input
                         type="number"
                         min={1}
+                        aria-label="Minimum · g"
                         value={minimum}
                         onChange={(e) => setMinimum(Number(e.target.value))}
                       />
                     </label>
                     <label>
-                      Step · g
+                      Step · g <InventoryInfo helpKey="weightStep" />
                       <input
                         type="number"
                         min={1}
+                        aria-label="Step · g"
                         value={step}
                         onChange={(e) => setStep(Number(e.target.value))}
                       />
@@ -470,7 +478,7 @@ export default function WorkspaceProductEditor({
                   </div>
                 )}
                 <label>
-                  Base price · ₹ per {sale === "WEIGHT" ? "kg" : "piece"} *
+                  <InventoryInfo helpKey="effectivePrice" /> Base price · ₹ per {sale === "WEIGHT" ? "kg" : "piece"} *
                   <input
                     type="number"
                     min={0.01}
@@ -480,8 +488,9 @@ export default function WorkspaceProductEditor({
                   />
                 </label>
                 <label>
-                  Tax category
+                  Tax category <InventoryInfo helpKey="taxCategory" />
                   <select
+                    aria-label="Tax category"
                     value={tax}
                     onChange={(e) => setTax(Number(e.target.value))}
                   >
@@ -498,7 +507,7 @@ export default function WorkspaceProductEditor({
           )}
           {mode === "add" && (
             <section>
-              <h3>Photo & branch assignment</h3>
+              <h3>Photo & branch assignment <InventoryInfo helpKey="branchAssignment" /></h3>
               <WorkspaceMediaEditor onChange={setFile} />
               <div className={styles.checklist}>
                 {branches.map((b) => (
@@ -541,7 +550,7 @@ export default function WorkspaceProductEditor({
                   onChange={(e) => setOverride(e.target.value)}
                 />
               </label>
-              <p>Effective price: ₹{override || item?.basePrice}</p>
+              <p>Effective price: ₹{override || item?.basePrice} <InventoryInfo helpKey="branchOverride" /></p>
               <button onClick={() => setOverride("")}>
                 Reset to base price
               </button>
@@ -560,7 +569,7 @@ export default function WorkspaceProductEditor({
                 </select>
               </label>
               <p className={styles.notice}>
-                Availability does not create stock. Turning it off keeps
+                Availability does not create stock. <InventoryInfo helpKey="purchaseAvailability" /> Turning it off keeps
                 existing orders and reservations.
               </p>
             </>
@@ -591,7 +600,7 @@ export default function WorkspaceProductEditor({
               {!item?.policy && (
                 <>
                   <label>
-                    Inventory policy
+                    Inventory policy <InventoryInfo helpKey="controlMode" />
                     <select
                       value={control}
                       onChange={(e) =>
@@ -611,7 +620,7 @@ export default function WorkspaceProductEditor({
                         checked={readyRequired}
                         onChange={(e) => setReadyRequired(e.target.checked)}
                       />{" "}
-                      Require ready stock
+                      Require ready stock <InventoryInfo helpKey="readyStockRequired" />
                     </span>
                   </label>
                 </>
@@ -619,7 +628,7 @@ export default function WorkspaceProductEditor({
               {item?.allocation && (
                 <>
                   <p>
-                    Approved:{" "}
+                    Approved <InventoryInfo helpKey="approved" />:{" "}
                     {stockQuantity(
                       item.allocation.approvedQuantity,
                       item.allocation.inventoryUnit,
@@ -631,12 +640,12 @@ export default function WorkspaceProductEditor({
                     )}
                   </p>
                   <p>
-                    Held:{" "}
+                    Held <InventoryInfo helpKey="held" />:{" "}
                     {stockQuantity(
                       item.allocation.heldQuantity,
                       item.allocation.inventoryUnit,
                     )}{" "}
-                    · Committed:{" "}
+                    · Committed <InventoryInfo helpKey="committed" />:{" "}
                     {stockQuantity(
                       item.allocation.committedQuantity,
                       item.allocation.inventoryUnit,
@@ -656,7 +665,7 @@ export default function WorkspaceProductEditor({
                 </>
               )}
               <label>
-                New approved allocation ·{" "}
+                New approved allocation <InventoryInfo helpKey="approved" /> ·{" "}
                 {(item?.allocation?.inventoryUnit ??
                   (item?.saleMode === "WEIGHT" ? "GRAM" : "PIECE")) === "GRAM"
                   ? "grams"
@@ -670,10 +679,11 @@ export default function WorkspaceProductEditor({
                 />
               </label>
               <label>
-                Adjustment reason *
+                Adjustment reason * <InventoryInfo helpKey="adjustmentReason" />
                 <textarea
                   required
                   maxLength={500}
+                  aria-label="Adjustment reason *"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />
@@ -685,12 +695,12 @@ export default function WorkspaceProductEditor({
                     checked={ready}
                     onChange={(e) => setReady(e.target.checked)}
                   />{" "}
-                  Mark stock ready after approval
+                  Mark stock ready after approval <InventoryInfo helpKey="ready" />
                 </span>
               </label>
               {ready && (
                 <label>
-                  Ready quantity ·{" "}
+                  Ready quantity <InventoryInfo helpKey="ready" /> ·{" "}
                   {item?.saleMode === "WEIGHT" ? "grams" : "pieces"}
                   <input
                     type="number"

@@ -29,6 +29,8 @@ public class MenuWorkspaceService {
  private final BranchInventoryPolicyRepository policies;
  private final InventoryDailyAllocationRepository allocations;
  private final InventoryAvailabilityService availability;
+ private final com.gokulsweets.restaurant.inventory.automation.service.InventoryAutomationWorkspaceService automation;
+ private final com.gokulsweets.restaurant.inventory.automation.config.InventoryAutomationProperties automationProperties;
  public record Details(@NotBlank @Size(max=150) String name,@NotBlank @Size(max=100) String code,
   @NotNull @Positive Long categoryId,@Size(max=500) String description,
   @NotNull @DecimalMin("0.01") BigDecimal basePrice,@NotNull ProductSaleMode saleMode,
@@ -110,6 +112,47 @@ public class MenuWorkspaceService {
  public String image(long branch,long id,long version,MultipartFile image,boolean remove){shared(branch,id);var old=product(id,true);if(((Number)old.get("workspace_version")).longValue()!=version)conflict();var saved=remove?products.removeImage(id):products.uploadImage(id,image);audit(branch,id,"PRODUCT_IMAGE",old.get("image_url"),saved.imageUrl());return saved.imageUrl();}
  private void conflict(){throw new ResponseStatusException(HttpStatus.CONFLICT,"This item changed since you opened it. Close and reload the item before saving; your entries have been retained.");}
 
+
+ public record Routine(@NotNull @Min(0) Long branchVersion,@Min(0) Long policyVersion,@Min(0) Long allocationVersion,
+  @NotBlank @Pattern(regexp="DAILY_PRODUCTION|READY_STOCK") String method,
+  @NotNull @DecimalMin("0.001") BigDecimal quantity,@DecimalMin("0.001") BigDecimal readyQuantity,
+  @NotNull Boolean repeatDaily,@NotNull Boolean applyMethod,@NotBlank @Size(max=500) String reason) {}
+ @Transactional
+ public void routine(long branch,long product,LocalDate date,Routine input){
+  authorize(branch,true);staff.requirePermission(PermissionName.INVENTORY_MANAGE);
+  var rows=jdbc.queryForList("SELECT id,workspace_version FROM branch_products WHERE branch_id=? AND product_id=? FOR UPDATE",branch,product);
+  if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not in branch.");
+  var row=rows.getFirst();if(((Number)row.get("workspace_version")).longValue()!=input.branchVersion())conflict();
+  long bp=((Number)row.get("id")).longValue();
+  jdbc.queryForList("SELECT id FROM branch_inventory_policies WHERE branch_product_id=? FOR UPDATE",bp);
+  var existing=policies.findByBranchProductId(bp).orElse(null);
+  if(existing==null?input.policyVersion()!=null:input.policyVersion()==null||!existing.getVersion().equals(input.policyVersion()))conflict();
+  boolean prepared=input.method().equals("READY_STOCK");
+  if(existing!=null&&!Boolean.TRUE.equals(input.applyMethod())&&(existing.isReadyStockRequired()!=prepared||!existing.getControlMode().name().equals(input.method())||!existing.isOnlineEnabled()))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"This item has a different selling policy. Adjust it in Advanced stock before using this routine.");
+  if(prepared&&input.readyQuantity()==null)throw new IllegalArgumentException("Enter the physically prepared quantity.");
+  if(!prepared&&input.readyQuantity()!=null)throw new IllegalArgumentException("Daily capacity does not confirm prepared stock.");
+  if(input.readyQuantity()!=null&&input.readyQuantity().compareTo(input.quantity())>0)throw new IllegalArgumentException("Prepared quantity cannot exceed the online allocation.");
+  if(Boolean.TRUE.equals(input.repeatDaily())){
+   if(!automationProperties.isSchedulerEnabled())throw new IllegalArgumentException("Daily scheduling is disabled on this server. Ask the administrator to enable it before saving a repeating routine.");
+   if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM inventory_automation_rules WHERE branch_product_id=?)",Boolean.class,bp)))
+    throw new ResponseStatusException(HttpStatus.CONFLICT,"This item already has an automation rule. Manage its schedule in Inventory automation; the existing rule has been preserved.");
+  }
+  var policy=existing==null||Boolean.TRUE.equals(input.applyMethod())?new AdminInventoryPolicyRequest(com.gokulsweets.restaurant.inventory.enums.InventoryControlMode.valueOf(input.method()),productUnit(product),true,prepared,existing==null?BigDecimal.ZERO:existing.getDefaultSafetyBuffer(),existing==null?null:existing.getMaximumDailyAllocation(),existing==null?14:existing.getBookingHorizonDays(),existing==null?0:existing.getProductionLeadMinutes(),existing==null?null:existing.getShelfLifeMinutes()):null;
+  var allocation=allocations.findByBranchProductIdAndServiceDate(bp,date).orElse(null);
+  if(!prepared&&allocation!=null&&List.of("DELAYED","UNAVAILABLE","CLOSED").contains(allocation.getStatus().name()))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"This date is paused or closed. Review its status in Advanced stock before reopening it.");
+  stock(branch,product,date,new StockEdit(input.allocationVersion(),input.policyVersion(),input.reason(),
+   new AdminAllocationApprovalRequest(input.quantity(),allocation!=null?allocation.getSafetyBufferQuantity():existing==null?BigDecimal.ZERO:existing.getDefaultSafetyBuffer(),allocation==null?null:allocation.getForecastQuantity(),allocation==null?null:allocation.getForecastConfidence(),allocation==null?null:allocation.getExpectedReadyAt(),input.reason()),policy,
+   prepared?new AdminReadinessUpdateRequest(com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus.READY,input.readyQuantity(),null,input.reason()):null));
+  if(Boolean.TRUE.equals(input.repeatDaily()))automation.updateRule(branch,bp,new com.gokulsweets.restaurant.inventory.automation.dto.AutomationRuleUpdateRequest(
+   com.gokulsweets.restaurant.inventory.automation.enums.InventoryAutomationMode.AUTO_APPROVE_GUARANTEED,input.quantity(),false,8,3,BigDecimal.ONE,null,127,com.gokulsweets.restaurant.inventory.automation.enums.InventorySeasonalMode.ALWAYS,existing==null?14:Math.min(14,existing.getBookingHorizonDays()),true,List.of()));
+  jdbc.update("UPDATE branch_products SET available=true,updated_at=now() WHERE id=?",bp);
+  audit(branch,product,"SIMPLE_ROUTINE",null,input);
+ }
+ private com.gokulsweets.restaurant.inventory.enums.InventoryUnit productUnit(long product){
+  return com.gokulsweets.restaurant.inventory.enums.InventoryUnit.valueOf("WEIGHT".equals(product(product,false).get("sale_mode"))?"GRAM":"PIECE");
+ }
 
  public record StockEdit(@Min(0) Long version,@Min(0) Long policyVersion,@NotBlank @Size(max=500) String reason,@NotNull @jakarta.validation.Valid AdminAllocationApprovalRequest allocation,@jakarta.validation.Valid AdminInventoryPolicyRequest policy,@jakarta.validation.Valid AdminReadinessUpdateRequest readiness) {}
  @Transactional
