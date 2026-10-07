@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import CustomerIcon from "@/components/customer/CustomerIcon";
 import OrderRatingLink from "@/components/order/OrderRatingLink";
@@ -396,10 +397,7 @@ export default function OrdersPage() {
                 )}
 
                 {loading && (
-                    <div className="mt-8 rounded-3xl border border-[#eadfd6] bg-white py-16 text-center">
-                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#eadfd6] border-t-[#7a1625]" />
-                        <p className="mt-4 font-semibold text-[#241715]">Loading your orders...</p>
-                    </div>
+                    <BrandLoading label="Loading your orders..." />
                 )}
 
                 {!loading && currentHistory?.error && (

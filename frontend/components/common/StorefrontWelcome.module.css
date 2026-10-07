@@ -22,3 +22,6 @@
 @keyframes breathe {50% {opacity:.35}}
 @media(prefers-reduced-motion:reduce) {.preparing span {animation:none}}
 @media(max-width:640px) {.hero {grid-template-columns:1fr}.photo {height:210px;min-height:0}.copy {padding:28px}.cards {grid-template-columns:1fr}.notice {align-items:stretch;flex-direction:column}.welcome {padding-top:12px}.hero {border-radius:22px}}
+
+/* Feature discovery has not finished here, so keep the same customer palette. */
+.welcome{color:#0c1029}.hero{background:linear-gradient(115deg,#ffe1d2,#fff0e8);color:#64182d}.copy>p:not(.eyebrow){color:#5f4350}.primary{background:#8f1838;color:#fff!important}.preparing span{background:#980c31}.notice{background:#f1ecfa;border-color:#e9e3ec}.notice button{color:#8f1838;border-color:#e4ced8}.cards article{border-color:#e9e3ec}.cards span{color:#8f1838}.cards p{color:#596579}

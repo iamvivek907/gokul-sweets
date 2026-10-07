@@ -1,6 +1,6 @@
 /** Compact wordmark from the approved menu reference; the shell owns its link. */
-export default function ReferenceWordmark() {
-    return <span className="reference-wordmark" aria-hidden="true">
+export default function ReferenceWordmark({className="reference-wordmark"}:{className?:string}={}) {
+    return <span className={className} aria-hidden="true">
         <svg viewBox="0 0 40 44" fill="none">
             <g stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
                 <path d="M20 40C12 33 5 28 5 19c7-1 12 3 15 9 3-6 8-10 15-9 0 9-7 14-15 21Z"/>

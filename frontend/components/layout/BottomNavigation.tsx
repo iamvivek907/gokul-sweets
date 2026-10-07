@@ -89,8 +89,8 @@ export default function BottomNavigation() {
     const [scrollHidden,setScrollHidden]=useState(false);
     const modern=features?.futuristicStorefrontV2===true||checkoutExperienceV2;
     const phone = usePhoneViewport();
-    const referenceMenu = pathname === "/menu" && modern
-        && features?.contextualStorefrontV2 === true && phone === true;
+    // Use the same phone destinations and icons throughout the enabled customer app.
+    const referenceMenu = modern && phone === true;
     const visibleItems = referenceMenu ? items.filter(item => item.icon !== "cart") : items;
     useEffect(()=>{
         if(!modern||checkoutExperienceV2&&pathname.startsWith("/checkout/"))return;

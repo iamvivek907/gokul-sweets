@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import MobilePageBack from "@/components/customer/MobilePageBack";
 import {T} from "@/lib/language";
 
@@ -10,6 +11,7 @@ import AppShell from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
 import BranchDiscovery from "@/components/branch/BranchDiscovery";
 import BranchDetails from "@/components/branch/BranchDetails";
+import BranchOverview from "@/components/branch/BranchOverview";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {checkOperationalBranch} from "@/lib/branchOperationalCache";
 import type {Branch} from "@/types/branch";
@@ -19,8 +21,11 @@ export default function BranchHomePage() {
     const {branchId} = useParams<{branchId: string}>();
     const id = Number(branchId);
     const {branch: selected} = useSelectedBranch();
-    const occasionEnquiries = useStorefrontFeatures()?.occasionEnquiries === true;
-    const [branch, setBranch] = useState<Branch | null>(null);
+    const features = useStorefrontFeatures();
+    const occasionEnquiries = features?.occasionEnquiries === true;
+    const modern = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
+    const [loadedBranch, setBranch] = useState<Branch | null>(null);
+    const branch = loadedBranch?.id === id ? loadedBranch : null;
     const [tab, setTab] = useState<"home" | "details">("home");
     const [error, setError] = useState("");
     useEffect(() => {
@@ -30,10 +35,13 @@ export default function BranchHomePage() {
             .catch(() => {if (!controller.signal.aborted) setError("This branch is unavailable right now.");});
         return () => controller.abort();
     }, [id]);
+    if (branch && modern) return <AppShell editorial showSocialPopup={false}>
+        <BranchOverview key={branch.id} branch={branch} selected={selected?.id === branch.id} occasionEnquiries={occasionEnquiries} />
+    </AppShell>;
     return <AppShell editorial showSocialPopup={false}>
         <article className="branch-home mx-auto max-w-6xl px-4 py-8 text-[#173a37] sm:px-6">
 
-            {!branch && !error && <p role="status" className="mt-10">Loading branch…</p>}
+            {!branch && !error && <BrandLoading label="Loading branch…" />}
             {(error || !Number.isSafeInteger(id) || id < 1) && <p role="alert" className="mt-10">{error || "Branch not found."}</p>}
             {branch && <>
                 <header className="branch-home-hero">

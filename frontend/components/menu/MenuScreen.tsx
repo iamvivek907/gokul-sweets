@@ -1,10 +1,12 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
 import {menuFamily,retailCollections} from "@/lib/menuPresentation";
 import RetailSweetRail from "./RetailSweetRail";
 import MobileMenuHighlights from "./MobileMenuHighlights";
 import MenuCategorySection from "./MenuCategorySection";
 import MenuOffers from "./MenuOffers";
+import FloatingMenuCategories from "./FloatingMenuCategories";
 const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
 import MobileMenuSuggestions from "./MobileMenuSuggestions";
 import {useMenuServiceRefresh} from "@/hooks/useMenuServiceRefresh";
@@ -755,11 +757,16 @@ export default function MenuScreen() {
         setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);setSearch("");
         setBrowseScroll(previous=>id===null||!branch?null:{branchId:branch.id,id,revision:(previous?.revision??0)+1});
     }
+    function jumpMenuCategory(id:number|null){
+        setBrowseCategory(null);setSelectedCategoryId(id);setMobileCategories(id===null?[]:[id]);
+        setMaximumPrice(null);setPortionsOnly(false);setSearch("");
+        if(branch)setBrowseScroll(previous=>({branchId:branch.id,id:id??0,revision:(previous?.revision??0)+1}));
+    }
     // Scroll only after React has committed the cleared search and destination collection.
     useEffect(()=>{
-        if(!phoneMenu||!browseScroll||completedBrowseScroll.current===browseScroll||browseScroll.branchId!==branch?.id)return;
+        if(!browseScroll||completedBrowseScroll.current===browseScroll||browseScroll.branchId!==branch?.id)return;
         const frame=requestAnimationFrame(()=>{
-            const section=document.getElementById(`menu-category-${browseScroll.id}`);
+            const section=document.getElementById(browseScroll.id===0?"gokul-menu-items":`menu-category-${browseScroll.id}`);
             if(!section)return;
             completedBrowseScroll.current=browseScroll;
             const disclosure=section.querySelector("details");if(disclosure)disclosure.open=true;
@@ -1031,7 +1038,7 @@ export default function MenuScreen() {
     }
 
 
-    if (isLoading) return <section className="customer-page-state customer-menu-loading" aria-busy="true"><div role="status"><span className="customer-page-state-brand" aria-hidden="true">G</span><span className="customer-page-state-spinner" aria-hidden="true"/><p><T text="Loading your page…"/></p></div></section>;
+    if (isLoading) return <BrandLoading className="customer-menu-loading" />;
 
     return (
         <>
@@ -1626,6 +1633,7 @@ export default function MenuScreen() {
                 )}
 
 
+            {(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true&&!error&&categories.length>0&&<FloatingMenuCategories key={branch.id} categories={categories} selectedId={phoneMenu?(mobileCategories?.length===1?mobileCategories[0]:undefined):(effectiveCategoryId??undefined)} hasCart={itemCount>0} onSelect={jumpMenuCategory}/>}
             <FloatingCartButton
                 offerEnabled={phoneMenu&&!!mobileFeatures?.pickupAddOns} offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
                 itemCount={

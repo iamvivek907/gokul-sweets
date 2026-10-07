@@ -1,6 +1,7 @@
 
 /* eslint-disable @next/next/no-img-element -- Real catalogue URLs are rendered directly without transforming supplier photos. */
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {T} from "@/lib/language";
 
@@ -108,13 +109,13 @@ export default function OccasionsPage() {
             <header className="occasion-hero"><p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]"><span className="desktop-celebration-label">Occasions at Gokul</span><span className="mobile-celebration-label"><T text="Bulk order" /></span></p>
             <h1 className="mt-3 font-serif text-4xl sm:text-6xl">{campaign?.headline||"Sweet moments. Thoughtfully planned."}</h1>
             <p className="mt-4 max-w-2xl">{campaign?.description||"Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment."}</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div>{campaign?.imageUrl&&<img src={campaign.imageUrl} alt={`${branch?.name??"Gokul"} occasion collection`} className="occasion-campaign-photo" />}<div className="occasion-hero-actions"><a href="#occasion-plan" className="occasion-primary">Build your celebration</a><Link href="/occasions/requests" className="occasion-secondary">Track requests & quotes</Link></div></header>
-            {!features && <p role="status" className="mt-8">Checking availability…</p>}
+            {!features && <BrandLoading label="Checking availability…" />}
             {features && !features.occasionEnquiries && <p className="mt-8 rounded-xl bg-white p-6">Occasion enquiries are not available yet. <Link href="/menu" className="underline">Explore pickup ordering</Link>.</p>}
             {features?.occasionEnquiries && <>
                 {!branch ? <p className="mt-8 rounded-xl bg-white p-6">Choose a branch first. <Link href="/branches" className="underline">Explore branches</Link>.</p> : <>
                     <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline"><T text="Change branch" /></Link></p>
                     <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel key={sessionVersion} mode="occasion" onSessionChange={setSession} /></div>
-                    {catalogueBranchId!==branch.id?<p role="status" className="mt-7">Loading this branch’s occasion collection…</p>:<form id="occasion-plan" onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
+                    {catalogueBranchId!==branch.id?<BrandLoading compact label="Loading this branch’s occasion collection…" />:<form id="occasion-plan" onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
                         <p className="text-xs font-bold uppercase tracking-widest text-[#c76752]">01 · Plan your celebration</p><p className="text-sm">Choose bulk quantities and optional packing groups. Our branch reviews production, box fit and pricing before you pay.</p>
                         <label className="block">Occasion <input required maxLength={80} value={type} onChange={event => setType(event.target.value)} className="mt-2 w-full rounded-xl border p-3" /></label>
                         <div className="grid gap-4 sm:grid-cols-2">

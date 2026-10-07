@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {T} from "@/lib/language";
 
 
@@ -15,7 +16,7 @@ export default function ProfileAccountExperience({initialSection}:{initialSectio
     const enabled = features?.customerAccountHub === true;
 
     if (!features) return <div className="mx-auto max-w-xl py-8 text-sm text-[#756763]" role="status">
-        {error ?? "Loading your profile…"}
+        {error ?? <BrandLoading label="Loading your profile…" />}
         {error && <button type="button" onClick={retry} className="ml-3 font-semibold text-[#7a1625] underline"><T text="Try again" /></button>}
     </div>;
 

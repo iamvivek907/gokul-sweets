@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {pwaInstall} from "@/lib/pwaInstall";
 import {T,useTranslation} from "@/lib/language";
@@ -114,7 +115,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     useEffect(() => {onVerificationBusyChange?.(busy);}, [busy,onVerificationBusyChange]);
 
     if (availability === "loading" && mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" aria-label={translate("Phone verification")} aria-busy="true"><h2><T text="Phone verification"/></h2><p role="status"><T text="Checking phone verification…"/></p><span className="mobile-phone-action-placeholder" aria-hidden="true"/></section>;
-    if (availability === "loading") return <p className="mt-6 text-sm text-[#756763]" role="status"><T text="Checking phone verification…" /></p>;
+    if (availability === "loading") return <BrandLoading compact label="Checking phone verification…" />;
     if (availability !== "ready" || !session.authenticated && (!widgetId || !widgetToken)) return mode === "checkout" && guestAllowed ? null : <section
         className={mode === "mobileCheckout" ? "mobile-checkout-section mobile-phone-entry" : "mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6"}
         aria-label={translate("Phone verification")}>

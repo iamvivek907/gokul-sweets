@@ -5,6 +5,7 @@ import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {constrainedPhoneConnection} from "@/lib/mobileConnection";
 import {warmMenu} from "@/services/menuApi";
 import {T} from "@/lib/language";
+import ReferenceWordmark from "@/components/layout/ReferenceWordmark";
 import "./MobileBrandLaunch.css";
 
 /** One short entrance per document/app resume; route changes never restart it. */
@@ -48,8 +49,8 @@ export default function MobileBrandLaunch() {
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
     return <dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
-        <div className="gokul-mobile-launch-copy"><span aria-hidden="true">G</span>
-            <h1 id="gokul-launch-title"><T text="Gokul Sweets" /></h1>
+        <div className="gokul-mobile-launch-copy">
+            <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>
             <p><T text="Fresh for your moments" /></p>
         </div>
     </dialog>;

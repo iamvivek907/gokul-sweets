@@ -1,8 +1,9 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import dynamic from "next/dynamic";
-const OccasionRequests=dynamic(()=>import("@/components/occasion/OccasionRequests"),{loading:()=> <p role="status">Loading your requests…</p>});
+const OccasionRequests=dynamic(()=>import("@/components/occasion/OccasionRequests"),{loading:()=> <BrandLoading compact label="Loading your requests…" />});
 import ReorderDialog from "./ReorderDialog";
 import CustomerRewards from "./CustomerRewards";
 import AddressLocationAssist from "./AddressLocationAssist";
@@ -102,7 +103,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     }, [enabled, session?.authenticated, session?.phone]);
 
     if (!enabled || !session?.authenticated) return null;
-    if (status === "loading") return <p role="status" className="mt-6 text-sm"><T text="Loading your account…" /></p>;
+    if (status === "loading") return <BrandLoading label="Loading your account…" />;
     if (status === "error" || !account) return <section className="mt-6 rounded-3xl border border-[#eadfd6] bg-white p-6">
         <p role="alert"><T text="Your account could not load. Your orders remain safe." /></p>
         <button type="button" onClick={() => {setStatus("loading"); void reload().catch(() => setStatus("error"));}}
@@ -229,7 +230,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 </section>}
         {activeSection === "orders" && <section id="account-orders" className="profile-history rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
             {features?.occasionEnquiries && <nav className="mobile-profile-order-types" aria-label="Order history types"><button type="button" aria-pressed={orderType==="pickup"} onClick={()=>setOrderType("pickup")}><T text="Pickup orders" /></button><button type="button" aria-pressed={orderType==="bulk"} onClick={()=>setOrderType("bulk")}><T text="Bulk order requests" /></button></nav>}
-            {orderType==="bulk"&&features?.occasionEnquiries?<Suspense fallback={<p role="status">Loading your requests…</p>}><OccasionRequests key={session.phone} embeddedSession={session}/></Suspense>:<><div className="profile-history-heading flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]"><T text="Your orders" /></h2>
+            {orderType==="bulk"&&features?.occasionEnquiries?<Suspense fallback={<BrandLoading compact label="Loading your requests…" />}><OccasionRequests key={session.phone} embeddedSession={session}/></Suspense>:<><div className="profile-history-heading flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]"><T text="Your orders" /></h2>
                 <p className="mt-1 text-sm text-[#756763]"><T text="Only orders placed while signed in to this account." /></p></div>
                 <span className="text-sm text-[#756763]"><T text="All branches" /></span></div>
             {orders.length ? <div className="profile-history-list mt-4 space-y-3">{orders.map(order => {
@@ -251,7 +252,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                         <h3 className="mt-1 font-serif text-3xl"><T text="Order details" /></h3></div>
                     <button type="button" onClick={() => detailDialog.current?.close()} className="grid min-h-11 min-w-11 place-items-center rounded-full border border-white/50 text-xl hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" aria-label="Close order details">×</button></div>
                 <div className="px-5 py-5 sm:px-7 sm:py-6">
-                {detailLoading && <p role="status"><T text="Loading order details…" /></p>}
+                {detailLoading && <BrandLoading compact label="Loading order details…" />}
                 {detailError && <p role="alert" className="text-[#9e2732]">{detailError}</p>}
                 {selectedOrder && <div className="space-y-5 text-sm">
                     <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]"><T text="Order number" /></p>

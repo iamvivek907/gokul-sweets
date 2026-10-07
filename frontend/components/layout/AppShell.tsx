@@ -32,6 +32,7 @@ import "./reference-storefront.css";
 import "./customer-polish.css";
 import "./profile-history-polish.css";
 import "./menu-premium.css";
+import "./customer-design.css";
 import MobileEdgeBack from "./MobileEdgeBack";
 
 
@@ -57,6 +58,7 @@ export default function AppShell({
     return (
         <div
             data-customer-route={pathname}
+            data-customer-design={futuristic ? "reference" : undefined}
             data-premium-menu={pathname === "/menu" && futuristic && features?.contextualStorefrontV2 === true ? "true" : undefined}
             className={`
                 app-container

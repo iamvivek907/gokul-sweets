@@ -4,6 +4,7 @@ import type {
 } from "next";
 
 import "./globals.css";
+import "@/components/common/brand-experience.css";
 
 import AppProviders
     from "@/components/providers/AppProviders";
@@ -35,7 +36,7 @@ export const viewport: Viewport = {
     initialScale: 1,
     maximumScale: 1,
     userScalable: false,
-    themeColor: "#143936"
+    themeColor: "#980c31"
 };
 
 export default function RootLayout({

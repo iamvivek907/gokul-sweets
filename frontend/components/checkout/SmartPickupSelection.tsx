@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -159,7 +160,7 @@ export default function SmartPickupSelection({features, onFallback}: {
                     <button className="min-h-11 px-4 underline" onClick={onFallback}><T text="Use standard pickup selection" /></button>
                     <p className="text-xs"><T text="Your cart is preserved. Checkout will still validate availability." /></p>
                 </div>}
-                {!data && !error && <p role="status" className="mt-5"><T text="Checking dates and times for your cart..." /></p>}
+                {!data && !error && <BrandLoading compact label="Checking dates and times for your cart..." />}
                 {data && <div className="mt-6 space-y-6">
                     <div className={features.checkoutExperienceV2 ? "gokul-pickup-options" : "space-y-6"}>
                     {next && !available && <button className="min-h-12 rounded-xl bg-[#fff0dc] px-4 py-3 text-left font-semibold"

@@ -1,4 +1,8 @@
 export const hindi: Record<string,string> = {
+    "Jump to a category": "श्रेणी पर जाएँ",
+    "Choose a category to see its items. This clears your search and filters.": "सामान देखने के लिए श्रेणी चुनें। इससे खोज और फ़िल्टर हट जाएँगे।",
+    "Preparing your visit…": "आपके स्वागत की तैयारी हो रही है…",
+
   "Sweets you’ll love": "आपकी पसंद की मिठाइयाँ",
   "Choose weight": "वज़न चुनें",
   "/ piece": "/ पीस",
@@ -983,5 +987,25 @@ Object.assign(hindi, {
  "Choose a time":"समय चुनें",
  "Check & save pickup":"जाँचें और पिकअप सहेजें",
  "Pickup time changed.":"पिकअप का समय बदल दिया गया।",
- "Alarm enabled. Sound starts automatically after your next tap if the browser requires it.":"अलार्म चालू है। ब्राउज़र की आवश्यकता होने पर अगले सामान्य टैप के बाद आवाज़ शुरू होगी।"
+ "Alarm enabled. Sound starts automatically after your next tap if the browser requires it.":"अलार्म चालू है। ब्राउज़र की आवश्यकता होने पर अगले सामान्य टैप के बाद आवाज़ शुरू होगी।",
+ "Welcome to your Gokul branch":"आपकी गोकुल ब्रांच में स्वागत है",
+ "Fresh sweets, snacks and meals from your neighbourhood Gokul branch.":"आपके पास की गोकुल ब्रांच से ताज़ी मिठाइयाँ, नाश्ता और भोजन।",
+ "Order online · Collect here":"ऑनलाइन ऑर्डर करें · यहाँ से लें",
+ "Explore the branch · Contact us to visit":"ब्रांच देखें · आने से पहले संपर्क करें",
+ "See this branch’s items, prices and availability on the menu.":"मेन्यू में इस ब्रांच के सामान, कीमत और उपलब्धता देखें।",
+ "Find us":"हमारा पता",
+ "Address being updated":"पता अपडेट किया जा रहा है",
+ "Opening hours":"खुलने का समय",
+ "Contact the branch for hours":"समय जानने के लिए ब्रांच से संपर्क करें",
+ "Get directions":"रास्ता देखें",
+ "Call branch":"ब्रांच को कॉल करें",
+ "A little planning. An easy pickup.":"थोड़ी योजना। आसान पिकअप।",
+ "Your order, ready to collect":"आपका ऑर्डर, पिकअप के लिए तैयार",
+ "Online orders are for pickup at this branch. Choose an available time at checkout.":"ऑनलाइन ऑर्डर इस ब्रांच से लेने के लिए हैं। चेकआउट पर उपलब्ध समय चुनें।",
+ "Choose your favourites":"अपनी पसंद चुनें",
+ "Browse the menu and add what you love.":"मेन्यू देखें और पसंद के सामान जोड़ें।",
+ "Choose pickup & pay":"पिकअप चुनें और भुगतान करें",
+ "Select an available slot and pay online.":"उपलब्ध समय चुनें और ऑनलाइन भुगतान करें।",
+ "Collect at this branch":"इस ब्रांच से ऑर्डर लें",
+ "Follow your order status and show your pickup code.":"ऑर्डर की स्थिति देखें और अपना पिकअप कोड दिखाएँ।"
 });

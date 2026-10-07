@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {Suspense} from "react";
 import OccasionRequests from "@/components/occasion/OccasionRequests";
-export default function OccasionRequestsPage(){return <Suspense fallback={<p role="status" className="p-6">Loading requests…</p>}><OccasionRequests/></Suspense>;}
+export default function OccasionRequestsPage(){return <Suspense fallback={<BrandLoading label="Loading requests…" />}><OccasionRequests/></Suspense>;}

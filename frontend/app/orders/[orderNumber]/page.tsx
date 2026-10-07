@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {ApiError} from "@/services/apiClient";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
@@ -336,10 +337,7 @@ export default function OrderDetailPage() {
         return (
             <AppShell>
                 <section className="mx-auto max-w-2xl px-4 pb-28 pt-5 sm:px-6">
-                    <div className="rounded-3xl border border-[#eadfd6] bg-white py-16 text-center">
-                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#eadfd6] border-t-[#7a1625]" />
-                        <p className="mt-4 font-semibold text-[#241715]">Loading your order...</p>
-                    </div>
+                    <BrandLoading label="Loading your order..." />
                 </section>
             </AppShell>
         );

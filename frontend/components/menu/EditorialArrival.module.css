@@ -68,3 +68,29 @@
 
 /* Brand stays left; ordering and the language trigger stay right in one compact row. */
 @media(max-width:900px){.topbar{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:.65rem;padding:1rem}.logo{min-width:0;font-size:clamp(1.45rem,6vw,2rem)}.logo span{font-size:.48rem;letter-spacing:.06em;overflow-wrap:anywhere}.topbar nav{min-width:0;margin-left:0}.topbar nav a:not(:last-child),.topbar nav button{display:none}.topbar nav a:last-child{max-width:104px;padding:.55rem .6rem;font-size:.68rem;text-align:center;line-height:1.4}.heroCopy{padding-top:8rem}}
+
+/* Shared menu palette, gated by the effective customer visual shell. */
+:global(.future-storefront[data-customer-design=reference]) .arrival{color:#0c1029}
+:global(.future-storefront[data-customer-design=reference]) .hero{background-color:#65142c}
+:global(.future-storefront[data-customer-design=reference]) .heroCopy{color:#fffaf0}
+:global(.future-storefront[data-customer-design=reference]) .scrim{background:linear-gradient(90deg,#491226eb,#4912269c 48%,#49122630)}
+:global(.future-storefront[data-customer-design=reference]) .heroCopy h1 em{color:#ffd7c7}
+:global(.future-storefront[data-customer-design=reference]) .topbar nav a:last-child,
+:global(.future-storefront[data-customer-design=reference]) .actions a:first-child{background:#8f1838;color:#fff;border-radius:12px}
+:global(.future-storefront[data-customer-design=reference]) .intro{background:#f1ecfa;color:#0c1029}
+:global(.future-storefront[data-customer-design=reference]) .intro :is(em,span),
+:global(.future-storefront[data-customer-design=reference]) .sectionHead>span{color:#8f1838}
+:global(.future-storefront[data-customer-design=reference]) .intro p,
+:global(.future-storefront[data-customer-design=reference]) .sectionHead p,
+:global(.future-storefront[data-customer-design=reference]) .closing p{color:#596579}
+:global(.future-storefront[data-customer-design=reference]) .branches{background:#fff;color:#0c1029}
+:global(.future-storefront[data-customer-design=reference]) .branchCard{background:linear-gradient(125deg,#ffe1d2,#f1ecfa);color:#64182d;border:1px solid #e9e3ec;box-shadow:none;border-radius:18px}
+:global(.future-storefront[data-customer-design=reference]) .branchCard:before{background:linear-gradient(0deg,#491226ed,transparent 80%)}
+:global(.future-storefront[data-customer-design=reference]) .branchCard:has(.branchPhoto){color:#fff}
+:global(.future-storefront[data-customer-design=reference]) .branchCard:not(:has(.branchPhoto)) .branchCopy:before{color:#8f1838}
+:global(.future-storefront[data-customer-design=reference]) .branchCard:not(:has(.branchPhoto)) .branchCopy>span,
+:global(.future-storefront[data-customer-design=reference]) .branchCard:not(:has(.branchPhoto)) .branchCopy button{color:#8f1838}
+:global(.future-storefront[data-customer-design=reference]) .closing{background:linear-gradient(120deg,#e1f3e8,#f1ecfa);color:#0c1029}
+:global(.future-storefront[data-customer-design=reference]) .closing em{color:#155a48}
+:global(.future-storefront[data-customer-design=reference]) .closing a{background:#8f1838;color:#fff;border-radius:12px}
+@media(max-width:640px){:global(.future-storefront[data-customer-design=reference]) .scrim{background:linear-gradient(0deg,#491226ed,#49122688)}}

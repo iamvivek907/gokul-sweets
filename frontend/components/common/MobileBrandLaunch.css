@@ -1,16 +1,13 @@
 .gokul-mobile-launch{display:none}
 @media(max-width:640px){
- .gokul-mobile-launch[open]{display:flex;position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0;padding:32px;background:#143936;color:#fffaf2;flex-direction:column;justify-content:center;align-items:center;text-align:center;z-index:1000}
- .gokul-mobile-launch::backdrop{background:#143936}
- .gokul-mobile-launch-copy>span{display:inline-flex;width:68px;height:68px;align-items:center;justify-content:center;border:1px solid #e2c6a3;border-radius:20px;font:42px Georgia,serif;color:#e2c6a3}
- .gokul-mobile-launch h1{margin:18px 0 10px;font:38px/1.2 Georgia,serif;color:#fffaf2}
- .gokul-mobile-launch p{font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+ .gokul-mobile-launch[open]{display:flex;position:fixed;inset:0;width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;border:0;padding:32px;background:radial-gradient(ellipse at 50% 38%,#fff0e8 0,white 60%);color:#980c31;flex-direction:column;justify-content:center;align-items:center;text-align:center;z-index:1000}
+ .gokul-mobile-launch::backdrop{background:#fff}
+ .gokul-mobile-launch h1{margin:0 0 20px}
+ .gokul-mobile-launch p{font-size:12px;line-height:1.6;letter-spacing:.08em;text-transform:uppercase;color:#596579}
+ .gokul-mobile-launch .brand-loading-wordmark>svg{animation:gokul-launch-enter .6s both}
+ .gokul-mobile-launch .brand-loading-wordmark strong{animation:gokul-launch-enter .6s .3s both}
+ .gokul-mobile-launch .brand-loading-wordmark small{animation:gokul-launch-enter .6s .6s both}
+ .gokul-mobile-launch p{animation:gokul-launch-enter .6s .9s both}
+ @keyframes gokul-launch-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 }
-
-@media(max-width:640px){
- .gokul-mobile-launch-copy>span{animation:gokul-launch-enter .6s both}
- .gokul-mobile-launch h1{animation:gokul-launch-enter .6s .55s both}
- .gokul-mobile-launch p{animation:gokul-launch-enter .6s 1.1s both}
- @keyframes gokul-launch-enter{from{opacity:0;transform:translateY(12px) scale(.94)}to{opacity:1;transform:none}}
- @media(prefers-reduced-motion:reduce){.gokul-mobile-launch-copy>span,.gokul-mobile-launch h1,.gokul-mobile-launch p{animation:none}}
-}
+@media(prefers-reduced-motion:reduce){.gokul-mobile-launch .brand-loading-wordmark>svg,.gokul-mobile-launch .brand-loading-wordmark strong,.gokul-mobile-launch .brand-loading-wordmark small,.gokul-mobile-launch p{animation:none}}
