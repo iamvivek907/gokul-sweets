@@ -45,7 +45,7 @@ class InventoryCentreIntegrationTest {
  long bp(long product){return jdbc.queryForObject("SELECT id FROM branch_products WHERE branch_id=? AND product_id=?",Long.class,branch,product);}
  Entry entry(long product,LocalDate date,String quantity,String ready){
   var r=jdbc.queryForMap("SELECT bp.workspace_version,p.version AS policy_version,a.version AS allocation_version FROM branch_products bp LEFT JOIN branch_inventory_policies p ON p.branch_product_id=bp.id LEFT JOIN inventory_daily_allocations a ON a.branch_product_id=bp.id AND a.service_date=? WHERE bp.branch_id=? AND bp.product_id=?",date,branch,product);
-  return new Entry(product,((Number)r.get("workspace_version")).longValue(),number(r.get("policy_version")),number(r.get("allocation_version")),quantity==null?null:new BigDecimal(quantity),ready==null?null:new BigDecimal(ready));
+  return new Entry(product,((Number)r.get("workspace_version")).longValue(),number(r.get("policy_version")),number(r.get("allocation_version")),jdbc.queryForObject("SELECT sale_mode FROM products WHERE id=?",String.class,product),quantity==null?null:new BigDecimal(quantity),ready==null?null:new BigDecimal(ready));
  }
  Long number(Object v){return v==null?null:((Number)v).longValue();}
  Options options(LocalDate from,LocalDate through,String method,boolean inventory,boolean hours){return new Options(from,through,method,inventory,false,false,hours,LocalTime.of(11,0),LocalTime.of(21,30),127,true,"Reviewed physical quantities");}
@@ -92,6 +92,14 @@ class InventoryCentreIntegrationTest {
   assertThat(jobs.summary(branch,id).get("succeeded")).isEqualTo(1);
   assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations WHERE branch_product_id=?",Integer.class,bp(p))).isEqualTo(1);
   assertThat(jdbc.queryForObject("SELECT count(*) FROM menu_workspace_audit WHERE branch_id=? AND action='INVENTORY_ADJUSTMENT'",Integer.class,branch)).isEqualTo(1);
+ }
+ @Test void changedSellingUnitsCannotReinterpretQueuedQuantities(){
+  long p=product();UUID id=enqueue(options(today,today,"READY_STOCK",true,false),entry(p,today,"10","8"));
+  jdbc.update("UPDATE products SET sale_mode='WEIGHT',minimum_weight_grams=250,weight_step_grams=250 WHERE id=?",p);worker.runBatch();
+  assertThat(jobs.summary(branch,id).get("failed")).isEqualTo(1);
+  assertThat(jobs.results(branch,id,0).getFirst().get("error")).asString().contains("selling unit changed");
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations WHERE branch_product_id=?",Integer.class,bp(p))).isZero();
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM branch_inventory_policies WHERE branch_product_id=?",Integer.class,bp(p))).isZero();
  }
  @Test void currentPermissionRevocationStopsQueuedStockWrites(){
   long p=product();UUID id=enqueue(options(today,today,"READY_STOCK",true,false),entry(p,today,"10","8"));

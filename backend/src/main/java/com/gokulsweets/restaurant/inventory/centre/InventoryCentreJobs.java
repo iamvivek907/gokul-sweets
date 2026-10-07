@@ -25,7 +25,7 @@ public class InventoryCentreJobs {
  private final ObjectMapper mapper;
  private final StaffAuthorizationService staff;
  private final Clock inventoryClock;
- public record Entry(@NotNull @Positive Long productId,@NotNull @Min(0) Long branchVersion,@Min(0) Long policyVersion,@Min(0) Long allocationVersion,@DecimalMin("0.001") @Digits(integer=11,fraction=3) BigDecimal quantity,@DecimalMin("0.001") @Digits(integer=11,fraction=3) BigDecimal readyQuantity){}
+ public record Entry(@NotNull @Positive Long productId,@NotNull @Min(0) Long branchVersion,@Min(0) Long policyVersion,@Min(0) Long allocationVersion,@NotBlank @Pattern(regexp="UNIT|WEIGHT") String saleMode,@DecimalMin("0.001") @Digits(integer=11,fraction=3) BigDecimal quantity,@DecimalMin("0.001") @Digits(integer=11,fraction=3) BigDecimal readyQuantity){}
  public record Options(@NotNull LocalDate fromDate,@NotNull LocalDate throughDate,@NotBlank @Pattern(regexp="DAILY_PRODUCTION|READY_STOCK|MANUAL") String method,@NotNull Boolean applyInventory,@NotNull Boolean applyPolicy,@NotNull Boolean openPurchases,@NotNull Boolean applyHours,LocalTime opens,LocalTime closes,@Min(1) @Max(127) int weekdays,@NotNull Boolean enableHours,@NotBlank @Size(max=500) String reason){}
  public record Submit(@NotNull UUID submissionId,@NotNull @Valid Options options,@NotNull @Size(min=1,max=500) List<@NotNull @Valid Entry> items){}
  public record DateVersion(LocalDate date,Long version){}
@@ -53,7 +53,7 @@ public class InventoryCentreJobs {
   if(jdbc.queryForObject("SELECT count(*) FROM inventory_centre_jobs WHERE branch_id=? AND succeeded+failed<total",Long.class,branch)>0)throw new ResponseStatusException(HttpStatus.CONFLICT,"This branch already has an active inventory job.");
   // Resolve stock versions in a single bounded query rather than one query per date.
   var named=new NamedParameterJdbcTemplate(jdbc);var args=Map.<String,Object>of("branch",branch,"ids",ids,"from",o.fromDate(),"through",o.throughDate());
-  var branches=named.queryForList("SELECT bp.id,bp.product_id,bp.workspace_version,p.version AS policy_version FROM branch_products bp LEFT JOIN branch_inventory_policies p ON p.branch_product_id=bp.id WHERE bp.branch_id=:branch AND bp.product_id IN (:ids)",args);
+  var branches=named.queryForList("SELECT bp.id,bp.product_id,bp.workspace_version,q.sale_mode,p.version AS policy_version FROM branch_products bp JOIN products q ON q.id=bp.product_id LEFT JOIN branch_inventory_policies p ON p.branch_product_id=bp.id WHERE bp.branch_id=:branch AND bp.product_id IN (:ids)",args);
   var byProduct=new HashMap<Long,Map<String,Object>>();branches.forEach(r->byProduct.put(((Number)r.get("product_id")).longValue(),r));
   if(byProduct.size()!=ids.size())throw new IllegalArgumentException("Some items do not belong to this branch.");
   // A group is never collapsed into one stock quantity. All selected variants must have their own reviewed row.
@@ -63,7 +63,7 @@ public class InventoryCentreJobs {
   var taskRows=new ArrayList<Object[]>();
   jdbc.update("INSERT INTO inventory_centre_jobs(id,branch_id,staff_id,digest,total) VALUES (?,?,?,?,?)",input.submissionId(),branch,actor,digest,input.items().size());
   for(var e:input.items()){
-   var bp=byProduct.get(e.productId());if(((Number)bp.get("workspace_version")).longValue()!=e.branchVersion()||!Objects.equals(bp.get("policy_version")==null?null:((Number)bp.get("policy_version")).longValue(),e.policyVersion()))throw new ResponseStatusException(HttpStatus.CONFLICT,"An item policy or branch entry changed. Reload before submitting.");
+   var bp=byProduct.get(e.productId());if(o.applyInventory()&&!Objects.equals(bp.get("sale_mode"),e.saleMode()))throw new ResponseStatusException(HttpStatus.CONFLICT,"An item selling unit changed. Reload before submitting.");if(((Number)bp.get("workspace_version")).longValue()!=e.branchVersion()||!Objects.equals(bp.get("policy_version")==null?null:((Number)bp.get("policy_version")).longValue(),e.policyVersion()))throw new ResponseStatusException(HttpStatus.CONFLICT,"An item policy or branch entry changed. Reload before submitting.");
    var dates=new ArrayList<DateVersion>();for(long offset=0;offset<days;offset++){var date=o.fromDate().plusDays(offset);dates.add(new DateVersion(date,versions.get(bp.get("id")+":"+date)));}
    if(!Objects.equals(dates.getFirst().version(),e.allocationVersion()))throw new ResponseStatusException(HttpStatus.CONFLICT,"An allocation changed. Reload before submitting.");
    taskRows.add(new Object[]{input.submissionId(),e.productId(),mapper.writeValueAsString(new Work(o,e,dates,groupVersion,timings.get(((Number)bp.get("id")).longValue())))});

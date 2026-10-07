@@ -42,8 +42,10 @@ public class InventoryCentreProcessor {
   if(policy!=null&&!o.applyPolicy()&&(!policy.getControlMode().name().equals(o.method())||policy.isReadyStockRequired()!=prepared||!policy.isOnlineEnabled()))throw new IllegalArgumentException("Policy differs from this plan. Enable Apply selling method or use the individual editor.");
   if(prepared&&o.fromDate().equals(LocalDate.now(inventoryClock))&&e.readyQuantity()==null)throw new IllegalArgumentException("Confirm the physically prepared quantity for today.");
   if(e.readyQuantity()!=null&&e.readyQuantity().compareTo(e.quantity())>0)throw new IllegalArgumentException("Prepared stock exceeds the online allocation.");
-  String sale=jdbc.queryForObject("SELECT sale_mode FROM products WHERE id=?",String.class,e.productId());
+  String sale=jdbc.queryForObject("SELECT sale_mode FROM products WHERE id=? FOR SHARE",String.class,e.productId());
+  if(!Objects.equals(sale,e.saleMode()))throw new IllegalArgumentException("Item selling unit changed. Reload before retrying.");
   var unit=InventoryUnit.valueOf("WEIGHT".equals(sale)?"GRAM":"PIECE");
+  if(policy!=null&&policy.getInventoryUnit()!=unit)throw new IllegalArgumentException("Existing inventory units differ. Use the individual editor; bulk jobs cannot convert stock units.");
   int horizon=(int)Math.max(14,java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(inventoryClock),o.throughDate()));
   var replacement=policy==null||o.applyPolicy()?new AdminInventoryPolicyRequest(InventoryControlMode.valueOf(o.method()),unit,true,prepared,policy==null?BigDecimal.ZERO:policy.getDefaultSafetyBuffer(),policy==null?null:policy.getMaximumDailyAllocation(),policy==null?horizon:policy.getBookingHorizonDays(),policy==null?0:policy.getProductionLeadMinutes(),policy==null?null:policy.getShelfLifeMinutes()):null;
   for(int index=0;index<work.dates().size();index++){
