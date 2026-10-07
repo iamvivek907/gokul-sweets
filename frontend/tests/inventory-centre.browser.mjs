@@ -67,8 +67,13 @@ try{
   await page.getByLabel("Large samosa allocation",{exact:true}).fill("1.2");await page.getByLabel("Large samosa ready",{exact:true}).fill("1");
   await page.getByLabel("Apply inventory quantities, configuration and readiness",{exact:true}).uncheck();
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,4);assert.equal(bodies[3].items.length,1);assert.equal(bodies[3].items[0].productId,2);assert.deepEqual(errors,[]);
-  await page.evaluate(()=>{const value=JSON.parse(localStorage.getItem("inventory-centre:77"));delete value.pendingRequest;value.job=null;value.submitted=false;localStorage.setItem("inventory-centre:77",JSON.stringify(value));});
-  await page.reload();await page.getByRole("button",{name:"Apply service hours",exact:true}).waitFor();
+  await page.getByText("1 succeeded · 0 failed · 0 remaining",{exact:true}).waitFor();
+  await page.waitForFunction(()=>JSON.parse(localStorage.getItem("inventory-centre:77")||"{}").job?.succeeded===1);
+  const olderDraft=await page.evaluate(()=>{const value=JSON.parse(localStorage.getItem("inventory-centre:77"));delete value.pendingRequest;value.job=null;value.submitted=false;return value;});
+  // Seed an older stored draft with the inventory page unmounted, so its live job
+  // persistence cannot overwrite the fixture before the simulated next launch.
+  await page.goto(`${base}/offline`);await page.evaluate(value=>localStorage.setItem("inventory-centre:77",JSON.stringify(value)),olderDraft);
+  await page.goto(`${base}/admin/inventory/centre`);await page.getByRole("button",{name:"Apply service hours",exact:true}).waitFor();
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();
   await page.getByRole("alert").filter({hasText:"older draft does not contain its original request"}).waitFor();assert.equal(bodies.length,4);
   await page.getByText("Recent backend jobs · recover progress",{exact:true}).click();await page.getByRole("button",{name:new RegExp(`^${bodies[3].submissionId.slice(0,8)}`)}).click();
