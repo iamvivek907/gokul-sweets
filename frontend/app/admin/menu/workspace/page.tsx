@@ -562,6 +562,7 @@ export default function MenuWorkspace() {
           branch={branch}
           draftKey={`${workspaceKey}:appearance:${branch}`}
           categories={data.categories}
+          categoriesReady={fresh}
           onNotice={setNotice}
         />
       ) : tab === "items" ? (

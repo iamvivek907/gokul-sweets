@@ -43,11 +43,13 @@ export default function WorkspaceAppearance({
   branch,
   draftKey,
   categories,
+  categoriesReady,
   onNotice,
 }: {
   branch: number;
   draftKey: string;
   categories: { id: number; name: string }[];
+  categoriesReady: boolean;
   onNotice: (message: string) => void;
 }) {
   const [restoredDraft] = useState(() =>
@@ -73,6 +75,42 @@ export default function WorkspaceAppearance({
   const [confirm, setConfirm] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const lock = useRef(false);
+  const [reloading, setReloading] = useState(false);
+  const [needsReload, setNeedsReload] = useState(false);
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+  async function discardDraft() {
+    if (lock.current || reloading) return;
+    setEditing(null);
+    setCategoryEditor(false);
+    setCategoryDraft([]);
+    setConfirm(false);
+    clearWorkspaceDraft(draftKey);
+    setReloading(true);
+    setNeedsReload(true);
+    setError("");
+    try {
+      const result = await workspaceRequest<Snapshot>(branch, "/appearance");
+      if (live.current) {
+        setSnapshot(result);
+        setNeedsReload(false);
+      }
+    } catch (e) {
+      if (live.current)
+        setError(
+          e instanceof Error
+            ? e.message
+            : "Could not reload current appearance. Retry before editing.",
+        );
+    } finally {
+      if (live.current) setReloading(false);
+    }
+  }
   useEffect(() => {
     const c = new AbortController();
     workspaceRequest<Snapshot>(branch, "/appearance", { signal: c.signal })
@@ -100,7 +138,7 @@ export default function WorkspaceAppearance({
       });
   }, [draftKey, editing, categoryEditor, categoryDraft, snapshot]);
   async function save(config: AppearanceConfig, publish = false) {
-    if (lock.current || !snapshot) return;
+    if (lock.current || !snapshot || reloading || needsReload) return;
     lock.current = true;
     setBusy(true);
     setError("");
@@ -183,6 +221,15 @@ export default function WorkspaceAppearance({
   const config = snapshot.draft;
   return (
     <section>
+      {reloading && <p role="status">Reloading current appearance…</p>}
+      {needsReload && !reloading && (
+        <button onClick={() => void discardDraft()}>
+          Retry appearance reload
+        </button>
+      )}
+      {!categoriesReady && (
+        <p role="status">Loading categories before editing…</p>
+      )}
       <div className={styles.heading}>
         <div>
           <h2>Menu appearance</h2>
@@ -195,7 +242,9 @@ export default function WorkspaceAppearance({
         </div>
         <div className={styles.row}>
           <button
-            disabled={busy || config.banners.length >= 12}
+            disabled={
+              busy || reloading || needsReload || config.banners.length >= 12
+            }
             onClick={() =>
               edit({
                 key: crypto.randomUUID(),
@@ -219,7 +268,7 @@ export default function WorkspaceAppearance({
             + Add banner
           </button>
           <button
-            disabled={busy}
+            disabled={busy || reloading || needsReload || !categoriesReady}
             onClick={() => {
               setCategoryDraft(
                 categories.map(
@@ -238,7 +287,7 @@ export default function WorkspaceAppearance({
           </button>
           <button
             className={styles.primary}
-            disabled={busy}
+            disabled={busy || reloading || needsReload}
             onClick={() => setConfirm(true)}
           >
             Review & publish
@@ -253,7 +302,10 @@ export default function WorkspaceAppearance({
               {b.visible ? "Shown when live" : "Hidden"} · Position {b.order} ·{" "}
               {b.mediaType?.startsWith("video/") ? "Video" : "Image"}
             </p>
-            <button disabled={busy} onClick={() => edit(b)}>
+            <button
+              disabled={busy || reloading || needsReload}
+              onClick={() => edit(b)}
+            >
               Edit banner
             </button>
           </article>
@@ -269,14 +321,17 @@ export default function WorkspaceAppearance({
           title="Edit menu banner"
           scope="Selected branch · Draft / Live"
           busy={busy}
-          onClose={() => setEditing(null)}
+          onClose={() => void discardDraft()}
           footer={
             <>
-              <button disabled={busy} onClick={() => setEditing(null)}>
+              <button
+                disabled={busy || reloading || needsReload}
+                onClick={() => void discardDraft()}
+              >
                 Cancel
               </button>
               <button
-                disabled={busy}
+                disabled={busy || reloading || needsReload}
                 onClick={() =>
                   void save({
                     ...config,
@@ -290,7 +345,7 @@ export default function WorkspaceAppearance({
               </button>
               <button
                 className={styles.primary}
-                disabled={busy}
+                disabled={busy || reloading || needsReload}
                 onClick={() =>
                   void save({
                     ...config,
@@ -307,7 +362,7 @@ export default function WorkspaceAppearance({
             </>
           }
         >
-          <fieldset disabled={busy}>
+          <fieldset disabled={busy || reloading || needsReload}>
             <div className={styles.formGrid}>
               <section>
                 {(
@@ -497,16 +552,20 @@ export default function WorkspaceAppearance({
           title="Category appearance"
           scope="Selected branch · Draft"
           busy={busy}
-          onClose={() => setCategoryEditor(false)}
+          onClose={() => void discardDraft()}
           footer={
             <>
-              <button disabled={busy} onClick={() => setCategoryEditor(false)}>
+              <button
+                disabled={busy || reloading || needsReload}
+                onClick={() => void discardDraft()}
+              >
                 Cancel
               </button>
               <button
                 className={styles.primary}
-                disabled={busy}
+                disabled={busy || reloading || needsReload || !categoriesReady}
                 onClick={() =>
+                  categoriesReady &&
                   void save({ ...config, categories: categoryDraft })
                 }
               >
@@ -515,7 +574,7 @@ export default function WorkspaceAppearance({
             </>
           }
         >
-          <fieldset disabled={busy}>
+          <fieldset disabled={busy || reloading || needsReload}>
             {categoryDraft.map((c) => (
               <div className={styles.product} key={c.id}>
                 <h3>{categories.find((x) => x.id === c.id)?.name}</h3>
@@ -578,12 +637,15 @@ export default function WorkspaceAppearance({
           onClose={() => setConfirm(false)}
           footer={
             <>
-              <button disabled={busy} onClick={() => setConfirm(false)}>
+              <button
+                disabled={busy || reloading || needsReload}
+                onClick={() => setConfirm(false)}
+              >
                 Keep draft
               </button>
               <button
                 className={styles.primary}
-                disabled={busy}
+                disabled={busy || reloading || needsReload}
                 onClick={() => void save(config, true)}
               >
                 Publish now

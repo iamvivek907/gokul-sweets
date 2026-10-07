@@ -94,7 +94,7 @@ public class MenuWorkspaceService {
   long bp=ids.getFirst();var old=jdbc.queryForList("SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND service_date=? FOR UPDATE",bp,date);
   if(old.isEmpty()?edit.version()!=null:edit.version()==null||((Number)old.getFirst().get("version")).longValue()!=edit.version())conflict();
   if(edit.policy()!=null){var existing=jdbc.queryForList("SELECT version FROM branch_inventory_policies WHERE branch_product_id=? FOR UPDATE",Long.class,bp);if(existing.isEmpty()?edit.policyVersion()!=null:edit.policyVersion()==null||!existing.getFirst().equals(edit.policyVersion()))conflict();inventory.upsertPolicy(bp,edit.policy());}
-  var i=edit.allocation();var saved=inventory.approveAllocation(bp,date,new AdminAllocationApprovalRequest(i.approvedQuantity(),i.safetyBufferQuantity(),i.forecastQuantity(),i.forecastConfidence(),i.expectedReadyAt(),edit.reason()),staff.getCurrentStaff().getUsername());
+  var i=edit.allocation();var saved=inventory.adjustAllocation(bp,date,new AdminAllocationApprovalRequest(i.approvedQuantity(),i.safetyBufferQuantity(),i.forecastQuantity(),i.forecastConfidence(),i.expectedReadyAt(),edit.reason()),staff.getCurrentStaff().getUsername());
   if(edit.readiness()!=null){var ready=edit.readiness();saved=inventory.updateReadiness(bp,date,new AdminReadinessUpdateRequest(ready.status(),ready.readyQuantity(),ready.expectedReadyAt(),edit.reason()),staff.getCurrentStaff().getUsername());}
   audit(branch,product,"INVENTORY_ADJUSTMENT",old.isEmpty()?null:old.getFirst(),saved);
  }

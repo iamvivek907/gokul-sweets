@@ -22,7 +22,10 @@ try {
     page.setDefaultTimeout(15000);
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
-    let releaseBranch;
+    let releaseBranch, releaseCatalogue;
+    let failAppearanceReload=false;
+    let delayCatalogue = false,
+      appearanceConflicts = 0;
     let delayBranch = false;
     let conflict = false,
       priceWrites = 0,
@@ -86,6 +89,14 @@ try {
           releaseBranch = resolve;
         });
       }
+      if (
+        delayCatalogue &&
+        path === "/api/admin/branches/1/menu/workspace" &&
+        req.method() === "GET"
+      )
+        await new Promise((resolve) => {
+          releaseCatalogue = resolve;
+        });
       const headers = {
         "Access-Control-Allow-Origin": base,
         "Access-Control-Allow-Credentials": "true",
@@ -127,8 +138,17 @@ try {
       } else if (path.includes("/groups/product/"))
         json = { version: groups.version, group: null };
       else if (path.endsWith("/appearance")) {
+        if(req.method()==="GET" && failAppearanceReload){failAppearanceReload=false;return route.fulfill({status:503,headers,json:{message:"Temporary reload failure"}});}
         if (req.method() === "PUT") {
           const b = req.postDataJSON();
+          if (b.version !== appearance.version) {
+            appearanceConflicts++;
+            return route.fulfill({
+              status: 409,
+              headers,
+              json: { message: "Appearance changed; draft retained." },
+            });
+          }
           assert.equal(b.version, appearance.version);
           appearance = {
             ...appearance,
@@ -402,13 +422,54 @@ try {
     await dialog
       .getByLabel("Hindi title", { exact: true })
       .fill("हर खुशी में मिठास");
+    appearance = {
+      ...appearance,
+      version: appearance.version + 1,
+      draft: {
+        ...appearance.draft,
+        categories: [{ id: 1, order: 2, imageUrl: null }],
+      },
+    };
+    delayCatalogue = true;
     await page.reload();
     dialog = page.getByRole("dialog");
     await dialog.waitFor();
     assert.equal(
+      await page
+        .getByRole("button", { name: "Category images & order", exact: true })
+        .isDisabled(),
+      true,
+    );
+    for (let i = 0; i < 50 && !releaseCatalogue; i++)
+      await page.waitForTimeout(20);
+    assert.ok(releaseCatalogue);
+    delayCatalogue = false;
+    releaseCatalogue();
+    assert.equal(
       await dialog.getByLabel("English title", { exact: true }).inputValue(),
       "Made for your sweet moments",
     );
+    await dialog
+      .getByRole("button", { name: "Save draft", exact: true })
+      .click();
+    await dialog.getByRole("alert").waitFor();
+    assert.equal(appearanceConflicts, 1);
+    failAppearanceReload=true;
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await dialog.waitFor({ state: "hidden" });
+    await page.getByRole("button",{name:"Retry appearance reload",exact:true}).waitFor();
+    assert.equal(await page.getByRole("button",{name:"+ Add banner",exact:true}).isDisabled(),true);
+    await page.getByRole("button",{name:"Retry appearance reload",exact:true}).click();
+    await page
+      .getByRole("button", { name: "+ Add banner", exact: true })
+      .click();
+    dialog = page.getByRole("dialog");
+    await dialog
+      .getByLabel("English title", { exact: true })
+      .fill("Made for your sweet moments");
+    await dialog
+      .getByLabel("Hindi title", { exact: true })
+      .fill("हर खुशी में मिठास");
     await page.screenshot({
       path: `${shots}/banner-preview-${width}.png`,
       fullPage: true,
@@ -418,6 +479,7 @@ try {
       .click();
     await dialog.waitFor({ state: "hidden" });
     assert.equal(appearance.live.banners.length, 0);
+    assert.equal(appearance.draft.categories.length, 1);
     await page
       .getByRole("button", { name: "Review & publish", exact: true })
       .click();
@@ -436,7 +498,7 @@ try {
     );
     await context.close();
     console.log(
-      `Workspace ${width}px: refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,
+      `Workspace ${width}px: appearance loading/conflict recovery, refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,
     );
   }
 } finally {
