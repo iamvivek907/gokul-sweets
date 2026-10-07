@@ -1,18 +1,40 @@
 name: Build and verify
 
 on:
-  # Every pushed branch is built, including dev after a PR merge.
+  # Feature branches are verified by the PR event; avoid duplicate push runs.
   push:
-    branches: ['**']
+    branches: [dev, main]
   pull_request:
-    branches: [dev]
+    branches: [dev, main]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
-  frontend:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.scope.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify CI selection rules
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+      - name: Detect frontend inputs
+        id: scope
+        run: python3 .github/scripts/frontend-changes.py
+
+  frontend-build:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -44,92 +66,102 @@ jobs:
           NEXT_PUBLIC_MSG91_WIDGET_ID: ci-test-widget
           NEXT_PUBLIC_MSG91_WIDGET_TOKEN: ci-test-widget-token
 
-      - name: Install PDF text and accessibility regression tools
+      - name: Package production build for browser jobs
+        run: tar --exclude=.next/cache -czf "$RUNNER_TEMP/gokul-next-build.tgz" .next
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-production-build
+          path: ${{ runner.temp }}/gokul-next-build.tgz
+          retention-days: 1
+
+  frontend-browser:
+    needs: frontend-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        suite: [navigation, menu, design, single-checkout, account-checkout, staff-bulk]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-production-build
+          path: ${{ runner.temp }}
+      - name: Restore tested production build
+        run: tar -xzf "$RUNNER_TEMP/gokul-next-build.tgz"
+      - name: Install PDF regression tools
         run: |
           if ! command -v pdftotext >/dev/null || ! command -v pdfinfo >/dev/null; then
             sudo apt-get update
             sudo apt-get install -y poppler-utils
           fi
-      - name: Install inbox browser regression runner
+      - name: Install browser regression runner
         run: |
-          # Keep browser tooling outside the application dependency tree.
           browser_runner="$RUNNER_TEMP/gokul-browser-runner"
           npm install --prefix "$browser_runner" --no-save --package-lock=false playwright@1.56.1
           node "$browser_runner/node_modules/playwright/cli.js" install --with-deps chromium
           echo "PLAYWRIGHT_MODULE=$browser_runner/node_modules/playwright" >> "$GITHUB_ENV"
-      - name: Customer inbox desktop/mobile browser regression
+      - name: Browser regressions with per-script timings
+        env:
+          BROWSER_SUITE: ${{ matrix.suite }}
+          SCREENSHOT_DIR: /tmp/gokul-layouts
         run: |
-          npm run start -- --hostname 127.0.0.1 --port 3311 > /tmp/gokul-inbox-next.log 2>&1 &
+          npm run start -- --hostname 127.0.0.1 --port 3311 > /tmp/gokul-next.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=false
           for attempt in $(seq 1 30); do
-            if curl --silent --fail http://127.0.0.1:3311/profile > /dev/null; then break; fi
+            if curl --silent --fail --max-time 2 http://127.0.0.1:3311/profile > /dev/null; then ready=true; break; fi
             sleep 1
           done
-          mkdir -p /tmp/gokul-scrum111-layouts
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/colourful-mobile-shell.browser.mjs
-          node tests/menu-import-recovery.browser.mjs
-          node tests/navigation-feedback.browser.mjs
-          node tests/branch-navigation-loading.browser.mjs
-          node tests/mobile-branch-recovery.browser.mjs
-          node tests/clean-mobile-shell.browser.mjs
-          node tests/mobile-order-history-refresh.browser.mjs
-          node tests/order-handover-navigation.browser.mjs
-          node tests/stable-checkout-entry.browser.mjs
-          node tests/reference-review.browser.mjs
-          node tests/menu-category-speed.browser.mjs
-          node tests/reference-ordering.browser.mjs
-          node tests/menu-pairings-speed.browser.mjs
-          node tests/menu-offer-freshness.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/menu-discovery.browser.mjs
-          node tests/menu-pickup-guidance.browser.mjs
-          node tests/menu-review-regressions.browser.mjs
-          node tests/menu-layout-recovery.browser.mjs
-          node tests/customer-design.browser.mjs
-          node tests/loading-category-navigation.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/premium-menu.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/premium-reference.browser.mjs
-          node tests/admin-product-groups.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-polish.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-ordering-guidance.browser.mjs
-          node tests/mobile-ordering-resilience.browser.mjs
-          node tests/review-quote-race.browser.mjs
-          MOBILE_CHECKOUT_SCENARIOS=menu-pickup-tomorrow,menu-pickup-later,menu-pickup-quantity,menu-pickup-priority,menu-pickup-date-only,menu-pickup-no-selection,menu-pickup-expired node tests/mobile-single-checkout.browser.mjs
-          MOBILE_CHECKOUT_SCENARIOS=stalled-offer,stored-priority,pickup-unavailable,pickup-network node tests/mobile-single-checkout.browser.mjs
-          MOBILE_CHECKOUT_SCENARIOS=cart-removal,clear-cart node tests/mobile-single-checkout.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/simple-checkout-kitchen.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/staff-order-desk.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/branch-discovery.browser.mjs
-          node tests/customer-notification-inbox.browser.mjs
-          node tests/customer-alerts.browser.mjs
-          node tests/staff-alerts.browser.mjs
-          node tests/occasion-booking.browser.mjs
-          node tests/occasion-admin.browser.mjs
-          node tests/occasion-operations.browser.mjs
-          node tests/occasion-planning.browser.mjs
-          node tests/pickup-code-payment-fee.browser.mjs
-          mkdir -p /tmp/gokul-scrum111-layouts
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/brand-careers.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/storefront-reconnect.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/compact-mobile-checkout.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-single-checkout.browser.mjs
-          node tests/rewards-checkout.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-account-corrections.browser.mjs
-          node tests/loyalty-admin.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-orders.browser.mjs
-          node tests/cart-settings-recovery.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/profile-reorder.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/mobile-pages-account.browser.mjs
-          SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/pwa-install.browser.mjs
-          node tests/menu-service-hours.browser.mjs
-
-      - name: Upload SCRUM-111 layout evidence
+          if [ "$ready" != true ]; then cat /tmp/gokul-next.log; exit 1; fi
+          mkdir -p "$SCREENSHOT_DIR"
+          node ../.github/scripts/run-browser-suite.mjs "$BROWSER_SUITE"
+      - name: Upload browser evidence and server log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scrum-111-layouts
-          path: /tmp/gokul-scrum111-layouts
+          name: frontend-${{ matrix.suite }}-evidence
+          path: |
+            /tmp/gokul-layouts
+            /tmp/gokul-next.log
           if-no-files-found: ignore
+
+  # Preserve the required frontend check name, including a successful skip for
+  # backend/docs-only changes. Fail closed if detection/build/any shard fails.
+  frontend:
+    needs: [changes, frontend-build, frontend-browser]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Frontend verification result
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          FRONTEND_CHANGED: ${{ needs.changes.outputs.frontend }}
+          BUILD_RESULT: ${{ needs.frontend-build.result }}
+          BROWSER_RESULT: ${{ needs.frontend-browser.result }}
+        run: |
+          if [ "$CHANGES_RESULT" != success ]; then exit 1; fi
+          if [ "$FRONTEND_CHANGED" = false ]; then
+            echo 'Frontend inputs unchanged; build and browser jobs skipped.'
+          elif [ "$FRONTEND_CHANGED" = true ] && [ "$BUILD_RESULT" = success ] && [ "$BROWSER_RESULT" = success ]; then
+            echo 'Frontend build and all six browser groups passed.'
+          else
+            echo "Frontend verification failed: build=$BUILD_RESULT browsers=$BROWSER_RESULT"
+            exit 1
+          fi
 
   backend:
     runs-on: ubuntu-latest

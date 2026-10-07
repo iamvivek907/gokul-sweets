@@ -6,6 +6,8 @@ The enabled contextual menu has a floating Categories action above the actual me
 
 ## Shared customer design and branch overview (October 7)
 
+Checkout header branch-change controls retain white text on the maroon surface; generic primary-link colour overrides must not reduce their contrast.
+
 The owner requested that the merged premium menu palette and presentation apply across the customer app. This direction supersedes the earlier page-specific palettes below. `customer-design.css`, loaded last by AppShell, defines maroon branding (`#980c31`), maroon primary/payment actions (`#8f1838`), emerald quantity/availability controls (`#087f55`), charcoal ink, white cards, lavender support panels, peach editorial heroes and mint pickup/rewards surfaces. Status colours remain meaningful. The effective `futuristicStorefrontV2` or `checkoutExperienceV2` flags enable `data-customer-design="reference"`; staff/admin and flag-OFF surfaces retain their presentation.
 
 Customer phone pages share the menu wordmark, compact single-row header and four-destination Home/Menu/Orders/Profile navigation. Checkout keeps its existing focused navigation and cart edits; the cart remains reachable through the menu cart action and desktop navigation. The welcome experience retains published campaign media with the shared palette. Module styles for arrival, home, brand and public careers are also scoped to this shared shell.

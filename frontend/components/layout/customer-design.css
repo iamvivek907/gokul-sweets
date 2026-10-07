@@ -68,6 +68,7 @@
 .future-storefront[data-customer-design=reference] .checkout-experience-v2 {background:#faf8fc!important;border-color:var(--customer-line);box-shadow:none}
 .future-storefront[data-customer-design=reference] .checkout-experience-head {background:var(--customer-action)!important;color:#fff!important}
 .future-storefront[data-customer-design=reference] .checkout-experience-head small {color:#fff!important}
+.future-storefront[data-customer-design=reference][data-customer-route] .page-content .checkout-experience-head .checkout-experience-branch>div>button {color:#fff!important}
 .future-storefront[data-customer-design=reference] .checkout-experience-progress .current {background:var(--customer-lavender)!important;color:var(--customer-action)!important}
 .future-storefront[data-customer-design=reference] .checkout-experience-content :is(h1,h2) {font-family:inherit}
 .future-storefront[data-customer-design=reference] :is(.mobile-page-back,.mobile-change-pickup,.notification-back) {color:var(--customer-action)!important}

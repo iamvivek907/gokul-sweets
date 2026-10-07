@@ -1,0 +1,65 @@
+{
+  "navigation": [
+    "tests/colourful-mobile-shell.browser.mjs",
+    "tests/menu-import-recovery.browser.mjs",
+    "tests/navigation-feedback.browser.mjs",
+    "tests/branch-navigation-loading.browser.mjs",
+    "tests/mobile-branch-recovery.browser.mjs",
+    "tests/clean-mobile-shell.browser.mjs",
+    "tests/mobile-order-history-refresh.browser.mjs",
+    "tests/order-handover-navigation.browser.mjs",
+    "tests/stable-checkout-entry.browser.mjs",
+    "tests/reference-review.browser.mjs",
+    "tests/branch-discovery.browser.mjs",
+    "tests/customer-alerts.browser.mjs",
+    "tests/storefront-reconnect.browser.mjs",
+    "tests/menu-service-hours.browser.mjs"
+  ],
+  "menu": [
+    "tests/menu-category-speed.browser.mjs",
+    "tests/reference-ordering.browser.mjs",
+    "tests/menu-pairings-speed.browser.mjs",
+    "tests/menu-offer-freshness.browser.mjs",
+    "tests/menu-discovery.browser.mjs",
+    "tests/menu-pickup-guidance.browser.mjs",
+    "tests/menu-review-regressions.browser.mjs",
+    "tests/menu-layout-recovery.browser.mjs",
+    "tests/premium-menu.browser.mjs",
+    "tests/mobile-ordering-polish.browser.mjs",
+    "tests/mobile-ordering-guidance.browser.mjs",
+    "tests/mobile-ordering-resilience.browser.mjs"
+  ],
+  "design": [
+    "tests/customer-design.browser.mjs",
+    "tests/loading-category-navigation.browser.mjs",
+    "tests/premium-reference.browser.mjs",
+    "tests/brand-careers.browser.mjs",
+    "tests/mobile-pages-account.browser.mjs"
+  ],
+  "single-checkout": [
+    "tests/mobile-single-checkout.browser.mjs",
+    "tests/review-quote-race.browser.mjs",
+    "tests/compact-mobile-checkout.browser.mjs",
+    "tests/cart-settings-recovery.browser.mjs"
+  ],
+  "account-checkout": [
+    "tests/simple-checkout-kitchen.browser.mjs",
+    "tests/pickup-code-payment-fee.browser.mjs",
+    "tests/rewards-checkout.browser.mjs",
+    "tests/mobile-account-corrections.browser.mjs",
+    "tests/mobile-orders.browser.mjs",
+    "tests/profile-reorder.browser.mjs",
+    "tests/pwa-install.browser.mjs"
+  ],
+  "staff-bulk": [
+    "tests/admin-product-groups.browser.mjs",
+    "tests/staff-order-desk.browser.mjs",
+    "tests/customer-notification-inbox.browser.mjs",
+    "tests/staff-alerts.browser.mjs",
+    "tests/occasion-booking.browser.mjs",
+    "tests/occasion-admin.browser.mjs",
+    "tests/occasion-operations.browser.mjs",
+    "tests/occasion-planning.browser.mjs",
+    "tests/loyalty-admin.browser.mjs"
+  ]
+}
