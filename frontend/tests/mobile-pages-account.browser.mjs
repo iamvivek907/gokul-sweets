@@ -36,7 +36,8 @@ try{
   await page.goto(`${base}/branches/1`);await page.locator('.branch-rated-grid article').waitFor();
   await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   assert.equal(await page.locator('.customer-menu-trigger').isVisible(),!compact);
-  assert.equal(await page.locator('.customer-account-mobile-label').isVisible(),compact);
+  assert.equal(await page.locator('.customer-account-mobile-label').isVisible(),false);
+  assert.equal(await page.locator('.customer-account-reference-icon').isVisible(),compact,'all enabled phone pages use the same profile icon');
   if(compact){assert.ok((await page.locator('.customer-site-header').boundingBox()).height<=110,'header is at most two short rows');assert.equal(await page.locator('.branch-rated-grid article').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ')[0]),'88px');}
   else assert.equal(await page.locator('.branch-rated-grid article').evaluate(e=>getComputedStyle(e).display),'block');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -107,7 +108,7 @@ try{
    const lastBox=await lastLink.boundingBox(),navigationBox=await page.locator('.customer-bottom-navigation').boundingBox();
    assert.ok(lastBox.y+lastBox.height<=navigationBox.y,'last profile link scrolls fully above fixed navigation');
    if(width===390){
-    customerName=undefined;await page.reload();await page.getByRole('link',{name:/Open profile for.*3210/}).waitFor();await page.locator('.customer-account-mobile-label svg').waitFor();
+    customerName=undefined;await page.reload();await page.getByRole('link',{name:/Open profile for.*3210/}).waitFor();await page.locator('.customer-account-reference-icon svg').waitFor();
     assert.equal(await page.locator('.customer-account-mobile-label').textContent(),'','no-name session uses a neutral account icon');
     assert.match(await page.locator('.customer-account-link').getAttribute('aria-label'),/3210/);
     customerName='Vivek Chaurasia';branchExperience=false;await page.reload();
@@ -145,11 +146,11 @@ try{
    await page.locator('.mobile-account-logout').click();await logoutDialog.getByRole('button',{name:'Log out',exact:true}).click();
    await logoutDialog.getByRole('alert').filter({hasText:'Could not sign out'}).waitFor();assert.equal(authenticated,true);assert.equal(logoutCalls,1);
    logoutError=false;await logoutDialog.getByRole('button',{name:'Log out',exact:true}).click();await page.locator('.account-hub').waitFor({state:'detached'});assert.equal(logoutCalls,2);
-   await page.getByRole('link',{name:'Log in to your account',exact:true}).waitFor();await page.locator('.customer-account-mobile-label svg').waitFor();
+   await page.getByRole('link',{name:'Log in to your account',exact:true}).waitFor();await page.locator('.customer-account-reference-icon svg').waitFor();
    assert.equal(await page.locator('.mobile-account-navigation').isVisible(),true,'public menu remains after logout');
    assert.equal(await page.locator('.account-navigation').count(),0,'private profile sections disappear');
    await page.getByRole('button',{name:'Verify with SMS',exact:true}).click();await page.locator('.account-hub').waitFor();
-   await page.locator('.customer-account-mobile-label').getByText('VC',{exact:true}).waitFor();
+   await page.getByRole('link',{name:/Open profile for Vivek Chaurasia/}).waitFor();await page.locator('.customer-account-reference-icon').waitFor();
    await page.getByRole('button',{name:'Edit details',exact:true}).click();await page.locator('#account-name-edit').waitFor();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    const largeText=await page.addStyleTag({content:'html{font-size:20px}'});

@@ -28,15 +28,15 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[1280,true],[
   assert.equal(await page.getByRole('button',{name:'Refresh',exact:true}).count(),0);
   await page.locator('.customer-notification-bell').waitFor();
   const nav=page.getByRole('navigation',{name:'Primary navigation',exact:true});
-  const colours=await nav.locator('a').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('svg')).stroke));assert.equal(new Set(colours).size,5);
+  const colours=await nav.locator('a').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('svg')).stroke));assert.equal(new Set(colours).size,2,'shared navigation uses maroon selection and muted inactive icons');
   assert.equal(await nav.locator('[data-nav-icon=orders]').getAttribute('aria-current'),'page');
   assert.equal(await nav.locator('[aria-current=page]').count(),1);
   const metrics=await nav.locator('a').evaluateAll(nodes=>{
    const luminance=colour=>{const values=colour.match(/\d+(?:\.\d+)?/g).slice(0,3).map(Number).map(v=>{const x=v/255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4;});return .2126*values[0]+.7152*values[1]+.0722*values[2];};
    const contrast=(a,b)=>{const x=luminance(a),y=luminance(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
-   return nodes.map(n=>{const tile=n.children[0],label=n.children[1],active=n.getAttribute('aria-current')==='page',style=getComputedStyle(n);return {active,textContrast:contrast(getComputedStyle(label).color,active?style.backgroundColor:'rgb(255,255,255)'),iconContrast:contrast(getComputedStyle(n.querySelector('svg')).stroke,getComputedStyle(tile).backgroundColor),indicator:getComputedStyle(n,'::before').content,labelClipped:label.scrollWidth>label.clientWidth||getComputedStyle(label).textOverflow==='ellipsis'};});
+   return nodes.map(n=>{const label=n.children[1],active=n.getAttribute('aria-current')==='page';return {active,textContrast:contrast(getComputedStyle(label).color,'rgb(255,255,255)'),iconContrast:contrast(getComputedStyle(n.querySelector('svg')).stroke,'rgb(255,255,255)'),weight:Number(getComputedStyle(n).fontWeight),labelClipped:label.scrollWidth>label.clientWidth||getComputedStyle(label).textOverflow==='ellipsis'};});
   });
-  for(const m of metrics){assert.ok(m.textContrast>=4.5,'all navigation text retains normal-size contrast');assert.ok(m.iconContrast>=3,'all navigation icons retain contrast');assert.equal(m.labelClipped,false);if(m.active)assert.notEqual(m.indicator,'none','selection has a visible shape indicator');}
+  for(const m of metrics){assert.ok(m.textContrast>=4.5,'all navigation text retains normal-size contrast');assert.ok(m.iconContrast>=3,'all navigation icons retain contrast');assert.equal(m.labelClipped,false);if(m.active)assert.ok(m.weight>=700,'selection retains bold emphasis as well as aria-current');}
 
   assert.equal(await page.locator('.gokul-location-pin svg').count(),1);
   assert.equal(await page.locator('.language-trigger svg').count(),1);
@@ -50,6 +50,6 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[1280,true],[
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
  await page.goto(`${base}/about`);await page.getByRole('contentinfo',{name:'Customer footer'}).waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const adminLink=page.getByRole('contentinfo',{name:'Customer footer'}).getByRole('link',{name:'Admin sign in',exact:true});assert.equal(await adminLink.getAttribute('href'),'/admin');assert.equal(await adminLink.evaluate(n=>new URL(n.href).origin),base,'admin entry follows the current deployment domain');
- if(compact){assert.ok((await page.locator('.customer-site-footer').evaluate(n=>getComputedStyle(n).backgroundImage)).includes('gradient'));assert.equal(await page.locator('.customer-footer-brand-mark').isVisible(),true);if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-shell-${width}.png`,fullPage:true});}
+ if(compact){assert.equal(await page.locator('.customer-site-footer').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(250, 248, 252)','footer follows the neutral shared palette');assert.equal(await page.locator('.customer-footer-brand-mark').isVisible(),true);if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-shell-${width}.png`,fullPage:true});}
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await context.close();console.log(`Colourful shell ${width}px enabled=${enabled} passed`);
 }}finally{await browser.close();}

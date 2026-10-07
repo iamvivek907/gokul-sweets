@@ -51,7 +51,7 @@ function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
 }
 
 
-export default function BranchSelector({compact = false, locationControl = false, cardBranch, destination = "menu"}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch; destination?: "menu" | "branchHome" | "occasions"}) {
+export default function BranchSelector({compact = false, locationControl = false, cardBranch, destination = "menu", actionLabel}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch; destination?: "menu" | "branchHome" | "occasions"; actionLabel?: string}) {
     const translate = useTranslation();
     const router = useRouter();
     const uniqueId = useId();
@@ -262,9 +262,9 @@ export default function BranchSelector({compact = false, locationControl = false
                 onKeep={() => setProposedBranch(null)} onConfirm={confirmSwitch} />, document.body)}
 
             {cardBranch ? <button type="button" disabled={cardBranch.operational===false} className="gokul-branch-card-action"
-                aria-label={cardBranch.operational===false?`${cardBranch.name} · ${translate("Currently not operational")}`:destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Bulk order")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
+                aria-label={cardBranch.operational===false?`${cardBranch.name} · ${translate("Currently not operational")}`:actionLabel ? `${translate(actionLabel)} · ${cardBranch.name}` : destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Bulk order")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
                 onClick={() => handleSelectBranch(cardBranch)}>
-                <span className="gokul-branch-card-action-label">{cardBranch.operational===false?<T text="Currently not operational"/>:destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></> : <T text="Explore this branch" />}</span>
+                <span className="gokul-branch-card-action-label">{cardBranch.operational===false?<T text="Currently not operational"/>:actionLabel ? <T text={actionLabel}/> : destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></> : <T text="Explore this branch" />}</span>
             </button> : <button
                 type="button"
                 popoverTarget={popoverId}
