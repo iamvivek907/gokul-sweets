@@ -35,7 +35,7 @@ public class MenuWorkspaceService {
   @Min(1) Integer minimumWeightGrams,@Min(1) Integer weightStepGrams,Long taxCategoryId,
   @NotNull @Min(0) Long version) {}
  public record BranchEdit(@NotNull @Min(0) Long version,Boolean available,
-  @DecimalMin("0.01") BigDecimal priceOverride,boolean clearPriceOverride) {}
+  @DecimalMin("0.01") BigDecimal priceOverride,Boolean clearPriceOverride) {}
  public record Option(Long id,String name) {}
  public record Page(List<Map<String,Object>> content,long totalElements,int page,int totalPages,
   List<Option> categories,List<Option> taxes,List<Option> branchCategories) {}
@@ -80,7 +80,32 @@ public class MenuWorkspaceService {
   for(long b:new TreeSet<>(branches))jdbc.update("INSERT INTO branch_products(branch_id,product_id,available,display_order,created_at,updated_at) VALUES (?,?,false,0,now(),now())",b,id);audit(branch,id,"CREATE_PRODUCT",null,d);return id;
  }
  @Transactional
- public void editBranch(long branch,long id,BranchEdit d){authorize(branch,false);if(d.clearPriceOverride()&&d.priceOverride()!=null)throw new IllegalArgumentException("Reset and override cannot be combined.");var rows=jdbc.queryForList("SELECT * FROM branch_products WHERE branch_id=? AND product_id=? FOR UPDATE",branch,id);if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not assigned to branch.");var old=rows.getFirst();if(((Number)old.get("workspace_version")).longValue()!=d.version())conflict();jdbc.update("UPDATE branch_products SET available=COALESCE(?,available),price_override=CASE WHEN ? THEN NULL ELSE COALESCE(?,price_override) END,updated_at=now() WHERE branch_id=? AND product_id=?",d.available(),d.clearPriceOverride(),d.priceOverride(),branch,id);audit(branch,id,"BRANCH_UPDATE",old,d);}
+ public void editBranch(long branch,long id,BranchEdit d){authorize(branch,false);if(Boolean.TRUE.equals(d.clearPriceOverride())&&d.priceOverride()!=null)throw new IllegalArgumentException("Reset and override cannot be combined.");var rows=jdbc.queryForList("SELECT * FROM branch_products WHERE branch_id=? AND product_id=? FOR UPDATE",branch,id);if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not assigned to branch.");var old=rows.getFirst();if(((Number)old.get("workspace_version")).longValue()!=d.version())conflict();jdbc.update("UPDATE branch_products SET available=COALESCE(?,available),price_override=CASE WHEN ? THEN NULL ELSE COALESCE(?,price_override) END,updated_at=now() WHERE branch_id=? AND product_id=?",d.available(),Boolean.TRUE.equals(d.clearPriceOverride()),d.priceOverride(),branch,id);audit(branch,id,"BRANCH_UPDATE",old,d);}
+ @Transactional
+ public void deleteBranchItem(long branch,long id,long version){
+  authorize(branch,true);staff.requirePermission(PermissionName.INVENTORY_MANAGE);
+  var rows=jdbc.queryForList("SELECT * FROM branch_products WHERE branch_id=? AND product_id=? FOR UPDATE",branch,id);
+  if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not assigned to branch.");
+  var old=rows.getFirst();if(((Number)old.get("workspace_version")).longValue()!=version)conflict();
+  long bp=((Number)old.get("id")).longValue();
+  for(String table:List.of("inventory_daily_allocations","inventory_stock_transactions","inventory_allocation_plan_audit","inventory_automation_run_items")){
+   if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM "+table+" WHERE branch_product_id=?)",Boolean.class,bp)))
+    throw new ResponseStatusException(HttpStatus.CONFLICT,"This item has inventory or reservation history. Set it unavailable instead to preserve existing orders and stock records.");
+  }
+  if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM menu_service_items WHERE requires_branch_product_id=?)",Boolean.class,bp)))
+   throw new ResponseStatusException(HttpStatus.CONFLICT,"Another item depends on this item. Remove its service dependency before deleting.");
+  // Lock the grouping revision before changing choices, like the grouping editor.
+  jdbc.update("INSERT INTO mobile_menu_config(branch_id,version) VALUES (?,0) ON CONFLICT DO NOTHING",branch);
+  jdbc.queryForObject("SELECT version FROM mobile_menu_config WHERE branch_id=? FOR UPDATE",Long.class,branch);
+  jdbc.update("DELETE FROM mobile_menu_choices WHERE branch_id=? AND product_id=?",branch,id);
+  jdbc.update("DELETE FROM mobile_menu_groups g WHERE g.branch_id=? AND NOT EXISTS(SELECT 1 FROM mobile_menu_choices c WHERE c.branch_id=g.branch_id AND c.group_key=g.group_key)",branch);
+  jdbc.update("UPDATE mobile_menu_config SET version=version+1 WHERE branch_id=?",branch);
+  jdbc.update("DELETE FROM menu_service_items WHERE branch_product_id=?",bp);
+  jdbc.update("DELETE FROM inventory_automation_rules WHERE branch_product_id=?",bp);
+  jdbc.update("DELETE FROM branch_inventory_policies WHERE branch_product_id=?",bp);
+  jdbc.update("DELETE FROM branch_products WHERE id=?",bp);
+  audit(branch,id,"DELETE_BRANCH_ITEM",old,null);
+ }
  @Transactional
  public String image(long branch,long id,long version,MultipartFile image,boolean remove){shared(branch,id);var old=product(id,true);if(((Number)old.get("workspace_version")).longValue()!=version)conflict();var saved=remove?products.removeImage(id):products.uploadImage(id,image);audit(branch,id,"PRODUCT_IMAGE",old.get("image_url"),saved.imageUrl());return saved.imageUrl();}
  private void conflict(){throw new ResponseStatusException(HttpStatus.CONFLICT,"This item changed since you opened it. Close and reload the item before saving; your entries have been retained.");}

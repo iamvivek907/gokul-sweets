@@ -21,6 +21,7 @@ try {
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     let imageCalls = 0;
+    let deleteCalls = 0, deleted = false;
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     let releaseBranch, releaseCatalogue;
@@ -111,6 +112,13 @@ try {
       if (path.endsWith("/image") && req.method() === "POST") {
         imageCalls++;
         return route.fulfill({ status: 204, headers });
+      }
+      if (/\/workspace\/1$/.test(path) && req.method() === "DELETE") {
+        deleteCalls++;
+        assert.equal(Number(url.searchParams.get("version")), items[0].branchVersion);
+        if (deleteCalls === 1) return route.fulfill({status: 409, headers, json: {message: "This item has inventory history. Set it unavailable instead."}});
+        deleted = true;
+        return route.fulfill({status: 204, headers});
       }
       let json = {};
       if (path === "/api/admin/auth/me")
@@ -204,7 +212,7 @@ try {
         } else {
           const search = url.searchParams.get("search")?.toLowerCase() ?? "";
           const filtered = items.filter((i) =>
-            `${i.name} ${i.code}`.toLowerCase().includes(search),
+            (!deleted || i.productId !== 1) && `${i.name} ${i.code}`.toLowerCase().includes(search),
           );
           json = {
             content:
@@ -706,6 +714,18 @@ try {
     await dialog.waitFor({ state: "hidden" });
     assert.equal(creates, createsBefore);
     assert.equal(imageCalls, imagesBefore + 1);
+    await first.getByRole("button", {name: "Delete from branch", exact: true}).click();
+    dialog = page.getByRole("dialog");
+    await dialog.getByText("This cannot be undone.", {exact: false}).waitFor();
+    await dialog.getByRole("button", {name: "Cancel", exact: true}).click();
+    assert.equal(deleteCalls, 0);
+    await first.getByRole("button", {name: "Delete from branch", exact: true}).click();
+    await dialog.getByRole("button", {name: "Yes, permanently delete", exact: true}).click();
+    await dialog.getByRole("alert").filter({hasText: "inventory history"}).waitFor();
+    await dialog.getByRole("button", {name: "Yes, permanently delete", exact: true}).click();
+    await dialog.waitFor({state: "hidden"});
+    await page.getByRole("heading", {name: "Kaju Katli", exact: true}).waitFor({state: "hidden"});
+    assert.equal(deleteCalls, 2);
     await context.close();
     console.log(
       `Workspace ${width}px: branch categories, partial photo recovery, fit/rotated-fit/fill pixels, appearance loading/conflict recovery, refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,

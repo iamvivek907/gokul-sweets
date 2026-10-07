@@ -55,4 +55,30 @@ class MenuWorkspaceIntegrationTest {
   }
  }
  @Test void stockAdjustmentsRetainHeldAndCommittedQuantities(){long b=branch(),c=category(),id=product(b,c);long bp=jdbc.queryForObject("SELECT id FROM branch_products WHERE branch_id=? AND product_id=?",Long.class,b,id);var date=LocalDate.now();inventory.upsertPolicy(bp,new com.gokulsweets.restaurant.inventory.dto.AdminInventoryPolicyRequest(com.gokulsweets.restaurant.inventory.enums.InventoryControlMode.DAILY_PRODUCTION,com.gokulsweets.restaurant.inventory.enums.InventoryUnit.PIECE,true,false,BigDecimal.ZERO,null,14,0,null));inventory.approveAllocation(bp,date,new com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest(BigDecimal.TEN,BigDecimal.ZERO,null,null,null,"Initial"),"test");entityManager.flush();entityManager.clear();jdbc.update("UPDATE inventory_daily_allocations SET held_quantity=2,committed_quantity=1 WHERE branch_product_id=? AND service_date=?",bp,date);long version=jdbc.queryForObject("SELECT version FROM inventory_daily_allocations WHERE branch_product_id=? AND service_date=?",Long.class,bp,date);workspace.stock(b,id,date,new MenuWorkspaceService.StockEdit(version,null,"Fresh production",new com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest(BigDecimal.valueOf(12),BigDecimal.ZERO,null,null,null,null),null,null));assertThat(jdbc.queryForObject("SELECT held_quantity FROM inventory_daily_allocations WHERE branch_product_id=? AND service_date=?",BigDecimal.class,bp,date)).isEqualByComparingTo("2");assertThat(jdbc.queryForObject("SELECT committed_quantity FROM inventory_daily_allocations WHERE branch_product_id=? AND service_date=?",BigDecimal.class,bp,date)).isEqualByComparingTo("1");}
+ @Test void availabilityPayloadMayOmitPriceReset() {
+  var input=tools.jackson.databind.json.JsonMapper.builder().build().readValue("{\"version\":0,\"available\":false}",MenuWorkspaceService.BranchEdit.class);
+  long b=branch(),c=category(),id=product(b,c);workspace.editBranch(b,id,input);
+  assertThat(jdbc.queryForObject("SELECT available FROM branch_products WHERE branch_id=? AND product_id=?",Boolean.class,b,id)).isFalse();
+ }
+ @Test void deletionIsBranchScopedAndPreservesSharedProduct(){
+  long b=branch(),other=branch(),c=category(),id=product(b,c);jdbc.update("INSERT INTO branch_products(branch_id,product_id) VALUES (?,?)",other,id);
+  workspace.deleteBranchItem(b,id,0);
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM branch_products WHERE branch_id=? AND product_id=?",Integer.class,b,id)).isZero();
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM branch_products WHERE branch_id=? AND product_id=?",Integer.class,other,id)).isEqualTo(1);
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM products WHERE id=?",Integer.class,id)).isEqualTo(1);
+ }
+ @Test void staleOrUnauthorizedDeletionIsRejected(){
+  long b=branch(),c=category(),id=product(b,c);
+  assertThatThrownBy(()->workspace.deleteBranchItem(b,id,1)).isInstanceOf(ResponseStatusException.class);
+  doThrow(new AccessDeniedException("Branch denied")).when(staff).requireBranchAccess(b);
+  assertThatThrownBy(()->workspace.deleteBranchItem(b,id,0)).isInstanceOf(AccessDeniedException.class);
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM branch_products WHERE branch_id=? AND product_id=?",Integer.class,b,id)).isEqualTo(1);
+ }
+ @Test void deletionCannotEraseInventoryHistory(){
+  long b=branch(),c=category(),id=product(b,c);long bp=jdbc.queryForObject("SELECT id FROM branch_products WHERE branch_id=? AND product_id=?",Long.class,b,id);
+  inventory.upsertPolicy(bp,new com.gokulsweets.restaurant.inventory.dto.AdminInventoryPolicyRequest(com.gokulsweets.restaurant.inventory.enums.InventoryControlMode.DAILY_PRODUCTION,com.gokulsweets.restaurant.inventory.enums.InventoryUnit.PIECE,true,false,BigDecimal.ZERO,null,14,0,null));
+  inventory.approveAllocation(bp,LocalDate.now(),new com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest(BigDecimal.TEN,BigDecimal.ZERO,null,null,null,"Initial"),"test");entityManager.flush();entityManager.clear();
+  assertThatThrownBy(()->workspace.deleteBranchItem(b,id,0)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("history");
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations WHERE branch_product_id=?",Integer.class,bp)).isEqualTo(1);
+ }
 }
