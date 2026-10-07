@@ -48,6 +48,16 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await page.waitForFunction(()=>{const f=document.querySelector('.menu-floating-category-trigger').getBoundingClientRect(),c=document.querySelector('.gokul-floating-cart').getBoundingClientRect();return f.bottom<=c.top-4;});
   assert.equal(await page.locator('.gokul-floating-cart>a').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(8, 127, 85)');
   const cart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+  await page.getByRole('button',{name:'Clear cart',exact:true}).click();
+  const clearDialog=page.getByRole('dialog',{name:'Clear cart?',exact:true});await clearDialog.waitFor();
+  assert.ok((await clearDialog.boundingBox()).height<400,'clear confirmation remains compact');
+  const clearBounds=await page.getByRole('button',{name:'Clear cart',exact:true}).boundingBox(),actionBounds=await page.locator('.reference-cart-action').boundingBox();
+  assert.ok(actionBounds.x+actionBounds.width<=clearBounds.x,'delete icon does not overlap view cart');
+  await clearDialog.getByRole('button',{name:'No, keep cart',exact:true}).click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart,'cancelling clear preserves the cart');
+  await page.getByRole('button',{name:'Clear cart',exact:true}).click();await page.keyboard.press('Escape');await clearDialog.waitFor({state:'hidden'});
+  assert.equal(await page.getByRole('button',{name:'Clear cart',exact:true}).evaluate(n=>n===document.activeElement),true);
+
   await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
   await floating.click();let sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});await sheet.waitFor();
   assert.equal(await sheet.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(8, 11, 16)');
@@ -65,6 +75,13 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await floating.click();await sheet.getByRole('button',{name:/^All items\s*\d+$/}).click();await page.locator('#gokul-product-7').waitFor();
   await page.locator('#gokul-menu-search').fill('No such item');await page.getByText('No matching items',{exact:true}).waitFor();
   await floating.click();await sheet.getByRole('button',{name:/Sweets/}).click();await page.locator('#gokul-product-1').waitFor();assert.equal(await page.locator('#gokul-menu-search').inputValue(),'');
+  await page.getByRole('button',{name:'Clear cart',exact:true}).click();
+  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/clear-cart-${width}.png`});
+  await page.getByRole('dialog',{name:'Clear cart?',exact:true}).getByRole('button',{name:'Yes, clear cart',exact:true}).click();
+  await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart'))?.items.length??0),0,'confirmation clears persisted cart');
+  assert.equal(new URL(page.url()).pathname,'/menu','clear cart stays on the menu');
+  await page.reload();await page.locator('#gokul-product-1').waitFor();assert.equal(await page.locator('.gokul-floating-cart').count(),0,'cleared cart stays empty after reload');
   await page.locator('.customer-bottom-navigation a[data-nav-icon=home]').click();await page.waitForURL('**/branches/1');await page.locator('.branch-overview').waitFor();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');
   console.log(`Loading/category ${width}px: slow loads, offer icons, cart separation, Escape/focus, exact category, All, search recovery and navigation passed (${y}px scroll)`);
  }else if(themed){

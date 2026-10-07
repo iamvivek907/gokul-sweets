@@ -1,4 +1,5 @@
 "use client";
+import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import {T} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -57,6 +58,7 @@ export default function FloatingCartButton({
     const cart = useCart();
     const {branch}=useSelectedBranch();
     const pickup=usePickupIntent(branch?.id);
+    const [confirmClear,setConfirmClear]=useState(false);
     const [mobile, setMobile] = useState(false);
     useEffect(() => {
         const media = window.matchMedia("(max-width: 640px)");
@@ -217,6 +219,16 @@ export default function FloatingCartButton({
                 </div>
                 </>}
             <LinkFeedback /></Link>
+            <button type="button" className="floating-cart-delete" aria-label="Clear cart" onClick={()=>setConfirmClear(true)}>
+                <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M9 6V4h6v2M5 6l1 14h12l1-14M10 10v6M14 10v6"/></svg>
+            </button>
+            {confirmClear&&<MenuDiscoverySheet title="Clear cart?" className="floating-cart-clear-dialog" onClose={()=>setConfirmClear(false)}>
+                <p><T text="Are you sure you want to clear your cart?"/></p>
+                <div className="floating-cart-clear-actions">
+                    <button type="button" onClick={()=>setConfirmClear(false)}><T text="No, keep cart"/></button>
+                    <button type="button" onClick={()=>{setConfirmClear(false);cart.clearCart();document.getElementById("gokul-menu-search")?.focus({preventScroll:true});}}><T text="Yes, clear cart"/></button>
+                </div>
+            </MenuDiscoverySheet>}
 
         </div>
     );

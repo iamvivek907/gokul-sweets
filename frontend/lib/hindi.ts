@@ -1,4 +1,8 @@
 export const hindi: Record<string,string> = {
+ "Clear cart?": "कार्ट खाली करें?",
+ "Are you sure you want to clear your cart?": "क्या आप अपना कार्ट खाली करना चाहते हैं?",
+ "No, keep cart": "नहीं, कार्ट रखें",
+ "Yes, clear cart": "हाँ, कार्ट खाली करें",
  "Choose a branch for your occasion": "अपने समारोह के लिए शाखा चुनें",
  "Select the branch that will prepare your bulk order.": "अपना बड़ा ऑर्डर तैयार करने वाली शाखा चुनें।",
  "Plan at this branch": "इस शाखा में योजना बनाएँ",
