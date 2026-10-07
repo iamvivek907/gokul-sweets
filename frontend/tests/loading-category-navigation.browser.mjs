@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
+async function waitForMockRequest(started,label){
+ let timer;
+ try{await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} request did not start within 15 seconds`)),15000);})]);}
+ finally{clearTimeout(timer);}
+}
 const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311',date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
 const product=(id,name,categoryId,categoryName,price)=>({id,name,categoryId,categoryName,price,available:true,saleMode:'UNIT',description:'Prepared for your pickup.',imageUrl:'/arrival-mithai.webp'});
@@ -8,13 +13,16 @@ const sweets=[product(1,'Rasgulla',1,'Sweets',15),{...product(2,'Gulab Jamun',1,
 const groups=[{key:'dahi',title:'Dahi',choices:dairy.map(p=>({productId:p.id,label:p.name.replace('Dahi ','')+' pack'}))}],slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false};
 const browser=await chromium.launch({headless:true});
 try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[390,false]]){const outcome="populated";
- const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let holdBranch=true,holdMenu=true,releaseBranch,releaseMenu;let blockRasgulla=false,delay=false,releaseOffers,releasePairings;let pairingOutcome=outcome;const offersGate=new Promise(resolve=>releaseOffers=resolve),pairingsGate=new Promise(resolve=>releasePairings=resolve);const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let holdBranch=true,holdMenu=true,releaseBranch,releaseMenu;let branchRequested,menuRequested;
+ const branchGate=new Promise(resolve=>releaseBranch=resolve),menuGate=new Promise(resolve=>releaseMenu=resolve);
+ const branchStarted=new Promise(resolve=>branchRequested=resolve),menuStarted=new Promise(resolve=>menuRequested=resolve);
+ let blockRasgulla=false,delay=false,releaseOffers,releasePairings;let pairingOutcome=outcome;const offersGate=new Promise(resolve=>releaseOffers=resolve),pairingsGate=new Promise(resolve=>releasePairings=resolve);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/api/**',async route=>{const path=new URL(route.request().url()).pathname;let json=[];
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:themed,checkoutExperienceV2:themed,contextualStorefrontV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,branchExperience:true,smartAvailability:true,pickupAddOns:true,reviews:true,notificationInbox:true,today:date,futureOrderingDays:30};
-  else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1'){if(holdBranch)await new Promise(resolve=>releaseBranch=resolve);json=branch;}
-  else if(path==='/api/menu'){if(holdMenu)await new Promise(resolve=>releaseMenu=resolve);json=[{id:1,name:'Sweets',products:sweets},{id:2,name:'Dairy',products:dairy},{id:3,name:'Snacks',products:snacks}];}
+  else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1'){branchRequested();if(holdBranch)await branchGate;json=branch;}
+  else if(path==='/api/menu'){menuRequested();if(holdMenu)await menuGate;json=[{id:1,name:'Sweets',products:sweets},{id:2,name:'Dairy',products:dairy},{id:3,name:'Snacks',products:snacks}];}
   else if(path==='/api/menu/offers'){await offersGate;if(outcome==='failed')return route.fulfill({status:503,json:{message:'Unavailable'},headers});json=outcome==='empty'?[]:[{rebateId:3,code:'PUBLIC20',name:'Public offer',description:'Standard pickup',rebateType:'FIXED_AMOUNT',rebateValue:20,minimumOrderAmount:200,maximumDiscountAmount:null,tiers:[]}];}else if(path==='/api/menu/portion-groups')json={version:1,groups};
   else if(path==='/api/storefront/customer-identity')json={enabled:true};else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Vivek',phone:'+919876543210'};
   else if(path.endsWith('/availability')){if(delay)await new Promise(r=>setTimeout(r,1500));json={today:date,maximumDate:date,dates:[{date,available:true,items:products.map(p=>({productId:p.id,available:p.id!==6&&!(p.id===1&&blockRasgulla),code:p.id===6?'NO_INVENTORY':p.id===1&&blockRasgulla?'QUANTITY_TOO_LARGE':null})),slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};}
@@ -34,10 +42,10 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
  await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  await page.locator('.customer-brand-loading .brand-loading-wordmark').waitFor();
  assert.equal(await page.locator('.customer-brand-loading .brand-loading-wordmark').evaluate(n=>getComputedStyle(n).color),'rgb(152, 12, 49)');
- holdBranch=false;releaseBranch();
+ await waitForMockRequest(branchStarted,"Branch");holdBranch=false;releaseBranch();
  await page.locator('.customer-menu-loading').waitFor();
  if(width===640)assert.equal(await page.locator('.customer-brand-loading-spinner>span').evaluate(n=>getComputedStyle(n).animationName),'none');
- holdMenu=false;releaseMenu();await page.locator('#gokul-product-1').waitFor();
+ await waitForMockRequest(menuStarted,"Menu");holdMenu=false;releaseMenu();await page.locator('#gokul-product-1').waitFor();
  const floating=page.getByRole('button',{name:'Categories',exact:true});
  if(width<=640&&themed){
   await floating.waitFor();
