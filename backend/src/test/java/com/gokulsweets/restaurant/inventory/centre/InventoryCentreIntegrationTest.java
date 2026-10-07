@@ -29,6 +29,9 @@ class InventoryCentreIntegrationTest {
  @Autowired MobileMenuOptionsService groups;
  @Autowired StaffUserRepository staff;
  @Autowired Clock inventoryClock;
+ @Autowired com.gokulsweets.restaurant.inventory.repository.BranchInventoryPolicyRepository policies;
+ @Autowired com.gokulsweets.restaurant.inventory.repository.InventoryDailyAllocationRepository allocations;
+ @Autowired org.springframework.transaction.PlatformTransactionManager manager;
  @MockitoBean StaffAuthorizationService authorization;
  @MockitoBean StaffUserDetailsService users;
  long branch,category,actor;String username;LocalDate today;
@@ -92,6 +95,17 @@ class InventoryCentreIntegrationTest {
   assertThat(jobs.summary(branch,id).get("succeeded")).isEqualTo(1);
   assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations WHERE branch_product_id=?",Integer.class,bp(p))).isEqualTo(1);
   assertThat(jdbc.queryForObject("SELECT count(*) FROM menu_workspace_audit WHERE branch_id=? AND action='INVENTORY_ADJUSTMENT'",Integer.class,branch)).isEqualTo(1);
+ }
+ @Test void crossingIstMidnightRollsBackInsteadOfReusingTodayStockForTomorrow(){
+  long p=product();var o=options(today,today.plusDays(1),"READY_STOCK",true,false);
+  var clock=mock(Clock.class);when(clock.getZone()).thenReturn(ZoneId.of("Asia/Kolkata"));
+  when(clock.instant()).thenReturn(today.atTime(23,59,59).atZone(clock.getZone()).toInstant(),today.plusDays(1).atStartOfDay(clock.getZone()).toInstant());
+  var timed=new InventoryCentreProcessor(jdbc,jobs,workspace,policies,allocations,clock);
+  var work=new Work(o,entry(p,today,"10","8"),List.of(new DateVersion(today,null),new DateVersion(today.plusDays(1),null)),0,null);
+  var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+  assertThatThrownBy(()->tx.executeWithoutResult(status->timed.apply(branch,work))).hasMessageContaining("crossed midnight");
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations WHERE branch_product_id=?",Integer.class,bp(p))).isZero();
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM branch_inventory_policies WHERE branch_product_id=?",Integer.class,bp(p))).isZero();
  }
  @Test void changedSellingUnitsCannotReinterpretQueuedQuantities(){
   long p=product();UUID id=enqueue(options(today,today,"READY_STOCK",true,false),entry(p,today,"10","8"));
