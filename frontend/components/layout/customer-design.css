@@ -260,8 +260,10 @@
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet nav button{min-height:48px;padding:12px 4px;border:0;border-radius:6px;background:transparent;color:#c7c8cc;font-size:15px;font-weight:400}
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet nav button[aria-current=true]{background:#ffffff0d;color:#fff;font-weight:700}
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet nav button>span:last-child{flex:none;text-align:right;min-width:24px;font-variant-numeric:tabular-nums}
+@media(max-width:640px){
 .future-storefront[data-customer-design=reference] .mobile-occasion-navigation{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px}
 .future-storefront[data-customer-design=reference] .mobile-occasion-navigation>a{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:4px 0;border:0;background:transparent;box-shadow:none;color:#8f1838;font-size:13px;font-weight:650;border-radius:0}
+}
 .occasion-branch-chooser{max-width:900px;margin:auto;padding:20px 16px 40px}
 .occasion-branch-chooser h1{font-size:28px;line-height:1.2;margin:20px 0 12px}
 .occasion-branch-list{display:grid;gap:12px;margin-top:24px}
