@@ -8,9 +8,9 @@ const shots=process.env.SCREENSHOT_DIR??"/tmp/gokul-layouts";mkdirSync(shots,{re
 try{
  for(const width of [320,390,1280]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});
-  const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on("pageerror",e=>errors.push(e.message));
+  const page=await context.newPage();await page.clock.setFixedTime(new Date("2026-10-08T23:59:00+05:30"));page.setDefaultTimeout(15000);const errors=[];page.on("pageerror",e=>errors.push(e.message));
   const items=[1,2,3].map(id=>({productId:id,branchProductId:id,branchVersion:0,policyVersion:null,allocationVersion:null,code:`SKU-${id}`,name:["Small samosa","Large samosa","Kaju Katli"][id-1],categoryName:"Fresh items",saleMode:id===3?"WEIGHT":"UNIT",available:false,allocation:null}));
-  let job=null,polls=0,failOne=false;const bodies=[];let loseAcknowledgement=true;
+  let job=null,polls=0,failOne=false;const bodies=[],rawBodies=[];let loseAcknowledgement=true;
   await context.route("**/api/**",async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;
    const headers={"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"content-type,x-staff-csrf","Access-Control-Allow-Methods":"GET,POST,OPTIONS","Access-Control-Expose-Headers":"X-Staff-CSRF","X-Staff-CSRF":"test-csrf"};
@@ -21,7 +21,7 @@ try{
    else if(path.endsWith("/portion-groups"))json={version:0,groups:[{key:"samosa",title:"Samosa portions",choices:[{productId:1,label:"Small"},{productId:2,label:"Large"}]}]};
    else if(path.endsWith("/workspace"))json={content:items,totalElements:3,totalPages:1,page:0};
    else if(path.endsWith("/centre/jobs")&&req.method()==="POST"){
-    const body=req.postDataJSON();bodies.push(body);failOne=bodies.length===3;job={id:body.submissionId,total:body.items.length,succeeded:0,failed:0};polls=0;
+    const body=req.postDataJSON();bodies.push(body);rawBodies.push(req.postData());failOne=bodies.length===3;job={id:body.submissionId,total:body.items.length,succeeded:0,failed:0};polls=0;
     if(loseAcknowledgement){loseAcknowledgement=false;return route.fulfill({status:503,headers,json:{message:"Acknowledgement lost. Retry this plan."}});}
     json=job;
    }else if(path.endsWith("/centre/jobs"))json=job?[job]:[];
@@ -40,10 +40,17 @@ try{
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.screenshot({path:`${shots}/inventory-centre-${width}.png`,fullPage:true});
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();
-  const run=page.getByRole("button",{name:"Apply configuration, allocation and readiness",exact:true});await run.click();await page.getByRole("alert").filter({hasText:"Acknowledgement lost"}).waitFor();await run.click();
+  const run=page.getByRole("button",{name:"Apply configuration, allocation and readiness",exact:true});await run.click();await page.getByRole("alert").filter({hasText:"Acknowledgement lost"}).waitFor();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem("inventory-centre:77")));
+  assert.equal(saved.pendingRequest.body,rawBodies[0]);
+  await page.clock.setFixedTime(new Date("2026-10-09T00:01:00+05:30"));await page.reload();await page.getByRole("button",{name:"Retry original plan",exact:true}).waitFor();
+  assert.equal(await page.getByLabel("From (IST)",{exact:true}).inputValue(),"2026-10-08");
+  assert.equal(await page.getByLabel("Kaju Katli ready",{exact:true}).count(),0);
+  await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();
+  await page.getByRole("button",{name:"Retry original plan",exact:true}).click();assert.equal(rawBodies[0],rawBodies[1]);
   await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,2);assert.deepEqual(bodies[0],bodies[1]);assert.equal(bodies[1].options.openPurchases,false);assert.equal(bodies[1].items[2].quantity,1250);assert.equal(bodies[1].items[2].readyQuantity,800);
   await page.reload();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();await page.getByText("3 succeeded · 0 failed · 0 remaining",{exact:true}).waitFor();assert.equal(bodies.length,2);
-  await page.getByRole("button",{name:"Start a fresh plan"}).click();await page.getByRole("button",{name:"Load branch items",exact:true}).click();await page.getByText("Kaju Katli",{exact:true}).waitFor();
+  await page.getByRole("button",{name:"Start a fresh plan"}).click();await page.getByLabel("From (IST)",{exact:true}).fill("2026-10-09");await page.getByLabel("Through (IST)",{exact:true}).fill("2026-10-09");await page.getByRole("button",{name:"Load branch items",exact:true}).click();await page.getByText("Kaju Katli",{exact:true}).waitFor();
   await page.getByLabel("Small samosa allocation",{exact:true}).fill("25");await page.getByLabel("Large samosa allocation",{exact:true}).fill("30");
   await page.getByLabel("Apply inventory quantities, configuration and readiness",{exact:true}).uncheck();await page.getByLabel("Apply common service hours to selected items",{exact:true}).check();await page.getByLabel("Enable service-hour enforcement for the whole branch",{exact:true}).check();
   await page.getByText("Select an existing portion group",{exact:true}).click();await page.getByRole("button",{name:"Samosa portions · 2 variants",exact:true}).click();
@@ -59,7 +66,13 @@ try{
   await page.getByLabel("Large samosa allocation",{exact:true}).fill("1.2");await page.getByLabel("Large samosa ready",{exact:true}).fill("1");
   await page.getByLabel("Apply inventory quantities, configuration and readiness",{exact:true}).uncheck();
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,4);assert.equal(bodies[3].items.length,1);assert.equal(bodies[3].items[0].productId,2);assert.deepEqual(errors,[]);
+  await page.evaluate(()=>{const value=JSON.parse(localStorage.getItem("inventory-centre:77"));delete value.pendingRequest;value.job=null;value.submitted=false;localStorage.setItem("inventory-centre:77",JSON.stringify(value));});
+  await page.reload();await page.getByRole("button",{name:"Apply service hours",exact:true}).waitFor();
+  await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();
+  await page.getByRole("alert").filter({hasText:"older draft does not contain its original request"}).waitFor();assert.equal(bodies.length,4);
+  await page.getByText("Recent backend jobs · recover progress",{exact:true}).click();await page.getByRole("button",{name:new RegExp(`^${bodies[3].submissionId.slice(0,8)}`)}).click();
+  await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,4);
   await context.close();
  }
- console.log("Inventory centre: drafts, recovery, idempotent retries, stock units, grouping and hours-only plans passed at 320/390/1280px.");
+ console.log("Inventory centre: drafts, recovery, exact request retries after refresh across IST midnight, stock units, grouping and hours-only plans passed at 320/390/1280px.");
 }finally{await browser.close();}
