@@ -51,6 +51,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
   await floating.click();let sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});await sheet.waitFor();
   assert.equal(await sheet.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(8, 11, 16)');
+  assert.equal(await sheet.locator('header').evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(8, 11, 16)');
   assert.ok((await sheet.boundingBox()).width<width,'category panel has side margins');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/category-panel-${width}.png`});
   await page.keyboard.press('Escape');await sheet.waitFor({state:'hidden'});assert.equal(await floating.evaluate(n=>n===document.activeElement),true);

@@ -252,9 +252,9 @@
 }
 /* Bounded category panel above the measured cart. */
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet{position:fixed;inset:auto 12px var(--floating-menu-bottom,68px) auto;margin:0;width:min(340px,calc(100vw - 32px));height:auto;max-height:min(560px,calc(100dvh - var(--floating-menu-bottom,68px) - 24px));border:1px solid #ffffff18;border-radius:18px;background:#080b10!important;color:#fff!important;padding:0;overflow:auto;box-shadow:0 12px 48px #0005}
-.future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet>header{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;background:#080b10;padding:10px 16px;border-bottom:1px solid #ffffff18}
+.future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet>header{display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:0;background:#080b10!important;padding:10px 16px;border-bottom:1px solid #ffffff18}
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet h2{font-size:13px;color:#ddd}
-.future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet>header button{min-height:44px;padding:8px;background:transparent;border:0;color:#fff;border-radius:8px}
+.future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet>header button{min-height:44px;padding:8px;background:transparent!important;border:0;color:#fff!important;border-radius:8px}
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet .mobile-menu-suggestion-body{padding:6px 16px 12px}
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet nav{gap:0;margin:0}
 .future-storefront[data-customer-design=reference][data-customer-route] .menu-floating-category-sheet nav button{min-height:48px;padding:12px 4px;border:0;border-radius:6px;background:transparent;color:#c7c8cc;font-size:15px;font-weight:400}
