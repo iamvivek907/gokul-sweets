@@ -53,6 +53,7 @@ const empty: WorkspacePage = {
   page: 0,
   totalPages: 0,
   categories: [],
+  branchCategories: [],
   taxes: [],
 };
 export default function MenuWorkspace() {
@@ -561,8 +562,8 @@ export default function MenuWorkspace() {
           key={branch}
           branch={branch}
           draftKey={`${workspaceKey}:appearance:${branch}`}
-          categories={data.categories}
-          categoriesReady={fresh}
+          categories={data.branchCategories ?? []}
+          categoriesReady={fresh && Array.isArray(data.branchCategories)}
           onNotice={setNotice}
         />
       ) : tab === "items" ? (

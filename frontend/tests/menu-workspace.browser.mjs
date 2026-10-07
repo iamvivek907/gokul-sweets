@@ -20,10 +20,11 @@ try {
     });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
+    let imageCalls = 0;
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     let releaseBranch, releaseCatalogue;
-    let failAppearanceReload=false;
+    let failAppearanceReload = false;
     let delayCatalogue = false,
       appearanceConflicts = 0;
     let delayBranch = false;
@@ -107,6 +108,10 @@ try {
       };
       if (req.method() === "OPTIONS")
         return route.fulfill({ status: 204, headers });
+      if (path.endsWith("/image") && req.method() === "POST") {
+        imageCalls++;
+        return route.fulfill({ status: 204, headers });
+      }
       let json = {};
       if (path === "/api/admin/auth/me")
         json = {
@@ -138,7 +143,14 @@ try {
       } else if (path.includes("/groups/product/"))
         json = { version: groups.version, group: null };
       else if (path.endsWith("/appearance")) {
-        if(req.method()==="GET" && failAppearanceReload){failAppearanceReload=false;return route.fulfill({status:503,headers,json:{message:"Temporary reload failure"}});}
+        if (req.method() === "GET" && failAppearanceReload) {
+          failAppearanceReload = false;
+          return route.fulfill({
+            status: 503,
+            headers,
+            json: { message: "Temporary reload failure" },
+          });
+        }
         if (req.method() === "PUT") {
           const b = req.postDataJSON();
           if (b.version !== appearance.version) {
@@ -210,7 +222,11 @@ try {
             totalElements: filtered.length,
             page: 0,
             totalPages: url.searchParams.get("filter") === "COUNT_SKU" ? 2 : 1,
-            categories: [{ id: 1, name: "Sweets" }],
+            categories: [
+              { id: 1, name: "Sweets" },
+              { id: 2, name: "Other branch category" },
+            ],
+            branchCategories: [{ id: 1, name: "Sweets" }],
             taxes: [{ id: 1, name: "Sweets tax" }],
           };
         }
@@ -454,12 +470,21 @@ try {
       .click();
     await dialog.getByRole("alert").waitFor();
     assert.equal(appearanceConflicts, 1);
-    failAppearanceReload=true;
+    failAppearanceReload = true;
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await dialog.waitFor({ state: "hidden" });
-    await page.getByRole("button",{name:"Retry appearance reload",exact:true}).waitFor();
-    assert.equal(await page.getByRole("button",{name:"+ Add banner",exact:true}).isDisabled(),true);
-    await page.getByRole("button",{name:"Retry appearance reload",exact:true}).click();
+    await page
+      .getByRole("button", { name: "Retry appearance reload", exact: true })
+      .waitFor();
+    assert.equal(
+      await page
+        .getByRole("button", { name: "+ Add banner", exact: true })
+        .isDisabled(),
+      true,
+    );
+    await page
+      .getByRole("button", { name: "Retry appearance reload", exact: true })
+      .click();
     await page
       .getByRole("button", { name: "+ Add banner", exact: true })
       .click();
@@ -496,9 +521,137 @@ try {
       ),
       true,
     );
+    await page
+      .getByRole("button", { name: "Category images & order", exact: true })
+      .click();
+    dialog = page.getByRole("dialog");
+    assert.equal(
+      await dialog.getByText("Other branch category", { exact: true }).count(),
+      0,
+    );
+    await dialog
+      .getByRole("button", { name: "Save draft", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    assert.deepEqual(
+      appearance.draft.categories.map((c) => c.id),
+      [1],
+    );
+    await page.evaluate(() => {
+      const key = "menu-workspace:77";
+      const state = JSON.parse(sessionStorage.getItem(key));
+      sessionStorage.setItem(
+        key,
+        JSON.stringify({
+          ...state,
+          tab: "items",
+          editor: { mode: "add", item: null },
+          groupEditor: null,
+          selected: [],
+        }),
+      );
+      sessionStorage.setItem(
+        key + ":product:1:add:new:",
+        JSON.stringify({
+          createdId: 99,
+          name: "Created sweet",
+          code: "CREATED-99",
+          category: 1,
+          price: "100",
+        }),
+      );
+    });
+    await page.reload();
+    dialog = page.getByRole("dialog");
+    await dialog.waitFor();
+    assert.equal(
+      await dialog.getByLabel("Name *", { exact: true }).isDisabled(),
+      true,
+    );
+    assert.equal(
+      await dialog.locator('input[type="file"]').isDisabled(),
+      false,
+    );
+    const createsBefore = creates,
+      imagesBefore = imageCalls;
+    await dialog
+      .getByRole("button", { name: "Retry photo", exact: true })
+      .click();
+    await dialog.getByRole("alert").waitFor();
+    assert.equal(imageCalls, imagesBefore);
+    const fixture = await page.evaluate(() => {
+      const c = document.createElement("canvas");
+      c.width = 240;
+      c.height = 120;
+      const ctx = c.getContext("2d");
+      for (const [x, color] of [
+        [0, "red"],
+        [80, "lime"],
+        [160, "blue"],
+      ]) {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, 0, 80, 120);
+      }
+      return c.toDataURL("image/png").split(",")[1];
+    });
+    await dialog
+      .locator('input[type="file"]')
+      .setInputFiles({
+        name: "landscape.png",
+        mimeType: "image/png",
+        buffer: Buffer.from(fixture, "base64"),
+      });
+    async function pixels(points) {
+      await dialog
+        .getByRole("button", { name: "Apply crop", exact: true })
+        .click();
+      const image = dialog.getByAltText("Cropped product photo");
+      await image.waitFor();
+      return image.evaluate(async (img, points) => {
+        await img.decode();
+        const c = document.createElement("canvas");
+        c.width = 800;
+        c.height = 800;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        return points.map(([x, y]) =>
+          Array.from(ctx.getImageData(x, y, 1, 1).data).slice(0, 3),
+        );
+      }, points);
+    }
+    let sampled = await pixels([
+      [10, 400],
+      [400, 400],
+      [790, 400],
+      [400, 10],
+    ]);
+    assert.ok(sampled[0][0] > 240 && sampled[0][1] < 20);
+    assert.ok(sampled[1][1] > 240);
+    assert.ok(sampled[2][2] > 240);
+    assert.ok(sampled[3].every((n) => n > 240));
+    await dialog
+      .getByRole("button", { name: "Rotate 90°", exact: true })
+      .click();
+    sampled = await pixels([
+      [400, 10],
+      [400, 790],
+      [10, 400],
+    ]);
+    assert.ok(sampled[0][0] > 240);
+    assert.ok(sampled[1][2] > 240);
+    assert.ok(sampled[2].every((n) => n > 240));
+    await dialog.getByRole("button", { name: "Fill", exact: true }).click();
+    sampled = await pixels([[400, 10]]);
+    assert.ok(sampled[0].some((n) => n < 200));
+    await dialog
+      .getByRole("button", { name: "Retry photo", exact: true })
+      .click();
+    await dialog.waitFor({ state: "hidden" });
+    assert.equal(creates, createsBefore);
+    assert.equal(imageCalls, imagesBefore + 1);
     await context.close();
     console.log(
-      `Workspace ${width}px: appearance loading/conflict recovery, refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,
+      `Workspace ${width}px: branch categories, partial photo recovery, fit/rotated-fit/fill pixels, appearance loading/conflict recovery, refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,
     );
   }
 } finally {

@@ -197,6 +197,10 @@ export default function WorkspaceProductEditor({
             productId = created.productId;
             setCreatedId(productId);
           }
+          if (createdId && !file)
+            throw new Error(
+              "The product already exists. Re-select a photo and apply it before retrying.",
+            );
           if (file) {
             const body = new FormData();
             body.append("image", file);
@@ -370,107 +374,111 @@ export default function WorkspaceProductEditor({
         Text entries are restored after refresh. Re-select any unsaved image
         file.
       </p>
-      <fieldset disabled={busy || (!!createdId && full)}>
+      <fieldset disabled={busy}>
         <div className={full ? styles.formGrid : undefined}>
           {full && (
             <section>
-              <h3>Product details</h3>
-              <label>
-                Name *
-                <input
-                  required
-                  maxLength={150}
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </label>
-              <label>
-                Product code *
-                <input
-                  required
-                  maxLength={100}
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                />
-              </label>
-              <label>
-                Category *
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(Number(e.target.value))}
-                >
-                  {data.categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Description
-                <textarea
-                  maxLength={500}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </label>
-              <label>
-                Sale unit
-                <select
-                  disabled={mode !== "add"}
-                  value={sale}
-                  onChange={(e) => setSale(e.target.value as "UNIT" | "WEIGHT")}
-                >
-                  <option value="UNIT">Count · pieces</option>
-                  <option value="WEIGHT">Weight · g / kg</option>
-                </select>
-              </label>
-              {sale === "WEIGHT" && (
-                <div className={styles.formGrid}>
-                  <label>
-                    Minimum · g
-                    <input
-                      type="number"
-                      min={1}
-                      value={minimum}
-                      onChange={(e) => setMinimum(Number(e.target.value))}
-                    />
-                  </label>
-                  <label>
-                    Step · g
-                    <input
-                      type="number"
-                      min={1}
-                      value={step}
-                      onChange={(e) => setStep(Number(e.target.value))}
-                    />
-                  </label>
-                </div>
-              )}
-              <label>
-                Base price · ₹ per {sale === "WEIGHT" ? "kg" : "piece"} *
-                <input
-                  type="number"
-                  min={0.01}
-                  step={0.01}
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                />
-              </label>
-              <label>
-                Tax category
-                <select
-                  value={tax}
-                  onChange={(e) => setTax(Number(e.target.value))}
-                >
-                  <option value={0}>No product tax category</option>
-                  {data.taxes.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <fieldset disabled={!!createdId}>
+                <h3>Product details</h3>
+                <label>
+                  Name *
+                  <input
+                    required
+                    maxLength={150}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Product code *
+                  <input
+                    required
+                    maxLength={100}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Category *
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(Number(e.target.value))}
+                  >
+                    {data.categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Description
+                  <textarea
+                    maxLength={500}
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Sale unit
+                  <select
+                    disabled={mode !== "add"}
+                    value={sale}
+                    onChange={(e) =>
+                      setSale(e.target.value as "UNIT" | "WEIGHT")
+                    }
+                  >
+                    <option value="UNIT">Count · pieces</option>
+                    <option value="WEIGHT">Weight · g / kg</option>
+                  </select>
+                </label>
+                {sale === "WEIGHT" && (
+                  <div className={styles.formGrid}>
+                    <label>
+                      Minimum · g
+                      <input
+                        type="number"
+                        min={1}
+                        value={minimum}
+                        onChange={(e) => setMinimum(Number(e.target.value))}
+                      />
+                    </label>
+                    <label>
+                      Step · g
+                      <input
+                        type="number"
+                        min={1}
+                        value={step}
+                        onChange={(e) => setStep(Number(e.target.value))}
+                      />
+                    </label>
+                  </div>
+                )}
+                <label>
+                  Base price · ₹ per {sale === "WEIGHT" ? "kg" : "piece"} *
+                  <input
+                    type="number"
+                    min={0.01}
+                    step={0.01}
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Tax category
+                  <select
+                    value={tax}
+                    onChange={(e) => setTax(Number(e.target.value))}
+                  >
+                    <option value={0}>No product tax category</option>
+                    {data.taxes.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </fieldset>
             </section>
           )}
           {mode === "add" && (
@@ -483,7 +491,7 @@ export default function WorkspaceProductEditor({
                     <input
                       type="checkbox"
                       checked={assigned.includes(b.id)}
-                      disabled={b.id === branch}
+                      disabled={!!createdId || b.id === branch}
                       onChange={(e) =>
                         setAssigned((a) =>
                           e.target.checked

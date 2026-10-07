@@ -38,7 +38,7 @@ public class MenuWorkspaceService {
   @DecimalMin("0.01") BigDecimal priceOverride,boolean clearPriceOverride) {}
  public record Option(Long id,String name) {}
  public record Page(List<Map<String,Object>> content,long totalElements,int page,int totalPages,
-  List<Option> categories,List<Option> taxes) {}
+  List<Option> categories,List<Option> taxes,List<Option> branchCategories) {}
  private void authorize(long branch,boolean inventory){staff.requirePermission(PermissionName.MENU_MANAGE);staff.requireBranchAccess(branch);if(inventory)staff.requirePermission(PermissionName.INVENTORY_VIEW);}
  private void shared(long branch,long product){authorize(branch,false);var bs=jdbc.queryForList("SELECT branch_id FROM branch_products WHERE product_id=? ORDER BY branch_id",Long.class,product);if(!bs.contains(branch))throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not assigned to this branch.");bs.forEach(staff::requireBranchAccess);}
  private static final String BALANCE="GREATEST((CASE WHEN pol.ready_stock_required THEN LEAST(al.ready_quantity,al.approved_quantity) ELSE al.approved_quantity END)-al.safety_buffer_quantity-al.held_quantity-al.committed_quantity-al.wasted_quantity,0)";
@@ -61,7 +61,8 @@ public class MenuWorkspaceService {
   }
   var cats=jdbc.query("SELECT id,name FROM categories WHERE active=true ORDER BY name LIMIT 200",(rs,n)->new Option(rs.getLong(1),rs.getString(2)));
   var taxes=jdbc.query("SELECT id,name FROM tax_categories WHERE active=true ORDER BY name LIMIT 200",(rs,n)->new Option(rs.getLong(1),rs.getString(2)));
-  return new Page(rows,total,page,(int)((total+size-1)/size),cats,taxes);
+  var branchCats=jdbc.query("SELECT c.id,c.name FROM categories c WHERE c.active=true AND EXISTS(SELECT 1 FROM products p JOIN branch_products bp ON bp.product_id=p.id WHERE p.category_id=c.id AND bp.branch_id=?) ORDER BY c.name LIMIT 200",(rs,n)->new Option(rs.getLong(1),rs.getString(2)),branch);
+  return new Page(rows,total,page,(int)((total+size-1)/size),cats,taxes,branchCats);
  }
  private Map<String,Object> product(long id,boolean lock){var rows=jdbc.queryForList("SELECT * FROM products WHERE id=?"+(lock?" FOR UPDATE":""),id);if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Product not found.");return rows.getFirst();}
  private void audit(long branch,Long product,String action,Object before,Object after){jdbc.update("INSERT INTO menu_workspace_audit(actor,branch_id,product_id,action,before_state,after_state) VALUES (?,?,?,?,?,?)",staff.getCurrentStaff().getUsername(),branch,product,action,String.valueOf(before),String.valueOf(after));}

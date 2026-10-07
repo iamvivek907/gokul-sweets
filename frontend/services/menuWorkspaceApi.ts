@@ -34,6 +34,7 @@ export type WorkspacePage = {
   page: number;
   totalPages: number;
   categories: { id: number; name: string }[];
+  branchCategories: { id: number; name: string }[];
   taxes: { id: number; name: string }[];
 };
 export type Group = {
