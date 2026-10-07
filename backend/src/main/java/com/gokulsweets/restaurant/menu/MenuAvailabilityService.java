@@ -26,7 +26,7 @@ public class MenuAvailabilityService {
             for(int attempt=0;attempt<3;attempt++) {
                 var snapshot=catalog.get(branchId);Instant now=inventoryClock.instant();var cached=cache.get(branchId);
                 if(publish&&cached!=null&&cached.value().revision().equals(snapshot.revision())&&!now.isBefore(cached.evaluatedAt())&&now.isBefore(cached.until()))return new Availability(cached.value().revision(),cached.value().serviceWindowsEnabled(),cached.value().items(),now);
-                var live=windows.snapshot(branchId);
+                var live=windows.pickupSnapshot(branchId,null);
                 var items=snapshot.categories().stream().flatMap(c->c.products().stream()).map(p->{
                     var status=live.status(p.id());return new Item(p.id(),p.available()&&(status==null||status.available()),status);
                 }).toList();

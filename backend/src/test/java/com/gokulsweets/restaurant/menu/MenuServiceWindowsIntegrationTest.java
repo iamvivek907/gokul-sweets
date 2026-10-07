@@ -24,6 +24,7 @@ class MenuServiceWindowsIntegrationTest {
  @Autowired BranchOperations operations;
  @Autowired MenuService menu;
  @Autowired OrderValidationService validation;
+ @Autowired com.gokulsweets.restaurant.pickup.repository.PickupSlotRepository slots;
  @Autowired JdbcTemplate jdbc;
  @Autowired PlatformTransactionManager manager;
  @MockitoBean StaffAuthorizationService authorization;
@@ -42,13 +43,59 @@ class MenuServiceWindowsIntegrationTest {
  long bp(long product){return jdbc.queryForObject("INSERT INTO branch_products(branch_id,product_id) VALUES (?,?) RETURNING id",Long.class,branch,product);}
  MenuServiceWindows.Item rule(long id,boolean sold,Long dependency){return new MenuServiceWindows.Item(id,LocalTime.of(10,0),LocalTime.of(17,0),127,sold,dependency);}
  MenuServiceWindows.Settings save(List<MenuServiceWindows.Item> items){return windows.save(branch,new MenuServiceWindows.Settings(true,windows.settings(branch).revision(),items));}
- @Test void clockGuardsCustomerMenuAndDirectCartValidation(){
+ @Test void browsingAllowsAdvancePickupWhileImmediateCartUsesCurrentClock(){
   save(List.of(rule(samosaBp,false,null)));
   time("2026-10-05T04:29:59Z");
-  assertThat(menu.getMenu(branch).getFirst().products().stream().filter(p->p.id()==samosa).findFirst().orElseThrow().available()).isFalse();
-  assertThatThrownBy(()->validation.validateCart(branch,List.of(new CreateOrderItemRequest(samosa,1,null)))).hasMessageContaining("available from");
+  assertThat(menu.getMenu(branch).getFirst().products().stream().filter(p->p.id()==samosa).findFirst().orElseThrow().available()).isTrue();
+  assertThatThrownBy(()->validation.validateCart(branch,List.of(new CreateOrderItemRequest(samosa,1,null)))).hasMessageContaining("unavailable for this pickup time");
   time("2026-10-05T04:30:00Z");assertThat(validation.validateCart(branch,List.of(new CreateOrderItemRequest(samosa,1,null)))).hasSize(1);
   time("2026-10-05T11:30:00Z");assertThat(windows.snapshot(branch).status(samosa).available()).isFalse();
+ }
+ @Test void earlyBookingUsesSelectedPickupIncludingWeekdaysDependenciesAndManualOverrides(){
+  time("2026-10-04T22:30:00Z"); // Monday 4 AM IST
+  save(List.of(new MenuServiceWindows.Item(samosaBp,LocalTime.of(11,0),LocalTime.of(21,0),1,false,null),
+      new MenuServiceWindows.Item(cholaBp,LocalTime.of(10,0),LocalTime.of(22,0),127,false,samosaBp)));
+  var monday=LocalDate.of(2026,10,5);
+  assertThat(menu.getMenu(branch).getFirst().products()).allMatch(p->p.available());
+  assertThat(validation.validatePickupCart(branch,List.of(new CreateOrderItemRequest(chola,1,null)))).hasSize(1);
+  assertThat(windows.pickupSnapshot(branch,monday.atTime(10,59)).status(chola).available()).isFalse();
+  assertThat(windows.pickupSnapshot(branch,monday.atTime(11,0)).status(chola).available()).isTrue();
+  assertThat(windows.pickupSnapshot(branch,monday.atTime(20,59)).status(chola).available()).isTrue();
+  assertThat(windows.pickupSnapshot(branch,monday.atTime(21,0)).status(chola).available()).isFalse();
+  assertThat(windows.pickupSnapshot(branch,monday.plusDays(1).atTime(12,0)).status(chola).available()).isFalse();
+  jdbc.update("UPDATE branch_products SET available=false WHERE id=?",samosaBp);
+  assertThat(windows.pickupSnapshot(branch,monday.atTime(12,0)).status(chola).code()).isEqualTo("SOLD_OUT");
+  assertThat(windows.pickupSnapshot(branch,null).status(chola).available()).isFalse();
+ }
+ @Test void calendarAndNewOrderAcceptLaterPickupBeforeServiceOpens(){
+  var date=LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(1);
+  time(date.atTime(4,0).atZone(ZoneId.of("Asia/Kolkata")).toInstant().toString());
+  save(List.of(new MenuServiceWindows.Item(samosaBp,LocalTime.of(11,0),LocalTime.of(21,0),127,false,null)));
+  long early=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,?,'10:30','11:00',10) RETURNING id",Long.class,branch,date);
+  long eligible=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,?,'11:00','11:30',10) RETURNING id",Long.class,branch,date);
+  long closing=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,?,'21:00','21:30',10) RETURNING id",Long.class,branch,date);
+  var requested=List.of(new CreateOrderItemRequest(samosa,1,null));
+  var policy=mock(com.gokulsweets.restaurant.inventory.repository.BranchInventoryPolicyRepository.class);
+  var allocations=mock(com.gokulsweets.restaurant.inventory.repository.InventoryDailyAllocationRepository.class);
+  var settings=mock(com.gokulsweets.restaurant.pickup.BranchPickupSettingsRepository.class);
+  var flags=new com.gokulsweets.restaurant.config.EnhancementProperties();flags.setFutureOrderingDays(7);
+  var inventory=new com.gokulsweets.restaurant.inventory.config.InventoryProperties();inventory.setEnforcementEnabled(false);
+  var calendar=new com.gokulsweets.restaurant.order.service.CartAvailabilityService(flags,inventory,validation,
+      new com.gokulsweets.restaurant.order.service.SmartOrderingRules(flags,settings,clock),policy,allocations,
+      new com.gokulsweets.restaurant.inventory.service.InventoryAvailabilityService(),slots,settings,clock,windows);
+  var preview=calendar.check(branch,date,1,requested).dates().getFirst();
+  assertThat(preview.available()).isTrue();assertThat(preview.items().getFirst().available()).isTrue();
+  assertThat(preview.slots()).filteredOn(p->p.slot().id().equals(eligible)).allMatch(p->p.normalAvailable());
+  assertThat(preview.slots()).filteredOn(p->!p.slot().id().equals(eligible)).allMatch(p->!p.normalAvailable() && p.code().equals("OUTSIDE_SERVICE"));
+  assertThat(validation.validate(new com.gokulsweets.restaurant.order.dto.CreateOrderRequest(branch,eligible,"Test customer","9876543210",com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,requested)).items()).hasSize(1);
+  assertThatThrownBy(()->validation.validate(new com.gokulsweets.restaurant.order.dto.CreateOrderRequest(branch,early,"Test customer","9876543210",com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,requested))).hasMessageContaining("unavailable for this pickup time");
+  assertThatThrownBy(()->validation.validate(new com.gokulsweets.restaurant.order.dto.CreateOrderRequest(branch,closing,"Test customer","9876543210",com.gokulsweets.restaurant.order.enums.PickupType.NORMAL,requested))).hasMessageContaining("unavailable for this pickup time");
+ }
+ @Test void overnightPickupUsesTheOpeningWeekdayEvenWhenBookedEarlier(){
+  time("2026-10-04T22:30:00Z");
+  save(List.of(new MenuServiceWindows.Item(samosaBp,LocalTime.of(22,0),LocalTime.of(2,0),1,false,null)));
+  assertThat(windows.pickupSnapshot(branch,LocalDateTime.of(2026,10,6,1,59)).status(samosa).available()).isTrue();
+  assertThat(windows.pickupSnapshot(branch,LocalDateTime.of(2026,10,6,2,0)).status(samosa).available()).isFalse();
  }
  @Test void soldOutIngredientBlocksAndRestoresDependentDish(){
   save(List.of(rule(samosaBp,true,null),rule(cholaBp,false,samosaBp)));
@@ -81,7 +128,7 @@ class MenuServiceWindowsIntegrationTest {
  }
  @Test void unchangedOwnedReservationSurvivesClosureButItemChangesAreBlocked(){
   var selected=new com.gokulsweets.restaurant.branch.Branch();selected.setId(branch);selected.setActive(true);
-  var slot=new com.gokulsweets.restaurant.pickup.PickupSlot();slot.setId(123L);slot.setBranch(selected);slot.setActive(true);slot.setSlotDate(LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(1));slot.setEndTime(LocalTime.of(18,0));
+  var slot=new com.gokulsweets.restaurant.pickup.PickupSlot();slot.setId(123L);slot.setBranch(selected);slot.setActive(true);slot.setSlotDate(LocalDate.now(ZoneId.of("Asia/Kolkata")).plusDays(1));slot.setStartTime(LocalTime.of(17,0));slot.setEndTime(LocalTime.of(18,0));
   var product=new com.gokulsweets.restaurant.product.Product();product.setId(samosa);
   var item=new com.gokulsweets.restaurant.order.entity.OrderItem();item.setProduct(product);item.setQuantity(1);
   var order=new com.gokulsweets.restaurant.order.entity.Order();order.setBranch(selected);order.setPickupSlot(slot);order.setPickupType(com.gokulsweets.restaurant.order.enums.PickupType.NORMAL);order.setItems(new ArrayList<>(List.of(item)));

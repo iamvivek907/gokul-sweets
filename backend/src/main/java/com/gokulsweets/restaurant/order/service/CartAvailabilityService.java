@@ -40,6 +40,7 @@ public class CartAvailabilityService {
     private final PickupSlotRepository slotRepository;
     private final BranchPickupSettingsRepository settingsRepository;
     private final Clock inventoryClock;
+    private final com.gokulsweets.restaurant.menu.MenuServiceWindows serviceWindows;
 
     @Transactional(readOnly = true)
     public Availability check(Long branchId, LocalDate startDate, int days, List<CreateOrderItemRequest> requested) {
@@ -54,7 +55,7 @@ public class CartAvailabilityService {
         if (startDate.isBefore(today) || startDate.isAfter(today.plusDays(features.getFutureOrderingDays()))) {
             throw new IllegalArgumentException("Choose a date within the advance ordering window.");
         }
-        List<ValidatedOrderItem> items = validation.validateCart(branchId, requested);
+        List<ValidatedOrderItem> items = validation.validatePickupCart(branchId, requested);
         List<Long> ids = items.stream().map(item -> item.branchProduct().getId()).toList();
         Map<Long, BranchInventoryPolicy> policies = policyRepository.findByBranchProductIdIn(ids).stream()
                 .collect(Collectors.toMap(policy -> policy.getBranchProduct().getId(), Function.identity()));
@@ -76,6 +77,7 @@ public class CartAvailabilityService {
         Map<LocalDate, List<PickupSlot>> slotsByDate = slotRepository
                 .findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(branchId, startDate, lastDate).stream()
                 .collect(Collectors.groupingBy(PickupSlot::getSlotDate));
+        var serviceAt = serviceWindows.pickupEvaluator(branchId);
         List<DateAvailability> dates = new ArrayList<>();
         for (LocalDate date = startDate; !date.isAfter(lastDate); date = date.plusDays(1)) {
             List<SlotAvailability> slots = new ArrayList<>();
@@ -85,6 +87,7 @@ public class CartAvailabilityService {
                         allocations.get(new StockKey(item.branchProduct().getId(), date)), today));
             }
             for (PickupSlot slot : slotsByDate.getOrDefault(date, List.of())) {
+                var service = serviceAt.apply(slot.getSlotDate().atTime(slot.getStartTime()));
                 String reason = rules.windowReason(slot, settings);
                 List<ItemAvailability> issues = new ArrayList<>();
                 for (int index = 0; index < items.size(); index++) {
@@ -99,6 +102,9 @@ public class CartAvailabilityService {
                                         && slot.getSlotDate().atTime(slot.getStartTime()).isBefore(allocation.getExpectedReadyAt())
                                         ? "NOT_READY" : "PREPARATION_TIME", timing);
                     }
+                    var status = service.status(item.product().getId());
+                    if (checked.available() && status != null && !status.available())
+                        checked = checked.unavailable(status.code(), status.message());
                     if (!checked.available()) issues.add(checked);
                 }
                 String code = reason != null ? "PICKUP_WINDOW" : null;

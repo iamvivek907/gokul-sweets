@@ -49,6 +49,13 @@ public class OrderValidationService {
         return validateProducts(branchId, normalizeItems(items));
     }
 
+    /** Product and manual availability checks before evaluating each pickup slot. */
+    @Transactional(readOnly = true)
+    public List<ValidatedOrderItem> validatePickupCart(Long branchId, List<CreateOrderItemRequest> items) {
+        validateBranch(branchId);
+        return validateProducts(branchId, normalizeItems(items), true, null);
+    }
+
     // =========================================================
     // VALIDATE NEW ORDER
     // =========================================================
@@ -95,7 +102,7 @@ public class OrderValidationService {
         List<ValidatedOrderItem> items =
                 validateProducts(
                         branch.getId(),
-                        normalizedItems
+                        normalizedItems, true, pickupSlot.getSlotDate().atTime(pickupSlot.getStartTime())
                 );
 
         log.debug(
@@ -304,7 +311,7 @@ public class OrderValidationService {
                                 return requested!=null && (item.getSaleMode()==ProductSaleMode.WEIGHT
                                     ? java.util.Objects.equals(item.getWeightGrams(),requested.weightGrams()) && (requested.quantity()==null || requested.quantity()==1)
                                     : java.util.Objects.equals(item.getQuantity(),requested.quantity()) && requested.weightGrams()==null);
-                            }))
+                            })), requestedPickupSlot.getSlotDate().atTime(requestedPickupSlot.getStartTime())
                 );
 
         log.debug(
@@ -621,16 +628,15 @@ public class OrderValidationService {
     // =========================================================
 
     private List<ValidatedOrderItem> validateProducts(Long branchId,Map<Long,RequestedOrderItem> requestedItems) {
-        return validateProducts(branchId,requestedItems,true);
+        return validateProducts(branchId,requestedItems,serviceWindows.snapshot(branchId));
     }
-    private List<ValidatedOrderItem> validateProducts(
-            Long branchId,
-            Map<Long, RequestedOrderItem> requestedItems,
-            boolean enforceService
-    ) {
-
-        var serviceAvailability = enforceService ? serviceWindows.snapshot(branchId)
-                : new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false,Map.of());
+    private List<ValidatedOrderItem> validateProducts(Long branchId, Map<Long,RequestedOrderItem> requestedItems,
+            boolean enforceService, java.time.LocalDateTime pickupAt) {
+        return validateProducts(branchId, requestedItems, enforceService ? serviceWindows.pickupSnapshot(branchId,pickupAt)
+                : new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false,Map.of()));
+    }
+    private List<ValidatedOrderItem> validateProducts(Long branchId, Map<Long,RequestedOrderItem> requestedItems,
+            com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot serviceAvailability) {
         Set<Long> productIds =
                 requestedItems.keySet();
 
