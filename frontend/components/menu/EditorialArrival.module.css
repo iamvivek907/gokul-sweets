@@ -72,6 +72,7 @@
 /* Shared menu palette, gated by the effective customer visual shell. */
 :global(.future-storefront[data-customer-design=reference]) .arrival{color:#0c1029}
 :global(.future-storefront[data-customer-design=reference]) .hero{background-color:#65142c}
+:global(.future-storefront[data-customer-design=reference]) .heroCopy{color:#fffaf0}
 :global(.future-storefront[data-customer-design=reference]) .scrim{background:linear-gradient(90deg,#491226eb,#4912269c 48%,#49122630)}
 :global(.future-storefront[data-customer-design=reference]) .heroCopy h1 em{color:#ffd7c7}
 :global(.future-storefront[data-customer-design=reference]) .topbar nav a:last-child,
@@ -87,8 +88,8 @@
 :global(.future-storefront[data-customer-design=reference]) .branchCard:before{background:linear-gradient(0deg,#491226ed,transparent 80%)}
 :global(.future-storefront[data-customer-design=reference]) .branchCard:has(.branchPhoto){color:#fff}
 :global(.future-storefront[data-customer-design=reference]) .branchCard:not(:has(.branchPhoto)) .branchCopy:before{color:#8f1838}
-:global(.future-storefront[data-customer-design=reference]) .branchCopy>span,
-:global(.future-storefront[data-customer-design=reference]) .branchCopy button{color:#8f1838}
+:global(.future-storefront[data-customer-design=reference]) .branchCard:not(:has(.branchPhoto)) .branchCopy>span,
+:global(.future-storefront[data-customer-design=reference]) .branchCard:not(:has(.branchPhoto)) .branchCopy button{color:#8f1838}
 :global(.future-storefront[data-customer-design=reference]) .closing{background:linear-gradient(120deg,#e1f3e8,#f1ecfa);color:#0c1029}
 :global(.future-storefront[data-customer-design=reference]) .closing em{color:#155a48}
 :global(.future-storefront[data-customer-design=reference]) .closing a{background:#8f1838;color:#fff;border-radius:12px}

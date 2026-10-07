@@ -9,12 +9,12 @@ const sweet={id:1,name:'Gulab Jamun',description:'Fresh sweets for your celebrat
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 try{
  for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[390,false]]){
-  let authenticated=true;const logoutError=true,customerName='Vivek Chaurasia',branchExperience=true,bulkFailure=false;
+  let authenticated=true,welcomeEnabled=false;const logoutError=true,customerName='Vivek Chaurasia',branchExperience=true,bulkFailure=false;
   const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',timezoneId:'America/Los_Angeles'}),page=await context.newPage();page.setDefaultTimeout(15000);
   await context.addInitScript(branch=>{if(!sessionStorage.getItem('test-branch-initialized')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('test-branch-initialized','true');}localStorage.setItem('gokul-social-follow-popup-seen','true');window.initSendOTP=config=>config.success({accessToken:'test-provider-proof'});},branch);
   await context.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;let json=[];if(req.method()==='OPTIONS')return route.fulfill({status:204,headers:{'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'}});
-   if(path==='/api/storefront/features')json={futuristicStorefrontV2:themed,checkoutExperienceV2:themed,simplifiedCheckout:themed,acceptedCheckoutQuote:themed,customerAccountHub:true,notificationInbox:true,contextualStorefrontV2:true,gokulRewards:true,branchExperience,occasionEnquiries:true,today};
+   if(path==='/api/storefront/features')json={preHomeIntentGateway:welcomeEnabled,futuristicStorefrontV2:themed,checkoutExperienceV2:themed,simplifiedCheckout:themed,acceptedCheckoutQuote:themed,customerAccountHub:true,notificationInbox:true,contextualStorefrontV2:true,gokulRewards:true,branchExperience,occasionEnquiries:true,today};
    else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
    else if(path==='/api/customer/identity/me')json={authenticated,name:customerName,phone:'+919876543210'};
    else if(path==='/api/customer/identity/start')return route.fulfill({status:204});
@@ -82,6 +82,22 @@ try{
    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart'))?.items.length??0),0);
    await page.goto(`${base}/branches/3`);await page.getByRole('heading',{name:'Currently not operational',exact:true}).waitFor();assert.equal(await page.locator('.branch-overview').count(),0);
   }
-  assert.deepEqual(errors,[]);await context.close();console.log(`Customer design ${width}px enabled=${themed}: 15 routes passed`);
+  // Exercise the editorial entrance separately: the regular home uses different CSS.
+  welcomeEnabled=true;
+  await page.goto(`${base}/`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+  const welcomeTitle=page.locator('#gokul-arrival-title');await welcomeTitle.waitFor();
+  assert.equal(await welcomeTitle.evaluate(node=>getComputedStyle(node).color),'rgb(255, 250, 240)','welcome heading stays light over the dark photo');
+  assert.equal(await welcomeTitle.locator('..').locator(':scope>p').evaluate(node=>getComputedStyle(node).color),'rgb(255, 250, 240)','welcome eyebrow stays light over the dark photo');
+  const photoCard=page.locator('.arrival-pickup-card').first(),fallbackCard=page.locator('.arrival-pickup-card').nth(1);
+  await photoCard.locator('img').waitFor();
+  await fallbackCard.locator('img').waitFor({state:'detached'});
+  if(width>640){
+   for(const label of await photoCard.locator('.arrival-pickup-copy>span').all()){
+    assert.equal(await label.evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)','photo-card labels retain light text over the dark scrim');
+   }
+   assert.equal(await fallbackCard.locator('.arrival-pickup-copy>span').first().evaluate(node=>getComputedStyle(node).color),'rgb(143, 24, 56)','fallback-card labels use maroon on the light surface');
+  }
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'welcome fits the viewport');
+  assert.deepEqual(errors,[]);await context.close();console.log(`Customer design ${width}px enabled=${themed}: 15 routes and editorial welcome passed`);
  }
 }finally{await browser.close();}
