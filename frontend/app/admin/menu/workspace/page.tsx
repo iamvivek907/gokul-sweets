@@ -245,6 +245,11 @@ export default function MenuWorkspace() {
       ])
         .then(([p, g]) => {
           if (!c.signal.aborted) {
+            const lastPage = Math.max(0, (tab === "groups" ? g.totalPages : p.totalPages) - 1);
+            if (page > lastPage && tab !== "appearance") {
+              setPage(lastPage);
+              return;
+            }
             setData(p);
             setGroups(g);
             setLoadedContext(queryContext);

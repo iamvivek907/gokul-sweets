@@ -22,6 +22,7 @@ try {
     page.setDefaultTimeout(15000);
     let imageCalls = 0;
     let deleteCalls = 0, deleted = false;
+    let paginationDeletion = false, deletedLast = false;
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     let releaseBranch, releaseCatalogue;
@@ -120,6 +121,11 @@ try {
         deleted = true;
         return route.fulfill({status: 204, headers});
       }
+      if (paginationDeletion && /\/workspace\/3$/.test(path) && req.method() === "DELETE") {
+        assert.equal(Number(url.searchParams.get("version")), items[2].branchVersion);
+        deletedLast = true;
+        return route.fulfill({status: 204, headers});
+      }
       let json = {};
       if (path === "/api/admin/auth/me")
         json = {
@@ -210,6 +216,12 @@ try {
           assert.deepEqual(req.postDataJSON().branchIds, [1]);
           json = { productId: 99 };
         } else {
+          if (paginationDeletion) return route.fulfill({headers, json: {
+            content: url.searchParams.get("page") === "1" ? (deletedLast ? [] : [items[2]]) : [items[1]],
+            totalElements: deletedLast ? 25 : 26,
+            page: Number(url.searchParams.get("page")), totalPages: deletedLast ? 1 : 2,
+            categories: [{id:1,name:"Sweets"}], branchCategories: [{id:1,name:"Sweets"}], taxes: [],
+          }});
           const search = url.searchParams.get("search")?.toLowerCase() ?? "";
           const filtered = items.filter((i) =>
             (!deleted || i.productId !== 1) && `${i.name} ${i.code}`.toLowerCase().includes(search),
@@ -726,6 +738,16 @@ try {
     await dialog.waitFor({state: "hidden"});
     await page.getByRole("heading", {name: "Kaju Katli", exact: true}).waitFor({state: "hidden"});
     assert.equal(deleteCalls, 2);
+    paginationDeletion = true;
+    await page.reload();
+    await page.getByRole("heading", {name: "Samosa", exact: true}).waitFor();
+    await page.getByRole("button", {name: "Next", exact: true}).click();
+    const lastItem = page.locator("article").filter({has: page.getByRole("heading", {name: "Rasmalai", exact: true})});
+    await lastItem.getByRole("button", {name: "Delete from branch", exact: true}).click();
+    await page.getByRole("dialog").getByRole("button", {name: "Yes, permanently delete", exact: true}).click();
+    await page.getByRole("heading", {name: "Samosa", exact: true}).waitFor();
+    assert.equal(await page.getByRole("button", {name: "Previous", exact: true}).isDisabled(), true);
+    assert.equal(await page.getByRole("button", {name: "Next", exact: true}).isDisabled(), true);
     await context.close();
     console.log(
       `Workspace ${width}px: branch categories, partial photo recovery, fit/rotated-fit/fill pixels, appearance loading/conflict recovery, refresh drafts/date/tab, branch loading safety, paginated SKUs, popup recovery, create, stock, partial bulk retry, grouping and draft/publish passed`,

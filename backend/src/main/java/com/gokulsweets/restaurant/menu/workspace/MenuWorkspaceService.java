@@ -98,7 +98,7 @@ public class MenuWorkspaceService {
   jdbc.update("INSERT INTO mobile_menu_config(branch_id,version) VALUES (?,0) ON CONFLICT DO NOTHING",branch);
   jdbc.queryForObject("SELECT version FROM mobile_menu_config WHERE branch_id=? FOR UPDATE",Long.class,branch);
   jdbc.update("DELETE FROM mobile_menu_choices WHERE branch_id=? AND product_id=?",branch,id);
-  jdbc.update("DELETE FROM mobile_menu_groups g WHERE g.branch_id=? AND NOT EXISTS(SELECT 1 FROM mobile_menu_choices c WHERE c.branch_id=g.branch_id AND c.group_key=g.group_key)",branch);
+  jdbc.update("DELETE FROM mobile_menu_groups g WHERE g.branch_id=? AND (SELECT count(*) FROM mobile_menu_choices c WHERE c.branch_id=g.branch_id AND c.group_key=g.group_key)<2",branch);
   jdbc.update("UPDATE mobile_menu_config SET version=version+1 WHERE branch_id=?",branch);
   jdbc.update("DELETE FROM menu_service_items WHERE branch_product_id=?",bp);
   jdbc.update("DELETE FROM inventory_automation_rules WHERE branch_product_id=?",bp);
