@@ -16,3 +16,12 @@
 .customer-route-loading{position:fixed;inset:0;z-index:9999;min-height:100dvh!important;background:radial-gradient(ellipse at 50% 38%,#fff0e8 0,white 60%)}
 @keyframes brand-loading-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.customer-brand-loading-spinner{animation:none}}
+.customer-brand-loading .brand-loading-content{display:flex;flex-direction:column;align-items:center;width:min(100%,400px);margin:auto}
+.customer-brand-loading .customer-brand-loading-spinner{width:144px;height:4px;border:0;border-radius:99px;overflow:hidden;background:#eee5e8;margin:24px auto 18px;animation:none}
+.customer-brand-loading-spinner>span{display:block;width:40%;height:100%;border-radius:inherit;background:#980c31;animation:brand-loading-travel 1.5s ease-in-out infinite alternate}
+.customer-brand-loading .brand-loading-detail{display:block;max-width:340px;margin-top:12px;font-size:12px;line-height:1.7;color:#596579}
+.customer-brand-loading.customer-route-loading{display:grid;place-items:center;padding:24px;text-align:center}
+.future-storefront .customer-brand-loading.mobile-checkout-loading{background:radial-gradient(ellipse at 50% 38%,#fff0e8,white 60%);color:#596579}
+.customer-brand-loading.is-compact .customer-brand-loading-spinner{width:100px;height:4px}
+@keyframes brand-loading-travel{from{transform:translateX(-20%)}to{transform:translateX(170%)}}
+@media(prefers-reduced-motion:reduce){.customer-brand-loading-spinner>span{animation:none;margin:auto}}

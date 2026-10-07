@@ -1,3 +1,5 @@
+import type {Metadata} from "next";
+export const metadata: Metadata = {title: {absolute: "Admin Portal | Gokul Sweets"}};
 import KitchenAlarm from "@/components/admin/KitchenAlarm";
 import type {
     ReactNode

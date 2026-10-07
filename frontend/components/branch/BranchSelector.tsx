@@ -99,6 +99,7 @@ export default function BranchSelector({compact = false, locationControl = false
 
 
     useEffect(() => {
+        if (cardBranch) return;
 
         const controller =
             new AbortController();
@@ -180,7 +181,7 @@ export default function BranchSelector({compact = false, locationControl = false
         };
 
     }, [
-        reloadKey
+        reloadKey, cardBranch
     ]);
 
 

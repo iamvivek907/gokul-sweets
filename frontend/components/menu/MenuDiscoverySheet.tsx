@@ -2,7 +2,7 @@
 import {useEffect,useId,useRef,type ReactNode} from "react";
 import {T} from "@/lib/language";
 
-export default function MenuDiscoverySheet({title,children,onClose,className}:{title:string;children:ReactNode;onClose:()=>void;className?:string}){
+export default function MenuDiscoverySheet({title,children,onClose,className,returnFocusId}:{title:string;children:ReactNode;onClose:()=>void;className?:string;returnFocusId?:string}){
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
  useEffect(()=>{
   const surface=dialog.current,previous=document.activeElement as HTMLElement|null;
@@ -12,9 +12,9 @@ export default function MenuDiscoverySheet({title,children,onClose,className}:{t
   surface?.showModal();
   return()=>{
    surface?.close();Object.assign(body.style,{position:saved.position,top:saved.top,left:saved.left,width:saved.width,overflow:saved.overflow});root.style.overflow=saved.rootOverflow;
-   window.scrollTo({left:x,top:y,behavior:"instant"});previous?.focus({preventScroll:true});
+   window.scrollTo({left:x,top:y,behavior:"instant"});const target=previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;target?.focus({preventScroll:true});
   };
- },[]);
+ },[returnFocusId]);
  return <dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();onClose();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))onClose();}}>
   <header><h2 id={titleId}><T text={title}/></h2><button type="button" onClick={onClose} autoFocus><T text="Close"/> ×</button></header>
   <div className="mobile-menu-suggestion-body">{children}</div>

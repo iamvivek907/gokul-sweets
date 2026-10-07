@@ -9,7 +9,7 @@ const sweet={id:1,name:'Gulab Jamun',description:'Fresh sweets for your celebrat
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 try{
  for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[390,false]]){
-  let authenticated=true,welcomeEnabled=false;const logoutError=true,customerName='Vivek Chaurasia',branchExperience=true,bulkFailure=false;
+  let authenticated=true,welcomeEnabled=false,branchListRequests=0;const logoutError=true,customerName='Vivek Chaurasia',branchExperience=true,bulkFailure=false;
   const context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',timezoneId:'America/Los_Angeles'}),page=await context.newPage();page.setDefaultTimeout(15000);
   await context.addInitScript(branch=>{if(!sessionStorage.getItem('test-branch-initialized')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('test-branch-initialized','true');}localStorage.setItem('gokul-social-follow-popup-seen','true');window.initSendOTP=config=>config.success({accessToken:'test-provider-proof'});},branch);
   await context.route('**/api/**',async route=>{
@@ -29,7 +29,7 @@ try{
    else if(path==='/api/menu/portion-groups')json={groups:[]};
    else if(path==='/api/menu/offers')json=[];
    else if(path==='/api/customer/identity/account')json={completedOrders:1,paidOrders:1,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
-   else if(path==='/api/branches')json=[branch,otherBranch];else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=otherBranch;else if(path==='/api/branches/3')json={...branch,id:3,operational:false};
+   else if(path==='/api/branches'){branchListRequests++;json=[branch,otherBranch];}else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=otherBranch;else if(path==='/api/branches/3')json={...branch,id:3,operational:false};
    else if(/^\/api\/branches\/[12]\/discovery$/.test(path))json={overallExperience:{average:4.8,count:2},offerings:[{title:'Fresh sweets',description:'Made at this branch'}],topRatedItems:[{productId:1,name:'Gulab Jamun',imageUrl:null,average:5,count:2,reviews:[]}]};
    else if(/^\/api\/branches\/[12]\/occasion-catalogue$/.test(path))json={sweets:[sweet],boxes:[],branding:{headline:'Wedding Dhamaka',description:'Exclusive for weddings',imageUrl:null,published:true}};
    else if(path==='/api/admin/auth/me'){return route.fulfill({status:401,json:{message:'Not signed in'}});}
@@ -37,9 +37,15 @@ try{
    return route.fulfill({json,headers:{'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true'}});
   });
 
+  await page.goto(`${base}/occasions/branches`);await page.getByRole('heading',{name:'Choose a branch for your occasion',exact:true}).waitFor();
+  await page.getByRole('button',{name:`Plan at this branch · ${branch.name}`,exact:true}).waitFor();
+  assert.equal(new URL(page.url()).pathname,'/occasions/branches','stored branch does not bypass explicit occasion selection');
+  assert.equal(branchListRequests,themed?2:1,'branch cards reuse supplied data; only chooser and enabled header fetch branches');
+  await page.getByRole('button',{name:`Plan at this branch · ${branch.name}`,exact:true}).click();await page.waitForURL('**/occasions');
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const routes=[['/branches/1','.branch-home-hero'],['/menu','#gokul-product-1'],['/profile','.account-cover'],['/profile/rewards','.customer-rewards-page'],['/profile/orders','.profile-focused-route'],['/notifications','.notification-page-heading'],['/orders','h1:visible'],[width<=640&&themed?'/checkout/mobile':'/cart',width<=640&&themed?'.mobile-empty-cart':'h1:visible'],['/occasions','.occasion-hero'],['/occasions/requests','#occasion-tracker'],['/about','h1:visible'],['/careers','h1:visible'],['/cancellation-policy','h1:visible'],['/profile/privacy','h1:visible'],['/','h1:visible']];
   for(const [route,ready] of routes){
+   console.log(`Checking customer design ${width}px themed=${themed} ${route}`);
    await page.goto(`${base}${route}`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator(ready).first().waitFor();
    if(themed){
     const shell=page.locator('[data-customer-design=reference]');await shell.waitFor();

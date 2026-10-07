@@ -1,3 +1,9 @@
+## October 7 customer polish follow-up
+
+Published landing videos use a neutral charcoal scrim, white text and maroon primary actions. The enabled customer footer is compact charcoal with readable links and a compact FSSAI line. Shared loading states use an indeterminate progress strip, stage-specific payment copy and an honest delayed-response message after eight seconds; reduced motion keeps a static strip. Loading presentation never implies paid status or changes gateway/retry logic.
+
+Landing Plan an occasion always opens `/occasions/branches` before the customer explicitly chooses a branch. The chooser preserves the existing cart-safe branch switch, blocks non-operational branch actions and has bounded loading with retry. The occasion header uses the shared back control. Floating menu categories use a dark panel above the measured cart dock, real item counts, bounded internal scrolling, background scroll lock, Escape/outside dismissal and restored focus.
+
 ## Consistent loading and floating categories (October 7)
 
 Customer launch, route streaming and page/section data loading share the maroon flower wordmark, white/peach surface, muted readable message and restrained animation. These boot surfaces render before backend flags arrive; they use the shared brand independently of those flags. Staff sessions, identity/payment safeguards, bounded reads and retry behaviour stay unchanged. Route changes never replay the launch; payment-app returns keep their existing bypass. Reduced motion removes launch, spinner and navigation motion. Existing navigation progress feedback remains delayed to avoid flashing on fast routes; no artificial transition delay or whole-page content animation is added.

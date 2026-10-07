@@ -16,15 +16,15 @@ import {
 
 export const metadata: Metadata = {
     title: {
-        default: APP_NAME,
+        default: "Gokul Sweets | Fresh Sweets & Snacks",
         template: `%s | ${APP_NAME}`
     },
     description: APP_DESCRIPTION,
-    applicationName: APP_NAME,
+    applicationName: "Gokul",
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
-        title: APP_NAME
+        title: "Gokul"
     },
     formatDetection: {
         telephone: false
