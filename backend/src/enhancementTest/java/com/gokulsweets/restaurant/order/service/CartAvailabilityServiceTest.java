@@ -40,12 +40,15 @@ class CartAvailabilityServiceTest {
         var full = SmartOrderingRulesTest.slot(today.plusDays(1), LocalTime.NOON); full.setBookedCount(5);
         var available = SmartOrderingRulesTest.slot(today.plusDays(1), LocalTime.of(13, 0)); available.setId(3L);
         var request = List.of(new CreateOrderItemRequest(11L, null, 250));
-        when(validation.validateCart(1L, request)).thenReturn(List.of(new ValidatedOrderItem(product, bp, ProductSaleMode.WEIGHT, 1, 250)));
+        when(validation.validatePickupCart(1L, request)).thenReturn(List.of(new ValidatedOrderItem(product, bp, ProductSaleMode.WEIGHT, 1, 250)));
         when(policies.findByBranchProductIdIn(List.of(22L))).thenReturn(List.of(policy));
         when(allocations.findByBranchProductIdInAndServiceDateBetween(List.of(22L), today, today.plusDays(1))).thenReturn(List.of(todayStock, tomorrowStock));
         when(slots.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(1L, today, today.plusDays(1))).thenReturn(List.of(first, full, available));
+        var windows = mock(com.gokulsweets.restaurant.menu.MenuServiceWindows.class);
+        when(windows.pickupEvaluator(anyLong())).thenReturn(at ->
+                new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false, java.util.Map.of()));
         var service = new CartAvailabilityService(features, inventory, validation, new SmartOrderingRules(features, settings, clock),
-                policies, allocations, new InventoryAvailabilityService(), slots, settings, clock);
+                policies, allocations, new InventoryAvailabilityService(), slots, settings, clock, windows);
         var result = service.check(1L, today, 2, request);
         assertThat(result.fulfilmentType()).isEqualTo("PICKUP");
         assertThat(result.dates().get(0).available()).isFalse();
@@ -64,7 +67,7 @@ class CartAvailabilityServiceTest {
         assertThat(result.dates().get(1).slots().get(1).slot().id()).isEqualTo(3L);
         assertThat(result.dates().getFirst().items().getFirst().code()).isEqualTo("QUANTITY_TOO_LARGE");
         assertThat(result.dates().getFirst().items().getFirst().availableQuantity()).isEqualByComparingTo("200");
-        verify(validation, atLeastOnce()).validateCart(1L, request);
+        verify(validation, atLeastOnce()).validatePickupCart(1L, request);
         verify(allocations, atLeastOnce()).findByBranchProductIdInAndServiceDateBetween(any(), any(), any());
         verify(policies, atLeastOnce()).findByBranchProductIdIn(any());
         todayStock.setHeldQuantity(BigDecimal.ZERO);
