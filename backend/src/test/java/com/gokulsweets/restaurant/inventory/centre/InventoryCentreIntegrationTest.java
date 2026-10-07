@@ -98,8 +98,8 @@ class InventoryCentreIntegrationTest {
  }
  @Test void crossingIstMidnightRollsBackInsteadOfReusingTodayStockForTomorrow(){
   long p=product();var o=options(today,today.plusDays(1),"READY_STOCK",true,false);
-  var clock=mock(Clock.class);when(clock.getZone()).thenReturn(ZoneId.of("Asia/Kolkata"));
-  when(clock.instant()).thenReturn(today.atTime(23,59,59).atZone(clock.getZone()).toInstant(),today.plusDays(1).atStartOfDay(clock.getZone()).toInstant());
+  var zone=ZoneId.of("Asia/Kolkata");var clock=mock(Clock.class);when(clock.getZone()).thenReturn(zone);
+  when(clock.instant()).thenReturn(today.atTime(23,59,59).atZone(zone).toInstant(),today.plusDays(1).atStartOfDay(zone).toInstant());
   var timed=new InventoryCentreProcessor(jdbc,jobs,workspace,policies,allocations,clock);
   var work=new Work(o,entry(p,today,"10","8"),List.of(new DateVersion(today,null),new DateVersion(today.plusDays(1),null)),0,null);
   var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
