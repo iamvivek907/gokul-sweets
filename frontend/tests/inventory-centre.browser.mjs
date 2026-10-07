@@ -44,11 +44,20 @@ try{
   await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,2);assert.deepEqual(bodies[0],bodies[1]);assert.equal(bodies[1].options.openPurchases,false);assert.equal(bodies[1].items[2].quantity,1250);assert.equal(bodies[1].items[2].readyQuantity,800);
   await page.reload();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();await page.getByText("3 succeeded · 0 failed · 0 remaining",{exact:true}).waitFor();assert.equal(bodies.length,2);
   await page.getByRole("button",{name:"Start a fresh plan"}).click();await page.getByRole("button",{name:"Load branch items",exact:true}).click();await page.getByText("Kaju Katli",{exact:true}).waitFor();
+  await page.getByLabel("Small samosa allocation",{exact:true}).fill("25");await page.getByLabel("Large samosa allocation",{exact:true}).fill("30");
   await page.getByLabel("Apply inventory quantities, configuration and readiness",{exact:true}).uncheck();await page.getByLabel("Apply common service hours to selected items",{exact:true}).check();await page.getByLabel("Enable service-hour enforcement for the whole branch",{exact:true}).check();
   await page.getByText("Select an existing portion group",{exact:true}).click();await page.getByRole("button",{name:"Samosa portions · 2 variants",exact:true}).click();
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();
-  assert.equal(bodies.length,3);assert.equal(bodies[2].options.applyInventory,false);assert.equal(bodies[2].options.applyHours,true);assert.equal(bodies[2].items.length,2);assert.ok(bodies[2].items.every(i=>i.quantity===null&&i.readyQuantity===null));await page.getByText("1 succeeded · 1 failed · 0 remaining",{exact:true}).waitFor();await page.getByRole("button",{name:"Reload failed items only",exact:true}).click();await page.getByRole("button",{name:"Apply service hours",exact:true}).waitFor();
+  assert.equal(bodies.length,3);assert.equal(bodies[2].options.applyInventory,false);assert.equal(bodies[2].options.applyHours,true);assert.equal(bodies[2].items.length,2);assert.ok(bodies[2].items.every(i=>i.quantity===null&&i.readyQuantity===null));await page.getByText("1 succeeded · 1 failed · 0 remaining",{exact:true}).waitFor();items[1].saleMode="WEIGHT";await page.getByRole("button",{name:"Reload failed items only",exact:true}).click();await page.getByRole("button",{name:"Apply service hours",exact:true}).waitFor();
   assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem("inventory-centre:77")).rows.filter(r=>r.selected).map(r=>r.item.productId)),[2]);
+  const recovered=await page.evaluate(()=>JSON.parse(localStorage.getItem("inventory-centre:77")).rows);
+  assert.equal(recovered[0].quantity,"25");assert.equal(recovered[1].item.saleMode,"WEIGHT");assert.equal(recovered[1].quantity,"");assert.ok(recovered.every(r=>r.ready===""));
+  await page.getByLabel("Apply inventory quantities, configuration and readiness",{exact:true}).check();
+  await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();
+  await page.getByRole("button",{name:"Apply configuration, allocation and readiness",exact:true}).click();
+  await page.getByRole("alert").filter({hasText:"Enter positive quantities"}).waitFor();assert.equal(bodies.length,3);
+  await page.getByLabel("Large samosa allocation",{exact:true}).fill("1.2");await page.getByLabel("Large samosa ready",{exact:true}).fill("1");
+  await page.getByLabel("Apply inventory quantities, configuration and readiness",{exact:true}).uncheck();
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,4);assert.equal(bodies[3].items.length,1);assert.equal(bodies[3].items[0].productId,2);assert.deepEqual(errors,[]);
   await context.close();
  }

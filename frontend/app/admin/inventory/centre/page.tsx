@@ -184,7 +184,12 @@ export default function InventoryCentre() {
             }
             if (query.current !== snapshot) return;
             const drafts = new Map(state.rows.map(r => [r.item.productId, r]));
-            setState(s => ({...s, job: null, submitted: false, submissionId: null, rows: fresh.map(item => ({item, selected: failed.has(item.productId), quantity: drafts.get(item.productId)?.quantity ?? "", ready: ""}))}));
+            const changedUnits = fresh.some(item => failed.has(item.productId) && drafts.get(item.productId)?.item.saleMode !== item.saleMode);
+            setState(s => ({...s, job: null, submitted: false, submissionId: null, rows: fresh.map(item => {
+                const draft = drafts.get(item.productId);
+                return {item, selected: failed.has(item.productId), quantity: draft?.item.saleMode === item.saleMode ? draft.quantity : "", ready: ""};
+            })}));
+            if (state.applyInventory && changedUnits) setError("Some selling units changed. Their quantities were cleared. Enter amounts in the current units and verify today's physical stock before retrying.");
             setResults([]); setResultPage(0); setPage(0); setSearch(""); setReview(false);
         } catch (e) { setError(e instanceof Error ? e.message : "Unable to reload failed items."); }
         finally { setLoading(false); }

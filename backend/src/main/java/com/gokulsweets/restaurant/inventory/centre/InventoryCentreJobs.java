@@ -35,20 +35,22 @@ public class InventoryCentreJobs {
  public void authorize(long branch,boolean manage){staff.requirePermission(PermissionName.MENU_MANAGE);staff.requirePermission(manage?PermissionName.INVENTORY_MANAGE:PermissionName.INVENTORY_VIEW);staff.requireBranchAccess(branch);}
  @Transactional
  public Map<String,Object> submit(long branch,Submit input){
-  authorize(branch,true);var o=input.options();long days=java.time.temporal.ChronoUnit.DAYS.between(o.fromDate(),o.throughDate())+1;
-  if(o.fromDate().isBefore(LocalDate.now(inventoryClock))||o.throughDate().isAfter(LocalDate.now(inventoryClock).plusDays(60))||days<1||days>60||days*input.items().size()>10000)throw new IllegalArgumentException("Choose current/future dates, at most 60 days and 10,000 item-date allocations per job.");
-  if(o.applyHours()&&(o.opens()==null||o.closes()==null||o.opens().equals(o.closes())))throw new IllegalArgumentException("Enter different opening and closing times in IST.");
-  if(o.applyInventory()&&input.items().stream().anyMatch(e->e.quantity()==null))throw new IllegalArgumentException("Enter allocation quantities for inventory changes.");
-  if(!o.applyInventory()&&!o.applyHours())throw new IllegalArgumentException("Select inventory or service-hour changes.");
-  if(!o.applyInventory()&&input.items().stream().anyMatch(e->e.readyQuantity()!=null))throw new IllegalArgumentException("Hours-only plans do not confirm stock.");
-  if(!o.method().equals("READY_STOCK")&&input.items().stream().anyMatch(e->e.readyQuantity()!=null))throw new IllegalArgumentException("Daily capacity does not confirm prepared stock.");
-  if(!o.fromDate().equals(LocalDate.now(inventoryClock))&&input.items().stream().anyMatch(e->e.readyQuantity()!=null))throw new IllegalArgumentException("Future stock cannot be confirmed physically ready.");
-  var ids=new HashSet<Long>();for(var e:input.items())if(!ids.add(e.productId()))throw new IllegalArgumentException("Select each product once.");
+  authorize(branch,true);
+  // Recover identical submissions before applying date rules that can change overnight.
   jdbc.queryForObject("SELECT pg_advisory_xact_lock(714187)",Object.class);
   long actor=staff.getCurrentStaff().getId();String digest;
   try{digest=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(mapper.writeValueAsString(input).getBytes(StandardCharsets.UTF_8)));}catch(Exception failure){throw new IllegalStateException("Unable to serialize inventory request.",failure);}
   var previous=jdbc.queryForList("SELECT * FROM inventory_centre_jobs WHERE id=?",input.submissionId());
   if(!previous.isEmpty()){var row=previous.getFirst();if(((Number)row.get("branch_id")).longValue()!=branch||((Number)row.get("staff_id")).longValue()!=actor||!digest.equals(row.get("digest")))throw new ResponseStatusException(HttpStatus.CONFLICT,"Submission identifier is already used for a different plan.");return summary(branch,input.submissionId());}
+  var today=LocalDate.now(inventoryClock);var o=input.options();long days=java.time.temporal.ChronoUnit.DAYS.between(o.fromDate(),o.throughDate())+1;
+  if(o.fromDate().isBefore(today)||o.throughDate().isAfter(today.plusDays(60))||days<1||days>60||days*input.items().size()>10000)throw new IllegalArgumentException("Choose current/future dates, at most 60 days and 10,000 item-date allocations per job.");
+  if(o.applyHours()&&(o.opens()==null||o.closes()==null||o.opens().equals(o.closes())))throw new IllegalArgumentException("Enter different opening and closing times in IST.");
+  if(o.applyInventory()&&input.items().stream().anyMatch(e->e.quantity()==null))throw new IllegalArgumentException("Enter allocation quantities for inventory changes.");
+  if(!o.applyInventory()&&!o.applyHours())throw new IllegalArgumentException("Select inventory or service-hour changes.");
+  if(!o.applyInventory()&&input.items().stream().anyMatch(e->e.readyQuantity()!=null))throw new IllegalArgumentException("Hours-only plans do not confirm stock.");
+  if(!o.method().equals("READY_STOCK")&&input.items().stream().anyMatch(e->e.readyQuantity()!=null))throw new IllegalArgumentException("Daily capacity does not confirm prepared stock.");
+  if(!o.fromDate().equals(today)&&input.items().stream().anyMatch(e->e.readyQuantity()!=null))throw new IllegalArgumentException("Future stock cannot be confirmed physically ready.");
+  var ids=new HashSet<Long>();for(var e:input.items())if(!ids.add(e.productId()))throw new IllegalArgumentException("Select each product once.");
   if(jdbc.queryForObject("SELECT count(*) FROM inventory_centre_jobs WHERE succeeded+failed<total",Long.class)>=3)throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,"Three inventory jobs are active. Wait for completion before submitting another.");
   if(jdbc.queryForObject("SELECT count(*) FROM inventory_centre_jobs WHERE branch_id=? AND succeeded+failed<total",Long.class,branch)>0)throw new ResponseStatusException(HttpStatus.CONFLICT,"This branch already has an active inventory job.");
   // Resolve stock versions in a single bounded query rather than one query per date.

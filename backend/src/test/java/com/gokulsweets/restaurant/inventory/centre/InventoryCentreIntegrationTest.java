@@ -29,6 +29,7 @@ class InventoryCentreIntegrationTest {
  @Autowired MobileMenuOptionsService groups;
  @Autowired StaffUserRepository staff;
  @Autowired Clock inventoryClock;
+ @Autowired tools.jackson.databind.ObjectMapper mapper;
  @Autowired com.gokulsweets.restaurant.inventory.repository.BranchInventoryPolicyRepository policies;
  @Autowired com.gokulsweets.restaurant.inventory.repository.InventoryDailyAllocationRepository allocations;
  @Autowired org.springframework.transaction.PlatformTransactionManager manager;
@@ -78,6 +79,21 @@ class InventoryCentreIntegrationTest {
   assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_daily_allocations WHERE branch_product_id=? AND ready_quantity=0 AND status<>'READY'",Integer.class,bp(p))).isEqualTo(3);
   assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_centre_jobs WHERE staff_id=?",Integer.class,actor)).isEqualTo(1);
   assertThatThrownBy(()->enqueue(o,entry(p,from,"10","8"))).hasMessageContaining("Future stock");
+ }
+ @Test void lostResponseRetryAfterMidnightReturnsSavedResultWithoutRepeatingStock(){
+  long p=product();var input=new Submit(UUID.randomUUID(),options(today,today,"READY_STOCK",true,false),List.of(entry(p,today,"10","8")));
+  jobs.submit(branch,input);worker.runBatch();
+  var nextDay=Clock.fixed(today.plusDays(1).atStartOfDay(inventoryClock.getZone()).toInstant(),inventoryClock.getZone());
+  var replay=new InventoryCentreJobs(jdbc,mapper,authorization,nextDay);
+  var tx=new org.springframework.transaction.support.TransactionTemplate(manager);
+  assertThat(tx.execute(status->replay.submit(branch,input)).get("succeeded")).isEqualTo(1);
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM inventory_centre_jobs WHERE staff_id=?",Integer.class,actor)).isEqualTo(1);
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM menu_workspace_audit WHERE branch_id=? AND action='INVENTORY_ADJUSTMENT'",Integer.class,branch)).isEqualTo(1);
+  var e=input.items().getFirst();
+  var changed=new Submit(input.submissionId(),input.options(),List.of(new Entry(e.productId(),e.branchVersion(),e.policyVersion(),e.allocationVersion(),e.saleMode(),new BigDecimal("11"),e.readyQuantity())));
+  assertThatThrownBy(()->tx.execute(status->replay.submit(branch,changed))).hasMessageContaining("different plan");
+  var fresh=new Submit(UUID.randomUUID(),input.options(),input.items());
+  assertThatThrownBy(()->tx.execute(status->replay.submit(branch,fresh))).hasMessageContaining("current/future dates");
  }
  @Test void failureOnLaterDateRollsBackAllDatesForThatItem(){
   long p=product();var from=today.plusDays(1);var o=options(from,from.plusDays(2),"DAILY_PRODUCTION",true,false);
