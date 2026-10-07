@@ -594,13 +594,11 @@ try {
       }
       return c.toDataURL("image/png").split(",")[1];
     });
-    await dialog
-      .locator('input[type="file"]')
-      .setInputFiles({
-        name: "landscape.png",
-        mimeType: "image/png",
-        buffer: Buffer.from(fixture, "base64"),
-      });
+    await dialog.locator('input[type="file"]').setInputFiles({
+      name: "landscape.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(fixture, "base64"),
+    });
     async function pixels(points) {
       await dialog
         .getByRole("button", { name: "Apply crop", exact: true })
@@ -643,6 +641,65 @@ try {
     await dialog.getByRole("button", { name: "Fill", exact: true }).click();
     sampled = await pixels([[400, 10]]);
     assert.ok(sampled[0].some((n) => n < 200));
+    await dialog.getByRole("button", { name: "Fit", exact: true }).click();
+    await page.evaluate(() => {
+      const original = HTMLImageElement.prototype.decode;
+      window.holdDecode = true;
+      HTMLImageElement.prototype.decode = function () {
+        const decode = original.bind(this);
+        if (window.holdDecode) {
+          window.holdDecode = false;
+          return new Promise((resolve) => {
+            window.releaseDecode = () => decode().then(resolve);
+          });
+        }
+        return decode();
+      };
+    });
+    await dialog
+      .getByRole("button", { name: "Apply crop", exact: true })
+      .click();
+    await page.waitForFunction(
+      () => typeof window.releaseDecode === "function",
+    );
+    for (const name of ["Rotate 90°", "Fit", "Fill"])
+      assert.equal(
+        await dialog.getByRole("button", { name, exact: true }).isDisabled(),
+        true,
+      );
+    assert.equal(await dialog.locator('input[type="file"]').isDisabled(), true);
+    assert.equal(await dialog.locator("[inert]").count(), 1);
+    await dialog
+      .getByRole("button", { name: "Rotate 90°", exact: true })
+      .evaluate((button) => button.click());
+    await page.evaluate(() => window.releaseDecode());
+    await dialog
+      .getByRole("button", { name: "Apply crop", exact: true })
+      .waitFor();
+    await page.waitForFunction(
+      () =>
+        !Array.from(document.querySelectorAll("button")).find(
+          (b) => b.textContent === "Apply crop",
+        ).disabled,
+    );
+    const finalPixel = await dialog
+      .getByAltText("Cropped product photo")
+      .evaluate(async (image) => {
+        await image.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = 800;
+        canvas.height = 800;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(image, 0, 0);
+        return Array.from(ctx.getImageData(10, 400, 1, 1).data).slice(0, 3);
+      });
+    assert.ok(finalPixel.every((n) => n > 240));
+    assert.equal(
+      await dialog
+        .getByRole("button", { name: "Rotate 90°", exact: true })
+        .isDisabled(),
+      false,
+    );
     await dialog
       .getByRole("button", { name: "Retry photo", exact: true })
       .click();

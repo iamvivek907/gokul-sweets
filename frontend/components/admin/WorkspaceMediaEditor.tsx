@@ -19,6 +19,14 @@ export default function WorkspaceMediaEditor({
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState("");
   const ref = useRef<string>("");
+  const processing = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const fitCanvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (!url || fit !== "contain") return;
@@ -53,7 +61,8 @@ export default function WorkspaceMediaEditor({
     [preview],
   );
   async function apply() {
-    if (!url || (fit === "cover" && !area)) return;
+    if (processing.current || !url || (fit === "cover" && !area)) return;
+    processing.current = true;
     setBusy(true);
     setError("");
     try {
@@ -75,16 +84,19 @@ export default function WorkspaceMediaEditor({
       const file = new File([blob], "product-photo.jpg", {
         type: "image/jpeg",
       });
+      if (!mounted.current) return;
       onChange(file);
       setPreview(URL.createObjectURL(file));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Unable to crop photo.");
+      if (mounted.current)
+        setError(e instanceof Error ? e.message : "Unable to crop photo.");
     } finally {
-      setBusy(false);
+      processing.current = false;
+      if (mounted.current) setBusy(false);
     }
   }
   return (
-    <div>
+    <fieldset disabled={busy} aria-busy={busy}>
       <label>
         Choose photo · JPEG, PNG or WebP · Up to 5 MB
         <input
@@ -116,7 +128,7 @@ export default function WorkspaceMediaEditor({
       </label>
       {url && (
         <>
-          <div className={styles.crop}>
+          <div className={styles.crop} inert={busy}>
             {fit === "contain" ? (
               <canvas
                 ref={fitCanvas}
@@ -134,11 +146,13 @@ export default function WorkspaceMediaEditor({
                 aspect={1}
                 objectFit={fit}
                 onCropChange={(v) => {
+                  if (processing.current) return;
                   setCrop(v);
                   onChange(null);
                   setPreview("");
                 }}
                 onZoomChange={(v) => {
+                  if (processing.current) return;
                   setZoom(v);
                   onChange(null);
                   setPreview("");
@@ -224,6 +238,6 @@ export default function WorkspaceMediaEditor({
           {error}
         </p>
       )}
-    </div>
+    </fieldset>
   );
 }
