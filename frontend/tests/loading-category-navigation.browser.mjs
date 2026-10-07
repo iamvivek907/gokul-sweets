@@ -94,6 +94,20 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await floating.click();await sheet.getByRole('button',{name:/^All items\s*\d+$/}).click();await page.locator('#gokul-product-1').waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart);
   console.log(`Loading/category ${width}px: desktop dock separation, exact category, All and cart preservation passed`);
- }else{assert.equal(await floating.count(),0);console.log(`Loading ${width}px enabled=${themed}: shared brand; ordering layout preserved`);}
+  }else{
+  await page.locator('#gokul-product-1').getByRole('button',{name:'Add Rasgulla to cart',exact:true}).click();await page.locator('.gokul-floating-cart').waitFor();
+  const clear=page.getByRole('button',{name:'Clear cart',exact:true});
+  const bounds=await clear.boundingBox();assert.ok(bounds.width>=44&&bounds.height>=44,'flag-OFF clear cart has an accessible touch target');
+  assert.equal(await clear.evaluate(n=>getComputedStyle(n).position),'absolute');
+  const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+  await clear.click();const dialog=page.getByRole('dialog',{name:'Clear cart?',exact:true});await dialog.waitFor();
+  assert.equal(await dialog.evaluate(n=>getComputedStyle(n).borderRadius),'24px');
+  assert.ok((await dialog.boundingBox()).height<400);
+  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/clear-cart-flag-off.png`});
+  await dialog.getByRole('button',{name:'No, keep cart',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),before);
+  await clear.click();await dialog.getByRole('button',{name:'Yes, clear cart',exact:true}).click();await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart'))?.items.length??0),0);
+  assert.equal(new URL(page.url()).pathname,'/menu');
+  assert.equal(await floating.count(),0);console.log(`Loading ${width}px enabled=${themed}: shared brand; ordering layout preserved`);}
  assert.deepEqual(errors,[]);await context.close();
  }}finally{await browser.close();}

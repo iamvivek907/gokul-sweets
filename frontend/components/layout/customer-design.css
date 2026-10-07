@@ -272,19 +272,22 @@
 .occasion-branch-list .gokul-branch-card-action-label{position:static;opacity:1}
 
 /* Keep clearing the cart separate from its navigation link. */
-.future-storefront[data-customer-route] .gokul-floating-cart>a{padding-right:60px!important;gap:6px!important}
-.future-storefront .floating-cart-delete{position:absolute;right:6px;bottom:0;width:44px;height:44px;min-height:44px;display:grid;place-items:center;border:0;border-radius:50%;background:#ffffff20;color:#fff;cursor:pointer}
-.future-storefront .floating-cart-delete:focus-visible{outline:2px solid #fff;outline-offset:-4px}
-.future-storefront .floating-cart-clear-dialog{position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 32px));height:fit-content;max-height:calc(100dvh - 32px);padding:0;border:1px solid #e9e3ec;border-radius:24px;background:#fff!important;color:#20242b!important;box-shadow:0 20px 64px #0003}
-.future-storefront .floating-cart-clear-dialog::backdrop{background:#10101588}
-.future-storefront .floating-cart-clear-dialog>header{padding:20px;border-bottom:0}
-.future-storefront .floating-cart-clear-dialog h2{font-size:24px;font-weight:750;color:#20242b}
-.future-storefront .floating-cart-clear-dialog .mobile-menu-suggestion-body{padding:0 20px 20px}
-.future-storefront .floating-cart-clear-dialog p{font-size:16px;line-height:1.6;color:#596579}
-.future-storefront .floating-cart-clear-actions{display:flex;gap:12px;margin-top:24px}
-.future-storefront .floating-cart-clear-actions button{flex:1;min-height:48px;border:0;border-radius:12px;padding:10px;font-weight:700;background:#f6e9ee;color:#980c31}
-.future-storefront .floating-cart-clear-actions button:last-child{background:#980c31;color:#fff}
+.app-container[data-customer-route] .gokul-floating-cart>a{padding-right:60px!important;gap:6px!important}
+.app-container .floating-cart-delete{position:absolute;right:6px;bottom:0;width:44px;height:44px;min-height:44px;display:grid;place-items:center;border:0;border-radius:50%;background:#ffffff20;color:#fff;cursor:pointer}
+.app-container .floating-cart-delete:focus-visible{outline:2px solid #fff;outline-offset:-4px}
+.app-container .floating-cart-clear-dialog{position:fixed;inset:0;margin:auto;width:min(420px,calc(100vw - 32px));height:fit-content;max-height:calc(100dvh - 32px);padding:0;border:1px solid #e9e3ec;border-radius:24px;background:#fff!important;color:#20242b!important;box-shadow:0 20px 64px #0003}
+.app-container .floating-cart-clear-dialog::backdrop{background:#10101588}
+.app-container .floating-cart-clear-dialog>header{padding:20px;border-bottom:0}
+.app-container .floating-cart-clear-dialog h2{font-size:24px;font-weight:750;color:#20242b}
+.app-container .floating-cart-clear-dialog .mobile-menu-suggestion-body{padding:0 20px 20px}
+.app-container .floating-cart-clear-dialog p{font-size:16px;line-height:1.6;color:#596579}
+.app-container .floating-cart-clear-actions{display:flex;gap:12px;margin-top:24px}
+.app-container .floating-cart-clear-actions button{flex:1;min-height:48px;border:0;border-radius:12px;padding:10px;font-weight:700;background:#f6e9ee;color:#980c31}
+.app-container .floating-cart-clear-actions button:last-child{background:#980c31;color:#fff}
 
-.future-storefront .floating-cart-clear-dialog>header button{width:44px;min-width:44px;height:44px;padding:0;font-size:0;border-radius:50%}
-.future-storefront .floating-cart-clear-dialog>header button::after{content:"×";font-size:24px}
-.future-storefront .floating-cart-clear-dialog h2{white-space:nowrap}
+.app-container .floating-cart-clear-dialog>header button{width:44px;min-width:44px;height:44px;padding:0;font-size:0;border-radius:50%}
+.app-container .floating-cart-clear-dialog>header button::after{content:"×";font-size:24px}
+.app-container .floating-cart-clear-dialog h2{white-space:nowrap}
+
+.app-container .floating-cart-clear-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.app-container .floating-cart-clear-dialog>header button{flex:none;background:#f6e9ee;color:#980c31;border:0;min-height:44px}
