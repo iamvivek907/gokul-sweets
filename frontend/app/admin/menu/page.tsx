@@ -184,9 +184,9 @@ export default function AdminMenuPage() {
                     >
 
                         <Link href="/admin/menu/workspace" className="rounded-2xl border border-[#eadfd6] bg-[#7a1625] p-6 text-white">
-                            <h2 className="text-xl font-bold">Menu &amp; inventory workspace</h2>
-                            <p className="mt-3 text-sm">Manage products, prices, photos, stock, groups and appearance from one place.</p>
-                            <span className="mt-6 block font-semibold">Open workspace →</span>
+                            <h2 className="text-xl font-bold" style={{color:"#ffffff"}}>Menu &amp; inventory workspace</h2>
+                            <p className="mt-3 text-sm" style={{color:"#fff1e6"}}>Manage products, prices, photos, stock, groups and appearance from one place.</p>
+                            <span className="mt-6 block font-semibold" style={{color:"#ffffff"}}>Open workspace →</span>
                         </Link>
 
                         {/* Live Menu */}
