@@ -79,6 +79,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/clear-cart-${width}.png`});
   await page.getByRole('dialog',{name:'Clear cart?',exact:true}).getByRole('button',{name:'Yes, clear cart',exact:true}).click();
   await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
+  await page.waitForFunction(()=>document.activeElement?.id==='gokul-menu-search');
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart'))?.items.length??0),0,'confirmation clears persisted cart');
   assert.equal(new URL(page.url()).pathname,'/menu','clear cart stays on the menu');
   await page.reload();await page.locator('#gokul-product-1').waitFor();assert.equal(await page.locator('.gokul-floating-cart').count(),0,'cleared cart stays empty after reload');
@@ -106,6 +107,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/clear-cart-flag-off.png`});
   await dialog.getByRole('button',{name:'No, keep cart',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),before);
   await clear.click();await dialog.getByRole('button',{name:'Yes, clear cart',exact:true}).click();await page.locator('.gokul-floating-cart').waitFor({state:'hidden'});
+  await page.waitForFunction(()=>document.activeElement?.id==='gokul-menu-search');
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart'))?.items.length??0),0);
   assert.equal(new URL(page.url()).pathname,'/menu');
   assert.equal(await floating.count(),0);console.log(`Loading ${width}px enabled=${themed}: shared brand; ordering layout preserved`);}
