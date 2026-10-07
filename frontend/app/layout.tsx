@@ -20,11 +20,11 @@ export const metadata: Metadata = {
         template: `%s | ${APP_NAME}`
     },
     description: APP_DESCRIPTION,
-    applicationName: APP_NAME,
+    applicationName: "Gokul",
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
-        title: APP_NAME
+        title: "Gokul"
     },
     formatDetection: {
         telephone: false
