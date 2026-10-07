@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
-const base=process.env.BROWSER_BASE??'http://127.0.0.1:3312';
+const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
 const product=(id,name,categoryId,categoryName,available=true)=>({id,name,categoryId,categoryName,price:50,available,saleMode:'UNIT',imageUrl:'/arrival-mithai.webp'});

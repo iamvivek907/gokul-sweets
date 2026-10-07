@@ -906,6 +906,8 @@ Object.assign(hindi, {
 
 Object.assign(hindi, {
  "View optional additions":"वैकल्पिक चीज़ें देखें",
+ "Retry pairings":"सुझाव फिर से जाँचें",
+ "We couldn’t load pairings. Try again.":"सुझाव लोड नहीं हो सके। फिर से कोशिश करें।",
  "Optional additions":"वैकल्पिक चीज़ें",
  "Choose pickup to see optional additions.":"वैकल्पिक चीज़ें देखने के लिए पिकअप चुनें।",
  "No optional additions right now.":"अभी कोई वैकल्पिक चीज़ उपलब्ध नहीं है।",

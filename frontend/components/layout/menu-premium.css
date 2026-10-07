@@ -133,7 +133,11 @@
 .future-storefront[data-premium-menu=true] .mobile-header-branch-name{display:none}
 .future-storefront[data-premium-menu=true] .customer-header-actions :is(.customer-notification-bell,.customer-account-link){color:#8f1838!important}
 .future-storefront[data-premium-menu=true] .mobile-menu-pickup>p:not(.menu-pickup-conflict):not([role=alert]){position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
-.future-storefront[data-premium-menu=true] .menu-offers--empty{display:contents}.future-storefront[data-premium-menu=true] .menu-offers--empty>button{display:none}
+/* Reserve the offer strip before its first response and through refresh/failure. */
+.future-storefront[data-premium-menu=true] .menu-offers>button{height:64px!important;min-height:64px!important;overflow:hidden}
+.future-storefront[data-premium-menu=true] .menu-offers>button>span:nth-child(2){min-width:0}
+.future-storefront[data-premium-menu=true] .menu-offers>button strong{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.future-storefront[data-premium-menu=true] .menu-offers>button small{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 
 .future-storefront[data-premium-menu=true] .menu-editorial-feature h2{position:relative;max-width:60%}
 }
@@ -417,4 +421,10 @@
  .future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-controls,.future-storefront[data-premium-menu=true] [data-menu-presentation=retail][data-menu-retail-kind=photo] .product-card-controls>button{height:28px;min-height:28px}
  .future-storefront[data-premium-menu=true] .menu-sweet-rail>div>button{flex-basis:180px;min-height:62px}
  .future-storefront[data-premium-menu=true] .menu-sweet-rail>div>button>span:first-child{height:62px;width:70px}
+}
+
+@media(max-width:640px){
+ /* Match the 104px cards plus the carousel's 3px bottom padding in every state. */
+ .future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline{min-height:107px}
+ .future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline>.mobile-menu-pairing-status{align-self:center;flex:1;font-size:12px;line-height:18px;color:#686080}
 }

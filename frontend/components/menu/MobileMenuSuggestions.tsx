@@ -39,14 +39,15 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
  const [open,setOpen]=useState(false);
  const [variant,setVariant]=useState<PortionGroup|null>(null);
  const [identityRevision,setIdentityRevision]=useState(0);
+ const [retry,setRetry]=useState(0);
  const [result,setResult]=useState<{key:string;scope:string;items:Suggestion[]}|null>(null),[busy,setBusy]=useState<number|null>(null),[feedback,setFeedback]=useState<{key:string;text:string}|null>(null);
  const selectionKey=JSON.stringify(intent.selection);
  const selected=useMemo(()=>JSON.parse(selectionKey) as PickupSelection|null,[selectionKey]);
  const serviceDate=intent.date??features?.today;
  const request=JSON.stringify({serviceDate,items:availabilityItems(cart.items)});
- const key=JSON.stringify([branchId,request,selected?.slot.id,selected?.pickupType,smartAvailability,identityRevision,cart.branchId,products.map(p=>[p.id,p.price,p.available,p.saleMode])]);
+ const key=JSON.stringify([branchId,request,selected?.slot.id,selected?.pickupType,smartAvailability,identityRevision,cart.branchId,products.map(p=>[p.id,p.price,p.available,p.saleMode]),retry]);
  const scope=JSON.stringify([branchId,serviceDate,selected?.slot.id,selected?.pickupType,smartAvailability,identityRevision,cart.branchId,products.map(p=>[p.id,p.price,p.available,p.saleMode])]);
- const [branchResult,setBranchResult]=useState<{key:string;items:Suggestion[]}|null>(null);
+ const [branchResult,setBranchResult]=useState<{key:string;items:Suggestion[];failed?:boolean}|null>(null);
  // Branch recommendations do not restart when optional customer history arrives.
  useEffect(()=>{
   if(!features?.pickupAddOns||!serviceDate||!cart.items.length||cart.branchId!==branchId)return;
@@ -54,7 +55,7 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
   const slotQuery=smartAvailability&&selected?`&pickupSlotId=${selected.slot.id}&pickupType=${selected.pickupType}`:"";
   void apiClient<Suggestion[]>(`/api/menu/pickup-addons?branchId=${branchId}${slotQuery}`,{method:"POST",body:request,credentials:"include",signal:AbortSignal.any([c.signal,AbortSignal.timeout(8000)])})
    .then(items=>{if(!c.signal.aborted)setBranchResult({key,items:Array.isArray(items)?items:[]});})
-   .catch(()=>{if(!c.signal.aborted)setBranchResult({key,items:[]});});
+   .catch(()=>{if(!c.signal.aborted)setBranchResult({key,items:[],failed:true});});
   return()=>c.abort();
  },[key,branchId,request,serviceDate,cart.branchId,cart.items.length,selected,smartAvailability,features?.pickupAddOns]);
  const message=feedback?.key===key?feedback.text:"";
@@ -139,14 +140,14 @@ export default function MobileMenuSuggestions({branchId,products,groups=[],picku
   finally{if(addition.current===controller)addition.current=null;locked.current=false;if(mounted.current)setBusy(null);}
  }
  const available=!!suggestions.length||!!message;
- if(!available&&current)return null;
+ const failed=!suggestions.length&&branchResult?.key===key&&branchResult.failed===true;
 
- const summary=message||(current?"No optional additions right now.":"Checking pairings…");
+ const summary=message||(failed?"We couldn’t load pairings. Try again.":current?"No optional additions right now.":"Checking pairings…");
  return <section className="mobile-menu-suggestions" aria-label="Pairs well with your selection">
   <h3><T text="A little something extra?"/></h3>
   <p className="menu-pairing-subtitle"><T text="Pairs perfectly with"/> {seedName??<T text="your selection"/>}</p>
   <div className="mobile-menu-pairing-row mobile-menu-pairings-inline">{!current&&<div className="mobile-menu-pairing-skeleton" aria-hidden="true">{[0,1,2].map(i=><div key={i}><span/><span/><span/></div>)}</div>}{suggestions.map(s=>{const group=groupFor(s.product.id);return <article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}{group?<button type="button" className="menu-pairing-group-button" id={`menu-pairing-group-${group.key}`} aria-label={`Choose options for ${group.title} from pairings`} onClick={()=>{setOpen(false);setVariant(group);}}><T text={groupQuantity(group)>0?"Manage":"Choose options"}/>{groupQuantity(group)>0&&<> · {groupQuantity(group)}</>}</button>:<MenuPurchaseControl name={s.product.name} addLabel={`Add ${s.product.name} from pairings`} blocked={busy!==null&&busy!==s.product.id} quantity={suggestionQuantity(s)} label={s.weightGrams===null?undefined:formatWeight(cart.items.find(i=>i.product.id===s.product.id)?.weightGrams??s.weightGrams)} busy={busy===s.product.id} onAdd={()=>void add(s)} onDecrease={()=>cart.decreaseQuantity(s.product.id)}/> }</div><h4>{group?.title??s.product.name}</h4><strong>{group?<><T text="From"/> {money(groupPrice(group))}</>:money(s.portionTotal)}</strong><small>{s.weightGrams===null?"":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"before tax":"incl. item tax"}/></small></article>;})}{!suggestions.length&&<p className={`mobile-menu-pairing-status ${!current?"sr-only":""}`} role="status"><T text={summary}/></p>}</div>
-  <div className="mobile-menu-pairing-footer"><button aria-label="View optional additions" id="mobile-menu-pairings-open" className="mobile-menu-suggestions-open" type="button" disabled={!!current&&!available} onClick={()=>setOpen(true)} aria-haspopup="dialog"><T text="View optional additions"/></button><p role="status">{(suggestions.length?message:"")||announcement}</p></div>
+  <div className="mobile-menu-pairing-footer"><button aria-label={failed?"Retry pairings":"View optional additions"} id="mobile-menu-pairings-open" className="mobile-menu-suggestions-open" type="button" disabled={!!current&&!available&&!failed} onClick={()=>failed?setRetry(value=>value+1):setOpen(true)} aria-haspopup={failed?undefined:"dialog"}><T text={failed?"Retry pairings":"View optional additions"}/></button><p role="status">{(suggestions.length?message:"")||announcement}</p></div>
   {variant&&<MenuVariantPicker group={variant} products={variant.choices.flatMap(c=>products.filter(p=>p.id===c.productId))} quantities={Object.fromEntries(cart.items.map(i=>[i.product.id,i.quantity]))} pickupItems={pickupItems} dateAware={smartAvailability} busyId={busy} error={message} onAdd={p=>void add({product:p,weightGrams:null,portionPrice:p.price,portionTotal:p.price,reason:""})} onIncrease={id=>{const p=live.get(id);if(p)void add({product:p,weightGrams:null,portionPrice:p.price,portionTotal:p.price,reason:""});}} onDecrease={cart.decreaseQuantity} onClose={()=>{const id=`menu-pairing-group-${variant.key}`;setVariant(null);requestAnimationFrame(()=>document.getElementById(id)?.focus({preventScroll:true}));}}/>}
   {open&&<MenuDiscoverySheet title="Optional additions" onClose={()=>setOpen(false)}>
    <div className="mobile-menu-pairing-row">{suggestions.map(s=>{const group=groupFor(s.product.id);return <article key={s.product.id}><div className="mobile-menu-pairing-photo">{s.product.imageUrl?<Image src={s.product.imageUrl} alt={s.product.name} fill sizes="144px"/>:<span aria-hidden="true">G</span>}{group?<button type="button" className="menu-pairing-group-button" aria-label={`Choose options for ${group.title} from pairings`} onClick={()=>{setOpen(false);setVariant(group);}}><T text={groupQuantity(group)>0?"Manage":"Choose options"}/>{groupQuantity(group)>0&&<> · {groupQuantity(group)}</>}</button>:<MenuPurchaseControl name={s.product.name} addLabel={`Add ${s.product.name}`} blocked={busy!==null&&busy!==s.product.id} quantity={suggestionQuantity(s)} label={s.weightGrams===null?undefined:formatWeight(cart.items.find(i=>i.product.id===s.product.id)?.weightGrams??s.weightGrams)} busy={busy===s.product.id} onAdd={()=>void add(s)} onDecrease={()=>cart.decreaseQuantity(s.product.id)}/> }</div><h4>{group?.title??s.product.name}</h4><strong>{group?<><T text="From"/> {money(groupPrice(group))}</>:money(s.portionTotal)}</strong><small>{s.weightGrams===null?"":formatWeight(s.weightGrams)} · <T text={s.includesTax===false?"tax checked at checkout":"incl. item tax"}/></small><p>{s.reason}</p></article>;})}</div>
