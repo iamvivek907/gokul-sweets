@@ -5,15 +5,20 @@ import {savePickupSlot,getPickupSlotSnapshot,clearPickupSlot} from "@/lib/checko
 import {savePickupIntent} from "@/hooks/usePickupIntent";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
-import {availabilityItems,checkCartAvailability,discoverPickupDates,type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems,checkCartAvailability,checkMenuAvailability,discoverPickupDates,type CartAvailability} from "@/services/availabilityApi";
 import {menuPickupOptions} from "@/lib/menuPickupOptions";
-import {T} from "@/lib/language";
+import {T,useLanguage,translate} from "@/lib/language";
 import type {MenuProduct} from "@/types/menu";
 import type {PickupSelection} from "@/types/pickup";
 const Dialog=dynamic(()=>import("@/components/checkout/MobilePickupDialog"));
-export default function MobileMenuPickup({branchId,products,today,days,selection,expired,selectionUnavailable=false}:{branchId:number;products:MenuProduct[];today:string;days:number;selection:PickupSelection|null;expired:boolean;selectionUnavailable?:boolean}){
+export default function MobileMenuPickup({branchId,products,today,days,selection,date,expired,selectionUnavailable=false}:{branchId:number;products:MenuProduct[];today:string;days:number;selection:PickupSelection|null;date?:string|null;expired:boolean;selectionUnavailable?:boolean}){
+ const locale=useLanguage();
+ const displayDate=selection?.date??date;
+ const dateLabel=displayDate?new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",timeZone:"Asia/Kolkata"}).format(new Date(`${displayDate}T12:00:00+05:30`)):"";
+ const namedDate=displayDate===today?translate("Today",locale):dateLabel;
+ const timeLabel=(time:string)=>new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"}).format(new Date(`2000-01-01T${time}+05:30`));
  const [data,setData]=useState<CartAvailability|null>(null),[open,setOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState("");
- const request=JSON.stringify(products.filter(p=>p.available).slice(0,100).map(p=>({productId:p.id,quantity:p.saleMode==="UNIT"?1:null,weightGrams:p.saleMode==="WEIGHT"?p.minimumWeightGrams??250:null})));
+ const request=JSON.stringify(products.filter(p=>p.available).map(p=>({productId:p.id,quantity:p.saleMode==="UNIT"?1:null,weightGrams:p.saleMode==="WEIGHT"?p.minimumWeightGrams??250:null})));
  const controller=useRef<AbortController|null>(null);
  useEffect(()=>{
   let active=true;
@@ -28,23 +33,23 @@ export default function MobileMenuPickup({branchId,products,today,days,selection
   finally{if(!c.signal.aborted)setBusy(false);}
  }
  const ids=JSON.parse(request).map((item:{productId:number})=>item.productId);
- return <section className="mobile-menu-pickup" aria-label="Menu pickup time"><div><span><T text="PICKUP TIME"/></span><strong>{selection?`${selection.slot.startTime.slice(0,5)}–${selection.slot.endTime.slice(0,5)} IST · ${selection.date}`:<T text="Find a time for your favourites"/>}</strong></div><button type="button" disabled={busy||!ids.length} onClick={()=>void choose()}><T text={busy?"Checking times…":selection?"Change time":"Choose time"}/></button>
- {expired&&<p role="status"><T text="Your previous pickup has passed. Choose a new time; your cart is saved."/></p>}
- {!expired&&selection&&<p><T text="Some items may need another time. Change time to explore availability."/></p>}
- {selectionUnavailable&&<p role="status"><T text="Your saved pickup time no longer fits your cart. Adjust items or choose another time. Your cart is saved."/></p>}
+ return <section className="mobile-menu-pickup" aria-label="Menu pickup time"><svg className="reference-pickup-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><div><span><T text="PICKUP TIME"/></span><strong>{selection?`${namedDate} · ${timeLabel(selection.slot.startTime)}–${timeLabel(selection.slot.endTime)} IST`:displayDate?`${namedDate} · ${translate("Time not selected",locale)}`:<T text="Choose pickup date & time"/>}</strong></div><button type="button" disabled={busy||!ids.length} onClick={()=>void choose()}><T text={busy?"Checking times…":selection?"Change time":"Choose time"}/></button>
+ {expired&&<p className="menu-pickup-conflict" role="status"><T text="Your previous pickup has passed. Choose a new time; your cart is saved."/></p>}
+ <p role="status"><T text={displayDate?"Item availability is checked for the date shown above. Confirm your pickup at checkout.":"Browse and add items. Choose a pickup date and time before payment."}/></p>
+ {selectionUnavailable&&<p className="menu-pickup-conflict" role="status"><T text="Your saved pickup time no longer fits your cart. Adjust items or choose another time. Your cart is saved."/></p>}
  {error&&<p role="alert">{error}</p>}
- {open&&data&&<Dialog advisory today={today} dates={data.dates} options={menuPickupOptions(data,ids)} chosen={selection??menuPickupOptions(data,ids)[0]??null} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);}} onConfirm={async value=>{
+ {open&&data&&<Dialog advisory today={today} dates={data.dates} options={menuPickupOptions(data,ids)} chosen={selection} initialDate={date??today} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);}} onConfirm={async value=>{
   const branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot(),cartSnapshot=getCartSnapshot();
   const cart=parseCart(cartSnapshot);
   if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");
-  // One response covers discovery and the actual cart, including larger weights and quantities.
+  // Keep actual cart validation together; batch unchosen catalogue items.
   const cartItems=availabilityItems(cart.items);
   if(cartItems.length>100)throw new Error("Review this large cart at checkout before changing pickup. Your previous pickup is saved.");
   const amounts=new Map(cartItems.map(item=>[item.productId,item]));
   const menuItems=JSON.parse(request) as ReturnType<typeof availabilityItems>;
   const requested=cartItems.length?cartItems:menuItems;
   const c=new AbortController();controller.current=c;
-  const fresh=await checkCartAvailability(branchId,value.date,1,requested,AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);
+  const fresh=await (cartItems.length?checkCartAvailability:checkMenuAvailability)(branchId,value.date,1,requested,AbortSignal.any([c.signal,AbortSignal.timeout(15000)]),true);
   if(c.signal.aborted||branch!==getStoredBranchSnapshot()||pickup!==getPickupSlotSnapshot()||cartSnapshot!==getCartSnapshot())return false;
   const slot=fresh.dates.find(day=>day.date===value.date)?.slots.find(slot=>slot.slot.id===value.slot.id);
   const conflict=slot?.issues?.find(issue=>!issue.available&&amounts.has(issue.productId));

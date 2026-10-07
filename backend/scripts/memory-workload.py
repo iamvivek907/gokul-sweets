@@ -61,8 +61,11 @@ async def request(user, iteration):
     data = await http_json(path, payload, headers)
     if not staff and payload is None and len(data.get('items', [])) != 379:
         raise ValueError('Incomplete menu availability')
-    if path.endswith('/inventory/check') and data.get('suggestedServiceDate', data.get('suggestedDate')) != (TODAY + datetime.timedelta(days=1)).isoformat():
-        raise ValueError('Incorrect inventory date suggestion')
+    if path.endswith('/inventory/check'):
+        expected = (TODAY + datetime.timedelta(days=1)).isoformat()
+        actual = data.get('suggestedServiceDate', data.get('suggestedDate'))
+        if actual != expected:
+            raise ValueError(f'Incorrect inventory date suggestion: expected {expected}, got {actual}; orderable={data.get("orderable")}')
     if path.endswith('/availability') and not data.get('dates'):
         raise ValueError('Missing pickup availability dates')
 

@@ -16,3 +16,12 @@ test('late suggestions refresh prices without moving existing cards or duplicati
  const result=stableSuggestions([chai,tea],[newTea,extra,chai]);assert.deepEqual(Array.from(result,item=>item.product.id),[1,2,3]);assert.equal(result[1],newTea);
  assert.deepEqual(Array.from(stableSuggestions([chai,tea],[newTea]),item=>item.product.id),[2]);
 });
+
+test('filtered product groups retain all branch variants in the option picker',()=>{
+ const {mobileMenuRows}=load('mobileMenu');
+ const catalog=[{id:1,price:25},{id:2,price:50},{id:3,price:120},{id:4,price:550}];
+ const groups=[{key:'dahi',title:'Dahi',choices:[{productId:2,label:'400 g'},{productId:1,label:'200 g'},{productId:3,label:'1 kg'},{productId:4,label:'5 kg'}]}];
+ const rows=mobileMenuRows([catalog[2]],groups,catalog);
+ assert.equal(rows.length,1);assert.deepEqual(Array.from(rows[0].products,p=>p.id),[2,1,3,4]);
+ assert.equal(rows[0].products[0],catalog[1]);assert.equal(catalog[1].price,50);
+});

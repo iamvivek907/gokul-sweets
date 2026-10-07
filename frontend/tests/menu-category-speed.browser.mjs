@@ -40,34 +40,23 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
  if(constrained)await context.addInitScript(()=>Object.defineProperty(navigator,'connection',{configurable:true,value:{effectiveType:'3g',saveData:false}}));
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
 
- const button=page.getByRole('button',{name:'Browse all item categories',exact:true});
+ await page.emulateMedia({reducedMotion:'reduce'});
+ const button=page.getByRole('button',{name:'Browse Category 10',exact:true});
  await page.locator('#menu-category-10').waitFor();
- assert.equal(await page.locator('.mobile-menu-filters,.mobile-filter-chips').count(),0,'no duplicate filter row under search');
+ assert.equal(await page.locator('.mobile-menu-filters,.mobile-filter-chips').count(),0,'no duplicate filter rows');
  const before={menu:menuReads,pickup:pickupReads};const timings=[];
  for(let i=0;i<12;i++){
   const started=Date.now();await button.click();
-  const panel=page.getByRole('dialog',{name:'Items',exact:true});await panel.waitFor();
-  const bounds=await panel.boundingBox();assert.ok(bounds.width<=304&&bounds.x>=0&&bounds.x+bounds.width<=width,'compact panel fits viewport');
-  assert.equal(await panel.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(8, 11, 16)');
-  await panel.getByRole('button',{name:/Category 10/}).click();
   await page.waitForFunction(()=>{const n=document.getElementById('menu-category-10');return n.getBoundingClientRect().top<200&&document.body.style.position!== 'fixed';});
-  timings.push(Date.now()-started);
-  assert.equal(await page.locator('.gokul-menu-category-section').count(),10);
+  timings.push(Date.now()-started);assert.equal(await page.locator('.gokul-menu-category-section').count(),1);
  }
- assert.equal(menuReads,before.menu,'jumps never refetch the catalog');
- assert.equal(pickupReads,before.pickup,'jumps never restart pending pickup checks');
+ assert.equal(menuReads,before.menu,'collection switches never refetch the catalog');
+ assert.equal(pickupReads,before.pickup,'collection switches never restart pending pickup checks');
  assert.deepEqual(errors,[],'large-menu repeated taps produce no page errors');
  await page.getByLabel('Find a favourite',{exact:true}).fill('Item 1-1');
- await button.click();await page.getByRole('dialog',{name:'Items',exact:true}).getByRole('button',{name:/Category 10/}).click();
+ await button.click();
  await page.waitForFunction(()=>document.getElementById('menu-category-10')?.getBoundingClientRect().top<200);
  assert.equal(await page.getByLabel('Find a favourite',{exact:true}).inputValue(),'','jump clears a search that would hide the category');
- await button.click();await page.getByRole('dialog',{name:'Items',exact:true}).getByRole('button',{name:/Recommended/}).click();
- await page.waitForFunction(()=>document.querySelector('.mobile-menu-highlights')?.getBoundingClientRect().top<200);
- assert.equal(await page.locator('.mobile-menu-highlights details').evaluate(n=>n.open),true);
- await button.click();const panel=page.getByRole('dialog',{name:'Items',exact:true});await panel.waitFor();
- await page.screenshot({path:`/tmp/menu-category-panel-${width}.png`});await page.keyboard.press('Escape');
- assert.equal(await button.evaluate(n=>n===document.activeElement),true);
- assert.equal(await page.evaluate(()=>document.body.style.position),'');
- console.log(`${width}px: 386 products, 12 jumps, no extra menu/pickup reads; slowest automated interaction ${Math.max(...timings)}ms`);
+ await page.getByRole('button',{name:'All',exact:true}).click();await page.locator('#gokul-menu-items').scrollIntoViewIfNeeded();
  releaseHistory();releaseRatings();releaseAvailability();releasePreview();await context.close();
 }}finally{await browser.close();}

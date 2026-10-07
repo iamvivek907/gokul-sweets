@@ -4,6 +4,7 @@ import {T} from "@/lib/language";
 
 interface MenuSearchProps {
     refined?: boolean;
+    premium?: boolean;
 
     value: string;
 
@@ -14,6 +15,7 @@ interface MenuSearchProps {
 
 export default function MenuSearch({
     refined = false,
+    premium = false,
     value,
     onChange
 }: MenuSearchProps) {
@@ -53,7 +55,7 @@ export default function MenuSearch({
                             event.target.value
                         )
                 }
-                placeholder="Search sweets, snacks & meals"
+                placeholder={premium ? "Search your favourites" : "Search sweets, snacks & meals"}
                 className="
                     min-h-13
                     w-full

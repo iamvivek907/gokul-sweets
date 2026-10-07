@@ -36,11 +36,7 @@ try{for(const [width,motion] of [[320,'no-preference'],[390,'no-preference'],[39
  await page.getByRole('heading',{name:'How was the Gokul experience?',exact:true}).waitFor();
  await page.screenshot({path:`/tmp/clean-branch-home-${width}-${motion}.png`});
  await page.getByRole('link',{name:'Browse menu',exact:false}).filter({hasText:'Browse menu'}).click();await page.waitForURL('**/menu');await page.locator('#gokul-product-1').waitFor();
- const recommended=page.getByRole('region',{name:'Recommended menu items'});
- await recommended.locator('.menu-recommended-unavailable').first().waitFor();assert.equal(await recommended.getByRole('button',{name:'Add Sweet 1 from recommendations',exact:true}).isDisabled(),true);
- assert.equal(await recommended.locator('.menu-recommended-unavailable').first().innerText(),'Try another pickup date');
- assert.ok(await recommended.locator('.menu-recommended-unavailable').first().evaluate(n=>parseFloat(getComputedStyle(n).fontSize)<=13&&n.getBoundingClientRect().height<60),'availability guidance fits as a compact readable badge');
- const regular=page.locator('#gokul-product-1');assert.equal(await regular.locator('.menu-availability-note').count(),0);assert.equal(await regular.locator('.menu-availability-chip').count(),0);assert.equal(await regular.getByText('Try another pickup date',{exact:true}).count(),1);
+ const regular=page.locator('#gokul-product-1');await regular.getByText('Unavailable for selected pickup',{exact:true}).waitFor();assert.equal(await regular.locator('.menu-availability-note').count(),0);assert.equal(await regular.locator('.menu-availability-chip').count(),0);assert.equal(await regular.getByText('Unavailable for selected pickup',{exact:true}).count(),1);
  const nav=page.locator('.customer-bottom-navigation');
  await page.evaluate(()=>{document.activeElement?.blur();document.documentElement.style.scrollBehavior='auto';window.scrollTo({top:450,behavior:'instant'});});
  if(motion==='reduce'){await page.waitForTimeout(100);assert.notEqual(await nav.getAttribute('data-scroll-hidden'),'true');}

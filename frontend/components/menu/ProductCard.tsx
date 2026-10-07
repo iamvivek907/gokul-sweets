@@ -10,7 +10,10 @@ import type { ProductRatingSummary } from "@/types/review";
 
 interface ProductCardProps {
     portionOptions?: ReactNode;
+    purchaseControl?: ReactNode;
     refined?: boolean;
+    premium?: boolean;
+    priceFrom?: boolean;
     unavailableForPickup?: boolean;
     product: MenuProduct;
     ratingSummary: ProductRatingSummary | null;
@@ -23,13 +26,14 @@ interface ProductCardProps {
 }
 
 
-function formatCurrency(amount: number, exact = false): string {
+function formatCurrency(amount: number, exact = false, compact = false): string {
 
     return new Intl.NumberFormat(
         "en-IN",
         {
             style: "currency",
             currency: "INR",
+            minimumFractionDigits: compact ? 0 : exact ? 2 : 0,
             maximumFractionDigits: exact ? 2 : 0
         }
     ).format(amount);
@@ -61,7 +65,10 @@ function formatWeight(
 
 export default function ProductCard({
     portionOptions,
+    purchaseControl,
     refined = false,
+    premium = false,
+    priceFrom = false,
     unavailableForPickup = false,
     product,
     ratingSummary,
@@ -202,7 +209,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                <T text={isAvailable ? "Try another pickup date" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
+                                <T text={isAvailable ? "Unavailable for selected pickup" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
                             </span>
                         </div>
                     )
@@ -281,7 +288,7 @@ export default function ProductCard({
 
                 {/* Rating */}
 
-                <div className="product-card-rating mt-1.5 flex min-h-5 items-center">
+                <div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">
 
                     {
                         ratingLoading
@@ -390,14 +397,12 @@ export default function ProductCard({
 
                         sm:text-base
                     ">
-                        {
-                            formatCurrency(
-                                product.price, refined
-                            )
-                        }
+                        {premium&&(isWeighted||priceFrom)&&<><T text="From"/> </>}
+                        {formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}
+                        {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
 
                         {
-                            isWeighted
+                            isWeighted && !premium
                             && (
                                 <span className="
                                     ml-1
@@ -412,12 +417,14 @@ export default function ProductCard({
                         }
                     </span>
 
-                    {refined && isWeighted && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
+                    {refined && isWeighted && !premium && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
                         <T text="From" />{" "}{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{" "}{formatWeight(product.minimumWeightGrams ?? 250)}
                     </span>}
 
 
-                    <div
+                    {premium&&!purchaseControl&&(isInCart||isWeighted)&&<small className="menu-product-caption">{isInCart?<>{isWeighted?selectionLabel:<>{quantity} <T text={quantity===1?"piece":"pieces"}/></>} · {formatCurrency(product.price*(isWeighted?(weightGrams??0)/1000:quantity),true,true)}</>:<T text="Choose weight"/>}</small>}
+
+                    {purchaseControl ?? <div
                         className={`
                             product-card-controls
                             relative
@@ -661,7 +668,7 @@ export default function ProductCard({
 
                         </div>
 
-                    </div>
+                    </div>}
 
                 </div>
 
