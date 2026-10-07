@@ -245,6 +245,11 @@ export default function MenuWorkspace() {
       ])
         .then(([p, g]) => {
           if (!c.signal.aborted) {
+            const lastPage = Math.max(0, (tab === "groups" ? g.totalPages : p.totalPages) - 1);
+            if (page > lastPage && tab !== "appearance") {
+              setPage(lastPage);
+              return;
+            }
             setData(p);
             setGroups(g);
             setLoadedContext(queryContext);
@@ -325,6 +330,7 @@ export default function MenuWorkspace() {
           jsonRequest("PATCH", {
             version: item.branchVersion,
             available: bulkAvailable,
+            clearPriceOverride: false,
           }),
         );
         next.push({ item, error: null });
@@ -647,13 +653,14 @@ export default function MenuWorkspace() {
                     ["availability", "Availability"],
                     ["details", "Details"],
                     ["stock", "Stock"],
+                    ["delete", "Delete from branch"],
                   ] as [EditMode, string][]
                 ).map(([mode, label]) => (
                   <button
                     key={mode}
                     onClick={() => setEditor({ mode, item: p })}
                     disabled={
-                      !fresh || loading || (mode === "stock" && !canStock)
+                      !fresh || loading || ((mode === "stock" || mode === "delete") && !canStock)
                     }
                   >
                     {label}

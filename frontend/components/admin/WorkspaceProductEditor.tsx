@@ -21,7 +21,8 @@ export type EditMode =
   | "price"
   | "availability"
   | "photo"
-  | "stock";
+  | "stock"
+  | "delete";
 export default function WorkspaceProductEditor({
   item,
   mode,
@@ -158,7 +159,7 @@ export default function WorkspaceProductEditor({
   const title =
     mode === "add"
       ? "Add product"
-      : `${{ details: "Edit details", price: "Edit branch price", availability: "Set availability", photo: "Edit product photo", stock: "Stock details" }[mode]} · ${item?.name}`;
+      : `${{ details: "Edit details", price: "Edit branch price", availability: "Set availability", photo: "Edit product photo", stock: "Stock details", delete: "Delete from branch" }[mode]} · ${item?.name}`;
   async function save() {
     if (lock.current) return;
     lock.current = true;
@@ -222,6 +223,10 @@ export default function WorkspaceProductEditor({
           onSaved();
         }
       }
+      if (mode === "delete") {
+        await workspaceRequest(branch, `/${item!.productId}?version=${initialDraft.branchVersion}`, { method: "DELETE" });
+        onSaved("Item permanently deleted from this branch menu.");
+      }
       if (mode === "price" || mode === "availability") {
         await workspaceRequest(
           branch,
@@ -233,7 +238,7 @@ export default function WorkspaceProductEditor({
                   priceOverride: override === "" ? null : Number(override),
                   clearPriceOverride: override === "",
                 }
-              : { available }),
+              : { available, clearPriceOverride: false }),
           }),
         );
         onSaved();
@@ -365,11 +370,21 @@ export default function WorkspaceProductEditor({
                 ? createdId
                   ? "Retry photo"
                   : "Create product"
-                : "Save changes"}
+                : mode === "delete"
+                  ? "Yes, permanently delete"
+                  : "Save changes"}
           </button>
         </>
       }
     >
+      {mode === "delete" && (
+        <p>
+          Delete <strong>{item!.name}</strong> permanently from this branch menu?
+          This cannot be undone. Other branches and the shared product remain
+          available. Items with stock or reservation history must be set
+          unavailable instead.
+        </p>
+      )}
       <p className={styles.muted}>
         Text entries are restored after refresh. Re-select any unsaved image
         file.
