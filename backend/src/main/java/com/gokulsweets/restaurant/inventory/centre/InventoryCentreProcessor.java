@@ -35,13 +35,13 @@ public class InventoryCentreProcessor {
   jdbc.queryForList("SELECT id FROM branch_inventory_policies WHERE branch_product_id=? FOR UPDATE",bp);
   var policy=policies.findByBranchProductId(bp).orElse(null);
   if(policy==null?e.policyVersion()!=null:e.policyVersion()==null||!policy.getVersion().equals(e.policyVersion()))throw new IllegalArgumentException("Inventory policy changed. Reload before retrying.");
+  var timing=jobs.timing(bp);
+  if(o.applyHours()&&!Objects.equals(timing,work.timing()))throw new IllegalArgumentException("Item service hours changed. Reload before retrying.");
   if(o.applyInventory()){
   boolean prepared=o.method().equals("READY_STOCK");
   if(policy!=null&&!o.applyPolicy()&&(!policy.getControlMode().name().equals(o.method())||policy.isReadyStockRequired()!=prepared||!policy.isOnlineEnabled()))throw new IllegalArgumentException("Policy differs from this plan. Enable Apply selling method or use the individual editor.");
   if(prepared&&o.fromDate().equals(LocalDate.now(inventoryClock))&&e.readyQuantity()==null)throw new IllegalArgumentException("Confirm the physically prepared quantity for today.");
   if(e.readyQuantity()!=null&&e.readyQuantity().compareTo(e.quantity())>0)throw new IllegalArgumentException("Prepared stock exceeds the online allocation.");
-  var timing=jobs.timing(bp);
-  if(o.applyHours()&&!Objects.equals(timing,work.timing()))throw new IllegalArgumentException("Item service hours changed. Reload before retrying.");
   String sale=jdbc.queryForObject("SELECT sale_mode FROM products WHERE id=?",String.class,e.productId());
   var unit=InventoryUnit.valueOf("WEIGHT".equals(sale)?"GRAM":"PIECE");
   int horizon=(int)Math.max(14,java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(inventoryClock),o.throughDate()));

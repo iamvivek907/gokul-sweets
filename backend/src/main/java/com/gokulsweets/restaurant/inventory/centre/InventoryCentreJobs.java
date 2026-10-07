@@ -25,7 +25,7 @@ public class InventoryCentreJobs {
  private final ObjectMapper mapper;
  private final StaffAuthorizationService staff;
  private final Clock inventoryClock;
- public record Entry(@NotNull @Positive Long productId,@NotNull @Min(0) Long branchVersion,@Min(0) Long policyVersion,@Min(0) Long allocationVersion,@DecimalMin("0.001") BigDecimal quantity,@DecimalMin("0.001") BigDecimal readyQuantity){}
+ public record Entry(@NotNull @Positive Long productId,@NotNull @Min(0) Long branchVersion,@Min(0) Long policyVersion,@Min(0) Long allocationVersion,@DecimalMin("0.001") @Digits(integer=11,fraction=3) BigDecimal quantity,@DecimalMin("0.001") @Digits(integer=11,fraction=3) BigDecimal readyQuantity){}
  public record Options(@NotNull LocalDate fromDate,@NotNull LocalDate throughDate,@NotBlank @Pattern(regexp="DAILY_PRODUCTION|READY_STOCK|MANUAL") String method,@NotNull Boolean applyInventory,@NotNull Boolean applyPolicy,@NotNull Boolean openPurchases,@NotNull Boolean applyHours,LocalTime opens,LocalTime closes,@Min(1) @Max(127) int weekdays,@NotNull Boolean enableHours,@NotBlank @Size(max=500) String reason){}
  public record Submit(@NotNull UUID submissionId,@NotNull @Valid Options options,@NotNull @Size(min=1,max=500) List<@NotNull @Valid Entry> items){}
  public record DateVersion(LocalDate date,Long version){}

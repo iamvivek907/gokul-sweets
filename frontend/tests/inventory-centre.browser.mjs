@@ -10,7 +10,7 @@ try{
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});
   const page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on("pageerror",e=>errors.push(e.message));
   const items=[1,2,3].map(id=>({productId:id,branchProductId:id,branchVersion:0,policyVersion:null,allocationVersion:null,code:`SKU-${id}`,name:["Small samosa","Large samosa","Kaju Katli"][id-1],categoryName:"Fresh items",saleMode:id===3?"WEIGHT":"UNIT",available:false,allocation:null}));
-  let job=null,polls=0;const bodies=[];let loseAcknowledgement=true;
+  let job=null,polls=0,failOne=false;const bodies=[];let loseAcknowledgement=true;
   await context.route("**/api/**",async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;
    const headers={"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"content-type,x-staff-csrf","Access-Control-Allow-Methods":"GET,POST,OPTIONS","Access-Control-Expose-Headers":"X-Staff-CSRF","X-Staff-CSRF":"test-csrf"};
@@ -21,12 +21,12 @@ try{
    else if(path.endsWith("/portion-groups"))json={version:0,groups:[{key:"samosa",title:"Samosa portions",choices:[{productId:1,label:"Small"},{productId:2,label:"Large"}]}]};
    else if(path.endsWith("/workspace"))json={content:items,totalElements:3,totalPages:1,page:0};
    else if(path.endsWith("/centre/jobs")&&req.method()==="POST"){
-    const body=req.postDataJSON();bodies.push(body);job={id:body.submissionId,total:body.items.length,succeeded:0,failed:0};polls=0;
+    const body=req.postDataJSON();bodies.push(body);failOne=bodies.length===3;job={id:body.submissionId,total:body.items.length,succeeded:0,failed:0};polls=0;
     if(loseAcknowledgement){loseAcknowledgement=false;return route.fulfill({status:503,headers,json:{message:"Acknowledgement lost. Retry this plan."}});}
     json=job;
    }else if(path.endsWith("/centre/jobs"))json=job?[job]:[];
-   else if(path.endsWith("/results"))json=items.slice(0,job.total).map(item=>({product_id:item.productId,name:item.name,status:job.succeeded?"SUCCEEDED":"QUEUED",error:null}));
-   else if(path.includes("/centre/jobs/")){polls++;if(polls>=3)job={...job,succeeded:job.total};json=job;}
+   else if(path.endsWith("/results"))json=items.slice(0,job.total).map(item=>({product_id:item.productId,name:item.name,status:job.succeeded?(job.failed&&item.productId===2?"FAILED":"SUCCEEDED"):"QUEUED",error:job.failed&&item.productId===2?"Policy changed. Reload.":null}));
+   else if(path.includes("/centre/jobs/")){polls++;if(polls>=3)job={...job,succeeded:job.total-(failOne?1:0),failed:failOne?1:0};json=job;}
    await route.fulfill({headers,json});
   });
   await page.goto(`${base}/admin/inventory/centre`);
@@ -47,7 +47,9 @@ try{
   await page.getByLabel("Apply inventory quantities, configuration and readiness",{exact:true}).uncheck();await page.getByLabel("Apply common service hours to selected items",{exact:true}).check();await page.getByLabel("Enable service-hour enforcement for the whole branch",{exact:true}).check();
   await page.getByText("Select an existing portion group",{exact:true}).click();await page.getByRole("button",{name:"Samosa portions · 2 variants",exact:true}).click();
   await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();
-  assert.equal(bodies.length,3);assert.equal(bodies[2].options.applyInventory,false);assert.equal(bodies[2].options.applyHours,true);assert.equal(bodies[2].items.length,2);assert.ok(bodies[2].items.every(i=>i.quantity===null&&i.readyQuantity===null));assert.deepEqual(errors,[]);
+  assert.equal(bodies.length,3);assert.equal(bodies[2].options.applyInventory,false);assert.equal(bodies[2].options.applyHours,true);assert.equal(bodies[2].items.length,2);assert.ok(bodies[2].items.every(i=>i.quantity===null&&i.readyQuantity===null));await page.getByText("1 succeeded · 1 failed · 0 remaining",{exact:true}).waitFor();await page.getByRole("button",{name:"Reload failed items only",exact:true}).click();await page.getByRole("button",{name:"Apply service hours",exact:true}).waitFor();
+  assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem("inventory-centre:77")).rows.filter(r=>r.selected).map(r=>r.item.productId)),[2]);
+  await page.getByLabel("I reviewed quantities, service hours and any physical-ready confirmations.").check();await page.getByRole("button",{name:"Apply service hours",exact:true}).click();await page.getByRole("heading",{name:"Backend job progress"}).waitFor();assert.equal(bodies.length,4);assert.equal(bodies[3].items.length,1);assert.equal(bodies[3].items[0].productId,2);assert.deepEqual(errors,[]);
   await context.close();
  }
  console.log("Inventory centre: drafts, recovery, idempotent retries, stock units, grouping and hours-only plans passed at 320/390/1280px.");
