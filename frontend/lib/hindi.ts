@@ -1,4 +1,8 @@
 export const hindi: Record<string,string> = {
+    "Jump to a category": "श्रेणी पर जाएँ",
+    "Choose a category to see its items. This clears your search and filters.": "सामान देखने के लिए श्रेणी चुनें। इससे खोज और फ़िल्टर हट जाएँगे।",
+    "Preparing your visit…": "आपके स्वागत की तैयारी हो रही है…",
+
   "Sweets you’ll love": "आपकी पसंद की मिठाइयाँ",
   "Choose weight": "वज़न चुनें",
   "/ piece": "/ पीस",

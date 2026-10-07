@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {T} from "@/lib/language";
 
 import {useEffect,useState} from "react";
@@ -127,7 +128,7 @@ export default function OccasionRequests({embeddedSession}:{embeddedSession?:Cus
         {!features&&<p role="status" className="mt-6">Checking availability…</p>}
         {features&&!features.occasionEnquiries&&<p className="mt-6">Occasion requests are not available at the moment.</p>}
         {features?.occasionEnquiries&&<>{session.authenticated&&historyPhone===(session.phone??"")&&history.some(item=>item.id===target)&&<NotificationReadOnOpen orderNumber={target} targetType="OCCASION" />}{!embeddedSession&&<div className="mt-6 rounded-2xl border bg-white p-4"><CustomerIdentityPanel mode="occasion" onSessionChange={setSession} /></div>}
-                {session.authenticated&&loading&&<p role="status" className="py-6">Loading your requests…</p>}
+                {session.authenticated&&loading&&<BrandLoading compact label="Loading your requests…" />}
                 {session.authenticated && historyPhone === (session.phone ?? "") && <section id="occasion-tracker" className="occasion-tracker scroll-mt-28 mt-7"><div className="occasion-tracker-heading"><div><h2 className="text-lg font-bold">Your requests</h2><p className="text-sm">Open a request to review its quote and next step.</p></div><span>{history.length} requests</span></div><label className="mt-4 block text-sm">Find a request<input type="search" value={historySearch} onChange={event=>{setHistorySearch(event.target.value);setHistoryLimit(10);}} placeholder="Occasion, date or order number" className="mt-1 w-full rounded-xl border p-3" /></label>{!matches.length&&<p className="mt-4">{history.length?"No matching requests.":"Your requests and quotes will appear here. Start a celebration from Occasions & gifting."}</p>}
                     {matches.slice(0,historyLimit).map(enquiry => <article id={`occasion-${enquiry.id}`} key={enquiry.id} className="scroll-mt-28 mt-4 rounded-2xl border bg-white p-5">
                         <div className="flex flex-wrap justify-between gap-2"><strong>{enquiry.occasionType} · {prettyDate(enquiry.serviceDate)}</strong><span className="occasion-status">{enquiry.estimated&&enquiry.status==="PAID"&&!enquiry.packingFinalizedAt?"Advance received — packing pending":({REQUESTED: "Under branch review", QUOTED: "Quote ready — deposit due", PAYMENT_PENDING: "Deposit payment in progress", HELD: "Deposit payment in progress", PAID: "Deposit received — balance due", CONFIRMED: "Pickup confirmed", EXPIRED: "Quote or payment window expired", DECLINED: "Request declined", CANCELLED: "Cancelled — finance review pending"}[enquiry.status] ?? "Contact the branch")}</span></div>

@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {T} from "@/lib/language";
 
 
@@ -70,7 +71,7 @@ export default function CustomerNotificationInbox() {
             .sort((a, b) => b.id - a.id)}));
     if (unavailable) return <section className="rounded-3xl border border-[#eadfd6] bg-white p-6">
         <h2 className="text-xl font-semibold"><T text="Notification inbox" /></h2><p className="mt-2 text-sm">The inbox is not available yet. Check Order history for current updates.</p></section>;
-    if (!inbox && !error) return <section className="customer-page-state customer-inbox-loading" aria-label="Notification inbox" aria-busy="true"><div role="status"><span className="customer-page-state-spinner" aria-hidden="true"/><p>Loading your inbox…</p></div></section>;
+    if (!inbox && !error) return <BrandLoading className="customer-inbox-loading" label="Loading your inbox…" />;
     return <section className="customer-notification-inbox rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8" aria-label="Notification inbox">
         <div className="notification-toolbar flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-xl font-semibold"><span className="sr-only"><T text="Notification inbox" /></span>{" "}{inbox && <span className="text-sm font-normal">{inbox.unreadCount} unread</span>}</h2>

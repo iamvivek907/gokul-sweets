@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -321,7 +322,7 @@ export default function PickupPage() {
         {configurationError ? <div role="alert"><p>{configurationError}</p>
             <button className="min-h-11 p-3 underline" onClick={retry}><T text="Retry settings" /></button>
             <button className="min-h-11 p-3 underline" onClick={() => setFallback(true)}><T text="Use standard pickup selection" /></button></div>
-            : <p role="status"><T text="Loading pickup options..." /></p>}
+            : <BrandLoading label="Loading pickup options..." />}
     </AppShell>;
     // Unauthenticated previews must not add back another order's private holds. Owned checkout edits keep their existing flow.
     if (features?.smartPickupSelection && !fallback && !parsePendingOrder(pending)) {

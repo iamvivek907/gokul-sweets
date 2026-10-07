@@ -86,6 +86,7 @@ jobs:
           node tests/menu-review-regressions.browser.mjs
           node tests/menu-layout-recovery.browser.mjs
           node tests/customer-design.browser.mjs
+          node tests/loading-category-navigation.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/premium-menu.browser.mjs
           SCREENSHOT_DIR=/tmp/gokul-scrum111-layouts node tests/premium-reference.browser.mjs
           node tests/admin-product-groups.browser.mjs

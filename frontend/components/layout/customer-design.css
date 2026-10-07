@@ -198,3 +198,35 @@
  .future-storefront[data-customer-design=reference][data-customer-route] .customer-bottom-navigation {transition:none}
  .future-storefront[data-customer-design=reference][data-customer-route] .customer-bottom-navigation[data-scroll-hidden=true] {transform:none!important;pointer-events:auto}
 }
+
+/* Floating category access sits above the measured cart dock, never over it. */
+.menu-floating-categories{padding-top:64px;padding-bottom:var(--floating-cart-height,0px)}
+.menu-floating-category-trigger{position:fixed;right:12px;bottom:var(--floating-menu-bottom,calc(68px + env(safe-area-inset-bottom)));z-index:65;display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 16px;border:1px solid #fff;border-radius:24px;background:#8f1838;color:#fff;font-size:13px;font-weight:700;box-shadow:0 4px 14px #64182d25;touch-action:manipulation}
+.menu-floating-category-sheet nav{display:grid;gap:8px;margin-top:16px}
+.menu-floating-category-sheet nav button{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;min-height:52px;padding:12px 16px;border:1px solid #e9e3ec;border-radius:12px;background:white;color:#0c1029;text-align:left;font-weight:700}
+.menu-floating-category-sheet nav button[aria-current=true]{background:#f1ecfa;color:#8f1838;border-color:#d8c7de}
+.menu-floating-category-sheet nav small{display:block;font-size:11px;font-weight:400;color:#596579;margin-top:3px}
+.menu-offer-name{display:flex;align-items:center;gap:7px}
+.menu-offer-label-icon{flex:none;vertical-align:middle;color:inherit}
+
+
+.future-storefront[data-customer-design=reference] .mobile-payment-verifying{background:radial-gradient(ellipse at 50% 38%,#fff0e8 0,white 60%);color:#0c1029}
+.future-storefront[data-customer-design=reference] .mobile-payment-verifying>.brand-loading-wordmark{display:flex;align-items:center;gap:10px;color:#980c31;font:inherit}
+.mobile-payment-verifying .brand-loading-wordmark>svg{width:48px;height:54px}
+.mobile-payment-verifying .brand-loading-wordmark>span{display:flex;flex-direction:column;align-items:center}
+.mobile-payment-verifying .brand-loading-wordmark strong{font:700 36px/38px Georgia,serif}
+.mobile-payment-verifying .brand-loading-wordmark small{font:11px/16px Arial,sans-serif;letter-spacing:3px}
+.future-storefront[data-customer-design=reference] .mobile-payment-verifying>div{width:24px;height:24px;border:3px solid #e9e3ec;border-top-color:#980c31;border-radius:50%;background:transparent;animation:brand-loading-spin .85s linear infinite}
+@media(prefers-reduced-motion:reduce){.future-storefront[data-customer-design=reference] .mobile-payment-verifying>div{animation:none}}
+
+/* Menu cart action stays emerald; primary/payment actions use maroon. */
+.future-storefront[data-customer-design=reference][data-premium-menu=true][data-customer-route] .page-content .gokul-floating-cart>a{background:#087f55!important;color:white!important}
+
+@media(min-width:641px){
+ .menu-floating-category-sheet{width:min(480px,calc(100vw - 32px));max-height:min(640px,80dvh);padding:0;border:1px solid #e9e3ec;overflow:auto;box-shadow:0 16px 48px #24132930}
+ .menu-floating-category-sheet>header{position:sticky;top:0;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px;background:#fff;border-bottom:1px solid #e9e3ec}
+ .menu-floating-category-sheet h2{font-size:18px;font-weight:700}
+ .menu-floating-category-sheet>header button{min-height:44px;padding:8px 12px;border-radius:10px;background:#f1ecfa;color:#8f1838}
+ .menu-floating-category-sheet .mobile-menu-suggestion-body{padding:20px}
+}
+.future-storefront[data-customer-design=reference] .menu-floating-category-sheet::backdrop{background:#29142d66}

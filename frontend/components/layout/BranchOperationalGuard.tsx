@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {useEffect,useRef,useState,type ReactNode} from "react";
 import {usePathname} from "next/navigation";
 import Link from "next/link";
@@ -16,7 +17,7 @@ function BranchRefreshNotice({retrying,onRetry}:{retrying:boolean;onRetry:()=>vo
  },[]);
  return <dialog ref={dialog} className="customer-branch-refresh-dialog" aria-label={translate("Branch availability could not be checked")} onCancel={event=>event.preventDefault()}>
   <section className="customer-page-state" aria-busy={retrying}>
-   <div>{retrying?<><span className="customer-page-state-spinner" aria-hidden="true"/><p role="status">{translate("Loading your page…")}</p></>:<>
+   <div>{retrying?<><BrandLoading /></>:<>
     <h1>{translate("Branch availability could not be checked")}</h1>
     <p>{translate("Please reconnect and try again, or choose another branch.")}</p>
     <button type="button" onClick={onRetry}>{translate("Try again")}</button>
@@ -54,7 +55,7 @@ export default function BranchOperationalGuard({children}:{children:ReactNode}){
  const current=status?.id===id?status:null;
  const checked=current?.branch??(!current?cachedOperationalBranch(id):null);
  const retry=()=>{setRetrying(true);if(!checked)setStatus(null);setRevision(value=>value+1);};
- if(!current&&!checked)return <main className="customer-page-state" aria-busy="true"><div role="status"><span className="customer-page-state-brand" aria-hidden="true">G</span><span className="customer-page-state-spinner" aria-hidden="true"/><p>{translate("Loading your page…")}</p></div></main>;
+ if(!current&&!checked)return <BrandLoading />;
  if(current?.error&&!checked||checked?.operational===false)return <main className="customer-page-state"><section aria-label={translate("Branch unavailable")}><h1>{translate(current?.error?"Branch availability could not be checked":"Currently not operational")}</h1><p>{translate(current?.error?"Please reconnect and try again, or choose another branch.":"This branch is temporarily closed for customer visits and new orders. Please choose another branch. Your placed orders remain available in order history.")}</p>{current?.error&&<button type="button" onClick={retry}>{translate("Try again")}</button>}<Link href="/branches">{translate("Choose another branch")}</Link></section></main>;
  return <><div style={{display:"contents"}} inert={current?.error===true}>{children}</div>{current?.error&&<BranchRefreshNotice retrying={retrying} onRetry={retry}/>}</>;
 }

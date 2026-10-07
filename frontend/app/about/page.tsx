@@ -256,7 +256,7 @@ export default function AboutPage() {
                     <h2 className="mt-1 text-3xl font-extrabold text-[#241715]">Our Branches</h2>
                     <p className="mt-2 text-sm leading-6 text-[#756763]">Choose your preferred pickup location while placing the order.</p>
 
-                    {loading && <div className="mt-5 grid gap-4 md:grid-cols-2">{[1, 2].map(item => <div key={item} className="h-64 animate-pulse rounded-3xl bg-[#f4ebe4]" />)}</div>}
+                    {loading && <div className="mt-5 grid gap-4 md:grid-cols-2">{[1, 2].map(item => <div key={item} className="h-64 animate-pulse motion-reduce:animate-none rounded-3xl bg-[#f1ecfa]" />)}</div>}
 
                     {!loading && error && (
                         <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-center">

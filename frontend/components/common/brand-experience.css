@@ -1,0 +1,18 @@
+/* Available before feature discovery and outside AppShell during route streaming. */
+.customer-brand-loading{display:grid;place-items:center;padding:32px 16px;text-align:center;color:#596579;background:#fff}
+.customer-brand-loading.customer-page-state{min-height:min(440px,60dvh);padding:32px 16px}
+.customer-brand-loading.is-compact{min-height:140px;padding:20px 12px;background:transparent}
+.customer-brand-loading .brand-loading-wordmark,.gokul-mobile-launch .brand-loading-wordmark{display:flex!important;align-items:center;justify-content:center;gap:10px;color:#980c31}
+.customer-brand-loading .brand-loading-wordmark>svg,.gokul-mobile-launch .brand-loading-wordmark>svg{width:48px;height:54px;flex:none}
+.customer-brand-loading .brand-loading-wordmark>span,.gokul-mobile-launch .brand-loading-wordmark>span{display:flex;flex-direction:column;align-items:center}
+.customer-brand-loading .brand-loading-wordmark strong,.gokul-mobile-launch .brand-loading-wordmark strong{font:700 36px/38px Georgia,serif;letter-spacing:-1px}
+.customer-brand-loading .brand-loading-wordmark small,.gokul-mobile-launch .brand-loading-wordmark small{display:block!important;font:11px/16px Arial,sans-serif;letter-spacing:3px;color:inherit}
+.customer-brand-loading-spinner{display:block;width:24px;height:24px;border:3px solid #e9e3ec;border-top-color:#980c31;border-radius:50%;margin:24px auto 14px;animation:brand-loading-spin .85s linear infinite}
+.customer-brand-loading p{font-size:13px;line-height:1.6;color:#596579}
+.customer-brand-loading.is-compact .brand-loading-wordmark>svg{width:28px;height:32px}
+.customer-brand-loading.is-compact .brand-loading-wordmark strong{font-size:23px;line-height:25px}
+.customer-brand-loading.is-compact .brand-loading-wordmark small{font-size:8px;line-height:12px;letter-spacing:2px}
+.customer-brand-loading.is-compact .customer-brand-loading-spinner{width:18px;height:18px;margin:16px auto 10px}
+.customer-route-loading{position:fixed;inset:0;z-index:9999;min-height:100dvh!important;background:radial-gradient(ellipse at 50% 38%,#fff0e8 0,white 60%)}
+@keyframes brand-loading-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.customer-brand-loading-spinner{animation:none}}

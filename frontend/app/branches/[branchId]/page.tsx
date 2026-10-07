@@ -1,4 +1,5 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import MobilePageBack from "@/components/customer/MobilePageBack";
 import {T} from "@/lib/language";
 
@@ -40,7 +41,7 @@ export default function BranchHomePage() {
     return <AppShell editorial showSocialPopup={false}>
         <article className="branch-home mx-auto max-w-6xl px-4 py-8 text-[#173a37] sm:px-6">
 
-            {!branch && !error && <p role="status" className="mt-10">Loading branch…</p>}
+            {!branch && !error && <BrandLoading label="Loading branch…" />}
             {(error || !Number.isSafeInteger(id) || id < 1) && <p role="alert" className="mt-10">{error || "Branch not found."}</p>}
             {branch && <>
                 <header className="branch-home-hero">

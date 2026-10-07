@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import ReferenceWordmark from "@/components/layout/ReferenceWordmark";
+import BrandLoading from "@/components/common/BrandLoading";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {T,useTranslation} from "@/lib/language";
 import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
@@ -1521,7 +1523,7 @@ export default function PaymentPage() {
      */
 
     if (phone && (loading || payment?.paymentStatus === "PAID") && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
-        <div className="mobile-payment-verifying" role="status" aria-live="polite"><span aria-hidden="true">G</span><h1><T text="Checking your payment…" /></h1><p><T text="Please keep this page open." /></p><div aria-hidden="true" /></div>
+        <div className="mobile-payment-verifying" role="status" aria-live="polite"><ReferenceWordmark className="brand-loading-wordmark"/><h1><T text="Checking your payment…" /></h1><p><T text="Please keep this page open." /></p><div aria-hidden="true" /></div>
     </AppShell>;
 
     if (
@@ -1552,28 +1554,7 @@ export default function PaymentPage() {
                         "
                     >
 
-                        <div
-                            className="
-                                mx-auto
-                                h-10
-                                w-10
-                                animate-spin
-                                rounded-full
-                                border-4
-                                border-[#eadfd6]
-                                border-t-[#7a1625]
-                            "
-                        />
-
-
-                        <p
-                            className="
-                                mt-5
-                                font-semibold
-                                text-[#241715]
-                            "
-                        >
-                            <T text="Preparing secure payment..." /></p>
+                        <BrandLoading compact label="Preparing secure payment..." />
 
 
                         <p
