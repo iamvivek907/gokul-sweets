@@ -37,9 +37,36 @@ function storage(){const map=new Map(),events=[];const localStorage={getItem:key
  const cart=load('lib/cartStorage.ts',()=>mode,{localStorage,window,Event});
  const checkout=load('lib/checkoutStorage.ts',()=>mode,{localStorage,window,Event});
  return {map,mode,cart,checkout,localStorage,window};}
-test('legacy/date-only/manual/malformed preferences stay fixed; a new empty menu can automate',()=>{
+test('stored mode stays conservative; incomplete recovery is evaluated separately',()=>{
  const {mode}=storage();assert.equal(mode.isSoonestPickup('',1,'',false),true);
  for(const [raw,pickup,preference] of [['','saved',true],['','',true],['broken','',false],[JSON.stringify({branchId:1,mode:'fixed',pickup:''}),'',false]]) assert.equal(mode.isSoonestPickup(raw,1,pickup,preference),false);
+});
+test('pickup intent activates recovery for retained today, future and past dates without a slot',()=>{
+ const {mode,map,checkout,localStorage,window}=storage();
+ const hook=load('hooks/usePickupIntent.ts',path=>{
+  if(path==='react')return {useSyncExternalStore:(_subscribe,snapshot)=>snapshot()};
+  if(path.includes('menuPickupMode'))return mode;
+  if(path.includes('checkoutStorage'))return checkout;
+  if(path.includes('usePickupClock'))return {usePickupClock:()=>now().getTime()};
+  return freshness;
+ },{localStorage,window,Event});
+ for(const date of [today,tomorrow,'2026-10-07'])for(const fixed of [false,true]){
+  map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date}));
+  if(fixed)mode.setMenuPickupMode(1,false,'');else map.delete('gokul-menu-pickup-mode:v1');
+  const intent=hook.usePickupIntent(1);assert.equal(intent.selection,null);assert.equal(intent.automatic,true);
+ }
+ const saved=JSON.stringify({date:tomorrow,slot:slot(tomorrow,8).slot,pickupType:'NORMAL'});
+ map.set('gokul-selected-pickup-slot',saved);map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date:tomorrow}));mode.setMenuPickupMode(1,false,saved);
+ assert.equal(hook.usePickupIntent(1).automatic,false,'confirmed manual pickup remains fixed');
+});
+test('incomplete date-only storage can recover without overriding a confirmed or unrecognized pickup',()=>{
+ const {mode}=storage();
+ assert.equal(mode.canRecoverIncompleteMenuPickup('',1,''),true,'legacy date-only preference');
+ for(const value of ['fixed','soonest'])assert.equal(mode.canRecoverIncompleteMenuPickup(JSON.stringify({branchId:1,mode:value,pickup:''}),1,''),true);
+ assert.equal(mode.canRecoverIncompleteMenuPickup(JSON.stringify({branchId:2,mode:'fixed',pickup:'old'}),1,''),true,'another branch mode cannot lock an incomplete local pickup');
+ for(const raw of ['broken','null','{}',JSON.stringify({branchId:1,mode:'unknown',pickup:''}),JSON.stringify({branchId:1,mode:'fixed',pickup:'confirmed'})])assert.equal(mode.canRecoverIncompleteMenuPickup(raw,1,''),false);
+ for(const pickup of ['broken','confirmed',JSON.stringify({date:today,slot:slot(today,1).slot,pickupType:'NORMAL'})])assert.equal(mode.canRecoverIncompleteMenuPickup('',1,pickup),false);
+ assert.equal(mode.canRecoverIncompleteMenuPickup('',null,''),false);
 });
 test('automatic mode survives refresh but cannot attach to a different saved pickup',()=>{
  const {mode}=storage();mode.setMenuPickupMode(1,true,'slot-a');const persisted=mode.getMenuPickupModeSnapshot();

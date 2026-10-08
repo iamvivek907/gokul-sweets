@@ -17,6 +17,18 @@ export function isSoonestPickup(raw: string, branchId: number | null | undefined
     try {const value = JSON.parse(raw); return value.branchId !== branchId ? !hasPreference && !pickup : value.mode === "soonest" && value.pickup === pickup;}
     catch {return false;}
 }
+/** A date without a confirmed slot is incomplete, even if an older date picker
+ * wrote fixed mode. Recover only empty slot storage; preserve saved pickups,
+ * malformed state and a fixed mode bound to a previously confirmed pickup. */
+export function canRecoverIncompleteMenuPickup(raw: string, branchId: number | null | undefined, pickup: string) {
+    if (!Number.isSafeInteger(branchId) || pickup) return false;
+    if (!raw) return true;
+    try {
+        const value = JSON.parse(raw);
+        if (!Number.isSafeInteger(value?.branchId) || !["fixed", "soonest"].includes(value?.mode) || typeof value?.pickup !== "string") return false;
+        return value.branchId !== branchId || value.pickup === "";
+    } catch {return false;}
+}
 export function setMenuPickupMode(branchId: number, automatic: boolean, pickup = localStorage.getItem("gokul-selected-pickup-slot") ?? "") {
     localStorage.setItem(MENU_PICKUP_MODE_KEY, JSON.stringify({branchId, mode: automatic ? "soonest" : "fixed", pickup}));
     window.dispatchEvent(new Event(event));
