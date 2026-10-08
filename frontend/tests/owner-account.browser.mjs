@@ -58,7 +58,7 @@ try {
    await noPersistedSecret(page,replacement);await noPersistedSecret(page,mode==='setup'?setupKey:recoveryKey);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
    const beforeLogin=profileLoads;const refreshed=page.waitForResponse(response=>response.url().endsWith('/api/admin/auth/me'));
-   await page.getByRole('link',{name:'Go to admin login',exact:true}).click();await refreshed;await page.waitForURL('**/admin/login');
+   await page.getByRole('link',{name:mode==='recover'&&width===390?'Back to admin login':'Go to admin login',exact:true}).click();await refreshed;await page.waitForURL('**/admin/login');
    assert.equal(profileLoads>beforeLogin,true,'login navigation reloads auth after credential recovery revoked the old session');
    assert.equal(await page.getByLabel('Recovery key',{exact:true}).count(),0,'raw recovery key is not retained after leaving');
    await context.close();console.log(`Owner ${mode} passed at ${width}px`);

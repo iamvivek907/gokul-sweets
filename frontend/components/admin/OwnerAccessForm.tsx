@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import {useEffect,useRef,useState} from "react";
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 export interface OwnerResult {username:string;recoveryKey:string}
@@ -60,6 +59,6 @@ export default function OwnerAccessForm({mode}:{mode:"setup"|"recover"}) {
             <p className="text-sm">Use at least 12 characters. {mode==="setup"?"After setup, sign in and enroll your authenticator.":"Sign in with your existing authenticator after recovery."} Keep MFA recovery codes separately from the account recovery key.</p>
             <button className="min-h-11 w-full rounded-xl bg-[#7a1625] p-3 font-semibold text-white" type="submit">{busy?"Checking account…":mode==="setup"?"Create first owner":"Recover credentials"}</button>
         </fieldset></form>}
-        <Link href="/admin/login" className="inline-block underline">Back to admin login</Link>
+        <a href="/admin/login" className="inline-block underline">Back to admin login</a>
     </section></main>;
 }
