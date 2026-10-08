@@ -70,6 +70,7 @@ public record CustomerOrderResponse(
         String deliveryPostalCode,
         String branchFssaiLicenceNumber,
         BigDecimal deliveryFee,
-        BigDecimal loyaltyDiscount, int loyaltyCoins, String loyaltyRewardCode, BigDecimal rebateDiscountAmount
+        BigDecimal loyaltyDiscount, int loyaltyCoins, String loyaltyRewardCode, BigDecimal rebateDiscountAmount,
+        Long branchId, Long pickupSlotId
 ) {
 }

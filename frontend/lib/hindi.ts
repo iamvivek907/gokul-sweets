@@ -1,4 +1,6 @@
 export const hindi: Record<string,string> = {
+ "Pickup changed or expired. Close this popup and review the pickup before adding.":"पिकअप बदल गया है या उसका समय निकल गया है। जोड़ने से पहले यह पॉपअप बंद करें और पिकअप की तारीख व समय देखें।",
+
  "Soonest pickup":"सबसे जल्द पिकअप",
  "Finding soonest pickup…":"सबसे जल्द पिकअप खोज रहे हैं…",
  "Finding the first pickup with available items. You can also choose a time.":"उपलब्ध आइटम के लिए पहला पिकअप खोज रहे हैं। आप समय भी चुन सकते हैं।",

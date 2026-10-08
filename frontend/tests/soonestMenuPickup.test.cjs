@@ -35,7 +35,8 @@ function storage(){const map=new Map(),events=[];const localStorage={getItem:key
  const window={localStorage,dispatchEvent:event=>events.push(event.type)};
  const mode=load('lib/menuPickupMode.ts',()=>{},{localStorage,window,Event});
  const cart=load('lib/cartStorage.ts',()=>mode,{localStorage,window,Event});
- return {map,mode,cart,localStorage,window};}
+ const checkout=load('lib/checkoutStorage.ts',()=>mode,{localStorage,window,Event});
+ return {map,mode,cart,checkout,localStorage,window};}
 test('legacy/date-only/manual/malformed preferences stay fixed; a new empty menu can automate',()=>{
  const {mode}=storage();assert.equal(mode.isSoonestPickup('',1,'',false),true);
  for(const [raw,pickup,preference] of [['','saved',true],['','',true],['broken','',false],[JSON.stringify({branchId:1,mode:'fixed',pickup:''}),'',false]]) assert.equal(mode.isSoonestPickup(raw,1,pickup,preference),false);
@@ -66,7 +67,7 @@ test('completed paid pickup releases automatic mode for the next order, without 
 });
 
 for(const changed of [false,true])test(`paid cleanup ${changed?'preserves a newer cart and its fixed choice':'starts a fresh soonest ordering session'}`,()=>{
- const {mode,map,cart,localStorage,window}=storage();
+ const {mode,map,cart,checkout,localStorage,window}=storage();
  const items=[{product:{id:1,saleMode:'UNIT',categoryName:'Breakfast'},quantity:1}];
  const pickup=JSON.stringify({date:today,slot:{branchId:1,id:8}});
  map.set('gokul-selected-pickup-slot',pickup);map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));
@@ -75,6 +76,7 @@ for(const changed of [false,true])test(`paid cleanup ${changed?'preserves a newe
  const pending={orderNumber:'paid-1',branchId:1,pickupSlotId:8,cartFingerprint:fingerprint(items)};
  const recovery=load('lib/paidCartRecovery.ts',path=>{
   if(path.includes('menuPickupMode'))return mode;
+  if(path.includes('checkoutStorage'))return checkout;
   if(path.includes('cartFingerprint'))return {createCartFingerprint:fingerprint};
   if(path.includes('cartStorage'))return cart;
   if(path.includes('pendingOrder'))return {getPendingOrderSnapshot:()=>JSON.stringify(pending),parsePendingOrder:JSON.parse,clearPendingOrder:()=>{}};
@@ -83,4 +85,35 @@ for(const changed of [false,true])test(`paid cleanup ${changed?'preserves a newe
  assert.equal(recovery.reconcilePaidCart('paid-1'),!changed);
  if(changed){assert.equal(cart.parseCart(cart.getCartSnapshot()).items[0].quantity,2);assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),1,pickup,true),false);}
  else {assert.equal(cart.parseCart(cart.getCartSnapshot()).items.length,0);assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),1,'',false),true);}
+});
+
+test('item picker rejects an expired or replaced pickup, including a different date with the same time',()=>{
+ const {checkout}=storage();const picker=load('lib/menuPickerPickup.ts',path=>path.includes('Freshness')?freshness:checkout);
+ const raw=JSON.stringify({date:today,slot:slot(today,8).slot,pickupType:'NORMAL'});
+ assert.equal(picker.pickerPickupMatches(raw,raw,now()),true);
+ assert.equal(picker.pickerPickupMatches(raw,raw,new Date(`${today}T08:00:01+05:30`)),false);
+ const replacement=JSON.stringify({date:tomorrow,slot:slot(tomorrow,9).slot,pickupType:'NORMAL'});
+ assert.equal(picker.pickerPickupMatches(raw,replacement,now()),false);
+ assert.equal(picker.pickerPickupMatches('',replacement,now()),false);
+});
+for(const scenario of ['defer','paid','later-pickup','other-cart','other-checkout','not-paid','wrong-order'])test(`payment-only recovery: ${scenario}`,()=>{
+ const {mode,map,cart,checkout,localStorage,window}=storage();
+ const items=[{product:{id:1,saleMode:'UNIT',categoryName:'Breakfast'},quantity:1}];
+ const fingerprint=items=>JSON.stringify(items.map(item=>({id:item.product.id,quantity:item.quantity})));
+ const old=JSON.stringify({date:today,slot:{branchId:1,id:8}}),later=JSON.stringify({date:tomorrow,slot:{branchId:1,id:9}});
+ const pickup=scenario==='later-pickup'?later:old;
+ map.set('gokul-selected-pickup-slot',pickup);map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date:scenario==='later-pickup'?tomorrow:today}));
+ cart.saveCart({branchId:1,items:scenario==='other-cart'?[{...items[0],quantity:2}]:items});
+ const payment={orderNumber:'paid-1',cartFingerprint:fingerprint(items)};map.set('payment',JSON.stringify(payment));
+ const recovery=load('lib/paidCartRecovery.ts',path=>{
+  if(path.includes('menuPickupMode'))return mode;if(path.includes('checkoutStorage'))return checkout;
+  if(path.includes('cartFingerprint'))return {createCartFingerprint:fingerprint};if(path.includes('cartStorage'))return cart;
+  if(path.includes('pendingOrder'))return {getPendingOrderSnapshot:()=>scenario==='other-checkout'?JSON.stringify({orderNumber:'new-checkout',branchId:1,pickupSlotId:9}):'',parsePendingOrder:value=>value?JSON.parse(value):null,clearPendingOrder:()=>{}};
+  return {getPendingPaymentSnapshot:()=>map.get('payment')??'',parsePendingPayment:value=>value?JSON.parse(value):null,clearPendingPayment:()=>map.delete('payment')};
+ },{localStorage,window,Event});
+ const owner=scenario==='defer'?undefined:{orderNumber:scenario==='wrong-order'?'other':'paid-1',paymentStatus:scenario==='not-paid'?'PENDING':'PAID',branchId:1,pickupSlotId:8};
+ const result=recovery.reconcilePaidCart('paid-1',owner);
+ if(scenario==='paid'){assert.equal(result,true);assert.equal(cart.parseCart(cart.getCartSnapshot()).items.length,0);assert.equal(map.get('gokul-selected-pickup-slot'),undefined);assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),1,'',false),true);}
+ else if(scenario==='later-pickup'){assert.equal(result,true);assert.equal(map.get('gokul-selected-pickup-slot'),later);assert.equal(JSON.parse(map.get('gokul-pickup-intent')).date,tomorrow);}
+ else {assert.equal(result,false);assert.equal(cart.parseCart(cart.getCartSnapshot()).items.length,1);assert.equal(map.get('gokul-selected-pickup-slot'),pickup);if(!['other-cart','other-checkout'].includes(scenario))assert.ok(map.has('payment'),'defer cleanup rather than discard the recovery fingerprint');}
 });

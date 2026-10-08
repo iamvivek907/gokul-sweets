@@ -50,6 +50,8 @@ class DeliveryCustomerOrderViewIntegrationTest {
 
         jdbc.update("UPDATE orders SET subtotal=100, delivery_fee=30, total_amount=110 WHERE order_number=?", orderNumber);
         var detail = orders.getCustomerOrder(orderNumber);
+        assertThat(detail.branchId()).isEqualTo(branch);
+        assertThat(detail.pickupSlotId()).isNull();
         assertThat(detail.deliveryFee()).isEqualByComparingTo("30");
         assertThat(detail.totalAmount()).isEqualByComparingTo("110");
         assertThat(detail.fulfillmentType()).isEqualTo(FulfillmentType.DELIVERY);
@@ -63,5 +65,26 @@ class DeliveryCustomerOrderViewIntegrationTest {
         assertThat(summary.fulfillmentType()).isEqualTo(FulfillmentType.DELIVERY);
         assertThat(summary.deliveryEndTime()).isEqualTo(LocalTime.of(12, 0));
         assertThat(summary.pickupDate()).isNull();
+    }
+
+    @Test
+    void pickupDetailsExposeTheOrdersOwnBranchAndSlotForPaidRecovery() {
+        String key = UUID.randomUUID().toString().substring(0, 8);
+        Long branch = jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,?) RETURNING id",
+                Long.class,"PCR-"+key,"Pickup recovery "+key);
+        Long slot = jdbc.queryForObject("""
+                INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)
+                VALUES (?,DATE '2026-10-10','18:00','18:30',10) RETURNING id
+                """,Long.class,branch);
+        String number = ("PCR-"+key).toUpperCase(java.util.Locale.ROOT);
+        jdbc.update("""
+                INSERT INTO orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,
+                                   order_status,reservation_expires_at,fulfillment_type,pickup_type)
+                VALUES (?,?,?,'Customer','9999999999','CONFIRMED',CURRENT_TIMESTAMP+INTERVAL '15 minutes','PICKUP','NORMAL')
+                """,number,branch,slot);
+        var detail = orders.getCustomerOrder(number);
+        assertThat(detail.branchId()).isEqualTo(branch);
+        assertThat(detail.pickupSlotId()).isEqualTo(slot);
+        assertThat(detail.pickupDate()).isEqualTo(LocalDate.of(2026,10,10));
     }
 }

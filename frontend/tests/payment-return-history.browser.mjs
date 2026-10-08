@@ -9,7 +9,7 @@ try {
         let providerDown = false, providerSettled = false, paymentExpired = false, lookupGate = null, lookupStarted = null;
         const branch = {id: 1, code: 'TEST', name: 'History branch', active: true, operational: true, pickupAvailable: true};
         const payment = () => ({paymentId: 10, orderNumber: 'TEST-HISTORY', provider: 'PHONEPE', paymentStatus: status, amount: 200, currency: 'INR', paymentUrl: null, providerOrderId: 'test', expiresAt: new Date(Date.now() + (paymentExpired ? -1000 : 600000)).toISOString()});
-        const order = () => ({id: 1, orderNumber: 'TEST-HISTORY', branchId: 1, branchName: branch.name, pickupDate: '2026-10-10', pickupStartTime: '18:00:00', pickupEndTime: '19:00:00', pickupType: 'NORMAL', fulfillmentType: 'PICKUP', customerName: 'Test customer', customerPhone: '9876543210', orderStatus: status === 'PAID' ? 'CONFIRMED' : status === 'PENDING' ? 'PENDING_PAYMENT' : 'CANCELLED', paymentStatus: status, subtotal: 200, totalAmount: 200, taxAmount: 0, priorityCharge: 0, items: [], reservationExpiresAt: new Date(Date.now() + 600000).toISOString(), createdAt: new Date().toISOString()});
+        const order = () => ({id: 1, orderNumber: 'TEST-HISTORY', branchId: 1, pickupSlotId: 8, branchName: branch.name, pickupDate: '2026-10-10', pickupStartTime: '18:00:00', pickupEndTime: '19:00:00', pickupType: 'NORMAL', fulfillmentType: 'PICKUP', customerName: 'Test customer', customerPhone: '9876543210', orderStatus: status === 'PAID' ? 'CONFIRMED' : status === 'PENDING' ? 'PENDING_PAYMENT' : 'CANCELLED', paymentStatus: status, subtotal: 200, totalAmount: 200, taxAmount: 0, priorityCharge: 0, items: [], reservationExpiresAt: new Date(Date.now() + 600000).toISOString(), createdAt: new Date().toISOString()});
         await context.route('https://gateway.example.invalid/**', async route => {gatewayVisits++; await route.fulfill({contentType: 'text/html', body: '<h1>Secure gateway</h1>'});});
         await context.route('**/api/**', async route => {
             const req = route.request(), path = new URL(req.url()).pathname;
@@ -94,6 +94,25 @@ try {
         status = 'PAID'; await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true})));
         await page.waitForURL('**/orders/TEST-HISTORY').catch(async error => {console.error('Cache restoration state:', page.url(), await page.locator('body').innerText()); throw error;});
         assert.equal(gatewayVisits, 1); assert.equal(creates, 0);
+        // No pending-order record: verified summary details must release the completed pickup.
+        for(const laterChoice of [false,true]){
+            await page.evaluate(({payment,laterChoice})=>{
+                const slot={id:laterChoice?9:8,branchId:1,slotDate:laterChoice?'2026-10-11':'2026-10-10',startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:10};
+                const raw=JSON.stringify({date:slot.slotDate,slot,pickupType:'NORMAL'});
+                localStorage.removeItem('gokul-pending-order');
+                localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:{id:1,name:'Sweet',price:100,available:true,saleMode:'UNIT',categoryName:'Sweet'},quantity:1,weightGrams:null}]}));
+                localStorage.setItem('gokul-pending-payment',JSON.stringify({...payment,cartFingerprint:'1:UNIT:1:-'}));
+                localStorage.setItem('gokul-selected-pickup-slot',raw);
+                localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:slot.slotDate}));
+                localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:raw}));
+            },{payment:payment(),laterChoice});
+            await page.goto(`${base}/orders/TEST-HISTORY`);
+            await page.waitForFunction(()=>localStorage.getItem('gokul-cart')===null);
+            const saved=await page.evaluate(()=>({pickup:localStorage.getItem('gokul-selected-pickup-slot'),intent:localStorage.getItem('gokul-pickup-intent'),mode:localStorage.getItem('gokul-menu-pickup-mode:v1'),payment:localStorage.getItem('gokul-pending-payment')}));
+            assert.equal(saved.payment,null);
+            if(laterChoice){assert.equal(JSON.parse(saved.pickup).slot.id,9);assert.equal(JSON.parse(saved.intent).date,'2026-10-11');assert.equal(JSON.parse(saved.mode).mode,'fixed');}
+            else {assert.equal(saved.pickup,null);assert.equal(saved.intent,null);assert.equal(saved.mode,null);}
+        }
         console.log(`PASS: payment history and restoration at ${width}px`);
         await context.close();
     }

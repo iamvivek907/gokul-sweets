@@ -17,6 +17,7 @@
     "tests/menu-service-hours.browser.mjs"
   ],
   "menu": [
+    "tests/menu-picker-pickup-guard.browser.mjs",
     "tests/menu-soonest-pickup.browser.mjs",
     "tests/menu-pickup-groups.browser.mjs",
     "tests/menu-pickup-default.browser.mjs",

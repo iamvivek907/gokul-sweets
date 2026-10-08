@@ -786,7 +786,7 @@ export default function PaymentPage() {
                             ) {
 
                                 if (paidCartRecovery !== false) {
-                                    reconcilePaidCart(orderNumber);
+                                    reconcilePaidCart(orderNumber,backendOrder);
                                 } else {
                                     clearPendingPayment();
 
