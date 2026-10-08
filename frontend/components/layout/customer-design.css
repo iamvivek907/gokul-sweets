@@ -293,3 +293,22 @@
 
 .app-container .floating-cart-clear-dialog>header{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .app-container .floating-cart-clear-dialog>header button{flex:none;background:#f6e9ee;color:#980c31;border:0;min-height:44px}
+
+/* The shared menu pickup dialog also needs a bounded desktop layout. */
+.future-storefront .mobile-pickup-dialog[open]{display:grid;grid-template-rows:auto minmax(0,1fr) auto;position:fixed;inset:0;margin:auto;width:calc(100vw - 32px);max-width:680px;max-height:80dvh;border:1px solid #d9e5df;border-radius:20px;padding:16px;background:#fff;color:#20242b;box-shadow:0 12px 40px #09272540}
+.future-storefront .mobile-pickup-dialog::backdrop{background:#09272580}
+.future-storefront .mobile-pickup-dialog-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.future-storefront .mobile-pickup-dialog h2{font-size:18px;font-weight:750}
+.future-storefront .mobile-pickup-dialog h3{font-size:15px;font-weight:750;margin:12px 0}
+.future-storefront .mobile-pickup-dialog-header button{min-height:44px;flex-shrink:0;padding:8px;font-size:13px}
+.future-storefront .mobile-pickup-dialog-body{overflow-y:auto;min-height:0;min-width:0;padding:8px 0;font-size:13px}
+.future-storefront .mobile-pickup-dialog .mobile-pickup-dates{display:flex;gap:8px;overflow-x:auto;margin-top:12px;padding-bottom:8px}
+.future-storefront .mobile-pickup-dialog .mobile-pickup-dates button{flex-shrink:0;max-width:170px;min-height:64px;border-radius:12px;padding:8px;text-align:left}
+.future-storefront .mobile-pickup-dialog .mobile-pickup-dates :is(strong,small){display:block}
+.future-storefront .mobile-pickup-dialog .mobile-pickup-times{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.future-storefront .mobile-pickup-dialog .mobile-pickup-times button{min-height:72px;padding:10px;font-size:13px}
+.future-storefront .mobile-pickup-dialog .mobile-pickup-times :is(strong,span){display:block}
+.future-storefront .mobile-pickup-dialog-actions{display:flex;gap:8px;padding-top:12px}
+.future-storefront .mobile-pickup-dialog-actions button{flex:1;min-height:48px;border:1px solid #d4d8de;border-radius:12px;font-size:13px;font-weight:750}
+.future-storefront .mobile-pickup-dialog-actions button:last-child{background:#087f55;color:white}
+.future-storefront .mobile-pickup-dialog-actions button:disabled{opacity:.5;cursor:not-allowed}

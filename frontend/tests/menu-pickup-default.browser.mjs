@@ -28,11 +28,12 @@ try {for(const width of [320,390,640,1280]) {
   else if(path.endsWith('/pickup-discovery'))json={today,maximumDate:today,dates:[{date:today,available:true,slots:[{slot:breakfast,normalAvailable:true,issues:[]},{slot:lunch,normalAvailable:true,issues:[]}]}]};
   else if(path.endsWith('/availability')){
    checks++;if(mode==='outage')return route.fulfill({status:503,headers,json:{message:'Unavailable'}});
-   const date=request.postDataJSON().startDate;
+   const body=request.postDataJSON(),date=body.startDate;
+   const requestedIds=new Set(body.items.map(item=>item.productId));
    const slots=[breakfast,lunch].map(original=>{
     const checked={...original,slotDate:date};
     if(mode==='full'||mode==='priority'){checked.remainingCapacity=0;checked.priorityEnabled=mode==='priority';checked.priorityRemainingCapacity=mode==='priority'?3:0;}
-    const issues=mode==='all'?[]:products.filter(p=>original.id===8?p.id===1:p.id!==1).map(p=>({productId:p.id,productName:p.name,available:false,code:'OUTSIDE_SERVICE',reason:original.id===8?'Available for pickup from 11 AM.':'Breakfast service ends at 9:30 AM.'}));
+    const issues=mode==='all'?[]:products.filter(p=>requestedIds.has(p.id)&&(original.id===8?p.id===1:p.id!==1)).map(p=>({productId:p.id,productName:p.name,available:false,code:'OUTSIDE_SERVICE',reason:original.id===8?'Available for pickup from 11 AM.':'Breakfast service ends at 9:30 AM.'}));
     return {slot:checked,normalAvailable:!issues.length,priorityAvailable:false,code:mode==='closed'?'PICKUP_WINDOW':null,reason:mode==='closed'?'Booking cutoff passed.':null,issues};
    });
    json={today,maximumDate:today,dates:[{date,available:true,items:products.map(p=>({productId:p.id,productName:p.name,available:true})),slots}]};
@@ -44,8 +45,7 @@ try {for(const width of [320,390,640,1280]) {
  const load=async()=>{await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});};
  const pickup=page.getByRole('region',{name:'Menu pickup time'});
  await load();await pickup.getByText(/Today, .* · 8:00/).waitFor();
- await page.getByRole('heading',{name:'Available for your 8:00 am pickup',exact:false}).waitFor();
- const breakfastSection=page.getByRole('region',{name:'Available for selected pickup'});
+ const breakfastSection=page.locator('#gokul-menu-items');
  assert.equal(await breakfastSection.getByRole('heading',{name:'Aloo Paratha',exact:true}).count(),1,'All is the default, even though Food is first in the catalog');
  assert.equal(await breakfastSection.getByRole('button',{name:'Add Aloo Paratha to cart'}).isEnabled(),true);
  assert.equal(await page.getByRole('button',{name:'Add Veg Chowmein to cart'}).isDisabled(),true);
@@ -56,8 +56,7 @@ try {for(const width of [320,390,640,1280]) {
  // A mixed breakfast/lunch cart cannot silently move its pickup or discard its items.
  await breakfastSection.getByRole('button',{name:'Add Aloo Paratha to cart'}).click();
  await pickup.getByRole('button',{name:'Change time',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Choose pickup date & time'});
- await dialog.getByRole('button',{name:/11:00–11:30/}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();
- await dialog.getByRole('alert').filter({hasText:'Aloo Paratha'}).waitFor();
+ assert.equal(await dialog.getByRole('button',{name:/11:00–11:30/}).count(),0,'cart-incompatible times are omitted');
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).slot.id),8);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);
  await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
@@ -68,7 +67,7 @@ try {for(const width of [320,390,640,1280]) {
  await pickup.getByText(/Today, .* · 11:00/).waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Veg Chowmein to cart"]')?.disabled);
  assert.equal(await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).isDisabled(),true);
  // All eligible restores the current category presentation without extra availability sections.
- mode='all';revision='2';await page.clock.fastForward(31000);await breakfastSection.waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
+ mode='all';revision='2';await page.clock.fastForward(31000);await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
  assert.equal(await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).isEnabled(),true);
  // Capacity refresh blocks Add but never moves the retained pickup.
  mode='full';revision='3';await page.clock.fastForward(61000);await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Veg Chowmein to cart"]')?.disabled===true);

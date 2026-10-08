@@ -13,7 +13,7 @@ export function formatAvailableAmount(quantity: number | null, unit: "GRAM" | "P
 export function describePickupAvailability(item: ItemAvailability | undefined, checking: boolean): string {
     if (!item) return checking ? "Checking this pickup date…" : "Choose a pickup date to check this item.";
     if (!item.available) {
-        if ((item.code === "OUTSIDE_SERVICE" || item.code === "DEPENDENCY_UNAVAILABLE") && item.reason) return item.reason;
+        if (item.reason) return item.reason;
         const remaining = item.code === "QUANTITY_TOO_LARGE"
             ? formatAvailableAmount(item.availableQuantity, item.unit) : null;
         return remaining ? `Not enough for this pickup date. Up to ${remaining} may be available.`

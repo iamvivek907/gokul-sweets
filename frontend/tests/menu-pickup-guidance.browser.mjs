@@ -42,7 +42,7 @@ try{
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
   await page.getByLabel('Find a favourite',{exact:true}).fill('Meal 1');
   await page.evaluate(date=>{localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));window.dispatchEvent(new Event('gokul-pickup-intent-change'));},date);
-  await pickup.getByText(/Time not selected/).waitFor();await pickup.getByText('Availability follows your selected pickup time. Confirm it at checkout.',{exact:true}).waitFor();
+  await pickup.getByText(/Time not selected/).waitFor();
   await page.getByLabel('Find a favourite',{exact:true}).fill('');
   await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Meal 2 to cart"]')?.disabled===true);
   assert.equal(await recommendations.getByRole('button',{name:'Add Meal 1 to cart'}).isDisabled(),true);

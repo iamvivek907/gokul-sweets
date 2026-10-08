@@ -3,7 +3,6 @@ import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
 import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
 import {pickupIsFresh} from "@/lib/pickupFreshness";
-import {partitionPickupProducts} from "@/lib/menuPickupPresentation";
 import {menuFamily,retailCollections} from "@/lib/menuPresentation";
 import RetailSweetRail from "./RetailSweetRail";
 import MobileMenuHighlights from "./MobileMenuHighlights";
@@ -790,11 +789,6 @@ export default function MenuScreen() {
 
     const pickupCheck = useDateAvailability(allProducts);
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
-    const pickupPartition = pickupCheck.intent.selection && pickupCheck.items && !pickupCheck.error
-        ? partitionPickupProducts(filteredProducts,pickupCheck.items,phoneMenu?portionGroups:[],allProducts) : null;
-    const splitPickup = !!pickupPartition && pickupPartition.other.length > 0;
-    const pickupTimeLabel = pickupCheck.intent.selection ? new Intl.DateTimeFormat("en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"})
-        .format(new Date(`${pickupCheck.intent.selection.date}T${pickupCheck.intent.selection.slot.startTime}+05:30`)) : "";
     const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
     const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
     const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
@@ -1456,19 +1450,10 @@ export default function MenuScreen() {
                                 </div>
 
 
-                                {phoneMenu&&!splitPickup&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
+                                {phoneMenu&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
-                                {pickupCheck.features?.contextualStorefrontV2 ? <div className={splitPickup?"menu-pickup-sections":undefined}>
-                                    <section aria-label={splitPickup?"Available for selected pickup":undefined} className={splitPickup?"menu-pickup-section":undefined}>
-                                        {splitPickup&&pickupPartition&&<><h2>Available for your {pickupTimeLabel} pickup</h2>
-                                        <p>{pickupPartition.available.length ? "These items fit your selected pickup." : "No items in this view fit your selected pickup. Change time or clear filters."}</p></>}
-                                        {(splitPickup&&pickupPartition?groupMenuProducts(categories,pickupPartition.available):phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
-                                    </section>
-                                    {splitPickup&&pickupPartition&&<section aria-label="Other menu items" className="menu-pickup-section menu-pickup-section--other">
-                                        <h2>Other menu items</h2><p>Service times and stock vary. Review each item or change pickup.</p>
-                                        <button type="button" className="menu-change-pickup" onClick={()=>document.querySelector<HTMLButtonElement>('.mobile-menu-pickup > button')?.click()}>Change pickup</button>
-                                        {groupMenuProducts(categories,pickupPartition.other).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={group.id} id={group.id} anchorId={pickupPartition.available.some(product=>product.categoryId===group.id)?`menu-later-category-${group.id}`:undefined} name={group.name} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
-                                    </section>}
+                                {pickupCheck.features?.contextualStorefrontV2 ? <div>
+                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
                                 </div> : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
@@ -1506,7 +1491,7 @@ export default function MenuScreen() {
                                 />
                                 )}
 
-                                {phoneMenu&&!splitPickup&&retailBrowse&&!search.trim()&&<RetailSweetRail products={allProducts} onBrowse={browseMenu}/>}
+                                {phoneMenu&&retailBrowse&&!search.trim()&&<RetailSweetRail products={allProducts} onBrowse={browseMenu}/>}
                             </>
                         )}
 

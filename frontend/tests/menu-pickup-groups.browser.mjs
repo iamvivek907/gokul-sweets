@@ -35,10 +35,11 @@ try{for(const width of [320,390,640]){
  await card.getByText('Half service starts at 11 AM.',{exact:false}).waitFor();
  await card.getByText('Full service starts at noon.',{exact:false}).waitFor();
  assert.equal(await card.getByRole('button',{name:'Choose options for Paratha',exact:true}).isDisabled(),true);
- assert.equal(await page.getByRole('region',{name:'Other menu items'}).locator('.mobile-portion-card').count(),1);
+ assert.equal(await page.locator('.mobile-portion-card').count(),1);
+ assert.equal(await page.getByRole('region',{name:'Other menu items'}).count(),0);
  mixed=true;await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  await page.waitForFunction(()=>document.querySelector('button[aria-label="Choose options for Paratha"]')?.disabled===false);
- assert.equal(await page.getByRole('region',{name:'Available for selected pickup'}).locator('.mobile-portion-card').count(),1);
+ assert.equal(await page.locator('.mobile-portion-card').count(),1);
  await page.getByLabel('Find a favourite',{exact:true}).fill('Half');
  await page.waitForFunction(()=>!document.querySelector('section[aria-label="Other menu items"]'));
  assert.equal(await card.count(),1,'filtered group is kept once, with its full catalogue of sizes');

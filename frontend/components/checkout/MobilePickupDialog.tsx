@@ -15,7 +15,10 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
 }){
  const locale=useLanguage();
  const dialog=useRef<HTMLDialogElement>(null);
- const [date,setDate]=useState(chosen?.date??initialDate??dates[0]?.date??"");
+ const [date,setDate]=useState(()=>{
+  const preferred=chosen?.date??initialDate;
+  return advisory&&!options.some(option=>option.date===preferred)?options[0]?.date??preferred??dates[0]?.date??"":preferred??dates[0]?.date??"";
+ });
  const [selection,setSelection]=useState(chosen);
  const mounted=useRef(true);
  const [checking,setChecking]=useState(false);
@@ -27,7 +30,7 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
  return <dialog ref={dialog} className="mobile-pickup-dialog" aria-labelledby="mobile-pickup-title" onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))onClose();}} onCancel={event=>{event.preventDefault();onClose();}}>
   <div className="mobile-pickup-dialog-header"><h2 id="mobile-pickup-title"><T text="Choose pickup date & time" /></h2><button type="button" onClick={onClose} aria-label="Close pickup selector"><T text="Close" /> <span aria-hidden="true">×</span></button></div>
   <div className="mobile-pickup-dialog-body">
-   <p><T text={advisory?"Choose a pickup time. Item stock and preparation are checked before saving.":"Choose a date, then tap a pickup time. Nothing changes until you confirm."} /></p>
+   <p><T text={advisory?"Choose a time, then confirm. Your cart is kept.":"Choose a date, then tap a pickup time. Nothing changes until you confirm."} /></p>
    <div className="mobile-pickup-dates" role="group" aria-label="Pickup dates">{dates.map(day=><button type="button" key={day.date} disabled={disabled||checking} aria-label={day.date} aria-pressed={date===day.date} onClick={()=>{setDate(day.date);setSelection(null);setError("");}}><strong>{dateLabel(day.date,locale,today)}</strong><small><T text={options.some(option=>option.date===day.date)?"Times available":"No matching time"} /></small></button>)}</div>
    <h3>{date?dateLabel(date,locale,today):""} · <T text="Pickup times" /></h3>
    <div className="mobile-pickup-times gokul-pickup-times" role="group" aria-label="Pickup times">{times.map(option=><button className="gokul-pickup-time" type="button" key={`${option.slot.id}:${option.pickupType}`} disabled={disabled||checking} aria-pressed={selected?.slot.id===option.slot.id&&selected.pickupType===option.pickupType} onClick={()=>{setSelection(option);setError("");}}><strong>{option.slot.startTime.slice(0,5)}–{option.slot.endTime.slice(0,5)}</strong><span>{option.pickupType==="NORMAL"?<T text="Standard" />:<><T text="Priority" /> · +{money(option.slot.priorityCharge)}</>}</span></button>)}</div>

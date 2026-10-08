@@ -21,3 +21,8 @@ test('mixed groups label only the unavailable size; failed previews, manual unav
  const html=render({pickupItems});assert.match(html,/Half service starts at 11 AM/);assert.doesNotMatch(html,/<strong>Full:/);assert.doesNotMatch(html,/disabled=""/);
  for(const extra of [{pickupItems,pickupChecking:true},{pickupItems,dateAware:false},{pickupItems,products:products.map(p=>({...p,available:false}))}])assert.doesNotMatch(render(extra),/Half service starts at 11 AM/);
 });
+
+test('grouped items expose stock reasons as well as service hours',()=>{
+ const html=render({pickupItems:[{productId:1,available:false,code:'NO_ALLOCATION',reason:'Stock has not been scheduled.'},{productId:2,available:false,code:'NOT_READY',reason:'Ready after noon.'}]});
+ assert.match(html,/Stock has not been scheduled/);assert.match(html,/Ready after noon/);
+});

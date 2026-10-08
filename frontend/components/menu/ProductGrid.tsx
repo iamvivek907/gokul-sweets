@@ -144,7 +144,7 @@ export default function ProductGrid({
                                 premium={portionGroups!==undefined}
                                 refined={refined}
                                 unavailableForPickup={unavailable}
-                                pickupMessage={pickupChecking ? "Choose pickup to add" : undefined}
+                                pickupMessage={pickupChecking ? "Checking pickup" : "Not at this time"}
                                 product={product}
                                 ratingSummary={ratingSummaries[product.id] ?? null}
                                 ratingLoading={ratingsLoading}
@@ -154,7 +154,7 @@ export default function ProductGrid({
                                 onDecrease={onDecrease}
                                 onAdd={onAdd}
                             />
-                            {unavailable && (!refined || pickup?.code === "QUANTITY_TOO_LARGE" || pickup?.code === "OUTSIDE_SERVICE" || pickup?.code === "DEPENDENCY_UNAVAILABLE") && (
+                            {unavailable && !pickupChecking && (
                                 <p role="status" className="menu-availability-note">
                                     {describePickupAvailability(pickup, false)}
                                 </p>
