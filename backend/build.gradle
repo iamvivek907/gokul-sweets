@@ -101,6 +101,10 @@ tasks.register('formatJava', JavaExec) {
     description = 'Formats maintained Java sources with four-space AOSP Java style.'
     classpath = configurations.javaFormatting
     mainClass = 'com.google.googlejavaformat.java.Main'
+    // Match the formatter JAR's Add-Exports manifest when launched through a classpath.
+    jvmArgs = ['api', 'code', 'file', 'parser', 'tree', 'util'].collect {
+        '--add-exports=jdk.compiler/com.sun.tools.javac.' + it + '=ALL-UNNAMED'
+    }
     maxHeapSize = '256m'
     doFirst { args = ['--aosp', '--replace'] + maintainedJava.files.sort().collect { it.absolutePath } }
 }
@@ -109,6 +113,10 @@ tasks.register('checkJavaFormat', JavaExec) {
     description = 'Rejects Java formatting drift without rewriting files.'
     classpath = configurations.javaFormatting
     mainClass = 'com.google.googlejavaformat.java.Main'
+    // Match the formatter JAR's Add-Exports manifest when launched through a classpath.
+    jvmArgs = ['api', 'code', 'file', 'parser', 'tree', 'util'].collect {
+        '--add-exports=jdk.compiler/com.sun.tools.javac.' + it + '=ALL-UNNAMED'
+    }
     maxHeapSize = '256m'
     doFirst { args = ['--aosp', '--dry-run', '--set-exit-if-changed'] + maintainedJava.files.sort().collect { it.absolutePath } }
 }
