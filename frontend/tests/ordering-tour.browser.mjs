@@ -18,7 +18,7 @@ try {
    const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,idempotency-key','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
    // Existing cart previews and recommendations use POST for read-only queries.
-   const readOnly=path.endsWith('/availability')||['/api/storefront/vitals','/api/orders/mobile-preview','/api/menu/pickup-addons','/api/menu/pickup-addons/check'].includes(path);
+   const readOnly=path.endsWith('/availability')||['/api/storefront/vitals','/api/orders/mobile-preview','/api/menu/pickup-addons','/api/menu/pickup-addons/check','/api/reviews/product-summaries'].includes(path);
    if(req.method()!=='GET'&&!readOnly)writes.push(`${req.method()} ${path}`);
    let json=[];
    if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,branchExperience:true,smartAvailability:true,today,futureOrderingDays:7};
