@@ -45,7 +45,7 @@ export const adminGroups: {label: string; items: Item[]}[] = [
         {href: "/admin/inventory/automation", label: "Future production", permissions: ["INVENTORY_VIEW", "INVENTORY_MANAGE"]},
         {href: "/admin/inventory/production", label: "Production & ready stock", permissions: ["INVENTORY_VIEW", "INVENTORY_MANAGE"]}
     ]},
-    {label: "System", items: [{href: "/admin/data-cleanup", label: "Data cleanup", ownerOnly: true}]},
+    {label: "System", items: [{href: "/admin/account-security", label: "Account security", ownerOnly: true}, {href: "/admin/data-cleanup", label: "Data cleanup", ownerOnly: true}]},
     {label: "Team", items: [
         {href: "/admin/careers", label: "Recruitment", permissions: ["CAREERS_MANAGE"]},
         {href: "/admin/staff", label: "Staff", permissions: ["STAFF_MANAGE"]},

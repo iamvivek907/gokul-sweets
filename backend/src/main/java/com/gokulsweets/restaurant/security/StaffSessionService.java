@@ -31,6 +31,7 @@ public class StaffSessionService {
     private final StaffMfaService mfa;
     private final com.gokulsweets.restaurant.staff.StaffUserRepository staff;
     private final AuthenticationManager authenticationManager;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwords;
     private final SecureRandom random = new SecureRandom();
     @org.springframework.beans.factory.annotation.Value("${staff.mfa.encryption-key:}")
     private String encryptionKey;
@@ -56,13 +57,16 @@ public class StaffSessionService {
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(normalized, password));
             StaffUser user = staff.findByUsername(normalized).orElseThrow();
+            // Authentication and the subsequent account read can race a credential reset.
+            if (!passwords.matches(password, user.getPasswordHash()))
+                throw new IllegalArgumentException("Invalid staff credentials or authenticator code.");
             if (!user.isActive()) throw new IllegalStateException("Staff account is inactive.");
             if (mfa.required(user)) {
                 if (!mfa.enrolled(user.getId())) {
                     String token = randomToken();
                     jdbc.update("DELETE FROM staff_mfa_enrollments WHERE staff_id = ?", user.getId());
-                    jdbc.update("INSERT INTO staff_mfa_enrollments(token_hash, staff_id, expires_at) VALUES (?, ?, ?)",
-                            hash(token), user.getId(), Timestamp.from(now.plusSeconds(300)));
+                    jdbc.update("INSERT INTO staff_mfa_enrollments(token_hash, staff_id, expires_at, staff_updated_at) VALUES (?, ?, ?, ?)",
+                            hash(token), user.getId(), Timestamp.from(now.plusSeconds(300)), Timestamp.valueOf(user.getUpdatedAt()));
                     jdbc.update("DELETE FROM staff_login_limits WHERE username = ?", limitKey);
                     audit(user.getId(), "MFA_ENROLLMENT_STARTED");
                     return new SignIn(token, null, user, true);
@@ -104,7 +108,8 @@ public class StaffSessionService {
     public Enrollment enrollment(String token) {
         if (token == null || token.length() != 43) throw new IllegalArgumentException("Enrollment expired.");
         return jdbc.query("""
-                SELECT staff_id FROM staff_mfa_enrollments WHERE token_hash = ? AND expires_at > ?
+                SELECT e.staff_id FROM staff_mfa_enrollments e JOIN staff_users u ON u.id=e.staff_id
+                WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=u.updated_at
                 """, (rs, index) -> new Enrollment(token, rs.getLong(1)), hash(token), Timestamp.from(Instant.now(inventoryClock)))
                 .stream().findFirst().orElseThrow(() -> new IllegalArgumentException("Enrollment expired."));
     }
