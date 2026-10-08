@@ -5,6 +5,7 @@ const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BA
 try {
  for(const width of [390,1280]) {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+  let refreshGate=null,refreshRequested;
   let config={enabled:true,dailyTime:'03:30',retentionDays:90,revision:0},runs=0,fail=false,role='OWNER_ADMIN';
   let view={config,timeZone:'Asia/Kolkata',status:'NEVER',startedAt:null,finishedAt:null,trigger:null,error:null,deleted:{},limitPerCategory:500,running:false};
   await context.route('**/api/**',async route=>{
@@ -13,6 +14,7 @@ try {
    let json=[];
    if(path==='/api/admin/auth/me')json={staffId:1,username:'owner',fullName:'Owner',roleName:role,branchIds:[1],permissions:['MENU_MANAGE','ORDER_VIEW']};
    else if(path==='/api/admin/data-cleanup') {
+    if(request.method()==='GET' && refreshGate) {const snapshot={...view,config:{...config}};refreshRequested();await refreshGate;return route.fulfill({json:snapshot,headers});}
     if(request.method()==='PUT'){config={...request.postDataJSON(),revision:config.revision+1};view={...view,config};}
     json=view;
    } else if(path.endsWith('/data-cleanup/preview')) json={revision:config.revision,cutoff:'2026-07-11T00:00:00Z',eligible:{customerNotifications:3,customerDeliveries:2,staffAlerts:4,staffReads:8,staffDeliveries:4},limitPerCategory:500};
@@ -27,6 +29,25 @@ try {
   await page.getByRole('heading',{name:'Daily schedule'}).waitFor();
   assert.equal(await page.getByLabel('Daily time (IST)').inputValue(),'03:30');
   assert.equal(await page.getByLabel('Keep history for (days)').inputValue(),'90');
+  let releaseRefresh;
+  refreshGate=new Promise(resolve=>{releaseRefresh=resolve;});
+  const requestStarted=new Promise(resolve=>{refreshRequested=resolve;});
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await requestStarted;
+  assert.equal(await page.getByLabel('Keep history for (days)').isDisabled(),true);
+  assert.equal(await page.getByLabel('Daily time (IST)').isDisabled(),true);
+  assert.equal(await page.getByLabel('Run automatically every day').isDisabled(),true);
+  assert.equal(await page.getByRole('button',{name:'Preview eligible records'}).isDisabled(),true);
+  assert.equal(await page.getByRole('button',{name:'Save schedule'}).isDisabled(),true);
+  assert.equal(await page.getByRole('button',{name:'Refreshing…',exact:true}).isDisabled(),true);
+  refreshGate=null;releaseRefresh();
+  await page.getByRole('button',{name:'Refresh',exact:true}).waitFor();
+  assert.equal(await page.getByLabel('Keep history for (days)').isEnabled(),true);
+  await page.getByLabel('Keep history for (days)').fill('120');
+  await page.getByRole('button',{name:'Save schedule'}).click();
+  await page.getByText('Daily cleanup settings saved.').waitFor();
+  assert.equal(config.retentionDays,120);
+  assert.equal(await page.getByLabel('Keep history for (days)').inputValue(),'120');
   await page.getByLabel('Run automatically every day').uncheck();
   assert.equal(await page.getByRole('button',{name:'Preview eligible records'}).isEnabled(),false);
   await page.getByLabel('Daily time (IST)').fill('05:45');

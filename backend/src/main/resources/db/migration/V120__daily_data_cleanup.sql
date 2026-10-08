@@ -11,6 +11,7 @@ CREATE TABLE data_cleanup_settings (
  last_started_at TIMESTAMPTZ,
  last_finished_at TIMESTAMPTZ,
  last_trigger VARCHAR(12),
+ last_run_token UUID,
  last_actor BIGINT REFERENCES staff_users(id),
  last_status VARCHAR(12) NOT NULL DEFAULT 'NEVER' CHECK (last_status IN ('NEVER','RUNNING','SUCCEEDED','FAILED')),
  last_error VARCHAR(300),

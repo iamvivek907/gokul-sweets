@@ -1,6 +1,6 @@
 "use client";
 
-import {useCallback, useEffect, useState} from "react";
+import {useCallback, useEffect, useRef, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminManagementApi} from "@/services/adminManagementApi";
 
@@ -22,38 +22,58 @@ export default function DataCleanupPage() {
     const [busy, setBusy] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
-    const load = useCallback(async (signal?: AbortSignal) => {
-        if (!authorization || !owner) return;
+    const operation = useRef<AbortController | null>(null);
+    const load = useCallback(async () => {
+        if (!authorization || !owner || operation.current) return;
+        const controller = new AbortController();
+        operation.current = controller;
+        setBusy("refresh");
         try {
-            const result = await adminManagementApi<View>("/api/admin/data-cleanup", authorization, {signal});
-            if (!signal?.aborted) {setView(result); setDraft(result.config); setPreview(null); setError(null);}
+            const result = await adminManagementApi<View>("/api/admin/data-cleanup", authorization,
+                {signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])});
+            if (!controller.signal.aborted) {setView(result); setDraft(result.config); setPreview(null); setError(null);}
         } catch (failure) {
-            if (!signal?.aborted) setError(failure instanceof Error ? failure.message : "Unable to load cleanup settings.");
+            if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : "Unable to load cleanup settings.");
+        } finally {
+            if (operation.current === controller) {operation.current = null; setBusy(null);}
         }
     }, [authorization, owner]);
     useEffect(() => {
-        const controller = new AbortController();
-        const timer = window.setTimeout(() => {void load(controller.signal);}, 0);
-        return () => {window.clearTimeout(timer); controller.abort();};
+        const timer = window.setTimeout(() => {void load();}, 0);
+        return () => {window.clearTimeout(timer); operation.current?.abort(); operation.current = null;};
     }, [load]);
     const dirty = !!draft && !!view && (draft.enabled !== view.config.enabled || draft.dailyTime !== view.config.dailyTime || draft.retentionDays !== view.config.retentionDays);
     async function action(kind: "save" | "preview" | "run") {
-        if (!authorization || !draft || busy) return;
+        if (!authorization || !draft || operation.current) return;
+        const controller = new AbortController();
+        operation.current = controller;
         setBusy(kind); setError(null); setNotice(null);
         try {
             if (kind === "preview") {
-                setPreview(await adminManagementApi<Preview>("/api/admin/data-cleanup/preview", authorization, {method: "POST"}));
+                const result = await adminManagementApi<Preview>("/api/admin/data-cleanup/preview", authorization, {method: "POST", signal: controller.signal});
+                if (controller.signal.aborted) return;
+                setPreview(result);
             } else {
                 const result = await adminManagementApi<View>(`/api/admin/data-cleanup${kind === "run" ? "/run" : ""}`, authorization,
-                    {method: kind === "run" ? "POST" : "PUT", headers: {"Content-Type": "application/json"},
+                    {method: kind === "run" ? "POST" : "PUT", signal: controller.signal, headers: {"Content-Type": "application/json"},
                         body: JSON.stringify(kind === "run" ? {revision: preview?.revision} : draft)});
+                if (controller.signal.aborted) return;
                 setView(result); setDraft(result.config); setPreview(null);
                 setNotice(kind === "run" ? "Cleanup finished. Deleted counts are shown below." : "Daily cleanup settings saved.");
             }
         } catch (failure) {
-            if (kind === "run") {setPreview(null); await load();}
+            if (controller.signal.aborted) return;
+            if (kind === "run") {
+                setPreview(null);
+                try {
+                    const result = await adminManagementApi<View>("/api/admin/data-cleanup", authorization,
+                        {signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])});
+                    if (controller.signal.aborted) return;
+                    setView(result); setDraft(result.config);
+                } catch {if (controller.signal.aborted) return;}
+            }
             setError(failure instanceof Error ? failure.message : "Unable to complete cleanup action.");
-        } finally {setBusy(null);}
+        } finally {if (operation.current === controller) {operation.current = null; setBusy(null);}}
     }
     if (!ready) return <p className="p-6">Loading admin session…</p>;
     if (!owner || !authorization) return <p className="p-6">Only the owner can manage data cleanup.</p>;
@@ -61,7 +81,7 @@ export default function DataCleanupPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
             <div><h1 className="text-2xl font-bold text-[#241715]">Data cleanup</h1>
                 <p className="mt-2 text-sm text-[#756763]">Remove old routine notifications for completed orders.</p></div>
-            <button className={button} disabled={!!busy} onClick={() => {setNotice(null); void load();}}>Refresh</button>
+            <button className={button} disabled={!!busy} onClick={() => {setNotice(null); void load();}}>{busy === "refresh" ? "Refreshing…" : "Refresh"}</button>
         </div>
         {error && <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm text-red-800">{error}</p>}
         {notice && <p role="status" className="rounded-xl bg-green-50 p-4 text-sm text-green-800">{notice}</p>}

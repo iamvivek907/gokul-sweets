@@ -157,9 +157,9 @@ public class DataCleanupService {
             UUID token=UUID.randomUUID();
             jdbc.update("""
                 UPDATE data_cleanup_settings SET lease_token=?,lease_until=?,last_status='RUNNING',last_started_at=?,
-                    last_finished_at=NULL,last_error=NULL,last_counts='{}',last_trigger=?,last_actor=?,
+                    last_finished_at=NULL,last_error=NULL,last_counts='{}',last_trigger=?,last_actor=?,last_run_token=?,
                     last_scheduled_date=CASE WHEN ? THEN ? ELSE last_scheduled_date END WHERE environment=?
-                """,token,Timestamp.from(now.plusSeconds(300)),Timestamp.from(now),actor==null?"DAILY":"MANUAL",actor,
+                """,token,Timestamp.from(now.plusSeconds(300)),Timestamp.from(now),actor==null?"DAILY":"MANUAL",actor,token,
                 actor==null,java.sql.Date.valueOf(now.atZone(ApplicationClock.BUSINESS_ZONE).toLocalDate()),scope());
             return new Claim(token,state.config().retentionDays());
         });
@@ -184,16 +184,37 @@ public class DataCleanupService {
                     """,Timestamp.from(clock.instant()),mapper.writeValueAsString(counts),scope(),claim.token());
             });
         } catch(RuntimeException failure) {
-            log.warn("Data cleanup failed for {} (all deletes rolled back)",scope(),failure);
-            tx.executeWithoutResult(status -> {
-                deadlines();
-                jdbc.update("""
-                    UPDATE data_cleanup_settings SET last_status='FAILED',last_finished_at=?,
-                        last_error='Cleanup failed; no records were deleted. Review server logs and retry.',
-                        lease_token=NULL,lease_until=NULL WHERE environment=? AND lease_token=?
-                    """,Timestamp.from(clock.instant()),scope(),claim.token());
-            });
-            if(actor!=null)throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,"Cleanup failed; no records were deleted. Refresh for details.");
+            log.warn("Cleanup execution/commit raised an error for {}; reconciling its persisted result",scope(),failure);
+            View reconciled;
+            try {
+                reconciled=tx.execute(status -> {
+                    deadlines();
+                    var rows=jdbc.queryForList("SELECT last_run_token,lease_token,last_status FROM data_cleanup_settings WHERE environment=? FOR UPDATE",scope());
+                    if(rows.isEmpty() || !claim.token().equals(rows.getFirst().get("last_run_token")))return null;
+                    // Success and deleted counts committed atomically. A lost acknowledgement is still success.
+                    if("SUCCEEDED".equals(rows.getFirst().get("last_status")))return view();
+                    // Acquiring this row lock waits for any uncertain original transaction to finish.
+                    // Its original claim still being RUNNING proves the delete transaction did not commit.
+                    if(!"RUNNING".equals(rows.getFirst().get("last_status"))
+                            || !claim.token().equals(rows.getFirst().get("lease_token")))return null;
+                    jdbc.update("""
+                        UPDATE data_cleanup_settings SET last_status='FAILED',last_finished_at=?,
+                            last_error='Cleanup failed; no records were deleted. Review server logs and retry.',
+                            lease_token=NULL,lease_until=NULL WHERE environment=? AND lease_token=?
+                        """,Timestamp.from(clock.instant()),scope(),claim.token());
+                    return view();
+                });
+            } catch(RuntimeException reconciliationFailure) {
+                log.warn("Cleanup result could not be confirmed for {}",scope(),reconciliationFailure);
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                    "Cleanup result could not be confirmed. Refresh the last run before trying again.");
+            }
+            if(reconciled==null)throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                "Cleanup result could not be confirmed. Refresh the last run before trying again.");
+            if("SUCCEEDED".equals(reconciled.status()))return reconciled;
+            if(actor!=null)throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Cleanup failed; no records were deleted. Refresh for details.");
+            return reconciled;
         }
         return view();
     }

@@ -12,6 +12,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.*;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.TransactionSystemException;
 import static org.assertj.core.api.Assertions.*;
 
 /** Real PostgreSQL, isolated schema. Never reads or deletes application/live data. */
@@ -115,4 +120,48 @@ class DataCleanupIntegrationTest {
         assertThat(cleanup.view().status()).isEqualTo("FAILED");
         assertThat(cleanup.view().deleted()).isEmpty();
     }
+    private DataCleanupService lostCommitResponse(boolean unavailable,boolean supersede) {
+        var delegate=new DataSourceTransactionManager(dataSource);
+        var commits=new AtomicInteger();
+        var manager=new PlatformTransactionManager() {
+            @Override public TransactionStatus getTransaction(TransactionDefinition definition) {
+                if(unavailable && commits.get()>=2)throw new TransactionSystemException("Simulated database outage during reconciliation");
+                return delegate.getTransaction(definition);
+            }
+            @Override public void commit(TransactionStatus status) {
+                delegate.commit(status);
+                if(commits.incrementAndGet()==2) {
+                    if(supersede)cleanup.run(1L,0L);
+                    throw new TransactionSystemException("Simulated lost commit acknowledgement");
+                }
+            }
+            @Override public void rollback(TransactionStatus status) {delegate.rollback(status);}
+        };
+        return new DataCleanupService(jdbc,Clock.fixed(now,ZoneOffset.UTC),
+            new MockEnvironment().withProperty("gokul.environment-isolation.environment","DEV"),new ObjectMapper(),manager);
+    }
+    @Test void lostCommitAcknowledgementReturnsPersistedSuccessWithoutRepeatingDeletion() {
+        long event=customer("DEV","completed","PREPARING","2026-01-01");
+        var result=lostCommitResponse(false,false).run(1L,0L);
+        assertThat(result.status()).isEqualTo("SUCCEEDED");
+        assertThat(result.deleted()).containsEntry("customerNotifications",1L);
+        assertThat(exists("customer_notification_events",event)).isFalse();
+        assertThat(cleanup.view().error()).isNull();
+    }
+    @Test void unavailableReconciliationDoesNotClaimRollbackOrOverwriteSuccess() {
+        long event=customer("DEV","completed","PREPARING","2026-01-01");
+        assertThatThrownBy(()->lostCommitResponse(true,false).run(1L,0L))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("could not be confirmed")
+            .satisfies(failure->assertThat(failure.getMessage()).doesNotContain("no records were deleted"));
+        assertThat(exists("customer_notification_events",event)).isFalse();
+        assertThat(cleanup.view().status()).isEqualTo("SUCCEEDED");
+    }
+    @Test void aNewerRunIsNotMistakenForTheUncertainRun() {
+        customer("DEV","completed","PREPARING","2026-01-01");
+        assertThatThrownBy(()->lostCommitResponse(false,true).run(1L,0L))
+            .isInstanceOf(ResponseStatusException.class).hasMessageContaining("could not be confirmed");
+        assertThat(cleanup.view().status()).isEqualTo("SUCCEEDED");
+        assertThat(cleanup.view().deleted()).containsEntry("customerNotifications",0L);
+    }
+
 }
