@@ -1454,53 +1454,18 @@ export default function MenuScreen() {
 
                                 {phoneMenu&&!splitPickup&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
-                                {splitPickup && pickupPartition ? <div className="menu-pickup-sections">
-                                    <section aria-label="Available for selected pickup" className="menu-pickup-section">
-                                        <h2>Available for your {pickupTimeLabel} pickup</h2>
-                                        <p>{pickupPartition.available.length ? "These items fit your selected pickup." : "No items in this view fit your selected pickup. Change time or clear filters."}</p>
-                                        {groupMenuProducts(categories,pickupPartition.available).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={group.id} id={group.id} name={group.name} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
+                                {pickupCheck.features?.contextualStorefrontV2 ? <div className={splitPickup?"menu-pickup-sections":undefined}>
+                                    <section aria-label={splitPickup?"Available for selected pickup":undefined} className={splitPickup?"menu-pickup-section":undefined}>
+                                        {splitPickup&&pickupPartition&&<><h2>Available for your {pickupTimeLabel} pickup</h2>
+                                        <p>{pickupPartition.available.length ? "These items fit your selected pickup." : "No items in this view fit your selected pickup. Change time or clear filters."}</p></>}
+                                        {(splitPickup&&pickupPartition?groupMenuProducts(categories,pickupPartition.available):phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
                                     </section>
-                                    <section aria-label="Other menu items" className="menu-pickup-section menu-pickup-section--other">
+                                    {splitPickup&&pickupPartition&&<section aria-label="Other menu items" className="menu-pickup-section menu-pickup-section--other">
                                         <h2>Other menu items</h2><p>Service times and stock vary. Review each item or change pickup.</p>
                                         <button type="button" className="menu-change-pickup" onClick={()=>document.querySelector<HTMLButtonElement>('.mobile-menu-pickup > button')?.click()}>Change pickup</button>
                                         {groupMenuProducts(categories,pickupPartition.other).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={group.id} id={group.id} anchorId={pickupPartition.available.some(product=>product.categoryId===group.id)?`menu-later-category-${group.id}`:undefined} name={group.name} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
-                                    </section>
-                                </div> : pickupCheck.features?.contextualStorefrontV2 ? (phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories, filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group => <MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>
-                                <ProductGrid
-                                    pairingSeed={pairingSeed}
-                                    pairing={retailBrowse?null:pairing}
-                                    portionGroups={phoneMenu?portionGroups:undefined}
-                                    catalogProducts={phoneMenu?allProducts:undefined}
-                                    refined={pickupCheck.features?.contextualStorefrontV2 === true}
-                                    pickupItems={pickupCheck.items}
-                                    pickupChecking={pickupChecking}
-                                    dateAware={!!pickupCheck.features?.smartAvailability}
-                                    products={
-                                        group.products
-                                    }
-                                    ratingSummaries={
-                                        ratingSummaries
-                                    }
-                                    ratingsLoading={
-                                        ratingsLoading
-                                    }
-                                    quantities={
-                                        productQuantities
-                                    }
-                                    weights={
-                                        productWeights
-                                    }
-                                    onIncrease={
-                                        guardedIncrease
-                                    }
-                                    onDecrease={
-                                        decreaseQuantity
-                                    }
-                                    onAdd={
-                                        handleAddToCart
-                                    }
-                                />
-                                </MenuCategorySection>) : (
+                                    </section>}
+                                </div> : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={retailBrowse?null:pairing}

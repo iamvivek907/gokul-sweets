@@ -22,8 +22,9 @@ test('defaults do not choose tomorrow, a priority fee or a slot with no eligible
 });
 test('available items lead, manual unavailable stays blocked, and mixed-size groups are not duplicated',()=>{
  const products=[{id:1,available:true},{id:2,available:true},{id:3,available:true},{id:4,available:false}];
- const groups=[{key:'portion',choices:[{productId:2},{productId:3}]}];
+ const groups=[{key:'portion',choices:[{productId:2},{productId:3},{productId:4}]}];
  const result=partitionPickupProducts(products,[{productId:1,available:false},{productId:2,available:true},{productId:3,available:false},{productId:4,available:true}],groups);
- assert.deepEqual(Array.from(result.available,p=>p.id),[2,3]);
- assert.deepEqual(Array.from(result.other,p=>p.id),[1,4]);
+ assert.deepEqual(Array.from(result.available,p=>p.id),[2,3,4]);
+ assert.deepEqual(Array.from(result.other,p=>p.id),[1]);
+ assert.equal(result.available.find(p=>p.id===4).available,false,'the grouped unavailable size remains disabled');
 });

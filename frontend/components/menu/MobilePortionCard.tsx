@@ -13,10 +13,11 @@ export default function MobilePortionCard({group,products,quantities,onAdd,onInc
  const product=products.find(p=>p.imageUrl)??products[0];
  const count=products.reduce((sum,p)=>sum+(quantities[p.id]??0),0);
  const total=products.reduce((sum,p)=>sum+p.price*(quantities[p.id]??0),0);
- const minimum=Math.min(...products.map(p=>p.price));
  const labels=products.map(p=>group.choices.find(c=>c.productId===p.id)?.label??p.name);
  const catalogueAvailable=products.some(p=>p.available);
- const availableSizes=products.filter(p=>p.available&&(!dateAware||!pickupChecking&&pickupItems?.find(i=>i.productId===p.id)?.available===true)).length;
+ const eligibleProducts=products.filter(p=>p.available&&(!dateAware||!pickupChecking&&pickupItems?.find(i=>i.productId===p.id)?.available===true));
+ const availableSizes=eligibleProducts.length;
+ const minimum=Math.min(...(eligibleProducts.length?eligibleProducts:products).map(p=>p.price));
  const unavailableForPickup=catalogueAvailable&&availableSizes===0;
  const status=!catalogueAvailable?"Currently unavailable":unavailableForPickup?pickupChecking?"Choose pickup to add":"Unavailable for selected pickup":`${availableSizes} ${availableSizes===1?"size":"sizes"} available`;
  const portion=labels.every(label=>/half|full|portion|हाफ|फुल/i.test(label));

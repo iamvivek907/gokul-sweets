@@ -15,7 +15,7 @@ export function partitionPickupProducts(products: MenuProduct[], items: ItemAvai
     const availableGroupIds = new Set(groups.filter(group => group.choices.some(choice =>
         products.some(product => product.id === choice.productId && product.available && eligible.has(product.id))))
         .flatMap(group => group.choices.map(choice => choice.productId)));
-    const fits = (product: MenuProduct) => product.available && (eligible.has(product.id) || availableGroupIds.has(product.id));
+    const fits = (product: MenuProduct) => product.available && eligible.has(product.id) || availableGroupIds.has(product.id);
     return {available: products.filter(fits), other: products.filter(product => !fits(product))};
 }
 
