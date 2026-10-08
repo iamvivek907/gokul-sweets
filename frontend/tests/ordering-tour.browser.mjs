@@ -60,7 +60,7 @@ try {
   const add=page.locator('[data-ordering-target="add"]:not(:disabled):not([aria-hidden="true"])').first();
   await add.click();await stage('cart');
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);
-  assert.ok(await page.locator('[data-ordering-target="cart"]').evaluate(node=>node.classList.contains('ordering-tour-target')));
+  await page.waitForFunction(()=>document.querySelector('[data-ordering-target="cart"]')?.classList.contains('ordering-tour-target'));
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/ordering-tour-interactive-${width}.png`});}
   const bounds=await coach.boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width&&bounds.y>=0&&bounds.y+bounds.height<=900);
   await page.locator('[data-ordering-target="cart"]').click();await page.waitForURL('**/cart');
