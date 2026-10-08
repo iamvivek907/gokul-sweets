@@ -286,7 +286,12 @@ export default function ProductCard({
                 }
 
 
-                {!isAvailable && product.serviceAvailability?.message && <p className="my-1 text-xs leading-5 text-[#a94d39]" role="status">{product.serviceAvailability.message}</p>}
+                {!isAvailable && (refined ? !unavailableForPickup : !!product.serviceAvailability?.message) && (
+                    <p className="menu-availability-note my-1 text-xs leading-5 text-[#a94d39]" role="status">
+                        <T text={refined && product.serviceAvailability?.code === "SOLD_OUT"
+                            ? "Sold out" : product.serviceAvailability?.message ?? "Unavailable"}/>
+                    </p>
+                )}
 
                 {/* Rating */}
 

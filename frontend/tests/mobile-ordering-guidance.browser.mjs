@@ -39,7 +39,15 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
    json={today,maximumDate:date,dates:[{date:today,available:false,items:[],slots:[]},{date,available:true,items:[],slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};
   }
   else if(p==='/api/branches/1/availability'){
-   availabilityCalls++;const body=route.request().postDataJSON();if(page.url().includes('/menu'))assert.equal(body.days,1,'menu stock checks only the selected date');const valid=body.startDate===date;
+   availabilityCalls++;const body=route.request().postDataJSON();
+   const menuPreview=new URL(route.request().url()).searchParams.get('menuPreview')==='true';
+   if(menuPreview)assert.equal(body.days,1,'menu stock checks only the selected date');
+   else if(page.url().includes('/menu')&&body.days>1){
+    assert.equal(body.days,31,'cart pickup searches the configured horizon');
+    const cart=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')));
+    assert.deepEqual(body.items,cart.items.map(item=>({productId:item.product.id,quantity:item.product.saleMode==='WEIGHT'?null:item.quantity,weightGrams:item.product.saleMode==='WEIGHT'?item.weightGrams:null})),'cart pickup checks use the actual cart quantities');
+   }
+   const valid=body.startDate===date;
    json={today,maximumDate:date,dates:[{date:body.startDate,available:valid,items:[{productId:1,available:true},{productId:2,available:true}],slots:valid?[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]:[]},...(body.days>1?[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[{productId:3,available:false}]}]}]:[])]};
    if(body.days===1&&body.startDate===date&&confirmationFails&&page.url().includes('/menu')&&await page.getByRole('dialog').count())json.dates[0].slots=[];
    if(body.startDate===date&&cartConflict&&body.items.some(item=>item.productId===1&&item.weightGrams===750))json.dates[0].slots=[{slot,normalAvailable:false,priorityAvailable:false,issues:[{productId:1,productName:sweet.name,available:false,code:'QUANTITY_TOO_LARGE',reason:'Only 500 g remain.'}]}];
