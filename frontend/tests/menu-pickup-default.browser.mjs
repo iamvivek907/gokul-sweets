@@ -12,7 +12,7 @@ const products=[product(1,'Veg Chowmein',1,'Food'),product(2,'Aloo Paratha',2,'B
 const slot=(id,time,date=today)=>({id,branchId:1,slotDate:date,startTime:time,endTime:time==='08:00:00'?'08:30:00':'11:30:00',active:true,capacity:10,bookedCount:0,remainingCapacity:10,priorityEnabled:false,priorityRemainingCapacity:0,priorityCharge:20});
 const breakfast=slot(8,'08:00:00'),lunch=slot(11,'11:00:00');
 const browser=await chromium.launch({headless:true});
-try {for(const width of [320,390,640,1280]) {
+try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_WIDTH)]:[320,390,640,1280])) {
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date(`${today}T00:01:00+05:30`)});
  let mode='normal',revision='1',checks=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -47,6 +47,7 @@ try {for(const width of [320,390,640,1280]) {
  await load();await pickup.getByText(/Today, .* · 8:00/).waitFor();
  const breakfastSection=page.locator('#gokul-menu-items');
  assert.equal(await breakfastSection.getByRole('heading',{name:'Aloo Paratha',exact:true}).count(),1,'All is the default, even though Food is first in the catalog');
+ await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
  assert.equal(await breakfastSection.getByRole('button',{name:'Add Aloo Paratha to cart'}).isEnabled(),true);
  assert.equal(await page.getByRole('button',{name:'Add Veg Chowmein to cart'}).isDisabled(),true);
  await page.getByText('Available for pickup from 11 AM.',{exact:true}).waitFor();
