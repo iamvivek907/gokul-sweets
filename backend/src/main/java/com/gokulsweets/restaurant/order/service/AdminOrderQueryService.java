@@ -614,7 +614,13 @@ SELECT id, service_date, starts_at, ends_at FROM delivery_capacity_windows WHERE
         }
     }
 
-    /** Immutable delivery window data contract. */
+    /**
+     * Immutable delivery window data contract.
+     *
+     * @param date the date
+     * @param start the start
+     * @param end the end
+     */
     private record DeliveryWindow(LocalDate date, LocalTime start, LocalTime end) {}
 
     /*
@@ -818,7 +824,13 @@ SELECT id, service_date, starts_at, ends_at FROM delivery_capacity_windows WHERE
      * INTERNAL QUEUE CUTOFF VALUE
      * =========================================================
      */
-    /** Immutable queue cutoffs data contract. */
+    /**
+     * Immutable queue cutoffs data contract.
+     *
+     * @param normal the normal
+     * @param priority the priority
+     * @param adminOverride the admin override
+     */
     private record QueueCutoffs(
             LocalDateTime normal, LocalDateTime priority, LocalDateTime adminOverride) {}
 }

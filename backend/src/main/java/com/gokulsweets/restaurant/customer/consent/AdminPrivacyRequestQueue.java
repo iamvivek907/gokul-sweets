@@ -177,7 +177,15 @@ VALUES (?, ?, ?, ?)
         }
     }
 
-    /** Immutable entry data contract. */
+    /**
+     * Immutable entry data contract.
+     *
+     * @param id the id
+     * @param subjectId the subject id
+     * @param kind the kind
+     * @param receivedAt the received at
+     * @param state the state
+     */
     public record Entry(
             long id,
             UUID subjectId,

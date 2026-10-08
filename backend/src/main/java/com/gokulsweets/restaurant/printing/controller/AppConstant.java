@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.printing.controller;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original PrintAgentController.API_KEY_HEADER value; unchanged during extraction. */

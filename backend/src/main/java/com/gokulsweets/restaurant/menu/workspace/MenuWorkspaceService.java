@@ -43,7 +43,20 @@ public class MenuWorkspaceService {
 
     private final InventoryAvailabilityService availability;
 
-    /** Immutable details data contract. */
+    /**
+     * Immutable details data contract.
+     *
+     * @param name the name
+     * @param code the code
+     * @param categoryId the category id
+     * @param description the description
+     * @param basePrice the base price
+     * @param saleMode the sale mode
+     * @param minimumWeightGrams the minimum weight grams
+     * @param weightStepGrams the weight step grams
+     * @param taxCategoryId the tax category id
+     * @param version the version
+     */
     public record Details(
             @NotBlank @Size(max = 150) String name,
             @NotBlank @Size(max = 100) String code,
@@ -56,17 +69,39 @@ public class MenuWorkspaceService {
             Long taxCategoryId,
             @NotNull @Min(0) Long version) {}
 
-    /** Immutable branch edit data contract. */
+    /**
+     * Immutable branch edit data contract.
+     *
+     * @param version the version
+     * @param available the available
+     * @param priceOverride the price override
+     * @param clearPriceOverride the clear price override
+     */
     public record BranchEdit(
             @NotNull @Min(0) Long version,
             Boolean available,
             @DecimalMin("0.01") BigDecimal priceOverride,
             Boolean clearPriceOverride) {}
 
-    /** Immutable option data contract. */
+    /**
+     * Immutable option data contract.
+     *
+     * @param id the id
+     * @param name the name
+     */
     public record Option(Long id, String name) {}
 
-    /** Immutable page data contract. */
+    /**
+     * Immutable page data contract.
+     *
+     * @param content the content
+     * @param totalElements the total elements
+     * @param page the page
+     * @param totalPages the total pages
+     * @param categories the categories
+     * @param taxes the taxes
+     * @param branchCategories the branch categories
+     */
     public record Page(
             List<Map<String, Object>> content,
             long totalElements,
@@ -646,7 +681,12 @@ public class MenuWorkspaceService {
         }
     }
 
-    /** Immutable dietary edit data contract. */
+    /**
+     * Immutable dietary edit data contract.
+     *
+     * @param version the version
+     * @param vegetarian the vegetarian
+     */
     public record DietaryEdit(@NotNull @Min(0) Long version, @NotNull Boolean vegetarian) {}
 
     /**
@@ -696,7 +736,16 @@ public class MenuWorkspaceService {
         }
     }
 
-    /** Immutable stock edit data contract. */
+    /**
+     * Immutable stock edit data contract.
+     *
+     * @param version the version
+     * @param policyVersion the policy version
+     * @param reason the reason
+     * @param allocation the allocation
+     * @param policy the policy
+     * @param readiness the readiness
+     */
     public record StockEdit(
             @Min(0) Long version,
             @Min(0) Long policyVersion,

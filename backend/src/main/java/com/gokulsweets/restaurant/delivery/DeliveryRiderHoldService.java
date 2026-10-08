@@ -146,7 +146,12 @@ WHERE id = ? AND NOT paused AND reserved_count < rider_capacity
         }
     }
 
-    /** Payment acceptance converts a temporary hold into capacity reserved for the order. */
+    /**
+     * Payment acceptance converts a temporary hold into capacity reserved for the order.
+     *
+     * @param holdKey the hold key
+     * @return the operation result
+     */
     @Transactional
     public boolean commit(String holdKey) {
         final long __gokulMethodStartedNanos =
@@ -161,6 +166,9 @@ WHERE id = ? AND NOT paused AND reserved_count < rider_capacity
 
     /**
      * Cancellation or refund releases either a temporary or a committed reservation exactly once.
+     *
+     * @param holdKey the hold key
+     * @return the operation result
      */
     @Transactional
     public boolean release(String holdKey) {
@@ -174,7 +182,12 @@ WHERE id = ? AND NOT paused AND reserved_count < rider_capacity
         }
     }
 
-    /** Called by a future expiry worker; never expires a paid reservation or a renewed hold. */
+    /**
+     * Called by a future expiry worker; never expires a paid reservation or a renewed hold.
+     *
+     * @param holdKey the hold key
+     * @return the operation result
+     */
     @Transactional
     public boolean expire(String holdKey) {
         final long __gokulMethodStartedNanos =
@@ -282,9 +295,21 @@ WHERE id = ? AND reserved_count > 0
         }
     }
 
-    /** Immutable existing data contract. */
+    /**
+     * Immutable existing data contract.
+     *
+     * @param windowId the window id
+     * @param fingerprint the fingerprint
+     * @param state the state
+     * @param expiresAt the expires at
+     */
     private record Existing(long windowId, String fingerprint, String state, Instant expiresAt) {}
 
-    /** Immutable state data contract. */
+    /**
+     * Immutable state data contract.
+     *
+     * @param name the name
+     * @param expiresAt the expires at
+     */
     private record State(String name, Instant expiresAt) {}
 }

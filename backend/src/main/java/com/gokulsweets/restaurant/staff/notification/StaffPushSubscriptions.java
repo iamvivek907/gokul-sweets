@@ -27,10 +27,20 @@ public class StaffPushSubscriptions {
 
     private final WebPushTransport push;
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param endpoint the endpoint
+     * @param publicKey the public key
+     * @param authSecret the auth secret
+     */
     public record Input(String endpoint, String publicKey, String authSecret) {}
 
-    /** Immutable result data contract. */
+    /**
+     * Immutable result data contract.
+     *
+     * @param id the id
+     */
     public record Result(UUID id) {}
 
     /**
@@ -197,7 +207,16 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.environment = ? AND
         }
     }
 
-    /** Immutable existing data contract. */
+    /**
+     * Immutable existing data contract.
+     *
+     * @param id the id
+     * @param staffId the staff id
+     * @param session the session
+     * @param publicKey the public key
+     * @param auth the auth
+     * @param inactive the inactive
+     */
     private record Existing(
             UUID id,
             long staffId,

@@ -24,7 +24,12 @@ public class RebateVisitRuleController {
 
     private final JdbcTemplate jdbc;
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param minimumCompletedOrders the minimum completed orders
+     * @param reason the reason
+     */
     public record Input(int minimumCompletedOrders, String reason) {}
 
     /**

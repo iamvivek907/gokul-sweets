@@ -54,12 +54,33 @@ public class DeliveryEconomicsService {
     @Value("${delivery.economics.minimum-contribution:0}")
     private BigDecimal minimumContribution;
 
+    /**
+     * Creates a delivery economics service instance.
+     *
+     * @param flags the flags
+     * @param inventoryClock the inventory clock
+     */
     public DeliveryEconomicsService(EnhancementProperties flags, java.time.Clock inventoryClock) {
         this.flags = flags;
         this.clock = inventoryClock;
     }
 
-    /** Immutable assessment data contract. */
+    /**
+     * Immutable assessment data contract.
+     *
+     * @param version the version
+     * @param foodCost the food cost
+     * @param packagingCost the packaging cost
+     * @param labourCost the labour cost
+     * @param wasteCost the waste cost
+     * @param paymentCost the payment cost
+     * @param journeyCost the journey cost
+     * @param remedyCost the remedy cost
+     * @param fee the fee
+     * @param contribution the contribution
+     * @param viable the viable
+     * @param alternative the alternative
+     */
     public record Assessment(
             String version,
             BigDecimal foodCost,

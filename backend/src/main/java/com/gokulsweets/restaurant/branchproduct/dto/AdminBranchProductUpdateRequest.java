@@ -8,7 +8,14 @@ import jakarta.validation.constraints.Min;
 
 import java.math.BigDecimal;
 
-/** Immutable admin branch product update request data contract. */
+/**
+ * Immutable admin branch product update request data contract.
+ *
+ * @param available the available
+ * @param priceOverride the price override
+ * @param clearPriceOverride the clear price override
+ * @param displayOrder the display order
+ */
 public record AdminBranchProductUpdateRequest(
         Boolean available,
         @DecimalMin(

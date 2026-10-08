@@ -15,16 +15,25 @@ import javax.crypto.spec.SecretKeySpec;
 /** Internal OTP policy. Never return a code through a customer HTTP response. */
 public final class OtpChallengePolicy {
 
+    /** The expiry value. */
     public static final Duration EXPIRY = Duration.ofMinutes(5);
 
+    /** The resend cooldown value. */
     public static final Duration RESEND_COOLDOWN = Duration.ofSeconds(60);
 
+    /** The max attempts value. */
     public static final int MAX_ATTEMPTS = AppConstant.OTP_CHALLENGE_POLICY_MAX_ATTEMPTS;
 
     private final SecureRandom random;
 
     private final byte[] signingKey;
 
+    /**
+     * Creates a otp challenge policy instance.
+     *
+     * @param random the random
+     * @param signingKey the signing key
+     */
     public OtpChallengePolicy(SecureRandom random, byte[] signingKey) {
         if (signingKey == null || signingKey.length < 32) {
             throw new IllegalArgumentException("OTP signing key must be at least 32 bytes");
@@ -166,7 +175,17 @@ public final class OtpChallengePolicy {
         }
     }
 
-    /** Immutable challenge data contract. */
+    /**
+     * Immutable challenge data contract.
+     *
+     * @param normalizedPhone the normalized phone
+     * @param nonce the nonce
+     * @param digest the digest
+     * @param expiresAt the expires at
+     * @param resendAfter the resend after
+     * @param attemptsRemaining the attempts remaining
+     * @param consumed the consumed
+     */
     public record Challenge(
             String normalizedPhone,
             String nonce,
@@ -198,7 +217,12 @@ public final class OtpChallengePolicy {
         }
     }
 
-    /** The code is for a trusted SMS transport only; never persist or log it. */
+    /**
+     * The code is for a trusted SMS transport only; never persist or log it.
+     *
+     * @param challenge the challenge
+     * @param code the code
+     */
     public record Issued(Challenge challenge, String code) {
 
         /**
@@ -219,6 +243,11 @@ public final class OtpChallengePolicy {
         }
     }
 
-    /** Immutable outcome data contract. */
+    /**
+     * Immutable outcome data contract.
+     *
+     * @param challenge the challenge
+     * @param verified the verified
+     */
     public record Outcome(Challenge challenge, boolean verified) {}
 }

@@ -246,6 +246,12 @@ final class MenuWorkbookLimits {
 
         private long bytes;
 
+        /**
+         * Creates a bounded part instance.
+         *
+         * @param input the input
+         * @param budget the budget
+         */
         BoundedPart(InputStream input, Budget budget) {
             super(input);
             this.budget = budget;

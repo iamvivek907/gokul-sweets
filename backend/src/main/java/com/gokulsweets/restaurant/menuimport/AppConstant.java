@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.menuimport;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original MenuExcelParser.SHEET_NAME value; unchanged during extraction. */

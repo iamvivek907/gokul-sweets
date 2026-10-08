@@ -8,7 +8,16 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/** Immutable update attendance request data contract. */
+/**
+ * Immutable update attendance request data contract.
+ *
+ * @param branchId the branch id
+ * @param attendanceDate the attendance date
+ * @param attendanceType the attendance type
+ * @param checkInTime the check in time
+ * @param checkOutTime the check out time
+ * @param note the note
+ */
 public record UpdateAttendanceRequest(
         @NotNull Long branchId,
         @NotNull LocalDate attendanceDate,

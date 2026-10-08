@@ -33,7 +33,21 @@ public class DeliveryDispatchPilotService {
 
     private final Clock inventoryClock;
 
-    /** Immutable board row data contract. */
+    /**
+     * Immutable board row data contract.
+     *
+     * @param orderId the order id
+     * @param orderNumber the order number
+     * @param windowId the window id
+     * @param date the date
+     * @param start the start
+     * @param end the end
+     * @param orderStatus the order status
+     * @param riderId the rider id
+     * @param state the state
+     * @param customerPhone the customer phone
+     * @param address the address
+     */
     public record BoardRow(
             long orderId,
             String orderNumber,
@@ -47,10 +61,23 @@ public class DeliveryDispatchPilotService {
             String customerPhone,
             String address) {}
 
-    /** Immutable rider data contract. */
+    /**
+     * Immutable rider data contract.
+     *
+     * @param id the id
+     * @param displayName the display name
+     * @param active the active
+     */
     public record Rider(long id, String displayName, boolean active) {}
 
-    /** Immutable assignment data contract. */
+    /**
+     * Immutable assignment data contract.
+     *
+     * @param orderId the order id
+     * @param riderId the rider id
+     * @param windowId the window id
+     * @param state the state
+     */
     public record Assignment(long orderId, long riderId, long windowId, String state) {}
 
     /**

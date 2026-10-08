@@ -7,7 +7,26 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-/** Immutable admin branch response data contract. */
+/**
+ * Immutable admin branch response data contract.
+ *
+ * @param id the id
+ * @param code the code
+ * @param name the name
+ * @param address the address
+ * @param city the city
+ * @param state the state
+ * @param pincode the pincode
+ * @param phone the phone
+ * @param fssaiLicenceNumber the fssai licence number
+ * @param latitude the latitude
+ * @param longitude the longitude
+ * @param openingTime the opening time
+ * @param closingTime the closing time
+ * @param active the active
+ * @param createdAt the created at
+ * @param updatedAt the updated at
+ */
 public record AdminBranchResponse(
         Long id,
         String code,

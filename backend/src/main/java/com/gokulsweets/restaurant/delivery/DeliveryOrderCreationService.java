@@ -335,7 +335,16 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         }
     }
 
-    /** Immutable create request data contract. */
+    /**
+     * Immutable create request data contract.
+     *
+     * @param quote the quote
+     * @param windowId the window id
+     * @param customerName the customer name
+     * @param customerPhone the customer phone
+     * @param addressLine the address line
+     * @param acceptedQuoteToken the accepted quote token
+     */
     public record CreateRequest(
             DeliveryCapacityService.QuoteRequest quote,
             long windowId,
@@ -344,7 +353,18 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             String addressLine,
             String acceptedQuoteToken) {}
 
-    /** Immutable created data contract. */
+    /**
+     * Immutable created data contract.
+     *
+     * @param id the id
+     * @param orderNumber the order number
+     * @param branchId the branch id
+     * @param windowId the window id
+     * @param orderStatus the order status
+     * @param totalAmount the total amount
+     * @param reservationExpiresAt the reservation expires at
+     * @param createdAt the created at
+     */
     public record Created(
             Long id,
             String orderNumber,

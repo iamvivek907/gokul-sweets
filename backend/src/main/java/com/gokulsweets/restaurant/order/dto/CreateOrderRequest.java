@@ -11,7 +11,19 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-/** Immutable create order request data contract. */
+/**
+ * Immutable create order request data contract.
+ *
+ * @param branchId the branch id
+ * @param pickupSlotId the pickup slot id
+ * @param customerName the customer name
+ * @param customerPhone the customer phone
+ * @param pickupType the pickup type
+ * @param items the items
+ * @param quoteToken the quote token
+ * @param rewardCode the reward code
+ * @param offerCode the offer code
+ */
 public record CreateOrderRequest(
         @NotNull(message = "Branch ID is required.") Long branchId,
         @NotNull(message = "Pickup slot ID is required.") Long pickupSlotId,
@@ -33,6 +45,17 @@ public record CreateOrderRequest(
         @Size(max = 40) String rewardCode,
         @Size(max = 100) String offerCode) {
 
+    /**
+     * Creates a create order request instance.
+     *
+     * @param branchId the branch id
+     * @param pickupSlotId the pickup slot id
+     * @param customerName the customer name
+     * @param customerPhone the customer phone
+     * @param pickupType the pickup type
+     * @param items the items
+     * @param quoteToken the quote token
+     */
     public CreateOrderRequest(
             Long branchId,
             Long pickupSlotId,
@@ -53,6 +76,16 @@ public record CreateOrderRequest(
                 null);
     }
 
+    /**
+     * Creates a create order request instance.
+     *
+     * @param branchId the branch id
+     * @param pickupSlotId the pickup slot id
+     * @param customerName the customer name
+     * @param customerPhone the customer phone
+     * @param pickupType the pickup type
+     * @param items the items
+     */
     public CreateOrderRequest(
             Long branchId,
             Long pickupSlotId,

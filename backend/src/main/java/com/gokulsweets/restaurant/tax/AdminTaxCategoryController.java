@@ -181,10 +181,24 @@ public class AdminTaxCategoryController {
         }
     }
 
-    /** Immutable active request data contract. */
+    /**
+     * Immutable active request data contract.
+     *
+     * @param active the active
+     */
     public record ActiveRequest(@NotNull Boolean active) {}
 
-    /** Immutable tax request data contract. */
+    /**
+     * Immutable tax request data contract.
+     *
+     * @param code the code
+     * @param name the name
+     * @param hsnSacCode the hsn sac code
+     * @param cgstRate the cgst rate
+     * @param sgstRate the sgst rate
+     * @param igstRate the igst rate
+     * @param active the active
+     */
     public record TaxRequest(
             @NotBlank @Size(max = 80) @Pattern(regexp = "[A-Za-z0-9_-]+") String code,
             @NotBlank @Size(max = 100) String name,

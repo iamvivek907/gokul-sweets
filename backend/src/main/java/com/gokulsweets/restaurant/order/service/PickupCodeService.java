@@ -28,7 +28,11 @@ public class PickupCodeService {
     private static final Set<String> ELIGIBLE =
             Set.of("CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "PICKUP_WINDOW_EXPIRED");
 
-    /** Immutable customer code data contract. */
+    /**
+     * Immutable customer code data contract.
+     *
+     * @param code the code
+     */
     public record CustomerCode(String code) {}
 
     /**
@@ -126,7 +130,12 @@ public class PickupCodeService {
         }
     }
 
-    /** Caller holds the order row lock, so verification and fulfilment cannot race. */
+    /**
+     * Caller holds the order row lock, so verification and fulfilment cannot race.
+     *
+     * @param order the order
+     * @param code the code
+     */
     public void verifyAndConsume(Order order, String code) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(PickupCodeService.class, "verifyAndConsume(Order,String)");

@@ -33,14 +33,31 @@ public class CustomerAlertPreferences {
 
     private final WebPushProperties properties;
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param soundEnabled the sound enabled
+     * @param quietHoursEnabled the quiet hours enabled
+     * @param quietStartMinute the quiet start minute
+     * @param quietEndMinute the quiet end minute
+     */
     public record Input(
             Boolean soundEnabled,
             Boolean quietHoursEnabled,
             Integer quietStartMinute,
             Integer quietEndMinute) {}
 
-    /** Immutable settings data contract. */
+    /**
+     * Immutable settings data contract.
+     *
+     * @param soundEnabled the sound enabled
+     * @param quietHoursEnabled the quiet hours enabled
+     * @param quietStartMinute the quiet start minute
+     * @param quietEndMinute the quiet end minute
+     * @param scopeId the scope id
+     * @param pushConfigured the push configured
+     * @param applicationServerKey the application server key
+     */
     public record Settings(
             boolean soundEnabled,
             boolean quietHoursEnabled,
@@ -50,10 +67,20 @@ public class CustomerAlertPreferences {
             boolean pushConfigured,
             String applicationServerKey) {}
 
-    /** Immutable subscription input data contract. */
+    /**
+     * Immutable subscription input data contract.
+     *
+     * @param endpoint the endpoint
+     * @param publicKey the public key
+     * @param authSecret the auth secret
+     */
     public record SubscriptionInput(String endpoint, String publicKey, String authSecret) {}
 
-    /** Immutable subscription result data contract. */
+    /**
+     * Immutable subscription result data contract.
+     *
+     * @param id the id
+     */
     public record SubscriptionResult(UUID id) {}
 
     /**
@@ -397,7 +424,16 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
         }
     }
 
-    /** Immutable existing data contract. */
+    /**
+     * Immutable existing data contract.
+     *
+     * @param id the id
+     * @param subject the subject
+     * @param inactive the inactive
+     * @param sessionId the session id
+     * @param publicKey the public key
+     * @param auth the auth
+     */
     private record Existing(
             UUID id,
             UUID subject,

@@ -46,7 +46,17 @@ public class OccasionEnquiryService {
 
     private final com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts staffAlerts;
 
-    /** Immutable item data contract. */
+    /**
+     * Immutable item data contract.
+     *
+     * @param productId the product id
+     * @param quantity the quantity
+     * @param unit the unit
+     * @param productName the product name
+     * @param productionUnit the production unit
+     * @param suggestedProductionQuantity the suggested production quantity
+     * @param supplementalGrams the supplemental grams
+     */
     public record Item(
             @Positive long productId,
             @DecimalMin("0.001") @Digits(integer = 9, fraction = 3) BigDecimal quantity,
@@ -56,6 +66,16 @@ public class OccasionEnquiryService {
             BigDecimal suggestedProductionQuantity,
             @DecimalMin("0") @Digits(integer = 9, fraction = 0) BigDecimal supplementalGrams) {
 
+        /**
+         * Creates a item instance.
+         *
+         * @param productId the product id
+         * @param quantity the quantity
+         * @param unit the unit
+         * @param productName the product name
+         * @param productionUnit the production unit
+         * @param suggestedProductionQuantity the suggested production quantity
+         */
         public Item(
                 long productId,
                 BigDecimal quantity,
@@ -73,6 +93,14 @@ public class OccasionEnquiryService {
                     null);
         }
 
+        /**
+         * Creates a item instance.
+         *
+         * @param productId the product id
+         * @param quantity the quantity
+         * @param unit the unit
+         * @param productName the product name
+         */
         public Item(long productId, BigDecimal quantity, Unit unit, String productName) {
             this(productId, quantity, unit, productName, null, null, null);
         }
@@ -80,17 +108,36 @@ public class OccasionEnquiryService {
 
     /** Defines the supported unit values. */
     public enum Unit {
+
+        /** The piece value. */
         PIECE,
+        /** The gram value. */
         GRAM
     }
 
     /** Defines the supported fulfilment values. */
     public enum Fulfilment {
+
+        /** The pickup value. */
         PICKUP,
+        /** The delivery request value. */
         DELIVERY_REQUEST
     }
 
-    /** Immutable request data contract. */
+    /**
+     * Immutable request data contract.
+     *
+     * @param branchId the branch id
+     * @param occasionType the occasion type
+     * @param serviceDate the service date
+     * @param guestCount the guest count
+     * @param fulfilment the fulfilment
+     * @param deliveryAddress the delivery address
+     * @param notes the notes
+     * @param items the items
+     * @param gift the gift
+     * @param packingGroups the packing groups
+     */
     public record Request(
             @Positive long branchId,
             @NotBlank @Size(max = 80) String occasionType,
@@ -103,6 +150,19 @@ public class OccasionEnquiryService {
             OccasionCatalogue.GiftRequest gift,
             @Size(max = 30) List<OccasionCatalogue.PackingGroup> packingGroups) {
 
+        /**
+         * Creates a request instance.
+         *
+         * @param branchId the branch id
+         * @param occasionType the occasion type
+         * @param serviceDate the service date
+         * @param guestCount the guest count
+         * @param fulfilment the fulfilment
+         * @param deliveryAddress the delivery address
+         * @param notes the notes
+         * @param items the items
+         * @param gift the gift
+         */
         public Request(
                 long branchId,
                 String occasionType,
@@ -126,6 +186,18 @@ public class OccasionEnquiryService {
                     null);
         }
 
+        /**
+         * Creates a request instance.
+         *
+         * @param branchId the branch id
+         * @param occasionType the occasion type
+         * @param serviceDate the service date
+         * @param guestCount the guest count
+         * @param fulfilment the fulfilment
+         * @param deliveryAddress the delivery address
+         * @param notes the notes
+         * @param items the items
+         */
         public Request(
                 long branchId,
                 String occasionType,
@@ -149,7 +221,19 @@ public class OccasionEnquiryService {
         }
     }
 
-    /** Immutable quote data contract. */
+    /**
+     * Immutable quote data contract.
+     *
+     * @param amount the amount
+     * @param deposit the deposit
+     * @param expiresAt the expires at
+     * @param balanceDueAt the balance due at
+     * @param terms the terms
+     * @param lines the lines
+     * @param expectedReadyAt the expected ready at
+     * @param packagingReviewed the packaging reviewed
+     * @param packagingTotal the packaging total
+     */
     public record Quote(
             @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount,
             @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) BigDecimal deposit,
@@ -161,6 +245,17 @@ public class OccasionEnquiryService {
             boolean packagingReviewed,
             BigDecimal packagingTotal) {
 
+        /**
+         * Creates a quote instance.
+         *
+         * @param amount the amount
+         * @param deposit the deposit
+         * @param expiresAt the expires at
+         * @param balanceDueAt the balance due at
+         * @param terms the terms
+         * @param lines the lines
+         * @param expectedReadyAt the expected ready at
+         */
         public Quote(
                 BigDecimal amount,
                 BigDecimal deposit,
@@ -181,6 +276,16 @@ public class OccasionEnquiryService {
                     null);
         }
 
+        /**
+         * Creates a quote instance.
+         *
+         * @param amount the amount
+         * @param deposit the deposit
+         * @param expiresAt the expires at
+         * @param balanceDueAt the balance due at
+         * @param terms the terms
+         * @param lines the lines
+         */
         public Quote(
                 BigDecimal amount,
                 BigDecimal deposit,
@@ -192,18 +297,41 @@ public class OccasionEnquiryService {
         }
     }
 
-    /** Immutable quote line data contract. */
+    /**
+     * Immutable quote line data contract.
+     *
+     * @param productId the product id
+     * @param grossAmount the gross amount
+     * @param productionQuantity the production quantity
+     */
     public record QuoteLine(
             @Positive long productId,
             @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal grossAmount,
             BigDecimal productionQuantity) {
 
+        /**
+         * Creates a quote line instance.
+         *
+         * @param productId the product id
+         * @param grossAmount the gross amount
+         */
         public QuoteLine(long productId, BigDecimal grossAmount) {
             this(productId, grossAmount, null);
         }
     }
 
-    /** Immutable priced line data contract. */
+    /**
+     * Immutable priced line data contract.
+     *
+     * @param productId the product id
+     * @param productName the product name
+     * @param grossAmount the gross amount
+     * @param subtotal the subtotal
+     * @param taxAmount the tax amount
+     * @param cgstRate the cgst rate
+     * @param sgstRate the sgst rate
+     * @param hsnSacCode the hsn sac code
+     */
     public record PricedLine(
             long productId,
             String productName,
@@ -214,7 +342,45 @@ public class OccasionEnquiryService {
             BigDecimal sgstRate,
             String hsnSacCode) {}
 
-    /** Immutable summary data contract. */
+    /**
+     * Immutable summary data contract.
+     *
+     * @param id the id
+     * @param branchId the branch id
+     * @param occasionType the occasion type
+     * @param serviceDate the service date
+     * @param guestCount the guest count
+     * @param fulfilment the fulfilment
+     * @param status the status
+     * @param quotedAmount the quoted amount
+     * @param depositAmount the deposit amount
+     * @param paidAmount the paid amount
+     * @param quoteTerms the quote terms
+     * @param quoteExpiresAt the quote expires at
+     * @param createdAt the created at
+     * @param nextStep the next step
+     * @param customerPhone the customer phone
+     * @param deliveryAddress the delivery address
+     * @param notes the notes
+     * @param balanceDueAt the balance due at
+     * @param holdExpiresAt the hold expires at
+     * @param pickupSlotId the pickup slot id
+     * @param items the items
+     * @param pricedLines the priced lines
+     * @param orderNumber the order number
+     * @param balancePaymentOpen the balance payment open
+     * @param productionPlan the production plan
+     * @param cancellationReview the cancellation review
+     * @param gift the gift
+     * @param estimated the estimated
+     * @param originalEstimate the original estimate
+     * @param packingFinalizedAt the packing finalized at
+     * @param packingRevision the packing revision
+     * @param creditReviewAmount the credit review amount
+     * @param extraCharges the extra charges
+     * @param calculation the calculation
+     * @param packingGroups the packing groups
+     */
     public record Summary(
             UUID id,
             long branchId,
@@ -252,10 +418,26 @@ public class OccasionEnquiryService {
             OccasionQuoteCalculator.Calculation calculation,
             List<OccasionCatalogue.PackedGroup> packingGroups) {}
 
-    /** Immutable cancellation review data contract. */
+    /**
+     * Immutable cancellation review data contract.
+     *
+     * @param paidAmount the paid amount
+     * @param reason the reason
+     * @param state the state
+     */
     public record CancellationReview(BigDecimal paidAmount, String reason, String state) {}
 
-    /** Immutable production line data contract. */
+    /**
+     * Immutable production line data contract.
+     *
+     * @param productId the product id
+     * @param quantity the quantity
+     * @param unit the unit
+     * @param expectedReadyAt the expected ready at
+     * @param state the state
+     * @param readyQuantity the ready quantity
+     * @param readinessRevision the readiness revision
+     */
     public record ProductionLine(
             long productId,
             BigDecimal quantity,

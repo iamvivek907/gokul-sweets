@@ -14,6 +14,11 @@ public class BranchProductController {
 
     private final BranchProductService branchProductService;
 
+    /**
+     * Creates a branch product controller instance.
+     *
+     * @param branchProductService the branch product service
+     */
     public BranchProductController(BranchProductService branchProductService) {
         this.branchProductService = branchProductService;
     }

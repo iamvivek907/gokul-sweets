@@ -40,7 +40,12 @@ public class R2StorageService {
     @Value("${cloudflare.r2.public-url}")
     private String publicUrl;
 
-    /** Immutable campaign media data contract. */
+    /**
+     * Immutable campaign media data contract.
+     *
+     * @param url the url
+     * @param contentType the content type
+     */
     public record CampaignMedia(String url, String contentType) {}
 
     /**
@@ -336,6 +341,8 @@ public class R2StorageService {
      *
      * <p>This is preferable to trying all possible extensions because the database already knows
      * exactly which image is being used.
+     *
+     * @param imageUrl the image url
      */
     public void deleteProductImage(String imageUrl) {
         final long __gokulMethodStartedNanos =
@@ -422,6 +429,9 @@ public class R2StorageService {
      *
      * <p>"Kaju Katli" -> "kaju-katli" "Mysore Pak" -> "mysore-pak" "Gulab Jamun" -> "gulab-jamun"
      * "Paneer Tikka 2" -> "paneer-tikka-2"
+     *
+     * @param productName the product name
+     * @return the operation result
      */
     private String createSlug(String productName) {
         final long __gokulMethodStartedNanos =

@@ -21,7 +21,12 @@ public class MenuCatalogService {
 
     private final Map<Long, Catalog> cache = new LinkedHashMap<>(16, .75f, true);
 
-    /** Immutable catalog data contract. */
+    /**
+     * Immutable catalog data contract.
+     *
+     * @param revision the revision
+     * @param categories the categories
+     */
     public record Catalog(String revision, List<MenuCategoryResponse> categories) {}
 
     /**

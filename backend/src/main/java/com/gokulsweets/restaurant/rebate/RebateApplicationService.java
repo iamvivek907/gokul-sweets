@@ -38,6 +38,9 @@ public class RebateApplicationService {
     /**
      * Automatic selection is atomic with payment creation and never replaces a stronger selected
      * offer.
+     *
+     * @param orderNumber the order number
+     * @return the operation result
      */
     @Transactional
     public AppliedRebateResponse applyBest(String orderNumber) {

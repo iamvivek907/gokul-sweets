@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.staff.notification;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original StaffOrderAlerts.ELIGIBLE value; unchanged during extraction. */

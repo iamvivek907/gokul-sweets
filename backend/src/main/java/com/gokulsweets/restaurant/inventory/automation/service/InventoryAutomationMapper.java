@@ -7,6 +7,7 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 /** Backend inventory automation mapper contract and implementation. */
 final class InventoryAutomationMapper {
 
+    /** Creates a inventory automation mapper instance. */
     private InventoryAutomationMapper() {}
 
     /**

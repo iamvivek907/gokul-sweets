@@ -74,7 +74,13 @@ public class OrderValidationService {
         }
     }
 
-    /** Product and manual availability checks before evaluating each pickup slot. */
+    /**
+     * Product and manual availability checks before evaluating each pickup slot.
+     *
+     * @param branchId the branch id
+     * @param items the items
+     * @return the operation result
+     */
     @Transactional(readOnly = true)
     public List<ValidatedOrderItem> validatePickupCart(
             Long branchId, List<CreateOrderItemRequest> items) {
@@ -792,6 +798,11 @@ public class OrderValidationService {
         }
     }
 
-    /** Immutable requested order item data contract. */
+    /**
+     * Immutable requested order item data contract.
+     *
+     * @param quantity the quantity
+     * @param weightGrams the weight grams
+     */
     private record RequestedOrderItem(Integer quantity, Integer weightGrams) {}
 }

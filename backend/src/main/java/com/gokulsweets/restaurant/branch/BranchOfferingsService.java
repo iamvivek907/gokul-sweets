@@ -28,15 +28,30 @@ public class BranchOfferingsService {
 
     private final StaffAuthorizationService staff;
 
-    /** Immutable offering data contract. */
+    /**
+     * Immutable offering data contract.
+     *
+     * @param title the title
+     * @param description the description
+     */
     public record Offering(
             @NotBlank @Size(max = 80) String title,
             @NotBlank @Size(max = 240) String description) {}
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param offerings the offerings
+     */
     public record Input(@NotNull @Size(max = 12) List<@Valid Offering> offerings) {}
 
-    /** Immutable snapshot data contract. */
+    /**
+     * Immutable snapshot data contract.
+     *
+     * @param version the version
+     * @param draft the draft
+     * @param published the published
+     */
     public record Snapshot(long version, List<Offering> draft, List<Offering> published) {}
 
     /**

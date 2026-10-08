@@ -124,6 +124,8 @@ public class OrderCalculationService {
     /**
      * Delivery uses the same accepted branch prices, weights and taxes, with no pickup priority
      * charge.
+     *
+     * @return the operation result
      */
     public boolean collectingTax() {
         final long __gokulMethodStartedNanos =

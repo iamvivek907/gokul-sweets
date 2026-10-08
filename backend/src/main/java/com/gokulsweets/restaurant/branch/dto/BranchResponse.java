@@ -6,7 +6,30 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 
-/** Immutable branch response data contract. */
+/**
+ * Immutable branch response data contract.
+ *
+ * @param id the id
+ * @param code the code
+ * @param name the name
+ * @param address the address
+ * @param city the city
+ * @param state the state
+ * @param pincode the pincode
+ * @param phone the phone
+ * @param fssaiLicenceNumber the fssai licence number
+ * @param latitude the latitude
+ * @param longitude the longitude
+ * @param openingTime the opening time
+ * @param closingTime the closing time
+ * @param active the active
+ * @param coverImageUrl the cover image url
+ * @param mobileCoverImageUrl the mobile cover image url
+ * @param coverAltText the cover alt text
+ * @param description the description
+ * @param pickupAvailable the pickup available
+ * @param operational the operational
+ */
 public record BranchResponse(
         Long id,
         String code,

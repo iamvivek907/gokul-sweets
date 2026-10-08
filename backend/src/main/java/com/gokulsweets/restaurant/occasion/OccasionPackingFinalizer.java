@@ -37,12 +37,23 @@ public class OccasionPackingFinalizer {
 
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
-    /** Immutable packed data contract. */
+    /**
+     * Immutable packed data contract.
+     *
+     * @param productId the product id
+     * @param quantity the quantity
+     */
     public record Packed(
             @Positive long productId,
             @NotNull @DecimalMin("0.001") @Digits(integer = 8, fraction = 3) BigDecimal quantity) {}
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param lines the lines
+     * @param revision the revision
+     * @param requestedPiecesPacked the requested pieces packed
+     */
     public record Input(
             @NotEmpty @Size(max = 30) List<@Valid Packed> lines,
             @Min(0) int revision,

@@ -15,7 +15,26 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
-/** Immutable create rebate request data contract. */
+/**
+ * Immutable create rebate request data contract.
+ *
+ * @param code the code
+ * @param name the name
+ * @param description the description
+ * @param scope the scope
+ * @param visibility the visibility
+ * @param rebateType the rebate type
+ * @param rebateValue the rebate value
+ * @param minimumOrderAmount the minimum order amount
+ * @param maximumDiscountAmount the maximum discount amount
+ * @param maxTotalUses the max total uses
+ * @param maxUsesPerCustomer the max uses per customer
+ * @param branchId the branch id
+ * @param validFrom the valid from
+ * @param validUntil the valid until
+ * @param customerPhones the customer phones
+ * @param slabs the slabs
+ */
 public record CreateRebateRequest(
         @NotBlank @Size(max = 50) String code,
         @NotBlank @Size(max = 150) String name,

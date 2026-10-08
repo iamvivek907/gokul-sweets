@@ -8,7 +8,17 @@ import com.gokulsweets.restaurant.staff.StaffUser;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/** Immutable admin auth response data contract. */
+/**
+ * Immutable admin auth response data contract.
+ *
+ * @param staffId the staff id
+ * @param username the username
+ * @param fullName the full name
+ * @param phone the phone
+ * @param roleName the role name
+ * @param permissions the permissions
+ * @param branchIds the branch ids
+ */
 public record AdminAuthResponse(
         Long staffId,
         String username,

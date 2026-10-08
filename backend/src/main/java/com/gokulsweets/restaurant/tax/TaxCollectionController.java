@@ -22,10 +22,18 @@ public class TaxCollectionController {
 
     private final StaffAuthorizationService staff;
 
-    /** Immutable setting data contract. */
+    /**
+     * Immutable setting data contract.
+     *
+     * @param enabled the enabled
+     */
     public record Setting(boolean enabled) {}
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param enabled the enabled
+     */
     public record Input(@NotNull Boolean enabled) {}
 
     /**

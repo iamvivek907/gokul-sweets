@@ -488,7 +488,19 @@ public class BasketAnalysisService {
         }
     }
 
-    /** Immutable pair row data contract. */
+    /**
+     * Immutable pair row data contract.
+     *
+     * @param productAId the product aid
+     * @param productACode the product acode
+     * @param productAName the product aname
+     * @param productBId the product bid
+     * @param productBCode the product bcode
+     * @param productBName the product bname
+     * @param pairOrderCount the pair order count
+     * @param productAOrderCount the product aorder count
+     * @param productBOrderCount the product border count
+     */
     private record PairRow(
             Long productAId,
             String productACode,

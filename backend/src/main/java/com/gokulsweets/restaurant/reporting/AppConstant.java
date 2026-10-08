@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.reporting;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original AnalyticsRefreshService.SALES_DAILY_SQL value; unchanged during extraction. */

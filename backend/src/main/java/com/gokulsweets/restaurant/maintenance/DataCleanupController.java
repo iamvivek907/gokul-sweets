@@ -94,7 +94,11 @@ public class DataCleanupController {
         }
     }
 
-    /** Immutable run input data contract. */
+    /**
+     * Immutable run input data contract.
+     *
+     * @param revision the revision
+     */
     public record RunInput(long revision) {}
 
     /**

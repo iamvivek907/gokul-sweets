@@ -34,7 +34,12 @@ public class WebCorsProperties {
                     String>
             allowedOrigins = new ArrayList<>(List.of("http://localhost:3000"));
 
-    /** Optional DEV/PROD CORS rollout; a mistaken explicit allowlist fails startup. */
+    /**
+     * Optional DEV/PROD CORS rollout; a mistaken explicit allowlist fails startup.
+     *
+     * @param environment the environment
+     * @return the operation result
+     */
     public List<String> effectiveAllowedOrigins(Environment environment) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(WebCorsProperties.class, "effectiveAllowedOrigins(Environment)");

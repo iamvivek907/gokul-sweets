@@ -51,6 +51,15 @@ public class DataCleanupService {
 
     static final String STAFF = AppConstant.DATA_CLEANUP_SERVICE_STAFF;
 
+    /**
+     * Creates a data cleanup service instance.
+     *
+     * @param jdbc the jdbc
+     * @param clock the clock
+     * @param environment the environment
+     * @param mapper the mapper
+     * @param transactions the transactions
+     */
     public DataCleanupService(
             JdbcTemplate jdbc,
             @Qualifier("inventoryClock") Clock clock,
@@ -85,10 +94,30 @@ public class DataCleanupService {
         }
     }
 
-    /** Immutable config data contract. */
+    /**
+     * Immutable config data contract.
+     *
+     * @param enabled the enabled
+     * @param dailyTime the daily time
+     * @param retentionDays the retention days
+     * @param revision the revision
+     */
     public record Config(boolean enabled, String dailyTime, int retentionDays, long revision) {}
 
-    /** Immutable view data contract. */
+    /**
+     * Immutable view data contract.
+     *
+     * @param config the config
+     * @param timeZone the time zone
+     * @param status the status
+     * @param startedAt the started at
+     * @param finishedAt the finished at
+     * @param trigger the trigger
+     * @param error the error
+     * @param deleted the deleted
+     * @param limitPerCategory the limit per category
+     * @param running the running
+     */
     public record View(
             Config config,
             String timeZone,
@@ -101,15 +130,34 @@ public class DataCleanupService {
             int limitPerCategory,
             boolean running) {}
 
-    /** Immutable preview data contract. */
+    /**
+     * Immutable preview data contract.
+     *
+     * @param revision the revision
+     * @param cutoff the cutoff
+     * @param eligible the eligible
+     * @param limitPerCategory the limit per category
+     */
     public record Preview(
             long revision, Instant cutoff, Map<String, Long> eligible, int limitPerCategory) {}
 
-    /** Immutable state data contract. */
+    /**
+     * Immutable state data contract.
+     *
+     * @param config the config
+     * @param scheduledDate the scheduled date
+     * @param status the status
+     * @param leaseUntil the lease until
+     */
     private record State(
             Config config, LocalDate scheduledDate, String status, Instant leaseUntil) {}
 
-    /** Immutable claim data contract. */
+    /**
+     * Immutable claim data contract.
+     *
+     * @param token the token
+     * @param retention the retention
+     */
     private record Claim(UUID token, int retention) {}
 
     /**

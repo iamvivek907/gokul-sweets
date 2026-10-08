@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public final class MethodTimingConfiguration {
+
     /**
      * Applies timing settings once the Spring application creates this component.
      *

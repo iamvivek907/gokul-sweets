@@ -186,9 +186,9 @@ public class SecurityConfig {
                             org.springframework.security.web.authentication.www
                                     .BasicAuthenticationFilter.class)
                     .authenticationProvider(authenticationProvider)
-                    .authorizeHttpRequests(
-                            auth -> // Allow browser CORS preflight requests
-                            auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+                    .authorizeHttpRequests( // Allow browser CORS preflight requests
+                            auth ->
+                                    auth.requestMatchers(HttpMethod.OPTIONS, "/**")
                                             .permitAll()
                                             .requestMatchers("/error")
                                             .permitAll()

@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.kot.service;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original KotNumberGenerator.PREFIX value; unchanged during extraction. */

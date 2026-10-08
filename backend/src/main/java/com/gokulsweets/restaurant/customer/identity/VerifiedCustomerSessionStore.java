@@ -163,7 +163,12 @@ WHERE environment = ? AND token_digest = ? AND expires_at > ? AND revoked_at IS 
         }
     }
 
-    /** The bearer token must be delivered only through a secure HttpOnly cookie. */
+    /**
+     * The bearer token must be delivered only through a secure HttpOnly cookie.
+     *
+     * @param token the token
+     * @param expiresAt the expires at
+     */
     public record IssuedSession(String token, Instant expiresAt) {
 
         /**

@@ -69,7 +69,21 @@ public class OrderCorrectionService {
                     OrderStatus.READY_FOR_DELIVERY,
                     OrderStatus.PICKUP_WINDOW_EXPIRED);
 
-    /** Immutable summary data contract. */
+    /**
+     * Immutable summary data contract.
+     *
+     * @param orderNumber the order number
+     * @param branchName the branch name
+     * @param serverTime the server time
+     * @param cancellationDeadline the cancellation deadline
+     * @param canCancel the can cancel
+     * @param canTransfer the can transfer
+     * @param refundAmount the refund amount
+     * @param retainedCharges the retained charges
+     * @param refundStatus the refund status
+     * @param refundReviewRequired the refund review required
+     * @param explanation the explanation
+     */
     public record Summary(
             String orderNumber,
             String branchName,
@@ -83,14 +97,28 @@ public class OrderCorrectionService {
             boolean refundReviewRequired,
             String explanation) {}
 
-    /** Immutable cancellation data contract. */
+    /**
+     * Immutable cancellation data contract.
+     *
+     * @param requestKey the request key
+     * @param reason the reason
+     * @param acceptedRefundAmount the accepted refund amount
+     * @param acceptedRetainedCharges the accepted retained charges
+     */
     public record Cancellation(
             UUID requestKey,
             String reason,
             BigDecimal acceptedRefundAmount,
             BigDecimal acceptedRetainedCharges) {}
 
-    /** Immutable transfer data contract. */
+    /**
+     * Immutable transfer data contract.
+     *
+     * @param requestKey the request key
+     * @param targetBranchId the target branch id
+     * @param targetSlotId the target slot id
+     * @param reason the reason
+     */
     public record Transfer(
             UUID requestKey, long targetBranchId, long targetSlotId, String reason) {}
 
@@ -466,7 +494,13 @@ public class OrderCorrectionService {
         }
     }
 
-    /** Immutable reschedule data contract. */
+    /**
+     * Immutable reschedule data contract.
+     *
+     * @param requestKey the request key
+     * @param targetSlotId the target slot id
+     * @param reason the reason
+     */
     public record Reschedule(UUID requestKey, long targetSlotId, String reason) {}
 
     /**

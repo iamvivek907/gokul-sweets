@@ -58,7 +58,12 @@ public class MenuWorkspaceController {
         }
     }
 
-    /** Immutable create data contract. */
+    /**
+     * Immutable create data contract.
+     *
+     * @param details the details
+     * @param branchIds the branch ids
+     */
     public record Create(
             @NotNull @Valid MenuWorkspaceService.Details details,
             @NotNull @Size(min = 1, max = 50) List<@Positive Long> branchIds) {}

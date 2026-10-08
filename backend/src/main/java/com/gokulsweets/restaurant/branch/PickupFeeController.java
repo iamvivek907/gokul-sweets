@@ -23,10 +23,21 @@ public class PickupFeeController {
 
     private final StaffAuthorizationService staff;
 
-    /** Immutable fee data contract. */
+    /**
+     * Immutable fee data contract.
+     *
+     * @param amount the amount
+     * @param taxRate the tax rate
+     */
     public record Fee(BigDecimal amount, BigDecimal taxRate) {}
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param amount the amount
+     * @param taxRate the tax rate
+     * @param taxReviewed the tax reviewed
+     */
     public record Input(
             @NotNull @DecimalMin("0") @DecimalMax("100") @Digits(integer = 3, fraction = 2)
                     BigDecimal amount,

@@ -133,10 +133,20 @@ public class IdentityClientConnection {
         }
     }
 
-    /** Immutable connection data contract. */
+    /**
+     * Immutable connection data contract.
+     *
+     * @param sourceAddress the source address
+     * @param secure the secure
+     */
     public record Connection(String sourceAddress, boolean secure) {}
 
-    /** Immutable range data contract. */
+    /**
+     * Immutable range data contract.
+     *
+     * @param network the network
+     * @param bits the bits
+     */
     private record Range(byte[] network, int bits) {
 
         /**

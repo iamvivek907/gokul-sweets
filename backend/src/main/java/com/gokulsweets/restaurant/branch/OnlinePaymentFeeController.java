@@ -24,10 +24,23 @@ public class OnlinePaymentFeeController {
 
     private final StaffAuthorizationService staff;
 
-    /** Immutable fee data contract. */
+    /**
+     * Immutable fee data contract.
+     *
+     * @param enabled the enabled
+     * @param percentage the percentage
+     * @param taxRate the tax rate
+     */
     public record Fee(boolean enabled, BigDecimal percentage, BigDecimal taxRate) {}
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param enabled the enabled
+     * @param percentage the percentage
+     * @param taxRate the tax rate
+     * @param reviewed the reviewed
+     */
     public record Input(
             boolean enabled,
             @NotNull @DecimalMin("0") @DecimalMax("10") @Digits(integer = 2, fraction = 2)

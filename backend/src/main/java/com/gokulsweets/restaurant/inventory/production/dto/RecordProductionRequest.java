@@ -6,7 +6,12 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
-/** Immutable record production request data contract. */
+/**
+ * Immutable record production request data contract.
+ *
+ * @param quantity the quantity
+ * @param note the note
+ */
 public record RecordProductionRequest(
         @NotNull(message = "Produced quantity is required.")
                 @DecimalMin(

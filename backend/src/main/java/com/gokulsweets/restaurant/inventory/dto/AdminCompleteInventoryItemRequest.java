@@ -6,7 +6,19 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** Immutable admin complete inventory item request data contract. */
+/**
+ * Immutable admin complete inventory item request data contract.
+ *
+ * @param branchProductId the branch product id
+ * @param approvedQuantity the approved quantity
+ * @param readyQuantity the ready quantity
+ * @param markReady the mark ready
+ * @param safetyBufferQuantity the safety buffer quantity
+ * @param forecastQuantity the forecast quantity
+ * @param forecastConfidence the forecast confidence
+ * @param expectedReadyAt the expected ready at
+ * @param note the note
+ */
 public record AdminCompleteInventoryItemRequest(
         @NotNull(message = "Branch product ID is required.") Long branchProductId,
         @NotNull(message = "Approved quantity is required.")
@@ -29,6 +41,18 @@ public record AdminCompleteInventoryItemRequest(
         LocalDateTime expectedReadyAt,
         String note) {
 
+    /**
+     * Creates a admin complete inventory item request instance.
+     *
+     * @param branchProductId the branch product id
+     * @param approvedQuantity the approved quantity
+     * @param readyQuantity the ready quantity
+     * @param safetyBufferQuantity the safety buffer quantity
+     * @param forecastQuantity the forecast quantity
+     * @param forecastConfidence the forecast confidence
+     * @param expectedReadyAt the expected ready at
+     * @param note the note
+     */
     public AdminCompleteInventoryItemRequest(
             Long branchProductId,
             BigDecimal approvedQuantity,

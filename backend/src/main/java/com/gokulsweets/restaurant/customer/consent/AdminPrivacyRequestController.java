@@ -71,6 +71,10 @@ public class AdminPrivacyRequestController {
         }
     }
 
-    /** Immutable triage choice data contract. */
+    /**
+     * Immutable triage choice data contract.
+     *
+     * @param state the state
+     */
     public record TriageChoice(PrivacyReviewState state) {}
 }

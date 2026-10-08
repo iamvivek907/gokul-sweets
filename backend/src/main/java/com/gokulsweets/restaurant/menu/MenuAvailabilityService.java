@@ -24,20 +24,46 @@ public class MenuAvailabilityService {
 
     private final Map<Long, Cached> cache = new LinkedHashMap<>(16, .75f, true);
 
-    /** Immutable item data contract. */
+    /**
+     * Immutable item data contract.
+     *
+     * @param productId the product id
+     * @param available the available
+     * @param serviceAvailability the service availability
+     */
     public record Item(
             long productId, boolean available, MenuServiceWindows.Status serviceAvailability) {}
 
-    /** Immutable availability data contract. */
+    /**
+     * Immutable availability data contract.
+     *
+     * @param revision the revision
+     * @param serviceWindowsEnabled the service windows enabled
+     * @param items the items
+     * @param observedAt the observed at
+     */
     public record Availability(
             String revision, boolean serviceWindowsEnabled, List<Item> items, Instant observedAt) {
 
+        /**
+         * Creates a availability instance.
+         *
+         * @param revision the revision
+         * @param serviceWindowsEnabled the service windows enabled
+         * @param items the items
+         */
         public Availability(String revision, boolean serviceWindowsEnabled, List<Item> items) {
             this(revision, serviceWindowsEnabled, items, null);
         }
     }
 
-    /** Immutable cached data contract. */
+    /**
+     * Immutable cached data contract.
+     *
+     * @param evaluatedAt the evaluated at
+     * @param until the until
+     * @param value the value
+     */
     private record Cached(Instant evaluatedAt, Instant until, Availability value) {}
 
     /**

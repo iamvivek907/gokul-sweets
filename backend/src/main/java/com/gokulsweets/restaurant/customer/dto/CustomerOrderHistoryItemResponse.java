@@ -8,7 +8,25 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-/** Immutable customer order history item response data contract. */
+/**
+ * Immutable customer order history item response data contract.
+ *
+ * @param orderId the order id
+ * @param orderNumber the order number
+ * @param customerOrderNumber the customer order number
+ * @param branchId the branch id
+ * @param branchName the branch name
+ * @param pickupDate the pickup date
+ * @param pickupStartTime the pickup start time
+ * @param pickupEndTime the pickup end time
+ * @param pickupType the pickup type
+ * @param orderStatus the order status
+ * @param subtotal the subtotal
+ * @param taxAmount the tax amount
+ * @param rebateDiscountAmount the rebate discount amount
+ * @param totalAmount the total amount
+ * @param createdAt the created at
+ */
 public record CustomerOrderHistoryItemResponse(
         Long orderId,
         String orderNumber,

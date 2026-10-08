@@ -7,7 +7,12 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
-/** Immutable record wastage request data contract. */
+/**
+ * Immutable record wastage request data contract.
+ *
+ * @param quantity the quantity
+ * @param reason the reason
+ */
 public record RecordWastageRequest(
         @NotNull(message = "Wastage quantity is required.")
                 @DecimalMin(

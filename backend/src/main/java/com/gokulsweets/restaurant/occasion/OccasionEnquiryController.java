@@ -120,7 +120,12 @@ public class OccasionEnquiryController {
         }
     }
 
-    /** Immutable deposit choice data contract. */
+    /**
+     * Immutable deposit choice data contract.
+     *
+     * @param pickupSlotId the pickup slot id
+     * @param estimateAccepted the estimate accepted
+     */
     public record DepositChoice(long pickupSlotId, boolean estimateAccepted) {}
 
     /**
@@ -520,7 +525,12 @@ public class OccasionEnquiryController {
         }
     }
 
-    /** Immutable ready quantity data contract. */
+    /**
+     * Immutable ready quantity data contract.
+     *
+     * @param quantity the quantity
+     * @param revision the revision
+     */
     public record ReadyQuantity(java.math.BigDecimal quantity, long revision) {}
 
     /**
@@ -593,7 +603,11 @@ public class OccasionEnquiryController {
         }
     }
 
-    /** Immutable decline data contract. */
+    /**
+     * Immutable decline data contract.
+     *
+     * @param reason the reason
+     */
     public record Decline(String reason) {}
 
     /**

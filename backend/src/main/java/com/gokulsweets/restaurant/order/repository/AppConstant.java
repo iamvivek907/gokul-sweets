@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.order.repository;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original PreparationQueueQueriesImpl.SCOPE value; unchanged during extraction. */

@@ -7,7 +7,24 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import java.math.BigDecimal;
 
-/** Immutable inventory policy response data contract. */
+/**
+ * Immutable inventory policy response data contract.
+ *
+ * @param id the id
+ * @param branchProductId the branch product id
+ * @param branchId the branch id
+ * @param productId the product id
+ * @param productName the product name
+ * @param controlMode the control mode
+ * @param inventoryUnit the inventory unit
+ * @param onlineEnabled the online enabled
+ * @param readyStockRequired the ready stock required
+ * @param defaultSafetyBuffer the default safety buffer
+ * @param maximumDailyAllocation the maximum daily allocation
+ * @param bookingHorizonDays the booking horizon days
+ * @param productionLeadMinutes the production lead minutes
+ * @param shelfLifeMinutes the shelf life minutes
+ */
 public record InventoryPolicyResponse(
         Long id,
         Long branchProductId,

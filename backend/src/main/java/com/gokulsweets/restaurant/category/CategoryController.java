@@ -14,6 +14,11 @@ public class CategoryController {
 
     private final CategoryService categoryService;
 
+    /**
+     * Creates a category controller instance.
+     *
+     * @param categoryService the category service
+     */
     public CategoryController(CategoryService categoryService) {
         this.categoryService = categoryService;
     }

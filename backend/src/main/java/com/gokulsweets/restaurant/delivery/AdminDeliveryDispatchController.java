@@ -201,18 +201,41 @@ public class AdminDeliveryDispatchController {
         }
     }
 
-    /** Immutable rider request data contract. */
+    /**
+     * Immutable rider request data contract.
+     *
+     * @param name the name
+     */
     public record RiderRequest(String name) {}
 
-    /** Immutable availability request data contract. */
+    /**
+     * Immutable availability request data contract.
+     *
+     * @param available the available
+     */
     public record AvailabilityRequest(boolean available) {}
 
-    /** Immutable assignment request data contract. */
+    /**
+     * Immutable assignment request data contract.
+     *
+     * @param riderId the rider id
+     */
     public record AssignmentRequest(long riderId) {}
 
-    /** Immutable exception request data contract. */
+    /**
+     * Immutable exception request data contract.
+     *
+     * @param reason the reason
+     * @param detail the detail
+     * @param customerContacted the customer contacted
+     */
     public record ExceptionRequest(String reason, String detail, boolean customerContacted) {}
 
-    /** Immutable outcome request data contract. */
+    /**
+     * Immutable outcome request data contract.
+     *
+     * @param actualJourneyCost the actual journey cost
+     * @param outcome the outcome
+     */
     public record OutcomeRequest(BigDecimal actualJourneyCost, String outcome) {}
 }

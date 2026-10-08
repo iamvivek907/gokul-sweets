@@ -14,6 +14,11 @@ public class TaxCategoryController {
 
     private final TaxCategoryService taxCategoryService;
 
+    /**
+     * Creates a tax category controller instance.
+     *
+     * @param taxCategoryService the tax category service
+     */
     public TaxCategoryController(TaxCategoryService taxCategoryService) {
         this.taxCategoryService = taxCategoryService;
     }

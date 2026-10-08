@@ -6,7 +6,11 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-/** Immutable customer order history request data contract. */
+/**
+ * Immutable customer order history request data contract.
+ *
+ * @param orderNumbers the order numbers
+ */
 public record CustomerOrderHistoryRequest(
         @NotEmpty(message = "At least one order number is required.")
                 @Size(max = 500, message = "A maximum of 500 orders can be loaded at once.")

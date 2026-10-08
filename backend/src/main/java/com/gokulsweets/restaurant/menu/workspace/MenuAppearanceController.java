@@ -35,14 +35,39 @@ public class MenuAppearanceController {
 
     private final R2StorageService storage;
 
-    /** Immutable frame data contract. */
+    /**
+     * Immutable frame data contract.
+     *
+     * @param x the x
+     * @param y the y
+     * @param zoom the zoom
+     * @param fit the fit
+     */
     public record Frame(
             @Min(0) @Max(100) int x,
             @Min(0) @Max(100) int y,
             @Min(100) @Max(300) int zoom,
             @NotNull @Pattern(regexp = "COVER|CONTAIN") String fit) {}
 
-    /** Immutable banner data contract. */
+    /**
+     * Immutable banner data contract.
+     *
+     * @param key the key
+     * @param titleEn the title en
+     * @param titleHi the title hi
+     * @param subtitleEn the subtitle en
+     * @param subtitleHi the subtitle hi
+     * @param buttonLabel the button label
+     * @param categoryId the category id
+     * @param visible the visible
+     * @param order the order
+     * @param startAt the start at
+     * @param endAt the end at
+     * @param mediaUrl the media url
+     * @param mediaType the media type
+     * @param posterUrl the poster url
+     * @param frame the frame
+     */
     public record Banner(
             @NotBlank @Pattern(regexp = "[A-Za-z0-9-]{1,40}") String key,
             @NotBlank @Size(max = 120) String titleEn,
@@ -61,19 +86,43 @@ public class MenuAppearanceController {
             @Size(max = 1000) String posterUrl,
             @NotNull @Valid Frame frame) {}
 
-    /** Immutable category data contract. */
+    /**
+     * Immutable category data contract.
+     *
+     * @param id the id
+     * @param order the order
+     * @param imageUrl the image url
+     */
     public record Category(
             @Positive long id, @Min(0) int order, @Size(max = 1000) String imageUrl) {}
 
-    /** Immutable config data contract. */
+    /**
+     * Immutable config data contract.
+     *
+     * @param banners the banners
+     * @param categories the categories
+     */
     public record Config(
             @NotNull @Size(max = 12) List<@Valid Banner> banners,
             @NotNull @Size(max = 200) List<@Valid Category> categories) {}
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param version the version
+     * @param config the config
+     * @param publish the publish
+     */
     public record Input(@Min(0) long version, @NotNull @Valid Config config, boolean publish) {}
 
-    /** Immutable snapshot data contract. */
+    /**
+     * Immutable snapshot data contract.
+     *
+     * @param version the version
+     * @param draft the draft
+     * @param live the live
+     * @param publishedAt the published at
+     */
     public record Snapshot(long version, Config draft, Config live, String publishedAt) {}
 
     /**

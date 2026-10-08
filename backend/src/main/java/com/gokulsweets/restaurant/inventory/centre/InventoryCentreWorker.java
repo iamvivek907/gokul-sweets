@@ -42,7 +42,15 @@ public class InventoryCentreWorker {
 
     private final ObjectMapper mapper;
 
-    /** Immutable claim data contract. */
+    /**
+     * Immutable claim data contract.
+     *
+     * @param task the task
+     * @param job the job
+     * @param branch the branch
+     * @param actor the actor
+     * @param token the token
+     */
     record Claim(long task, UUID job, long branch, long actor, UUID token) {}
 
     /** Runs batch. */

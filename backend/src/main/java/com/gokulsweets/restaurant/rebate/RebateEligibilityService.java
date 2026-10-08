@@ -66,10 +66,28 @@ public class RebateEligibilityService {
 
     private final RebateRedemptionRepository rebateRedemptionRepository;
 
-    /** Immutable public tier data contract. */
+    /**
+     * Immutable public tier data contract.
+     *
+     * @param minimumOrderAmount the minimum order amount
+     * @param rebateAmount the rebate amount
+     */
     public record PublicTier(BigDecimal minimumOrderAmount, BigDecimal rebateAmount) {}
 
-    /** Immutable public offer data contract. */
+    /**
+     * Immutable public offer data contract.
+     *
+     * @param rebateId the rebate id
+     * @param code the code
+     * @param name the name
+     * @param description the description
+     * @param rebateType the rebate type
+     * @param rebateValue the rebate value
+     * @param minimumOrderAmount the minimum order amount
+     * @param maximumDiscountAmount the maximum discount amount
+     * @param tiers the tiers
+     * @param validUntil the valid until
+     */
     public record PublicOffer(
             Long rebateId,
             String code,
@@ -84,6 +102,9 @@ public class RebateEligibilityService {
 
     /**
      * Advertise unrestricted public terms without exposing customer-specific codes or eligibility.
+     *
+     * @param branchId the branch id
+     * @return the operation result
      */
     @Transactional(readOnly = true)
     public List<PublicOffer> publicOffers(long branchId) {
@@ -210,7 +231,12 @@ public class RebateEligibilityService {
         }
     }
 
-    /** Prices a validated draft without creating an order or claiming an offer. */
+    /**
+     * Prices a validated draft without creating an order or claiming an offer.
+     *
+     * @param order the order
+     * @return the operation result
+     */
     @Transactional(readOnly = true)
     public List<AvailableRebateResponse> previewDraft(Order order) {
         final long __gokulMethodStartedNanos =
@@ -257,7 +283,12 @@ public class RebateEligibilityService {
         }
     }
 
-    /** Informational targets are separate from rebates that may currently be applied. */
+    /**
+     * Informational targets are separate from rebates that may currently be applied.
+     *
+     * @param orderNumber the order number
+     * @return the operation result
+     */
     @Transactional(readOnly = true)
     public List<AvailableRebateResponse> getSpendTargets(String orderNumber) {
         final long __gokulMethodStartedNanos =
@@ -827,7 +858,13 @@ public class RebateEligibilityService {
         }
     }
 
-    /** An ineligible saved choice is expected during reward changes, not a failed transaction. */
+    /**
+     * An ineligible saved choice is expected during reward changes, not a failed transaction.
+     *
+     * @param order the order
+     * @param code the code
+     * @return the operation result
+     */
     @Transactional
     public java.util.Optional<AvailableRebateResponse> findEligibleRebate(
             Order order, String code) {
@@ -850,6 +887,10 @@ public class RebateEligibilityService {
 
     /**
      * Explicit-code pricing for an unsaved validated draft; persisted orders retain payment guards.
+     *
+     * @param draft the draft
+     * @param code the code
+     * @return the operation result
      */
     @Transactional(readOnly = true)
     public java.util.Optional<AvailableRebateResponse> findEligibleDraftRebate(

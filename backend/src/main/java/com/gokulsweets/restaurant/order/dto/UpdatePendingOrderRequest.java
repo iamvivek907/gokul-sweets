@@ -8,7 +8,14 @@ import jakarta.validation.constraints.NotNull;
 
 import java.util.List;
 
-/** Immutable update pending order request data contract. */
+/**
+ * Immutable update pending order request data contract.
+ *
+ * @param pickupSlotId the pickup slot id
+ * @param pickupType the pickup type
+ * @param items the items
+ * @param quoteToken the quote token
+ */
 public record UpdatePendingOrderRequest(
         @NotNull(message = "Pickup slot ID is required.") Long pickupSlotId,
         @NotNull(message = "Pickup type is required.") PickupType pickupType,
@@ -16,6 +23,13 @@ public record UpdatePendingOrderRequest(
                 List<@Valid CreateOrderItemRequest> items,
         String quoteToken) {
 
+    /**
+     * Creates a update pending order request instance.
+     *
+     * @param pickupSlotId the pickup slot id
+     * @param pickupType the pickup type
+     * @param items the items
+     */
     public UpdatePendingOrderRequest(
             Long pickupSlotId, PickupType pickupType, List<CreateOrderItemRequest> items) {
         this(pickupSlotId, pickupType, items, null);

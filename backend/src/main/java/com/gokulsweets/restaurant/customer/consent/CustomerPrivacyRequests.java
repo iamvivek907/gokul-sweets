@@ -124,6 +124,12 @@ WHERE environment = ? AND verified_subject_id = ? ORDER BY received_at DESC, id 
         }
     }
 
-    /** Immutable request data contract. */
+    /**
+     * Immutable request data contract.
+     *
+     * @param id the id
+     * @param kind the kind
+     * @param receivedAt the received at
+     */
     public record Request(long id, PrivacyRequestKind kind, Instant receivedAt) {}
 }

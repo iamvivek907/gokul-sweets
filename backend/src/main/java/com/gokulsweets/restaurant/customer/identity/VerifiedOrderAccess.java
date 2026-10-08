@@ -156,7 +156,12 @@ SELECT EXISTS (SELECT 1 FROM verified_order_ownership own
         }
     }
 
-    /** Pickup secrets require an actual owner session even when legacy order reads are public. */
+    /**
+     * Pickup secrets require an actual owner session even when legacy order reads are public.
+     *
+     * @param orderNumber the order number
+     * @param request the request
+     */
     public void requirePickupCode(String orderNumber, HttpServletRequest request) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
@@ -171,7 +176,12 @@ SELECT EXISTS (SELECT 1 FROM verified_order_ownership own
         }
     }
 
-    /** Financial changes never use the optional public/legacy read boundary. */
+    /**
+     * Financial changes never use the optional public/legacy read boundary.
+     *
+     * @param orderNumber the order number
+     * @param request the request
+     */
     public void requireOwner(String orderNumber, HttpServletRequest request) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(

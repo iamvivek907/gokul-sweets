@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.delivery;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original DeliveryPreparationQueue.FROM value; unchanged during extraction. */

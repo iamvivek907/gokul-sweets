@@ -437,7 +437,23 @@ public class ProductIntelligenceService {
         }
     }
 
-    /** Immutable product row data contract. */
+    /**
+     * Immutable product row data contract.
+     *
+     * @param productId the product id
+     * @param productCode the product code
+     * @param productName the product name
+     * @param categoryId the category id
+     * @param categoryCode the category code
+     * @param categoryName the category name
+     * @param orderCount the order count
+     * @param quantitySold the quantity sold
+     * @param revenue the revenue
+     * @param uniqueCustomers the unique customers
+     * @param activeSalesDays the active sales days
+     * @param previousQuantity the previous quantity
+     * @param previousRevenue the previous revenue
+     */
     private record ProductRow(
             Long productId,
             String productCode,
@@ -453,6 +469,11 @@ public class ProductIntelligenceService {
             long previousQuantity,
             BigDecimal previousRevenue) {}
 
-    /** Immutable classification data contract. */
+    /**
+     * Immutable classification data contract.
+     *
+     * @param state the state
+     * @param reason the reason
+     */
     private record Classification(ProductPerformanceState state, String reason) {}
 }

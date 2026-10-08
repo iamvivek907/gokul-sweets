@@ -30,6 +30,7 @@ import java.util.HexFormat;
 @RequiredArgsConstructor
 public class StaffSessionService {
 
+    /** The cookie name value. */
     public static final String COOKIE_NAME = AppConstant.STAFF_SESSION_SERVICE_COOKIE_NAME;
 
     private final EnhancementProperties flags;
@@ -51,16 +52,40 @@ public class StaffSessionService {
     @org.springframework.beans.factory.annotation.Value("${staff.mfa.encryption-key:}")
     private String encryptionKey;
 
-    /** Immutable sign in data contract. */
+    /**
+     * Immutable sign in data contract.
+     *
+     * @param token the token
+     * @param csrf the csrf
+     * @param user the user
+     * @param enrollmentRequired the enrollment required
+     */
     public record SignIn(String token, String csrf, StaffUser user, boolean enrollmentRequired) {}
 
-    /** Immutable enrollment data contract. */
+    /**
+     * Immutable enrollment data contract.
+     *
+     * @param token the token
+     * @param staffId the staff id
+     */
     public record Enrollment(String token, long staffId) {}
 
-    /** Immutable completed data contract. */
+    /**
+     * Immutable completed data contract.
+     *
+     * @param session the session
+     * @param recoveryCodes the recovery codes
+     */
     public record Completed(SignIn session, java.util.List<String> recoveryCodes) {}
 
-    /** Immutable verified data contract. */
+    /**
+     * Immutable verified data contract.
+     *
+     * @param staffId the staff id
+     * @param username the username
+     * @param csrfHash the csrf hash
+     * @param createdAt the created at
+     */
     public record Verified(long staffId, String username, String csrfHash, Instant createdAt) {}
 
     /**

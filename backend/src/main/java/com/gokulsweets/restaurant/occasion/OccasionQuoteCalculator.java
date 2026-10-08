@@ -35,7 +35,15 @@ public class OccasionQuoteCalculator {
 
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
-    /** Immutable rate data contract. */
+    /**
+     * Immutable rate data contract.
+     *
+     * @param productId the product id
+     * @param unitPrice the unit price
+     * @param pieceGrams the piece grams
+     * @param estimatedKg the estimated kg
+     * @param rebatePercent the rebate percent
+     */
     public record Rate(
             @Positive long productId,
             @DecimalMin("0.01") @Digits(integer = 8, fraction = 2) BigDecimal unitPrice,
@@ -43,6 +51,14 @@ public class OccasionQuoteCalculator {
             @DecimalMin("0.001") @Digits(integer = 8, fraction = 3) BigDecimal estimatedKg,
             @DecimalMin("0") @DecimalMax("99") BigDecimal rebatePercent) {
 
+        /**
+         * Creates a rate instance.
+         *
+         * @param productId the product id
+         * @param unitPrice the unit price
+         * @param pieceGrams the piece grams
+         * @param estimatedKg the estimated kg
+         */
         public Rate(
                 long productId,
                 BigDecimal unitPrice,
@@ -52,7 +68,21 @@ public class OccasionQuoteCalculator {
         }
     }
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param rates the rates
+     * @param depositPercent the deposit percent
+     * @param packagingPerBox the packaging per box
+     * @param packagingReviewed the packaging reviewed
+     * @param readyTime the ready time
+     * @param terms the terms
+     * @param estimated the estimated
+     * @param extras the extras
+     * @param expectedTotal the expected total
+     * @param bulkRebatePercent the bulk rebate percent
+     * @param packingRates the packing rates
+     */
     public record Input(
             @NotEmpty @Size(max = 30) List<@Valid Rate> rates,
             @NotNull @DecimalMin("1") @DecimalMax("100") BigDecimal depositPercent,
@@ -66,6 +96,19 @@ public class OccasionQuoteCalculator {
             @DecimalMin("0") @DecimalMax("99") BigDecimal bulkRebatePercent,
             @Size(max = 30) List<@Valid PackingRate> packingRates) {
 
+        /**
+         * Creates a input instance.
+         *
+         * @param rates the rates
+         * @param depositPercent the deposit percent
+         * @param packagingPerBox the packaging per box
+         * @param packagingReviewed the packaging reviewed
+         * @param readyTime the ready time
+         * @param terms the terms
+         * @param estimated the estimated
+         * @param extras the extras
+         * @param expectedTotal the expected total
+         */
         public Input(
                 List<Rate> rates,
                 BigDecimal depositPercent,
@@ -91,23 +134,63 @@ public class OccasionQuoteCalculator {
         }
     }
 
-    /** Immutable packing rate data contract. */
+    /**
+     * Immutable packing rate data contract.
+     *
+     * @param groupNumber the group number
+     * @param pricePerBox the price per box
+     */
     public record PackingRate(
             @Min(1) int groupNumber,
             @NotNull @DecimalMin("0") @Digits(integer = 8, fraction = 2) BigDecimal pricePerBox) {}
 
-    /** Immutable packing charge data contract. */
+    /**
+     * Immutable packing charge data contract.
+     *
+     * @param groupNumber the group number
+     * @param name the name
+     * @param quantity the quantity
+     * @param pricePerBox the price per box
+     * @param total the total
+     */
     public record PackingCharge(
             int groupNumber, String name, int quantity, BigDecimal pricePerBox, BigDecimal total) {}
 
-    /** Immutable extra data contract. */
+    /**
+     * Immutable extra data contract.
+     *
+     * @param name the name
+     * @param quantity the quantity
+     * @param priceIncludingTax the price including tax
+     */
     public record Extra(
             @NotBlank @Size(max = 100) String name,
             @Min(1) @Max(100000) int quantity,
             @NotNull @DecimalMin("0") @Digits(integer = 8, fraction = 2)
                     BigDecimal priceIncludingTax) {}
 
-    /** Immutable line data contract. */
+    /**
+     * Immutable line data contract.
+     *
+     * @param productId the product id
+     * @param name the name
+     * @param unit the unit
+     * @param requestedQuantity the requested quantity
+     * @param requestedUnit the requested unit
+     * @param unitPrice the unit price
+     * @param pieceGrams the piece grams
+     * @param productionQuantity the production quantity
+     * @param cgstRate the cgst rate
+     * @param sgstRate the sgst rate
+     * @param foodBase the food base
+     * @param foodTax the food tax
+     * @param packagingAmount the packaging amount
+     * @param grossAmount the gross amount
+     * @param rebatePercent the rebate percent
+     * @param originalFoodBase the original food base
+     * @param rebateAmount the rebate amount
+     * @param requestedSupplementalGrams the requested supplemental grams
+     */
     public record Line(
             long productId,
             String name,
@@ -128,6 +211,24 @@ public class OccasionQuoteCalculator {
             BigDecimal rebateAmount,
             BigDecimal requestedSupplementalGrams) {
 
+        /**
+         * Creates a line instance.
+         *
+         * @param productId the product id
+         * @param name the name
+         * @param unit the unit
+         * @param requestedQuantity the requested quantity
+         * @param requestedUnit the requested unit
+         * @param unitPrice the unit price
+         * @param pieceGrams the piece grams
+         * @param productionQuantity the production quantity
+         * @param cgstRate the cgst rate
+         * @param sgstRate the sgst rate
+         * @param foodBase the food base
+         * @param foodTax the food tax
+         * @param packagingAmount the packaging amount
+         * @param grossAmount the gross amount
+         */
         public Line(
                 long productId,
                 String name,
@@ -165,7 +266,25 @@ public class OccasionQuoteCalculator {
         }
     }
 
-    /** Immutable calculation data contract. */
+    /**
+     * Immutable calculation data contract.
+     *
+     * @param lines the lines
+     * @param foodBase the food base
+     * @param foodTax the food tax
+     * @param packagingTotal the packaging total
+     * @param total the total
+     * @param deposit the deposit
+     * @param balance the balance
+     * @param expiresAt the expires at
+     * @param balanceDueAt the balance due at
+     * @param expectedReadyAt the expected ready at
+     * @param extras the extras
+     * @param estimated the estimated
+     * @param bulkRebatePercent the bulk rebate percent
+     * @param rebateTotal the rebate total
+     * @param packingCharges the packing charges
+     */
     public record Calculation(
             List<Line> lines,
             BigDecimal foodBase,
@@ -183,6 +302,22 @@ public class OccasionQuoteCalculator {
             BigDecimal rebateTotal,
             List<PackingCharge> packingCharges) {
 
+        /**
+         * Creates a calculation instance.
+         *
+         * @param lines the lines
+         * @param foodBase the food base
+         * @param foodTax the food tax
+         * @param packagingTotal the packaging total
+         * @param total the total
+         * @param deposit the deposit
+         * @param balance the balance
+         * @param expiresAt the expires at
+         * @param balanceDueAt the balance due at
+         * @param expectedReadyAt the expected ready at
+         * @param extras the extras
+         * @param estimated the estimated
+         */
         public Calculation(
                 List<Line> lines,
                 BigDecimal foodBase,
@@ -215,7 +350,20 @@ public class OccasionQuoteCalculator {
         }
     }
 
-    /** Immutable source data contract. */
+    /**
+     * Immutable source data contract.
+     *
+     * @param id the id
+     * @param name the name
+     * @param weight the weight
+     * @param quantity the quantity
+     * @param requestedUnit the requested unit
+     * @param unitPrice the unit price
+     * @param pieceGrams the piece grams
+     * @param cgst the cgst
+     * @param sgst the sgst
+     * @param supplementalGrams the supplemental grams
+     */
     private record Source(
             long id,
             String name,

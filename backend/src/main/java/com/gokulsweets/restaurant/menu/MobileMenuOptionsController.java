@@ -106,7 +106,12 @@ public class MobileMenuOptionsController {
         }
     }
 
-    /** Immutable one data contract. */
+    /**
+     * Immutable one data contract.
+     *
+     * @param version the version
+     * @param group the group
+     */
     public record One(
             @jakarta.validation.constraints.Min(0) long version,
             @jakarta.validation.constraints.NotNull @Valid MobileMenuOptionsService.Group group) {}

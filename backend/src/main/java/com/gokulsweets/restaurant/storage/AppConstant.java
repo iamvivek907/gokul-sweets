@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.storage;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original R2StorageService.MAX_IMAGE_SIZE value; unchanged during extraction. */

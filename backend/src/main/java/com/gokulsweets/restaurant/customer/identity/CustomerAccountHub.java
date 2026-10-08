@@ -20,14 +20,35 @@ public class CustomerAccountHub {
 
     private final JdbcTemplate jdbc;
 
-    /** Immutable address data contract. */
+    /**
+     * Immutable address data contract.
+     *
+     * @param id the id
+     * @param label the label
+     * @param addressLine the address line
+     * @param locality the locality
+     * @param postalCode the postal code
+     */
     public record Address(
             long id, String label, String addressLine, String locality, String postalCode) {}
 
-    /** Immutable preferences data contract. */
+    /**
+     * Immutable preferences data contract.
+     *
+     * @param dietaryNotes the dietary notes
+     * @param preferredBranchId the preferred branch id
+     */
     public record Preferences(String dietaryNotes, Long preferredBranchId) {}
 
-    /** Immutable snapshot data contract. */
+    /**
+     * Immutable snapshot data contract.
+     *
+     * @param paidOrders the paid orders
+     * @param favouriteProductIds the favourite product ids
+     * @param addresses the addresses
+     * @param preferences the preferences
+     * @param completedOrders the completed orders
+     */
     public record Snapshot(
             long paidOrders,
             List<Long> favouriteProductIds,
@@ -35,7 +56,14 @@ public class CustomerAccountHub {
             Preferences preferences,
             long completedOrders) {}
 
-    /** Immutable address input data contract. */
+    /**
+     * Immutable address input data contract.
+     *
+     * @param label the label
+     * @param addressLine the address line
+     * @param locality the locality
+     * @param postalCode the postal code
+     */
     public record AddressInput(
             String label, String addressLine, String locality, String postalCode) {}
 

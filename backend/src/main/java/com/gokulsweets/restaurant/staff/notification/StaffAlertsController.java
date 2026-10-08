@@ -37,7 +37,20 @@ public class StaffAlertsController {
 
     private final StaffAlertEmail email;
 
-    /** Immutable settings data contract. */
+    /**
+     * Immutable settings data contract.
+     *
+     * @param enabled the enabled
+     * @param environment the environment
+     * @param staffId the staff id
+     * @param pushConfigured the push configured
+     * @param applicationServerKey the application server key
+     * @param deviceActive the device active
+     * @param emailConfigured the email configured
+     * @param reminderMinutes the reminder minutes
+     * @param escalationMinutes the escalation minutes
+     * @param emailTestRouting the email test routing
+     */
     public record Settings(
             boolean enabled,
             String environment,
@@ -170,7 +183,11 @@ public class StaffAlertsController {
         }
     }
 
-    /** Immutable read all data contract. */
+    /**
+     * Immutable read all data contract.
+     *
+     * @param throughId the through id
+     */
     public record ReadAll(@jakarta.validation.constraints.Positive long throughId) {}
 
     /**

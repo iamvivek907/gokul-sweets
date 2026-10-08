@@ -85,6 +85,13 @@ public class CartAvailabilityService {
 
     /**
      * Menu discovery spans individual product horizons; order validation still checks every item.
+     *
+     * @param branchId the branch id
+     * @param startDate the start date
+     * @param days the days
+     * @param requested the requested
+     * @param menuPreview the menu preview
+     * @return the operation result
      */
     @Transactional(readOnly = true)
     public Availability check(
@@ -447,17 +454,41 @@ public class CartAvailabilityService {
         }
     }
 
-    /** Immutable stock key data contract. */
+    /**
+     * Immutable stock key data contract.
+     *
+     * @param branchProductId the branch product id
+     * @param date the date
+     */
     private record StockKey(Long branchProductId, LocalDate date) {}
 
-    /** Immutable availability data contract. */
+    /**
+     * Immutable availability data contract.
+     *
+     * @param fulfilmentType the fulfilment type
+     * @param today the today
+     * @param maximumDate the maximum date
+     * @param dates the dates
+     */
     public record Availability(
             String fulfilmentType,
             LocalDate today,
             LocalDate maximumDate,
             List<DateAvailability> dates) {}
 
-    /** Immutable item availability data contract. */
+    /**
+     * Immutable item availability data contract.
+     *
+     * @param productId the product id
+     * @param productName the product name
+     * @param unit the unit
+     * @param requestedQuantity the requested quantity
+     * @param availableQuantity the available quantity
+     * @param available the available
+     * @param code the code
+     * @param reason the reason
+     * @param expectedReadyAt the expected ready at
+     */
     public record ItemAvailability(
             Long productId,
             String productName,
@@ -501,7 +532,16 @@ public class CartAvailabilityService {
         }
     }
 
-    /** Immutable date availability data contract. */
+    /**
+     * Immutable date availability data contract.
+     *
+     * @param date the date
+     * @param available the available
+     * @param slots the slots
+     * @param items the items
+     * @param reason the reason
+     * @param plannedProduction the planned production
+     */
     public record DateAvailability(
             LocalDate date,
             boolean available,
@@ -510,7 +550,16 @@ public class CartAvailabilityService {
             String reason,
             boolean plannedProduction) {}
 
-    /** Immutable slot availability data contract. */
+    /**
+     * Immutable slot availability data contract.
+     *
+     * @param slot the slot
+     * @param normalAvailable the normal available
+     * @param priorityAvailable the priority available
+     * @param reason the reason
+     * @param code the code
+     * @param issues the issues
+     */
     public record SlotAvailability(
             PickupSlotResponse slot,
             boolean normalAvailable,

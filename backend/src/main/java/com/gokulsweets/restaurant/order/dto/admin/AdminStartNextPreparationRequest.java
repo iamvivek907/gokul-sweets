@@ -4,7 +4,12 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
-/** Immutable admin start next preparation request data contract. */
+/**
+ * Immutable admin start next preparation request data contract.
+ *
+ * @param branchId the branch id
+ * @param count the count
+ */
 public record AdminStartNextPreparationRequest(
         @NotNull(message = "Branch ID is required.") Long branchId,
         @NotNull(message = "Count is required.")

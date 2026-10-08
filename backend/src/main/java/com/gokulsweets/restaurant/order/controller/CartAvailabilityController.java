@@ -88,7 +88,14 @@ public class CartAvailabilityController {
         }
     }
 
-    /** Immutable request data contract. */
+    /**
+     * Immutable request data contract.
+     *
+     * @param startDate the start date
+     * @param days the days
+     * @param items the items
+     * @param fulfilmentType the fulfilment type
+     */
     public record Request(
             @NotNull LocalDate startDate,
             @Min(1) @Max(61) int days,

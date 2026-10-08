@@ -18,6 +18,11 @@ public class ApplicationClock {
 
     private static volatile boolean istTimeFixEnabled = true;
 
+    /**
+     * Creates a application clock instance.
+     *
+     * @param features the features
+     */
     public ApplicationClock(EnhancementProperties features) {
         istTimeFixEnabled = features.isIstTimeFixEnabled();
     }
@@ -26,6 +31,8 @@ public class ApplicationClock {
      * Entity callbacks cannot inject a Clock. This rollout switch makes their legacy LocalDateTime
      * timestamps consistent with payment and slot logic. Switch off only while investigating an
      * existing database timestamp migration.
+     *
+     * @return the operation result
      */
     public static LocalDateTime legacyTimestampNow() {
         final long __gokulMethodStartedNanos =

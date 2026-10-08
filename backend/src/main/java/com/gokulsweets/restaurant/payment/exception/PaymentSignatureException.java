@@ -8,6 +8,12 @@ public class PaymentSignatureException extends RuntimeException {
 
     private final String code;
 
+    /**
+     * Creates a payment signature exception instance.
+     *
+     * @param code the code
+     * @param message the message
+     */
     public PaymentSignatureException(String code, String message) {
         super(message);
         this.code = code;

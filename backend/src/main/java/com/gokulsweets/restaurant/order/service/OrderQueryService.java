@@ -283,7 +283,13 @@ SELECT service_date, starts_at, ends_at FROM delivery_capacity_windows WHERE id 
         }
     }
 
-    /** Immutable delivery window data contract. */
+    /**
+     * Immutable delivery window data contract.
+     *
+     * @param date the date
+     * @param start the start
+     * @param end the end
+     */
     private record DeliveryWindow(LocalDate date, LocalTime start, LocalTime end) {}
 
     /**

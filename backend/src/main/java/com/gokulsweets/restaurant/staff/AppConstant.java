@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.staff;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original StaffManagementService.OWNER_ROLE value; unchanged during extraction. */

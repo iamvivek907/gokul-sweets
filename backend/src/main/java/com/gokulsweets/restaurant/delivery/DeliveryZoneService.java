@@ -256,7 +256,17 @@ ORDER BY b.name
         }
     }
 
-    /** Immutable configuration data contract. */
+    /**
+     * Immutable configuration data contract.
+     *
+     * @param locality the locality
+     * @param postalCode the postal code
+     * @param opensAt the opens at
+     * @param closesAt the closes at
+     * @param active the active
+     * @param riderPaused the rider paused
+     * @param productIds the product ids
+     */
     public record Configuration(
             @NotBlank @Size(min = 2, max = 120) String locality,
             @NotBlank @Pattern(regexp = "[0-9]{6}") String postalCode,
@@ -266,7 +276,19 @@ ORDER BY b.name
             boolean riderPaused,
             @NotNull @Size(max = 100) List<@NotNull @Positive Long> productIds) {}
 
-    /** Immutable zone data contract. */
+    /**
+     * Immutable zone data contract.
+     *
+     * @param id the id
+     * @param branchId the branch id
+     * @param locality the locality
+     * @param postalCode the postal code
+     * @param opensAt the opens at
+     * @param closesAt the closes at
+     * @param active the active
+     * @param riderPaused the rider paused
+     * @param productIds the product ids
+     */
     public record Zone(
             Long id,
             long branchId,
@@ -278,9 +300,22 @@ ORDER BY b.name
             boolean riderPaused,
             List<Long> productIds) {}
 
-    /** Immutable area data contract. */
+    /**
+     * Immutable area data contract.
+     *
+     * @param branchId the branch id
+     * @param branchName the branch name
+     * @param opensAt the opens at
+     * @param closesAt the closes at
+     */
     public record Area(long branchId, String branchName, LocalTime opensAt, LocalTime closesAt) {}
 
-    /** Immutable coverage data contract. */
+    /**
+     * Immutable coverage data contract.
+     *
+     * @param configuredAreas the configured areas
+     * @param orderable the orderable
+     * @param notice the notice
+     */
     public record Coverage(List<Area> configuredAreas, boolean orderable, String notice) {}
 }

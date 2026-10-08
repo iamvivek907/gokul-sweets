@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.inventory.service;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original AdminInventoryWorkspaceService.MAX_PAGE_SIZE value; unchanged during extraction. */

@@ -199,7 +199,19 @@ FROM occasion_payment_attempts WHERE enquiry_id = ? AND status = 'PAID'
         }
     }
 
-    /** Immutable line data contract. */
+    /**
+     * Immutable line data contract.
+     *
+     * @param productId the product id
+     * @param name the name
+     * @param mode the mode
+     * @param quantity the quantity
+     * @param weightGrams the weight grams
+     * @param gross the gross
+     * @param subtotal the subtotal
+     * @param tax the tax
+     * @param taxRate the tax rate
+     */
     private record Line(
             long productId,
             String name,

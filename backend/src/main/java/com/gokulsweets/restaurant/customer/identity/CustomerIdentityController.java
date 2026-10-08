@@ -83,7 +83,12 @@ public class CustomerIdentityController {
 
     private final com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences alerts;
 
-    /** Called before opening the widget. Source and device limits are shared across instances. */
+    /**
+     * Called before opening the widget. Source and device limits are shared across instances.
+     *
+     * @param request the request
+     * @return the operation result
+     */
     @PostMapping("/start")
     public ResponseEntity<Void> start(HttpServletRequest request) {
         final long __gokulMethodStartedNanos =
@@ -261,7 +266,11 @@ public class CustomerIdentityController {
         }
     }
 
-    /** Immutable name request data contract. */
+    /**
+     * Immutable name request data contract.
+     *
+     * @param name the name
+     */
     public record NameRequest(String name) {}
 
     /**
@@ -290,7 +299,12 @@ public class CustomerIdentityController {
         }
     }
 
-    /** Immutable order history page data contract. */
+    /**
+     * Immutable order history page data contract.
+     *
+     * @param orders the orders
+     * @param nextBefore the next before
+     */
     public record OrderHistoryPage(List<CustomerOrderSummaryResponse> orders, String nextBefore) {}
 
     /**
@@ -755,7 +769,11 @@ public class CustomerIdentityController {
         }
     }
 
-    /** Immutable consent choice data contract. */
+    /**
+     * Immutable consent choice data contract.
+     *
+     * @param granted the granted
+     */
     public record ConsentChoice(Boolean granted) {}
 
     /**
@@ -882,10 +900,20 @@ public class CustomerIdentityController {
         }
     }
 
-    /** Immutable notification read target data contract. */
+    /**
+     * Immutable notification read target data contract.
+     *
+     * @param targetType the target type
+     * @param targetId the target id
+     * @param throughId the through id
+     */
     public record NotificationReadTarget(String targetType, String targetId, Long throughId) {}
 
-    /** Immutable notification read all data contract. */
+    /**
+     * Immutable notification read all data contract.
+     *
+     * @param throughId the through id
+     */
     public record NotificationReadAll(@jakarta.validation.constraints.Positive long throughId) {}
 
     /**
@@ -1383,7 +1411,11 @@ public class CustomerIdentityController {
         }
     }
 
-    /** Immutable exchange request data contract. */
+    /**
+     * Immutable exchange request data contract.
+     *
+     * @param accessToken the access token
+     */
     public record ExchangeRequest(String accessToken) {}
 
     /**

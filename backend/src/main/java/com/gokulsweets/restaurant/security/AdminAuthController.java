@@ -220,18 +220,42 @@ public class AdminAuthController {
         }
     }
 
-    /** Immutable login data contract. */
+    /**
+     * Immutable login data contract.
+     *
+     * @param username the username
+     * @param password the password
+     * @param code the code
+     */
     public record Login(String username, String password, String code) {}
 
-    /** Immutable enrollment request data contract. */
+    /**
+     * Immutable enrollment request data contract.
+     *
+     * @param token the token
+     */
     public record EnrollmentRequest(String token) {}
 
-    /** Immutable confirmation data contract. */
+    /**
+     * Immutable confirmation data contract.
+     *
+     * @param token the token
+     * @param code the code
+     */
     public record Confirmation(String token, String code) {}
 
-    /** Immutable enrollment response data contract. */
+    /**
+     * Immutable enrollment response data contract.
+     *
+     * @param enrollmentToken the enrollment token
+     */
     public record EnrollmentResponse(String enrollmentToken) {}
 
-    /** Immutable login response data contract. */
+    /**
+     * Immutable login response data contract.
+     *
+     * @param profile the profile
+     * @param recoveryCodes the recovery codes
+     */
     public record LoginResponse(AdminAuthResponse profile, List<String> recoveryCodes) {}
 }

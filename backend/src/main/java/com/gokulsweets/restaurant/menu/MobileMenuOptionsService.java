@@ -29,20 +29,41 @@ public class MobileMenuOptionsService {
 
     private final StaffAuthorizationService staff;
 
-    /** Immutable choice data contract. */
+    /**
+     * Immutable choice data contract.
+     *
+     * @param productId the product id
+     * @param label the label
+     */
     public record Choice(@NotNull Long productId, @NotBlank @Size(max = 30) String label) {}
 
-    /** Immutable group data contract. */
+    /**
+     * Immutable group data contract.
+     *
+     * @param key the key
+     * @param title the title
+     * @param choices the choices
+     */
     public record Group(
             @NotBlank @Pattern(regexp = "[A-Za-z0-9-]{1,40}") String key,
             @NotBlank @Size(max = 100) String title,
             @NotNull @Size(min = 2, max = 6) List<@Valid Choice> choices) {}
 
-    /** Immutable input data contract. */
+    /**
+     * Immutable input data contract.
+     *
+     * @param version the version
+     * @param groups the groups
+     */
     public record Input(
             @Min(0) long version, @NotNull @Size(max = 500) List<@Valid Group> groups) {}
 
-    /** Immutable snapshot data contract. */
+    /**
+     * Immutable snapshot data contract.
+     *
+     * @param version the version
+     * @param groups the groups
+     */
     public record Snapshot(long version, List<Group> groups) {}
 
     /**
@@ -248,7 +269,12 @@ public class MobileMenuOptionsService {
         }
     }
 
-    /** Immutable group match data contract. */
+    /**
+     * Immutable group match data contract.
+     *
+     * @param version the version
+     * @param group the group
+     */
     public record GroupMatch(long version, Group group) {}
 
     /**
@@ -300,7 +326,15 @@ public class MobileMenuOptionsService {
         }
     }
 
-    /** Immutable group page data contract. */
+    /**
+     * Immutable group page data contract.
+     *
+     * @param version the version
+     * @param groups the groups
+     * @param total the total
+     * @param page the page
+     * @param totalPages the total pages
+     */
     public record GroupPage(
             long version, List<Group> groups, long total, int page, int totalPages) {}
 

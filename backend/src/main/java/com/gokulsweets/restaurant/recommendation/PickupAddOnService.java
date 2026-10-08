@@ -47,7 +47,16 @@ public class PickupAddOnService {
 
     private final com.gokulsweets.restaurant.order.service.CartAvailabilityService slotAvailability;
 
-    /** Immutable suggestion data contract. */
+    /**
+     * Immutable suggestion data contract.
+     *
+     * @param product the product
+     * @param weightGrams the weight grams
+     * @param portionPrice the portion price
+     * @param portionTotal the portion total
+     * @param reason the reason
+     * @param slotVerified the slot verified
+     */
     public record Suggestion(
             MenuProductResponse product,
             Integer weightGrams,
@@ -56,10 +65,21 @@ public class PickupAddOnService {
             String reason,
             boolean slotVerified) {}
 
-    /** Immutable availability data contract. */
+    /**
+     * Immutable availability data contract.
+     *
+     * @param orderable the orderable
+     */
     public record Availability(boolean orderable) {}
 
-    /** Immutable pair data contract. */
+    /**
+     * Immutable pair data contract.
+     *
+     * @param seed the seed
+     * @param candidate the candidate
+     * @param confidence the confidence
+     * @param count the count
+     */
     record Pair(long seed, long candidate, double confidence, long count) {}
 
     /**

@@ -574,7 +574,15 @@ public class SalesIntelligenceService {
         }
     }
 
-    /** Immutable aggregate data contract. */
+    /**
+     * Immutable aggregate data contract.
+     *
+     * @param revenue the revenue
+     * @param orders the orders
+     * @param units the units
+     * @param customers the customers
+     * @param discount the discount
+     */
     private record Aggregate(
             BigDecimal revenue, long orders, long units, long customers, BigDecimal discount) {}
 }

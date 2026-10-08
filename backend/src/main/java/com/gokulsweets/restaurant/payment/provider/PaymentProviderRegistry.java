@@ -23,6 +23,13 @@ public class PaymentProviderRegistry {
 
     private final PaymentProviderType defaultProvider;
 
+    /**
+     * Creates a payment provider registry instance.
+     *
+     * @param availableProviders the available providers
+     * @param enabled the enabled
+     * @param defaultProvider the default provider
+     */
     public PaymentProviderRegistry(
             List<PaymentProvider> availableProviders,
             @Value("${payment.enabled-providers:RAZORPAY,PAYTM}") String enabled,

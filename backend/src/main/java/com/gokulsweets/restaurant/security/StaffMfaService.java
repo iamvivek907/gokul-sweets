@@ -101,7 +101,12 @@ public class StaffMfaService {
         }
     }
 
-    /** Immutable setup data contract. */
+    /**
+     * Immutable setup data contract.
+     *
+     * @param secret the secret
+     * @param uri the uri
+     */
     public record Setup(String secret, String uri) {}
 
     /**

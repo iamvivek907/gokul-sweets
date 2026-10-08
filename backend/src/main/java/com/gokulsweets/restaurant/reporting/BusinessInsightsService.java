@@ -787,6 +787,12 @@ public class BusinessInsightsService {
         }
     }
 
-    /** Immutable branch share row data contract. */
+    /**
+     * Immutable branch share row data contract.
+     *
+     * @param branchId the branch id
+     * @param branchName the branch name
+     * @param revenueShare the revenue share
+     */
     private record BranchShareRow(Long branchId, String branchName, BigDecimal revenueShare) {}
 }

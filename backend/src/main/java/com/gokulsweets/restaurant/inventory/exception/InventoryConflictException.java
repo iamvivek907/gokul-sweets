@@ -11,10 +11,23 @@ public class InventoryConflictException extends RuntimeException {
 
     private final Map<String, Object> details;
 
+    /**
+     * Creates a inventory conflict exception instance.
+     *
+     * @param code the code
+     * @param message the message
+     */
     public InventoryConflictException(String code, String message) {
         this(code, message, Map.of());
     }
 
+    /**
+     * Creates a inventory conflict exception instance.
+     *
+     * @param code the code
+     * @param message the message
+     * @param details the details
+     */
     public InventoryConflictException(String code, String message, Map<String, Object> details) {
         super(message);
         this.code = code;

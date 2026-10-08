@@ -32,6 +32,13 @@ public class DeliveryAcceptedQuoteService {
     @Value("${checkout.quote-signing-key:}")
     private String signingKey;
 
+    /**
+     * Creates a delivery accepted quote service instance.
+     *
+     * @param flags the flags
+     * @param preparation the preparation
+     * @param inventoryClock the inventory clock
+     */
     public DeliveryAcceptedQuoteService(
             EnhancementProperties flags,
             DeliveryOrderPreparationService preparation,
@@ -41,7 +48,15 @@ public class DeliveryAcceptedQuoteService {
         this.clock = inventoryClock;
     }
 
-    /** Immutable line data contract. */
+    /**
+     * Immutable line data contract.
+     *
+     * @param productName the product name
+     * @param unitPrice the unit price
+     * @param taxRate the tax rate
+     * @param taxAmount the tax amount
+     * @param totalAmount the total amount
+     */
     public record Line(
             String productName,
             String unitPrice,
@@ -49,7 +64,26 @@ public class DeliveryAcceptedQuoteService {
             String taxAmount,
             String totalAmount) {}
 
-    /** Immutable quote data contract. */
+    /**
+     * Immutable quote data contract.
+     *
+     * @param windowId the window id
+     * @param serviceDate the service date
+     * @param startsAt the starts at
+     * @param endsAt the ends at
+     * @param items the items
+     * @param subtotal the subtotal
+     * @param taxAmount the tax amount
+     * @param priorityCharge the priority charge
+     * @param deliveryFee the delivery fee
+     * @param totalAmount the total amount
+     * @param currency the currency
+     * @param expiresAt the expires at
+     * @param token the token
+     * @param paymentFee the payment fee
+     * @param paymentFeeTax the payment fee tax
+     * @param paymentFeeRate the payment fee rate
+     */
     public record Quote(
             long windowId,
             String serviceDate,
@@ -68,6 +102,23 @@ public class DeliveryAcceptedQuoteService {
             String paymentFeeTax,
             String paymentFeeRate) {
 
+        /**
+         * Creates a quote instance.
+         *
+         * @param windowId the window id
+         * @param serviceDate the service date
+         * @param startsAt the starts at
+         * @param endsAt the ends at
+         * @param items the items
+         * @param subtotal the subtotal
+         * @param taxAmount the tax amount
+         * @param priorityCharge the priority charge
+         * @param deliveryFee the delivery fee
+         * @param totalAmount the total amount
+         * @param currency the currency
+         * @param expiresAt the expires at
+         * @param token the token
+         */
         public Quote(
                 long windowId,
                 String serviceDate,

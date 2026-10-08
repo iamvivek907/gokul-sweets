@@ -664,6 +664,12 @@ public class AdminInventoryWorkspaceService {
         }
     }
 
-    /** Immutable attention data contract. */
+    /**
+     * Immutable attention data contract.
+     *
+     * @param required the required
+     * @param code the code
+     * @param message the message
+     */
     private record Attention(boolean required, String code, String message) {}
 }

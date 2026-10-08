@@ -6,7 +6,29 @@ import jakarta.validation.constraints.*;
 
 import java.time.Instant;
 
-/** Immutable campaign request data contract. */
+/**
+ * Immutable campaign request data contract.
+ *
+ * @param type the type
+ * @param title the title
+ * @param subtitle the subtitle
+ * @param ctaLabel the cta label
+ * @param ctaTarget the cta target
+ * @param startAt the start at
+ * @param endAt the end at
+ * @param active the active
+ * @param displayOrder the display order
+ * @param altText the alt text
+ * @param branchId the branch id
+ * @param mainX the main x
+ * @param mainY the main y
+ * @param mainZoom the main zoom
+ * @param mainFit the main fit
+ * @param mobileX the mobile x
+ * @param mobileY the mobile y
+ * @param mobileZoom the mobile zoom
+ * @param mobileFit the mobile fit
+ */
 public record CampaignRequest(
         @NotNull @Pattern(regexp = "HERO|FEATURE") String type,
         @NotBlank @Size(max = 120) String title,
@@ -28,6 +50,21 @@ public record CampaignRequest(
         @Min(100) @Max(300) Integer mobileZoom,
         @Pattern(regexp = "COVER|CONTAIN") String mobileFit) {
 
+    /**
+     * Creates a campaign request instance.
+     *
+     * @param type the type
+     * @param title the title
+     * @param subtitle the subtitle
+     * @param ctaLabel the cta label
+     * @param ctaTarget the cta target
+     * @param startAt the start at
+     * @param endAt the end at
+     * @param active the active
+     * @param displayOrder the display order
+     * @param altText the alt text
+     * @param branchId the branch id
+     */
     public CampaignRequest(
             String type,
             String title,
@@ -62,6 +99,19 @@ public record CampaignRequest(
                 null);
     }
 
+    /**
+     * Creates a campaign request instance.
+     *
+     * @param type the type
+     * @param title the title
+     * @param subtitle the subtitle
+     * @param ctaLabel the cta label
+     * @param ctaTarget the cta target
+     * @param startAt the start at
+     * @param endAt the end at
+     * @param active the active
+     * @param displayOrder the display order
+     */
     public CampaignRequest(
             String type,
             String title,

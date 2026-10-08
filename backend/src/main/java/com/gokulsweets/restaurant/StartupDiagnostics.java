@@ -15,6 +15,7 @@ import java.util.List;
 /** Opt-in measurements for slow cold starts; no public diagnostics endpoint or tag values. */
 final class StartupDiagnostics {
 
+    /** Creates a startup diagnostics instance. */
     private StartupDiagnostics() {}
 
     /**

@@ -38,18 +38,43 @@ public class KitchenPlanningService {
 
     /** Defines the supported filter values. */
     public enum Filter {
+
+        /** The all value. */
         ALL,
+        /** The overdue value. */
         OVERDUE,
+        /** The eligible value. */
         ELIGIBLE,
+        /** The scheduled value. */
         SCHEDULED,
+        /** The preparing value. */
         PREPARING,
+        /** The ready value. */
         READY,
+        /** The waiting value. */
         WAITING,
+        /** The in progress value. */
         IN_PROGRESS,
+        /** The handover value. */
         HANDOVER
     }
 
-    /** Immutable row data contract. */
+    /**
+     * Immutable row data contract.
+     *
+     * @param orderNumber the order number
+     * @param customerOrderNumber the customer order number
+     * @param customerName the customer name
+     * @param fulfillmentType the fulfillment type
+     * @param orderStatus the order status
+     * @param bucket the bucket
+     * @param date the date
+     * @param start the start
+     * @param end the end
+     * @param preparationAt the preparation at
+     * @param earlyPreparation the early preparation
+     * @param items the items
+     */
     public record Row(
             String orderNumber,
             Long customerOrderNumber,
@@ -64,7 +89,15 @@ public class KitchenPlanningService {
             boolean earlyPreparation,
             List<Item> items) {}
 
-    /** Immutable item data contract. */
+    /**
+     * Immutable item data contract.
+     *
+     * @param productId the product id
+     * @param productName the product name
+     * @param saleMode the sale mode
+     * @param quantity the quantity
+     * @param weightGrams the weight grams
+     */
     public record Item(
             long productId,
             String productName,
@@ -72,7 +105,18 @@ public class KitchenPlanningService {
             int quantity,
             Integer weightGrams) {}
 
-    /** Immutable slot data contract. */
+    /**
+     * Immutable slot data contract.
+     *
+     * @param date the date
+     * @param start the start
+     * @param end the end
+     * @param fulfillmentType the fulfillment type
+     * @param waiting the waiting
+     * @param preparing the preparing
+     * @param ready the ready
+     * @param total the total
+     */
     public record Slot(
             LocalDate date,
             LocalTime start,
@@ -83,7 +127,16 @@ public class KitchenPlanningService {
             long ready,
             long total) {}
 
-    /** Immutable plan data contract. */
+    /**
+     * Immutable plan data contract.
+     *
+     * @param orders the orders
+     * @param slots the slots
+     * @param counts the counts
+     * @param page the page
+     * @param total the total
+     * @param generatedAt the generated at
+     */
     public record Plan(
             List<Row> orders,
             List<Slot> slots,
@@ -92,7 +145,12 @@ public class KitchenPlanningService {
             long total,
             LocalDateTime generatedAt) {}
 
-    /** Immutable alert counts data contract. */
+    /**
+     * Immutable alert counts data contract.
+     *
+     * @param needsPreparation the needs preparation
+     * @param readyOverdue the ready overdue
+     */
     public record AlertCounts(long needsPreparation, long readyOverdue) {}
 
     private static final String BASE = AppConstant.KITCHEN_PLANNING_SERVICE_BASE;

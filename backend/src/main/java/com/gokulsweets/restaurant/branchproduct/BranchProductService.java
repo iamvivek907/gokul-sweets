@@ -18,6 +18,11 @@ public class BranchProductService {
 
     private final BranchProductRepository branchProductRepository;
 
+    /**
+     * Creates a branch product service instance.
+     *
+     * @param branchProductRepository the branch product repository
+     */
     public BranchProductService(BranchProductRepository branchProductRepository) {
         this.branchProductRepository = branchProductRepository;
     }

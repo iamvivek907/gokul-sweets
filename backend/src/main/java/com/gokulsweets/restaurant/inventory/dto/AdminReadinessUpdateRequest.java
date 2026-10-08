@@ -9,7 +9,14 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** Immutable admin readiness update request data contract. */
+/**
+ * Immutable admin readiness update request data contract.
+ *
+ * @param status the status
+ * @param readyQuantity the ready quantity
+ * @param expectedReadyAt the expected ready at
+ * @param note the note
+ */
 public record AdminReadinessUpdateRequest(
         @NotNull InventoryAllocationStatus status,
         @NotNull @DecimalMin("0.000") BigDecimal readyQuantity,

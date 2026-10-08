@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.staff.approval;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original AdminApprovalService.MAX_PAGE_SIZE value; unchanged during extraction. */

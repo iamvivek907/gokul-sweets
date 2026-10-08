@@ -39,7 +39,17 @@ public class InventoryCentreJobs {
 
     private final Clock inventoryClock;
 
-    /** Immutable entry data contract. */
+    /**
+     * Immutable entry data contract.
+     *
+     * @param productId the product id
+     * @param branchVersion the branch version
+     * @param policyVersion the policy version
+     * @param allocationVersion the allocation version
+     * @param saleMode the sale mode
+     * @param quantity the quantity
+     * @param readyQuantity the ready quantity
+     */
     public record Entry(
             @NotNull @Positive Long productId,
             @NotNull @Min(0) Long branchVersion,
@@ -49,7 +59,22 @@ public class InventoryCentreJobs {
             @DecimalMin("0.001") @Digits(integer = 11, fraction = 3) BigDecimal quantity,
             @DecimalMin("0.001") @Digits(integer = 11, fraction = 3) BigDecimal readyQuantity) {}
 
-    /** Immutable options data contract. */
+    /**
+     * Immutable options data contract.
+     *
+     * @param fromDate the from date
+     * @param throughDate the through date
+     * @param method the method
+     * @param applyInventory the apply inventory
+     * @param applyPolicy the apply policy
+     * @param openPurchases the open purchases
+     * @param applyHours the apply hours
+     * @param opens the opens
+     * @param closes the closes
+     * @param weekdays the weekdays
+     * @param enableHours the enable hours
+     * @param reason the reason
+     */
     public record Options(
             @NotNull LocalDate fromDate,
             @NotNull LocalDate throughDate,
@@ -64,20 +89,47 @@ public class InventoryCentreJobs {
             @NotNull Boolean enableHours,
             @NotBlank @Size(max = 500) String reason) {}
 
-    /** Immutable submit data contract. */
+    /**
+     * Immutable submit data contract.
+     *
+     * @param submissionId the submission id
+     * @param options the options
+     * @param items the items
+     */
     public record Submit(
             @NotNull UUID submissionId,
             @NotNull @Valid Options options,
             @NotNull @Size(min = 1, max = 500) List<@NotNull @Valid Entry> items) {}
 
-    /** Immutable date version data contract. */
+    /**
+     * Immutable date version data contract.
+     *
+     * @param date the date
+     * @param version the version
+     */
     public record DateVersion(LocalDate date, Long version) {}
 
-    /** Immutable timing data contract. */
+    /**
+     * Immutable timing data contract.
+     *
+     * @param opens the opens
+     * @param closes the closes
+     * @param weekdays the weekdays
+     * @param soldOut the sold out
+     * @param dependency the dependency
+     */
     public record Timing(
             LocalTime opens, LocalTime closes, int weekdays, boolean soldOut, Long dependency) {}
 
-    /** Immutable work data contract. */
+    /**
+     * Immutable work data contract.
+     *
+     * @param options the options
+     * @param entry the entry
+     * @param dates the dates
+     * @param groupVersion the group version
+     * @param timing the timing
+     */
     public record Work(
             Options options,
             Entry entry,

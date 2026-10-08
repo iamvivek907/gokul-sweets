@@ -15,7 +15,10 @@ AOSP style uses four-space indentation, separates declarations, and wraps long e
 It applies to maintained main, test and enhancement Java sources and verification tooling.
 
 Existing JavaDoc is retained. Previously undocumented types and explicitly declared methods
-have summaries and parameter/return/declared-exception tags. Update those contracts when behavior
+have summaries and parameter/return/declared-exception tags. Record components, exposed enum
+values and explicit constructors are documented too. Standard Javadoc does not expand Lombok
+and reports missing synthetic/default-constructor comments; a published API documentation
+workflow should delombok generated members first. This change documents maintained source. Update those contracts when behavior
 changes; document business invariants and unusual concurrency rules rather than narrating each line.
 
 ## Method timing and diagnostic logging

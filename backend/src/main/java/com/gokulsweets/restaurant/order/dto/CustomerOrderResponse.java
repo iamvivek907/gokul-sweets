@@ -11,7 +11,54 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
-/** Immutable customer order response data contract. */
+/**
+ * Immutable customer order response data contract.
+ *
+ * @param orderNumber the order number
+ * @param customerOrderNumber the customer order number
+ * @param orderStatus the order status
+ * @param paymentStatus the payment status
+ * @param branchName the branch name
+ * @param branchAddress the branch address
+ * @param pickupDate the pickup date
+ * @param pickupStartTime the pickup start time
+ * @param pickupEndTime the pickup end time
+ * @param pickupType the pickup type
+ * @param customerName the customer name
+ * @param maskedCustomerPhone the masked customer phone
+ * @param items the items
+ * @param subtotal the subtotal
+ * @param taxAmount the tax amount
+ * @param priorityCharge the priority charge
+ * @param convenienceFee the convenience fee
+ * @param convenienceFeeTax the convenience fee tax
+ * @param paymentFee the payment fee
+ * @param paymentFeeTax the payment fee tax
+ * @param paymentFeeRate the payment fee rate
+ * @param totalAmount the total amount
+ * @param reservationExpiresAt the reservation expires at
+ * @param createdAt the created at
+ * @param updatedAt the updated at
+ * @param branchPhone the branch phone
+ * @param estimatedReadyAt the estimated ready at
+ * @param delayReason the delay reason
+ * @param delayReportedAt the delay reported at
+ * @param fulfillmentType the fulfillment type
+ * @param deliveryDate the delivery date
+ * @param deliveryStartTime the delivery start time
+ * @param deliveryEndTime the delivery end time
+ * @param deliveryAddressLine the delivery address line
+ * @param deliveryLocality the delivery locality
+ * @param deliveryPostalCode the delivery postal code
+ * @param branchFssaiLicenceNumber the branch fssai licence number
+ * @param deliveryFee the delivery fee
+ * @param loyaltyDiscount the loyalty discount
+ * @param loyaltyCoins the loyalty coins
+ * @param loyaltyRewardCode the loyalty reward code
+ * @param rebateDiscountAmount the rebate discount amount
+ * @param branchId the branch id
+ * @param pickupSlotId the pickup slot id
+ */
 public record CustomerOrderResponse(
         String orderNumber,
         Long customerOrderNumber,

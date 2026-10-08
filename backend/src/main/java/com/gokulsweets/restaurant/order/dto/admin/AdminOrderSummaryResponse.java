@@ -10,7 +10,30 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
-/** Immutable admin order summary response data contract. */
+/**
+ * Immutable admin order summary response data contract.
+ *
+ * @param orderNumber the order number
+ * @param customerOrderNumber the customer order number
+ * @param branchId the branch id
+ * @param branchName the branch name
+ * @param customerName the customer name
+ * @param maskedCustomerPhone the masked customer phone
+ * @param pickupDate the pickup date
+ * @param pickupStartTime the pickup start time
+ * @param pickupEndTime the pickup end time
+ * @param pickupType the pickup type
+ * @param totalAmount the total amount
+ * @param orderStatus the order status
+ * @param paymentStatus the payment status
+ * @param createdAt the created at
+ * @param estimatedReadyAt the estimated ready at
+ * @param delayReportedAt the delay reported at
+ * @param fulfillmentType the fulfillment type
+ * @param deliveryDate the delivery date
+ * @param deliveryStartTime the delivery start time
+ * @param deliveryEndTime the delivery end time
+ */
 public record AdminOrderSummaryResponse(
         String orderNumber,
         Long customerOrderNumber,

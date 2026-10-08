@@ -174,15 +174,39 @@ public class OwnerAccountController {
         }
     }
 
-    /** Immutable setup data contract. */
+    /**
+     * Immutable setup data contract.
+     *
+     * @param setupKey the setup key
+     * @param username the username
+     * @param password the password
+     * @param fullName the full name
+     */
     public record Setup(String setupKey, String username, String password, String fullName) {}
 
-    /** Immutable recovery data contract. */
+    /**
+     * Immutable recovery data contract.
+     *
+     * @param recoveryKey the recovery key
+     * @param username the username
+     * @param password the password
+     */
     public record Recovery(String recoveryKey, String username, String password) {}
 
-    /** Immutable verification data contract. */
+    /**
+     * Immutable verification data contract.
+     *
+     * @param password the password
+     * @param code the code
+     */
     public record Verification(String password, String code) {}
 
-    /** Immutable rename data contract. */
+    /**
+     * Immutable rename data contract.
+     *
+     * @param username the username
+     * @param password the password
+     * @param code the code
+     */
     public record Rename(String username, String password, String code) {}
 }

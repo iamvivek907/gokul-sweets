@@ -5,7 +5,18 @@ import com.gokulsweets.restaurant.tax.TaxCategory;
 
 import java.math.BigDecimal;
 
-/** Immutable tax category response data contract. */
+/**
+ * Immutable tax category response data contract.
+ *
+ * @param id the id
+ * @param code the code
+ * @param name the name
+ * @param hsnSacCode the hsn sac code
+ * @param cgstRate the cgst rate
+ * @param sgstRate the sgst rate
+ * @param igstRate the igst rate
+ * @param active the active
+ */
 public record TaxCategoryResponse(
         Long id,
         String code,

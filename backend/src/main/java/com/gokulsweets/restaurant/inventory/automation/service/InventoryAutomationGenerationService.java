@@ -781,12 +781,27 @@ public class InventoryAutomationGenerationService {
         }
     }
 
-    /** Immutable key data contract. */
+    /**
+     * Immutable key data contract.
+     *
+     * @param branchProductId the branch product id
+     * @param serviceDate the service date
+     */
     private record Key(Long branchProductId, LocalDate serviceDate) {}
 
-    /** Immutable history key data contract. */
+    /**
+     * Immutable history key data contract.
+     *
+     * @param branchProductId the branch product id
+     * @param dayOfWeek the day of week
+     */
     private record HistoryKey(Long branchProductId, DayOfWeek dayOfWeek) {}
 
-    /** Immutable forecast data contract. */
+    /**
+     * Immutable forecast data contract.
+     *
+     * @param quantity the quantity
+     * @param confidence the confidence
+     */
     private record Forecast(BigDecimal quantity, String confidence) {}
 }

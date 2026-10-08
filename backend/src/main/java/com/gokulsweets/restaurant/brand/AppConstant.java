@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.brand;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original CareerService.JOBS value; unchanged during extraction. */

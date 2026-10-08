@@ -18,10 +18,16 @@ public class PickupSlotValidationService {
 
     private final Clock clock;
 
+    /** Creates a pickup slot validation service instance. */
     public PickupSlotValidationService() {
         this(Clock.system(ZoneId.of("Asia/Kolkata")));
     }
 
+    /**
+     * Creates a pickup slot validation service instance.
+     *
+     * @param clock the clock
+     */
     public PickupSlotValidationService(Clock clock) {
         this.clock = clock;
     }

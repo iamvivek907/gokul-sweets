@@ -8,7 +8,34 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-/** Immutable inventory allocation response data contract. */
+/**
+ * Immutable inventory allocation response data contract.
+ *
+ * @param id the id
+ * @param branchProductId the branch product id
+ * @param productId the product id
+ * @param productName the product name
+ * @param serviceDate the service date
+ * @param inventoryUnit the inventory unit
+ * @param status the status
+ * @param approvedQuantity the approved quantity
+ * @param readyQuantity the ready quantity
+ * @param safetyBufferQuantity the safety buffer quantity
+ * @param heldQuantity the held quantity
+ * @param committedQuantity the committed quantity
+ * @param fulfilledQuantity the fulfilled quantity
+ * @param wastedQuantity the wasted quantity
+ * @param availableQuantity the available quantity
+ * @param orderable the orderable
+ * @param unavailableReason the unavailable reason
+ * @param forecastQuantity the forecast quantity
+ * @param forecastConfidence the forecast confidence
+ * @param expectedReadyAt the expected ready at
+ * @param actualReadyAt the actual ready at
+ * @param approvedBy the approved by
+ * @param approvedAt the approved at
+ * @param note the note
+ */
 public record InventoryAllocationResponse(
         Long id,
         Long branchProductId,

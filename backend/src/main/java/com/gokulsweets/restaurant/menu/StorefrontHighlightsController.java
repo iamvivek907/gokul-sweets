@@ -141,9 +141,10 @@ ORDER BY p.created_at DESC, p.id DESC LIMIT 20
             return new Highlights(
                     availableIds(branchId, today, trending, products, checked),
                     availableIds(
-                            branchId, today, recent,
-                            products, // The latest-items display is a catalog preview; pickup
-                            checked), // suitability is checked for the chosen date.
+                            branchId, today,
+                            recent, // The latest-items display is a catalog preview; pickup
+                            products, // suitability is checked for the chosen date.
+                            checked),
                     latest.stream().filter(products::containsKey).limit(8).toList());
         } finally {
             MethodTiming.finish(
@@ -230,7 +231,13 @@ ORDER BY p.created_at DESC, p.id DESC LIMIT 20
         }
     }
 
-    /** Immutable cache key data contract. */
+    /**
+     * Immutable cache key data contract.
+     *
+     * @param branchId the branch id
+     * @param date the date
+     * @param futureOrderingDays the future ordering days
+     */
     private record CacheKey(Long branchId, LocalDate date, int futureOrderingDays) {}
 
     /** Backend cache entry contract and implementation. */
@@ -241,7 +248,13 @@ ORDER BY p.created_at DESC, p.id DESC LIMIT 20
         private Instant expiresAt;
     }
 
-    /** Immutable highlights data contract. */
+    /**
+     * Immutable highlights data contract.
+     *
+     * @param trendingProductIds the trending product ids
+     * @param newProductIds the new product ids
+     * @param latestProductIds the latest product ids
+     */
     public record Highlights(
             List<Long> trendingProductIds, List<Long> newProductIds, List<Long> latestProductIds) {}
 }

@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.loyalty;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original LoyaltyService.POLICY_LOCK_NAMESPACE value; unchanged during extraction. */

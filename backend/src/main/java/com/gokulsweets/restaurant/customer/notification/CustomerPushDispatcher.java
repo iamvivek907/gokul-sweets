@@ -301,7 +301,23 @@ WHERE id = ? AND state = 'SENDING' AND lease_token = ?
         }
     }
 
-    /** Immutable task data contract. */
+    /**
+     * Immutable task data contract.
+     *
+     * @param id the id
+     * @param eventId the event id
+     * @param subscriptionId the subscription id
+     * @param attempts the attempts
+     * @param subject the subject
+     * @param endpoint the endpoint
+     * @param publicKey the public key
+     * @param auth the auth
+     * @param createdAt the created at
+     * @param title the title
+     * @param message the message
+     * @param url the url
+     * @param lease the lease
+     */
     private record Task(
             long id,
             long eventId,

@@ -45,7 +45,15 @@ public class MenuImportJobs {
         }
     }
 
-    /** Immutable job data contract. */
+    /**
+     * Immutable job data contract.
+     *
+     * @param id the id
+     * @param operation the operation
+     * @param status the status
+     * @param result the result
+     * @param error the error
+     */
     public record Job(UUID id, String operation, String status, String result, String error) {}
 
     /**

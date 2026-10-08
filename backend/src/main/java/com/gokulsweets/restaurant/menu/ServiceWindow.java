@@ -4,7 +4,13 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import java.time.*;
 
-/** Start-inclusive/end-exclusive. Overnight windows belong to their opening weekday. */
+/**
+ * Start-inclusive/end-exclusive. Overnight windows belong to their opening weekday.
+ *
+ * @param startsAt the starts at
+ * @param endsAt the ends at
+ * @param weekdays the weekdays
+ */
 public record ServiceWindow(LocalTime startsAt, LocalTime endsAt, int weekdays) {
 
     /**

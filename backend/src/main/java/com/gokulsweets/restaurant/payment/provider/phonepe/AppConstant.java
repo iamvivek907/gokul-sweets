@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.payment.provider.phonepe;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original PhonePeClient.BEARER_PREFIX value; unchanged during extraction. */

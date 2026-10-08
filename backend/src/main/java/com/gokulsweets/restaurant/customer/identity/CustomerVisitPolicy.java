@@ -47,7 +47,10 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.order_status IN ('PI
 
     /** Defines the supported selection mode values. */
     public enum SelectionMode {
+
+        /** The preview value. */
         PREVIEW,
+        /** The acceptance value. */
         ACCEPTANCE
     }
 
@@ -93,7 +96,14 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.order_status IN ('PI
         }
     }
 
-    /** One request-local snapshot; never cache eligibility across orders or policy updates. */
+    /**
+     * One request-local snapshot; never cache eligibility across orders or policy updates.
+     *
+     * @param rebateIds the rebate ids
+     * @param order the order
+     * @param mode the mode
+     * @return the operation result
+     */
     public java.util.Set<Long> eligibleOffers(
             java.util.Collection<Long> rebateIds, Order order, SelectionMode mode) {
         final long __gokulMethodStartedNanos =

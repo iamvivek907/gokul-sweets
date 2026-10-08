@@ -29,13 +29,33 @@ public class BranchDiscoveryService {
 
     private final MenuService menu;
 
-    /** Immutable rating data contract. */
+    /**
+     * Immutable rating data contract.
+     *
+     * @param average the average
+     * @param count the count
+     */
     public record Rating(double average, long count) {}
 
-    /** Immutable excerpt data contract. */
+    /**
+     * Immutable excerpt data contract.
+     *
+     * @param comment the comment
+     * @param overallRating the overall rating
+     */
     public record Excerpt(String comment, int overallRating) {}
 
-    /** Immutable rated item data contract. */
+    /**
+     * Immutable rated item data contract.
+     *
+     * @param productId the product id
+     * @param name the name
+     * @param imageUrl the image url
+     * @param categoryId the category id
+     * @param average the average
+     * @param count the count
+     * @param review the review
+     */
     public record RatedItem(
             long productId,
             String name,
@@ -45,7 +65,13 @@ public class BranchDiscoveryService {
             long count,
             Excerpt review) {}
 
-    /** Immutable discovery data contract. */
+    /**
+     * Immutable discovery data contract.
+     *
+     * @param offerings the offerings
+     * @param overallExperience the overall experience
+     * @param topRatedItems the top rated items
+     */
     public record Discovery(
             List<BranchOfferingsService.Offering> offerings,
             Rating overallExperience,

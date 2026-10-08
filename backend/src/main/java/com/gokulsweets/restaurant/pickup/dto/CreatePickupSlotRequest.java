@@ -8,7 +8,19 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/** Immutable create pickup slot request data contract. */
+/**
+ * Immutable create pickup slot request data contract.
+ *
+ * @param startDate the start date
+ * @param endDate the end date
+ * @param startTime the start time
+ * @param endTime the end time
+ * @param slotDurationMinutes the slot duration minutes
+ * @param capacity the capacity
+ * @param priorityEnabled the priority enabled
+ * @param priorityCapacity the priority capacity
+ * @param priorityCharge the priority charge
+ */
 public record CreatePickupSlotRequest(
         @NotNull LocalDate startDate,
         @NotNull LocalDate endDate,

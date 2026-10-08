@@ -40,6 +40,16 @@ public class OwnerAccountService {
 
     private final SecureRandom random = new SecureRandom();
 
+    /**
+     * Creates a owner account service instance.
+     *
+     * @param jdbc the jdbc
+     * @param environment the environment
+     * @param flags the flags
+     * @param passwords the passwords
+     * @param mfa the mfa
+     * @param transactions the transactions
+     */
     public OwnerAccountService(
             JdbcTemplate jdbc,
             Environment environment,
@@ -57,13 +67,27 @@ public class OwnerAccountService {
         tx.setTimeout(30);
     }
 
-    /** Immutable status data contract. */
+    /**
+     * Immutable status data contract.
+     *
+     * @param available the available
+     */
     public record Status(boolean available) {}
 
-    /** Immutable created data contract. */
+    /**
+     * Immutable created data contract.
+     *
+     * @param username the username
+     * @param recoveryKey the recovery key
+     */
     public record Created(String username, String recoveryKey) {}
 
-    /** Immutable account data contract. */
+    /**
+     * Immutable account data contract.
+     *
+     * @param username the username
+     * @param hasRecoveryKey the has recovery key
+     */
     public record Account(String username, boolean hasRecoveryKey) {}
 
     /**
@@ -167,7 +191,12 @@ public class OwnerAccountService {
         }
     }
 
-    /** Independently committed attempts survive invalid credentials and transaction rollback. */
+    /**
+     * Independently committed attempts survive invalid credentials and transaction rollback.
+     *
+     * @param action the action
+     * @param source the source
+     */
     public void limit(String action, String source) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(OwnerAccountService.class, "limit(String,String)");

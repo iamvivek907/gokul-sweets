@@ -33,7 +33,20 @@ public class CustomerNotificationInbox {
 
     private final OptionalProcessingGate optionalProcessing;
 
-    /** Immutable message data contract. */
+    /**
+     * Immutable message data contract.
+     *
+     * @param id the id
+     * @param eventKey the event key
+     * @param kind the kind
+     * @param targetType the target type
+     * @param targetId the target id
+     * @param title the title
+     * @param message the message
+     * @param deliveryState the delivery state
+     * @param createdAt the created at
+     * @param readAt the read at
+     */
     public record Message(
             long id,
             String eventKey,
@@ -46,23 +59,48 @@ public class CustomerNotificationInbox {
             Instant createdAt,
             Instant readAt) {}
 
-    /** Immutable page data contract. */
+    /**
+     * Immutable page data contract.
+     *
+     * @param messages the messages
+     * @param unreadCount the unread count
+     * @param nextBefore the next before
+     * @param readThrough the read through
+     */
     public record Page(
             List<Message> messages, long unreadCount, Long nextBefore, long readThrough) {
 
+        /**
+         * Creates a page instance.
+         *
+         * @param messages the messages
+         * @param unreadCount the unread count
+         * @param nextBefore the next before
+         */
         public Page(List<Message> messages, long unreadCount, Long nextBefore) {
             this(messages, unreadCount, nextBefore, 0);
         }
     }
 
-    /** Immutable preferences data contract. */
+    /**
+     * Immutable preferences data contract.
+     *
+     * @param offerInboxEnabled the offer inbox enabled
+     * @param marketingConsentGranted the marketing consent granted
+     * @param transactionalChannel the transactional channel
+     * @param browserPushAvailable the browser push available
+     */
     public record Preferences(
             boolean offerInboxEnabled,
             boolean marketingConsentGranted,
             String transactionalChannel,
             boolean browserPushAvailable) {}
 
-    /** Immutable preference input data contract. */
+    /**
+     * Immutable preference input data contract.
+     *
+     * @param offerInboxEnabled the offer inbox enabled
+     */
     public record PreferenceInput(Boolean offerInboxEnabled) {}
 
     /**

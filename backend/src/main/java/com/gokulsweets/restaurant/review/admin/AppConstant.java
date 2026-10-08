@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.review.admin;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original AdminReviewService.MAX_PAGE_SIZE value; unchanged during extraction. */

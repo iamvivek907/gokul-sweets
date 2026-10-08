@@ -40,7 +40,12 @@ public class MenuImportWorker {
 
     private final ObjectMapper mapper;
 
-    /** Immutable claim data contract. */
+    /**
+     * Immutable claim data contract.
+     *
+     * @param id the id
+     * @param token the token
+     */
     record Claim(UUID id, UUID token) {}
 
     /** Processes the operation. */
@@ -186,7 +191,12 @@ public class MenuImportWorker {
         }
     }
 
-    /** Immutable upload data contract. */
+    /**
+     * Immutable upload data contract.
+     *
+     * @param filename the filename
+     * @param bytes the bytes
+     */
     record Upload(String filename, byte[] bytes) implements MultipartFile {
 
         /**

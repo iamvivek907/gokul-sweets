@@ -454,7 +454,18 @@ public class DemandForecastService {
         }
     }
 
-    /** Immutable history row data contract. */
+    /**
+     * Immutable history row data contract.
+     *
+     * @param businessDate the business date
+     * @param productId the product id
+     * @param productCode the product code
+     * @param productName the product name
+     * @param categoryId the category id
+     * @param categoryCode the category code
+     * @param categoryName the category name
+     * @param quantitySold the quantity sold
+     */
     private record HistoryRow(
             LocalDate businessDate,
             Long productId,
@@ -482,6 +493,16 @@ public class DemandForecastService {
 
         private final Map<LocalDate, Long> quantities = new HashMap<>();
 
+        /**
+         * Creates a product history instance.
+         *
+         * @param productId the product id
+         * @param productCode the product code
+         * @param productName the product name
+         * @param categoryId the category id
+         * @param categoryCode the category code
+         * @param categoryName the category name
+         */
         private ProductHistory(
                 Long productId,
                 String productCode,

@@ -3,7 +3,14 @@ package com.gokulsweets.restaurant.printing.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
-/** Immutable print agent failed request data contract. */
+/**
+ * Immutable print agent failed request data contract.
+ *
+ * @param agentId the agent id
+ * @param claimToken the claim token
+ * @param errorCode the error code
+ * @param errorMessage the error message
+ */
 public record PrintAgentFailedRequest(
         @NotBlank(message = "Agent ID is required.")
                 @Size(max = 120, message = "Agent ID cannot exceed 120 characters.")

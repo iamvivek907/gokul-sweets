@@ -25,10 +25,22 @@ public class ReverseAddressLookup {
 
     private final JdbcTemplate jdbc;
 
-    /** Immutable coordinates data contract. */
+    /**
+     * Immutable coordinates data contract.
+     *
+     * @param latitude the latitude
+     * @param longitude the longitude
+     */
     public record Coordinates(BigDecimal latitude, BigDecimal longitude) {}
 
-    /** Immutable suggestion data contract. */
+    /**
+     * Immutable suggestion data contract.
+     *
+     * @param addressLine the address line
+     * @param locality the locality
+     * @param postalCode the postal code
+     * @param attribution the attribution
+     */
     public record Suggestion(
             String addressLine, String locality, String postalCode, String attribution) {}
 

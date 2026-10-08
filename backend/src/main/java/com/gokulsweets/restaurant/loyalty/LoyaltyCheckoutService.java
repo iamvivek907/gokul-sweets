@@ -25,7 +25,15 @@ public class LoyaltyCheckoutService {
 
     private final RebateApplicationService rebates;
 
-    /** Immutable checkout data contract. */
+    /**
+     * Immutable checkout data contract.
+     *
+     * @param rewards the rewards
+     * @param rewardCode the reward code
+     * @param coins the coins
+     * @param rewardDiscount the reward discount
+     * @param offer the offer
+     */
     public record Checkout(
             LoyaltyService.Wallet rewards,
             String rewardCode,

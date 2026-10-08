@@ -42,6 +42,12 @@ public class RazorpayClient {
 
     private final HttpClient httpClient;
 
+    /**
+     * Creates a razorpay client instance.
+     *
+     * @param properties the properties
+     * @param objectMapper the object mapper
+     */
     public RazorpayClient(RazorpayProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
         this.objectMapper = objectMapper;
@@ -617,13 +623,34 @@ public class RazorpayClient {
         }
     }
 
-    /** Immutable created order data contract. */
+    /**
+     * Immutable created order data contract.
+     *
+     * @param id the id
+     * @param status the status
+     * @param amount the amount
+     */
     public record CreatedOrder(String id, String status, long amount) {}
 
-    /** Immutable provider payment data contract. */
+    /**
+     * Immutable provider payment data contract.
+     *
+     * @param id the id
+     * @param orderId the order id
+     * @param status the status
+     * @param amount the amount
+     * @param failureReason the failure reason
+     */
     public record ProviderPayment(
             String id, String orderId, String status, long amount, String failureReason) {}
 
-    /** Immutable provider refund data contract. */
+    /**
+     * Immutable provider refund data contract.
+     *
+     * @param id the id
+     * @param status the status
+     * @param paymentId the payment id
+     * @param amount the amount
+     */
     public record ProviderRefund(String id, String status, String paymentId, long amount) {}
 }

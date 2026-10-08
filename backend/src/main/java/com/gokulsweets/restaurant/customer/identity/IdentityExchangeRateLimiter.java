@@ -270,6 +270,7 @@ RETURNING attempts
     /** Backend limited contract and implementation. */
     public static class Limited extends RuntimeException {
 
+        /** Creates a limited instance. */
         public Limited() {
             super("Identity verification is temporarily limited");
         }

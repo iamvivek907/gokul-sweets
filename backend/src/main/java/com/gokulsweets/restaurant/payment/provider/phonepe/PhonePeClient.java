@@ -47,6 +47,12 @@ public class PhonePeClient {
 
     private volatile AccessToken accessToken;
 
+    /**
+     * Creates a phone pe client instance.
+     *
+     * @param properties the properties
+     * @param objectMapper the object mapper
+     */
     public PhonePeClient(PhonePeProperties properties, ObjectMapper objectMapper) {
         this.properties = properties;
         this.objectMapper = objectMapper;
@@ -56,7 +62,14 @@ public class PhonePeClient {
                         .build();
     }
 
-    /** Creates a PhonePe Standard Checkout V2 order. */
+    /**
+     * Creates a PhonePe Standard Checkout V2 order.
+     *
+     * @param merchantOrderId the merchant order id
+     * @param amount the amount
+     * @param redirectUrl the redirect url
+     * @return the operation result
+     */
     public CreatePaymentResponse createPayment(
             String merchantOrderId, BigDecimal amount, String redirectUrl) {
         final long __gokulMethodStartedNanos =
@@ -71,7 +84,15 @@ public class PhonePeClient {
         }
     }
 
-    /** A shorter provider window keeps occasion deposit attempts inside the inventory hold. */
+    /**
+     * A shorter provider window keeps occasion deposit attempts inside the inventory hold.
+     *
+     * @param merchantOrderId the merchant order id
+     * @param amount the amount
+     * @param redirectUrl the redirect url
+     * @param expireAfterSeconds the expire after seconds
+     * @return the operation result
+     */
     public CreatePaymentResponse createPayment(
             String merchantOrderId, BigDecimal amount, String redirectUrl, int expireAfterSeconds) {
         final long __gokulMethodStartedNanos =
@@ -125,7 +146,12 @@ public class PhonePeClient {
         }
     }
 
-    /** Checks current PhonePe order status. */
+    /**
+     * Checks current PhonePe order status.
+     *
+     * @param merchantOrderId the merchant order id
+     * @return the operation result
+     */
     public StatusResponse checkStatus(String merchantOrderId) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(PhonePeClient.class, "checkStatus(String)");
@@ -185,6 +211,10 @@ public class PhonePeClient {
      *
      * <p>The configured key ID is checked first, then the raw request body is verified using
      * HMAC-SHA256.
+     *
+     * @param rawBody the raw body
+     * @param checksumKeyId the checksum key id
+     * @param checksumSignature the checksum signature
      */
     public void verifyWebhookSignature(
             byte[] rawBody, String checksumKeyId, String checksumSignature) {
@@ -230,7 +260,15 @@ public class PhonePeClient {
         }
     }
 
-    /** Merchant refund reference and amount remain identical on every recovery attempt. */
+    /**
+     * Merchant refund reference and amount remain identical on every recovery attempt.
+     *
+     * @param refundId the refund id
+     * @param amount the amount
+     * @param state the state
+     * @param merchantRefundId the merchant refund id
+     * @param originalMerchantOrderId the original merchant order id
+     */
     public record RefundResponse(
             String refundId,
             long amount,
@@ -514,7 +552,11 @@ public class PhonePeClient {
         }
     }
 
-    /** Gets an OAuth token and caches it until shortly before expiry. */
+    /**
+     * Gets an OAuth token and caches it until shortly before expiry.
+     *
+     * @return the operation result
+     */
     private String getAccessToken() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(PhonePeClient.class, "getAccessToken()");
@@ -875,7 +917,16 @@ public class PhonePeClient {
         }
     }
 
-    /** Immutable create payment response data contract. */
+    /**
+     * Immutable create payment response data contract.
+     *
+     * @param orderId the order id
+     * @param merchantOrderId the merchant order id
+     * @param state the state
+     * @param redirectUrl the redirect url
+     * @param message the message
+     * @param expireAt the expire at
+     */
     public record CreatePaymentResponse(
             String orderId,
             String merchantOrderId,
@@ -884,11 +935,23 @@ public class PhonePeClient {
             String message,
             Long expireAt) {}
 
-    /** Immutable status response data contract. */
+    /**
+     * Immutable status response data contract.
+     *
+     * @param state the state
+     * @param transactionId the transaction id
+     * @param errorMessage the error message
+     * @param expireAt the expire at
+     */
     public record StatusResponse(
             String state, String transactionId, String errorMessage, Long expireAt) {}
 
-    /** Immutable access token data contract. */
+    /**
+     * Immutable access token data contract.
+     *
+     * @param value the value
+     * @param expiresAt the expires at
+     */
     private record AccessToken(String value, Instant expiresAt) {
 
         /**

@@ -5,7 +5,14 @@ import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
 
 import java.time.LocalDateTime;
 
-/** Immutable preparation eligibility data contract. */
+/**
+ * Immutable preparation eligibility data contract.
+ *
+ * @param status the status
+ * @param pickupAt the pickup at
+ * @param eligibleAt the eligible at
+ * @param minutesUntilPickup the minutes until pickup
+ */
 public record PreparationEligibility(
         PreparationEligibilityStatus status,
         LocalDateTime pickupAt,

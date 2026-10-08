@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.customer.identity;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original CustomerIdentityController.COOKIE value; unchanged during extraction. */

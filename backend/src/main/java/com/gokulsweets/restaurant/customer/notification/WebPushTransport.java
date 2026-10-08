@@ -382,6 +382,14 @@ public class WebPushTransport {
     /** Backend request builder contract and implementation. */
     private static final class RequestBuilder extends PushService {
 
+        /**
+         * Creates a request builder instance.
+         *
+         * @param publicKey the public key
+         * @param privateKey the private key
+         * @param subject the subject
+         * @throws java.security.GeneralSecurityException if construction cannot complete
+         */
         RequestBuilder(String publicKey, String privateKey, String subject)
                 throws java.security.GeneralSecurityException {
             super(publicKey, privateKey, subject);

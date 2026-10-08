@@ -121,6 +121,10 @@ public class OrderInventoryReservationService {
 
     /**
      * Paid branch correction creates and confirms receiving stock in the same outer transaction.
+     *
+     * @param order the order
+     * @param validated the validated
+     * @param hadStock the had stock
      */
     @Transactional
     public void reserveTransferredOrder(
@@ -154,6 +158,9 @@ public class OrderInventoryReservationService {
 
     /**
      * Only a held window belonging to this order's branch can supply the inventory service date.
+     *
+     * @param order the order
+     * @param validatedOrder the validated order
      */
     @Transactional
     public void synchronizePendingDeliveryOrder(Order order, ValidatedOrderData validatedOrder) {
@@ -1006,14 +1013,31 @@ public class OrderInventoryReservationService {
         }
     }
 
-    /** Immutable window start data contract. */
+    /**
+     * Immutable window start data contract.
+     *
+     * @param date the date
+     * @param start the start
+     */
     private record WindowStart(LocalDate date, LocalTime start) {}
 
-    /** Immutable requested hold data contract. */
+    /**
+     * Immutable requested hold data contract.
+     *
+     * @param branchProductId the branch product id
+     * @param productName the product name
+     * @param key the key
+     * @param quantity the quantity
+     */
     private record RequestedHold(
             Long branchProductId, String productName, AllocationKey key, BigDecimal quantity) {}
 
-    /** Immutable allocation key data contract. */
+    /**
+     * Immutable allocation key data contract.
+     *
+     * @param serviceDate the service date
+     * @param branchProductId the branch product id
+     */
     private record AllocationKey(LocalDate serviceDate, Long branchProductId)
             implements Comparable<AllocationKey> {
 

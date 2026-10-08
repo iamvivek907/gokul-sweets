@@ -7,6 +7,12 @@ public class InventoryNotFoundException extends RuntimeException {
 
     private final String code;
 
+    /**
+     * Creates a inventory not found exception instance.
+     *
+     * @param code the code
+     * @param message the message
+     */
     public InventoryNotFoundException(String code, String message) {
         super(message);
         this.code = code;

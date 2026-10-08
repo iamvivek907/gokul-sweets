@@ -31,10 +31,23 @@ public class CareerService {
 
     private final StaffAuthorizationService staff;
 
+    /** The statuses value. */
     public static final Set<String> STATUSES =
             Set.of("NEW", "REVIEWING", "SHORTLISTED", "INTERVIEW", "HIRED", "REJECTED");
 
-    /** Immutable job data contract. */
+    /**
+     * Immutable job data contract.
+     *
+     * @param id the id
+     * @param branchId the branch id
+     * @param branchName the branch name
+     * @param title the title
+     * @param department the department
+     * @param requirements the requirements
+     * @param minimumExperience the minimum experience
+     * @param active the active
+     * @param version the version
+     */
     public record Job(
             long id,
             long branchId,
@@ -46,7 +59,16 @@ public class CareerService {
             boolean active,
             long version) {}
 
-    /** Immutable job input data contract. */
+    /**
+     * Immutable job input data contract.
+     *
+     * @param branchId the branch id
+     * @param title the title
+     * @param department the department
+     * @param requirements the requirements
+     * @param minimumExperience the minimum experience
+     * @param active the active
+     */
     public record JobInput(
             @Positive long branchId,
             @NotBlank @Size(max = 120) String title,
@@ -56,7 +78,21 @@ public class CareerService {
                     BigDecimal minimumExperience,
             boolean active) {}
 
-    /** Immutable application input data contract. */
+    /**
+     * Immutable application input data contract.
+     *
+     * @param requestId the request id
+     * @param jobId the job id
+     * @param branchId the branch id
+     * @param name the name
+     * @param phone the phone
+     * @param email the email
+     * @param desiredRole the desired role
+     * @param experience the experience
+     * @param qualifications the qualifications
+     * @param consent the consent
+     * @param website the website
+     */
     public record ApplicationInput(
             @NotNull UUID requestId,
             Long jobId,
@@ -71,10 +107,33 @@ public class CareerService {
             @AssertTrue boolean consent,
             @Size(max = 0) String website) {}
 
-    /** Immutable receipt data contract. */
+    /**
+     * Immutable receipt data contract.
+     *
+     * @param reference the reference
+     * @param message the message
+     */
     public record Receipt(UUID reference, String message) {}
 
-    /** Immutable applicant data contract. */
+    /**
+     * Immutable applicant data contract.
+     *
+     * @param id the id
+     * @param jobId the job id
+     * @param branchId the branch id
+     * @param branchName the branch name
+     * @param jobTitle the job title
+     * @param name the name
+     * @param phone the phone
+     * @param email the email
+     * @param desiredRole the desired role
+     * @param experience the experience
+     * @param qualifications the qualifications
+     * @param status the status
+     * @param staffNotes the staff notes
+     * @param createdAt the created at
+     * @param version the version
+     */
     public record Applicant(
             UUID id,
             Long jobId,
@@ -92,11 +151,24 @@ public class CareerService {
             OffsetDateTime createdAt,
             long version) {}
 
-    /** Immutable page data contract. */
+    /**
+     * Immutable page data contract.
+     *
+     * @param items the items
+     * @param total the total
+     * @param page the page
+     * @param size the size
+     * @param counts the counts
+     */
     public record Page(
             List<Applicant> items, long total, int page, int size, Map<String, Long> counts) {}
 
-    /** Immutable update data contract. */
+    /**
+     * Immutable update data contract.
+     *
+     * @param status the status
+     * @param staffNotes the staff notes
+     */
     public record Update(
             @Pattern(regexp = "NEW|REVIEWING|SHORTLISTED|INTERVIEW|HIRED|REJECTED") @NotNull
                     String status,

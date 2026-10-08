@@ -30,7 +30,17 @@ public class BrandService {
 
     private final R2StorageService storage;
 
-    /** Immutable story data contract. */
+    /**
+     * Immutable story data contract.
+     *
+     * @param title the title
+     * @param subtitle the subtitle
+     * @param storyTitle the story title
+     * @param storyBody the story body
+     * @param imageUrl the image url
+     * @param published the published
+     * @param version the version
+     */
     public record Story(
             String title,
             String subtitle,
@@ -40,7 +50,15 @@ public class BrandService {
             boolean published,
             long version) {}
 
-    /** Immutable copy data contract. */
+    /**
+     * Immutable copy data contract.
+     *
+     * @param title the title
+     * @param subtitle the subtitle
+     * @param storyTitle the story title
+     * @param storyBody the story body
+     * @param published the published
+     */
     public record Copy(
             @NotBlank @Size(max = 120) String title,
             @NotBlank @Size(max = 400) String subtitle,
@@ -48,7 +66,19 @@ public class BrandService {
             @NotBlank @Size(max = 6000) String storyBody,
             boolean published) {}
 
-    /** Immutable person data contract. */
+    /**
+     * Immutable person data contract.
+     *
+     * @param id the id
+     * @param section the section
+     * @param name the name
+     * @param role the role
+     * @param bio the bio
+     * @param photoUrl the photo url
+     * @param displayOrder the display order
+     * @param published the published
+     * @param version the version
+     */
     public record Person(
             long id,
             String section,
@@ -60,7 +90,16 @@ public class BrandService {
             boolean published,
             long version) {}
 
-    /** Immutable person input data contract. */
+    /**
+     * Immutable person input data contract.
+     *
+     * @param section the section
+     * @param name the name
+     * @param role the role
+     * @param bio the bio
+     * @param displayOrder the display order
+     * @param published the published
+     */
     public record PersonInput(
             @Pattern(regexp = "FOUNDER|TEAM|DEVELOPER") @NotNull String section,
             @NotBlank @Size(max = 100) String name,
@@ -69,7 +108,12 @@ public class BrandService {
             @Min(0) @Max(10000) int displayOrder,
             boolean published) {}
 
-    /** Immutable content data contract. */
+    /**
+     * Immutable content data contract.
+     *
+     * @param story the story
+     * @param people the people
+     */
     public record Content(Story story, List<Person> people) {}
 
     /**

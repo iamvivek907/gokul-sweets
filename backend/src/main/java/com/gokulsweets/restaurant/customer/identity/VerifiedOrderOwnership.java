@@ -27,7 +27,12 @@ public class VerifiedOrderOwnership {
 
     private final Environment settings;
 
-    /** Runs inside checkout's transaction before claiming an idempotency key or reserving stock. */
+    /**
+     * Runs inside checkout's transaction before claiming an idempotency key or reserving stock.
+     *
+     * @param checkoutPhone the checkout phone
+     * @param token the token
+     */
     public void requireCheckoutIdentity(String checkoutPhone, String token) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
@@ -43,7 +48,12 @@ public class VerifiedOrderOwnership {
         }
     }
 
-    /** Customer-specific draft offers always require a real verified session. */
+    /**
+     * Customer-specific draft offers always require a real verified session.
+     *
+     * @param checkoutPhone the checkout phone
+     * @param token the token
+     */
     public void requireVerifiedIdentity(String checkoutPhone, String token) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
@@ -74,7 +84,12 @@ WHERE s.environment=? AND s.token_digest=? AND s.revoked_at IS NULL AND s.expire
         }
     }
 
-    /** Immutable subject data contract. */
+    /**
+     * Immutable subject data contract.
+     *
+     * @param environment the environment
+     * @param id the id
+     */
     public record Subject(String environment, UUID id) {}
 
     /**
@@ -249,7 +264,13 @@ WHERE own.order_id=? AND own.environment=? AND s.token_digest=?
         }
     }
 
-    /** A current subject sees only orders bound while that exact subject was live. */
+    /**
+     * A current subject sees only orders bound while that exact subject was live.
+     *
+     * @param environment the environment
+     * @param subjectId the subject id
+     * @return the operation result
+     */
     public List<String> orderNumbers(String environment, UUID subjectId) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(VerifiedOrderOwnership.class, "orderNumbers(String,UUID)");
@@ -272,7 +293,15 @@ WHERE own.order_id=? AND own.environment=? AND s.token_digest=?
         }
     }
 
-    /** Stable owner-scoped cursor: new orders do not shift subsequent pages. */
+    /**
+     * Stable owner-scoped cursor: new orders do not shift subsequent pages.
+     *
+     * @param environment the environment
+     * @param subjectId the subject id
+     * @param before the before
+     * @param limit the limit
+     * @return the operation result
+     */
     public List<String> orderNumberPage(
             String environment, UUID subjectId, String before, int limit) {
         final long __gokulMethodStartedNanos =

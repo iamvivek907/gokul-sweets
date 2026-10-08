@@ -8,7 +8,12 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
-/** Immutable admin start selected preparation request data contract. */
+/**
+ * Immutable admin start selected preparation request data contract.
+ *
+ * @param branchId the branch id
+ * @param orderNumbers the order numbers
+ */
 public record AdminStartSelectedPreparationRequest(
         @NotNull(message = "Branch ID is required.") Long branchId,
         @NotEmpty(message = "At least one order number is required.")

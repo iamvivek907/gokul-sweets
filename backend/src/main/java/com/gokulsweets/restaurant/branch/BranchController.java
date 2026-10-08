@@ -14,6 +14,11 @@ public class BranchController {
 
     private final BranchService branchService;
 
+    /**
+     * Creates a branch controller instance.
+     *
+     * @param branchService the branch service
+     */
     public BranchController(BranchService branchService) {
         this.branchService = branchService;
     }

@@ -301,10 +301,28 @@ UPDATE staff_alert_deliveries SET state = 'QUEUED', last_http_status = ?, next_a
         }
     }
 
-    /** Immutable recipient data contract. */
+    /**
+     * Immutable recipient data contract.
+     *
+     * @param eventId the event id
+     * @param staffId the staff id
+     */
     private record Recipient(long eventId, long staffId) {}
 
-    /** Immutable task data contract. */
+    /**
+     * Immutable task data contract.
+     *
+     * @param id the id
+     * @param staffId the staff id
+     * @param channel the channel
+     * @param subscriptionId the subscription id
+     * @param attempts the attempts
+     * @param lease the lease
+     * @param event the event
+     * @param endpoint the endpoint
+     * @param publicKey the public key
+     * @param auth the auth
+     */
     private record Task(
             long id,
             long staffId,

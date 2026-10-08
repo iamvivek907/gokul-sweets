@@ -278,7 +278,11 @@ public class AdminOrderController {
         }
     }
 
-    /** Immutable pickup code input data contract. */
+    /**
+     * Immutable pickup code input data contract.
+     *
+     * @param pickupCode the pickup code
+     */
     public record PickupCodeInput(String pickupCode) {}
 
     /**

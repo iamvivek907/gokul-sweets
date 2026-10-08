@@ -123,7 +123,11 @@ VALUES (?, ?, ?, ?, ?)
         }
     }
 
-    /** Always protect existing dedicated commitments, including during a flag rollback. */
+    /**
+     * Always protect existing dedicated commitments, including during a flag rollback.
+     *
+     * @param orderId the order id
+     */
     @Transactional
     public void requireReady(long orderId) {
         final long __gokulMethodStartedNanos =

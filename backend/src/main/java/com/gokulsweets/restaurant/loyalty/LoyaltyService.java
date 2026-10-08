@@ -31,7 +31,17 @@ public class LoyaltyService {
 
     private final Clock inventoryClock;
 
-    /** Immutable reward data contract. */
+    /**
+     * Immutable reward data contract.
+     *
+     * @param code the code
+     * @param name the name
+     * @param coins the coins
+     * @param discount the discount
+     * @param minimumSubtotal the minimum subtotal
+     * @param eligible the eligible
+     * @param unavailableReason the unavailable reason
+     */
     public record Reward(
             String code,
             String name,
@@ -41,7 +51,18 @@ public class LoyaltyService {
             boolean eligible,
             String unavailableReason) {}
 
-    /** Immutable entry data contract. */
+    /**
+     * Immutable entry data contract.
+     *
+     * @param id the id
+     * @param kind the kind
+     * @param coins the coins
+     * @param reason the reason
+     * @param orderNumber the order number
+     * @param customerOrderNumber the customer order number
+     * @param createdAt the created at
+     * @param expiresAt the expires at
+     */
     public record Entry(
             long id,
             String kind,
@@ -52,7 +73,20 @@ public class LoyaltyService {
             Instant createdAt,
             Instant expiresAt) {}
 
-    /** Immutable wallet data contract. */
+    /**
+     * Immutable wallet data contract.
+     *
+     * @param balance the balance
+     * @param debt the debt
+     * @param pendingCoins the pending coins
+     * @param completedOrders the completed orders
+     * @param rewards the rewards
+     * @param history the history
+     * @param nextExpiry the next expiry
+     * @param maximumRedemptionPercent the maximum redemption percent
+     * @param terms the terms
+     * @param policyVersion the policy version
+     */
     public record Wallet(
             int balance,
             int debt,
@@ -65,18 +99,42 @@ public class LoyaltyService {
             String terms,
             String policyVersion) {}
 
-    /** Immutable selection data contract. */
+    /**
+     * Immutable selection data contract.
+     *
+     * @param rewardCode the reward code
+     * @param policyVersion the policy version
+     */
     public record Selection(String rewardCode, String policyVersion) {}
 
-    /** Immutable lot data contract. */
+    /**
+     * Immutable lot data contract.
+     *
+     * @param id the id
+     * @param remaining the remaining
+     * @param expiry the expiry
+     * @param origin the origin
+     */
     private record Lot(long id, int remaining, Instant expiry, Long origin) {
 
+        /**
+         * Creates a lot instance.
+         *
+         * @param id the id
+         * @param remaining the remaining
+         * @param expiry the expiry
+         */
         Lot(long id, int remaining, Instant expiry) {
             this(id, remaining, expiry, null);
         }
     }
 
-    /** Immutable owner data contract. */
+    /**
+     * Immutable owner data contract.
+     *
+     * @param environment the environment
+     * @param subject the subject
+     */
     private record Owner(String environment, UUID subject) {}
 
     /**
@@ -842,6 +900,9 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     /**
      * Called after verified binding, inside order creation. No caller-supplied coin amount is
      * accepted.
+     *
+     * @param order the order
+     * @param code the code
      */
     @Transactional
     public void reserve(Order order, String code) {
@@ -1125,7 +1186,11 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
         }
     }
 
-    /** Payment totals must never use a released/expired hold, even after rollout is disabled. */
+    /**
+     * Payment totals must never use a released/expired hold, even after rollout is disabled.
+     *
+     * @param order the order
+     */
     @Transactional
     public void verifyPayment(Order order) {
         final long __gokulMethodStartedNanos =
@@ -1179,10 +1244,22 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
         }
     }
 
-    /** Immutable adjustment data contract. */
+    /**
+     * Immutable adjustment data contract.
+     *
+     * @param key the key
+     * @param coins the coins
+     * @param reason the reason
+     */
     public record Adjustment(UUID key, int coins, String reason) {}
 
-    /** Immutable adjusted data contract. */
+    /**
+     * Immutable adjusted data contract.
+     *
+     * @param ledgerId the ledger id
+     * @param oldBalance the old balance
+     * @param newBalance the new balance
+     */
     public record Adjusted(long ledgerId, int oldBalance, int newBalance) {}
 
     /**
@@ -1272,7 +1349,13 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
         }
     }
 
-    /** Immutable earning data contract. */
+    /**
+     * Immutable earning data contract.
+     *
+     * @param eligible the eligible
+     * @param minimum the minimum
+     * @param coins the coins
+     */
     private record Earning(BigDecimal eligible, BigDecimal minimum, int coins) {}
 
     /**
@@ -1292,7 +1375,13 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
         }
     }
 
-    /** One calculation for paid pending estimates and completed-order credits. */
+    /**
+     * One calculation for paid pending estimates and completed-order credits.
+     *
+     * @param row the row
+     * @param excludedPromotions the excluded promotions
+     * @return the operation result
+     */
     private Earning earning(Map<String, Object> row, Set<String> excludedPromotions) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(LoyaltyService.class, "earning(Map<String,Object>,Set<String>)");
@@ -1334,6 +1423,8 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     /**
      * Authoritative terminal order/payment state, not a customer callback. Idempotent under
      * retries.
+     *
+     * @param orderId the order id
      */
     @Transactional
     public void reconcile(long orderId) {

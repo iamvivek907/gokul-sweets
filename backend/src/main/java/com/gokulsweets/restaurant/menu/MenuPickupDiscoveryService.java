@@ -34,7 +34,14 @@ public class MenuPickupDiscoveryService {
 
     private final Clock inventoryClock;
 
-    /** Branch capacity only. Item stock/preparation must be checked after choosing a date. */
+    /**
+     * Branch capacity only. Item stock/preparation must be checked after choosing a date.
+     *
+     * @param branchId the branch id
+     * @param startDate the start date
+     * @param days the days
+     * @return the operation result
+     */
     @Transactional(readOnly = true)
     public Availability discover(long branchId, LocalDate startDate, int days) {
         final long __gokulMethodStartedNanos =

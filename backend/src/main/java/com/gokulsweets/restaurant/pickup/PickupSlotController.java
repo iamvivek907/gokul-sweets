@@ -26,6 +26,13 @@ public class PickupSlotController {
 
     private final PickupSlotRepository repository;
 
+    /**
+     * Creates a pickup slot controller instance.
+     *
+     * @param pickupSlotService the pickup slot service
+     * @param authorization the authorization
+     * @param repository the repository
+     */
     public PickupSlotController(
             PickupSlotService pickupSlotService,
             StaffAuthorizationService authorization,

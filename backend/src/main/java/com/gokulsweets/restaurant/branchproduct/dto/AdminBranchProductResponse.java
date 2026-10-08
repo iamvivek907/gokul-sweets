@@ -5,7 +5,26 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import java.math.BigDecimal;
 
-/** Immutable admin branch product response data contract. */
+/**
+ * Immutable admin branch product response data contract.
+ *
+ * @param branchProductId the branch product id
+ * @param branchId the branch id
+ * @param productId the product id
+ * @param productCode the product code
+ * @param productName the product name
+ * @param productDescription the product description
+ * @param productActive the product active
+ * @param categoryId the category id
+ * @param categoryCode the category code
+ * @param categoryName the category name
+ * @param categoryActive the category active
+ * @param basePrice the base price
+ * @param priceOverride the price override
+ * @param effectivePrice the effective price
+ * @param available the available
+ * @param displayOrder the display order
+ */
 public record AdminBranchProductResponse(
         Long branchProductId,
         Long branchId,

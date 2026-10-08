@@ -55,7 +55,11 @@ public class OrderInventoryLifecycleService {
         }
     }
 
-    /** Used only after the order-locked branch transfer has cancelled the original commitments. */
+    /**
+     * Used only after the order-locked branch transfer has cancelled the original commitments.
+     *
+     * @param orderNumber the order number
+     */
     @Transactional
     public void confirmTransferredOrderInventory(String orderNumber) {
         final long __gokulMethodStartedNanos =
@@ -485,7 +489,12 @@ public class OrderInventoryLifecycleService {
         }
     }
 
-    /** Immutable allocation key data contract. */
+    /**
+     * Immutable allocation key data contract.
+     *
+     * @param serviceDate the service date
+     * @param branchProductId the branch product id
+     */
     private record AllocationKey(java.time.LocalDate serviceDate, Long branchProductId)
             implements Comparable<AllocationKey> {
 

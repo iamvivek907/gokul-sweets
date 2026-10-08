@@ -69,7 +69,16 @@ public class OccasionCommitmentService {
 
     private final Clock clock;
 
-    /** Immutable checkout data contract. */
+    /**
+     * Immutable checkout data contract.
+     *
+     * @param attemptId the attempt id
+     * @param stage the stage
+     * @param status the status
+     * @param amount the amount
+     * @param expiresAt the expires at
+     * @param paymentUrl the payment url
+     */
     public record Checkout(
             UUID attemptId,
             String stage,
@@ -78,7 +87,24 @@ public class OccasionCommitmentService {
             Instant expiresAt,
             String paymentUrl) {}
 
-    /** Immutable enquiry data contract. */
+    /**
+     * Immutable enquiry data contract.
+     *
+     * @param id the id
+     * @param environment the environment
+     * @param subject the subject
+     * @param branchId the branch id
+     * @param date the date
+     * @param fulfilment the fulfilment
+     * @param status the status
+     * @param quote the quote
+     * @param deposit the deposit
+     * @param paid the paid
+     * @param quoteExpiry the quote expiry
+     * @param holdExpiry the hold expiry
+     * @param balanceDue the balance due
+     * @param slotId the slot id
+     */
     private record Enquiry(
             UUID id,
             ConsentEnvironment environment,
@@ -95,7 +121,19 @@ public class OccasionCommitmentService {
             Instant balanceDue,
             Long slotId) {}
 
-    /** Immutable attempt data contract. */
+    /**
+     * Immutable attempt data contract.
+     *
+     * @param id the id
+     * @param enquiryId the enquiry id
+     * @param environment the environment
+     * @param stage the stage
+     * @param status the status
+     * @param amount the amount
+     * @param merchantOrderId the merchant order id
+     * @param expiresAt the expires at
+     * @param url the url
+     */
     private record Attempt(
             UUID id,
             UUID enquiryId,
@@ -107,10 +145,20 @@ public class OccasionCommitmentService {
             Instant expiresAt,
             String url) {}
 
-    /** Immutable held item data contract. */
+    /**
+     * Immutable held item data contract.
+     *
+     * @param key the key
+     * @param productId the product id
+     */
     private record HeldItem(String key, long productId) {}
 
-    /** Immutable start data contract. */
+    /**
+     * Immutable start data contract.
+     *
+     * @param attempt the attempt
+     * @param newAttempt the new attempt
+     */
     private record Start(Attempt attempt, boolean newAttempt) {}
 
     /**

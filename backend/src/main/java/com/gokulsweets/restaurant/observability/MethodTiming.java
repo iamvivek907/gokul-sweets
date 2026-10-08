@@ -14,10 +14,14 @@ import java.util.concurrent.TimeUnit;
  * exception message, customer identifier or credential is recorded.
  */
 public final class MethodTiming {
+
     private static final Logger LOG = LoggerFactory.getLogger(MethodTiming.class);
+
     private static volatile boolean enabled;
+
     private static volatile long slowThresholdNanos = TimeUnit.SECONDS.toNanos(1);
 
+    /** Creates a method timing instance. */
     private MethodTiming() {}
 
     /**

@@ -27,7 +27,21 @@ public class OccasionProductionWorkspace {
 
     private final EnhancementProperties features;
 
-    /** Immutable product data contract. */
+    /**
+     * Immutable product data contract.
+     *
+     * @param productId the product id
+     * @param name the name
+     * @param requestedPieces the requested pieces
+     * @param requestedGrams the requested grams
+     * @param committedPieces the committed pieces
+     * @param committedGrams the committed grams
+     * @param approvedPieces the approved pieces
+     * @param approvedGrams the approved grams
+     * @param readyPieces the ready pieces
+     * @param readyGrams the ready grams
+     * @param approvalToken the approval token
+     */
     public record Product(
             long productId,
             String name,
@@ -41,7 +55,15 @@ public class OccasionProductionWorkspace {
             BigDecimal readyGrams,
             String approvalToken) {}
 
-    /** Immutable day data contract. */
+    /**
+     * Immutable day data contract.
+     *
+     * @param date the date
+     * @param orderCount the order count
+     * @param needsReview the needs review
+     * @param committedOrders the committed orders
+     * @param products the products
+     */
     public record Day(
             LocalDate date,
             int orderCount,
@@ -49,10 +71,19 @@ public class OccasionProductionWorkspace {
             int committedOrders,
             List<Product> products) {}
 
-    /** Immutable week data contract. */
+    /**
+     * Immutable week data contract.
+     *
+     * @param today the today
+     * @param days the days
+     */
     public record Week(LocalDate today, List<Day> days) {}
 
-    /** Immutable approval data contract. */
+    /**
+     * Immutable approval data contract.
+     *
+     * @param token the token
+     */
     public record Approval(String token) {}
 
     /**
@@ -90,11 +121,24 @@ public class OccasionProductionWorkspace {
         }
     }
 
-    /** Immutable calendar day data contract. */
+    /**
+     * Immutable calendar day data contract.
+     *
+     * @param date the date
+     * @param orderCount the order count
+     * @param needsReview the needs review
+     * @param committedOrders the committed orders
+     */
     public record CalendarDay(
             LocalDate date, int orderCount, int needsReview, int committedOrders) {}
 
-    /** Immutable month data contract. */
+    /**
+     * Immutable month data contract.
+     *
+     * @param today the today
+     * @param month the month
+     * @param days the days
+     */
     public record Month(LocalDate today, YearMonth month, List<CalendarDay> days) {}
 
     /**

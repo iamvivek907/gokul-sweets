@@ -5,7 +5,21 @@ import com.gokulsweets.restaurant.product.Product;
 
 import java.math.BigDecimal;
 
-/** Immutable product response data contract. */
+/**
+ * Immutable product response data contract.
+ *
+ * @param id the id
+ * @param categoryId the category id
+ * @param categoryName the category name
+ * @param taxCategoryId the tax category id
+ * @param taxCategoryName the tax category name
+ * @param name the name
+ * @param description the description
+ * @param basePrice the base price
+ * @param active the active
+ * @param imageUrl the image url
+ * @param vegetarian the vegetarian
+ */
 public record ProductResponse(
         Long id,
         Long categoryId,

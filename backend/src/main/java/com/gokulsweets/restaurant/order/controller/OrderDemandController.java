@@ -97,7 +97,11 @@ public class OrderDemandController {
         }
     }
 
-    /** Immutable policy request data contract. */
+    /**
+     * Immutable policy request data contract.
+     *
+     * @param earlyPreparationAllowed the early preparation allowed
+     */
     public record PolicyRequest(boolean earlyPreparationAllowed) {}
 
     /**

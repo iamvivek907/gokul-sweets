@@ -13,6 +13,11 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
 
+    /**
+     * Creates a category service instance.
+     *
+     * @param categoryRepository the category repository
+     */
     public CategoryService(CategoryRepository categoryRepository) {
         this.categoryRepository = categoryRepository;
     }

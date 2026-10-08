@@ -30,7 +30,20 @@ public class OrderDemandService {
 
     private final EnhancementProperties flags;
 
-    /** Immutable demand data contract. */
+    /**
+     * Immutable demand data contract.
+     *
+     * @param date the date
+     * @param productId the product id
+     * @param productName the product name
+     * @param saleMode the sale mode
+     * @param ordered the ordered
+     * @param waiting the waiting
+     * @param preparing the preparing
+     * @param ready the ready
+     * @param completed the completed
+     * @param orderCount the order count
+     */
     public record Demand(
             LocalDate date,
             long productId,
@@ -43,7 +56,13 @@ public class OrderDemandService {
             long completed,
             long orderCount) {}
 
-    /** Immutable policy data contract. */
+    /**
+     * Immutable policy data contract.
+     *
+     * @param productId the product id
+     * @param productName the product name
+     * @param earlyPreparationAllowed the early preparation allowed
+     */
     public record Policy(long productId, String productName, boolean earlyPreparationAllowed) {}
 
     private static final String LINES = AppConstant.ORDER_DEMAND_SERVICE_LINES;

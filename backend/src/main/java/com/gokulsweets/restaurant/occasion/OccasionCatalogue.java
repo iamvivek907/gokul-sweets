@@ -31,7 +31,23 @@ public class OccasionCatalogue {
     private final tools.jackson.databind.ObjectMapper mapper =
             new tools.jackson.databind.ObjectMapper();
 
-    /** Immutable sweet data contract. */
+    /**
+     * Immutable sweet data contract.
+     *
+     * @param id the id
+     * @param name the name
+     * @param description the description
+     * @param imageUrl the image url
+     * @param saleMode the sale mode
+     * @param occasionOnly the occasion only
+     * @param published the published
+     * @param leadDays the lead days
+     * @param pieceGrams the piece grams
+     * @param categoryId the category id
+     * @param categoryName the category name
+     * @param unitPrice the unit price
+     * @param taxPercent the tax percent
+     */
     public record Sweet(
             long id,
             String name,
@@ -47,6 +63,19 @@ public class OccasionCatalogue {
             BigDecimal unitPrice,
             BigDecimal taxPercent) {
 
+        /**
+         * Creates a sweet instance.
+         *
+         * @param id the id
+         * @param name the name
+         * @param description the description
+         * @param imageUrl the image url
+         * @param saleMode the sale mode
+         * @param occasionOnly the occasion only
+         * @param published the published
+         * @param leadDays the lead days
+         * @param pieceGrams the piece grams
+         */
         public Sweet(
                 long id,
                 String name,
@@ -74,7 +103,23 @@ public class OccasionCatalogue {
         }
     }
 
-    /** Immutable box data contract. */
+    /**
+     * Immutable box data contract.
+     *
+     * @param id the id
+     * @param name the name
+     * @param imageUrl the image url
+     * @param dimensions the dimensions
+     * @param material the material
+     * @param compartments the compartments
+     * @param capacityPieces the capacity pieces
+     * @param price the price
+     * @param branding the branding
+     * @param leadDays the lead days
+     * @param published the published
+     * @param imageUrls the image urls
+     * @param capacityGrams the capacity grams
+     */
     public record Box(
             Long id,
             @NotBlank @Size(max = 100) String name,
@@ -90,6 +135,21 @@ public class OccasionCatalogue {
             @Size(max = 6) List<@NotBlank @Size(max = 1000) String> imageUrls,
             @Min(250) @Max(1000) Integer capacityGrams) {
 
+        /**
+         * Creates a box instance.
+         *
+         * @param id the id
+         * @param name the name
+         * @param imageUrl the image url
+         * @param dimensions the dimensions
+         * @param material the material
+         * @param compartments the compartments
+         * @param capacityPieces the capacity pieces
+         * @param price the price
+         * @param branding the branding
+         * @param leadDays the lead days
+         * @param published the published
+         */
         public Box(
                 Long id,
                 String name,
@@ -118,6 +178,22 @@ public class OccasionCatalogue {
                     null);
         }
 
+        /**
+         * Creates a box instance.
+         *
+         * @param id the id
+         * @param name the name
+         * @param imageUrl the image url
+         * @param dimensions the dimensions
+         * @param material the material
+         * @param compartments the compartments
+         * @param capacityPieces the capacity pieces
+         * @param price the price
+         * @param branding the branding
+         * @param leadDays the lead days
+         * @param published the published
+         * @param imageUrls the image urls
+         */
         public Box(
                 Long id,
                 String name,
@@ -148,7 +224,18 @@ public class OccasionCatalogue {
         }
     }
 
-    /** Immutable packing group data contract. */
+    /**
+     * Immutable packing group data contract.
+     *
+     * @param kind the kind
+     * @param boxId the box id
+     * @param boxCount the box count
+     * @param recipe the recipe
+     * @param productId the product id
+     * @param totalGrams the total grams
+     * @param packGrams the pack grams
+     * @param includeSpoons the include spoons
+     */
     public record PackingGroup(
             String kind,
             Long boxId,
@@ -159,7 +246,21 @@ public class OccasionCatalogue {
             Integer packGrams,
             boolean includeSpoons) {}
 
-    /** Immutable packed group data contract. */
+    /**
+     * Immutable packed group data contract.
+     *
+     * @param groupNumber the group number
+     * @param kind the kind
+     * @param box the box
+     * @param boxCount the box count
+     * @param recipe the recipe
+     * @param productId the product id
+     * @param productName the product name
+     * @param totalGrams the total grams
+     * @param packGrams the pack grams
+     * @param includeSpoons the include spoons
+     * @param packagingEstimate the packaging estimate
+     */
     public record PackedGroup(
             int groupNumber,
             String kind,
@@ -173,16 +274,35 @@ public class OccasionCatalogue {
             boolean includeSpoons,
             BigDecimal packagingEstimate) {}
 
-    /** Immutable branding data contract. */
+    /**
+     * Immutable branding data contract.
+     *
+     * @param headline the headline
+     * @param description the description
+     * @param imageUrl the image url
+     * @param published the published
+     */
     public record Branding(
             @NotNull @Size(max = 100) String headline,
             @NotNull @Size(max = 500) String description,
             @Size(max = 1000) String imageUrl,
             boolean published) {}
 
-    /** Immutable catalogue data contract. */
+    /**
+     * Immutable catalogue data contract.
+     *
+     * @param sweets the sweets
+     * @param boxes the boxes
+     * @param branding the branding
+     */
     public record Catalogue(List<Sweet> sweets, List<Box> boxes, Branding branding) {
 
+        /**
+         * Creates a catalogue instance.
+         *
+         * @param sweets the sweets
+         * @param boxes the boxes
+         */
         public Catalogue(List<Sweet> sweets, List<Box> boxes) {
             this(sweets, boxes, null);
         }
@@ -248,26 +368,61 @@ public class OccasionCatalogue {
         }
     }
 
-    /** Immutable sweet settings data contract. */
+    /**
+     * Immutable sweet settings data contract.
+     *
+     * @param occasionOnly the occasion only
+     * @param published the published
+     * @param leadDays the lead days
+     * @param pieceGrams the piece grams
+     */
     public record SweetSettings(
             boolean occasionOnly,
             boolean published,
             @Min(0) @Max(365) int leadDays,
             @DecimalMin("0.001") @Digits(integer = 6, fraction = 3) BigDecimal pieceGrams) {}
 
-    /** Immutable recipe data contract. */
+    /**
+     * Immutable recipe data contract.
+     *
+     * @param productId the product id
+     * @param pieces the pieces
+     */
     public record Recipe(long productId, int pieces) {}
 
-    /** Immutable gift request data contract. */
+    /**
+     * Immutable gift request data contract.
+     *
+     * @param boxId the box id
+     * @param boxCount the box count
+     * @param recipe the recipe
+     * @param includeSpoons the include spoons
+     */
     public record GiftRequest(
             long boxId, int boxCount, List<Recipe> recipe, boolean includeSpoons) {
 
+        /**
+         * Creates a gift request instance.
+         *
+         * @param boxId the box id
+         * @param boxCount the box count
+         * @param recipe the recipe
+         */
         public GiftRequest(long boxId, int boxCount, List<Recipe> recipe) {
             this(boxId, boxCount, recipe, false);
         }
     }
 
-    /** Immutable gift snapshot data contract. */
+    /**
+     * Immutable gift snapshot data contract.
+     *
+     * @param box the box
+     * @param boxCount the box count
+     * @param recipe the recipe
+     * @param packagingEstimate the packaging estimate
+     * @param approvedPackagingTotal the approved packaging total
+     * @param includeSpoons the include spoons
+     */
     public record GiftSnapshot(
             Box box,
             int boxCount,
@@ -276,6 +431,15 @@ public class OccasionCatalogue {
             BigDecimal approvedPackagingTotal,
             boolean includeSpoons) {
 
+        /**
+         * Creates a gift snapshot instance.
+         *
+         * @param box the box
+         * @param boxCount the box count
+         * @param recipe the recipe
+         * @param packagingEstimate the packaging estimate
+         * @param approvedPackagingTotal the approved packaging total
+         */
         public GiftSnapshot(
                 Box box,
                 int boxCount,

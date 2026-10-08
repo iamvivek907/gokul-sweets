@@ -35,6 +35,13 @@ public class PickupSlotService {
 
     private final PickupSlotValidationService pickupSlotValidationService;
 
+    /**
+     * Creates a pickup slot service instance.
+     *
+     * @param pickupSlotRepository the pickup slot repository
+     * @param branchRepository the branch repository
+     * @param pickupSlotValidationService the pickup slot validation service
+     */
     public PickupSlotService(
             PickupSlotRepository pickupSlotRepository,
             BranchRepository branchRepository,

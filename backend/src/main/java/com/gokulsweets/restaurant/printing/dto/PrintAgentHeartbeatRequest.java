@@ -6,7 +6,13 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
-/** Immutable print agent heartbeat request data contract. */
+/**
+ * Immutable print agent heartbeat request data contract.
+ *
+ * @param branchId the branch id
+ * @param agentId the agent id
+ * @param station the station
+ */
 public record PrintAgentHeartbeatRequest(
         @NotNull Long branchId,
         @NotBlank @Size(max = 120) String agentId,

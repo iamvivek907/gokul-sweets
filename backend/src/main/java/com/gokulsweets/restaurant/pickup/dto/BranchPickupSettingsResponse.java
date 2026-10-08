@@ -6,7 +6,21 @@ import com.gokulsweets.restaurant.pickup.BranchPickupSettings;
 import java.math.BigDecimal;
 import java.time.LocalTime;
 
-/** Immutable branch pickup settings response data contract. */
+/**
+ * Immutable branch pickup settings response data contract.
+ *
+ * @param id the id
+ * @param branchId the branch id
+ * @param slotDurationMinutes the slot duration minutes
+ * @param defaultCapacity the default capacity
+ * @param advanceBookingDays the advance booking days
+ * @param openingTime the opening time
+ * @param closingTime the closing time
+ * @param enabled the enabled
+ * @param priorityEnabled the priority enabled
+ * @param defaultPriorityCapacity the default priority capacity
+ * @param defaultPriorityCharge the default priority charge
+ */
 public record BranchPickupSettingsResponse(
         Long id,
         Long branchId,

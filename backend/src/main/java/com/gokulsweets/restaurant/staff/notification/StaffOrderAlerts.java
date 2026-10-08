@@ -45,10 +45,25 @@ public class StaffOrderAlerts {
     private static final DateTimeFormatter TIME =
             DateTimeFormatter.ofPattern("dd MMM yyyy, h:mm a", java.util.Locale.ENGLISH);
 
-    // Same rule is used for inbox, registration recipients and the pre-send permission recheck.
+    /** The eligible value. */
     public static final String ELIGIBLE = AppConstant.STAFF_ORDER_ALERTS_ELIGIBLE;
 
-    /** Immutable event data contract. */
+    /**
+     * Immutable event data contract.
+     *
+     * @param id the id
+     * @param orderId the order id
+     * @param orderNumber the order number
+     * @param branchId the branch id
+     * @param kind the kind
+     * @param title the title
+     * @param message the message
+     * @param scheduledAt the scheduled at
+     * @param createdAt the created at
+     * @param enquiryId the enquiry id
+     * @param targetUrl the target url
+     * @param customerOrderNumber the customer order number
+     */
     public record Event(
             long id,
             long orderId,
@@ -63,6 +78,19 @@ public class StaffOrderAlerts {
             String targetUrl,
             Long customerOrderNumber) {
 
+        /**
+         * Creates a event instance.
+         *
+         * @param id the id
+         * @param orderId the order id
+         * @param orderNumber the order number
+         * @param branchId the branch id
+         * @param kind the kind
+         * @param title the title
+         * @param message the message
+         * @param scheduledAt the scheduled at
+         * @param createdAt the created at
+         */
         public Event(
                 long id,
                 long orderId,
@@ -89,7 +117,15 @@ public class StaffOrderAlerts {
         }
     }
 
-    /** Immutable message data contract. */
+    /**
+     * Immutable message data contract.
+     *
+     * @param event the event
+     * @param readAt the read at
+     * @param actionRequired the action required
+     * @param pushState the push state
+     * @param emailState the email state
+     */
     public record Message(
             Event event,
             java.time.Instant readAt,
@@ -97,10 +133,24 @@ public class StaffOrderAlerts {
             String pushState,
             String emailState) {}
 
-    /** Immutable page data contract. */
+    /**
+     * Immutable page data contract.
+     *
+     * @param messages the messages
+     * @param unreadCount the unread count
+     * @param nextBefore the next before
+     * @param readThrough the read through
+     */
     public record Page(
             List<Message> messages, long unreadCount, Long nextBefore, long readThrough) {
 
+        /**
+         * Creates a page instance.
+         *
+         * @param messages the messages
+         * @param unreadCount the unread count
+         * @param nextBefore the next before
+         */
         public Page(List<Message> messages, long unreadCount, Long nextBefore) {
             this(messages, unreadCount, nextBefore, 0);
         }

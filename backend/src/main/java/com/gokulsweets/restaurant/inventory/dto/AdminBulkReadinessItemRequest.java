@@ -8,7 +8,15 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
-/** Immutable admin bulk readiness item request data contract. */
+/**
+ * Immutable admin bulk readiness item request data contract.
+ *
+ * @param branchProductId the branch product id
+ * @param status the status
+ * @param readyQuantity the ready quantity
+ * @param expectedReadyAt the expected ready at
+ * @param note the note
+ */
 public record AdminBulkReadinessItemRequest(
         @NotNull(message = "Branch product ID is required.") Long branchProductId,
         @NotNull(message = "Readiness status is required.") InventoryAllocationStatus status,

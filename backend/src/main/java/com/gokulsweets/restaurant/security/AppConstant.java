@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.security;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original StaffSessionService.COOKIE_NAME value; unchanged during extraction. */

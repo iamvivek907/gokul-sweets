@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.printing.service;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original AdminPrintJobService.DEFAULT_PAGE_SIZE value; unchanged during extraction. */

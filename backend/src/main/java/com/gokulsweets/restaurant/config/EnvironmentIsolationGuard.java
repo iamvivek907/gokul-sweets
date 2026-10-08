@@ -56,6 +56,9 @@ public class EnvironmentIsolationGuard {
 
     /**
      * New payments get distinct provider identifiers; stored legacy IDs still reconcile unchanged.
+     *
+     * @param paymentId the payment id
+     * @return the operation result
      */
     public String phonePeMerchantOrderId(Long paymentId) {
         final long __gokulMethodStartedNanos =
@@ -78,7 +81,21 @@ public class EnvironmentIsolationGuard {
         }
     }
 
-    /** Immutable settings data contract. */
+    /**
+     * Immutable settings data contract.
+     *
+     * @param deployment the deployment
+     * @param apiOrigin the api origin
+     * @param allowedOrigins the allowed origins
+     * @param redirectBase the redirect base
+     * @param webhookUrl the webhook url
+     * @param databaseUrl the database url
+     * @param bucket the bucket
+     * @param imageOrigin the image origin
+     * @param phonePeBase the phone pe base
+     * @param phonePeClientId the phone pe client id
+     * @param webhookKeyId the webhook key id
+     */
     public record Settings(
             String deployment,
             String apiOrigin,

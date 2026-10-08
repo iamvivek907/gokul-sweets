@@ -69,7 +69,15 @@ public class DeliveryStockCheck {
         }
     }
 
-    /** A future rider window must fit every line's approved plan and preparation cutoff. */
+    /**
+     * A future rider window must fit every line's approved plan and preparation cutoff.
+     *
+     * @param branchId the branch id
+     * @param date the date
+     * @param startsAt the starts at
+     * @param requested the requested
+     * @return the operation result
+     */
     @Transactional(readOnly = true)
     public Check checkWindow(
             long branchId,
@@ -180,6 +188,11 @@ public class DeliveryStockCheck {
         }
     }
 
-    /** Immutable check data contract. */
+    /**
+     * Immutable check data contract.
+     *
+     * @param available the available
+     * @param reason the reason
+     */
     public record Check(boolean available, String reason) {}
 }

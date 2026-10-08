@@ -6,7 +6,12 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
-/** Immutable record stock adjustment request data contract. */
+/**
+ * Immutable record stock adjustment request data contract.
+ *
+ * @param quantityDelta the quantity delta
+ * @param reason the reason
+ */
 public record RecordStockAdjustmentRequest(
         @NotNull(message = "Adjustment quantity is required.") BigDecimal quantityDelta,
         @NotBlank(message = "Adjustment reason is required.")

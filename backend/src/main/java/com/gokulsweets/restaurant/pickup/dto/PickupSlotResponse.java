@@ -7,7 +7,24 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
-/** Immutable pickup slot response data contract. */
+/**
+ * Immutable pickup slot response data contract.
+ *
+ * @param id the id
+ * @param branchId the branch id
+ * @param slotDate the slot date
+ * @param startTime the start time
+ * @param endTime the end time
+ * @param capacity the capacity
+ * @param bookedCount the booked count
+ * @param remainingCapacity the remaining capacity
+ * @param active the active
+ * @param priorityEnabled the priority enabled
+ * @param priorityCapacity the priority capacity
+ * @param priorityBookedCount the priority booked count
+ * @param priorityRemainingCapacity the priority remaining capacity
+ * @param priorityCharge the priority charge
+ */
 public record PickupSlotResponse(
         Long id,
         Long branchId,

@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.menu.workspace;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /** Original MenuWorkspaceService.BALANCE value; unchanged during extraction. */

@@ -58,6 +58,13 @@ public class StorefrontVitalsController {
         }
     }
 
-    /** Immutable vital data contract. */
+    /**
+     * Immutable vital data contract.
+     *
+     * @param name the name
+     * @param value the value
+     * @param rating the rating
+     * @param page the page
+     */
     public record Vital(String name, double value, String rating, String page) {}
 }

@@ -387,7 +387,15 @@ WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
         }
     }
 
-    /** Immutable window configuration data contract. */
+    /**
+     * Immutable window configuration data contract.
+     *
+     * @param serviceDate the service date
+     * @param startsAt the starts at
+     * @param endsAt the ends at
+     * @param riderCapacity the rider capacity
+     * @param paused the paused
+     */
     public record WindowConfiguration(
             @NotNull LocalDate serviceDate,
             @NotNull LocalTime startsAt,
@@ -395,7 +403,18 @@ WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
             @Min(1) @Max(1000) int riderCapacity,
             boolean paused) {}
 
-    /** Immutable window data contract. */
+    /**
+     * Immutable window data contract.
+     *
+     * @param id the id
+     * @param zoneId the zone id
+     * @param serviceDate the service date
+     * @param startsAt the starts at
+     * @param endsAt the ends at
+     * @param riderCapacity the rider capacity
+     * @param reservedCount the reserved count
+     * @param paused the paused
+     */
     public record Window(
             long id,
             long zoneId,
@@ -406,7 +425,17 @@ WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
             int reservedCount,
             boolean paused) {}
 
-    /** Immutable quote request data contract. */
+    /**
+     * Immutable quote request data contract.
+     *
+     * @param branchId the branch id
+     * @param locality the locality
+     * @param postalCode the postal code
+     * @param serviceDate the service date
+     * @param items the items
+     * @param latitude the latitude
+     * @param longitude the longitude
+     */
     public record QuoteRequest(
             @Positive long branchId,
             @NotBlank @Size(min = 2, max = 120) String locality,
@@ -416,6 +445,15 @@ WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
             Double latitude,
             Double longitude) {
 
+        /**
+         * Creates a quote request instance.
+         *
+         * @param branchId the branch id
+         * @param locality the locality
+         * @param postalCode the postal code
+         * @param serviceDate the service date
+         * @param items the items
+         */
         public QuoteRequest(
                 long branchId,
                 String locality,
@@ -426,6 +464,12 @@ WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
         }
     }
 
-    /** Immutable quote data contract. */
+    /**
+     * Immutable quote data contract.
+     *
+     * @param provisionalWindows the provisional windows
+     * @param orderable the orderable
+     * @param notice the notice
+     */
     public record Quote(List<Window> provisionalWindows, boolean orderable, String notice) {}
 }

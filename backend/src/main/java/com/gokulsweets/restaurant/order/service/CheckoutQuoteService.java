@@ -42,7 +42,16 @@ public class CheckoutQuoteService {
     @Value("${checkout.quote-signing-key:}")
     private String signingKey;
 
-    /** Immutable line data contract. */
+    /**
+     * Immutable line data contract.
+     *
+     * @param name the name
+     * @param unitPrice the unit price
+     * @param taxRate the tax rate
+     * @param taxAmount the tax amount
+     * @param total the total
+     * @param productId the product id
+     */
     public record Line(
             String name,
             String unitPrice,
@@ -51,7 +60,24 @@ public class CheckoutQuoteService {
             String total,
             long productId) {}
 
-    /** Immutable quote data contract. */
+    /**
+     * Immutable quote data contract.
+     *
+     * @param items the items
+     * @param subtotal the subtotal
+     * @param taxAmount the tax amount
+     * @param priorityCharge the priority charge
+     * @param convenienceFee the convenience fee
+     * @param convenienceFeeTax the convenience fee tax
+     * @param totalAmount the total amount
+     * @param currency the currency
+     * @param expiresAt the expires at
+     * @param token the token
+     * @param paymentFee the payment fee
+     * @param paymentFeeTax the payment fee tax
+     * @param paymentFeeRate the payment fee rate
+     * @param paymentFeeTaxRate the payment fee tax rate
+     */
     public record Quote(
             List<Line> items,
             String subtotal,

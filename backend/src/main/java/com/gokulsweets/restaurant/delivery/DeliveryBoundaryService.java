@@ -378,10 +378,20 @@ SELECT vertices::text FROM delivery_zone_boundaries WHERE zone_id = ? AND review
         }
     }
 
-    /** Immutable point data contract. */
+    /**
+     * Immutable point data contract.
+     *
+     * @param latitude the latitude
+     * @param longitude the longitude
+     */
     public record Point(double latitude, double longitude) {}
 
-    /** Immutable boundary data contract. */
+    /**
+     * Immutable boundary data contract.
+     *
+     * @param vertices the vertices
+     * @param reviewed the reviewed
+     */
     public record Boundary(
             @NotNull @Size(min = 3, max = 100) List<@NotNull @Valid Point> vertices,
             boolean reviewed) {}

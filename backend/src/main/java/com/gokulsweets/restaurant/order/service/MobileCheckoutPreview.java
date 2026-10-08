@@ -30,7 +30,19 @@ public class MobileCheckoutPreview {
 
     private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
 
-    /** Immutable preview data contract. */
+    /**
+     * Immutable preview data contract.
+     *
+     * @param quote the quote
+     * @param offers the offers
+     * @param spendTargets the spend targets
+     * @param paymentFee the payment fee
+     * @param paymentFeeTax the payment fee tax
+     * @param rewards the rewards
+     * @param rewardDiscount the reward discount
+     * @param totalBeforeOffer the total before offer
+     * @param selectedOffer the selected offer
+     */
     public record Preview(
             CheckoutQuoteService.Quote quote,
             List<AvailableRebateResponse> offers,

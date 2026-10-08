@@ -51,7 +51,17 @@ public class LoyaltyAdminController {
         }
     }
 
-    /** Immutable reward input data contract. */
+    /**
+     * Immutable reward input data contract.
+     *
+     * @param code the code
+     * @param name the name
+     * @param coins the coins
+     * @param discount the discount
+     * @param minimumSubtotal the minimum subtotal
+     * @param active the active
+     * @param reason the reason
+     */
     public record RewardInput(
             String code,
             String name,
@@ -61,7 +71,13 @@ public class LoyaltyAdminController {
             boolean active,
             String reason) {}
 
-    /** Immutable exclusions data contract. */
+    /**
+     * Immutable exclusions data contract.
+     *
+     * @param productIds the product ids
+     * @param rebateCodes the rebate codes
+     * @param reason the reason
+     */
     public record Exclusions(List<Long> productIds, List<String> rebateCodes, String reason) {}
 
     /**

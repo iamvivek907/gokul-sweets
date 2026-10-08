@@ -20,6 +20,11 @@ public class CheckoutUrlVault {
 
     private final String configuredKey;
 
+    /**
+     * Creates a checkout url vault instance.
+     *
+     * @param configuredKey the configured key
+     */
     public CheckoutUrlVault(@Value("${payment.checkout-encryption-key:}") String configuredKey) {
         this.configuredKey = configuredKey;
     }

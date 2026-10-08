@@ -21,6 +21,12 @@ public class OrderNumberGenerator {
 
     private final EnhancementProperties features;
 
+    /**
+     * Creates a order number generator instance.
+     *
+     * @param clock the clock
+     * @param features the features
+     */
     public OrderNumberGenerator(Clock clock, EnhancementProperties features) {
         this.clock = clock;
         this.features = features;

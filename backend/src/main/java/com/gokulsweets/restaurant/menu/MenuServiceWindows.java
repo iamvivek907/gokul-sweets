@@ -28,7 +28,16 @@ public class MenuServiceWindows {
 
     private final StaffAuthorizationService authorization;
 
-    /** Immutable item data contract. */
+    /**
+     * Immutable item data contract.
+     *
+     * @param branchProductId the branch product id
+     * @param startsAt the starts at
+     * @param endsAt the ends at
+     * @param weekdays the weekdays
+     * @param soldOut the sold out
+     * @param requiresBranchProductId the requires branch product id
+     */
     public record Item(
             long branchProductId,
             LocalTime startsAt,
@@ -37,19 +46,45 @@ public class MenuServiceWindows {
             boolean soldOut,
             Long requiresBranchProductId) {}
 
-    /** Immutable settings data contract. */
+    /**
+     * Immutable settings data contract.
+     *
+     * @param enabled the enabled
+     * @param revision the revision
+     * @param items the items
+     */
     public record Settings(boolean enabled, long revision, List<Item> items) {}
 
-    /** Immutable item hours data contract. */
+    /**
+     * Immutable item hours data contract.
+     *
+     * @param enabled the enabled
+     * @param revision the revision
+     * @param item the item
+     */
     public record ItemHours(boolean enabled, long revision, Item item) {}
 
-    /** Immutable hours edit data contract. */
+    /**
+     * Immutable hours edit data contract.
+     *
+     * @param revision the revision
+     * @param startsAt the starts at
+     * @param endsAt the ends at
+     */
     public record HoursEdit(
             @jakarta.validation.constraints.Min(0) long revision,
             LocalTime startsAt,
             LocalTime endsAt) {}
 
-    /** Immutable status data contract. */
+    /**
+     * Immutable status data contract.
+     *
+     * @param available the available
+     * @param code the code
+     * @param message the message
+     * @param nextChangeAt the next change at
+     * @param evaluatedAt the evaluated at
+     */
     public record Status(
             boolean available,
             String code,
@@ -57,15 +92,34 @@ public class MenuServiceWindows {
             Instant nextChangeAt,
             Instant evaluatedAt) {
 
+        /**
+         * Creates a status instance.
+         *
+         * @param available the available
+         * @param code the code
+         * @param message the message
+         * @param nextChangeAt the next change at
+         */
         public Status(boolean available, String code, String message, Instant nextChangeAt) {
             this(available, code, message, nextChangeAt, null);
         }
     }
 
-    /** Immutable product state data contract. */
+    /**
+     * Immutable product state data contract.
+     *
+     * @param id the id
+     * @param available the available
+     * @param name the name
+     */
     private record ProductState(long id, boolean available, String name) {}
 
-    /** Immutable snapshot data contract. */
+    /**
+     * Immutable snapshot data contract.
+     *
+     * @param enabled the enabled
+     * @param products the products
+     */
     public record Snapshot(boolean enabled, Map<Long, Status> products) {
 
         /**
@@ -444,7 +498,13 @@ public class MenuServiceWindows {
         }
     }
 
-    /** No pickup selected: retain manual/sold-out rules without blocking advance browsing. */
+    /**
+     * No pickup selected: retain manual/sold-out rules without blocking advance browsing.
+     *
+     * @param branchId the branch id
+     * @param pickupAt the pickup at
+     * @return the operation result
+     */
     public Snapshot pickupSnapshot(long branchId, LocalDateTime pickupAt) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(MenuServiceWindows.class, "pickupSnapshot(long,LocalDateTime)");
@@ -482,6 +542,9 @@ public class MenuServiceWindows {
 
     /**
      * Read rules once for an entire calendar; each slot uses its own server-owned IST timestamp.
+     *
+     * @param branchId the branch id
+     * @return the operation result
      */
     public java.util.function.Function<LocalDateTime, Snapshot> pickupEvaluator(long branchId) {
         final long __gokulMethodStartedNanos =
@@ -494,7 +557,13 @@ public class MenuServiceWindows {
         }
     }
 
-    /** Evaluate only requested SKUs; dependencies may still reference any item in the branch. */
+    /**
+     * Evaluate only requested SKUs; dependencies may still reference any item in the branch.
+     *
+     * @param branchId the branch id
+     * @param productIds the product ids
+     * @return the operation result
+     */
     public java.util.function.Function<LocalDateTime, Snapshot> pickupEvaluator(
             long branchId, Set<Long> productIds) {
         final long __gokulMethodStartedNanos =

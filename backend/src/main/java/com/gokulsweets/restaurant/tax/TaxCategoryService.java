@@ -18,6 +18,11 @@ public class TaxCategoryService {
 
     private final TaxCategoryRepository taxCategoryRepository;
 
+    /**
+     * Creates a tax category service instance.
+     *
+     * @param taxCategoryRepository the tax category repository
+     */
     public TaxCategoryService(TaxCategoryRepository taxCategoryRepository) {
         this.taxCategoryRepository = taxCategoryRepository;
     }

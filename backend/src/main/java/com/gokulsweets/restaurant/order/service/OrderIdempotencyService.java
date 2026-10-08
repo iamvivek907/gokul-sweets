@@ -461,11 +461,22 @@ public class OrderIdempotencyService {
         }
     }
 
-    /** Immutable claim result data contract. */
+    /**
+     * Immutable claim result data contract.
+     *
+     * @param newRequest the new request
+     * @param existingOrder the existing order
+     */
     public record ClaimResult(boolean newRequest, Order existingOrder) {
 
+        /** The new value. */
         public static final ClaimResult NEW = new ClaimResult(true, null);
 
+        /**
+         * Creates a claim result instance.
+         *
+         * @param existingOrder the existing order
+         */
         public ClaimResult(Order existingOrder) {
             this(false, existingOrder);
         }

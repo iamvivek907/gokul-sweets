@@ -91,7 +91,14 @@ public class DeliveryOrderPreparationService {
         }
     }
 
-    /** Immutable prepared data contract. */
+    /**
+     * Immutable prepared data contract.
+     *
+     * @param validated the validated
+     * @param price the price
+     * @param window the window
+     * @param economics the economics
+     */
     public record Prepared(
             ValidatedOrderData validated,
             OrderCalculationResult price,

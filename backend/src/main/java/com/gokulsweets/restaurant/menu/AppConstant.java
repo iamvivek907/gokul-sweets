@@ -6,6 +6,7 @@ package com.gokulsweets.restaurant.menu;
  */
 public final class AppConstant {
 
+    /** Creates a app constant instance. */
     private AppConstant() {}
 
     /**

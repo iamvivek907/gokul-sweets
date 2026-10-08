@@ -224,6 +224,9 @@ public class PaymentCheckoutService {
      */
     /**
      * Provider verification precedes CAS closure; late capture uses the existing refund lifecycle.
+     *
+     * @param paymentId the payment id
+     * @return the operation result
      */
     public PaymentResponse cancelCheckout(Long paymentId) {
         final long __gokulMethodStartedNanos =

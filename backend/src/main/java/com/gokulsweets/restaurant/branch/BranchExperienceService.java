@@ -31,7 +31,21 @@ public class BranchExperienceService {
 
     private final BranchRepository branches;
 
-    /** Immutable snapshot data contract. */
+    /**
+     * Immutable snapshot data contract.
+     *
+     * @param branchId the branch id
+     * @param draftImageUrl the draft image url
+     * @param draftMobileUrl the draft mobile url
+     * @param draftAltText the draft alt text
+     * @param draftDescription the draft description
+     * @param publishedImageUrl the published image url
+     * @param publishedMobileUrl the published mobile url
+     * @param publishedAltText the published alt text
+     * @param publishedDescription the published description
+     * @param editVersion the edit version
+     * @param publishedRevision the published revision
+     */
     public record Snapshot(
             long branchId,
             String draftImageUrl,
@@ -45,7 +59,16 @@ public class BranchExperienceService {
             long editVersion,
             long publishedRevision) {}
 
-    /** Immutable publication data contract. */
+    /**
+     * Immutable publication data contract.
+     *
+     * @param revision the revision
+     * @param imageUrl the image url
+     * @param mobileUrl the mobile url
+     * @param altText the alt text
+     * @param description the description
+     * @param actorStaffId the actor staff id
+     */
     public record Publication(
             long revision,
             String imageUrl,
@@ -54,7 +77,12 @@ public class BranchExperienceService {
             String description,
             long actorStaffId) {}
 
-    /** Immutable copy data contract. */
+    /**
+     * Immutable copy data contract.
+     *
+     * @param altText the alt text
+     * @param description the description
+     */
     public record Copy(String altText, String description) {}
 
     /**

@@ -3,7 +3,15 @@ package com.gokulsweets.restaurant.category.dto;
 import com.gokulsweets.restaurant.category.Category;
 import com.gokulsweets.restaurant.observability.MethodTiming;
 
-/** Immutable category response data contract. */
+/**
+ * Immutable category response data contract.
+ *
+ * @param id the id
+ * @param name the name
+ * @param description the description
+ * @param displayOrder the display order
+ * @param active the active
+ */
 public record CategoryResponse(
         Long id, String name, String description, Integer displayOrder, boolean active) {
 

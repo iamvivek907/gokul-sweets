@@ -63,6 +63,12 @@ public class DeliveryOrderWindowLookup {
         }
     }
 
-    /** Immutable window data contract. */
+    /**
+     * Immutable window data contract.
+     *
+     * @param date the date
+     * @param start the start
+     * @param end the end
+     */
     public record Window(LocalDate date, LocalTime start, LocalTime end) {}
 }

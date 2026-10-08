@@ -79,7 +79,13 @@ public class CustomerInventoryAvailabilityService {
         }
     }
 
-    /** Discovery only needs this date; do not scan future dates for every candidate. */
+    /**
+     * Discovery only needs this date; do not scan future dates for every candidate.
+     *
+     * @param branchId the branch id
+     * @param request the request
+     * @return the operation result
+     */
     @Transactional(readOnly = true)
     public CustomerInventoryCheckResponse checkRequestedDate(
             Long branchId, CustomerInventoryCheckRequest request) {
@@ -496,6 +502,11 @@ public class CustomerInventoryAvailabilityService {
         }
     }
 
-    /** Immutable date result data contract. */
+    /**
+     * Immutable date result data contract.
+     *
+     * @param orderable the orderable
+     * @param items the items
+     */
     private record DateResult(boolean orderable, List<CustomerInventoryCheckResponse.Item> items) {}
 }

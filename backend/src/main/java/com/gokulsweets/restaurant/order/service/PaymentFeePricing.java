@@ -9,6 +9,7 @@ import java.math.RoundingMode;
 /** Rate is customer-visible and inclusive of the configured tax treatment, never fee-on-fee. */
 public final class PaymentFeePricing {
 
+    /** Creates a payment fee pricing instance. */
     private PaymentFeePricing() {}
 
     /**

@@ -19,7 +19,11 @@ public class BranchOperations {
 
     private final StaffAuthorizationService authorization;
 
-    /** Immutable status data contract. */
+    /**
+     * Immutable status data contract.
+     *
+     * @param operational the operational
+     */
     public record Status(boolean operational) {}
 
     /**

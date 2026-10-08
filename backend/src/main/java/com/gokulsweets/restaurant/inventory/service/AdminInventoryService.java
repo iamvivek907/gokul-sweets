@@ -34,7 +34,15 @@ import java.util.List;
 @Slf4j
 public class AdminInventoryService {
 
-    /** Immutable plan change data contract. */
+    /**
+     * Immutable plan change data contract.
+     *
+     * @param id the id
+     * @param performedBy the performed by
+     * @param changedAt the changed at
+     * @param beforeState the before state
+     * @param afterState the after state
+     */
     public record PlanChange(
             long id,
             String performedBy,
@@ -191,7 +199,15 @@ public class AdminInventoryService {
         }
     }
 
-    /** Adjust quantities without resuming paused stock or revoking existing readiness. */
+    /**
+     * Adjust quantities without resuming paused stock or revoking existing readiness.
+     *
+     * @param branchProductId the branch product id
+     * @param serviceDate the service date
+     * @param request the request
+     * @param performedBy the performed by
+     * @return the operation result
+     */
     @Transactional
     public InventoryAllocationResponse adjustAllocation(
             Long branchProductId,
