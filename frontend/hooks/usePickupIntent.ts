@@ -34,7 +34,7 @@ export function usePickupIntent(branchId?: number | null) {
     if (!date && selection && selection.slot.branchId === branchId) date = selection.date;
     const previousDate = saved && saved.slot.branchId === branchId ? saved.date : date;
     const expired=!!saved && !selection || !!date && !!now && date < indiaToday(new Date(now));
-    const preferenceMatches = !date || !saved || date === saved.date;
+    const preferenceMatches = !date || !saved || saved.slot.branchId !== branchId || date === saved.date;
     if (date && now && date < indiaToday(new Date(now))) date=null;
     return {date, expired, previousDate, pickupRaw, modeRaw, automatic: preferenceMatches && isSoonestPickup(modeRaw,branchId,pickupRaw,!!previousDate), selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
 }

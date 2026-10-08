@@ -7,6 +7,12 @@ export function subscribeMenuPickupMode(listener: () => void) {
     return () => {window.removeEventListener(event, listener); window.removeEventListener("storage", listener);};
 }
 export function isSoonestPickup(raw: string, branchId: number | null | undefined, pickup: string, hasPreference: boolean) {
+    // Branch selection can retain an empty cart's old pickup. Only a positively
+    // identified foreign-branch pickup is ignored; malformed/legacy choices stay fixed.
+    try {
+        const saved = pickup ? JSON.parse(pickup) : null;
+        if (Number.isSafeInteger(branchId) && Number.isSafeInteger(saved?.slot?.branchId) && saved.slot.branchId !== branchId) pickup = "";
+    } catch { /* Preserve unrecognized saved choices. */ }
     if (!raw) return !hasPreference && !pickup;
     try {const value = JSON.parse(raw); return value.branchId !== branchId ? !hasPreference && !pickup : value.mode === "soonest" && value.pickup === pickup;}
     catch {return false;}

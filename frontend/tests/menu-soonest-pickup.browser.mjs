@@ -34,11 +34,20 @@ try{for(const width of [320,390,1280]){
   }
   await route.fulfill({headers,json});
  });
- await context.addInitScript(branch=>{if(!localStorage.getItem('gokul-selected-branch'))localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','seen');},branch);
+ // Empty-cart branch switches retain the old branch's pickup; it must not block the new default.
+ await context.addInitScript(({branch,oldPickup})=>{
+  if(!localStorage.getItem('gokul-selected-branch')){
+   localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));
+   const raw=JSON.stringify(oldPickup);localStorage.setItem('gokul-selected-pickup-slot',raw);
+   localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:99,date:oldPickup.date}));
+   localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:99,mode:'fixed',pickup:raw}));
+  }
+  localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','seen');
+ },{branch,oldPickup:{date:later,slot:{...slot(later,99),branchId:99},pickupType:'NORMAL'}});
  const pickup=page.getByRole('region',{name:'Menu pickup time'}),add=page.getByRole('button',{name:'Add Aloo Paratha to cart'});
  const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));
  await page.goto(`${base}/menu`);await pickup.getByText(/Tomorrow, .*8:00/).waitFor();await add.waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled);
- assert.equal((await saved()).date,tomorrow);assert.equal((await saved()).pickupType,'NORMAL');assert.equal(checks.includes(today),false,'closed slots are skipped before item queries');
+ assert.equal((await saved()).slot.branchId,branch.id,'new branch receives its own verified pickup');assert.equal((await saved()).date,tomorrow);assert.equal((await saved()).pickupType,'NORMAL');assert.equal(checks.includes(today),false,'closed slots are skipped before item queries');
  await mkdir(screenshots,{recursive:true});await page.screenshot({path:`${screenshots}/soonest-tomorrow-${width}.png`,fullPage:true});
  await page.reload();await pickup.getByText(/Tomorrow, .*8:00/).waitFor();assert.equal((await saved()).date,tomorrow);
  await pickup.getByRole('button',{name:'Change time',exact:true}).click();

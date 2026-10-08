@@ -55,6 +55,18 @@ test('first addition fixes pickup; reductions and clearing cart never reactivate
 test('an empty new branch is not blocked by another branch’s mode',()=>{
  const {mode}=storage();mode.setMenuPickupMode(1,false,'old');assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),2,'',false),true);
 });
+test('retained foreign pickup does not block a new branch, while local preferences and malformed pickups stay fixed',()=>{
+ const {mode}=storage();const pickup=JSON.stringify({date:today,slot:{branchId:1,id:8}});
+ for(const automatic of [true,false]){
+  mode.setMenuPickupMode(1,automatic,pickup);const raw=mode.getMenuPickupModeSnapshot();
+  assert.equal(mode.isSoonestPickup(raw,2,pickup,false),true);
+  assert.equal(mode.isSoonestPickup(raw,2,pickup,true),false,'current-branch date preference stays fixed');
+  assert.equal(mode.isSoonestPickup(raw,1,pickup,true),automatic,'same-branch mode is preserved');
+  assert.equal(mode.isSoonestPickup(raw,2,'broken',false),false);
+ }
+ assert.equal(mode.isSoonestPickup('',2,pickup,false),true,'legacy foreign branch pickup is scoped too');
+ assert.equal(mode.isSoonestPickup('',1,pickup,false),false);
+});
 
 test('completed paid pickup releases automatic mode for the next order, without erasing a later choice',()=>{
  const {mode,map}=storage();const pickup=JSON.stringify({date:today,slot:{branchId:1,id:8}});
