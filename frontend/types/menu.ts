@@ -21,6 +21,9 @@ export interface MenuProduct {
 
     available: boolean;
 
+    /** Absent only for older API responses; never infer a dietary label. */
+    vegetarian?: boolean;
+
     /** Live menu revision used to invalidate dated service-hour previews. */
     availabilityRevision?: string;
 

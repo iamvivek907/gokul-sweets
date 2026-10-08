@@ -2,6 +2,7 @@
 import {T} from "@/lib/language";
 
 import Image from "next/image";
+import DietaryLabel from "./DietaryLabel";
 import {useState,type ReactNode} from "react";
 
 import type { MenuProduct } from "@/types/menu";
@@ -9,6 +10,7 @@ import type { ProductRatingSummary } from "@/types/review";
 
 
 interface ProductCardProps {
+    dietaryLabel?: ReactNode;
     portionOptions?: ReactNode;
     purchaseControl?: ReactNode;
     refined?: boolean;
@@ -65,6 +67,7 @@ function formatWeight(
 
 
 export default function ProductCard({
+    dietaryLabel,
     portionOptions,
     purchaseControl,
     refined = false,
@@ -234,6 +237,7 @@ export default function ProductCard({
                 sm:p-3.5
             ">
 
+                <div>{dietaryLabel ?? <DietaryLabel vegetarian={product.vegetarian}/>}</div>
                 <p className="
                     truncate
                     text-[9px]

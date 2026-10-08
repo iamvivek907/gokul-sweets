@@ -32,6 +32,15 @@ class MenuCatalogIntegrationTest {
         product=jdbc.queryForObject("INSERT INTO products(code,name,category_id,base_price,sale_mode,minimum_weight_grams,weight_step_grams) VALUES(?,'Sweet',?,400,'WEIGHT',250,250) RETURNING id",Long.class,code,category);
         bp=jdbc.queryForObject("INSERT INTO branch_products(branch_id,product_id) VALUES(?,?) RETURNING id",Long.class,branch,product);
     }
+    @Test void dietaryChangesInvalidateCatalogAndReachCombinedMenu(){
+        var before=catalog.get(branch);assertThat(before.categories().getFirst().products().getFirst().vegetarian()).isTrue();
+        jdbc.update("UPDATE products SET vegetarian=false WHERE id=?",product);
+        var after=catalog.get(branch);assertThat(after.revision()).isNotEqualTo(before.revision());
+        assertThat(after.categories().getFirst().products().getFirst().vegetarian()).isFalse();
+        assertThat(before.categories().getFirst().products().getFirst().vegetarian()).isTrue();
+        windows.save(branch,new MenuServiceWindows.Settings(true,0,List.of()));
+        assertThat(menu.getMenu(branch).getFirst().products().getFirst().vegetarian()).isFalse();
+    }
     @Test void immutableSnapshotIsReusedAndDirectSqlEditsInvalidateItAcrossBranches(){
         var first=catalog.get(branch);assertThat(catalog.get(branch)).isSameAs(first);
         jdbc.update("UPDATE products SET base_price=500 WHERE id=?",product);

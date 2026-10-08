@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import DietaryLabel from "@/components/menu/DietaryLabel";
 import {
   readWorkspaceDraft,
   writeWorkspaceDraft,
@@ -103,6 +104,8 @@ export default function MenuWorkspace() {
     { item: WorkspaceItem; error: string | null }[]
   >([]);
   const bulkLock = useRef(false);
+  const dietaryLock = useRef(false);
+  const [dietaryBusy,setDietaryBusy] = useState<number|null>(null);
   const restored = useRef(false);
   const currentBranch = useRef<number | null>(null);
   const scrollRestore = useRef<number | null>(null);
@@ -285,6 +288,16 @@ export default function MenuWorkspace() {
     canView,
     queryContext,
   ]);
+  async function saveDietary(item:WorkspaceItem,vegetarian:boolean) {
+    if(!branch||!fresh||!canMenu||dietaryLock.current)return;
+    dietaryLock.current=true;setDietaryBusy(item.productId);setError("");
+    try {
+      await workspaceRequest(branch,`/${item.productId}/dietary`,{...jsonRequest("PATCH",{version:item.productVersion,vegetarian}),signal:AbortSignal.timeout(15000)});
+      if(currentBranch.current===branch){setSelected([]);setNotice(`${item.name}: ${vegetarian?"Veg":"Non-veg"} saved for all branches.`);setRevision(n=>n+1);}
+    } catch(failure) {
+      if(currentBranch.current===branch){setError(`${failure instanceof Error?failure.message:"Unable to save classification."} Reload the list before retrying if the response was lost.`);}
+    } finally {dietaryLock.current=false;setDietaryBusy(null);}
+  }
   async function openProductGroup(item: WorkspaceItem) {
     if (!branch) return;
     try {
@@ -620,6 +633,17 @@ export default function MenuWorkspace() {
                   Missing photo
                 </span>
               )}
+              <div className={styles.row}>
+                <DietaryLabel vegetarian={p.vegetarian}/>
+                <label>Food type
+                  <select aria-label={`${p.name} food type`} value={typeof p.vegetarian==="boolean"?String(p.vegetarian):""} disabled={!fresh||loading||!canMenu||dietaryBusy!==null} onChange={e=>void saveDietary(p,e.target.value==="true")}>
+                    {typeof p.vegetarian!=="boolean"&&<option value="" disabled>Not loaded</option>}
+                    <option value="true">Veg</option><option value="false">Non-veg</option>
+                  </select>
+                </label>
+                {dietaryBusy===p.productId&&<span role="status">Saving food type…</span>}
+              </div>
+              <p className={styles.muted}>Shared across branches. Mark egg-containing items Non-veg.</p>
               <div className={styles.numbers}>
                 <div>
                   <span className={styles.muted}>Effective price</span>

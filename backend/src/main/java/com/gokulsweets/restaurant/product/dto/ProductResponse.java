@@ -14,7 +14,8 @@ public record ProductResponse(
         String description,
         BigDecimal basePrice,
         boolean active,
-        String imageUrl
+        String imageUrl,
+        boolean vegetarian
 ) {
 
     public static ProductResponse from(
@@ -44,7 +45,8 @@ public record ProductResponse(
 
                 product.isActive(),
 
-                product.getImageUrl()
+                product.getImageUrl(),
+                product.isVegetarian()
         );
     }
 }

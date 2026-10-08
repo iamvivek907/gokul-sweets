@@ -94,6 +94,11 @@ public class Product {
     @Column(nullable = false)
     private boolean active = true;
 
+    // Classification updates belong to the versioned workspace SQL writer.
+    // Unrelated image/import saves must not overwrite a newer classification.
+    @Column(nullable = false, updatable = false)
+    private boolean vegetarian = true;
+
 
     /*
      * Cloudflare R2 public image URL.

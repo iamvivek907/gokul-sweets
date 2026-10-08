@@ -1,5 +1,6 @@
 "use client";
 import {useState} from "react";
+import {GroupDietaryLabel} from "./DietaryLabel";
 import ProductCard from "./ProductCard";
 import MenuVariantPicker from "./MenuVariantPicker";
 import {T} from "@/lib/language";
@@ -28,7 +29,7 @@ export default function MobilePortionCard({group,products,quantities,onAdd,onInc
  }):[];
  const serviceNotes=Array.from(new Set(rawNotes.map(note=>note.reason))).map(reason=>({reason,labels:rawNotes.filter(note=>note.reason===reason).map(note=>note.label).join(" / ")}));
  return <div className="mobile-portion-card">
-  <ProductCard refined premium priceFrom product={{...product,name:group.title,price:minimum,available:catalogueAvailable,description:product.description}} unavailableForPickup={unavailableForPickup} pickupMessage={pickupChecking?"Checking pickup":"Not at this time"} quantity={0} weightGrams={null} ratingSummary={ratings[product.id]??null} ratingLoading={loading} purchaseControl={<button data-ordering-target="add" type="button" className="product-card-controls menu-group-control" onClick={()=>setOpen(true)} disabled={availableSizes===0&&count===0} aria-label={`Choose options for ${group.title}`}><T text={count>0?"Manage":portion?"Add":"Choose size"}/>{count>0&&<span> · {count}</span>}</button>} onAdd={()=>setOpen(true)} onIncrease={onIncrease} onDecrease={onDecrease}/>
+  <ProductCard dietaryLabel={<GroupDietaryLabel products={products}/>} refined premium priceFrom product={{...product,name:group.title,price:minimum,available:catalogueAvailable,description:product.description}} unavailableForPickup={unavailableForPickup} pickupMessage={pickupChecking?"Checking pickup":"Not at this time"} quantity={0} weightGrams={null} ratingSummary={ratings[product.id]??null} ratingLoading={loading} purchaseControl={<button data-ordering-target="add" type="button" className="product-card-controls menu-group-control" onClick={()=>setOpen(true)} disabled={availableSizes===0&&count===0} aria-label={`Choose options for ${group.title}`}><T text={count>0?"Manage":portion?"Add":"Choose size"}/>{count>0&&<span> · {count}</span>}</button>} onAdd={()=>setOpen(true)} onIncrease={onIncrease} onDecrease={onDecrease}/>
   <div className="menu-group-caption"><span>{count>0?`${count} · ${money(total)}`:<><T text="From"/> {money(minimum)}</>}</span><button type="button" disabled={availableSizes===0&&count===0} onClick={()=>setOpen(true)}><T text={count>0?"Manage sizes":labels.join(" / ")}/><span aria-hidden="true"> ›</span></button></div>
   {serviceNotes.map(note=><p key={note.reason} role="status" className="menu-availability-note"><strong>{note.labels}:</strong>{" "}<T text={note.reason}/></p>)}
   {!serviceNotes.length&&availableSizes===0&&<p role="status" className="menu-availability-note"><T text={status}/></p>}

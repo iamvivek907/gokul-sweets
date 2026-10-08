@@ -17,6 +17,7 @@ public class MenuWorkspaceController {
  @PostMapping public Map<String,Long> create(@PathVariable long branch,@Valid @RequestBody Create input){return Map.of("productId",service.create(branch,input.details(),input.branchIds()));}
  @PutMapping("/{id}/details") public void details(@PathVariable long branch,@PathVariable long id,@Valid @RequestBody MenuWorkspaceService.Details input){service.editDetails(branch,id,input);}
  @PatchMapping("/{id}/branch") public void editBranch(@PathVariable long branch,@PathVariable long id,@Valid @RequestBody MenuWorkspaceService.BranchEdit input){service.editBranch(branch,id,input);}
+ @PatchMapping("/{id}/dietary") public void dietary(@PathVariable long branch,@PathVariable long id,@Valid @RequestBody MenuWorkspaceService.DietaryEdit input){service.editDietary(branch,id,input);}
  @DeleteMapping("/{id}") public void deleteItem(@PathVariable long branch,@PathVariable long id,@RequestParam @Min(0) long version){service.deleteBranchItem(branch,id,version);}
  @PostMapping(value="/{id}/image",consumes="multipart/form-data") public Map<String,String> image(@PathVariable long branch,@PathVariable long id,@RequestParam long version,@RequestParam MultipartFile image){return Map.of("imageUrl",service.image(branch,id,version,image,false));}
  @DeleteMapping("/{id}/image") public void remove(@PathVariable long branch,@PathVariable long id,@RequestParam long version){service.image(branch,id,version,null,true);}

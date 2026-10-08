@@ -1,4 +1,5 @@
 "use client";
+import DietaryLabel, {GroupDietaryLabel} from "./DietaryLabel";
 
 import {mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import Image from "next/image";
@@ -56,7 +57,7 @@ export default function NewBranchItems({branch, products, onSelect,portionGroups
             </div>
         </div>
         <div className={styles.row} ref={row}>
-            {mobileMenuRows(shownItems,portionGroups??[]).map(row => {const product=row.group?{...row.product,name:row.group.title}:row.product;return <button type="button" key={product.id} className={styles.item}
+            {mobileMenuRows(shownItems,portionGroups??[],products).map(row => {const product=row.group?{...row.product,name:row.group.title}:row.product;return <button type="button" key={product.id} className={styles.item}
                 onClick={() => onSelect(product)} aria-label={`View ${product.name} on the menu`}>
                 <span className={styles.photo}>
                     {product.imageUrl && !failedPhotos.includes(product.imageUrl)
@@ -64,7 +65,7 @@ export default function NewBranchItems({branch, products, onSelect,portionGroups
                             className={styles.image} onError={() => setFailedPhotos(current => [...current, product.imageUrl!])} />
                         : <span className={styles.fallback} aria-hidden="true">G</span>}
                 </span>
-                <span className={styles.name}>{product.name}</span>
+                {row.group?<GroupDietaryLabel products={row.products??[]}/>:<DietaryLabel vegetarian={product.vegetarian}/>}<span className={styles.name}>{product.name}</span>
             </button>;})}
         </div>
     </section>;
