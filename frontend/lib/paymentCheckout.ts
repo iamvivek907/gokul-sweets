@@ -150,16 +150,17 @@ async function openPhonePe(
      * The backend created this URL using the order-specific
      * redirect URL:
      *
-     * https://gokul-sweets-dev.vercel.app/payment/{orderNumber}
+     * {storefront}/checkout/payment/{orderNumber}
      */
-    window.location.assign(
+    // Remove this merchant Pay page from history before the provider return.
+    window.location.replace(
         payment.paymentUrl
     );
 
 
     /*
      * The current page will normally unload immediately
-     * after window.location.assign().
+     * after window.location.replace().
      *
      * This return value only satisfies CheckoutOutcome.
      *

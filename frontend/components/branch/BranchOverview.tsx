@@ -35,7 +35,7 @@ export default function BranchOverview({branch, selected, occasionEnquiries}: {
                     <span data-pickup={branch.pickupAvailable === true}><CustomerIcon kind="menu" /><T text={branch.pickupAvailable ? "Order online · Collect here" : "Explore the branch · Contact us to visit"} /></span>
                 </div>
                 <div className="branch-home-actions">
-                    {selected ? <Link href="/menu"><T text="Browse menu" /><span aria-hidden="true">→</span></Link>
+                    {selected ? <Link data-ordering-target="menu" href="/menu"><T text="Browse menu" /><span aria-hidden="true">→</span></Link>
                         : <BranchSelector cardBranch={branch} destination="menu" actionLabel="Browse menu" />}
                 </div>
                 <small><T text="See this branch’s items, prices and availability on the menu." /></small>

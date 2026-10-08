@@ -2,9 +2,7 @@
 import "@/lib/paymentNavigation";
 
 import {usePathname} from "next/navigation";
-import type {
-    ReactNode
-} from "react";
+import {useEffect, useState, type ReactNode} from "react";
 
 import BranchOperationalGuard from "./BranchOperationalGuard";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
@@ -35,6 +33,9 @@ import "./menu-premium.css";
 import "./customer-design.css";
 import "./menu-pickup.css";
 import MobileEdgeBack from "./MobileEdgeBack";
+import OrderingTour from "@/components/customer/OrderingTour";
+import {OPEN_ORDERING_TOUR, getWalkthroughSnapshot, stopWalkthrough} from "@/lib/orderingTour";
+import "./ordering-tour.css";
 
 
 interface AppShellProps {
@@ -55,6 +56,11 @@ export default function AppShell({
     const pathname = usePathname();
     const features = useStorefrontFeatures();
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
+    const tourAllowed = futuristic && pathname !== "/cart" && !pathname.startsWith("/checkout") && !/^\/orders\/[^/]+/.test(pathname);
+    const [orderingGuideActive, setOrderingGuideActive] = useState(false);
+    useEffect(() => {
+        if ((pathname === "/cart" || pathname.startsWith("/checkout") || /^\/orders\/[^/]+/.test(pathname)) && getWalkthroughSnapshot()) stopWalkthrough();
+    }, [pathname]);
 
     return (
         <div
@@ -98,12 +104,13 @@ export default function AppShell({
             >
                 {futuristic && <CustomerBreadcrumbs />}
                 {futuristic && <InstallAppBanner compact />}
+                {tourAllowed && <OrderingTour key={pathname} pathname={pathname} onActivityChange={setOrderingGuideActive} />}
                 {children}
             </main>
 
-            <CustomerFooter />
+            <CustomerFooter onHowToOrder={tourAllowed ? () => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR)) : undefined} />
 
-            {showSocialPopup && <SocialFollowPopup />}
+            {showSocialPopup && !orderingGuideActive && <SocialFollowPopup />}
             </BranchOperationalGuard>
 
             <BottomNavigation />

@@ -1,5 +1,6 @@
 {
   "navigation": [
+    "tests/ordering-tour.browser.mjs",
     "tests/colourful-mobile-shell.browser.mjs",
     "tests/menu-import-recovery.browser.mjs",
     "tests/navigation-feedback.browser.mjs",
@@ -39,6 +40,7 @@
     "tests/mobile-pages-account.browser.mjs"
   ],
   "single-checkout": [
+    "tests/payment-return-history.browser.mjs",
     "tests/mobile-single-checkout.browser.mjs",
     "tests/review-quote-race.browser.mjs",
     "tests/compact-mobile-checkout.browser.mjs",

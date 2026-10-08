@@ -8,7 +8,7 @@ import Link from "next/link";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {checkOperationalBranch} from "@/lib/branchOperationalCache";
 
-export default function CustomerFooter() {
+export default function CustomerFooter({onHowToOrder}: {onHowToOrder?: () => void}) {
     const {branch} = useSelectedBranch();
     const branchId = branch?.id;
     const [licence, setLicence] = useState<{branchId: number; number: string | null} | null>(null);
@@ -31,7 +31,7 @@ export default function CustomerFooter() {
         <div className="gokul-footer-grid">
             <div><h2><span className="customer-footer-brand-mark" aria-hidden="true">G</span><T text="Gokul Sweets" /></h2><p><T text="Freshly made for the moments that matter. Order online, then collect from your chosen branch." /></p></div>
             <div><h3><T text="EXPLORE" /></h3><Link href="/menu"><T text="Menu" /><LinkFeedback /></Link><Link href="/branches"><T text="Branches" /><LinkFeedback /></Link><Link href="/about"><T text="Our story" /><LinkFeedback /></Link></div>
-            <div><h3><T text="YOUR ORDER" /></h3><Link href="/orders"><T text="Orders" /><LinkFeedback /></Link><Link href="/profile"><T text="Profile" /><LinkFeedback /></Link><span><T text="Pickup only" /></span></div>
+            <div><h3><T text="YOUR ORDER" /></h3><Link href="/orders"><T text="Orders" /><LinkFeedback /></Link><Link href="/profile"><T text="Profile" /><LinkFeedback /></Link>{onHowToOrder && <button type="button" className="ordering-tour-replay" onClick={onHowToOrder}><T text="How to order" /></button>}<span><T text="Pickup only" /></span></div>
             <div><h3><T text="GOOD TO KNOW" /></h3><Link href="/admin" prefetch={false}><T text="Admin sign in" /><LinkFeedback /></Link><span><T text="Choose a branch to see its live menu." /></span><span><T text="Pickup times and the full price are confirmed before payment." /></span></div>
         </div>
         {fssaiLicenceNumber && <div className="gokul-fssai" aria-label={`FSSAI licence number for ${branch?.name}: ${fssaiLicenceNumber}`}>
