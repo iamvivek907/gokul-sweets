@@ -1,0 +1,28 @@
+.future-storefront .ordering-tour-invite {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px auto;padding:14px 18px;max-width:1100px;border:1px solid #e5d8ec;border-radius:14px;background:#f4effb;color:#362433;font-size:13px}
+.future-storefront .ordering-tour-invite>div {flex:1;min-width:180px}
+.future-storefront .ordering-tour-invite strong,.future-storefront .ordering-tour-invite span {display:block}
+.future-storefront .ordering-tour-invite span {margin-top:4px;line-height:1.5}
+.future-storefront .ordering-tour-invite button {min-height:44px;padding:8px 14px;border-radius:10px;background:#8f1838;color:white;font-weight:700;cursor:pointer}
+.future-storefront .ordering-tour-invite .ordering-tour-skip {background:transparent;color:#64182d}
+.future-storefront .ordering-tour-dialog {position:fixed;inset:0;margin:auto;width:min(480px,calc(100vw - 24px));max-height:calc(100dvh - 32px);overflow:auto;padding:22px;border:1px solid #eadde2;border-radius:22px;background:#fff;color:#28212a;box-shadow:0 24px 80px #24171540}
+.future-storefront .ordering-tour-dialog::backdrop {background:#24171580}
+.future-storefront .ordering-tour-top,.future-storefront .ordering-tour-actions {display:flex;align-items:center;justify-content:space-between;gap:12px}
+.future-storefront .ordering-tour-top {font-size:12px;font-weight:700;color:#624c5c}
+.future-storefront .ordering-tour-dialog button {min-height:44px;padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:700}
+.future-storefront .ordering-tour-top button {color:#64182d}
+.future-storefront .ordering-tour-content {padding:16px 0}
+.future-storefront .ordering-tour-symbol {display:grid;place-items:center;width:70px;height:70px;border-radius:22px;background:#fbe4dc;color:#8f1838;margin-bottom:18px}
+.future-storefront .ordering-tour-symbol svg {width:34px;height:34px}
+.future-storefront .ordering-tour-content h2 {font-size:25px;line-height:1.2;letter-spacing:-.03em;margin:0 0 14px;color:#64182d;outline:none}
+.future-storefront .ordering-tour-content p {font-size:15px;line-height:1.7;margin:0 0 16px}
+.future-storefront .ordering-tour-tip {font-size:13px;line-height:1.6;padding:14px;border-radius:12px;background:#e9f7f0;color:#205845}
+.future-storefront .ordering-tour-progress {display:flex;gap:6px;margin:0 0 18px}
+.future-storefront .ordering-tour-progress span {height:4px;flex:1;border-radius:4px;background:#eadde2}
+.future-storefront .ordering-tour-progress span[data-current=true] {background:#8f1838}
+.future-storefront .ordering-tour-actions button {border:1px solid #eadde2;color:#64182d}
+.future-storefront .ordering-tour-actions button:disabled {opacity:.4;cursor:default}
+.future-storefront .ordering-tour-actions .ordering-tour-primary {background:#8f1838;color:white;border-color:#8f1838;min-width:120px}
+.future-storefront .ordering-tour-menu-link {display:block;text-align:center;padding:12px;margin-top:10px;color:#64182d;font-weight:700;font-size:14px}
+.future-storefront .ordering-tour-replay {min-height:44px;text-align:left;color:inherit;font:inherit;cursor:pointer}
+.future-storefront :is(.ordering-tour-invite button,.ordering-tour-dialog button,.ordering-tour-menu-link,.ordering-tour-replay):focus-visible {outline:3px solid #087f55;outline-offset:3px}
+@media(max-width:640px){.future-storefront .ordering-tour-invite {margin:10px 12px;padding:12px;gap:4px 8px}.future-storefront .ordering-tour-invite>div {flex-basis:100%;margin-bottom:4px}}

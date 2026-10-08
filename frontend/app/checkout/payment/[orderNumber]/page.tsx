@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import {mergePaymentResponse, refreshKnownPayment} from "@/lib/paymentRecovery";
 
 import BrandLoading from "@/components/common/BrandLoading";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
@@ -104,24 +105,6 @@ function getPaymentStatus(
         : "";
 }
 
-async function refreshKnownPayment(known: PaymentResponse, resilient: boolean): Promise<PaymentResponse> {
-    // A settled payment has no active checkout to poll. Read the current database
-    // state on a new visit; a late provider callback can still update that state.
-    if (known.paymentStatus !== "PENDING") {
-        const lookup = await getPaymentForOrder(known.orderNumber);
-        return lookup.payment ?? known;
-    }
-    if (resilient && known.paymentStatus === "PENDING" &&
-        !hasOpenedPaymentGateway(known.orderNumber, known.paymentId)) return known;
-    try {
-        return mergePaymentResponse(await refreshPayment(known.paymentId), known);
-    } catch (error) {
-        // A temporary provider outage cannot turn a known pending payment into a new attempt.
-        if (resilient && known.paymentStatus === "PENDING" && error instanceof ApiError &&
-            isTemporaryPaymentFailure(error.status)) return known;
-        throw error;
-    }
-}
 
 
 function formatCurrency(
@@ -220,43 +203,6 @@ function statusBadgeClass(
  * Preserve the locally-known values when they exist.
  */
 
-function mergePaymentResponse(
-    refreshed: PaymentResponse,
-    existing:
-        | PaymentResponse
-        | ReturnType<typeof parsePendingPayment>
-        | null
-): PaymentResponse {
-
-    return {
-        ...refreshed,
-
-        providerPaymentId:
-            refreshed.providerPaymentId
-            ?? existing?.providerPaymentId
-            ?? null,
-
-        providerOrderId:
-            refreshed.providerOrderId
-            ?? existing?.providerOrderId
-            ?? null,
-
-        paymentSessionId:
-            refreshed.paymentSessionId
-            ?? existing?.paymentSessionId
-            ?? null,
-
-        paymentUrl:
-            refreshed.paymentUrl
-            ?? existing?.paymentUrl
-            ?? null,
-
-        checkoutKeyId:
-            refreshed.checkoutKeyId
-            ?? existing?.checkoutKeyId
-            ?? null
-    };
-}
 
 
 /*
@@ -1333,17 +1279,33 @@ export default function PaymentPage() {
             applyPaymentResult(result);
             if(result.paymentStatus==="EXPIRED" || result.paymentStatus==="FAILED") {
                 clearPendingPayment();clearPendingOrder();clearPaymentGatewayVisit(payment.orderNumber);
-                router.push(destination ?? (recoveryOrder.fulfillmentType === "DELIVERY" ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`));
+                router.replace(destination ?? (recoveryOrder.fulfillmentType === "DELIVERY" ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`));
             } else {setConfirmCancel(false);setError("Payment was already confirmed. View this order before starting another checkout.");}
         } catch(error) {setError(signal.aborted ? "The payment check took too long. We haven’t confirmed whether cancellation completed. Stay here or retry to check the latest status." : error instanceof Error ? error.message : "Could not check payment. Stay here or retry to check the latest status.");}
         finally {cancellationRunning.current=false;setCancelling(false);}
     }
 
+    const paymentLaunchRunning = useRef(false);
+
+    // Browser cache restores do not mount again; reconcile their cached Pay action.
+    useEffect(() => {
+        if (!payment) return;
+        let alive = true;
+        const restored = (event: PageTransitionEvent) => {
+            if (!event.persisted) return;
+            void refreshKnownPayment(payment, paymentPollingV2)
+                .then(current => { if (alive) applyPaymentResult(current); })
+                .catch(error => { if (alive) setError(error instanceof Error ? error.message : "Unable to check payment. Please check My Orders."); });
+        };
+        window.addEventListener("pageshow", restored);
+        return () => { alive = false; window.removeEventListener("pageshow", restored); };
+    }, [payment, paymentPollingV2, applyPaymentResult]);
+
     async function handlePayNow():
         Promise<void> {
 
         if (
-            !payment || cancelling
+            !payment || cancelling || refreshing || paymentLaunchRunning.current
         ) {
 
             return;
@@ -1377,55 +1339,29 @@ export default function PaymentPage() {
         }
 
 
-        /*
-         * If PhonePe was recovered from the backend after the
-         * browser lost localStorage, the PaymentResponse does
-         * not contain paymentUrl because that URL is not stored
-         * in the Payment entity.
-         *
-         * Do not attempt to create another payment.
-         * Keep checking the existing provider payment instead.
-         */
+        paymentLaunchRunning.current = true;
+        setOpeningPayment(true);
+        setError(null);
 
-        if (
-            payment.provider ===
-                "PHONEPE"
-            &&
-            !payment.paymentUrl
-        ) {
-
-            setError(
-                "Your existing PhonePe payment is being checked. Please wait for the provider status to update."
-            );
-
-
-            await refreshCurrentPayment();
-
-            return;
-        }
-
-
-        setOpeningPayment(
-            true
-        );
-        if (paymentPollingV2) {
-            markPaymentGatewayOpened(payment.orderNumber, payment.paymentId);
-            setGatewayOpened(true);
-        }
-
-
-        setError(
-            null
-        );
-
-
+        let gatewayInvoked = false;
         try {
-
-            const outcome =
-                await openPaymentCheckout(
-                    payment
-                );
-
+            const current = await refreshKnownPayment(payment, paymentPollingV2);
+            applyPaymentResult(current);
+            if (current.paymentStatus !== "PENDING") return;
+            if (current.paymentId !== payment.paymentId || current.provider !== payment.provider || current.amount !== payment.amount) {
+                setError("Payment details changed. Review them before continuing.");
+                return;
+            }
+            if (current.provider === "PHONEPE" && !current.paymentUrl) {
+                setError("Your existing PhonePe payment is being checked. Please check My Orders before paying again.");
+                return;
+            }
+            if (paymentPollingV2) {
+                markPaymentGatewayOpened(current.orderNumber, current.paymentId);
+                setGatewayOpened(true);
+            }
+            gatewayInvoked = true;
+            const outcome = await openPaymentCheckout(current);
 
             if (
                 outcome.kind ===
@@ -1464,7 +1400,7 @@ export default function PaymentPage() {
         } catch (
             exception
         ) {
-            if (paymentPollingV2) {
+            if (paymentPollingV2 && gatewayInvoked) {
                 clearPaymentGatewayVisit(payment.orderNumber);
                 setGatewayOpened(false);
             }
@@ -1482,7 +1418,7 @@ export default function PaymentPage() {
             );
 
         } finally {
-
+            paymentLaunchRunning.current = false;
             setOpeningPayment(
                 false
             );

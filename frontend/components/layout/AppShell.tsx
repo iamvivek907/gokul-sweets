@@ -35,6 +35,9 @@ import "./menu-premium.css";
 import "./customer-design.css";
 import "./menu-pickup.css";
 import MobileEdgeBack from "./MobileEdgeBack";
+import OrderingTour from "@/components/customer/OrderingTour";
+import {OPEN_ORDERING_TOUR} from "@/lib/orderingTour";
+import "./ordering-tour.css";
 
 
 interface AppShellProps {
@@ -55,6 +58,7 @@ export default function AppShell({
     const pathname = usePathname();
     const features = useStorefrontFeatures();
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
+    const tourAllowed = futuristic && !pathname.startsWith("/checkout") && !/^\/orders\/[^/]+/.test(pathname);
 
     return (
         <div
@@ -98,10 +102,11 @@ export default function AppShell({
             >
                 {futuristic && <CustomerBreadcrumbs />}
                 {futuristic && <InstallAppBanner compact />}
+                {tourAllowed && <OrderingTour key={pathname} pathname={pathname} />}
                 {children}
             </main>
 
-            <CustomerFooter />
+            <CustomerFooter onHowToOrder={tourAllowed ? () => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR)) : undefined} />
 
             {showSocialPopup && <SocialFollowPopup />}
             </BranchOperationalGuard>

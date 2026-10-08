@@ -152,14 +152,15 @@ async function openPhonePe(
      *
      * https://gokul-sweets-dev.vercel.app/payment/{orderNumber}
      */
-    window.location.assign(
+    // Remove this merchant Pay page from history before the provider return.
+    window.location.replace(
         payment.paymentUrl
     );
 
 
     /*
      * The current page will normally unload immediately
-     * after window.location.assign().
+     * after window.location.replace().
      *
      * This return value only satisfies CheckoutOutcome.
      *
