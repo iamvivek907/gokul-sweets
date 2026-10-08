@@ -21,6 +21,9 @@ export interface MenuProduct {
 
     available: boolean;
 
+    /** Live menu revision used to invalidate dated service-hour previews. */
+    availabilityRevision?: string;
+
     serviceAvailability?: {available: boolean; code: string; message: string | null; nextChangeAt: string | null; evaluatedAt?: string | null; receivedMonotonic?: number} | null;
 
     saleMode: ProductSaleMode;

@@ -44,7 +44,7 @@ async function readAvailability(branchId:number,signal:AbortSignal|undefined,att
     return stampMenuServiceAvailability(catalog.categories.map(category=>({...category,products:category.products.flatMap(product=>{
         const state=states.get(product.id);
         if(!state||!live.serviceWindowsEnabled&&!state.available)return [];
-        return [{...product,available:state.available,serviceAvailability:state.serviceAvailability?{...state.serviceAvailability,evaluatedAt:live.observedAt??state.serviceAvailability.evaluatedAt}:state.serviceAvailability}];
+        return [{...product,available:state.available,availabilityRevision:String(live.revision),serviceAvailability:state.serviceAvailability?{...state.serviceAvailability,evaluatedAt:live.observedAt??state.serviceAvailability.evaluatedAt}:state.serviceAvailability}];
     })})).filter(category=>category.products.length),receivedMonotonic);
 }
 

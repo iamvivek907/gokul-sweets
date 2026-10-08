@@ -5,12 +5,12 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const branch={id:1,code:'SERVICE',name:'Service branch',active:true,operational:true,address:'Test address',city:'Test city',openingTime:'08:00:00',closingTime:'22:00:00',pickupAvailable:true};
 const product={id:1,name:'Samosa',categoryId:1,categoryName:'Snacks',description:null,price:20,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null};
-try{for(const width of [390,1280]){
+try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
  // Device time is deliberately years wrong; service boundaries are server-relative.
  await page.clock.install({time:new Date('2030-01-01T00:00:00Z')});
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');},branch);
- let gateway=true,operational=true,opened=false,saved={enabled:false,revision:0,items:[]},failMenu=false;
+ let gateway=true,operational=true,saved={enabled:false,revision:0,items:[]},failMenu=false;
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  await context.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;
@@ -33,14 +33,15 @@ try{for(const width of [390,1280]){
   }else if(path==='/api/menu'){
    if(failMenu)return route.fulfill({status:503,headers,json:{message:'Temporary outage'}});
    const sold=saved.enabled&&saved.items.find(item=>item.branchProductId===101)?.soldOut;
-   json=[{id:1,name:'Snacks',description:null,displayOrder:1,products:[1,2].map(id=>({...product,id,name:id===1?'Samosa':'Chola samosa',available:opened&&!sold,serviceAvailability:{available:opened&&!sold,code:sold?'SOLD_OUT':opened?'AVAILABLE':'OUTSIDE_SERVICE',message:sold?'Sold out.':opened?null:'Available from 11:00 AM IST.',evaluatedAt:opened?'2026-10-05T05:30:00Z':'2026-10-05T05:29:40Z',nextChangeAt:opened?'2026-10-05T11:30:00Z':'2026-10-05T05:30:00Z'}}))}];
+   // Browsing at 4 AM may build a cart for an eligible later pickup.
+   json=[{id:1,name:'Snacks',description:null,displayOrder:1,products:[1,2].map(id=>({...product,id,name:id===1?'Samosa':'Chola samosa',available:!sold,serviceAvailability:{available:!sold,code:sold?'SOLD_OUT':'AVAILABLE',message:sold?'Sold out.':null,evaluatedAt:'2026-10-04T22:30:00Z',nextChangeAt:null}}))}];
   }else if(path==='/api/branches/1/discovery')json={overallExperience:{average:4.5,count:2},offerings:[],topRatedItems:[]};
   return route.fulfill({headers,json});
  });
  await page.goto(`${base}/menu`);const samosa=page.locator('.gokul-product-card').filter({has:page.getByRole('heading',{name:'Samosa',exact:true})});
- await samosa.getByText('Available from 11:00 AM IST.',{exact:true}).waitFor();assert.equal(await samosa.getByRole('button',{name:/^Add .* to cart$/}).isDisabled(),true);
- opened=true;await page.clock.fastForward(21000);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('.gokul-product-card button')].some(button=>button.getAttribute('aria-label')==='Add Samosa to cart'&&!button.disabled));
- assert.equal(await samosa.getByRole('button',{name:/^Add .* to cart$/}).isEnabled(),true);
+ await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();
+ assert.equal(await samosa.getByRole('button',{name:/^Add .* to cart$/}).isEnabled(),true,'advance pickup browsing is allowed before service opens');
+ assert.equal(await samosa.getByText('Available later',{exact:true}).count(),0);
  await page.goto(`${base}/admin/menu/service-hours`);await page.getByRole('heading',{name:'Menu service hours'}).waitFor();const help=page.getByRole('button',{name:'Help for Samosa sold out',exact:true});await help.click();
  const helpDialog=page.getByRole('dialog',{name:'Samosa sold out',exact:true});await helpDialog.waitFor();await helpDialog.getByText('What to enter or do',{exact:true}).waitFor();
  assert.equal(await page.getByRole('checkbox',{name:'Sold out until cleared'}).first().isChecked(),false,'help does not toggle the setting');
@@ -67,8 +68,8 @@ try{for(const width of [390,1280]){
  operational=true;await page.goto(`${base}/menu`);await page.getByText('स्टॉक खत्म',{exact:true}).first().waitFor();
  await page.evaluate(()=>localStorage.setItem('gokul-language','en'));
  operational=true;saved={...saved,enabled:false};await page.goto(`${base}/branches`);await closedCard.getByText(width<=640?'Collect your order here':'Order for pickup',{exact:true}).waitFor();await page.goto(`${base}/menu`);await samosa.getByRole('button',{name:/^Add .* to cart$/}).waitFor();assert.equal(await page.getByRole('heading',{name:'Currently not operational',exact:true}).count(),0);
- // Closing boundary + failed refresh disables stale Add controls while retaining the cart.
- await samosa.getByRole('button',{name:/^Add .* to cart$/}).click();failMenu=true;await page.clock.fastForward(6*3600000+1000);await samosa.getByText('Checking current availability…',{exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:/^Add .* to cart$/}).last().isDisabled(),true);
+ // An advisory menu refresh failure must retain the cart for final pickup checks.
+ await samosa.getByRole('button',{name:/^Add .* to cart$/}).click();failMenu=true;await page.clock.fastForward(31000);
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),1);
- assert.deepEqual(errors,[]);await context.close();console.log(`Menu service hours, saved dependencies, closed branch and boundary outage ${width}px passed`);
+ assert.deepEqual(errors,[]);await context.close();console.log(`Menu service hours, saved dependencies, advance browsing, closed branch and refresh outage ${width}px passed`);
 }}finally{await browser.close();}

@@ -16,10 +16,10 @@ function setup(catalogDelay=0){
  return {api:exports,calls,change:value=>{revision=value;},sold:()=>{available=false;},disable:()=>{enabled=false;}};
 }
 test('repeat visits refresh live stock but reuse the versioned catalog',async()=>{
- const f=setup();const first=await f.api.getMenu(1);assert.equal(first[0].products[0].price,400);
+ const f=setup();const first=await f.api.getMenu(1);assert.equal(first[0].products[0].price,400);assert.equal(first[0].products[0].availabilityRevision,"1");
  assert.equal(f.calls.length,2);assert.match(f.calls[1].path,/catalog\/1\/1$/);assert.equal(f.calls[1].options.cacheMode,'default');
  f.sold();const next=await f.api.getMenu(1);assert.equal(next[0].products[0].available,false);assert.equal(f.calls.length,3);
- f.change(2);const changed=await f.api.refreshMenuAvailability(1);assert.equal(changed[0].products[0].price,800);assert.equal(f.calls.length,5);
+ f.change(2);const changed=await f.api.refreshMenuAvailability(1);assert.equal(changed[0].products[0].price,800);assert.equal(changed[0].products[0].availabilityRevision,"2");assert.equal(f.calls.length,5);
  assert.equal(first[0].products[0].price,400,'older immutable display data is unchanged');
 });
 test('flag-off menus retain legacy exclusion of unavailable products',async()=>{

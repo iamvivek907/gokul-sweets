@@ -35,10 +35,12 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))];
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
-    const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability,menuPreview]);
+    // Service-rule edits change the live menu revision even when all SKUs remain browsable.
+    const menuRevision = products?.[0]?.availabilityRevision ?? null;
+    const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability,menuPreview,menuRevision]);
     // Retain the last preview while quantities refresh, but never across branch,
     // date, slot, or catalogue changes. Checkout still checks the exact cart.
-    const scope = JSON.stringify([branch?.id,intent.date,intent.selection?.slot.id,intent.selection?.pickupType,features?.smartAvailability,menuPreview,candidates]);
+    const scope = JSON.stringify([branch?.id,intent.date,intent.selection?.slot.id,intent.selection?.pickupType,features?.smartAvailability,menuPreview,candidates,menuRevision]);
     const validDate = intent.date && features && validPickupDate(intent.date,today,features.futureOrderingDays);
     useEffect(() => {
         if (!features?.smartAvailability || !branch || !intent.date || !validDate || !JSON.parse(itemsJson).length) return;

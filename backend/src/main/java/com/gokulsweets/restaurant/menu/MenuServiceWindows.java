@@ -78,20 +78,45 @@ public class MenuServiceWindows {
         return readSettings(branchId);
     }
     public Snapshot snapshot(long branchId) {
+        return pickupEvaluator(branchId).apply(LocalDateTime.ofInstant(inventoryClock.instant(),ZoneId.of("Asia/Kolkata")));
+    }
+    /** No pickup selected: retain manual/sold-out rules without blocking advance browsing. */
+    public Snapshot pickupSnapshot(long branchId, LocalDateTime pickupAt) {
+        return pickupEvaluator(branchId).apply(pickupAt);
+    }
+    public Snapshot pickupSnapshot(long branchId, LocalDateTime pickupAt, Set<Long> productIds) {
+        return pickupEvaluator(branchId,productIds).apply(pickupAt);
+    }
+    /** Read rules once for an entire calendar; each slot uses its own server-owned IST timestamp. */
+    public java.util.function.Function<LocalDateTime, Snapshot> pickupEvaluator(long branchId) {
+        return pickupEvaluator(branchId,null);
+    }
+    /** Evaluate only requested SKUs; dependencies may still reference any item in the branch. */
+    public java.util.function.Function<LocalDateTime, Snapshot> pickupEvaluator(long branchId, Set<Long> productIds) {
         if(TransactionSynchronizationManager.isActualTransactionActive() && !TransactionSynchronizationManager.isCurrentTransactionReadOnly())
             jdbc.queryForObject("SELECT id FROM branches WHERE id=? FOR SHARE",Long.class,branchId);
         Boolean operational=jdbc.queryForObject("SELECT operational FROM branches WHERE id=?",Boolean.class,branchId);
         if(!Boolean.TRUE.equals(operational))throw new IllegalArgumentException("This branch is currently not operational.");
         var settings=readSettings(branchId,false);
-        if(!settings.enabled())return new Snapshot(false,Map.of());
+        if(!settings.enabled())return ignored -> new Snapshot(false,Map.of());
         var states=jdbc.query("SELECT b.id,b.product_id,b.available AND p.active AND c.active available,p.name FROM branch_products b JOIN products p ON p.id=b.product_id JOIN categories c ON c.id=p.category_id WHERE b.branch_id=?",
                 (r,n)->Map.entry(r.getLong("product_id"),new ProductState(r.getLong("id"),r.getBoolean("available"),r.getString("name"))),branchId);
         var products=new HashMap<Long,ProductState>();states.forEach(e->products.put(e.getKey(),e.getValue()));
         var byBranchProduct=new HashMap<Long,ProductState>();products.values().forEach(p->byBranchProduct.put(p.id(),p));
         var rules=new HashMap<Long,Item>();settings.items().forEach(i->rules.put(i.branchProductId(),i));
-        var statuses=new HashMap<Long,Status>();var now=ZonedDateTime.now(inventoryClock).withZoneSameInstant(ZoneId.of("Asia/Kolkata"));
-        products.forEach((id,p)->{var state=evaluate(p.id(),byBranchProduct,rules,now,new HashSet<>());statuses.put(id,new Status(state.available(),state.code(),state.message(),state.nextChangeAt(),now.toInstant()));});
-        return new Snapshot(true,statuses);
+        var requestedIds=productIds==null?Set.copyOf(products.keySet()):Set.copyOf(productIds);
+        return pickupAt -> {
+            var statuses=new HashMap<Long,Status>();
+            var at=pickupAt==null?null:pickupAt.atZone(ZoneId.of("Asia/Kolkata"));
+            var observedAt=inventoryClock.instant();
+            requestedIds.forEach(id->{
+                var p=products.get(id);
+                var state=p==null?new Status(false,"DEPENDENCY_UNAVAILABLE","Required item is unavailable.",null)
+                        :evaluate(p.id(),byBranchProduct,rules,at,new HashSet<>());
+                statuses.put(id,new Status(state.available(),state.code(),state.message(),state.nextChangeAt(),observedAt));
+            });
+            return new Snapshot(true,Map.copyOf(statuses));
+        };
     }
     private Status evaluate(long id,Map<Long,ProductState> products,Map<Long,Item> rules,ZonedDateTime now,Set<Long> visited) {
         var product=products.get(id);var rule=rules.get(id);
@@ -99,13 +124,13 @@ public class MenuServiceWindows {
         if(!product.available() || rule!=null&&rule.soldOut())return new Status(false,"SOLD_OUT",product.name()+" is sold out.",null);
         Instant next=null;
         if(rule!=null) {
-            var window=new ServiceWindow(rule.startsAt(),rule.endsAt(),rule.weekdays());next=window.nextChange(now);
+            var window=new ServiceWindow(rule.startsAt(),rule.endsAt(),rule.weekdays());next=now==null?null:window.nextChange(now);
             Status dependency=rule.requiresBranchProductId()==null?null:evaluate(rule.requiresBranchProductId(),products,rules,now,visited);
             if(dependency!=null && dependency.code().equals("SOLD_OUT"))
                 return new Status(false,"SOLD_OUT",product.name()+" is unavailable: "+dependency.message(),null);
-            if(!window.contains(now)) {
+            if(now!=null && !window.contains(now)) {
                 String time=next==null?"later":DateTimeFormatter.ofPattern("EEE, h:mm a",Locale.ENGLISH).format(next.atZone(now.getZone()))+" IST";
-                return new Status(false,"OUTSIDE_SERVICE",product.name()+" is available from "+time+".",next);
+                return new Status(false,"OUTSIDE_SERVICE",product.name()+" is unavailable for this pickup time. Choose pickup from "+time+".",next);
             }
             if(dependency!=null) {
                 if(!dependency.available())return new Status(false,dependency.code().equals("SOLD_OUT")?"SOLD_OUT":"DEPENDENCY_UNAVAILABLE",product.name()+" is unavailable: "+dependency.message(),dependency.nextChangeAt());
