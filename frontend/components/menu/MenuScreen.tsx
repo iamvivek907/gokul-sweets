@@ -1320,9 +1320,7 @@ export default function MenuScreen() {
 
                 </div>
 
-                {phoneMenu&&<div className={mobileFeatures?.smartAvailability?"mobile-menu-legacy-pickup":""}><PickupContext check={pickupCheck} /></div>}
 
-                {phoneMenu&&pickupCheck.error&&<aside className="menu-date-error" role="alert"><p>{pickupCheck.error}</p><button type="button" onClick={pickupCheck.retry}><T text="Retry availability"/></button></aside>}
                 {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
 
                 <div

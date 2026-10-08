@@ -40,7 +40,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const itemsJson = JSON.stringify(requested);
     // A fresh, empty menu visit may default today; retained dates/carts require customer action.
     // At a new IST day an empty cart can start again; a same-day expired slot is never moved.
-    const mayDefault = menuPreview && !intent.date && cart.isEmpty && (!intent.expired || !!intent.previousDate && intent.previousDate < today);
+    const mayDefault = menuPreview && !!features?.smartAvailability && Number.isInteger(features.futureOrderingDays) && !intent.date && cart.isEmpty && (!intent.expired || !!intent.previousDate && intent.previousDate < today);
     const requestDate = intent.date ?? (mayDefault ? today : null);
     // Service-rule edits change the live menu revision even when all SKUs remain browsable.
     const menuRevision = products?.[0]?.availabilityRevision ?? null;
@@ -48,7 +48,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     // Retain the last preview while quantities refresh, but never across branch,
     // date, slot, or catalogue changes. Checkout still checks the exact cart.
     const scope = JSON.stringify([branch?.id,intent.date,intent.selection?.slot.id,intent.selection?.pickupType,features?.smartAvailability,menuPreview,candidates,menuRevision]);
-    const validDate = requestDate && features && validPickupDate(requestDate,today,features.futureOrderingDays);
+    const validDate = requestDate && features?.smartAvailability && Number.isInteger(features.futureOrderingDays) && validPickupDate(requestDate,today,features.futureOrderingDays);
     useEffect(() => {
         if (!features?.smartAvailability || !branch || !requestDate || !validDate || !JSON.parse(itemsJson).length) return;
         const branchBefore = getStoredBranchSnapshot(), pickupBefore = getPickupSlotSnapshot(), cartBefore = getCartSnapshot();
@@ -92,7 +92,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const selectedSlot = day?.slots.find(value => value.slot.id === intent.selection?.slot.id);
     // Menu previews include unchosen products; only the actual cart can invalidate its saved pickup.
     const cartIds = new Set(cart.branchId === branch?.id ? cart.items.map(item => item.product.id) : []);
-    const selectionUnavailable = !!intent.selection && !!day && cartIds.size > 0 && (!selectedSlot
+    const selectionUnavailable = !!intent.selection && !!day && (!selectedSlot
         || selectedSlot.code === "PICKUP_WINDOW"
         || (intent.selection.pickupType === "PRIORITY"
             ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0
@@ -102,7 +102,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
         || (intent.selection.pickupType === "PRIORITY" ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0 : selectedSlot.slot.remainingCapacity <= 0));
     const items = day?.items?.map(item => slotUnavailable ? {...item, available: false, code: selectedSlot?.code ?? "NO_SLOTS", reason: selectedSlot?.reason ?? "Choose another pickup time."}
         : selectedSlot?.issues?.find(issue => issue.productId === item.productId) ?? item);
-    const noPickupMessage = menuPreview && !intent.selection && data && mayDefault && !earliestNormalMenuPickup(data,candidates.map(item=>item.productId),today) ? noDefaultPickupMessage(data,today) : null;
+    const noPickupMessage = menuPreview && !intent.selection && data && requestDate === today && !earliestNormalMenuPickup(data,candidates.map(item=>item.productId),today) ? noDefaultPickupMessage(data,today) : null;
     const pickupRequired = menuPreview && !!features?.smartAvailability && !intent.selection;
     return {features, today, branch, intent, data, items, selectionUnavailable, error: result?.key === key ? result.error : null,
         noPickupMessage, pickupRequired, hasItems: requested.length > 0, retry: () => setRevision(value => value + 1)};

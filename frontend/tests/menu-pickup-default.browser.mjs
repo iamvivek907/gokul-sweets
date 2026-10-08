@@ -53,13 +53,22 @@ try {for(const width of [320,390,640,1280]) {
  const first=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));assert.equal(first.slot.id,8);assert.equal(first.date,today);assert.equal(first.pickupType,'NORMAL');
  await mkdir(screenshots,{recursive:true});await page.screenshot({path:`${screenshots}/pickup-breakfast-${width}.png`,fullPage:true});
  await page.reload();await pickup.getByText(/Today · 8:00/).waitFor();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))),first);
- // Explicitly choose lunch; no cart/date changes before confirmation.
+ // A mixed breakfast/lunch cart cannot silently move its pickup or discard its items.
+ await breakfastSection.getByRole('button',{name:'Add Aloo Paratha to cart'}).click();
  await pickup.getByRole('button',{name:'Change time',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Choose pickup date & time'});
+ await dialog.getByRole('button',{name:/11:00–11:30/}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();
+ await dialog.getByRole('alert').filter({hasText:'Aloo Paratha'}).waitFor();
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).slot.id),8);
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);
+ await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
+ await breakfastSection.getByRole('button',{name:'Remove one Aloo Paratha',exact:true}).click();
+ // Explicitly choose lunch after resolving the incompatible cart.
+ await pickup.getByRole('button',{name:'Change time',exact:true}).click();
  await dialog.getByRole('button',{name:/11:00–11:30/}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.waitFor({state:'hidden'});
  await pickup.getByText(/Today · 11:00/).waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Veg Chowmein to cart"]')?.disabled);
  assert.equal(await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).isDisabled(),true);
  // All eligible restores the current category presentation without extra availability sections.
- mode='all';revision='2';await page.clock.fastForward(31000);await breakfastSection.waitFor({state:'hidden'});await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).waitFor();
+ mode='all';revision='2';await page.clock.fastForward(31000);await breakfastSection.waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
  assert.equal(await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).isEnabled(),true);
  // Capacity refresh blocks Add but never moves the retained pickup.
  mode='full';revision='3';await page.clock.fastForward(61000);await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Veg Chowmein to cart"]')?.disabled===true);
@@ -82,6 +91,11 @@ try {for(const width of [320,390,640,1280]) {
   },{yesterday,breakfast,product:products[1],retain});await load();
   if(!retain)await pickup.getByText(/Today · 8:00/).waitFor();else {await pickup.getByText(/Your previous pickup has passed/).waitFor();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),yesterday);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);}
  }
+ // An uncertain checkout attempt prevents automatic pickup replacement even with an empty cart.
+ await page.evaluate(()=>{localStorage.removeItem('gokul-cart');localStorage.removeItem('gokul-pickup-intent');localStorage.removeItem('gokul-selected-pickup-slot');sessionStorage.setItem('gokul-mobile-order-attempt','pending');});
+ const beforeAttempt=checks;await load();await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===true);
+ await page.waitForTimeout(800);assert.ok(checks>beforeAttempt);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
+ assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-mobile-order-attempt')),'pending');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
  await context.close();console.log(`Pickup-aware default, All view, service grouping, refresh, closing, priority, outage and midnight recovery ${width}px passed (${checks} checks)`);
 }}finally{await browser.close();}
