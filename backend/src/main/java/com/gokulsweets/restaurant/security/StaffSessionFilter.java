@@ -40,7 +40,8 @@ public class StaffSessionFilter extends OncePerRequestFilter {
         }
         String path = request.getRequestURI();
         if (path.equals("/api/admin/auth/login") || path.equals("/api/admin/auth/mfa/setup")
-                || path.equals("/api/admin/auth/mfa/confirm")) {
+                || path.equals("/api/admin/auth/mfa/confirm") || path.equals("/api/admin/auth/owner-setup")
+                || path.equals("/api/admin/auth/owner-recovery")) {
             chain.doFilter(request, response); return;
         }
         var verified = sessions.verify(StaffSessionService.cookie(request));

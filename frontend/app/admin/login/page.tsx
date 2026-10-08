@@ -1,3 +1,4 @@
+import Link from "next/link";
 import AdminLoginForm
     from "@/components/admin/AdminLoginForm";
 
@@ -76,6 +77,10 @@ export default function AdminLoginPage() {
 
 
                 <AdminLoginForm />
+                <div className="mt-5 flex flex-wrap gap-4 text-sm">
+                    <Link href="/admin/recover" className="underline">Recover owner account</Link>
+                    <Link href="/admin/setup" className="underline">First owner setup</Link>
+                </div>
 
             </section>
 
