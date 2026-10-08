@@ -5,7 +5,8 @@ import LinkFeedback from "@/components/common/LinkFeedback";
 
 import Image from "next/image";
 import Link from "next/link";
-import {useEffect, useState} from "react";
+import {usePathname} from "next/navigation";
+import {useEffect, useState, type MouseEvent} from "react";
 import BranchSelector from "@/components/branch/BranchSelector";
 import CampaignMedia from "@/components/menu/CampaignMedia";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
@@ -21,6 +22,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
     campaignsEnabled: boolean; accessible: boolean; branchExperience?: boolean; occasionEnquiries?: boolean;
 }) {
     const translate = useTranslation();
+    const pathname = usePathname();
     const phone=usePhoneViewport();
 
     const {branch} = useSelectedBranch();
@@ -82,6 +84,14 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
     const hero = visibleCampaigns(campaigns, now, branch?.id ?? -1)
         .find(value => value.type === "HERO" && !failed.includes(value.id));
 
+    function orderFood(event: MouseEvent<HTMLAnchorElement>) {
+        if (pathname !== "/branches" || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        const target = document.getElementById("gokul-branches");
+        if (!target) return;
+        event.preventDefault();
+        target.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
+    }
+
     return <div className={`gokul-arrival ${styles.arrival}`}>
         <section className={styles.hero} aria-labelledby="gokul-arrival-title">
             {hero && <div className={styles.media}><CampaignMedia
@@ -95,7 +105,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                     <a href="#gokul-arrival-title" aria-current="page"><T text="Home" /></a>
                     <Link href="/about"><T text="Our story" /><LinkFeedback /></Link>
                     <a href="#gokul-branches"><T text="Our branches" /></a>
-                    <Link href="/branches" className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
+                    <Link href="/branches" onClick={orderFood} className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
                 </nav>
                 <LanguagePicker />
             </div>
@@ -104,7 +114,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <h1 id="gokul-arrival-title"><T text="A little joy" /><br /><T text="in every visit." /></h1>
                 <span><T text="Fresh sweets, snacks and meals for the moments you share. Order ahead and collect at your chosen branch." /></span>
                 <div className={styles.actions}>
-                    <Link href="/branches" className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
+                    <Link href="/branches" onClick={orderFood} className={styles.orderFood}><T text="Order food" /><LinkFeedback /></Link>
                     <Link href={occasionEnquiries ? "/occasions/branches" : "/branches"}><T text="Plan an occasion" /><LinkFeedback /></Link>
                 </div>
             </div>
