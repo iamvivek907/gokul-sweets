@@ -38,5 +38,5 @@ export function usePickupIntent(branchId?: number | null) {
     if (date && now && date < indiaToday(new Date(now))) date=null;
     const automatic = preferenceMatches && (isSoonestPickup(modeRaw,branchId,pickupRaw,!!previousDate)
         || canRecoverIncompleteMenuPickup(modeRaw,branchId,pickupRaw));
-    return {date, expired, previousDate, pickupRaw, modeRaw, automatic, selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
+    return {date, dateRaw: raw, expired, previousDate, pickupRaw, modeRaw, automatic, selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
 }

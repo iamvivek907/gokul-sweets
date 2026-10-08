@@ -54,6 +54,7 @@ test('pickup intent activates recovery for retained today, future and past dates
   map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date}));
   if(fixed)mode.setMenuPickupMode(1,false,'');else map.delete('gokul-menu-pickup-mode:v1');
   const intent=hook.usePickupIntent(1);assert.equal(intent.selection,null);assert.equal(intent.automatic,true);
+  assert.equal(intent.dateRaw,JSON.stringify({branchId:1,date}),'expose the exact snapshot even when an expired date normalizes to null');
  }
  const saved=JSON.stringify({date:tomorrow,slot:slot(tomorrow,8).slot,pickupType:'NORMAL'});
  map.set('gokul-selected-pickup-slot',saved);map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date:tomorrow}));mode.setMenuPickupMode(1,false,saved);
