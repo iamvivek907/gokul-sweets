@@ -65,4 +65,13 @@ class StaffSessionFilterTest {
         var response = new MockHttpServletResponse();filter.doFilter(account, response, chain);
         assertEquals(401, response.getStatus());verify(sessions).verify(null);
     }
+    @Test void existingLoginAndProtectedMutationsRejectMissingOriginWithoutServerError() throws Exception {
+        flags.setSecureStaffSessions(true);
+        for (String path : java.util.List.of("/api/admin/auth/login", "/api/admin/orders/123/status")) {
+            var response = new MockHttpServletResponse();
+            filter.doFilter(new MockHttpServletRequest("POST", path), response, chain);
+            assertEquals(403, response.getStatus());
+        }
+        verifyNoInteractions(chain, sessions);
+    }
 }
