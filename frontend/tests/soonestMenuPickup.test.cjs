@@ -35,7 +35,7 @@ function storage(){const map=new Map(),events=[];const localStorage={getItem:key
  const window={localStorage,dispatchEvent:event=>events.push(event.type)};
  const mode=load('lib/menuPickupMode.ts',()=>{},{localStorage,window,Event});
  const cart=load('lib/cartStorage.ts',()=>mode,{localStorage,window,Event});
- return {map,mode,cart};}
+ return {map,mode,cart,localStorage,window};}
 test('legacy/date-only/manual/malformed preferences stay fixed; a new empty menu can automate',()=>{
  const {mode}=storage();assert.equal(mode.isSoonestPickup('',1,'',false),true);
  for(const [raw,pickup,preference] of [['','saved',true],['','',true],['broken','',false],[JSON.stringify({branchId:1,mode:'fixed',pickup:''}),'',false]]) assert.equal(mode.isSoonestPickup(raw,1,pickup,preference),false);
@@ -53,4 +53,34 @@ test('first addition fixes pickup; reductions and clearing cart never reactivate
 });
 test('an empty new branch is not blocked by another branch’s mode',()=>{
  const {mode}=storage();mode.setMenuPickupMode(1,false,'old');assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),2,'',false),true);
+});
+
+test('completed paid pickup releases automatic mode for the next order, without erasing a later choice',()=>{
+ const {mode,map}=storage();const pickup=JSON.stringify({date:today,slot:{branchId:1,id:8}});
+ map.set('gokul-selected-pickup-slot',pickup);map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));mode.setMenuPickupMode(1,false,pickup);
+ assert.equal(mode.releaseCompletedMenuPickup(1,8,pickup),true);map.delete('gokul-selected-pickup-slot');
+ assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),1,'',false),true);
+ map.set('gokul-selected-pickup-slot',pickup);map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date:tomorrow}));mode.setMenuPickupMode(1,false,pickup);
+ assert.equal(mode.releaseCompletedMenuPickup(1,8,pickup),false);assert.equal(JSON.parse(map.get('gokul-pickup-intent')).date,tomorrow);
+ assert.equal(mode.releaseCompletedMenuPickup(1,9,pickup),false);
+});
+
+for(const changed of [false,true])test(`paid cleanup ${changed?'preserves a newer cart and its fixed choice':'starts a fresh soonest ordering session'}`,()=>{
+ const {mode,map,cart,localStorage,window}=storage();
+ const items=[{product:{id:1,saleMode:'UNIT',categoryName:'Breakfast'},quantity:1}];
+ const pickup=JSON.stringify({date:today,slot:{branchId:1,id:8}});
+ map.set('gokul-selected-pickup-slot',pickup);map.set('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));
+ cart.saveCart({branchId:1,items:changed?[{...items[0],quantity:2}]:items});
+ const fingerprint=items=>JSON.stringify(items.map(item=>({id:item.product.id,quantity:item.quantity})));
+ const pending={orderNumber:'paid-1',branchId:1,pickupSlotId:8,cartFingerprint:fingerprint(items)};
+ const recovery=load('lib/paidCartRecovery.ts',path=>{
+  if(path.includes('menuPickupMode'))return mode;
+  if(path.includes('cartFingerprint'))return {createCartFingerprint:fingerprint};
+  if(path.includes('cartStorage'))return cart;
+  if(path.includes('pendingOrder'))return {getPendingOrderSnapshot:()=>JSON.stringify(pending),parsePendingOrder:JSON.parse,clearPendingOrder:()=>{}};
+  return {getPendingPaymentSnapshot:()=>'',parsePendingPayment:()=>null,clearPendingPayment:()=>{}};
+ },{localStorage,window,Event});
+ assert.equal(recovery.reconcilePaidCart('paid-1'),!changed);
+ if(changed){assert.equal(cart.parseCart(cart.getCartSnapshot()).items[0].quantity,2);assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),1,pickup,true),false);}
+ else {assert.equal(cart.parseCart(cart.getCartSnapshot()).items.length,0);assert.equal(mode.isSoonestPickup(mode.getMenuPickupModeSnapshot(),1,'',false),true);}
 });

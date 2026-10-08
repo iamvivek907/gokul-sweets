@@ -1,3 +1,4 @@
+import {releaseCompletedMenuPickup} from "@/lib/menuPickupMode";
 import {createCartFingerprint} from "@/lib/cartFingerprint";
 import {clearStoredCart, getCartSnapshot, parseCart} from "@/lib/cartStorage";
 import {clearPendingOrder, getPendingOrderSnapshot, parsePendingOrder} from "@/lib/pendingOrderStorage";
@@ -19,6 +20,7 @@ export function reconcilePaidCart(orderNumber: string): boolean {
         createCartFingerprint(cart.items) === fingerprint;
 
     if (sameCart) {
+        if (matchingOrder) releaseCompletedMenuPickup(matchingOrder.branchId,matchingOrder.pickupSlotId,window.localStorage.getItem("gokul-selected-pickup-slot") ?? "");
         clearStoredCart();
         window.localStorage.removeItem("gokul-selected-pickup-slot");
         window.localStorage.removeItem("gokul-customer-details");

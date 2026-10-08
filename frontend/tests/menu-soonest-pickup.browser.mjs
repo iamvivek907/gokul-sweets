@@ -34,7 +34,7 @@ try{for(const width of [320,390,1280]){
   }
   await route.fulfill({headers,json});
  });
- await context.addInitScript(branch=>{if(!localStorage.getItem('gokul-selected-branch'))localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','dismissed');},branch);
+ await context.addInitScript(branch=>{if(!localStorage.getItem('gokul-selected-branch'))localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','seen');},branch);
  const pickup=page.getByRole('region',{name:'Menu pickup time'}),add=page.getByRole('button',{name:'Add Aloo Paratha to cart'});
  const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));
  await page.goto(`${base}/menu`);await pickup.getByText(/Tomorrow, .*8:00/).waitFor();await add.waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled);
