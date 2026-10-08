@@ -21,9 +21,15 @@ export default function MobilePortionCard({group,products,quantities,onAdd,onInc
  const unavailableForPickup=catalogueAvailable&&availableSizes===0;
  const status=!catalogueAvailable?"Currently unavailable":unavailableForPickup?pickupChecking?"Choose pickup to add":"Unavailable for selected pickup":`${availableSizes} ${availableSizes===1?"size":"sizes"} available`;
  const portion=labels.every(label=>/half|full|portion|हाफ|फुल/i.test(label));
+ const serviceNotes=dateAware&&!pickupChecking?products.flatMap(p=>{
+  const item=pickupItems?.find(i=>i.productId===p.id);
+  return p.available&&item?.available===false&&(item.code==="OUTSIDE_SERVICE"||item.code==="DEPENDENCY_UNAVAILABLE")&&item.reason
+   ? [{id:p.id,label:group.choices.find(c=>c.productId===p.id)?.label??p.name,reason:item.reason}] : [];
+ }):[];
  return <div className="mobile-portion-card">
   <ProductCard refined premium priceFrom product={{...product,name:group.title,price:minimum,available:catalogueAvailable,description:availableSizes===0?status:portion?product.description:status}} unavailableForPickup={unavailableForPickup} pickupMessage={pickupChecking?"Choose pickup to add":undefined} quantity={0} weightGrams={null} ratingSummary={ratings[product.id]??null} ratingLoading={loading} purchaseControl={<button type="button" className="product-card-controls menu-group-control" onClick={()=>setOpen(true)} disabled={availableSizes===0&&count===0} aria-label={`Choose options for ${group.title}`}><T text={count>0?"Manage":availableSizes===0?status:portion?"Add":"Choose size"}/>{count>0&&<span> · {count}</span>}</button>} onAdd={()=>setOpen(true)} onIncrease={onIncrease} onDecrease={onDecrease}/>
   <div className="menu-group-caption"><span>{count>0?`${count} · ${money(total)}`:<><T text="From"/> {money(minimum)}</>}</span><button type="button" disabled={availableSizes===0&&count===0} onClick={()=>setOpen(true)}><T text={count>0?"Manage sizes":availableSizes===0?status:portion?labels.join(" / "):status}/><span aria-hidden="true"> ›</span></button></div>
+  {serviceNotes.map(note=><p key={note.id} role="status" className="menu-availability-note"><strong>{note.label}:</strong>{" "}<T text={note.reason}/></p>)}
   {open&&<MenuVariantPicker group={group} products={products} quantities={quantities} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} onClose={()=>setOpen(false)}/>}
  </div>;
 }

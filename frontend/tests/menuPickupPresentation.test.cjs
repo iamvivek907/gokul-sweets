@@ -28,3 +28,19 @@ test('available items lead, manual unavailable stays blocked, and mixed-size gro
  assert.deepEqual(Array.from(result.other,p=>p.id),[1]);
  assert.equal(result.available.find(p=>p.id===4).available,false,'the grouped unavailable size remains disabled');
 });
+test('search and price filters classify a group against the same full catalogue rendered in its picker',()=>{
+ const catalog=[{id:1,name:'Half Paratha',price:50,available:true},{id:2,name:'Full Paratha',price:90,available:true}];
+ const groups=[{key:'paratha',choices:[{productId:1},{productId:2}]}];
+ const items=[{productId:1,available:false},{productId:2,available:true}];
+ for(const filtered of [catalog.filter(p=>p.name.includes('Half')),catalog.filter(p=>p.price<=50)]){
+  const result=partitionPickupProducts(filtered,items,groups,catalog);
+  assert.deepEqual(Array.from(result.available,p=>p.id),[1]);
+  assert.equal(result.other.length,0);
+ }
+ // Hidden, removed or manually unavailable siblings cannot make a group eligible.
+ for(const live of [[catalog[0]],[catalog[0],{...catalog[1],available:false}]]){
+  const result=partitionPickupProducts([catalog[0]],items,groups,live);
+  assert.equal(result.available.length,0);
+  assert.deepEqual(Array.from(result.other,p=>p.id),[1]);
+ }
+});

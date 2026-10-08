@@ -789,7 +789,7 @@ export default function MenuScreen() {
     const pickupCheck = useDateAvailability(allProducts);
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || !pickupCheck.items || !!pickupCheck.error);
     const pickupPartition = pickupCheck.intent.selection && pickupCheck.items && !pickupCheck.error
-        ? partitionPickupProducts(filteredProducts,pickupCheck.items,phoneMenu?portionGroups:[]) : null;
+        ? partitionPickupProducts(filteredProducts,pickupCheck.items,phoneMenu?portionGroups:[],allProducts) : null;
     const splitPickup = !!pickupPartition && pickupPartition.other.length > 0;
     const pickupTimeLabel = pickupCheck.intent.selection ? new Intl.DateTimeFormat("en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"})
         .format(new Date(`${pickupCheck.intent.selection.date}T${pickupCheck.intent.selection.slot.startTime}+05:30`)) : "";

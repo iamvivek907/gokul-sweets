@@ -10,10 +10,10 @@ export function earliestNormalMenuPickup(data: CartAvailability, ids: number[], 
 }
 
 /** Keep size groups together; each size still retains its own eligibility in the picker. */
-export function partitionPickupProducts(products: MenuProduct[], items: ItemAvailability[], groups: PortionGroup[] = []) {
+export function partitionPickupProducts(products: MenuProduct[], items: ItemAvailability[], groups: PortionGroup[] = [], catalog: MenuProduct[] = products) {
     const eligible = new Set(items.filter(item => item.available).map(item => item.productId));
     const availableGroupIds = new Set(groups.filter(group => group.choices.some(choice =>
-        products.some(product => product.id === choice.productId && product.available && eligible.has(product.id))))
+        catalog.some(product => product.id === choice.productId && product.available && eligible.has(product.id))))
         .flatMap(group => group.choices.map(choice => choice.productId)));
     const fits = (product: MenuProduct) => product.available && eligible.has(product.id) || availableGroupIds.has(product.id);
     return {available: products.filter(fits), other: products.filter(product => !fits(product))};
