@@ -130,8 +130,11 @@ public class SecurityConfig {
 
                         // Credential verification and MFA enrollment precede staff session creation.
                         .requestMatchers(HttpMethod.POST, "/api/admin/auth/login",
-                                "/api/admin/auth/mfa/setup", "/api/admin/auth/mfa/confirm")
+                                "/api/admin/auth/mfa/setup", "/api/admin/auth/mfa/confirm",
+                                "/api/admin/auth/owner-setup", "/api/admin/auth/owner-recovery")
                         .permitAll()
+
+                        .requestMatchers(HttpMethod.GET, "/api/admin/auth/owner-setup").permitAll()
 
                         // Admin APIs require authentication
                         .requestMatchers("/api/admin/**")

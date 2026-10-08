@@ -35,12 +35,14 @@ public class StaffSessionFilter extends OncePerRequestFilter {
         }
         if (request.getHeader("Authorization") != null) {response.sendError(401); return;}
         boolean changing = !Set.of("GET", "HEAD", "OPTIONS").contains(request.getMethod());
-        if (changing && !cors.effectiveAllowedOrigins(environment).contains(request.getHeader("Origin"))) {
+        String origin = request.getHeader("Origin");
+        if (changing && (origin == null || !cors.effectiveAllowedOrigins(environment).contains(origin))) {
             response.sendError(403); return;
         }
         String path = request.getRequestURI();
         if (path.equals("/api/admin/auth/login") || path.equals("/api/admin/auth/mfa/setup")
-                || path.equals("/api/admin/auth/mfa/confirm")) {
+                || path.equals("/api/admin/auth/mfa/confirm") || path.equals("/api/admin/auth/owner-setup")
+                || path.equals("/api/admin/auth/owner-recovery")) {
             chain.doFilter(request, response); return;
         }
         var verified = sessions.verify(StaffSessionService.cookie(request));
