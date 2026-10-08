@@ -1,4 +1,13 @@
 export const hindi: Record<string,string> = {
+ "Dismiss ordering guide": "ऑर्डर गाइड बंद करें",
+ "Choose where you’ll collect your order from Branches or the header.": "शाखाएँ या ऊपर के बटन से चुनें कि ऑर्डर कहाँ से लेना है।",
+ "Each branch has its own menu and pickup slots.": "हर शाखा का अपना मेन्यू और पिकअप समय है।",
+ "Pick a date and time. Add items available for that pickup.": "तारीख और समय चुनें। उस पिकअप पर उपलब्ध सामान जोड़ें।",
+ "Some items start service later. Confirm your pickup at checkout.": "कुछ सामान बाद में मिलते हैं। चेकआउट पर पिकअप की पुष्टि करें।",
+ "Tap Add, choose a size or weight, then review View cart.": "जोड़ें दबाएँ, आकार या वज़न चुनें, फिर कार्ट देखें।",
+ "Use Search or Categories to find more items.": "और सामान के लिए खोज या श्रेणियाँ देखें।",
+ "Verify your phone, review the total and pay. Find your order in Orders.": "फ़ोन सत्यापित करें, कुल कीमत देखें और भुगतान करें। अपना ऑर्डर ऑर्डर में देखें।",
+ "Show your pickup code when ready. Unsure about payment? Check Orders first.": "तैयार होने पर पिकअप कोड दिखाएँ। भुगतान स्पष्ट न हो तो पहले ऑर्डर देखें।",
  "Your checkout changed while payment was being checked. Review your order before paying.": "भुगतान की जाँच के दौरान आपका चेकआउट बदल गया। भुगतान से पहले अपना ऑर्डर जाँचें।",
  "Payment details changed. Review them before continuing.": "भुगतान की जानकारी बदल गई है। आगे बढ़ने से पहले उसे जाँचें।",
  "How to order": "ऑर्डर कैसे करें",

@@ -25,11 +25,21 @@ try {
         }, branch);
         await page.goto(`${base}/branches`);
         await page.locator('.gokul-mobile-launch').waitFor({state: 'hidden'});
-        await page.getByRole('button', {name: 'Show me how', exact: true}).click();
+        await page.getByRole('button', {name: 'Show me how', exact: true}).waitFor();
+        assert.equal(await page.evaluate(() => localStorage.getItem('gokul-ordering-tour:v1')), 'seen', 'first invitation exposure persists before any action');
+        if (width === 320) {
+            await page.reload(); await page.locator('.gokul-mobile-launch').waitFor({state: 'hidden'});
+            assert.equal(await page.locator('.ordering-tour-invite').count(), 0, 'reopening without acting on the first invitation does not repeat it');
+            await page.getByRole('button', {name: 'How to order', exact: true}).click();
+        } else await page.getByRole('button', {name: 'Show me how', exact: true}).click();
         const dialog = page.locator('.ordering-tour-dialog');
         await dialog.getByRole('heading', {name: 'Choose your branch', exact: true}).waitFor();
         assert.equal(await dialog.evaluate(node => node.matches(':modal')), true);
         assert.equal(await page.evaluate(() => document.body.style.overflow), 'hidden');
+        const firstBounds = await dialog.boundingBox();
+        assert.ok(firstBounds.height <= (width <= 640 ? 340 : 380), 'guide stays compact');
+        if (width <= 640) assert.ok(firstBounds.y >= 900 - 360, 'phone guide sits at the bottom');
+        await dialog.getByRole('button', {name: 'Close', exact: false}).waitFor();
         // The existing social popup is scheduled after 4.5 seconds. A fresh
         // customer reading the guide must not have two competing prompts.
         await page.waitForTimeout(4700);
@@ -48,13 +58,41 @@ try {
         await page.reload(); await page.locator('.gokul-mobile-launch').waitFor({state: 'hidden'});
         assert.equal(await page.locator('.ordering-tour-invite').count(), 0, 'starting/skipping persists across refresh');
         await page.getByRole('button', {name: 'How to order', exact: true}).click();
-        for (let step = 0; step < 3; step++) await dialog.getByRole('button', {name: 'Next', exact: true}).click();
+        for (let step = 0; step < 3; step++) {
+            await dialog.getByRole('button', {name: 'Next', exact: true}).click();
+            assert.ok((await dialog.boundingBox()).height <= (width <= 640 ? 340 : 380));
+        }
         await dialog.getByRole('heading', {name: 'Pay, then collect', exact: true}).waitFor();
         assert.ok((await dialog.boundingBox()).width <= width - 24);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
         await dialog.getByRole('button', {name: 'Got it', exact: true}).click();
         await dialog.waitFor({state: 'hidden'});
         assert.equal(await page.getByRole('button', {name: 'How to order', exact: true}).evaluate(node => node === document.activeElement), true, 'replay returns focus to its original trigger');
+        await page.getByRole('button', {name: 'How to order', exact: true}).click();
+        await dialog.getByRole('button', {name: 'Close', exact: false}).click();
+        await dialog.waitFor({state: 'hidden'});
+        await page.getByRole('button', {name: 'How to order', exact: true}).click();
+        await page.mouse.click(4, 4);
+        await dialog.waitFor({state: 'hidden'});
+        assert.notEqual(await page.evaluate(() => document.body.style.overflow), 'hidden');
+        if (width <= 640) {
+            await page.setViewportSize({width, height: 600});
+            await page.evaluate(() => {localStorage.setItem('gokul-language', 'hi'); window.dispatchEvent(new StorageEvent('storage', {key: 'gokul-language'}));});
+            await page.getByRole('button', {name: 'ऑर्डर कैसे करें', exact: true}).click();
+            const close = dialog.getByRole('button', {name: 'बंद करें', exact: false});
+            await close.waitFor();
+            const bounds = await close.boundingBox();
+            assert.ok(bounds.y >= 0 && bounds.y + bounds.height <= 600, 'Hindi Close stays inside a short phone viewport');
+            const next = dialog.getByRole('button', {name: 'अगला', exact: true});
+            for (let step = 0; step < 3; step++) {
+                await next.click();
+                const action = await dialog.locator('.ordering-tour-primary').boundingBox();
+                assert.ok(action.y >= 0 && action.y + action.height <= 600, 'step actions stay visible with Hindi copy');
+            }
+            await close.click(); await dialog.waitFor({state: 'hidden'});
+            await page.evaluate(() => {localStorage.setItem('gokul-language', 'en'); window.dispatchEvent(new StorageEvent('storage', {key: 'gokul-language'}));});
+            await page.setViewportSize({width, height: 900});
+        }
         await page.evaluate(() => {
             localStorage.removeItem('gokul-ordering-tour:v1');
             localStorage.setItem('gokul-cart', JSON.stringify({branchId: 1, items: [{product: {id: 1, name: 'Sweet', price: 100, available: true, saleMode: 'UNIT'}, quantity: 1, weightGrams: null}]}));
