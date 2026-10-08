@@ -11,13 +11,15 @@ try {
  for (const width of [320,390,1280]) {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
   await page.clock.install({time:new Date(`${today}T07:00:00+05:30`)});
-  const hindi=width===390; const errors=[];page.on('pageerror',e=>errors.push(e.message));let writes=0;
+  const hindi=width===390; const errors=[];page.on('pageerror',e=>errors.push(e.message));const writes=[];
   await context.addInitScript(hindi=>{if(hindi)localStorage.setItem('gokul-language','hi');localStorage.setItem('gokul-social-follow-popup-seen','true');},hindi);
   await context.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;
    const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,idempotency-key','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
-   if(req.method()!=='GET'&&!path.endsWith('/availability')&&path!=='/api/storefront/vitals')writes++;
+   // Existing cart previews and recommendations use POST for read-only queries.
+   const readOnly=path.endsWith('/availability')||['/api/storefront/vitals','/api/orders/mobile-preview','/api/menu/pickup-addons','/api/menu/pickup-addons/check'].includes(path);
+   if(req.method()!=='GET'&&!readOnly)writes.push(`${req.method()} ${path}`);
    let json=[];
    if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,branchExperience:true,smartAvailability:true,today,futureOrderingDays:7};
    else if(path==='/api/storefront/customer-identity')json={enabled:false,guestCheckoutEnabled:true};
@@ -70,7 +72,7 @@ try {
   await page.getByRole('button',{name:hindi?'ऑर्डर कैसे करें':'How to order',exact:true}).click();await stage('cart');
   await page.keyboard.press('Escape');await coach.waitFor({state:'hidden'});
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-ordering-walkthrough:v1')),null);
-  assert.equal(writes,0,'guide never creates an order, payment or branch write');assert.deepEqual(errors,[]);
+  assert.deepEqual(writes,[],'guide never creates an order, payment or branch write');assert.deepEqual(errors,[]);
   await context.close();console.log(`PASS: interactive ordering walkthrough ${width}px ${hindi?'Hindi':'English'}`);
  }
 } finally {await browser.close();}
