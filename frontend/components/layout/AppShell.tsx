@@ -2,7 +2,7 @@
 import "@/lib/paymentNavigation";
 
 import {usePathname} from "next/navigation";
-import {useState, type ReactNode} from "react";
+import {useEffect, useState, type ReactNode} from "react";
 
 import BranchOperationalGuard from "./BranchOperationalGuard";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
@@ -34,7 +34,7 @@ import "./customer-design.css";
 import "./menu-pickup.css";
 import MobileEdgeBack from "./MobileEdgeBack";
 import OrderingTour from "@/components/customer/OrderingTour";
-import {OPEN_ORDERING_TOUR} from "@/lib/orderingTour";
+import {OPEN_ORDERING_TOUR, getWalkthroughSnapshot, stopWalkthrough} from "@/lib/orderingTour";
 import "./ordering-tour.css";
 
 
@@ -56,8 +56,11 @@ export default function AppShell({
     const pathname = usePathname();
     const features = useStorefrontFeatures();
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
-    const tourAllowed = futuristic && !pathname.startsWith("/checkout") && !/^\/orders\/[^/]+/.test(pathname);
+    const tourAllowed = futuristic && pathname !== "/cart" && !pathname.startsWith("/checkout") && !/^\/orders\/[^/]+/.test(pathname);
     const [orderingGuideActive, setOrderingGuideActive] = useState(false);
+    useEffect(() => {
+        if ((pathname === "/cart" || pathname.startsWith("/checkout") || /^\/orders\/[^/]+/.test(pathname)) && getWalkthroughSnapshot()) stopWalkthrough();
+    }, [pathname]);
 
     return (
         <div

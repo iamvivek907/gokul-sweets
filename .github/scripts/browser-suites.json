@@ -1,5 +1,6 @@
 {
   "navigation": [
+    "tests/ordering-tour.browser.mjs",
     "tests/colourful-mobile-shell.browser.mjs",
     "tests/menu-import-recovery.browser.mjs",
     "tests/navigation-feedback.browser.mjs",
@@ -13,8 +14,7 @@
     "tests/branch-discovery.browser.mjs",
     "tests/customer-alerts.browser.mjs",
     "tests/storefront-reconnect.browser.mjs",
-    "tests/menu-service-hours.browser.mjs",
-    "tests/ordering-tour.browser.mjs"
+    "tests/menu-service-hours.browser.mjs"
   ],
   "menu": [
     "tests/menu-pickup-groups.browser.mjs",

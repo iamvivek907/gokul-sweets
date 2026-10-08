@@ -445,6 +445,7 @@ export default function ProductCard({
                         {/* ADD */}
 
                         <button
+                            data-ordering-target="add"
                             type="button"
                             disabled={!isAvailable || unavailableForPickup}
                             tabIndex={

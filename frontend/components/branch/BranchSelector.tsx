@@ -262,12 +262,13 @@ export default function BranchSelector({compact = false, locationControl = false
             {proposedBranch && createPortal(<StartFreshDialog branchName={proposedBranch.name} itemCount={cart.itemCount}
                 onKeep={() => setProposedBranch(null)} onConfirm={confirmSwitch} />, document.body)}
 
-            {cardBranch ? <button type="button" disabled={cardBranch.operational===false} className="gokul-branch-card-action"
+            {cardBranch ? <button data-ordering-target={destination === "occasions" ? undefined : "branch"} type="button" disabled={cardBranch.operational===false} className="gokul-branch-card-action"
                 aria-label={cardBranch.operational===false?`${cardBranch.name} · ${translate("Currently not operational")}`:actionLabel ? `${translate(actionLabel)} · ${cardBranch.name}` : destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Bulk order")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
                 onClick={() => handleSelectBranch(cardBranch)}>
                 <span className="gokul-branch-card-action-label">{cardBranch.operational===false?<T text="Currently not operational"/>:actionLabel ? <T text={actionLabel}/> : destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></> : <T text="Explore this branch" />}</span>
             </button> : <button
                 type="button"
+                data-ordering-target="branch"
                 popoverTarget={popoverId}
                 className={locationControl ? "gokul-location-control" : compact ? "min-h-11 font-semibold text-[#7a1625] underline" : `
                     w-full

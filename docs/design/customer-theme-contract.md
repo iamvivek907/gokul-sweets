@@ -253,3 +253,8 @@ The enabled customer shell offers an unobtrusive first-visit ordering guide on h
 ## Compact ordering help (8 October 2026)
 
 The optional guide uses a short inline first-visit invitation, then a compact native dialog: bottom sheet on phones and bottom-right card on desktop. Small inline icons, concise copy and light dimming keep the app visible. The first invitation exposure itself is remembered, even without a click, so app reopening never repeats it. Close, outside tap and Escape dismiss immediately; dismissal persists and the footer can reopen it. Close and step actions stay visible while long or enlarged text scrolls inside the content region. Payment and checkout behavior remain unchanged.
+
+
+## Action-driven first-use walkthrough (8 October 2026)
+
+The owner's interactive direction supersedes the static instruction cards. Optional, nonmodal hints highlight existing enabled controls: branch selection, menu navigation, explicit pickup confirmation, successful item addition and cart review. Actual state changes advance the walkthrough; help never selects a branch, changes pickup, adds food, submits orders or opens payment automatically. Existing popovers and dialogs temporarily hide the hint. Progress survives client navigation and refresh for up to 30 minutes; completion, Close or Escape persist dismissal and stop future automatic prompts. The existing first-exposure preference is retained, and manual footer replay stays available. Checkout/cart entry ends the walkthrough; payment/result routes have no guide. Hindi copy, narrow-screen positioning and actual stock/pickup validation remain required.

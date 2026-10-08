@@ -196,6 +196,7 @@ export default function BottomNavigation() {
                                     href={
                                         item.icon === "home" ? homeHref : item.href
                                     }
+                                    data-ordering-target={item.href === "/menu" ? "menu" : undefined}
                                     data-nav-icon={item.icon}
                                     aria-current={
                                         active
