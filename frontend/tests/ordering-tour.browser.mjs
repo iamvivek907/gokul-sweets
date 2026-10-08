@@ -17,7 +17,7 @@ try {
    const req=route.request(),path=new URL(req.url()).pathname;
    const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,idempotency-key','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
    if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
-   if(req.method()!=='GET'&&!path.endsWith('/availability'))writes++;
+   if(req.method()!=='GET'&&!path.endsWith('/availability')&&path!=='/api/storefront/vitals')writes++;
    let json=[];
    if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,branchExperience:true,smartAvailability:true,today,futureOrderingDays:7};
    else if(path==='/api/storefront/customer-identity')json={enabled:false,guestCheckoutEnabled:true};
