@@ -28,6 +28,7 @@ interface ProductGridProps {
     refined?: boolean;
     pickupItems?: ItemAvailability[];
     pickupChecking?: boolean;
+    pickupStatusMessage?: string;
     dateAware?: boolean;
 
     products:
@@ -72,6 +73,7 @@ export default function ProductGrid({
     onAdd,
     pickupItems,
     pickupChecking,
+    pickupStatusMessage,
     dateAware
 }: ProductGridProps) {
 
@@ -129,7 +131,7 @@ export default function ProductGrid({
             <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
                 {mobileMenuRows(products,portionGroups??[],catalogProducts??products).map(row => {
                     const product=row.product;
-                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
+                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
                     const pickup = pickupItems?.find(item => item.productId === product.id);
                     const unavailable = !!dateAware && (pickupChecking || pickup?.available !== true);
                     return (
@@ -154,9 +156,9 @@ export default function ProductGrid({
                                 onDecrease={onDecrease}
                                 onAdd={onAdd}
                             />
-                            {unavailable && !pickupChecking && (
+                            {unavailable && (
                                 <p role="status" className="menu-availability-note">
-                                    {describePickupAvailability(pickup, false)}
+                                    <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>
                                 </p>
                             )}
                         </div>{pairing&&product.id===pairingSeed&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>

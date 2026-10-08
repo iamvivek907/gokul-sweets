@@ -33,3 +33,11 @@ test('identical grouped stock blockers are explained once with both sizes',()=>{
  assert.equal((html.match(/Not ready for online sale yet/g)||[]).length,1);
  assert.match(html,/Half \/ Full:/);assert.doesNotMatch(html,/Not at this time/);
 });
+
+test('missing pickup and failed checks explain disabled grouped Add without suggesting ongoing loading',()=>{
+ for(const pickupStatusMessage of ['Choose pickup time to add','Pickup check failed. Please retry.']){
+  const html=render({pickupChecking:true,pickupStatusMessage});
+  assert.ok(html.includes(pickupStatusMessage));assert.doesNotMatch(html,/Checking pickup/);assert.match(html,/disabled=""/);
+ }
+ assert.match(render({pickupChecking:true,pickupStatusMessage:'Checking pickup'}),/Checking pickup/);
+});

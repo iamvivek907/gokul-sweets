@@ -789,12 +789,15 @@ export default function MenuScreen() {
 
     const pickupCheck = useDateAvailability(allProducts);
     const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
+    const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."
+        : pickupCheck.findingSoonest ? "Finding soonest pickup…"
+        : pickupCheck.pickupRequired ? "Choose pickup time to add" : "Checking pickup";
     const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
     const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
     const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
         portionGroups={phoneMenu?portionGroups:undefined} catalogProducts={phoneMenu?allProducts:undefined}
         refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
-        pickupChecking={pickupChecking} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
+        pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
         ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
         onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
     const [menuOffer,setMenuOffer]=useState<{key:string;target:AvailableRebateResponse|null}|null>(null);
@@ -1462,7 +1465,7 @@ export default function MenuScreen() {
                                     catalogProducts={phoneMenu?allProducts:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
-                                    pickupChecking={pickupChecking}
+                                    pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}
                                     dateAware={!!pickupCheck.features?.smartAvailability}
                                     products={
                                         filteredProducts

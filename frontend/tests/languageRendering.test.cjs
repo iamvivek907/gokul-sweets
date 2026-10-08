@@ -38,3 +38,11 @@ test('link completion feedback leaves the link geometry unchanged',()=>{
  const markup=renderToStaticMarkup(React.createElement(LinkFeedback));
  assert.equal(markup,'');
 });
+
+test('menu pickup recovery instructions are available in Hindi',()=>{
+ for(const text of ['Choose pickup time to add','Pickup check failed. Please retry.','Checking pickup','Not at this time','Choose a time, then confirm. Your cart is kept.']){
+  assert.notEqual(translate(text,'hi'),text);
+  assert.match(translate(text,'hi'),/[\u0900-\u097F]/);
+  assert.equal(translate(text,'en'),text);
+ }
+});

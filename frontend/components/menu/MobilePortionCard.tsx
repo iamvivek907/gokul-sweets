@@ -8,7 +8,7 @@ import type {MenuProduct} from "@/types/menu";
 import type {ProductRatingSummary} from "@/types/review";
 import type {ItemAvailability} from "@/services/availabilityApi";
 const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR",minimumFractionDigits:0,maximumFractionDigits:2}).format(value);
-export default function MobilePortionCard({group,products,quantities,onAdd,onIncrease,onDecrease,ratings,loading,pickupItems,dateAware,pickupChecking}:{group:PortionGroup;products:MenuProduct[];quantities:Record<number,number>;onAdd:(p:MenuProduct)=>void;onIncrease:(id:number)=>void;onDecrease:(id:number)=>void;ratings:Record<number,ProductRatingSummary>;loading:boolean;pickupItems?:ItemAvailability[];dateAware?:boolean;pickupChecking?:boolean}){
+export default function MobilePortionCard({group,products,quantities,onAdd,onIncrease,onDecrease,ratings,loading,pickupItems,dateAware,pickupChecking,pickupStatusMessage}:{group:PortionGroup;products:MenuProduct[];quantities:Record<number,number>;onAdd:(p:MenuProduct)=>void;onIncrease:(id:number)=>void;onDecrease:(id:number)=>void;ratings:Record<number,ProductRatingSummary>;loading:boolean;pickupItems?:ItemAvailability[];dateAware?:boolean;pickupChecking?:boolean;pickupStatusMessage?:string}){
  const [open,setOpen]=useState(false);
  const product=products.find(p=>p.imageUrl)??products[0];
  const count=products.reduce((sum,p)=>sum+(quantities[p.id]??0),0);
@@ -19,7 +19,7 @@ export default function MobilePortionCard({group,products,quantities,onAdd,onInc
  const availableSizes=eligibleProducts.length;
  const minimum=Math.min(...(eligibleProducts.length?eligibleProducts:products).map(p=>p.price));
  const unavailableForPickup=catalogueAvailable&&availableSizes===0;
- const status=!catalogueAvailable?"Currently unavailable":unavailableForPickup?pickupChecking?"Checking pickup":"Not at this time":`${availableSizes} ${availableSizes===1?"size":"sizes"} available`;
+ const status=!catalogueAvailable?"Currently unavailable":unavailableForPickup?pickupChecking?pickupStatusMessage??"Checking pickup":"Not at this time":`${availableSizes} ${availableSizes===1?"size":"sizes"} available`;
  const portion=labels.every(label=>/half|full|portion|हाफ|फुल/i.test(label));
  const rawNotes=dateAware&&!pickupChecking?products.flatMap(p=>{
   const item=pickupItems?.find(i=>i.productId===p.id);
