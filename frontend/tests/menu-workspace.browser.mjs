@@ -21,6 +21,7 @@ try {
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     let imageCalls = 0;
+    let hours={enabled:true,revision:0,item:{branchProductId:1,startsAt:"08:00:00",endsAt:"09:30:00",weekdays:31,soldOut:true,requiresBranchProductId:2}};
     let deleteCalls = 0, deleted = false;
     let paginationDeletion = false, deletedLast = false;
     const errors = [];
@@ -110,6 +111,14 @@ try {
       };
       if (req.method() === "OPTIONS")
         return route.fulfill({ status: 204, headers });
+      if(path==="/api/admin/branches/1/menu-service-windows/1/hours"){
+        if(req.method()==="PUT"){
+          const body=req.postDataJSON();assert.deepEqual(Object.keys(body).sort(),["endsAt","revision","startsAt"]);
+          if(body.revision!==hours.revision)return route.fulfill({status:409,headers,json:{message:"Service rules changed. Reload saved hours before applying your edit."}});
+          hours={...hours,revision:hours.revision+1,item:{...hours.item,startsAt:body.startsAt,endsAt:body.endsAt}};
+        }
+        return route.fulfill({headers,json:hours});
+      }
       if (path.endsWith("/image") && req.method() === "POST") {
         imageCalls++;
         return route.fulfill({ status: 204, headers });
@@ -299,6 +308,24 @@ try {
       .getByRole("button", { name: "+ Add product", exact: true })
       .waitFor();
     await page.getByLabel("Selected branch").selectOption("1");
+    await first.getByRole("button",{name:"Service hours",exact:true}).click();
+    const hoursDialog=page.getByRole("dialog",{name:"Service hours · Kaju Katli",exact:true});
+    const start=hoursDialog.getByLabel("Daily service start (IST)",{exact:false}),end=hoursDialog.getByLabel("Daily service end (IST)",{exact:false});
+    await page.waitForFunction(()=>document.querySelector('button')&&Array.from(document.querySelectorAll('dialog input[type="time"]')).some(i=>i.value==='08:00'));
+    await start.fill("11:00");await end.fill("21:30");await page.reload();await hoursDialog.waitFor();
+    assert.equal(await start.inputValue(),"11:00");assert.equal(await end.inputValue(),"21:30");
+    await hoursDialog.getByText(/Service days: Mon, Tue, Wed, Thu, Fri/).waitFor();
+    hours.revision++;
+    await hoursDialog.getByRole("button",{name:"Save service hours",exact:true}).click();
+    await hoursDialog.getByRole("alert").filter({hasText:"Service rules changed"}).waitFor();
+    assert.equal(await start.inputValue(),"11:00");assert.equal(hours.item.startsAt,"08:00:00");
+    await hoursDialog.getByRole("button",{name:"Reload saved hours",exact:true}).click();
+    await page.waitForFunction(()=>Array.from(document.querySelectorAll('dialog input[type="time"]')).some(i=>i.value==='08:00'));
+    await start.fill("11:00");await end.fill("21:30");await hoursDialog.getByRole("button",{name:"Save service hours",exact:true}).click();await hoursDialog.waitFor({state:"hidden"});
+    assert.equal(hours.item.startsAt,"11:00");assert.equal(hours.item.endsAt,"21:30");assert.equal(hours.item.weekdays,31);assert.equal(hours.item.soldOut,true);assert.equal(hours.item.requiresBranchProductId,2);
+    await first.getByRole("button",{name:"Service hours",exact:true}).click();await hoursDialog.waitFor();
+    await page.waitForFunction(()=>Array.from(document.querySelectorAll('dialog input[type="time"]')).some(i=>i.value==='11:00'));
+    await hoursDialog.getByRole("button",{name:"Clear daily hours",exact:true}).click();await hoursDialog.getByRole("button",{name:"Save service hours",exact:true}).click();await hoursDialog.waitFor({state:"hidden"});assert.equal(hours.item.startsAt,null);assert.equal(hours.item.endsAt,null);
     await first.getByRole("button", { name: "Price", exact: true }).click();
     let dialog = page.getByRole("dialog");
     await dialog.waitFor();
