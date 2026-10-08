@@ -87,6 +87,33 @@ try {
   await page.getByRole('button',{name:'Change username and sign out',exact:true}).click();await page.waitForURL('**/admin/login');assert.equal(renames,1);assert.equal(logouts,0);
   await context.close();console.log(`Owner account security passed at ${width}px`);
  }
+ for(const width of [390,1280])for(const failure of ['http','timeout']){
+  const context=await browser.newContext({viewport:{width,height:950},serviceWorkers:'block'}),page=await context.newPage();
+  if(failure==='timeout'){
+   await page.clock.install();
+   await context.addInitScript(()=>{AbortSignal.timeout=milliseconds=>{const controller=new AbortController();setTimeout(()=>controller.abort(new DOMException('Account request timed out','TimeoutError')),milliseconds);return controller.signal;};});
+  }
+  let calls=0,releaseFailure,releaseRetry,retryStarted;
+  const failedGate=new Promise(resolve=>{releaseFailure=resolve;}),retryGate=new Promise(resolve=>{releaseRetry=resolve;}),started=new Promise(resolve=>{retryStarted=resolve;});
+  await mock(context,async(route,path)=>{
+   if(path!=='/api/admin/account-security')return false;
+   calls++;
+   if(calls===1){if(failure==='timeout')await failedGate;await route.fulfill({status:503,json:{message:'Unavailable'},headers:headers()}).catch(()=>{});}
+   else {retryStarted();await retryGate;await route.fulfill({json:{username:'owner',hasRecoveryKey:false},headers:headers()});}
+   return true;
+  },owner);
+  await page.goto(`${base}/admin/account-security`);
+  if(failure==='timeout'){await page.getByRole('status').filter({hasText:'Loading account security…'}).waitFor();await page.clock.fastForward(15001);}
+  await page.getByRole('alert').filter({hasText:'Unable to load account security. Try again.'}).waitFor();
+  assert.equal(await page.getByText('Loading account security…',{exact:true}).count(),0,'failed account requests must stop displaying loading');
+  assert.equal(calls,1,'failed account reads are not automatically retried');
+  await page.getByRole('button',{name:'Retry',exact:true}).click();await started;
+  await page.getByRole('status').filter({hasText:'Loading account security…'}).waitFor();assert.equal(await page.getByRole('alert').filter({hasText:'Unable to load account security.'}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'Retry',exact:true}).count(),0,'retry is hidden while the read is pending');
+  releaseRetry();await page.getByText('No account recovery key has been generated yet.').waitFor();
+  assert.equal(calls,2);assert.equal(await page.getByText('Loading account security…',{exact:true}).count(),0);
+  releaseFailure();await context.close();console.log(`Owner account ${failure} retry passed at ${width}px`);
+ }
  for(const available of [false,'failure']){
   const context=await browser.newContext({serviceWorkers:'block'}),page=await context.newPage();
   await mock(context,async(route,path)=>{

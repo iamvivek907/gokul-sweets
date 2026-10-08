@@ -8,16 +8,17 @@ export default function AccountSecurityPage(){
     const {authorization,profile}=useAdminAuth();
     const [account,setAccount]=useState<{username:string;hasRecoveryKey:boolean}|null>(null),[username,setUsername]=useState(""),[password,setPassword]=useState(""),[code,setCode]=useState("");
     const [error,setError]=useState(""),[busy,setBusy]=useState(false),[result,setResult]=useState<OwnerResult|null>(null);
+    const [loading,setLoading]=useState(true),[loadAttempt,setLoadAttempt]=useState(0);
     const operation=useRef<AbortController|null>(null),owner=profile?.roleName==="OWNER_ADMIN";
     useEffect(()=>{
         if(!authorization||!owner)return;
         const controller=new AbortController();operation.current=controller;
         adminManagementApi<{username:string;hasRecoveryKey:boolean}>("/api/admin/account-security",authorization,{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(15000)])})
             .then(value=>{if(!controller.signal.aborted){setAccount(value);setUsername(value.username);}})
-            .catch(()=>{if(!controller.signal.aborted)setError("Unable to load account security. Reload to try again.");})
-            .finally(()=>{if(operation.current===controller)operation.current=null;});
+            .catch(()=>{if(!controller.signal.aborted)setError("Unable to load account security. Try again.");})
+            .finally(()=>{if(operation.current===controller){operation.current=null;if(!controller.signal.aborted)setLoading(false);}});
         return()=>{controller.abort();operation.current?.abort();operation.current=null;};
-    },[authorization,owner]);
+    },[authorization,owner,loadAttempt]);
     async function action(kind:"recovery-key"|"username"){
         if(!authorization||operation.current||!account)return;
         const controller=new AbortController();operation.current=controller;setBusy(true);setError("");setResult(null);
@@ -46,7 +47,7 @@ export default function AccountSecurityPage(){
                 <label className="block">New username<input className={input} autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} minLength={2} maxLength={100}/></label>
                 <p className="text-sm">Changing your username signs out all of your devices. Sign in again with the new username, your existing password and MFA.</p>
                 <button type="button" disabled={!password||!code||busy||username===account.username||username.trim().length<2} className="min-h-11 rounded-xl border p-3 disabled:opacity-50" onClick={()=>void action("username")}>Change username and sign out</button>
-            </fieldset>{result&&<SavedOwnerKey result={result}/>}</>:<p>Loading account security…</p>}
+            </fieldset>{result&&<SavedOwnerKey result={result}/>}</>:loading?<p role="status">Loading account security…</p>:<button type="button" className="min-h-11 rounded-xl border p-3" onClick={()=>{if(operation.current)return;setError("");setLoading(true);setLoadAttempt(attempt=>attempt+1);}}>Retry</button>}
         <Link href="/admin/staff" className="inline-block underline">Staff management and password resets</Link>
     </main>;
 }
