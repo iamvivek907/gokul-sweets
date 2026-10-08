@@ -221,14 +221,18 @@ public class StaffOrderAlerts {
     }
     @Transactional
     public void markRead(long staffId, long eventId) {
-        Boolean allowed = jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.id = ? AND e.environment = ? AND " + ELIGIBLE + ")", Boolean.class, staffId, eventId, scope());
-        if (!Boolean.TRUE.equals(allowed)) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);
+        // Keep the authorized parent alive until its read record commits. Cleanup skips this lock.
+        var allowed = jdbc.queryForList("SELECT e.id FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.id = ? AND e.environment = ? AND "
+                + ELIGIBLE + " FOR KEY SHARE OF e", Long.class, staffId, eventId, scope());
+        if (allowed.isEmpty()) throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND);
         jdbc.update("INSERT INTO staff_order_alert_reads(event_id, staff_id) VALUES (?, ?) ON CONFLICT DO NOTHING", eventId, staffId);
     }
     @Transactional
     public void markAllRead(long staffId,long throughId) {
         if(throughId<=0)throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_REQUEST);
-        jdbc.update("INSERT INTO staff_order_alert_reads(event_id,staff_id) SELECT e.id,u.id FROM staff_order_alerts e JOIN staff_users u ON u.id=? WHERE e.environment=? AND e.id<=? AND "+ELIGIBLE+" ON CONFLICT DO NOTHING",staffId,scope(),throughId);
+        // Skip alerts already being cleaned; retain parent locks for every inserted read record.
+        jdbc.update("INSERT INTO staff_order_alert_reads(event_id,staff_id) SELECT e.id,u.id FROM staff_order_alerts e JOIN staff_users u ON u.id=? WHERE e.environment=? AND e.id<=? AND "
+                + ELIGIBLE + " FOR KEY SHARE OF e SKIP LOCKED ON CONFLICT DO NOTHING",staffId,scope(),throughId);
     }
     public boolean eligible(long eventId, long staffId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS (SELECT 1 FROM staff_order_alerts e JOIN staff_users u ON u.id = ? WHERE e.id = ? AND e.environment = ? AND " + ELIGIBLE + ")", Boolean.class, staffId, eventId, scope()));
