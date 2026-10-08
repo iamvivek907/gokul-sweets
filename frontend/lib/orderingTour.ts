@@ -60,6 +60,7 @@ export function startWalkthrough(branchId: number | null, onMenu: boolean, hasIt
 export function stopWalkthrough() { dismissOrderingTour(); writeWalkthrough(null); }
 export function followWalkthrough(value: Walkthrough, branchId: number | null, onMenu: boolean, hasItems: boolean, smartPickup: boolean): WalkthroughStep {
     if (!branchId) return "branch";
+    if (!onMenu) return "menu";
     if (onMenu && hasItems) return "cart";
     if (value.branchId !== branchId || value.step === "branch") return onMenu ? smartPickup ? "pickup" : "add" : "menu";
     if (value.step === "menu" && onMenu) return smartPickup ? "pickup" : "add";
@@ -68,6 +69,9 @@ export function followWalkthrough(value: Walkthrough, branchId: number | null, o
 }
 export function updateWalkthrough(step: WalkthroughStep, branchId: number | null) {
     const current = parseWalkthrough(getWalkthroughSnapshot());
+    // Show the menu-navigation hint away from Menu without losing the last
+    // actual ordering step when the customer returns or refreshes.
+    if (current && step === "menu" && current.branchId === branchId && ["pickup", "add", "cart"].includes(current.step)) return;
     if (current && (current.step !== step || current.branchId !== branchId)) writeWalkthrough({...current, step, branchId});
 }
 /** Called only after the existing picker successfully validates and saves a customer choice. */

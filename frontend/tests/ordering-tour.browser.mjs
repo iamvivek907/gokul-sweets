@@ -35,6 +35,14 @@ try {
   });
   const coach=page.locator('.ordering-tour-coach');
   const stage=async step=>{await page.waitForFunction(step=>JSON.parse(localStorage.getItem('gokul-ordering-walkthrough:v1')??'null')?.step===step,step);await coach.waitFor({state:'visible'});};
+  const leaveMenuAndResume=async step=>{
+   await page.goto(`${base}/branches/1`);
+   const open=coach.getByRole('button',{name:hindi?'मेन्यू खोलें':'Open menu',exact:true});await open.waitFor();
+   assert.equal(await open.isEnabled(),true,'guide offers a real route back to Menu');
+   await page.reload();await open.waitFor();
+   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-ordering-walkthrough:v1')).step),step,'navigation and refresh retain progress');
+   await open.click();await page.waitForURL('**/menu');await stage(step);
+  };
   await page.goto(`${base}/branches`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   await page.getByRole('button',{name:hindi?'मुझे दिखाएँ':'Show me how',exact:true}).click();await stage('branch');
   assert.notEqual(await page.evaluate(()=>document.body.style.overflow),'hidden','walkthrough does not lock browsing');
@@ -46,6 +54,7 @@ try {
   else await page.locator('.branch-home-actions [data-ordering-target="menu"]').click();
   await page.waitForURL('**/menu');await stage('pickup');
   await page.reload();await stage('pickup');
+  await leaveMenuAndResume('pickup');
   assert.equal(await page.locator('.ordering-tour-invite').count(),0,'reload resumes progress, not the invitation');
   await page.locator('[data-ordering-target="pickup"]').click();
   const dialog=page.getByRole('dialog');await dialog.waitFor();await coach.waitFor({state:'hidden'});
@@ -54,6 +63,7 @@ try {
   await dialog.getByRole('button',{name:/18:00–18:30/}).click();
   await dialog.getByRole('button',{name:hindi?'इस पिकअप का उपयोग करें':'Use this pickup',exact:true}).click();
   await dialog.waitFor({state:'hidden'});await stage('add');
+  await leaveMenuAndResume('add');
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')??'null')?.items?.length??0),0,'picker and guide do not add food');
   await coach.locator('.ordering-tour-primary').click();
   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')??'null')?.items?.length??0),0,'Show item focuses Add without adding');

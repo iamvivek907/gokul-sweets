@@ -7,13 +7,13 @@ const source = ts.transpileModule(fs.readFileSync(require('node:path').join(__di
     compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}
 }).outputText;
 const known = {paymentId: 1, orderNumber: 'A', provider: 'PHONEPE', paymentStatus: 'PENDING', paymentUrl: 'https://checkout.invalid/old'};
-function load(current, {opened = false, refreshError} = {}) {
+function load(current, {opened = false, refreshError, refreshed = current} = {}) {
     const calls = [];
     class ApiError extends Error {constructor(status) {super('provider unavailable'); this.status = status;}}
     const modules = {
         '@/services/paymentApi': {
             getPaymentForOrder: async number => {calls.push(['lookup', number]); return {payment: current};},
-            refreshPayment: async id => {calls.push(['refresh', id]); if (refreshError) throw new ApiError(refreshError); return current;}
+            refreshPayment: async id => {calls.push(['refresh', id]); if (refreshError) throw new ApiError(refreshError); return refreshed;}
         },
         '@/services/apiClient': {ApiError},
         '@/lib/paymentGatewayVisit': {hasOpenedPaymentGateway: () => opened},
@@ -54,6 +54,18 @@ test('opened checkout refresh keeps the same attempt on a temporary outage', asy
 });
 test('deliberate Pay cannot fall back to pending when provider confirmation fails', async () => {
     const service = load({...known, paymentUrl: null}, {opened: true, refreshError: 503});
+    await assert.rejects(service.refreshKnownPayment(known, true, {allowTemporaryFallback: false}), /provider unavailable/);
+    assert.deepEqual(service.calls, [['lookup', 'A'], ['refresh', 1]]);
+});
+test('deliberate Pay verifies a settled provider attempt even when its browser marker is missing', async () => {
+    for (const paymentStatus of ['PAID', 'EXPIRED', 'FAILED']) {
+        const service = load(known, {refreshed: {...known, paymentStatus}});
+        assert.equal((await service.refreshKnownPayment(known, true, {allowTemporaryFallback: false})).paymentStatus, paymentStatus);
+        assert.deepEqual(service.calls, [['lookup', 'A'], ['refresh', 1]]);
+    }
+});
+test('missing gateway marker cannot bypass provider failure on deliberate Pay', async () => {
+    const service = load(known, {refreshError: 503});
     await assert.rejects(service.refreshKnownPayment(known, true, {allowTemporaryFallback: false}), /provider unavailable/);
     assert.deepEqual(service.calls, [['lookup', 'A'], ['refresh', 1]]);
 });

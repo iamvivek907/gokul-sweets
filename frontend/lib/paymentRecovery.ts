@@ -52,7 +52,7 @@ export async function refreshKnownPayment(known: PaymentResponse, resilient: boo
     if (!lookup.payment || lookup.payment.orderNumber !== known.orderNumber) throw new Error("This payment could not be recovered. Please check My Orders before paying again.");
     const current = mergePaymentResponse(lookup.payment, known);
     if (current.paymentStatus !== "PENDING") return current;
-    if (resilient && !hasOpenedPaymentGateway(current.orderNumber, current.paymentId)) return current;
+    if (allowTemporaryFallback && resilient && !hasOpenedPaymentGateway(current.orderNumber, current.paymentId)) return current;
     try {
         return mergePaymentResponse(await refreshPayment(current.paymentId), current);
     } catch (error) {

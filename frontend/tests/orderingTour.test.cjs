@@ -66,6 +66,22 @@ test('completed or dismissed walkthrough stops in other tabs and never starts to
     assert.equal(first.parseWalkthrough(raw, Date.now() + 86400000), null);
     assert.equal(load(storage).orderingTourSeen(), true);
 });
+test('leaving Menu shows navigation help and refresh preserves the actual ordering step', () => {
+    for (const step of ['pickup', 'add', 'cart']) {
+        const storage = new Map(), tour = load(storage);
+        tour.startWalkthrough(1, true, false, true);
+        tour.updateWalkthrough(step, 1);
+        const before = tour.parseWalkthrough(tour.getWalkthroughSnapshot());
+        assert.equal(tour.followWalkthrough(before, 1, false, step === 'cart', true), 'menu');
+        tour.updateWalkthrough('menu', 1);
+        const restored = load(storage).parseWalkthrough(load(storage).getWalkthroughSnapshot());
+        assert.equal(restored.step, step);
+        assert.equal(restored.expiresAt, before.expiresAt);
+        assert.equal(tour.followWalkthrough(restored, 1, true, step === 'cart', true), step);
+        tour.updateWalkthrough('menu', 2);
+        assert.equal(tour.parseWalkthrough(tour.getWalkthroughSnapshot()).step, 'menu', 'another branch resets progress');
+    }
+});
 test('blocked storage supports an interactive visit and bounded malformed sessions stay inactive', () => {
     const tour = load(new Map(), true);
     tour.startWalkthrough(null, false, false, true);

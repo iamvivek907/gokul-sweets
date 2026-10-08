@@ -6,7 +6,7 @@ try {
     for (const width of [390, 1280]) {
         const context = await browser.newContext({viewport: {width, height: 900}, serviceWorkers: 'block'}), page = await context.newPage();
         let status = 'PENDING', creates = 0, gatewayVisits = 0;
-        let providerDown = false, paymentExpired = false, lookupGate = null, lookupStarted = null;
+        let providerDown = false, providerSettled = false, paymentExpired = false, lookupGate = null, lookupStarted = null;
         const branch = {id: 1, code: 'TEST', name: 'History branch', active: true, operational: true, pickupAvailable: true};
         const payment = () => ({paymentId: 10, orderNumber: 'TEST-HISTORY', provider: 'PHONEPE', paymentStatus: status, amount: 200, currency: 'INR', paymentUrl: null, providerOrderId: 'test', expiresAt: new Date(Date.now() + (paymentExpired ? -1000 : 600000)).toISOString()});
         const order = () => ({id: 1, orderNumber: 'TEST-HISTORY', branchId: 1, branchName: branch.name, pickupDate: '2026-10-10', pickupStartTime: '18:00:00', pickupEndTime: '19:00:00', pickupType: 'NORMAL', fulfillmentType: 'PICKUP', customerName: 'Test customer', customerPhone: '9876543210', orderStatus: status === 'PAID' ? 'CONFIRMED' : status === 'PENDING' ? 'PENDING_PAYMENT' : 'CANCELLED', paymentStatus: status, subtotal: 200, totalAmount: 200, taxAmount: 0, priorityCharge: 0, items: [], reservationExpiresAt: new Date(Date.now() + 600000).toISOString(), createdAt: new Date().toISOString()});
@@ -22,7 +22,7 @@ try {
             else if (path === '/api/branches') json = [branch];
             else if (path === '/api/branches/1') json = branch;
             else if (path === '/api/payments/order/TEST-HISTORY') {if (lookupGate) {lookupStarted(); await lookupGate;} json = {payment: payment()};}
-            else if (path === '/api/payments/10/refresh') {if (providerDown) return route.fulfill({status: 503, json: {message: 'Provider temporarily unavailable'}, headers}); json = payment();}
+            else if (path === '/api/payments/10/refresh') {if (providerDown) return route.fulfill({status: 503, json: {message: 'Provider temporarily unavailable'}, headers}); if(providerSettled)status='PAID'; json = payment();}
             else if (path === '/api/payments/10/cancel-checkout') {status = 'EXPIRED'; json = payment();}
             else if (path === '/api/orders/TEST-HISTORY') json = order();
             else if (path === '/api/payments' && req.method() === 'POST') {creates++; json = payment();}
@@ -50,8 +50,13 @@ try {
         await page.getByRole('alert').filter({hasText: 'Provider temporarily unavailable'}).waitFor();
         assert.equal(gatewayVisits, 1, 'provider uncertainty blocks a deliberate gateway reopen');
         assert.equal(await page.evaluate(() => localStorage.getItem('gokul-payment-gateway-opened:TEST-HISTORY')), '10', 'failed preflight preserves reconciliation marker');
-        providerDown = false;
         await page.evaluate(() => localStorage.removeItem('gokul-payment-gateway-opened:TEST-HISTORY'));
+        const missingMarkerFailure=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/payments/10/refresh'&&response.status()===503);
+        await pay().click();
+        await missingMarkerFailure;
+        await page.getByRole('alert').filter({hasText: 'Provider temporarily unavailable'}).waitFor();
+        assert.equal(gatewayVisits, 1, 'missing browser marker does not bypass failed provider confirmation');
+        providerDown = false;
         // Delay the pre-Pay server read while another tab changes the cart.
         let releaseLookup;
         lookupGate = new Promise(resolve => {releaseLookup = resolve;});
@@ -70,9 +75,10 @@ try {
         await page.getByRole('alert').filter({hasText: 'This payment window has closed'}).waitFor();
         assert.equal(gatewayVisits, 1, 'a deadline reached during the read cannot open checkout');
         paymentExpired = false;
-        // The server settled while a pending page was already on screen.
+        // Provider settled but its callback has not updated the database yet.
         await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`); await pay().waitFor();
-        status = 'PAID'; await pay().click(); await page.waitForURL('**/orders/TEST-HISTORY');
+        await page.evaluate(() => localStorage.removeItem('gokul-payment-gateway-opened:TEST-HISTORY'));
+        providerSettled = true; await pay().click(); await page.waitForURL('**/orders/TEST-HISTORY');providerSettled=false;
         assert.equal(gatewayVisits, 1, 'a stale Pay button cannot reopen the gateway after success');
         assert.equal(await page.locator('.ordering-tour-dialog,.ordering-tour-invite').count(), 0);
         await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`); await page.waitForURL('**/orders/TEST-HISTORY');
