@@ -21,3 +21,23 @@ test('mixed groups label only the unavailable size; failed previews, manual unav
  const html=render({pickupItems});assert.match(html,/Half service starts at 11 AM/);assert.doesNotMatch(html,/<strong>Full:/);assert.doesNotMatch(html,/disabled=""/);
  for(const extra of [{pickupItems,pickupChecking:true},{pickupItems,dateAware:false},{pickupItems,products:products.map(p=>({...p,available:false}))}])assert.doesNotMatch(render(extra),/Half service starts at 11 AM/);
 });
+
+test('grouped items expose stock reasons as well as service hours',()=>{
+ const html=render({pickupItems:[{productId:1,available:false,code:'NO_ALLOCATION',reason:'Stock has not been scheduled.'},{productId:2,available:false,code:'NOT_READY',reason:'Ready after noon.'}]});
+ assert.match(html,/Stock has not been scheduled/);assert.match(html,/Ready after noon/);
+});
+
+test('identical grouped stock blockers are explained once with both sizes',()=>{
+ const pickupItems=products.map(p=>({productId:p.id,available:false,code:'READY_STOCK_REQUIRED',reason:'Not ready for online sale yet.'}));
+ const html=render({pickupItems});
+ assert.equal((html.match(/Not ready for online sale yet/g)||[]).length,1);
+ assert.match(html,/Half \/ Full:/);assert.doesNotMatch(html,/Not at this time/);
+});
+
+test('missing pickup and failed checks explain disabled grouped Add without suggesting ongoing loading',()=>{
+ for(const pickupStatusMessage of ['Choose pickup time to add','Pickup check failed. Please retry.']){
+  const html=render({pickupChecking:true,pickupStatusMessage});
+  assert.ok(html.includes(pickupStatusMessage));assert.doesNotMatch(html,/Checking pickup/);assert.match(html,/disabled=""/);
+ }
+ assert.match(render({pickupChecking:true,pickupStatusMessage:'Checking pickup'}),/Checking pickup/);
+});

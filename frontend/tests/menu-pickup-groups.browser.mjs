@@ -8,7 +8,7 @@ const products=['Half Paratha','Full Paratha','Breakfast'].map((name,index)=>({i
 const group={key:'paratha',title:'Paratha',choices:[{productId:1,label:'Half'},{productId:2,label:'Full'}]};
 const slot={id:1,branchId:1,slotDate:date,startTime:'08:00:00',endTime:'08:30:00',active:true,remainingCapacity:20,priorityEnabled:false};
 const browser=await chromium.launch({headless:true});
-try{for(const width of [320,390,640]){
+try{for(const family of ['Food','Sweets']){for(const width of [320,390,640]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  let mixed=false;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
@@ -17,7 +17,7 @@ try{for(const width of [320,390,640]){
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,smartAvailability:true,today:date,futureOrderingDays:7};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/menu')json=[{id:1,name:'Food',products}];
+  else if(path==='/api/menu')json=[{id:1,name:family,products}];
   else if(path==='/api/menu/portion-groups')json={groups:[group]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/availability')){
@@ -35,10 +35,15 @@ try{for(const width of [320,390,640]){
  await card.getByText('Half service starts at 11 AM.',{exact:false}).waitFor();
  await card.getByText('Full service starts at noon.',{exact:false}).waitFor();
  assert.equal(await card.getByRole('button',{name:'Choose options for Paratha',exact:true}).isDisabled(),true);
- assert.equal(await page.getByRole('region',{name:'Other menu items'}).locator('.mobile-portion-card').count(),1);
+ assert.equal(await card.getByRole('button',{name:'Choose options for Paratha',exact:true}).evaluate(node=>getComputedStyle(node).color),'rgb(102, 112, 106)','disabled Add is visibly grey');
+ assert.equal(await page.locator('.mobile-portion-card').count(),1);
+ assert.equal(await page.getByRole('region',{name:'Other menu items'}).count(),0);
+ assert.equal(await page.locator('.gokul-menu-product-grid').first().evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),1,'each phone family has one product column');
+ assert.equal(await card.locator('.product-card-image').getByText('Not at this time',{exact:true}).count(),0,'photos are not covered with status text');
+ await page.screenshot({path:`/tmp/customer-menu-${family}-${width}.png`,fullPage:true});
  mixed=true;await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  await page.waitForFunction(()=>document.querySelector('button[aria-label="Choose options for Paratha"]')?.disabled===false);
- assert.equal(await page.getByRole('region',{name:'Available for selected pickup'}).locator('.mobile-portion-card').count(),1);
+ assert.equal(await page.locator('.mobile-portion-card').count(),1);
  await page.getByLabel('Find a favourite',{exact:true}).fill('Half');
  await page.waitForFunction(()=>!document.querySelector('section[aria-label="Other menu items"]'));
  assert.equal(await card.count(),1,'filtered group is kept once, with its full catalogue of sizes');
@@ -48,5 +53,5 @@ try{for(const width of [320,390,640]){
  assert.equal(await dialog.getByRole('button',{name:'Add Paratha Full to cart',exact:true}).isEnabled(),true);
  await dialog.getByRole('button',{name:'Done',exact:true}).click();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
- await context.close();console.log(`Grouped service reasons and search eligibility ${width}px passed`);
-}}finally{await browser.close();}
+ await context.close();console.log(`Grouped service reasons and search eligibility ${family} ${width}px passed`);
+}}}finally{await browser.close();}

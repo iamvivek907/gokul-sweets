@@ -25,3 +25,9 @@ test('availability copy never presents a preview as a confirmed pickup', () => {
     assert.match(exported.describePickupAvailability({available: false, code: 'QUANTITY_TOO_LARGE', availableQuantity: 1500, unit: 'GRAM'}, false), /1.5 kg/);
     assert.match(exported.describePickupAvailability({available: false, code: 'PICKUP_WINDOW', availableQuantity: null, unit: 'GRAM'}, false), /another date/);
 });
+
+test('stock and preparation reasons remain visible even when service hours are configured',()=>{
+ for(const code of ['NO_ALLOCATION','NOT_READY','ONLINE_DISABLED','PRODUCT_HORIZON']){
+  assert.equal(exported.describePickupAvailability({available:false,code,reason:'Not ready until noon.'},false),'Not ready until noon.');
+ }
+});

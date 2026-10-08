@@ -189,7 +189,7 @@ export default function ProductCard({
 
 
                 {
-                    (!isAvailable || (refined && unavailableForPickup))
+                    (!refined && !isAvailable)
                     && (
                         <div className="
                             absolute
@@ -211,7 +211,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                <T text={isAvailable ? pickupMessage ?? "Unavailable for selected pickup" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
+                                <T text={isAvailable ? pickupMessage ?? "Not at this time" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
                             </span>
                         </div>
                     )
@@ -286,7 +286,12 @@ export default function ProductCard({
                 }
 
 
-                {!isAvailable && product.serviceAvailability?.message && <p className="my-1 text-xs leading-5 text-[#a94d39]" role="status">{product.serviceAvailability.message}</p>}
+                {!isAvailable && (refined ? !unavailableForPickup : !!product.serviceAvailability?.message) && (
+                    <p className="menu-availability-note my-1 text-xs leading-5 text-[#a94d39]" role="status">
+                        <T text={refined && product.serviceAvailability?.code === "SOLD_OUT"
+                            ? "Sold out" : product.serviceAvailability?.message ?? "Unavailable"}/>
+                    </p>
+                )}
 
                 {/* Rating */}
 

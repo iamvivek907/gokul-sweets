@@ -11,3 +11,12 @@ export function menuPickupOptions(data:CartAvailability,ids:number[],now=new Dat
   return [...(value.slot.remainingCapacity>0?[{...base,pickupType:"NORMAL" as const}]:[]),...(value.slot.priorityEnabled&&value.slot.priorityRemainingCapacity>0?[{...base,pickupType:"PRIORITY" as const}]:[])];
  }));
 }
+
+/** Cart choices require every requested amount to fit, including booking horizons. */
+export function cartPickupOptions(data:CartAvailability,now=new Date()):PickupSelection[]{
+ return data.dates.flatMap(day=>day.slots.flatMap(value=>{
+  const base={date:day.date,slot:value.slot};
+  if(!pickupIsFresh({...base,pickupType:"NORMAL"},now))return [];
+  return [...(value.normalAvailable?[{...base,pickupType:"NORMAL" as const}]:[]),...(value.priorityAvailable?[{...base,pickupType:"PRIORITY" as const}]:[])];
+ }));
+}

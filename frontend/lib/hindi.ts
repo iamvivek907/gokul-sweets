@@ -1,4 +1,10 @@
 export const hindi: Record<string,string> = {
+  "Choose pickup time to add": "जोड़ने के लिए पिकअप का समय चुनें",
+  "Pickup check failed. Please retry.": "पिकअप की जाँच नहीं हो सकी। कृपया दोबारा कोशिश करें।",
+  "Checking pickup": "पिकअप की जाँच हो रही है",
+  "Not at this time": "इस समय उपलब्ध नहीं है",
+  "Choose a time, then confirm. Your cart is kept.": "समय चुनें, फिर पुष्टि करें। आपकी कार्ट सुरक्षित रहेगी।",
+
  "Pickup changed or expired. Close this popup and review the pickup before adding.":"पिकअप बदल गया है या उसका समय निकल गया है। जोड़ने से पहले यह पॉपअप बंद करें और पिकअप की तारीख व समय देखें।",
 
  "Soonest pickup":"सबसे जल्द पिकअप",

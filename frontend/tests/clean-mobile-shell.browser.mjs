@@ -19,6 +19,7 @@ try{for(const [width,motion] of [[320,'no-preference'],[390,'no-preference'],[39
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
   else if(path==='/api/branches/1/discovery')json={offerings:[],overallExperience:{average:4.6,count:27},topRatedItems:[]};
   else if(path==='/api/menu')json=[{id:1,name:'Sweets',products}];
+  else if(path==='/api/branches/1/pickup-discovery')json={today:date,maximumDate:date,dates:[{date,available:false,slots:[]}]};
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/branches/1/availability')json={today:date,maximumDate:date,dates:[{date,available:false,slots:[],items:products.map(p=>({productId:p.id,available:false,code:'NO_INVENTORY'}))}]};
   return route.fulfill({headers,json});
@@ -36,7 +37,7 @@ try{for(const [width,motion] of [[320,'no-preference'],[390,'no-preference'],[39
  await page.getByRole('heading',{name:'How was the Gokul experience?',exact:true}).waitFor();
  await page.screenshot({path:`/tmp/clean-branch-home-${width}-${motion}.png`});
  await page.getByRole('link',{name:'Browse menu',exact:false}).filter({hasText:'Browse menu'}).click();await page.waitForURL('**/menu');await page.locator('#gokul-product-1').waitFor();
- const regular=page.locator('#gokul-product-1');await regular.getByText('Choose pickup to add',{exact:true}).waitFor();assert.equal(await regular.locator('.menu-availability-note').count(),0);assert.equal(await regular.locator('.menu-availability-chip').count(),0);assert.equal(await regular.getByText('Choose pickup to add',{exact:true}).count(),1);
+ const regular=page.locator('#gokul-product-1');await regular.getByText('Choose pickup time to add',{exact:true}).waitFor();assert.equal(await regular.locator('.menu-availability-note').count(),1);assert.equal(await regular.locator('.menu-availability-chip').count(),0);assert.equal(await regular.getByText('Choose pickup time to add',{exact:true}).count(),1);assert.equal(await regular.getByRole('button',{name:'Add Sweet 1 to cart',exact:true}).isDisabled(),true);
  const nav=page.locator('.customer-bottom-navigation');
  await page.evaluate(()=>{document.activeElement?.blur();document.documentElement.style.scrollBehavior='auto';window.scrollTo({top:450,behavior:'instant'});});
  if(motion==='reduce'){await page.waitForTimeout(100);assert.notEqual(await nav.getAttribute('data-scroll-hidden'),'true');}
