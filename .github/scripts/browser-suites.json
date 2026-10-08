@@ -69,6 +69,7 @@
     "tests/occasion-admin.browser.mjs",
     "tests/occasion-operations.browser.mjs",
     "tests/occasion-planning.browser.mjs",
-    "tests/loyalty-admin.browser.mjs"
+    "tests/loyalty-admin.browser.mjs",
+    "tests/data-cleanup.browser.mjs"
   ]
 }
