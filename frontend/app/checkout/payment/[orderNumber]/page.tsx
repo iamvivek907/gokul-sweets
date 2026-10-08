@@ -1583,6 +1583,7 @@ export default function PaymentPage() {
                             && (
 
                                 <div
+                                    role="alert"
                                     className="
                                         mt-5
                                         rounded-xl
@@ -2848,6 +2849,7 @@ export default function PaymentPage() {
                         && (
 
                             <div
+                                role="alert"
                                 className="
                                     mt-5
                                     rounded-xl
