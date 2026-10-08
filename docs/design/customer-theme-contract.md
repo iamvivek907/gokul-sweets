@@ -1,6 +1,6 @@
 ## October 8 simpler menu and cart pickup
 
-The customer menu keeps one category list, with all portion sizes together. Unavailable items show the server’s stock, preparation or service reason beneath a short status; do not split categories into available and other sections. Pickup changes with a cart show only times approved for all cart quantities and product booking horizons, then recheck that date before confirmation. If the saved date has no matching times, open the first matching date as a draft. Cancellation, failures and stale responses preserve the cart and saved pickup.
+The customer menu keeps one category list, with all portion sizes together. Phone menu families use one product row per item, including retail sweets and snacks. Photos stay clear; disabled Add controls and one inline reason explain unavailable items. Identical reasons for grouped sizes share one message; do not split categories into available and other sections. Pickup changes with a cart show only times approved for all cart quantities and product booking horizons, then recheck that date before confirmation. If the saved date has no matching times, open the first matching date as a draft. Cancellation, failures and stale responses preserve the cart and saved pickup.
 
 ## October 7 customer polish follow-up
 

@@ -26,3 +26,10 @@ test('grouped items expose stock reasons as well as service hours',()=>{
  const html=render({pickupItems:[{productId:1,available:false,code:'NO_ALLOCATION',reason:'Stock has not been scheduled.'},{productId:2,available:false,code:'NOT_READY',reason:'Ready after noon.'}]});
  assert.match(html,/Stock has not been scheduled/);assert.match(html,/Ready after noon/);
 });
+
+test('identical grouped stock blockers are explained once with both sizes',()=>{
+ const pickupItems=products.map(p=>({productId:p.id,available:false,code:'READY_STOCK_REQUIRED',reason:'Not ready for online sale yet.'}));
+ const html=render({pickupItems});
+ assert.equal((html.match(/Not ready for online sale yet/g)||[]).length,1);
+ assert.match(html,/Half \/ Full:/);assert.doesNotMatch(html,/Not at this time/);
+});

@@ -189,7 +189,7 @@ export default function ProductCard({
 
 
                 {
-                    (!isAvailable || (refined && unavailableForPickup))
+                    (!refined && !isAvailable)
                     && (
                         <div className="
                             absolute
