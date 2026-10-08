@@ -1,5 +1,6 @@
 "use client";
 
+import {getMenuPickupModeSnapshot,subscribeMenuPickupMode,isSoonestPickup,setMenuPickupMode} from "@/lib/menuPickupMode";
 import {useSyncExternalStore} from "react";
 import {getPickupSlotSnapshot, getServerPickupSlotSnapshot, parsePickupSlot, subscribeToPickupSlot} from "@/lib/checkoutStorage";
 
@@ -13,13 +14,15 @@ function subscribe(listener: () => void) {
     window.addEventListener(event, listener); window.addEventListener("storage", listener);
     return () => {window.removeEventListener(event, listener); window.removeEventListener("storage", listener);};
 }
-export function savePickupIntent(branchId: number, date: string) {
+export function savePickupIntent(branchId: number, date: string, automatic = false) {
     if (date && !validPickupDate(date,indiaToday(),60)) return;
+    if (!automatic) setMenuPickupMode(branchId, false);
     localStorage.setItem(key, JSON.stringify({branchId, date})); window.dispatchEvent(new Event(event));
 }
 export function usePickupIntent(branchId?: number | null) {
     const raw = useSyncExternalStore(subscribe, snapshot, server);
     const pickupRaw = useSyncExternalStore(subscribeToPickupSlot, getPickupSlotSnapshot, getServerPickupSlotSnapshot);
+    const modeRaw = useSyncExternalStore(subscribeMenuPickupMode,getMenuPickupModeSnapshot,server);
     const now=usePickupClock();
     const saved=parsePickupSlot(pickupRaw);
     const selection=saved && (!now || pickupIsFresh(saved,new Date(now))) ? saved : null;
@@ -31,6 +34,7 @@ export function usePickupIntent(branchId?: number | null) {
     if (!date && selection && selection.slot.branchId === branchId) date = selection.date;
     const previousDate = saved && saved.slot.branchId === branchId ? saved.date : date;
     const expired=!!saved && !selection || !!date && !!now && date < indiaToday(new Date(now));
+    const preferenceMatches = !date || !saved || date === saved.date;
     if (date && now && date < indiaToday(new Date(now))) date=null;
-    return {date, expired, previousDate, selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
+    return {date, expired, previousDate, pickupRaw, modeRaw, automatic: preferenceMatches && isSoonestPickup(modeRaw,branchId,pickupRaw,!!previousDate), selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
 }
