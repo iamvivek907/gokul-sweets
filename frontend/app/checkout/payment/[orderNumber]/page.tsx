@@ -10,6 +10,7 @@ import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -1269,7 +1270,7 @@ export default function PaymentPage() {
     const cancellationRunning=useRef(false);
     const [confirmCancel,setConfirmCancel]=useState(false);
     async function cancelCheckout(destination?:string) {
-        if(!payment || cancellationRunning.current || openingPayment || refreshing) return;
+        if(!payment || cancellationRunning.current || paymentLaunchRunning.current || openingPayment || refreshing) return;
         cancellationRunning.current=true;
         setCancelling(true);setError(null);
         const signal=AbortSignal.timeout(15000);
@@ -1287,25 +1288,28 @@ export default function PaymentPage() {
 
     const paymentLaunchRunning = useRef(false);
 
-    // Browser cache restores do not mount again; reconcile their cached Pay action.
-    useEffect(() => {
-        if (!payment) return;
+    // Keep the restore subscription stable while other payment reads update
+    // state. A render must not invalidate a status check already in flight.
+    const recoveryState = useRef({payment, paymentPollingV2, applyPaymentResult});
+    useLayoutEffect(() => { recoveryState.current = {payment, paymentPollingV2, applyPaymentResult}; }, [payment, paymentPollingV2, applyPaymentResult]);
+    useLayoutEffect(() => {
         let alive = true;
         const restored = (event: PageTransitionEvent) => {
-            if (!event.persisted) return;
-            void refreshKnownPayment(payment, paymentPollingV2)
-                .then(current => { if (alive) applyPaymentResult(current); })
+            const state = recoveryState.current;
+            if (!event.persisted || !state.payment) return;
+            void refreshKnownPayment(state.payment, state.paymentPollingV2)
+                .then(current => { if (alive) recoveryState.current.applyPaymentResult(current); })
                 .catch(error => { if (alive) setError(error instanceof Error ? error.message : "Unable to check payment. Please check My Orders."); });
         };
         window.addEventListener("pageshow", restored);
         return () => { alive = false; window.removeEventListener("pageshow", restored); };
-    }, [payment, paymentPollingV2, applyPaymentResult]);
+    }, [orderNumber]);
 
     async function handlePayNow():
         Promise<void> {
 
         if (
-            !payment || cancelling || refreshing || paymentLaunchRunning.current
+            !payment || cancelling || cancellationRunning.current || refreshing || paymentLaunchRunning.current
         ) {
 
             return;

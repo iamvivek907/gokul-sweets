@@ -57,8 +57,9 @@ try {
         assert.equal(await pay().count(), 0, 'cancelled history has no Pay action');
         // Simulate a cache restoration while the page is still pending.
         status = 'PENDING'; await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`); await pay().waitFor();
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
         status = 'PAID'; await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true})));
-        await page.waitForURL('**/orders/TEST-HISTORY');
+        await page.waitForURL('**/orders/TEST-HISTORY').catch(async error => {console.error('Cache restoration state:', page.url(), await page.locator('body').innerText()); throw error;});
         assert.equal(gatewayVisits, 1); assert.equal(creates, 0);
         await context.close();
     }

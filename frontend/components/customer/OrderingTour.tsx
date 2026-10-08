@@ -10,8 +10,8 @@ import {getPendingOrderSnapshot, getServerPendingOrderSnapshot, parsePendingOrde
 import {getPendingPaymentSnapshot, getServerPendingPaymentSnapshot, parsePendingPayment, subscribeToPendingPayment} from "@/lib/pendingPaymentStorage";
 
 const steps = [
-    {title: "Choose your branch", icon: "pin" as const, description: "Open Branches and choose where you want to collect your order. Each branch has its own menu, prices and pickup slots.", hint: "Your selected branch stays visible in the header."},
-    {title: "Check pickup date & time", icon: "receipt" as const, description: "Check the pickup row at the top of the menu. Change the date or time if needed. Items available for that pickup appear first; later-service items explain when they can be ordered.", hint: "No suitable slot today? Choose another date. Checkout asks you to confirm your pickup."},
+    {title: "Choose your branch", icon: "pin" as const, description: "Open Branches and choose where you want to collect your order. Each branch has its own menu, prices and pickup slots.", hint: "Use the branch control in the header to check or change your branch."},
+    {title: "Check pickup date & time", icon: "receipt" as const, description: "Check your pickup date and time in the menu or checkout. Change them if needed, and check that your items are available for that pickup.", hint: "An item may start service later in the day. Choose a matching pickup time; checkout asks you to confirm it again."},
     {title: "Add your favourites", icon: "menu" as const, description: "Use Add, choose a pack size or weight, and adjust the quantity. Open View cart to review your items and continue to checkout.", hint: "The menu starts on All. Search or Categories helps you find more items."},
     {title: "Pay, then collect", icon: "receipt" as const, description: "Verify your phone when asked, confirm pickup and review the full price before paying. Wait for payment confirmation, then find your order in Orders.", hint: "For pickup, show the order and its pickup code when it is ready. If payment is uncertain, check Orders before trying again."}
 ];
