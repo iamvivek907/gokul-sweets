@@ -19,7 +19,7 @@ public class MenuService {
             if(!snapshot.revision().equals(live.revision()))continue;
             var states=new HashMap<Long,MenuAvailabilityService.Item>();live.items().forEach(i->states.put(i.productId(),i));
             return snapshot.categories().stream().map(c->new MenuCategoryResponse(c.id(),c.name(),c.description(),c.displayOrder(),c.products().stream().filter(p->live.serviceWindowsEnabled()||states.get(p.id()).available()).map(p->{
-                var state=states.get(p.id());return new MenuProductResponse(p.id(),p.categoryId(),p.categoryName(),p.name(),p.description(),p.price(),p.imageUrl(),state.available(),p.saleMode(),p.minimumWeightGrams(),p.weightStepGrams(),retime(state.serviceAvailability(),live.observedAt()));
+                var state=states.get(p.id());return new MenuProductResponse(p.id(),p.categoryId(),p.categoryName(),p.name(),p.description(),p.price(),p.imageUrl(),state.available(),p.saleMode(),p.minimumWeightGrams(),p.weightStepGrams(),retime(state.serviceAvailability(),live.observedAt()),p.vegetarian());
             }).toList())).filter(c->!c.products().isEmpty()).toList();
         }
         throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"Menu is updating. Please try again.");

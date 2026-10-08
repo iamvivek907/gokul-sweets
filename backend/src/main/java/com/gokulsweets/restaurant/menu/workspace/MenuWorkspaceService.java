@@ -52,7 +52,7 @@ public class MenuWorkspaceService {
   from+=switch(filter){case "ALL"->"";case "COUNT_SKU"->" AND p.sale_mode='UNIT'";case "UNAVAILABLE"->" AND (NOT bp.available OR NOT p.active OR NOT c.active)";case "MISSING_IMAGE"->" AND (p.image_url IS NULL OR p.image_url='')";case "OVERRIDE"->" AND bp.price_override IS NOT NULL";case "GROUPED"->" AND EXISTS(SELECT 1 FROM mobile_menu_choices mc WHERE mc.branch_id=bp.branch_id AND mc.product_id=p.id)";case "LOW_STOCK"->" AND al.id IS NOT NULL AND "+BALANCE+"<=al.safety_buffer_quantity";default->throw new IllegalArgumentException("Unknown filter.");};
   var named=new NamedParameterJdbcTemplate(jdbc);
   long total=Objects.requireNonNull(named.queryForObject("SELECT count(*)"+from,args,Long.class));
-  var rows=named.queryForList("SELECT bp.id AS \"branchProductId\",p.id AS \"productId\",p.code,p.name,p.description,p.category_id AS \"categoryId\",c.name AS \"categoryName\",p.base_price AS \"basePrice\",bp.price_override AS \"priceOverride\",COALESCE(bp.price_override,p.base_price) AS \"effectivePrice\",bp.available,p.active,p.sale_mode AS \"saleMode\",p.minimum_weight_grams AS \"minimumWeightGrams\",p.weight_step_grams AS \"weightStepGrams\",p.tax_category_id AS \"taxCategoryId\",p.image_url AS \"imageUrl\",p.workspace_version AS \"productVersion\",bp.workspace_version AS \"branchVersion\""+from+" ORDER BY c.display_order,bp.display_order,p.name,p.id LIMIT :limit OFFSET :offset",args);
+  var rows=named.queryForList("SELECT bp.id AS \"branchProductId\",p.id AS \"productId\",p.code,p.name,p.description,p.category_id AS \"categoryId\",c.name AS \"categoryName\",p.base_price AS \"basePrice\",bp.price_override AS \"priceOverride\",COALESCE(bp.price_override,p.base_price) AS \"effectivePrice\",bp.available,p.active,p.vegetarian,p.sale_mode AS \"saleMode\",p.minimum_weight_grams AS \"minimumWeightGrams\",p.weight_step_grams AS \"weightStepGrams\",p.tax_category_id AS \"taxCategoryId\",p.image_url AS \"imageUrl\",p.workspace_version AS \"productVersion\",bp.workspace_version AS \"branchVersion\""+from+" ORDER BY c.display_order,bp.display_order,p.name,p.id LIMIT :limit OFFSET :offset",args);
   if(!rows.isEmpty()){
    var ids=rows.stream().map(r->((Number)r.get("branchProductId")).longValue()).toList();
    var ps=new HashMap<Long,com.gokulsweets.restaurant.inventory.entity.BranchInventoryPolicy>();policies.findByBranchProductIdIn(ids).forEach(p->ps.put(p.getBranchProduct().getId(),p));
@@ -108,6 +108,15 @@ public class MenuWorkspaceService {
  }
  @Transactional
  public String image(long branch,long id,long version,MultipartFile image,boolean remove){shared(branch,id);var old=product(id,true);if(((Number)old.get("workspace_version")).longValue()!=version)conflict();var saved=remove?products.removeImage(id):products.uploadImage(id,image);audit(branch,id,"PRODUCT_IMAGE",old.get("image_url"),saved.imageUrl());return saved.imageUrl();}
+ public record DietaryEdit(@NotNull @Min(0) Long version,@NotNull Boolean vegetarian) {}
+ @Transactional
+ public void editDietary(long branch,long id,DietaryEdit edit){
+  shared(branch,id);
+  if(edit.version()==null||edit.version()<0||edit.vegetarian()==null)throw new IllegalArgumentException("Choose Veg or Non-veg and a valid item version.");
+  var old=product(id,true);if(((Number)old.get("workspace_version")).longValue()!=edit.version())conflict();
+  jdbc.update("UPDATE products SET vegetarian=?,updated_at=now() WHERE id=?",edit.vegetarian(),id);
+  audit(branch,id,"PRODUCT_DIETARY",old.get("vegetarian"),edit.vegetarian());
+ }
  private void conflict(){throw new ResponseStatusException(HttpStatus.CONFLICT,"This item changed since you opened it. Close and reload the item before saving; your entries have been retained.");}
 
 

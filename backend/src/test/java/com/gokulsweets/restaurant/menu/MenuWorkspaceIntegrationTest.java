@@ -31,6 +31,29 @@ class MenuWorkspaceIntegrationTest {
  MenuWorkspaceService.Details details(long c,String code,long version){return new MenuWorkspaceService.Details("Test product",code,c,"Fresh",BigDecimal.valueOf(120),ProductSaleMode.UNIT,null,null,null,version);}
  long product(long b,long c){return workspace.create(b,details(c,UUID.randomUUID().toString(),0),List.of(b));}
  long branchProduct(long b,long product){return jdbc.queryForObject("SELECT id FROM branch_products WHERE branch_id=? AND product_id=?",Long.class,b,product);}
+ @Test void dietaryToggleDefaultsToVegPreservesBranchSettingsAndRejectsStaleEdits(){
+  long b=branch(),c=category(),id=product(b,c),other=branch();
+  jdbc.update("INSERT INTO branch_products(branch_id,product_id) VALUES (?,?)",other,id);
+  var before=jdbc.queryForList("SELECT * FROM branch_products WHERE product_id=? ORDER BY id",id);
+  assertThat(workspace.list(b,LocalDate.now(),"",null,"ALL",0,25).content().getFirst().get("vegetarian")).isEqualTo(true);
+  workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(0L,false));
+  assertThat(workspace.list(other,LocalDate.now(),"",null,"ALL",0,25).content().getFirst().get("vegetarian")).isEqualTo(false);
+  assertThat(jdbc.queryForList("SELECT * FROM branch_products WHERE product_id=? ORDER BY id",id)).isEqualTo(before);
+  assertThat(jdbc.queryForObject("SELECT workspace_version FROM products WHERE id=?",Long.class,id)).isEqualTo(1);
+  assertThat(jdbc.queryForObject("SELECT count(*) FROM menu_workspace_audit WHERE product_id=? AND action='PRODUCT_DIETARY'",Integer.class,id)).isEqualTo(1);
+  assertThatThrownBy(()->workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(0L,true))).isInstanceOf(ResponseStatusException.class);
+  workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(1L,true));
+  assertThat(jdbc.queryForObject("SELECT vegetarian FROM products WHERE id=?",Boolean.class,id)).isTrue();
+ }
+ @Test void dietaryChangesRequireAllAssignedBranchesAndMenuPermission(){
+  long b=branch(),c=category(),id=product(b,c),other=branch();
+  jdbc.update("INSERT INTO branch_products(branch_id,product_id) VALUES (?,?)",other,id);
+  doThrow(new AccessDeniedException("Other branch")).when(staff).requireBranchAccess(other);
+  assertThatThrownBy(()->workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(0L,false))).isInstanceOf(AccessDeniedException.class);
+  doThrow(new AccessDeniedException("Menu permission")).when(staff).requirePermission(com.gokulsweets.restaurant.staff.PermissionName.MENU_MANAGE);
+  assertThatThrownBy(()->workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(0L,false))).isInstanceOf(AccessDeniedException.class);
+  assertThat(jdbc.queryForObject("SELECT vegetarian FROM products WHERE id=?",Boolean.class,id)).isTrue();
+ }
  @Test void individualHoursPreserveOtherItemsAndAllNonTimingRules(){
   long b=branch(),c=category(),a=branchProduct(b,product(b,c)),d=branchProduct(b,product(b,c));
   var original=new MenuServiceWindows.Item(a,java.time.LocalTime.of(8,0),java.time.LocalTime.of(9,30),31,true,d);

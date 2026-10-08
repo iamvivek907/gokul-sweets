@@ -1,4 +1,5 @@
 "use client";
+import DietaryLabel from "./DietaryLabel";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import {T,useTranslation} from "@/lib/language";
@@ -156,7 +157,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
                     {product.imageUrl && !failedPhotos.includes(product.imageUrl) && <div className={styles.highlightImage}><Image src={product.imageUrl} alt={product.name} fill sizes="(max-width: 767px) 96px, 33vw" className="object-cover"
                         onError={() => setFailedPhotos(current => [...current, product.imageUrl!])} /></div>}
                     <div className="p-5"><p className={styles.eyebrow}>{ranked?.trendingProductIds.includes(product.id) ? "Branch favourite" : "New to the menu"}</p>
-                        <h3 className="mt-2 text-xl font-bold">{product.name}</h3><span className="mt-3 inline-block text-sm"><T text="Discover on the menu" /></span></div>
+                        <DietaryLabel vegetarian={product.vegetarian}/><h3 className="mt-2 text-xl font-bold">{product.name}</h3><span className="mt-3 inline-block text-sm"><T text="Discover on the menu" /></span></div>
                 <LinkFeedback /></Link>)}</div>
         </section>}
         <section className={styles.later}>

@@ -28,9 +28,11 @@ public record MenuProductResponse(
 
         Integer weightStepGrams,
 
-        com.gokulsweets.restaurant.menu.MenuServiceWindows.Status serviceAvailability
+        com.gokulsweets.restaurant.menu.MenuServiceWindows.Status serviceAvailability,
+
+        boolean vegetarian
 ) {
     public MenuProductResponse(Long id,Long categoryId,String categoryName,String name,String description,BigDecimal price,String imageUrl,boolean available,ProductSaleMode saleMode,Integer minimumWeightGrams,Integer weightStepGrams) {
-        this(id,categoryId,categoryName,name,description,price,imageUrl,available,saleMode,minimumWeightGrams,weightStepGrams,null);
+        this(id,categoryId,categoryName,name,description,price,imageUrl,available,saleMode,minimumWeightGrams,weightStepGrams,null,true);
     }
 }

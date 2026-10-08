@@ -94,6 +94,9 @@ public class Product {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(nullable = false)
+    private boolean vegetarian = true;
+
 
     /*
      * Cloudflare R2 public image URL.

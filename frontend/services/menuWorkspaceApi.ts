@@ -16,6 +16,7 @@ export type WorkspaceItem = {
   effectivePrice: number;
   available: boolean;
   active: boolean;
+  vegetarian?: boolean;
   saleMode: "UNIT" | "WEIGHT";
   minimumWeightGrams: number | null;
   weightStepGrams: number | null;
