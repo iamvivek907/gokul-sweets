@@ -1,5 +1,6 @@
 {
   "navigation": [
+    "tests/landing-order-food.browser.mjs",
     "tests/ordering-tour.browser.mjs",
     "tests/colourful-mobile-shell.browser.mjs",
     "tests/menu-import-recovery.browser.mjs",
