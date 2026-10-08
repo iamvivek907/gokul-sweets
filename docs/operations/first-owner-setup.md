@@ -26,7 +26,7 @@ STAFF_OWNER_SETUP_ENABLED=true
 STAFF_OWNER_SETUP_KEY_HASH=<the 64-character lowercase hash>
 ```
 
-Deploy the backend migration and frontend changes through the normal release process. Open `/admin/setup` on the matching storefront. Enter the private setup key, owner name, username and a new password of at least 12 characters (at most 72 UTF-8 bytes). Copy the displayed account recovery key to secure offline storage. It is shown only in the successful response; the database stores its hash only. Confirm that it is saved, then sign in through `/admin/login` and complete the existing authenticator enrollment. Save the MFA recovery codes separately.
+Deploy the backend migrations and frontend changes through the normal release process. Complete the rollout on all backend instances before using setup or recovery; old backend versions do not enforce credential-bound enrollment challenges. Open `/admin/setup` on the matching storefront. Enter the private setup key, owner name, username and a new password of at least 12 characters (at most 72 UTF-8 bytes). Copy the displayed account recovery key to secure offline storage. It is shown only in the successful response; the database stores its hash only. Confirm that it is saved, then sign in through `/admin/login` and complete the existing authenticator enrollment. Save the MFA recovery codes separately.
 
 Setup closes transactionally after the first owner. Concurrent requests cannot create a second owner. Deactivating/deleting that owner does not reopen setup. After completion, set `STAFF_OWNER_SETUP_ENABLED=false` and remove `STAFF_OWNER_SETUP_KEY_HASH` as deployment housekeeping. Recovery remains available independently of the setup flag.
 
@@ -40,7 +40,7 @@ Each owner has a separate recovery key. Rotating it immediately invalidates the 
 
 ## Forgotten owner username or password
 
-Open `/admin/recover`. Enter the saved account recovery key and choose the username and password. A successful recovery consumes that key, issues a replacement, signs out all existing sessions and removes pending enrollment challenges. Established MFA enrollment and MFA recovery codes, role and branch permissions are preserved. Save the replacement and sign in with MFA normally. Inactive or demoted owners cannot use this feature to reactivate themselves or regain privileges.
+Open `/admin/recover`. Enter the saved account recovery key and choose the username and password. A successful recovery consumes that key, issues a replacement, signs out all existing sessions and removes pending enrollment challenges. Established MFA enrollment and MFA recovery codes, role and branch permissions are preserved. Migration V122 binds enrollment challenges to the staff credential version, so a concurrent old-password sign-in cannot create a usable challenge after recovery. Existing pending challenges are preserved when the migration runs; mixed old/new backend versions require retrying login if an old instance issues a challenge without a credential snapshot. Save the replacement and sign in with MFA normally. Inactive or demoted owners cannot use this feature to reactivate themselves or regain privileges.
 
 An account recovery key does not bypass established MFA. Keep account recovery keys and MFA recovery codes separately. If both the account key and login credentials are lost, another authorized owner can use the existing staff password reset flow. Loss of all credentials and all MFA recovery methods requires controlled operator support; there is no public bypass or reopening of first-owner setup.
 

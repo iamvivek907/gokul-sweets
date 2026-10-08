@@ -17,6 +17,7 @@ import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /** Real PostgreSQL with real BCrypt/MFA, in a disposable schema only. */
 @EnabledIfEnvironmentVariable(named="DATABASE_URL",matches="jdbc:postgresql:.*")
@@ -38,7 +39,7 @@ class OwnerAccountIntegrationTest {
         jdbc.execute("CREATE TABLE branches(id bigint PRIMARY KEY)");jdbc.execute("INSERT INTO branches VALUES (1)");
         migration("V18__create_staff_security.sql");migration("V75__staff_sessions_and_mfa.sql");
         jdbc.execute("INSERT INTO roles(name) VALUES ('OWNER_ADMIN'),('BRANCH_MANAGER')");
-        migration("V121__first_owner_setup.sql");
+        migration("V121__first_owner_setup.sql");migration("V122__bind_staff_enrollment_credentials.sql");
         flags=new EnhancementProperties();flags.setSecureStaffSessions(true);
         env=new MockEnvironment().withProperty("gokul.environment-isolation.environment","DEV")
             .withProperty("staff.owner-setup.enabled","true").withProperty("staff.owner-setup.key-hash",StaffSessionService.hash(setupKey));
@@ -188,5 +189,65 @@ class OwnerAccountIntegrationTest {
         service.limit("recovery","other");
         assertThat(jdbc.queryForObject("SELECT failures FROM staff_login_limits WHERE username=?",Integer.class,StaffSessionService.hash("legacy-login"))).isEqualTo(99);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_login_limits WHERE username='owner:stale'",Long.class)).isZero();
+    }
+    private com.gokulsweets.restaurant.staff.StaffUser snapshot(long id) {
+        var row=jdbc.queryForMap("SELECT username,password_hash,updated_at FROM staff_users WHERE id=?",id);
+        var user=new com.gokulsweets.restaurant.staff.StaffUser();user.setId(id);user.setUsername((String)row.get("username"));
+        user.setPasswordHash((String)row.get("password_hash"));user.setActive(true);
+        user.setUpdatedAt(((java.sql.Timestamp)row.get("updated_at")).toLocalDateTime());
+        var role=new com.gokulsweets.restaurant.staff.Role();role.setName("OWNER_ADMIN");user.setRole(role);return user;
+    }
+    private StaffSessionService sessions(com.gokulsweets.restaurant.staff.StaffUserRepository users) {
+        return sessions(users,mock(org.springframework.security.authentication.AuthenticationManager.class));
+    }
+    private StaffSessionService sessions(com.gokulsweets.restaurant.staff.StaffUserRepository users,
+            org.springframework.security.authentication.AuthenticationManager manager) {
+        return new StaffSessionService(flags,jdbc,Clock.systemUTC(),mfa(),users,manager,passwords);
+    }
+    @Test void oldPasswordCannotAuthenticateIfRecoveryWinsBeforeTheAccountRead() {
+        var first=service.setup(setupKey,"first",password,"Owner");long owner=id("first");
+        var manager=mock(org.springframework.security.authentication.AuthenticationManager.class);
+        when(manager.authenticate(any())).thenAnswer(invocation->{
+            // Authentication accepted the old password, then recovery wins before the account read.
+            service.recover(first.recoveryKey(),"first","Replacement-password-2026");
+            return org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated("first",null,List.of());
+        });
+        var users=mock(com.gokulsweets.restaurant.staff.StaffUserRepository.class);
+        when(users.findByUsername("first")).thenAnswer(invocation->Optional.of(snapshot(owner)));
+        assertThatThrownBy(()->sessions(users,manager).login("first",password,null,"client",null)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_mfa_enrollments",Long.class)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_sessions",Long.class)).isZero();
+    }
+    @Test void enrollmentInsertedAfterRecoveryUsingAnOldAccountSnapshotCannotBeUsed() {
+        var first=service.setup(setupKey,"first",password,"Owner");long owner=id("first");
+        var old=snapshot(owner);var users=mock(com.gokulsweets.restaurant.staff.StaffUserRepository.class);
+        when(users.findByUsername("first")).thenAnswer(invocation->{
+            // Sign-in loaded the old account, but recovery commits before it inserts the challenge.
+            service.recover(first.recoveryKey(),"first","Replacement-password-2026");return Optional.of(old);
+        });
+        var sessions=sessions(users);var stale=sessions.login("first",password,null,"client",null);
+        assertThat(stale.enrollmentRequired()).isTrue();
+        assertThatThrownBy(()->sessions.enrollment(stale.token())).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(()->sessions.finishEnrollment(stale.token(),"287082",null)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM staff_mfa",Long.class)).isZero();
+        doReturn(Optional.of(snapshot(owner))).when(users).findByUsername("first");
+        var fresh=sessions.login("first","Replacement-password-2026",null,"client",null);
+        assertThat(sessions.enrollment(fresh.token()).staffId()).isEqualTo(owner);
+        assertThat(mfa().setup(owner,StaffSessionService.hash(fresh.token())).uri()).startsWith("otpauth://totp/");
+    }
+    @Test void enrollmentMigrationPreservesExistingChallengeAndOtherStaffData() throws Exception {
+        long owner=user("existing","OWNER_ADMIN",true);
+        jdbc.execute("ALTER TABLE staff_mfa_enrollments DROP COLUMN staff_updated_at");
+        String token="E".repeat(43);
+        jdbc.update("INSERT INTO staff_mfa_enrollments(token_hash,staff_id,expires_at) VALUES (?,?,CURRENT_TIMESTAMP+INTERVAL '5 minutes')",StaffSessionService.hash(token),owner);
+        var before=jdbc.queryForMap("SELECT * FROM staff_users WHERE id=?",owner);
+        migration("V122__bind_staff_enrollment_credentials.sql");
+        assertThat(sessions(mock(com.gokulsweets.restaurant.staff.StaffUserRepository.class)).enrollment(token).staffId()).isEqualTo(owner);
+        assertThat(jdbc.queryForMap("SELECT * FROM staff_users WHERE id=?",owner)).isEqualTo(before);
+        String legacy="L".repeat(43);
+        jdbc.update("INSERT INTO staff_mfa_enrollments(token_hash,staff_id,expires_at) VALUES (?,?,CURRENT_TIMESTAMP+INTERVAL '5 minutes')",StaffSessionService.hash(legacy),owner);
+        assertThatThrownBy(()->sessions(mock(com.gokulsweets.restaurant.staff.StaffUserRepository.class)).enrollment(legacy)).isInstanceOf(IllegalArgumentException.class);
+        jdbc.update("UPDATE staff_users SET updated_at=updated_at+INTERVAL '1 second' WHERE id=?",owner);
+        assertThatThrownBy(()->sessions(mock(com.gokulsweets.restaurant.staff.StaffUserRepository.class)).enrollment(token)).isInstanceOf(IllegalArgumentException.class);
     }
 }
