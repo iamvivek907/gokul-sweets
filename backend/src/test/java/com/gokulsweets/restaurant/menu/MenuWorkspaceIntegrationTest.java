@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.menu;
 import com.gokulsweets.restaurant.menu.workspace.MenuWorkspaceService;
+import com.gokulsweets.restaurant.product.Product;
 import com.gokulsweets.restaurant.product.ProductSaleMode;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import com.gokulsweets.restaurant.staff.StaffUser;
@@ -44,6 +45,37 @@ class MenuWorkspaceIntegrationTest {
   assertThatThrownBy(()->workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(0L,true))).isInstanceOf(ResponseStatusException.class);
   workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(1L,true));
   assertThat(jdbc.queryForObject("SELECT vegetarian FROM products WHERE id=?",Boolean.class,id)).isTrue();
+ }
+ @Test void staleJpaImageAndDetailsSavesPreserveNewDietaryClassification(){
+  long b=branch(),c=category(),id=product(b,c);
+  for(boolean target:List.of(false,true)){
+   entityManager.clear();
+   var stale=entityManager.find(Product.class,id);
+   assertThat(stale.isVegetarian()).isEqualTo(!target);
+   long version=jdbc.queryForObject("SELECT workspace_version FROM products WHERE id=?",Long.class,id);
+   workspace.editDietary(b,id,new MenuWorkspaceService.DietaryEdit(version,target));
+   // The image upload/import loaded this entity before the dietary change.
+   assertThat(stale.isVegetarian()).isEqualTo(!target);
+   String image="https://example.invalid/product-"+target+".jpg";
+   stale.setImageUrl(image);
+   stale.setName("Imported product "+target);
+   stale.setBasePrice(BigDecimal.valueOf(target?140:130));
+   entityManager.flush();
+   assertThat(jdbc.queryForObject("SELECT vegetarian FROM products WHERE id=?",Boolean.class,id)).isEqualTo(target);
+   assertThat(jdbc.queryForObject("SELECT image_url FROM products WHERE id=?",String.class,id)).isEqualTo(image);
+   assertThat(jdbc.queryForObject("SELECT name FROM products WHERE id=?",String.class,id)).isEqualTo(stale.getName());
+   assertThat(jdbc.queryForObject("SELECT base_price FROM products WHERE id=?",BigDecimal.class,id)).isEqualByComparingTo(stale.getBasePrice());
+  }
+ }
+ @Test void newJpaProductsStillDefaultToVeg(){
+  var item=new Product();
+  item.setCode(UUID.randomUUID().toString());
+  item.setName("New imported product");
+  item.setCategory(entityManager.getReference(com.gokulsweets.restaurant.category.Category.class,category()));
+  item.setBasePrice(BigDecimal.TEN);
+  entityManager.persist(item);
+  entityManager.flush();
+  assertThat(jdbc.queryForObject("SELECT vegetarian FROM products WHERE id=?",Boolean.class,item.getId())).isTrue();
  }
  @Test void dietaryChangesRequireAllAssignedBranchesAndMenuPermission(){
   long b=branch(),c=category(),id=product(b,c),other=branch();
