@@ -121,6 +121,9 @@ class DataCleanupIntegrationTest {
         assertThat(cleanup.view().deleted()).isEmpty();
     }
     private DataCleanupService lostCommitResponse(boolean unavailable,boolean supersede) {
+        return commitResponse(unavailable,supersede,true);
+    }
+    private DataCleanupService commitResponse(boolean unavailable,boolean supersede,boolean loseAcknowledgement) {
         var delegate=new DataSourceTransactionManager(dataSource);
         var commits=new AtomicInteger();
         var manager=new PlatformTransactionManager() {
@@ -132,13 +135,20 @@ class DataCleanupIntegrationTest {
                 delegate.commit(status);
                 if(commits.incrementAndGet()==2) {
                     if(supersede)cleanup.run(1L,0L);
-                    throw new TransactionSystemException("Simulated lost commit acknowledgement");
+                    if(loseAcknowledgement)throw new TransactionSystemException("Simulated lost commit acknowledgement");
                 }
             }
             @Override public void rollback(TransactionStatus status) {delegate.rollback(status);}
         };
         return new DataCleanupService(jdbc,Clock.fixed(now,ZoneOffset.UTC),
             new MockEnvironment().withProperty("gokul.environment-isolation.environment","DEV"),new ObjectMapper(),manager);
+    }
+    @Test void successfulResponseKeepsItsCountsWhenAnotherRunCommitsBeforeReturn() {
+        customer("DEV","completed","PREPARING","2026-01-01");
+        var result=commitResponse(false,true,false).run(1L,0L);
+        assertThat(result.status()).isEqualTo("SUCCEEDED");
+        assertThat(result.deleted()).containsEntry("customerNotifications",1L);
+        assertThat(cleanup.view().deleted()).containsEntry("customerNotifications",0L);
     }
     @Test void lostCommitAcknowledgementReturnsPersistedSuccessWithoutRepeatingDeletion() {
         long event=customer("DEV","completed","PREPARING","2026-01-01");

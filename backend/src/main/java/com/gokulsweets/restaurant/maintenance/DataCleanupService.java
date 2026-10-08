@@ -165,7 +165,7 @@ public class DataCleanupService {
         });
         if(claim==null)return view();
         try {
-            tx.executeWithoutResult(status -> {
+            return tx.execute(status -> {
                 deadlines();
                 // Hold the run row throughout deletion. An expired lease cannot be stolen mid-transaction.
                 var tokens=jdbc.queryForList("SELECT lease_token FROM data_cleanup_settings WHERE environment=? FOR UPDATE",UUID.class,scope());
@@ -182,6 +182,8 @@ public class DataCleanupService {
                     UPDATE data_cleanup_settings SET last_status='SUCCEEDED',last_finished_at=?,last_counts=?::jsonb,
                         lease_token=NULL,lease_until=NULL WHERE environment=? AND lease_token=?
                     """,Timestamp.from(clock.instant()),mapper.writeValueAsString(counts),scope(),claim.token());
+                // Capture this run before releasing the lock; another run may claim immediately after commit.
+                return view();
             });
         } catch(RuntimeException failure) {
             log.warn("Cleanup execution/commit raised an error for {}; reconciling its persisted result",scope(),failure);
@@ -216,7 +218,6 @@ public class DataCleanupService {
                 "Cleanup failed; no records were deleted. Refresh for details.");
             return reconciled;
         }
-        return view();
     }
     private long delete(String table,String column,List<Long> ids) {
         return ids.isEmpty()?0:named.update("DELETE FROM "+table+" WHERE "+column+" IN (:ids)",Map.of("ids",ids));

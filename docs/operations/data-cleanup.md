@@ -1,6 +1,6 @@
 # Daily data cleanup
 
-Refresh locks the settings form until loading finishes; reads and mutations cannot overlap, and leaving the page aborts requests.
+Refresh locks the settings form until loading finishes; reads and mutations cannot overlap, and leaving the page aborts requests. Save/preview requests time out after 15 seconds; manual runs after 90 seconds. An uncertain run refreshes the persisted last result with a separate 15-second deadline and never retries deletion automatically. If that refresh fails, preview/run stay blocked until an explicit successful Refresh.
 
 Owner admin: **System → Data cleanup** (`/admin/data-cleanup`). Default: enabled, daily 03:30 IST, retention 90 days (minimum 30). Configuration and latest results persist separately for DEV and PROD. Save settings, preview the next batch, then run manually if needed. Manual execution works with the schedule paused. A stale settings revision is rejected.
 
@@ -18,7 +18,7 @@ Each run removes at most 500 customer events and 500 staff events, plus their ch
 
 A minute poll catches up on the current IST day if the server starts after the configured time. It does not wake a sleeping hosting instance or replay every missed day. Failed daily runs do not retry every minute; use manual retry or wait for the next day. Dedicated import workers skip scheduling.
 
-A five-minute persisted lease prevents overlapping instances; a crashed expired RUNNING claim may recover. The cleanup transaction locks the settings row and event/order rows. Locked candidates are skipped. It has a 45-second transaction deadline, 10-second statement timeout and 2-second lock timeout. Child deletion, parent deletion and success counts commit together. A confirmed rollback records failure. Commit-response errors are reconciled against the same persistent run token; committed success is returned without repeating deletion. An unavailable or superseded result reports uncertainty and preserves the existing result/lease; server logs contain diagnostics. Changing config while a claim is active affects future runs, not its captured retention.
+A five-minute persisted lease prevents overlapping instances; a crashed expired RUNNING claim may recover. The cleanup transaction locks the settings row and event/order rows. Locked candidates are skipped. It has a 45-second transaction deadline, 10-second statement timeout and 2-second lock timeout. Child deletion, parent deletion and success counts commit together. The successful response captures its own result while holding the run lock, so a subsequent run cannot replace the returned counts. A confirmed rollback records failure. Commit-response errors are reconciled against the same persistent run token; committed success is returned without repeating deletion. An unavailable or superseded result reports uncertainty and preserves the existing result/lease; server logs contain diagnostics. Changing config while a claim is active affects future runs, not its captured retention.
 
 Deletion frees space for PostgreSQL reuse through normal autovacuum; the table's reported disk size may not immediately shrink. This job never runs VACUUM FULL or rebuilds tables, which would lock normal operations.
 
