@@ -1,4 +1,15 @@
 export const hindi: Record<string,string> = {
+ "Pickup changed or expired. Close this popup and review the pickup before adding.":"पिकअप बदल गया है या उसका समय निकल गया है। जोड़ने से पहले यह पॉपअप बंद करें और पिकअप की तारीख व समय देखें।",
+
+ "Soonest pickup":"सबसे जल्द पिकअप",
+ "Finding soonest pickup…":"सबसे जल्द पिकअप खोज रहे हैं…",
+ "Finding the first pickup with available items. You can also choose a time.":"उपलब्ध आइटम के लिए पहला पिकअप खोज रहे हैं। आप समय भी चुन सकते हैं।",
+ "Soonest pickup · Time stays fixed once you add an item.":"सबसे जल्द पिकअप · आइटम जोड़ने के बाद समय नहीं बदलेगा।",
+ "We couldn’t find the soonest pickup. Try again or choose a time.":"सबसे जल्द पिकअप नहीं खोज पाए। दोबारा कोशिश करें या समय चुनें।",
+ "No verified normal pickup is available in the booking window. Choose a date to explore other times.":"बुकिंग अवधि में कोई सामान्य पिकअप उपलब्ध नहीं है। अन्य समय देखने के लिए तारीख चुनें।",
+ "Retry availability":"उपलब्धता दोबारा जाँचें",
+ "Pickup changed. Review the displayed time before adding.":"पिकअप बदल गया है। जोड़ने से पहले दिखाई गई तारीख और समय देखें।",
+
  "Choose branch": "शाखा चुनें",
  "Use this pickup": "इस पिकअप का उपयोग करें",
  "Ordering guide": "ऑर्डर गाइड",

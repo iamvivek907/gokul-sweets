@@ -5,18 +5,20 @@ import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
 import {usePickupClock} from "@/hooks/usePickupClock";
-import {indiaToday,validPickupDate} from "@/lib/pickupFreshness";
+import {indiaToday,pickupIsFresh,validPickupDate} from "@/lib/pickupFreshness";
 import {useEffect, useState} from "react";
 import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
-import {availabilityItems, checkCartAvailability, checkMenuAvailability, type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, type CartAvailability} from "@/services/availabilityApi";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
 import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/checkoutStorage";
 import {getCartSnapshot, parseCart} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
-import {earliestNormalMenuPickup, noDefaultPickupMessage} from "@/lib/menuPickupPresentation";
+import {findSoonestMenuPickup} from "@/lib/soonestMenuPickup";
+import {menuPickupOptions} from "@/lib/menuPickupOptions";
+import {getMenuPickupModeSnapshot} from "@/lib/menuPickupMode";
 import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 import type {MenuProduct} from "@/types/menu";
 
@@ -38,10 +40,9 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))];
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
-    // A fresh, empty menu visit may default today; retained dates/carts require customer action.
-    // At a new IST day an empty cart can start again; a same-day expired slot is never moved.
-    const mayDefault = menuPreview && !!features?.smartAvailability && Number.isInteger(features.futureOrderingDays) && !intent.date && cart.isEmpty && (!intent.expired || !!intent.previousDate && intent.previousDate < today);
-    const requestDate = intent.date ?? (mayDefault ? today : null);
+    const [choosing,setChoosing] = useState(false);
+    const [automaticResult,setAutomaticResult] = useState<{key:string; error?:string; empty?:boolean} | null>(null);
+    const requestDate = intent.date;
     // Service-rule edits change the live menu revision even when all SKUs remain browsable.
     const menuRevision = products?.[0]?.availabilityRevision ?? null;
     const key = JSON.stringify([branch?.id, requestDate, itemsJson, revision, features?.smartAvailability,menuPreview,menuRevision]);
@@ -51,9 +52,6 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const validDate = requestDate && features?.smartAvailability && Number.isInteger(features.futureOrderingDays) && validPickupDate(requestDate,today,features.futureOrderingDays);
     useEffect(() => {
         if (!features?.smartAvailability || !branch || !requestDate || !validDate || !JSON.parse(itemsJson).length) return;
-        const branchBefore = getStoredBranchSnapshot(), pickupBefore = getPickupSlotSnapshot(), cartBefore = getCartSnapshot();
-        const intentBefore = localStorage.getItem("gokul-pickup-intent");
-        const pendingBefore = [localStorage.getItem("gokul-pending-order"), localStorage.getItem("gokul-pending-payment")];
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             void (menuPreview ? checkMenuAvailability : checkCartAvailability)(branch.id, requestDate, 1, JSON.parse(itemsJson),
@@ -61,15 +59,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
                 .then(data => {
                     if (controller.signal.aborted) return;
                     setResult({key, scope, data});
-                    if (mayDefault && !sessionStorage.getItem("gokul-mobile-order-attempt") && !pendingBefore.some(Boolean)
-                        && branchBefore === getStoredBranchSnapshot() && pickupBefore === getPickupSlotSnapshot()
-                        && cartBefore === getCartSnapshot() && !parseCart(getCartSnapshot()).items.length
-                        && intentBefore === localStorage.getItem("gokul-pickup-intent")
-                        && !localStorage.getItem("gokul-pending-order") && !localStorage.getItem("gokul-pending-payment")
-                        && requestDate === indiaToday()) {
-                        const first = earliestNormalMenuPickup(data, JSON.parse(itemsJson).map((item: {productId: number}) => item.productId), requestDate);
-                        if (first) {savePickupIntent(branch.id, first.date); savePickupSlot(first);}
-                    }
+
                 })
                 .catch(error => {if (!controller.signal.aborted) {
                     console.warn("Date availability check failed.", error);
@@ -77,7 +67,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
                 }});
         }, 350);
         return () => {controller.abort(); window.clearTimeout(timer);};
-    }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview,mayDefault]);
+    }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview]);
     // Recheck slot capacity, cutoff and preparation as time passes, without changing the pickup.
     useEffect(() => {
         if (!menuPreview || !features?.smartAvailability) return;
@@ -102,10 +92,40 @@ export function useDateAvailability(products?: MenuProduct[]) {
         || (intent.selection.pickupType === "PRIORITY" ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0 : selectedSlot.slot.remainingCapacity <= 0));
     const items = day?.items?.map(item => slotUnavailable ? {...item, available: false, code: selectedSlot?.code ?? "NO_SLOTS", reason: selectedSlot?.reason ?? "Choose another pickup time."}
         : selectedSlot?.issues?.find(issue => issue.productId === item.productId) ?? item);
-    const noPickupMessage = menuPreview && !intent.selection && data && requestDate === today && !earliestNormalMenuPickup(data,candidates.map(item=>item.productId),today) ? noDefaultPickupMessage(data,today) : null;
-    const pickupRequired = menuPreview && !!features?.smartAvailability && !intent.selection;
-    return {features, today, branch, intent, data, items, selectionUnavailable, error: result?.key === key ? result.error : null,
-        noPickupMessage, pickupRequired, hasItems: requested.length > 0, retry: () => setRevision(value => value + 1)};
+    const autoKey = JSON.stringify([branch?.id,today,features?.futureOrderingDays,itemsJson,intent.pickupRaw,intent.modeRaw,revision,menuRevision,choosing,cart.isEmpty]);
+    const selectedStillFits = !!data && !!intent.selection && menuPickupOptions(data,candidates.map(item=>item.productId))
+        .some(value=>value.date===intent.selection?.date && value.slot.id===intent.selection.slot.id && value.pickupType==="NORMAL");
+    const pendingCheckout = !!clock && (!!localStorage.getItem("gokul-pending-order") || !!localStorage.getItem("gokul-pending-payment") || !!sessionStorage.getItem("gokul-mobile-order-attempt"));
+    const needsAutomatic = !!features?.smartAvailability && candidates.length > 0 && !pendingCheckout && !!clock && menuPreview && intent.automatic && cart.isEmpty && !choosing && (!intent.selection || !validDate || (!!data && !selectedStillFits));
+    useEffect(() => {
+        if (!needsAutomatic || !branch || !features?.smartAvailability || !today || !Number.isInteger(features.futureOrderingDays) || !candidates.length) return;
+        const pending = () => !!localStorage.getItem("gokul-pending-order") || !!localStorage.getItem("gokul-pending-payment") || !!sessionStorage.getItem("gokul-mobile-order-attempt");
+        if (pending()) return;
+        const businessDayBefore = indiaToday();
+        const before = [getStoredBranchSnapshot(),getPickupSlotSnapshot(),getCartSnapshot(),localStorage.getItem("gokul-pickup-intent"),getMenuPickupModeSnapshot()];
+        const controller = new AbortController();
+        const signal = AbortSignal.any([controller.signal,AbortSignal.timeout(30000)]);
+        const timer = window.setTimeout(() => {
+            setAutomaticResult({key:autoKey});
+            void discoverPickupDates(branch.id,today,features.futureOrderingDays+1,signal)
+                .then(discovery=>findSoonestMenuPickup(discovery,JSON.parse(itemsJson).map((item:{productId:number})=>item.productId),today,features.futureOrderingDays,
+                    date=>checkMenuAvailability(branch.id,date,1,JSON.parse(itemsJson),signal),signal))
+                .then(first=>{
+                    if (controller.signal.aborted) return;
+                    const after = [getStoredBranchSnapshot(),getPickupSlotSnapshot(),getCartSnapshot(),localStorage.getItem("gokul-pickup-intent"),getMenuPickupModeSnapshot()];
+                    if (pending() || before.some((value,index)=>value!==after[index]) || parseCart(getCartSnapshot()).items.length || businessDayBefore!==indiaToday()) return;
+                    if (first && !pickupIsFresh(first,new Date())) {setRevision(value=>value+1);return;}
+                    setAutomaticResult({key:autoKey,empty:!first});
+                    if (first) {savePickupIntent(branch.id,first.date,true);savePickupSlot(first,true);}
+                }).catch(()=>{if (!controller.signal.aborted) setAutomaticResult({key:autoKey,error:"We couldn’t find the soonest pickup. Try again or choose a time."});});
+        },350);
+        return ()=>{controller.abort();clearTimeout(timer);};
+    },[needsAutomatic,autoKey,branch,features?.smartAvailability,features?.futureOrderingDays,today,itemsJson,candidates.length]);
+    const automaticState = automaticResult?.key===autoKey ? automaticResult : null;
+    const noPickupMessage = automaticState?.empty ? "No verified normal pickup is available in the booking window. Choose a date to explore other times." : null;
+    const pickupRequired = menuPreview && !!features?.smartAvailability && (!intent.selection || !validDate);
+    return {features, today, branch, intent, data, items, selectionUnavailable: selectionUnavailable || !!intent.selection && !validDate, error: result?.key === key ? result.error : null,
+        noPickupMessage, pickupRequired, choosing, setChoosing, findingSoonest: needsAutomatic && !automaticState?.empty && !automaticState?.error, automaticError: automaticState?.error, hasItems: requested.length > 0, retry: () => setRevision(value => value + 1)};
 }
 
 export default function PickupContext({check, cart = false}: {check: ReturnType<typeof useDateAvailability>; cart?: boolean}) {

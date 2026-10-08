@@ -1,6 +1,8 @@
 "use client";
 import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
+import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
+import {pickupIsFresh} from "@/lib/pickupFreshness";
 import {partitionPickupProducts} from "@/lib/menuPickupPresentation";
 import {menuFamily,retailCollections} from "@/lib/menuPresentation";
 import RetailSweetRail from "./RetailSweetRail";
@@ -25,7 +27,7 @@ import Link from "next/link";
 import BranchMenuGallery from "@/components/menu/BranchMenuGallery";
 import BranchMenuAppearance from "@/components/menu/BranchMenuAppearance";
 import NewBranchItems from "@/components/menu/NewBranchItems";
-import PickupContext, {useDateAvailability} from "@/components/menu/PickupContext";
+import {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
     useCallback,
@@ -787,13 +789,13 @@ export default function MenuScreen() {
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
     const pickupCheck = useDateAvailability(allProducts);
-    const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || !pickupCheck.items || !!pickupCheck.error);
+    const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
     const pickupPartition = pickupCheck.intent.selection && pickupCheck.items && !pickupCheck.error
         ? partitionPickupProducts(filteredProducts,pickupCheck.items,phoneMenu?portionGroups:[],allProducts) : null;
     const splitPickup = !!pickupPartition && pickupPartition.other.length > 0;
     const pickupTimeLabel = pickupCheck.intent.selection ? new Intl.DateTimeFormat("en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"})
         .format(new Date(`${pickupCheck.intent.selection.date}T${pickupCheck.intent.selection.slot.startTime}+05:30`)) : "";
-    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
+    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
     const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
     const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
         portionGroups={phoneMenu?portionGroups:undefined} catalogProducts={phoneMenu?allProducts:undefined}
@@ -808,12 +810,14 @@ export default function MenuScreen() {
     const pairingSeed=lastAdded??items.at(-1)?.product.id;
     const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedName={allProducts.find(p=>p.id===pairingSeed)?.name} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
 
+    const weightPickup = useRef("");
     function handleAddToCart(
         product: MenuProduct
     ) {
 
         if (!product.available || !pickupAllows(product.id)) return;
         if (product.saleMode === "WEIGHT") {
+            weightPickup.current=getPickupSlotSnapshot();
             setWeightProduct(product);
             return;
         }
@@ -845,6 +849,7 @@ export default function MenuScreen() {
             }
         });
 
+        if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {setCartNotice("Pickup changed. Review the displayed time before adding.");return;}
         const liveProduct=categories.flatMap(category=>category.products).find(item=>item.id===product.id);
         if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         const result =
@@ -1264,9 +1269,8 @@ export default function MenuScreen() {
 
                 </header>
 
-                {!phoneMenu&&<PickupContext check={pickupCheck} />}
 
-                {mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry}/>}
+                {mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
 
                 <div
                     className="gokul-menu-tools

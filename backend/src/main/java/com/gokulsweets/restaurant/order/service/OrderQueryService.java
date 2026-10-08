@@ -104,7 +104,8 @@ public class OrderQueryService {
                 order.getDeliveryLocality(),
                 order.getDeliveryPostalCode(),
                 order.getBranch().getFssaiLicenceNumber(),
-                order.getDeliveryFee(),order.getLoyaltyDiscount(),order.getLoyaltyCoins(),order.getLoyaltyRewardCode(),order.getRebateDiscountAmount()
+                order.getDeliveryFee(),order.getLoyaltyDiscount(),order.getLoyaltyCoins(),order.getLoyaltyRewardCode(),order.getRebateDiscountAmount(),
+                order.getBranch().getId(), slot == null ? null : slot.getId()
         );
     }
 

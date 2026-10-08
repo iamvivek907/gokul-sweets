@@ -43,7 +43,7 @@ try {for(const width of [320,390,640,1280]) {
  await page.addInitScript(branch=>{if(!localStorage.getItem('gokul-selected-branch'))localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');},branch);
  const load=async()=>{await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});};
  const pickup=page.getByRole('region',{name:'Menu pickup time'});
- await load();await pickup.getByText(/Today · 8:00/).waitFor();
+ await load();await pickup.getByText(/Today, .* · 8:00/).waitFor();
  await page.getByRole('heading',{name:'Available for your 8:00 am pickup',exact:false}).waitFor();
  const breakfastSection=page.getByRole('region',{name:'Available for selected pickup'});
  assert.equal(await breakfastSection.getByRole('heading',{name:'Aloo Paratha',exact:true}).count(),1,'All is the default, even though Food is first in the catalog');
@@ -52,7 +52,7 @@ try {for(const width of [320,390,640,1280]) {
  await page.getByText('Available for pickup from 11 AM.',{exact:true}).waitFor();
  const first=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));assert.equal(first.slot.id,8);assert.equal(first.date,today);assert.equal(first.pickupType,'NORMAL');
  await mkdir(screenshots,{recursive:true});await page.screenshot({path:`${screenshots}/pickup-breakfast-${width}.png`,fullPage:true});
- await page.reload();await pickup.getByText(/Today · 8:00/).waitFor();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))),first);
+ await page.reload();await pickup.getByText(/Today, .* · 8:00/).waitFor();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))),first);
  // A mixed breakfast/lunch cart cannot silently move its pickup or discard its items.
  await breakfastSection.getByRole('button',{name:'Add Aloo Paratha to cart'}).click();
  await pickup.getByRole('button',{name:'Change time',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Choose pickup date & time'});
@@ -65,7 +65,7 @@ try {for(const width of [320,390,640,1280]) {
  // Explicitly choose lunch after resolving the incompatible cart.
  await pickup.getByRole('button',{name:'Change time',exact:true}).click();
  await dialog.getByRole('button',{name:/11:00–11:30/}).click();await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.waitFor({state:'hidden'});
- await pickup.getByText(/Today · 11:00/).waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Veg Chowmein to cart"]')?.disabled);
+ await pickup.getByText(/Today, .* · 11:00/).waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Veg Chowmein to cart"]')?.disabled);
  assert.equal(await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).isDisabled(),true);
  // All eligible restores the current category presentation without extra availability sections.
  mode='all';revision='2';await page.clock.fastForward(31000);await breakfastSection.waitFor({state:'hidden'});await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
@@ -75,26 +75,27 @@ try {for(const width of [320,390,640,1280]) {
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).slot.id),11);
  // Closed day: no automatic tomorrow. Priority-only times must not incur an automatic fee.
  for(const state of ['closed','priority','outage']){
-  mode=state;await page.evaluate(()=>{localStorage.removeItem('gokul-pickup-intent');localStorage.removeItem('gokul-selected-pickup-slot');localStorage.removeItem('gokul-cart');});await load();
-  if(state==='closed')await pickup.getByText(/Today's pickup booking is closed/).waitFor();
-  if(state==='priority')await pickup.getByText(/normal pickup times are fully booked/).waitFor();
+  mode=state;await page.evaluate(()=>{localStorage.removeItem('gokul-menu-pickup-mode:v1');localStorage.removeItem('gokul-pickup-intent');localStorage.removeItem('gokul-selected-pickup-slot');localStorage.removeItem('gokul-cart');});await load();
+  if(state==='closed')await pickup.getByText(/No verified normal pickup/).waitFor();
+  if(state==='priority')await pickup.getByText(/No verified normal pickup/).waitFor();
   if(state==='outage')await pickup.getByRole('button',{name:'Retry availability'}).waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
   assert.equal(await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).isDisabled(),true);
  }
- mode='normal';await pickup.getByRole('button',{name:'Retry availability'}).click();await pickup.getByText(/Today · 8:00/).waitFor();
+ mode='normal';await pickup.getByRole('button',{name:'Retry availability'}).click();await pickup.getByText(/Today, .* · 8:00/).waitFor();
  // Empty old-day visits may default today; an old cart and unfinished order must be preserved.
  for(const retain of [false,true]){
   await page.evaluate(({yesterday,breakfast,product,retain})=>{
    localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:yesterday}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date:yesterday,slot:{...breakfast,slotDate:yesterday},pickupType:'NORMAL'}));
+   localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'soonest',pickup:localStorage.getItem('gokul-selected-pickup-slot')}));
    if(retain)localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:1,weightGrams:null}]}));else localStorage.removeItem('gokul-cart');
   },{yesterday,breakfast,product:products[1],retain});await load();
-  if(!retain)await pickup.getByText(/Today · 8:00/).waitFor();else {await pickup.getByText(/Your previous pickup has passed/).waitFor();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),yesterday);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);}
+  if(!retain)await pickup.getByText(/Today, .* · 8:00/).waitFor();else {await pickup.getByText(/Your previous pickup has passed/).waitFor();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),yesterday);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);}
  }
  // An uncertain checkout attempt prevents automatic pickup replacement even with an empty cart.
- await page.evaluate(()=>{localStorage.removeItem('gokul-cart');localStorage.removeItem('gokul-pickup-intent');localStorage.removeItem('gokul-selected-pickup-slot');sessionStorage.setItem('gokul-mobile-order-attempt','pending');});
- const beforeAttempt=checks;await load();await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===true);
- await page.waitForTimeout(800);assert.ok(checks>beforeAttempt);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
+ await page.evaluate(()=>{localStorage.removeItem('gokul-cart');localStorage.removeItem('gokul-menu-pickup-mode:v1');localStorage.removeItem('gokul-pickup-intent');localStorage.removeItem('gokul-selected-pickup-slot');sessionStorage.setItem('gokul-mobile-order-attempt','pending');});
+ await load();await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===true);
+ await page.waitForTimeout(800);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
  assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-mobile-order-attempt')),'pending');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
  await context.close();console.log(`Pickup-aware default, All view, service grouping, refresh, closing, priority, outage and midnight recovery ${width}px passed (${checks} checks)`);

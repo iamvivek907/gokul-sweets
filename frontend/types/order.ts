@@ -116,6 +116,8 @@ export interface OrderResponse {
 
 
 export interface CustomerOrderResponse {
+    branchId?: number;
+    pickupSlotId?: number | null;
     loyaltyDiscount?: number;
     loyaltyCoins?: number;
     loyaltyRewardCode?: string | null;

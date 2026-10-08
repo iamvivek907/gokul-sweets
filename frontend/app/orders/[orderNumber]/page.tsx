@@ -174,9 +174,9 @@ export default function OrderDetailPage() {
 
     useEffect(() => {
         if (features?.paidCartRecovery && order?.paymentStatus === "PAID") {
-            reconcilePaidCart(orderNumber);
+            reconcilePaidCart(orderNumber,order);
         }
-    }, [features?.paidCartRecovery, order?.paymentStatus, orderNumber]);
+    }, [features?.paidCartRecovery, order, orderNumber]);
 
     const fetchOrder =
         useCallback(
