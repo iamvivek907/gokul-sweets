@@ -14,7 +14,7 @@ const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date(`${today}T22:00:00+05:30`)});
- let outage=false,hold=false,release=null;const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let outage=false,hold=false,holdDate=null,release=null,discoveries=0;const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;let json=[];
@@ -25,10 +25,11 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/pickup-discovery')){
+   discoveries++;
    json={today,maximumDate:later,dates:[today,tomorrow,later].map((date,index)=>({date,slots:[{slot:slot(date,index+1),normalAvailable:true,issues:[]}]}))};
   }else if(path.endsWith('/availability')){
    const date=request.postDataJSON().startDate;checks.push(date);
-   if(hold){hold=false;await new Promise(resolve=>{release=resolve;});}
+   if(hold&&(!holdDate||date===holdDate)){hold=false;await new Promise(resolve=>{release=resolve;});}
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
    json={today,maximumDate:later,dates:[{date,available:true,items:[{productId:1,productName:product.name,available:true}],slots:[{slot:slot(date,[today,tomorrow,later].indexOf(date)+1),normalAvailable:true,issues:[]}]}]};
   }
@@ -49,6 +50,31 @@ try{for(const width of [320,390,1280]){
  await page.goto(`${base}/menu`);await pickup.getByText(/Tomorrow, .*8:00/).waitFor();await add.waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled);
  assert.equal((await saved()).slot.branchId,branch.id,'new branch receives its own verified pickup');assert.equal((await saved()).date,tomorrow);assert.equal((await saved()).pickupType,'NORMAL');assert.equal(checks.includes(today),false,'closed slots are skipped before item queries');
  await mkdir(screenshots,{recursive:true});await page.screenshot({path:`${screenshots}/soonest-tomorrow-${width}.png`,fullPage:true});
+ // Returning customers may retain a date without ever confirming a time.
+ for(const fixed of [false,true]){
+  await page.evaluate(({today,fixed})=>{
+   localStorage.removeItem('gokul-selected-pickup-slot');
+   localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));
+   if(fixed)localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:''}));
+   else localStorage.removeItem('gokul-menu-pickup-mode:v1');
+  },{today,fixed});
+  await page.reload();await pickup.getByText(/Tomorrow, .*8:00/).waitFor();
+  assert.equal((await saved()).date,tomorrow);assert.equal((await saved()).slot.id,2);
+  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
+ }
+ // Incomplete recovery must never alter a cart or an unfinished checkout.
+ for(const guard of ['gokul-cart','gokul-pending-order','gokul-pending-payment','gokul-mobile-order-attempt']){
+  await page.evaluate(({today,guard,product})=>{
+   localStorage.removeItem('gokul-selected-pickup-slot');
+   localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));
+   localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:''}));
+   const storage=guard==='gokul-mobile-order-attempt'?sessionStorage:localStorage;
+   storage.setItem(guard,guard==='gokul-cart'?JSON.stringify({branchId:1,items:[{product,quantity:1,weightGrams:null}]}):'{}');
+  },{today,guard,product});
+  const before=discoveries;await page.reload();await pickup.getByText(/Time not selected/).waitFor();await page.waitForTimeout(800);
+  assert.equal(await saved(),null,`${guard} blocks incomplete recovery`);assert.equal(discoveries,before);
+  await page.evaluate(guard=>(guard==='gokul-mobile-order-attempt'?sessionStorage:localStorage).removeItem(guard),guard);
+ }
  await page.reload();await pickup.getByText(/Tomorrow, .*8:00/).waitFor();assert.equal((await saved()).date,tomorrow);
  await pickup.getByRole('button',{name:'Change time',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Choose pickup date & time'});
@@ -73,12 +99,33 @@ try{for(const width of [320,390,1280]){
  await pickup.getByRole('button',{name:'Change time',exact:true}).click();
  await dialog.getByRole('button',{name:'Use this pickup',exact:true}).click();await dialog.waitFor({state:'hidden'});
  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-menu-pickup-mode:v1')).mode),'fixed','explicit confirmation fixes the same pickup too');
- // Late automatic responses cannot overwrite a manual/date-only choice from another tab.
- await page.evaluate(()=>{for(const key of ['gokul-menu-pickup-mode:v1','gokul-selected-pickup-slot','gokul-pickup-intent'])localStorage.removeItem(key);});hold=true;
+ // A date-only storage change must restart recovery rather than just drop the old result.
+ await page.evaluate(today=>{
+  localStorage.removeItem('gokul-selected-pickup-slot');
+  localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));
+  localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:''}));
+ },today);
+ hold=true;holdDate=tomorrow;release=null;await page.reload();
+ const dateDeadline=Date.now()+15000;while(!release&&Date.now()<dateDeadline)await page.waitForTimeout(50);assert.ok(release,'date-only recovery verification started');
+ const oldRelease=release,beforeDateChange=discoveries;
+ await page.evaluate(date=>{localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));window.dispatchEvent(new Event('storage'));},later);
+ await pickup.getByText(/Tomorrow, .*8:00/).waitFor();
+ assert.ok(discoveries>beforeDateChange,'date intent alone restarts discovery');
+ assert.equal((await saved()).date,tomorrow,'replacement verification completes without waiting for the old response');
+ oldRelease();holdDate=null;await page.waitForTimeout(600);
+ assert.equal((await saved()).date,tomorrow);
+ assert.equal(await pickup.getByText('Finding soonest pickup…',{exact:true}).count(),0);
+ await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
+ // Late automatic responses cannot overwrite a confirmed manual pickup from another tab.
+ await page.evaluate(()=>{for(const key of ['gokul-menu-pickup-mode:v1','gokul-selected-pickup-slot','gokul-pickup-intent'])localStorage.removeItem(key);});hold=true;release=null;
  await page.reload();await page.waitForFunction(()=>document.querySelector('.mobile-menu-pickup')?.textContent?.includes('Finding'));
  const deadline=Date.now()+15000;while(!release&&Date.now()<deadline)await page.waitForTimeout(50);assert.ok(release,"automatic verification started");
- await page.evaluate(date=>{localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:''}));window.dispatchEvent(new Event('storage'));},later);
- release();await pickup.getByText(/Time not selected/).waitFor();await page.waitForTimeout(600);assert.equal(await saved(),null);
+ await page.evaluate(value=>{
+  const raw=JSON.stringify(value);localStorage.setItem('gokul-selected-pickup-slot',raw);
+  localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:value.date}));
+  localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:raw}));window.dispatchEvent(new Event('storage'));
+ },{date:later,slot:slot(later,3),pickupType:'NORMAL'});
+ release();await pickup.getByText(/8:00/).waitFor();await page.waitForTimeout(600);assert.equal((await saved()).date,later);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);
  await context.close();console.log(`Soonest pickup future dates, midnight, expiry, cart lock, failure and stale response ${width}px passed`);
 }}finally{await browser.close();}

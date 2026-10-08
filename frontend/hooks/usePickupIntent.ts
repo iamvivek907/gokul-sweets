@@ -1,6 +1,6 @@
 "use client";
 
-import {getMenuPickupModeSnapshot,subscribeMenuPickupMode,isSoonestPickup,setMenuPickupMode} from "@/lib/menuPickupMode";
+import {getMenuPickupModeSnapshot,subscribeMenuPickupMode,isSoonestPickup,canRecoverIncompleteMenuPickup,setMenuPickupMode} from "@/lib/menuPickupMode";
 import {useSyncExternalStore} from "react";
 import {getPickupSlotSnapshot, getServerPickupSlotSnapshot, parsePickupSlot, subscribeToPickupSlot} from "@/lib/checkoutStorage";
 
@@ -36,5 +36,7 @@ export function usePickupIntent(branchId?: number | null) {
     const expired=!!saved && !selection || !!date && !!now && date < indiaToday(new Date(now));
     const preferenceMatches = !date || !saved || saved.slot.branchId !== branchId || date === saved.date;
     if (date && now && date < indiaToday(new Date(now))) date=null;
-    return {date, expired, previousDate, pickupRaw, modeRaw, automatic: preferenceMatches && isSoonestPickup(modeRaw,branchId,pickupRaw,!!previousDate), selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
+    const automatic = preferenceMatches && (isSoonestPickup(modeRaw,branchId,pickupRaw,!!previousDate)
+        || canRecoverIncompleteMenuPickup(modeRaw,branchId,pickupRaw));
+    return {date, dateRaw: raw, expired, previousDate, pickupRaw, modeRaw, automatic, selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
 }
