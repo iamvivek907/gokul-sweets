@@ -1,17 +1,20 @@
 package com.gokulsweets.restaurant.payment.provider.razorpay;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import com.gokulsweets.restaurant.payment.exception.PaymentSignatureException;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+
 import tools.jackson.databind.ObjectMapper;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 
 class RazorpayClientSignatureTest {
 
@@ -33,48 +36,33 @@ class RazorpayClientSignatureTest {
     void acceptsValidCheckoutSignature() {
         String orderId = "order_example";
         String paymentId = "pay_example";
-        String signature = hmac(
-                (orderId + "|" + paymentId).getBytes(StandardCharsets.UTF_8),
-                API_SECRET
-        );
+        String signature =
+                hmac((orderId + "|" + paymentId).getBytes(StandardCharsets.UTF_8), API_SECRET);
 
-        assertDoesNotThrow(() -> client.verifyCheckoutSignature(
-                orderId,
-                paymentId,
-                signature
-        ));
+        assertDoesNotThrow(() -> client.verifyCheckoutSignature(orderId, paymentId, signature));
     }
 
     @Test
     void rejectsInvalidCheckoutSignature() {
         assertThrows(
                 PaymentSignatureException.class,
-                () -> client.verifyCheckoutSignature(
-                        "order_example",
-                        "pay_example",
-                        "00".repeat(32)
-                )
-        );
+                () ->
+                        client.verifyCheckoutSignature(
+                                "order_example", "pay_example", "00".repeat(32)));
     }
 
     @Test
     void acceptsValidRawWebhookSignature() {
-        byte[] payload = "{\"event\":\"payment.captured\"}"
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] payload = "{\"event\":\"payment.captured\"}".getBytes(StandardCharsets.UTF_8);
 
-        assertDoesNotThrow(() -> client.verifyWebhookSignature(
-                payload,
-                hmac(payload, WEBHOOK_SECRET)
-        ));
+        assertDoesNotThrow(
+                () -> client.verifyWebhookSignature(payload, hmac(payload, WEBHOOK_SECRET)));
     }
 
     private String hmac(byte[] payload, String secret) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(
-                    secret.getBytes(StandardCharsets.UTF_8),
-                    "HmacSHA256"
-            ));
+            mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return HexFormat.of().formatHex(mac.doFinal(payload));
         } catch (Exception exception) {
             throw new AssertionError(exception);

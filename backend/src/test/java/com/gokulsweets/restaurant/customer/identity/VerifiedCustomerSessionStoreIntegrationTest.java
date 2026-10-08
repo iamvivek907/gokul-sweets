@@ -1,6 +1,9 @@
 package com.gokulsweets.restaurant.customer.identity;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -10,8 +13,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.TimeZone;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @Transactional
@@ -26,8 +27,7 @@ class VerifiedCustomerSessionStoreIntegrationTest {
 
         assertThat(issued.token()).matches("[0-9a-f]{64}");
         assertThat(issued.toString()).doesNotContain(issued.token());
-        assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), now))
-                .contains(subject);
+        assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), now)).contains(subject);
         assertThat(sessions.subject(ConsentEnvironment.PROD, issued.token(), now)).isEmpty();
         assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), issued.expiresAt()))
                 .isEmpty();
@@ -51,7 +51,11 @@ class VerifiedCustomerSessionStoreIntegrationTest {
             assertThat(issued.expiresAt()).isEqualTo(issuedAt.plusSeconds(30L * 24 * 60 * 60));
             assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), afterIstMidnight))
                     .contains(subject);
-            assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), issued.expiresAt().minusSeconds(1)))
+            assertThat(
+                            sessions.subject(
+                                    ConsentEnvironment.DEV,
+                                    issued.token(),
+                                    issued.expiresAt().minusSeconds(1)))
                     .contains(subject);
             assertThat(sessions.subject(ConsentEnvironment.DEV, issued.token(), issued.expiresAt()))
                     .isEmpty();

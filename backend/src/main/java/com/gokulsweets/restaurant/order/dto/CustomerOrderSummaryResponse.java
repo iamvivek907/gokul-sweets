@@ -1,7 +1,7 @@
 package com.gokulsweets.restaurant.order.dto;
 
-import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 
 import java.math.BigDecimal;
@@ -9,6 +9,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/** Immutable customer order summary response data contract. */
 public record CustomerOrderSummaryResponse(
         String orderNumber,
         Long customerOrderNumber,
@@ -27,6 +28,4 @@ public record CustomerOrderSummaryResponse(
         FulfillmentType fulfillmentType,
         LocalDate deliveryDate,
         LocalTime deliveryStartTime,
-        LocalTime deliveryEndTime
-) {
-}
+        LocalTime deliveryEndTime) {}

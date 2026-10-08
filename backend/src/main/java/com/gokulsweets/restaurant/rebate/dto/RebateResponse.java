@@ -9,51 +9,27 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
+/** Immutable rebate response data contract. */
 public record RebateResponse(
-
         Long id,
-
         String code,
-
         String name,
-
         String description,
-
         RebateScope scope,
-
         RebateVisibility visibility,
-
         RebateType rebateType,
-
         BigDecimal rebateValue,
-
         BigDecimal minimumOrderAmount,
-
         BigDecimal maximumDiscountAmount,
-
         Integer maxTotalUses,
-
         Integer maxUsesPerCustomer,
-
         Long branchId,
-
         String branchName,
-
         LocalDateTime validFrom,
-
         LocalDateTime validUntil,
-
         boolean active,
-
         List<RebateSlabResponse> slabs,
-
         Set<String> customerPhones,
-
         String createdBy,
-
         LocalDateTime createdAt,
-
-        LocalDateTime updatedAt
-
-) {
-}
+        LocalDateTime updatedAt) {}

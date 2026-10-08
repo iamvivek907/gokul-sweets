@@ -1,10 +1,10 @@
 package com.gokulsweets.restaurant;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.metrics.buffering.BufferingApplicationStartup;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class StartupDiagnosticsTest {
     @Test
@@ -14,7 +14,8 @@ class StartupDiagnosticsTest {
         StartupDiagnostics.configure(application, false);
         assertThat(application.getApplicationStartup()).isSameAs(original);
         StartupDiagnostics.configure(application, true);
-        assertThat(application.getApplicationStartup()).isInstanceOf(BufferingApplicationStartup.class);
+        assertThat(application.getApplicationStartup())
+                .isInstanceOf(BufferingApplicationStartup.class);
     }
 
     @Test
@@ -24,7 +25,8 @@ class StartupDiagnosticsTest {
         var report = StartupDiagnostics.slowest(startup.drainBufferedTimeline().getEvents());
         assertThat(report).hasSize(20);
         for (int i = 1; i < report.size(); i++) {
-            assertThat(report.get(i - 1).getDuration()).isGreaterThanOrEqualTo(report.get(i).getDuration());
+            assertThat(report.get(i - 1).getDuration())
+                    .isGreaterThanOrEqualTo(report.get(i).getDuration());
         }
         assertThat(startup.getBufferedTimeline().getEvents()).isEmpty();
     }

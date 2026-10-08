@@ -1,5 +1,8 @@
 package com.gokulsweets.restaurant.order;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.*;
+
 import com.gokulsweets.restaurant.delivery.DeliveryRiderHoldService;
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
 import com.gokulsweets.restaurant.order.entity.Order;
@@ -9,14 +12,12 @@ import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.order.service.CheckoutReservationExpiryProcessor;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
 import com.gokulsweets.restaurant.pickup.service.PickupSlotReservationService;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.*;
 
 class DeliveryCheckoutExpiryTest {
     @Test
@@ -35,7 +36,8 @@ class DeliveryCheckoutExpiryTest {
         order.setReservationExpiresAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")).minusMinutes(1));
         when(orders.findForUpdate("GKS-DELIVERY")).thenReturn(Optional.of(order));
         when(riders.release("server-issued-hold")).thenReturn(true);
-        var processor = new CheckoutReservationExpiryProcessor(orders, payments, pickup, inventory, riders);
+        var processor =
+                new CheckoutReservationExpiryProcessor(orders, payments, pickup, inventory, riders);
 
         assertThat(processor.expireReservation("GKS-DELIVERY")).isTrue();
         assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.CANCELLED);

@@ -1,5 +1,11 @@
 package com.gokulsweets.restaurant.delivery;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
 import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
@@ -7,27 +13,29 @@ import com.gokulsweets.restaurant.customer.CustomerContactService;
 import com.gokulsweets.restaurant.customer.identity.VerifiedOrderOwnership;
 import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
 import com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest;
+import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
-import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
-import com.gokulsweets.restaurant.order.service.PreparationEligibilityService;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.order.service.OrderCalculationService;
 import com.gokulsweets.restaurant.order.service.OrderIdempotencyService;
 import com.gokulsweets.restaurant.order.service.OrderNumberGenerator;
+import com.gokulsweets.restaurant.order.service.PreparationEligibilityService;
 import com.gokulsweets.restaurant.order.service.model.ValidatedOrderData;
 import com.gokulsweets.restaurant.order.service.model.ValidatedOrderItem;
+import com.gokulsweets.restaurant.printing.dto.PrintAgentClaimResponse;
 import com.gokulsweets.restaurant.product.Product;
 import com.gokulsweets.restaurant.product.ProductSaleMode;
-import com.gokulsweets.restaurant.printing.dto.PrintAgentClaimResponse;
+
 import jakarta.persistence.EntityManager;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -36,12 +44,6 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.*;
 
 @SpringBootTest
 @Transactional
@@ -56,51 +58,104 @@ class DeliveryOrderCreationIntegrationTest {
     @Autowired DeliveryPreparationQueue deliveryQueue;
     @Autowired tools.jackson.databind.ObjectMapper json;
 
-    private static EnhancementProperties flagsForEconomics() { return new EnhancementProperties(); }
+    private static EnhancementProperties flagsForEconomics() {
+        return new EnhancementProperties();
+    }
 
     @Test
     void retryReturnsSameOrderWithOneRiderAndInventoryReservation() {
         Clock ist = Clock.system(ZoneId.of("Asia/Kolkata"));
         String key = UUID.randomUUID().toString().substring(0, 8);
-        Long branchId = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, ?) RETURNING id",
-                Long.class, "DCO-" + key, "Delivery " + key);
-        Long categoryId = jdbc.queryForObject("INSERT INTO categories(code, name) VALUES (?, ?) RETURNING id",
-                Long.class, "DCO-C-" + key, "Category " + key);
-        Long productId = jdbc.queryForObject("""
-                INSERT INTO products(code, category_id, name, base_price) VALUES (?, ?, 'Sweet', 100)
-                RETURNING id
-                """, Long.class, "DCO-P-" + key, categoryId);
-        Long branchProductId = jdbc.queryForObject("""
-                INSERT INTO branch_products(branch_id, product_id) VALUES (?, ?) RETURNING id
-                """, Long.class, branchId, productId);
-        Long zoneId = jdbc.queryForObject("""
-                INSERT INTO delivery_zones(branch_id, locality_key, postal_code, opens_at, closes_at, active, rider_paused)
-                VALUES (?, 'hazratganj', '226001', '10:00', '20:00', true, false) RETURNING id
-                """, Long.class, branchId);
+        Long branchId =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code, name) VALUES (?, ?) RETURNING id",
+                        Long.class,
+                        "DCO-" + key,
+                        "Delivery " + key);
+        Long categoryId =
+                jdbc.queryForObject(
+                        "INSERT INTO categories(code, name) VALUES (?, ?) RETURNING id",
+                        Long.class,
+                        "DCO-C-" + key,
+                        "Category " + key);
+        Long productId =
+                jdbc.queryForObject(
+                        """
+INSERT INTO products(code, category_id, name, base_price) VALUES (?, ?, 'Sweet', 100)
+RETURNING id
+""",
+                        Long.class,
+                        "DCO-P-" + key,
+                        categoryId);
+        Long branchProductId =
+                jdbc.queryForObject(
+                        """
+INSERT INTO branch_products(branch_id, product_id) VALUES (?, ?) RETURNING id
+""",
+                        Long.class,
+                        branchId,
+                        productId);
+        Long zoneId =
+                jdbc.queryForObject(
+                        """
+INSERT INTO delivery_zones(branch_id, locality_key, postal_code, opens_at, closes_at, active, rider_paused)
+VALUES (?, 'hazratganj', '226001', '10:00', '20:00', true, false) RETURNING id
+""",
+                        Long.class,
+                        branchId);
         LocalDate date = LocalDate.now(ist).plusDays(1);
-        Long windowId = jdbc.queryForObject("""
-                INSERT INTO delivery_capacity_windows(zone_id, service_date, starts_at, ends_at, rider_capacity, paused)
-                VALUES (?, ?, '11:00', '12:00', 1, false) RETURNING id
-                """, Long.class, zoneId, date);
+        Long windowId =
+                jdbc.queryForObject(
+                        """
+INSERT INTO delivery_capacity_windows(zone_id, service_date, starts_at, ends_at, rider_capacity, paused)
+VALUES (?, ?, '11:00', '12:00', 1, false) RETURNING id
+""",
+                        Long.class,
+                        zoneId,
+                        date);
         var branch = em.find(Branch.class, branchId);
         var product = em.find(Product.class, productId);
         var branchProduct = em.find(BranchProduct.class, branchProductId);
         var items = List.of(new CreateOrderItemRequest(productId, 1, null));
-        var quote = new DeliveryCapacityService.QuoteRequest(branchId, "Hazratganj", "226001", date,
-                items, 26.85, 80.94);
-        var window = new DeliveryCapacityService.Window(windowId, zoneId, date,
-                LocalTime.of(11, 0), LocalTime.of(12, 0), 1, 0, false);
-        var validated = new ValidatedOrderData(branch, null, null, List.of(new ValidatedOrderItem(
-                product, branchProduct, ProductSaleMode.UNIT, 1, null)));
-        var prepared = new DeliveryOrderPreparationService.Prepared(validated,
-                new OrderCalculationService().calculateDelivery(validated.items()), window,
-                new DeliveryEconomicsService(flagsForEconomics(), java.time.Clock.system(java.time.ZoneId.of("Asia/Kolkata"))).assess(
-                        new OrderCalculationService().calculateDelivery(validated.items())));
+        var quote =
+                new DeliveryCapacityService.QuoteRequest(
+                        branchId, "Hazratganj", "226001", date, items, 26.85, 80.94);
+        var window =
+                new DeliveryCapacityService.Window(
+                        windowId,
+                        zoneId,
+                        date,
+                        LocalTime.of(11, 0),
+                        LocalTime.of(12, 0),
+                        1,
+                        0,
+                        false);
+        var validated =
+                new ValidatedOrderData(
+                        branch,
+                        null,
+                        null,
+                        List.of(
+                                new ValidatedOrderItem(
+                                        product, branchProduct, ProductSaleMode.UNIT, 1, null)));
+        var prepared =
+                new DeliveryOrderPreparationService.Prepared(
+                        validated,
+                        new OrderCalculationService().calculateDelivery(validated.items()),
+                        window,
+                        new DeliveryEconomicsService(
+                                        flagsForEconomics(),
+                                        java.time.Clock.system(java.time.ZoneId.of("Asia/Kolkata")))
+                                .assess(
+                                        new OrderCalculationService()
+                                                .calculateDelivery(validated.items())));
         var preparation = mock(DeliveryOrderPreparationService.class);
         when(preparation.prepare(quote, windowId)).thenReturn(prepared);
         var capacity = mock(DeliveryCapacityService.class);
         when(capacity.enabled()).thenReturn(true);
-        when(capacity.quote(quote)).thenReturn(new DeliveryCapacityService.Quote(List.of(window), false, "Provisional"));
+        when(capacity.quote(quote))
+                .thenReturn(
+                        new DeliveryCapacityService.Quote(List.of(window), false, "Provisional"));
         var flags = new EnhancementProperties();
         flags.setDeliveryRiderHolds(true);
         flags.setDeliveryAddressBoundaries(true);
@@ -116,13 +171,34 @@ class DeliveryOrderCreationIntegrationTest {
         var contacts = mock(CustomerContactService.class);
         var ownership = mock(VerifiedOrderOwnership.class);
         var accepted = new DeliveryAcceptedQuoteService(flags, preparation, ist);
-        ReflectionTestUtils.setField(accepted, "signingKey", "delivery-quote-test-signing-key-at-least-32-characters");
-        var service = new DeliveryOrderCreationService(mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),flags, preparation, accepted, rider, inventory,
-                idempotency, orders, jdbc, numbers, contacts, ownership, ist);
-        var draft = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
-                "Customer", "9999999999", "12 Main Road", null);
-        var request = new DeliveryOrderCreationService.CreateRequest(quote, windowId,
-                "Customer", "9999999999", "12 Main Road", accepted.preview(draft).token());
+        ReflectionTestUtils.setField(
+                accepted, "signingKey", "delivery-quote-test-signing-key-at-least-32-characters");
+        var service =
+                new DeliveryOrderCreationService(
+                        mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
+                        flags,
+                        preparation,
+                        accepted,
+                        rider,
+                        inventory,
+                        idempotency,
+                        orders,
+                        jdbc,
+                        numbers,
+                        contacts,
+                        ownership,
+                        ist);
+        var draft =
+                new DeliveryOrderCreationService.CreateRequest(
+                        quote, windowId, "Customer", "9999999999", "12 Main Road", null);
+        var request =
+                new DeliveryOrderCreationService.CreateRequest(
+                        quote,
+                        windowId,
+                        "Customer",
+                        "9999999999",
+                        "12 Main Road",
+                        accepted.preview(draft).token());
         String idempotencyKey = "delivery-create-" + key;
 
         var first = service.create(request, idempotencyKey, null);
@@ -133,12 +209,21 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(first.id()).isPositive();
         assertThat(first.branchId()).isEqualTo(branchId);
         assertThat(first.windowId()).isEqualTo(windowId);
-        assertThat(first.orderStatus()).isEqualTo(com.gokulsweets.restaurant.order.enums.OrderStatus.PENDING_PAYMENT);
+        assertThat(first.orderStatus())
+                .isEqualTo(com.gokulsweets.restaurant.order.enums.OrderStatus.PENDING_PAYMENT);
         assertThat(first.createdAt()).isNotNull();
-        assertThat(jdbc.queryForObject("SELECT reserved_count FROM delivery_capacity_windows WHERE id = ?",
-                Integer.class, windowId)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM orders WHERE order_number = ?",
-                Integer.class, first.orderNumber())).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT reserved_count FROM delivery_capacity_windows WHERE id = ?",
+                                Integer.class,
+                                windowId))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM orders WHERE order_number = ?",
+                                Integer.class,
+                                first.orderNumber()))
+                .isEqualTo(1);
         var saved = orders.findByOrderNumber(first.orderNumber()).orElseThrow();
         assertThat(saved.getFulfillmentType()).isEqualTo(FulfillmentType.DELIVERY);
         assertThat(saved.getPickupSlot()).isNull();
@@ -147,8 +232,10 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(kitchenWindow.date()).isEqualTo(date);
         assertThat(kitchenWindow.start()).isEqualTo(LocalTime.of(11, 0));
         assertThat(kitchenWindow.end()).isEqualTo(LocalTime.of(12, 0));
-        var foreignBranch = new Branch(); foreignBranch.setId(branchId + 999);
-        var wrongBranchOrder = new Order(); wrongBranchOrder.setBranch(foreignBranch);
+        var foreignBranch = new Branch();
+        foreignBranch.setId(branchId + 999);
+        var wrongBranchOrder = new Order();
+        wrongBranchOrder.setBranch(foreignBranch);
         wrongBranchOrder.setFulfillmentType(FulfillmentType.DELIVERY);
         wrongBranchOrder.setDeliveryWindowId(windowId);
         assertThatThrownBy(() -> deliveryWindows.require(wrongBranchOrder))
@@ -169,19 +256,37 @@ class DeliveryOrderCreationIntegrationTest {
         assertThat(deliveryQueue.eligible(branchId, date.atTime(9, 59), 10)).isEmpty();
         assertThat(deliveryQueue.eligibleCount(branchId, date.atTime(9, 59))).isZero();
         assertThat(deliveryQueue.eligible(branchId, date.atTime(10, 0), 10))
-                .extracting(Order::getId).containsExactly(saved.getId());
+                .extracting(Order::getId)
+                .containsExactly(saved.getId());
         assertThat(deliveryQueue.eligibleCount(branchId, date.atTime(10, 0))).isEqualTo(1);
         assertThat(deliveryQueue.overdueCount(branchId, date.atTime(10, 0))).isZero();
         assertThat(deliveryQueue.overdueCount(branchId, date.atTime(11, 0))).isEqualTo(1);
         assertThat(deliveryQueue.eligible(branchId + 999, date.atTime(11, 0), 10)).isEmpty();
 
-        // External printer-agent contract: delivery has its own IST window; never invent a pickup slot.
-        var printPayload = new PrintAgentClaimResponse.KotPayload(1L, "KOT-1", saved.getOrderNumber(), saved.getCustomerOrderNumber(),
-                branch.getName(), branch.getAddress(), null, null, null, null, "Kitchen", date.atTime(10, 0),
-                List.of(new PrintAgentClaimResponse.Item("Sweet", 1, 0)), FulfillmentType.DELIVERY,
-                kitchenWindow.date(), kitchenWindow.start(), kitchenWindow.end());
+        // External printer-agent contract: delivery has its own IST window; never invent a pickup
+        // slot.
+        var printPayload =
+                new PrintAgentClaimResponse.KotPayload(
+                        1L,
+                        "KOT-1",
+                        saved.getOrderNumber(),
+                        saved.getCustomerOrderNumber(),
+                        branch.getName(),
+                        branch.getAddress(),
+                        null,
+                        null,
+                        null,
+                        null,
+                        "Kitchen",
+                        date.atTime(10, 0),
+                        List.of(new PrintAgentClaimResponse.Item("Sweet", 1, 0)),
+                        FulfillmentType.DELIVERY,
+                        kitchenWindow.date(),
+                        kitchenWindow.start(),
+                        kitchenWindow.end());
         String printJson = json.writeValueAsString(printPayload);
-        assertThat(printJson).contains("\"fulfillmentType\":\"DELIVERY\"")
+        assertThat(printJson)
+                .contains("\"fulfillmentType\":\"DELIVERY\"")
                 .contains("\"deliveryDate\":\"" + date + "\"")
                 .doesNotContain("\"pickupDate\":\"" + date + "\"");
     }

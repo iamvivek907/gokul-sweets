@@ -6,10 +6,9 @@ import com.gokulsweets.restaurant.pickup.PickupSlot;
 
 import java.util.List;
 
+/** Immutable validated order data data contract. */
 public record ValidatedOrderData(
         Branch branch,
         PickupSlot pickupSlot,
         PickupType pickupType,
-        List<ValidatedOrderItem> items
-) {
-}
+        List<ValidatedOrderItem> items) {}

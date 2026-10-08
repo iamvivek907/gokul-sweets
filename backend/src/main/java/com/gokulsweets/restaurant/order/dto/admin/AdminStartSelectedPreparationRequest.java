@@ -8,27 +8,10 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
+/** Immutable admin start selected preparation request data contract. */
 public record AdminStartSelectedPreparationRequest(
-
-        @NotNull(
-                message = "Branch ID is required."
-        )
-        Long branchId,
-
-        @NotEmpty(
-                message = "At least one order number is required."
-        )
-        @Size(
-                max = 50,
-                message = "A maximum of 50 orders can be started at once."
-        )
-        List<
-                @Valid
-                @NotBlank(
-                        message = "Order number must not be blank."
-                )
-                        String
-                > orderNumbers
-
-) {
-}
+        @NotNull(message = "Branch ID is required.") Long branchId,
+        @NotEmpty(message = "At least one order number is required.")
+                @Size(max = 50, message = "A maximum of 50 orders can be started at once.")
+                List<@Valid @NotBlank(message = "Order number must not be blank.") String>
+                        orderNumbers) {}

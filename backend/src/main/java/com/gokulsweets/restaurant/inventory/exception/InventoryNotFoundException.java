@@ -1,20 +1,30 @@
 package com.gokulsweets.restaurant.inventory.exception;
 
-public class InventoryNotFoundException
-        extends RuntimeException {
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
+/** Backend inventory not found exception contract and implementation. */
+public class InventoryNotFoundException extends RuntimeException {
 
     private final String code;
 
-    public InventoryNotFoundException(
-            String code,
-            String message
-    ) {
+    public InventoryNotFoundException(String code, String message) {
         super(message);
         this.code = code;
     }
 
+    /**
+     * Returns code.
+     *
+     * @return the get code result
+     */
     public String getCode() {
-        return code;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryNotFoundException.class, "getCode()");
+        try {
+            return code;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryNotFoundException.class, "getCode()");
+        }
     }
 }
-

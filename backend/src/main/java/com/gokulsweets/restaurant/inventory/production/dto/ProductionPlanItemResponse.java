@@ -3,6 +3,7 @@ package com.gokulsweets.restaurant.inventory.production.dto;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Immutable production plan item response data contract. */
 public record ProductionPlanItemResponse(
         Long branchProductId,
         Long productId,
@@ -27,6 +28,4 @@ public record ProductionPlanItemResponse(
         BigDecimal minimumToPrepareQuantity,
         BigDecimal suggestedToPrepareQuantity,
         LocalDateTime expectedReadyAt,
-        String note
-) {
-}
+        String note) {}

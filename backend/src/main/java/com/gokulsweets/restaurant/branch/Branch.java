@@ -1,6 +1,9 @@
 package com.gokulsweets.restaurant.branch;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,22 +11,30 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/** Persisted branch state. */
 @Entity
 @Table(name = "branches")
 @Getter
 @Setter
 public class Branch {
-    @Column(nullable=false) private boolean onlinePaymentFeeEnabled=false;
-    @Column(nullable=false,precision=5,scale=2) private BigDecimal onlinePaymentFeeRate=BigDecimal.ZERO;
-    @Column(nullable=false,precision=5,scale=2) private BigDecimal onlinePaymentFeeTaxRate=BigDecimal.ZERO;
 
-    @Column(nullable=false, precision=10, scale=2)
+    @Column(nullable = false)
+    private boolean onlinePaymentFeeEnabled = false;
+
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal onlinePaymentFeeRate = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal onlinePaymentFeeTaxRate = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal pickupConvenienceFee = BigDecimal.ZERO;
-    @Column(nullable=false, precision=5, scale=2)
-    private BigDecimal pickupConvenienceFeeTaxRate = BigDecimal.ZERO;
-    @Column(nullable=false)
-    private long pickupFeeVersion;
 
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal pickupConvenienceFeeTaxRate = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private long pickupFeeVersion;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -66,7 +77,7 @@ public class Branch {
     @Column(nullable = false)
     private boolean active = true;
 
-    @Column(nullable=false)
+    @Column(nullable = false)
     private boolean operational = true;
 
     @Column(nullable = false)
@@ -75,15 +86,27 @@ public class Branch {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos = MethodTiming.start(Branch.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Branch.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos = MethodTiming.start(Branch.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Branch.class, "onUpdate()");
+        }
     }
 }

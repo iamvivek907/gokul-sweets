@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.staff;
 
+/** Defines the supported permission name values. */
 public enum PermissionName {
     ORDER_VIEW,
     ORDER_START_PREPARATION,

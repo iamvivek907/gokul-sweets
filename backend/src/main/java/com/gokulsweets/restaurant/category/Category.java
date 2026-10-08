@@ -1,21 +1,19 @@
 package com.gokulsweets.restaurant.category;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+/** Persisted category state. */
 @Entity
 @Table(
         name = "categories",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_categories_code",
-                        columnNames = "code"
-                )
-        }
-)
+        uniqueConstraints = {@UniqueConstraint(name = "uk_categories_code", columnNames = "code")})
 @Getter
 @Setter
 public class Category {
@@ -37,11 +35,7 @@ public class Category {
      * Do not use the display name as identity because names may
      * legitimately change over time.
      */
-    @Column(
-            nullable = false,
-            unique = true,
-            length = 80
-    )
+    @Column(nullable = false, unique = true, length = 80)
     private String code;
 
     @Column(nullable = false, length = 100)
@@ -62,20 +56,27 @@ public class Category {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-
-        LocalDateTime now =
-                LocalDateTime.now();
-
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos = MethodTiming.start(Category.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Category.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-
-        updatedAt =
-                LocalDateTime.now();
+        final long __gokulMethodStartedNanos = MethodTiming.start(Category.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Category.class, "onUpdate()");
+        }
     }
 }

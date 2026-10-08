@@ -5,6 +5,7 @@ import com.gokulsweets.restaurant.product.ProductSaleMode;
 
 import java.math.BigDecimal;
 
+/** Immutable calculated order item data contract. */
 public record CalculatedOrderItem(
         Product product,
         ProductSaleMode saleMode,
@@ -13,6 +14,4 @@ public record CalculatedOrderItem(
         BigDecimal unitPrice,
         BigDecimal taxRate,
         BigDecimal taxAmount,
-        BigDecimal lineTotal
-) {
-}
+        BigDecimal lineTotal) {}

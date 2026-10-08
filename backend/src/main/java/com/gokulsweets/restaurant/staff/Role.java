@@ -1,6 +1,7 @@
 package com.gokulsweets.restaurant.staff;
 
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -8,6 +9,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 
+/** Persisted role state. */
 @Entity
 @Table(name = "roles")
 @Getter
@@ -15,16 +17,10 @@ import java.util.Set;
 public class Role {
 
     @Id
-    @GeneratedValue(
-            strategy = GenerationType.IDENTITY
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(
-            nullable = false,
-            unique = true,
-            length = 50
-    )
+    @Column(nullable = false, unique = true, length = 50)
     private String name;
 
     @Column(length = 255)
@@ -33,23 +29,10 @@ public class Role {
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "role_permissions",
+            joinColumns = @JoinColumn(name = "role_id"),
+            inverseJoinColumns = @JoinColumn(name = "permission_id"))
+    private Set<Permission> permissions = new HashSet<>();
 
-            joinColumns =
-            @JoinColumn(
-                    name = "role_id"
-            ),
-
-            inverseJoinColumns =
-            @JoinColumn(
-                    name = "permission_id"
-            )
-    )
-    private Set<Permission> permissions =
-            new HashSet<>();
-
-    @Column(
-            name = "created_at",
-            nullable = false
-    )
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 }

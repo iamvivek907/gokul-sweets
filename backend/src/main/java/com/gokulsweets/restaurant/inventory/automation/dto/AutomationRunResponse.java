@@ -3,6 +3,7 @@ package com.gokulsweets.restaurant.inventory.automation.dto;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** Immutable automation run response data contract. */
 public record AutomationRunResponse(
         Long id,
         Long branchId,
@@ -18,6 +19,4 @@ public record AutomationRunResponse(
         String initiatedBy,
         LocalDateTime startedAt,
         LocalDateTime completedAt,
-        String errorSummary
-) {
-}
+        String errorSummary) {}

@@ -1,14 +1,16 @@
 package com.gokulsweets.restaurant.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.gokulsweets.restaurant.common.security.WebCorsProperties;
+
 import jakarta.validation.Validation;
+
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class RuntimeConfigurationTest {
     @Test
@@ -18,32 +20,49 @@ class RuntimeConfigurationTest {
             assertThat(stream).isNotNull();
             properties.load(stream);
         }
-        var enabledFeatures = properties.stringPropertyNames().stream()
-                .filter(key -> key.startsWith("gokul.features."))
-                .filter(key -> !key.endsWith("future-ordering-days"))
-                .filter(key -> !key.endsWith("branch-experience"))
-                .filter(key -> !List.of("gokul.features.simplified-checkout", "gokul.features.bilingual-storefront", "gokul.features.admin-preparation-board").contains(key))
-                .toList();
-        assertThat(properties.getProperty("gokul.notifications.staff.email-enabled")).endsWith(":true}");
+        var enabledFeatures =
+                properties.stringPropertyNames().stream()
+                        .filter(key -> key.startsWith("gokul.features."))
+                        .filter(key -> !key.endsWith("future-ordering-days"))
+                        .filter(key -> !key.endsWith("branch-experience"))
+                        .filter(
+                                key ->
+                                        !List.of(
+                                                        "gokul.features.simplified-checkout",
+                                                        "gokul.features.bilingual-storefront",
+                                                        "gokul.features.admin-preparation-board")
+                                                .contains(key))
+                        .toList();
+        assertThat(properties.getProperty("gokul.notifications.staff.email-enabled"))
+                .endsWith(":true}");
         assertThat(enabledFeatures).hasSizeGreaterThan(30);
         for (var feature : enabledFeatures) {
             assertThat(properties.getProperty(feature)).endsWith(":true}");
         }
-        for (var feature : List.of("simplified-checkout", "bilingual-storefront", "admin-preparation-board")) {
+        for (var feature :
+                List.of("simplified-checkout", "bilingual-storefront", "admin-preparation-board")) {
             assertThat(properties.getProperty("gokul.features." + feature)).endsWith(":true}");
         }
-        assertThat(properties.getProperty("gokul.features.customer-account-hub")).endsWith(":true}");
+        assertThat(properties.getProperty("gokul.features.customer-account-hub"))
+                .endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.branch-experience")).endsWith(":true}");
-        assertThat(properties.getProperty("gokul.features.planned-pickup-production")).endsWith(":true}");
-        assertThat(properties.getProperty("gokul.features.planned-delivery-production")).endsWith(":true}");
+        assertThat(properties.getProperty("gokul.features.planned-pickup-production"))
+                .endsWith(":true}");
+        assertThat(properties.getProperty("gokul.features.planned-delivery-production"))
+                .endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.occasion-enquiries")).endsWith(":true}");
         assertThat(properties.getProperty("gokul.features.occasion-payments")).endsWith(":true}");
-        assertThat(properties.getProperty("gokul.features.occasion-bulk-production")).endsWith(":true}");
-        assertThat(properties.getProperty("gokul.features.gokul-rewards")).isEqualTo("${GOKUL_FEATURES_GOKUL_REWARDS:true}");
+        assertThat(properties.getProperty("gokul.features.occasion-bulk-production"))
+                .endsWith(":true}");
+        assertThat(properties.getProperty("gokul.features.gokul-rewards"))
+                .isEqualTo("${GOKUL_FEATURES_GOKUL_REWARDS:true}");
         assertThat(properties.getProperty("inventory.enforcement-enabled")).isEqualTo("true");
-        assertThat(properties.getProperty("inventory.automation.scheduler-enabled")).isEqualTo("true");
-        assertThat(properties.getProperty("gokul.identity.provider-abuse-controls-verified")).endsWith(":false}");
-        assertThat(properties.getProperty("gokul.environment-isolation.enabled")).endsWith(":true}");
+        assertThat(properties.getProperty("inventory.automation.scheduler-enabled"))
+                .isEqualTo("true");
+        assertThat(properties.getProperty("gokul.identity.provider-abuse-controls-verified"))
+                .endsWith(":false}");
+        assertThat(properties.getProperty("gokul.environment-isolation.enabled"))
+                .endsWith(":true}");
         assertThat(properties.getProperty("gokul.web.environment-cors-enabled")).endsWith(":true}");
     }
 

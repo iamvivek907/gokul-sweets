@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.order.enums;
 
+/** Defines the supported preparation eligibility status values. */
 public enum PreparationEligibilityStatus {
 
     /*
@@ -7,22 +8,16 @@ public enum PreparationEligibilityStatus {
      * window has not started yet.
      */
     SCHEDULED,
-
-
     /*
      * Preparation window has started and the pickup
      * start time has not yet passed.
      */
     ELIGIBLE,
-
-
     /*
      * Pickup start time has already been reached or
      * passed while the order remains CONFIRMED.
      */
     OVERDUE,
-
-
     /*
      * Preparation eligibility is only relevant to
      * CONFIRMED orders.

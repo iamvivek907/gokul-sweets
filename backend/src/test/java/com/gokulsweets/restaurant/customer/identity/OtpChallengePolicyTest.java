@@ -1,15 +1,16 @@
 package com.gokulsweets.restaurant.customer.identity;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import org.junit.jupiter.api.Test;
 
 import java.security.SecureRandom;
 import java.time.Instant;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
 class OtpChallengePolicyTest {
-    private final OtpChallengePolicy policy = new OtpChallengePolicy(new SecureRandom(), new byte[32]);
+    private final OtpChallengePolicy policy =
+            new OtpChallengePolicy(new SecureRandom(), new byte[32]);
     private final Instant now = Instant.parse("2026-09-26T16:00:00Z");
 
     @Test
@@ -19,8 +20,10 @@ class OtpChallengePolicyTest {
         assertThat(issued.toString()).doesNotContain(issued.code());
         var verified = policy.verify(issued.challenge(), "+919876543210", issued.code(), now);
         assertThat(verified.verified()).isTrue();
-        assertThat(policy.verify(verified.challenge(), "+919876543210", issued.code(), now)
-                .verified()).isFalse();
+        assertThat(
+                        policy.verify(verified.challenge(), "+919876543210", issued.code(), now)
+                                .verified())
+                .isFalse();
     }
 
     @Test
@@ -35,8 +38,14 @@ class OtpChallengePolicyTest {
         }
         assertThat(policy.verify(challenge, "+919876543210", issued.code(), now).verified())
                 .isFalse();
-        assertThat(policy.verify(issued.challenge(), "+919876543210", issued.code(),
-                now.plus(OtpChallengePolicy.EXPIRY)).verified()).isFalse();
+        assertThat(
+                        policy.verify(
+                                        issued.challenge(),
+                                        "+919876543210",
+                                        issued.code(),
+                                        now.plus(OtpChallengePolicy.EXPIRY))
+                                .verified())
+                .isFalse();
         assertThat(issued.challenge().resendAfter()).isAfter(now);
         assertThat(policy.canResend(issued.challenge(), now.plusSeconds(59))).isFalse();
         assertThat(policy.canResend(issued.challenge(), now.plusSeconds(60))).isTrue();

@@ -4,24 +4,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** Immutable payroll opening balance response data contract. */
 public record PayrollOpeningBalanceResponse(
-
         Long id,
-
         Long staffUserId,
-
         LocalDate asOfDate,
-
         BigDecimal earnedAmount,
-
         BigDecimal takenAmount,
-
         BigDecimal netOpeningBalance,
-
         String note,
-
         String createdByName,
-
-        LocalDateTime createdAt
-) {
-}
+        LocalDateTime createdAt) {}

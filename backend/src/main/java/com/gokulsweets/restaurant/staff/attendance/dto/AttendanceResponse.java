@@ -7,38 +7,21 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 
+/** Immutable attendance response data contract. */
 public record AttendanceResponse(
-
         Long id,
-
         String approvalRequestNumber,
-
         ApprovalRequestStatus status,
-
         Integer workflowVersion,
-
         Long branchId,
-
         String branchCode,
-
         String branchName,
-
         LocalDate attendanceDate,
-
         AttendanceType attendanceType,
-
         LocalTime checkInTime,
-
         LocalTime checkOutTime,
-
         String note,
-
         LocalDateTime submittedAt,
-
         LocalDateTime resolvedAt,
-
         LocalDateTime createdAt,
-
-        LocalDateTime updatedAt
-) {
-}
+        LocalDateTime updatedAt) {}

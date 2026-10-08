@@ -1,56 +1,35 @@
 package com.gokulsweets.restaurant.kot.entity;
 
 import com.gokulsweets.restaurant.product.Product;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
+/** Persisted kot item state. */
 @Entity
 @Table(
         name = "kot_items",
         indexes = {
-                @Index(
-                        name = "idx_kot_items_kot_id",
-                        columnList = "kot_id"
-                ),
-                @Index(
-                        name = "idx_kot_items_product_id",
-                        columnList = "product_id"
-                )
-        }
-)
+            @Index(name = "idx_kot_items_kot_id", columnList = "kot_id"),
+            @Index(name = "idx_kot_items_product_id", columnList = "product_id")
+        })
 @Getter
 @Setter
 public class KotItem {
 
     @Id
-    @GeneratedValue(
-            strategy = GenerationType.IDENTITY
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
-    @ManyToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "kot_id",
-            nullable = false
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "kot_id", nullable = false)
     private Kot kot;
 
-
-    @ManyToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "product_id",
-            nullable = false
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
     private Product product;
-
 
     /*
      * Product-name snapshot.
@@ -59,17 +38,10 @@ public class KotItem {
      * the name that existed when this KOT
      * was created.
      */
-    @Column(
-            name = "product_name",
-            nullable = false,
-            length = 200
-    )
+    @Column(name = "product_name", nullable = false, length = 200)
     private String productName;
 
-
-    @Column(
-            nullable = false
-    )
+    @Column(nullable = false)
     private Integer quantity;
 
     @Column(name = "sale_mode", length = 20)
@@ -78,10 +50,6 @@ public class KotItem {
     @Column(name = "weight_grams")
     private Integer weightGrams;
 
-
-    @Column(
-            name = "display_order",
-            nullable = false
-    )
+    @Column(name = "display_order", nullable = false)
     private Integer displayOrder = 0;
 }

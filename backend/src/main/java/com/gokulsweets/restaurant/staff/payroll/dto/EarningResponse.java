@@ -6,24 +6,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** Immutable earning response data contract. */
 public record EarningResponse(
-
         Long id,
-
         Long attendanceId,
-
         Long branchId,
-
         String branchName,
-
         LocalDate earningDate,
-
         AttendanceType attendanceType,
-
         BigDecimal rateSnapshot,
-
         BigDecimal amount,
-
-        LocalDateTime createdAt
-) {
-}
+        LocalDateTime createdAt) {}

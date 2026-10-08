@@ -4,6 +4,7 @@ import com.gokulsweets.restaurant.product.ProductSaleMode;
 
 import java.math.BigDecimal;
 
+/** Immutable order item response data contract. */
 public record OrderItemResponse(
         Long id,
         Long productId,
@@ -14,8 +15,7 @@ public record OrderItemResponse(
         BigDecimal unitPrice,
         BigDecimal taxRate,
         BigDecimal taxAmount,
-        BigDecimal lineTotal
-) {
+        BigDecimal lineTotal) {
 
     /*
      * Compatibility constructor for unrelated callers while they are
@@ -30,8 +30,7 @@ public record OrderItemResponse(
             BigDecimal unitPrice,
             BigDecimal taxRate,
             BigDecimal taxAmount,
-            BigDecimal lineTotal
-    ) {
+            BigDecimal lineTotal) {
         this(
                 id,
                 productId,
@@ -42,7 +41,6 @@ public record OrderItemResponse(
                 unitPrice,
                 taxRate,
                 taxAmount,
-                lineTotal
-        );
+                lineTotal);
     }
 }

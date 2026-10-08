@@ -10,75 +10,79 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-public interface CustomerContactRepository
-        extends JpaRepository<CustomerContact, Long> {
+/** Persistence operations for customer contact records. */
+public interface CustomerContactRepository extends JpaRepository<CustomerContact, Long> {
 
-    Optional<CustomerContact>
-    findByNormalizedPhone(
-            String normalizedPhone
-    );
-
-
-    /*
-     * PostgreSQL UPSERT prevents duplicate contact rows when
-     * two checkouts using the same phone arrive concurrently.
+    /**
+     * Finds by normalized phone.
+     *
+     * @param normalizedPhone the normalized phone
+     * @return the find by normalized phone result
      */
-    @Modifying(
-            clearAutomatically = true,
-            flushAutomatically = true
-    )
+    Optional<CustomerContact> findByNormalizedPhone(String normalizedPhone);
+
+    /**
+     * Upserts guest contact.
+     *
+     * @param normalizedPhone the normalized phone
+     * @param latestName the latest name
+     * @param seenAt the seen at
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
-            value = """
-                    INSERT INTO customer_contacts (
-                        normalized_phone,
-                        latest_name,
-                        verification_status,
-                        first_seen_at,
-                        last_seen_at,
-                        created_at,
-                        updated_at
-                    )
-                    VALUES (
-                        :normalizedPhone,
-                        :latestName,
-                        CASE WHEN EXISTS (SELECT 1 FROM verified_customer_subjects v WHERE v.verified_phone=:normalizedPhone) THEN 'VERIFIED' ELSE 'UNVERIFIED' END,
-                        :seenAt,
-                        :seenAt,
-                        :seenAt,
-                        :seenAt
-                    )
-                    ON CONFLICT (normalized_phone)
-                    DO UPDATE SET
-                        latest_name =
-                            COALESCE(
-                                EXCLUDED.latest_name,
-                                customer_contacts.latest_name
-                            ),
-                        last_seen_at =
-                            GREATEST(
-                                customer_contacts.last_seen_at,
-                                EXCLUDED.last_seen_at
-                            ),
-                        updated_at =
-                            EXCLUDED.updated_at
-                    """,
-            nativeQuery = true
-    )
+            value =
+                    """
+INSERT INTO customer_contacts (
+    normalized_phone,
+    latest_name,
+    verification_status,
+    first_seen_at,
+    last_seen_at,
+    created_at,
+    updated_at
+)
+VALUES (
+    :normalizedPhone,
+    :latestName,
+    CASE WHEN EXISTS (SELECT 1 FROM verified_customer_subjects v WHERE v.verified_phone=:normalizedPhone) THEN 'VERIFIED' ELSE 'UNVERIFIED' END,
+    :seenAt,
+    :seenAt,
+    :seenAt,
+    :seenAt
+)
+ON CONFLICT (normalized_phone)
+DO UPDATE SET
+    latest_name =
+        COALESCE(
+            EXCLUDED.latest_name,
+            customer_contacts.latest_name
+        ),
+    last_seen_at =
+        GREATEST(
+            customer_contacts.last_seen_at,
+            EXCLUDED.last_seen_at
+        ),
+    updated_at =
+        EXCLUDED.updated_at
+""",
+            nativeQuery = true)
     void upsertGuestContact(
+            @Param("normalizedPhone") String normalizedPhone,
+            @Param("latestName") String latestName,
+            @Param("seenAt") LocalDateTime seenAt);
 
-            @Param("normalizedPhone")
-            String normalizedPhone,
-
-            @Param("latestName")
-            String latestName,
-
-            @Param("seenAt")
-            LocalDateTime seenAt
-    );
-
-
+    /**
+     * Searches directory.
+     *
+     * @param search the search
+     * @param searchLike the search like
+     * @param status the status
+     * @param pageable the pageable
+     * @return the search directory result
+     */
     @Query(
-            value = """
+            value =
+                    """
                     SELECT
                         cc.id AS id,
                         cc.latest_name AS latestName,
@@ -142,7 +146,8 @@ public interface CustomerContactRepository
                         cc.last_seen_at DESC,
                         cc.id DESC
                     """,
-            countQuery = """
+            countQuery =
+                    """
                     SELECT COUNT(*)
                     FROM customer_contacts cc
                     WHERE
@@ -163,25 +168,22 @@ public interface CustomerContactRepository
                             OR cc.verification_status = :status
                         )
                     """,
-            nativeQuery = true
-    )
-    Page<CustomerDirectoryProjection>
-    searchDirectory(
+            nativeQuery = true)
+    Page<CustomerDirectoryProjection> searchDirectory(
+            @Param("search") String search,
+            @Param("searchLike") String searchLike,
+            @Param("status") String status,
+            Pageable pageable);
 
-            @Param("search")
-            String search,
-
-            @Param("searchLike")
-            String searchLike,
-
-            @Param("status")
-            String status,
-
-            Pageable pageable
-    );
-
+    /**
+     * Finds directory item by id.
+     *
+     * @param customerContactId the customer contact id
+     * @return the find directory item by id result
+     */
     @Query(
-            value = """
+            value =
+                    """
                     SELECT
                         cc.id AS id,
                         cc.latest_name AS latestName,
@@ -225,13 +227,7 @@ public interface CustomerContactRepository
                         cc.first_seen_at,
                         cc.last_seen_at
                     """,
-            nativeQuery = true
-    )
-    Optional<CustomerDirectoryProjection>
-    findDirectoryItemById(
-
-            @Param("customerContactId")
-            Long customerContactId
-    );
-
+            nativeQuery = true)
+    Optional<CustomerDirectoryProjection> findDirectoryItemById(
+            @Param("customerContactId") Long customerContactId);
 }

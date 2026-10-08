@@ -1,8 +1,9 @@
 package com.gokulsweets.restaurant.payment.entity;
 
 import com.gokulsweets.restaurant.config.ApplicationClock;
-
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -13,19 +14,20 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+/** Persisted payment webhook event state. */
 @Entity
 @Table(
         name = "payment_webhook_events",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_payment_webhook_provider_event",
-                columnNames = {"provider", "provider_event_id"}
-        )
-)
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_payment_webhook_provider_event",
+                        columnNames = {"provider", "provider_event_id"}))
 @Getter
 @Setter
 public class PaymentWebhookEvent {
@@ -53,13 +55,20 @@ public class PaymentWebhookEvent {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        if (processedAt == null) {
-            processedAt = ApplicationClock.legacyTimestampNow();
-        }
-        if (createdAt == null) {
-            createdAt = ApplicationClock.legacyTimestampNow();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(PaymentWebhookEvent.class, "onCreate()");
+        try {
+            if (processedAt == null) {
+                processedAt = ApplicationClock.legacyTimestampNow();
+            }
+            if (createdAt == null) {
+                createdAt = ApplicationClock.legacyTimestampNow();
+            }
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, PaymentWebhookEvent.class, "onCreate()");
         }
     }
 }

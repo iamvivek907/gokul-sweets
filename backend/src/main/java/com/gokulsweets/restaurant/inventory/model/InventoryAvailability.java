@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** Immutable inventory availability data contract. */
 public record InventoryAvailability(
         Long branchProductId,
         LocalDate serviceDate,
@@ -15,7 +16,4 @@ public record InventoryAvailability(
         BigDecimal availableQuantity,
         boolean orderable,
         LocalDateTime expectedReadyAt,
-        String unavailableReason
-) {
-}
-
+        String unavailableReason) {}

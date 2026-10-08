@@ -9,53 +9,31 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+/** Immutable order response data contract. */
 public record OrderResponse(
-
         Long id,
-
         String orderNumber,
-
         Long branchId,
-
         Long pickupSlotId,
-
         LocalDate pickupDate,
-
         LocalTime pickupStartTime,
-
         LocalTime pickupEndTime,
-
         String customerName,
-
         String customerPhone,
-
         PickupType pickupType,
-
         BigDecimal priorityCharge,
         BigDecimal convenienceFee,
         BigDecimal convenienceFeeTax,
         BigDecimal paymentFee,
         BigDecimal paymentFeeTax,
         BigDecimal paymentFeeRate,
-
         BigDecimal subtotal,
-
         BigDecimal taxAmount,
-
         BigDecimal totalAmount,
-
         OrderStatus orderStatus,
-
         boolean adminOverride,
-
         String overrideReason,
-
         List<OrderItemResponse> items,
-
         LocalDateTime reservationExpiresAt,
-
         LocalDateTime createdAt,
-
-        LocalDateTime updatedAt
-) {
-}
+        LocalDateTime updatedAt) {}

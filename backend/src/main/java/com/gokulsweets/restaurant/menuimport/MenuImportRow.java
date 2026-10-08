@@ -4,15 +4,14 @@ import com.gokulsweets.restaurant.product.ProductSaleMode;
 
 import java.math.BigDecimal;
 
+/** Immutable menu import row data contract. */
 record MenuImportRow(
         int excelRowNumber,
-
         String categoryCode,
         String categoryName,
         String categoryDescription,
         int categoryDisplayOrder,
         boolean categoryActive,
-
         String productCode,
         String productName,
         String productDescription,
@@ -22,9 +21,6 @@ record MenuImportRow(
         Integer minimumWeightGrams,
         Integer weightStepGrams,
         String taxCode,
-
         BigDecimal branchPriceOverride,
         boolean branchAvailable,
-        int branchDisplayOrder
-) {
-}
+        int branchDisplayOrder) {}

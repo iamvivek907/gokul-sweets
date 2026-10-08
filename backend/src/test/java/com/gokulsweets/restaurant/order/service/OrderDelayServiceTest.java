@@ -1,5 +1,9 @@
 package com.gokulsweets.restaurant.order.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
 import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
@@ -10,6 +14,7 @@ import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import com.gokulsweets.restaurant.staff.PermissionName;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -18,17 +23,22 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
-
 class OrderDelayServiceTest {
     private final EnhancementProperties features = new EnhancementProperties();
     private final ApplicationClock clock = mock(ApplicationClock.class);
     private final OrderRepository orders = mock(OrderRepository.class);
     private final StaffAuthorizationService authorization = mock(StaffAuthorizationService.class);
     private final AdminOrderQueryService queries = mock(AdminOrderQueryService.class);
-    private final OrderDelayService service = new OrderDelayService(features, clock, orders, authorization, queries, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class));
+    private final OrderDelayService service =
+            new OrderDelayService(
+                    features,
+                    clock,
+                    orders,
+                    authorization,
+                    queries,
+                    mock(
+                            com.gokulsweets.restaurant.customer.notification
+                                    .CustomerNotificationInbox.class));
     private final LocalDateTime now = LocalDateTime.of(2026, 9, 26, 10, 0);
     private final Order order = new Order();
 
@@ -49,7 +59,8 @@ class OrderDelayServiceTest {
 
     @Test
     void savesIstEstimateOnceAndRetainsTimestampOnRetry() {
-        var request = new UpdateOrderDelayRequest(now.plusHours(2), "Kitchen running behind schedule");
+        var request =
+                new UpdateOrderDelayRequest(now.plusHours(2), "Kitchen running behind schedule");
         service.report("GKS-TEST", request);
         assertThat(order.getEstimatedReadyAt()).isEqualTo(now.plusHours(2));
         assertThat(order.getDelayReportedAt()).isEqualTo(now);
@@ -61,23 +72,35 @@ class OrderDelayServiceTest {
 
     @Test
     void blocksDisabledUnauthorizedTerminalAndUnreasonableEstimates() {
-        var request = new UpdateOrderDelayRequest(now.plusHours(2), "Kitchen running behind schedule");
+        var request =
+                new UpdateOrderDelayRequest(now.plusHours(2), "Kitchen running behind schedule");
         features.setTruthfulOrderTracking(false);
-        assertThatThrownBy(() -> service.report("GKS-TEST", request)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.report("GKS-TEST", request))
+                .isInstanceOf(IllegalStateException.class);
         verify(orders, never()).saveAndFlush(order);
 
         features.setTruthfulOrderTracking(true);
         doThrow(new SecurityException("wrong branch")).when(authorization).requireBranchAccess(5L);
-        assertThatThrownBy(() -> service.report("GKS-TEST", request)).isInstanceOf(SecurityException.class);
+        assertThatThrownBy(() -> service.report("GKS-TEST", request))
+                .isInstanceOf(SecurityException.class);
         reset(authorization);
         order.setOrderStatus(OrderStatus.CANCELLED);
-        assertThatThrownBy(() -> service.report("GKS-TEST", request)).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> service.report("GKS-TEST", request))
+                .isInstanceOf(IllegalStateException.class);
         order.setOrderStatus(OrderStatus.CONFIRMED);
-        assertThatThrownBy(() -> service.report("GKS-TEST",
-                new UpdateOrderDelayRequest(now.plusMinutes(30), request.reason())))
+        assertThatThrownBy(
+                        () ->
+                                service.report(
+                                        "GKS-TEST",
+                                        new UpdateOrderDelayRequest(
+                                                now.plusMinutes(30), request.reason())))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThatThrownBy(() -> service.report("GKS-TEST",
-                new UpdateOrderDelayRequest(now.plusHours(25), request.reason())))
+        assertThatThrownBy(
+                        () ->
+                                service.report(
+                                        "GKS-TEST",
+                                        new UpdateOrderDelayRequest(
+                                                now.plusHours(25), request.reason())))
                 .isInstanceOf(IllegalArgumentException.class);
         verify(orders, never()).saveAndFlush(order);
     }

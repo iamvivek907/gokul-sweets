@@ -5,33 +5,18 @@ import com.gokulsweets.restaurant.rebate.RebateType;
 
 import java.math.BigDecimal;
 
+/** Immutable available rebate response data contract. */
 public record AvailableRebateResponse(
-
         Long rebateId,
-
         String code,
-
         String name,
-
         String description,
-
         RebateScope scope,
-
         RebateType rebateType,
-
         BigDecimal rebateAmount,
-
         BigDecimal payableAfterRebate,
-
         BigDecimal minimumOrderAmount,
-
         BigDecimal maximumDiscountAmount,
-
         BigDecimal nextSlabMinimumOrderAmount,
-
         BigDecimal nextSlabRebateAmount,
-
-        BigDecimal amountNeededForNextSlab
-
-) {
-}
+        BigDecimal amountNeededForNextSlab) {}

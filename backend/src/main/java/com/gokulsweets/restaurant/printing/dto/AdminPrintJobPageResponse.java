@@ -1,18 +1,7 @@
 package com.gokulsweets.restaurant.printing.dto.admin;
 
 import java.util.List;
-import com.gokulsweets.restaurant.printing.dto.admin.AdminPrintJobResponse;
 
+/** Immutable admin print job page response data contract. */
 public record AdminPrintJobPageResponse(
-
-        List<AdminPrintJobResponse> jobs,
-
-        int page,
-
-        int size,
-
-        long totalElements,
-
-        int totalPages
-) {
-}
+        List<AdminPrintJobResponse> jobs, int page, int size, long totalElements, int totalPages) {}

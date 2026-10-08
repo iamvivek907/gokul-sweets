@@ -6,6 +6,7 @@ import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Immutable payment response data contract. */
 public record PaymentResponse(
         Long paymentId,
         String orderNumber,
@@ -18,6 +19,4 @@ public record PaymentResponse(
         String paymentSessionId,
         String paymentUrl,
         String checkoutKeyId,
-        LocalDateTime expiresAt
-) {
-}
+        LocalDateTime expiresAt) {}

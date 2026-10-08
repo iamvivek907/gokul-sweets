@@ -2,60 +2,244 @@ package com.gokulsweets.restaurant.staff.notification;
 
 import com.gokulsweets.restaurant.customer.notification.WebPushProperties;
 import com.gokulsweets.restaurant.customer.notification.WebPushTransport;
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import com.gokulsweets.restaurant.security.StaffSessionService;
 import com.gokulsweets.restaurant.staff.PermissionName;
+
 import jakarta.servlet.http.HttpServletRequest;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
+
 import java.util.UUID;
 
-@RestController @RequestMapping("/api/admin/notifications") @RequiredArgsConstructor
+/** HTTP endpoints for staff alerts operations. */
+@RestController
+@RequestMapping("/api/admin/notifications")
+@RequiredArgsConstructor
 public class StaffAlertsController {
+
     private final StaffAuthorizationService authorization;
+
     private final StaffOrderAlerts alerts;
+
     private final StaffPushSubscriptions subscriptions;
+
     private final WebPushTransport push;
+
     private final WebPushProperties pushProperties;
+
     private final StaffAlertEmail email;
-    public record Settings(boolean enabled, String environment, long staffId, boolean pushConfigured,
-                           String applicationServerKey, boolean deviceActive, boolean emailConfigured,
-                           int reminderMinutes, int escalationMinutes, boolean emailTestRouting) {}
+
+    /** Immutable settings data contract. */
+    public record Settings(
+            boolean enabled,
+            String environment,
+            long staffId,
+            boolean pushConfigured,
+            String applicationServerKey,
+            boolean deviceActive,
+            boolean emailConfigured,
+            int reminderMinutes,
+            int escalationMinutes,
+            boolean emailTestRouting) {}
+
+    /**
+     * Staffs the operation.
+     *
+     * @return the staff result
+     */
     private long staff() {
-        authorization.requirePermission(PermissionName.ORDER_VIEW);
-        return authorization.getCurrentStaff().getId();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(StaffAlertsController.class, "staff()");
+        try {
+            authorization.requirePermission(PermissionName.ORDER_VIEW);
+            return authorization.getCurrentStaff().getId();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, StaffAlertsController.class, "staff()");
+        }
     }
-    private void enabled() {if (!alerts.enabled()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);}
-    @GetMapping("/settings") public ResponseEntity<Settings> settings(@RequestParam(required = false) UUID deviceId, HttpServletRequest request) {
-        long staffId = staff(); boolean enabled = alerts.enabled(), configured = enabled && push.configured();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(new Settings(enabled, alerts.scope(), staffId, configured,
-                configured ? pushProperties.getPublicKey() : null, enabled && subscriptions.live(staffId, deviceId, StaffSessionService.cookie(request)),
-                enabled && email.recipient(staffId) != null, alerts.reminderMinutes(), alerts.escalationMinutes(), enabled && email.testRouting(staffId)));
+
+    /** Enableds the operation. */
+    private void enabled() {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(StaffAlertsController.class, "enabled()");
+        try {
+            if (!alerts.enabled()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, StaffAlertsController.class, "enabled()");
+        }
     }
-    @GetMapping public ResponseEntity<StaffOrderAlerts.Page> page(@RequestParam(required = false) Long before, @RequestParam(defaultValue = "false") boolean unreadOnly, @RequestParam(defaultValue = "") String search) {
-        long staffId = staff(); enabled();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(alerts.page(staffId, before, unreadOnly, search));
+
+    /**
+     * Settingses the operation.
+     *
+     * @param deviceId the device id
+     * @param request the request
+     * @return the settings result
+     */
+    @GetMapping("/settings")
+    public ResponseEntity<Settings> settings(
+            @RequestParam(required = false) UUID deviceId, HttpServletRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        StaffAlertsController.class, "settings(UUID,HttpServletRequest)");
+        try {
+            long staffId = staff();
+            boolean enabled = alerts.enabled(), configured = enabled && push.configured();
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(
+                            new Settings(
+                                    enabled,
+                                    alerts.scope(),
+                                    staffId,
+                                    configured,
+                                    configured ? pushProperties.getPublicKey() : null,
+                                    enabled
+                                            && subscriptions.live(
+                                                    staffId,
+                                                    deviceId,
+                                                    StaffSessionService.cookie(request)),
+                                    enabled && email.recipient(staffId) != null,
+                                    alerts.reminderMinutes(),
+                                    alerts.escalationMinutes(),
+                                    enabled && email.testRouting(staffId)));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    StaffAlertsController.class,
+                    "settings(UUID,HttpServletRequest)");
+        }
     }
-    @PutMapping("/{id}/read") public ResponseEntity<Void> read(@PathVariable long id) {
-        long staffId = staff(); enabled(); alerts.markRead(staffId, id);
-        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+
+    /**
+     * Pages the operation.
+     *
+     * @param before the before
+     * @param unreadOnly the unread only
+     * @param search the search
+     * @return the page result
+     */
+    @GetMapping
+    public ResponseEntity<StaffOrderAlerts.Page> page(
+            @RequestParam(required = false) Long before,
+            @RequestParam(defaultValue = "false") boolean unreadOnly,
+            @RequestParam(defaultValue = "") String search) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(StaffAlertsController.class, "page(Long,boolean,String)");
+        try {
+            long staffId = staff();
+            enabled();
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(alerts.page(staffId, before, unreadOnly, search));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    StaffAlertsController.class,
+                    "page(Long,boolean,String)");
+        }
     }
+
+    /**
+     * Reads the operation.
+     *
+     * @param id the id
+     * @return the read result
+     */
+    @PutMapping("/{id}/read")
+    public ResponseEntity<Void> read(@PathVariable long id) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(StaffAlertsController.class, "read(long)");
+        try {
+            long staffId = staff();
+            enabled();
+            alerts.markRead(staffId, id);
+            return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, StaffAlertsController.class, "read(long)");
+        }
+    }
+
+    /** Immutable read all data contract. */
     public record ReadAll(@jakarta.validation.constraints.Positive long throughId) {}
-    @PutMapping("/read-all") public ResponseEntity<Void> readAll(@jakarta.validation.Valid @RequestBody ReadAll input) {
-        long staffId=staff();enabled();alerts.markAllRead(staffId,input.throughId());
-        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+
+    /**
+     * Reads all.
+     *
+     * @param input the input
+     * @return the read all result
+     */
+    @PutMapping("/read-all")
+    public ResponseEntity<Void> readAll(@jakarta.validation.Valid @RequestBody ReadAll input) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(StaffAlertsController.class, "readAll(ReadAll)");
+        try {
+            long staffId = staff();
+            enabled();
+            alerts.markAllRead(staffId, input.throughId());
+            return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, StaffAlertsController.class, "readAll(ReadAll)");
+        }
     }
-    @PostMapping("/push-subscriptions") public ResponseEntity<StaffPushSubscriptions.Result> subscribe(@RequestBody StaffPushSubscriptions.Input input, HttpServletRequest request) {
-        long staffId = staff(); enabled();
-        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(subscriptions.subscribe(staffId, StaffSessionService.cookie(request), input));
+
+    /**
+     * Subscribes the operation.
+     *
+     * @param input the input
+     * @param request the request
+     * @return the subscribe result
+     */
+    @PostMapping("/push-subscriptions")
+    public ResponseEntity<StaffPushSubscriptions.Result> subscribe(
+            @RequestBody StaffPushSubscriptions.Input input, HttpServletRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        StaffAlertsController.class,
+                        "subscribe(StaffPushSubscriptions.Input,HttpServletRequest)");
+        try {
+            long staffId = staff();
+            enabled();
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(
+                            subscriptions.subscribe(
+                                    staffId, StaffSessionService.cookie(request), input));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    StaffAlertsController.class,
+                    "subscribe(StaffPushSubscriptions.Input,HttpServletRequest)");
+        }
     }
-    // Revocation remains possible while the feature flag is OFF.
-    @DeleteMapping("/push-subscriptions/{id}") public ResponseEntity<Void> revoke(@PathVariable UUID id) {
-        subscriptions.revoke(authorization.getCurrentStaff().getId(), id);
-        return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+
+    /**
+     * Revokes the operation.
+     *
+     * @param id the id
+     * @return the revoke result
+     */
+    @DeleteMapping("/push-subscriptions/{id}")
+    public ResponseEntity<Void> revoke(@PathVariable UUID id) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(StaffAlertsController.class, "revoke(UUID)");
+        try {
+            subscriptions.revoke(authorization.getCurrentStaff().getId(), id);
+            return ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, StaffAlertsController.class, "revoke(UUID)");
+        }
     }
 }

@@ -7,59 +7,32 @@ import com.gokulsweets.restaurant.printing.enums.PrinterStation;
 
 import java.time.LocalDateTime;
 
+/** Immutable admin print job response data contract. */
 public record AdminPrintJobResponse(
-
         Long id,
-
         Long branchId,
-
         String branchName,
-
         Long kotId,
-
         String kotNumber,
-
         String orderNumber,
         Long customerOrderNumber,
-
         Long printerId,
-
         String printerName,
-
         PrintJobType jobType,
-
         PrintJobPurpose purpose,
-
         PrinterStation station,
-
         PrintJobStatus status,
-
         Integer copies,
-
         Integer attemptCount,
-
         Integer maxAttempts,
-
         String claimedByAgent,
-
         LocalDateTime claimedAt,
-
         LocalDateTime claimExpiresAt,
-
         LocalDateTime queuedAt,
-
         LocalDateTime firstAttemptAt,
-
         LocalDateTime lastAttemptAt,
-
         LocalDateTime printedAt,
-
         LocalDateTime failedAt,
-
         LocalDateTime nextAttemptAt,
-
         String lastErrorCode,
-
-        String lastErrorMessage
-) {
-}
+        String lastErrorMessage) {}

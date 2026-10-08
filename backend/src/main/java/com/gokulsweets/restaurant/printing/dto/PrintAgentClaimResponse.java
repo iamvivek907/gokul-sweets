@@ -9,92 +9,58 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+/** Immutable print agent claim response data contract. */
 public record PrintAgentClaimResponse(
-
         Long printJobId,
-
         String claimToken,
-
         LocalDateTime leaseExpiresAt,
-
         Integer copies,
-
         Printer printer,
+        KotPayload kot) {
 
-        KotPayload kot
-
-) {
-
+    /** Immutable printer data contract. */
     public record Printer(
-
             Long id,
-
             String code,
-
             String name,
-
             PrinterStation station,
-
             PrinterProtocol protocol,
-
             String host,
-
             Integer port,
-
             Integer paperWidthMm,
+            boolean autoCut) {}
 
-            boolean autoCut
-    ) {
-    }
-
-
+    /** Immutable kot payload data contract. */
     public record KotPayload(
-
             Long kotId,
-
             String kotNumber,
-
             String orderNumber,
-        Long customerOrderNumber,
-
+            Long customerOrderNumber,
             String branchName,
-
             String branchAddress,
-
             LocalDate pickupDate,
-
             LocalTime pickupStartTime,
-
             LocalTime pickupEndTime,
-
             PickupType pickupType,
-
             String startedByStaffName,
-
             LocalDateTime createdAt,
-
             List<Item> items,
             com.gokulsweets.restaurant.order.enums.FulfillmentType fulfillmentType,
             LocalDate deliveryDate,
             LocalTime deliveryStartTime,
-            LocalTime deliveryEndTime
-    ) {
-    }
+            LocalTime deliveryEndTime) {}
 
-
+    /** Immutable item data contract. */
     public record Item(
-
             String productName,
-
             Integer quantity,
-
             Integer displayOrder,
             String saleMode,
             Integer weightGrams,
-            String quantityLabel
-    ) {
+            String quantityLabel) {
+
         public Item(String productName, Integer quantity, Integer displayOrder) {
-            this(productName,quantity,displayOrder,"UNIT",null,quantity+" pcs");
+            this(productName, quantity, displayOrder, "UNIT", null, quantity + " pcs");
         }
     }
 }

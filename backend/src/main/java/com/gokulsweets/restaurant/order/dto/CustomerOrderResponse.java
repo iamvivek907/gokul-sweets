@@ -1,7 +1,7 @@
 package com.gokulsweets.restaurant.order.dto;
 
-import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
 
@@ -11,52 +11,33 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+/** Immutable customer order response data contract. */
 public record CustomerOrderResponse(
-
         String orderNumber,
         Long customerOrderNumber,
-
         OrderStatus orderStatus,
-
         PaymentStatus paymentStatus,
-
         String branchName,
-
         String branchAddress,
-
         LocalDate pickupDate,
-
         LocalTime pickupStartTime,
-
         LocalTime pickupEndTime,
-
         PickupType pickupType,
-
         String customerName,
-
         String maskedCustomerPhone,
-
         List<OrderItemResponse> items,
-
         BigDecimal subtotal,
-
         BigDecimal taxAmount,
-
         BigDecimal priorityCharge,
         BigDecimal convenienceFee,
         BigDecimal convenienceFeeTax,
         BigDecimal paymentFee,
         BigDecimal paymentFeeTax,
         BigDecimal paymentFeeRate,
-
         BigDecimal totalAmount,
-
         LocalDateTime reservationExpiresAt,
-
         LocalDateTime createdAt,
-
         LocalDateTime updatedAt,
-
         String branchPhone,
         LocalDateTime estimatedReadyAt,
         String delayReason,
@@ -70,7 +51,9 @@ public record CustomerOrderResponse(
         String deliveryPostalCode,
         String branchFssaiLicenceNumber,
         BigDecimal deliveryFee,
-        BigDecimal loyaltyDiscount, int loyaltyCoins, String loyaltyRewardCode, BigDecimal rebateDiscountAmount,
-        Long branchId, Long pickupSlotId
-) {
-}
+        BigDecimal loyaltyDiscount,
+        int loyaltyCoins,
+        String loyaltyRewardCode,
+        BigDecimal rebateDiscountAmount,
+        Long branchId,
+        Long pickupSlotId) {}

@@ -4,42 +4,23 @@ import com.gokulsweets.restaurant.reporting.ProductPerformanceState;
 
 import java.math.BigDecimal;
 
+/** Immutable product intelligence item response data contract. */
 public record ProductIntelligenceItemResponse(
-
         Long productId,
-
         String productCode,
-
         String productName,
-
         Long categoryId,
-
         String categoryCode,
-
         String categoryName,
-
         long orderCount,
-
         long quantitySold,
-
         BigDecimal grossItemRevenue,
-
         long uniqueCustomers,
-
         int activeSalesDays,
-
         BigDecimal orderPenetrationPercent,
-
         BigDecimal activeDayConsistencyPercent,
-
         BigDecimal previousRevenue,
-
         long previousQuantitySold,
-
         BigDecimal revenueGrowthPercent,
-
         ProductPerformanceState state,
-
-        String stateReason
-) {
-}
+        String stateReason) {}

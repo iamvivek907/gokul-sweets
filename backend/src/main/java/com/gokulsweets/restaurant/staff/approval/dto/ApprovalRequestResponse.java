@@ -5,40 +5,22 @@ import com.gokulsweets.restaurant.staff.approval.ApprovalRequestType;
 
 import java.time.LocalDateTime;
 
+/** Immutable approval request response data contract. */
 public record ApprovalRequestResponse(
-
         Long id,
-
         String requestNumber,
-
         ApprovalRequestType requestType,
-
         ApprovalRequestStatus status,
-
         Long staffUserId,
-
         String staffName,
-
         String staffUsername,
-
         Long branchId,
-
         String branchCode,
-
         String branchName,
-
         String title,
-
         String summary,
-
         Integer workflowVersion,
-
         LocalDateTime submittedAt,
-
         LocalDateTime resolvedAt,
-
         LocalDateTime createdAt,
-
-        LocalDateTime updatedAt
-) {
-}
+        LocalDateTime updatedAt) {}

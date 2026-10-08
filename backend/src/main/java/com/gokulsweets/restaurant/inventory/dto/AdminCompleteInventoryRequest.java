@@ -7,11 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.List;
 
+/** Immutable admin complete inventory request data contract. */
 public record AdminCompleteInventoryRequest(
-        @NotNull(message = "Service date is required.")
-        LocalDate serviceDate,
-
+        @NotNull(message = "Service date is required.") LocalDate serviceDate,
         @NotEmpty(message = "Select at least one inventory item.")
-        List<@Valid AdminCompleteInventoryItemRequest> items
-) {
-}
+                List<@Valid AdminCompleteInventoryItemRequest> items) {}

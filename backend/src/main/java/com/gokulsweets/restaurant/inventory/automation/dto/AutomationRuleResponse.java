@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+/** Immutable automation rule response data contract. */
 public record AutomationRuleResponse(
         Long branchProductId,
         Long productId,
@@ -26,14 +27,9 @@ public record AutomationRuleResponse(
         List<Window> windows,
         boolean readyStockRequired,
         int bookingHorizonDays,
-        int productionLeadMinutes
-) {
+        int productionLeadMinutes) {
+
+    /** Immutable window data contract. */
     public record Window(
-            Long id,
-            String name,
-            LocalDate startDate,
-            LocalDate endDate,
-            boolean active
-    ) {
-    }
+            Long id, String name, LocalDate startDate, LocalDate endDate, boolean active) {}
 }

@@ -7,11 +7,8 @@ import jakarta.validation.constraints.NotNull;
 import java.time.LocalDate;
 import java.util.List;
 
+/** Immutable admin bulk readiness request data contract. */
 public record AdminBulkReadinessRequest(
-        @NotNull(message = "Service date is required.")
-        LocalDate serviceDate,
-
+        @NotNull(message = "Service date is required.") LocalDate serviceDate,
         @NotEmpty(message = "Select at least one allocation.")
-        List<@Valid AdminBulkReadinessItemRequest> items
-) {
-}
+                List<@Valid AdminBulkReadinessItemRequest> items) {}

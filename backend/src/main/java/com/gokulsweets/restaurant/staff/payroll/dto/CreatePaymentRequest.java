@@ -6,16 +6,8 @@ import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
+/** Immutable create payment request data contract. */
 public record CreatePaymentRequest(
-
-        @NotNull
-        Long branchId,
-
-        @NotNull
-        @DecimalMin("0.01")
-        BigDecimal amount,
-
-        @Size(max = 1000)
-        String note
-) {
-}
+        @NotNull Long branchId,
+        @NotNull @DecimalMin("0.01") BigDecimal amount,
+        @Size(max = 1000) String note) {}

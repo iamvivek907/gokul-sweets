@@ -1,21 +1,24 @@
 package com.gokulsweets.restaurant.inventory.entity;
 
 import com.gokulsweets.restaurant.inventory.enums.InventoryReservationStatus;
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted inventory reservation state. */
 @Entity
 @Table(
         name = "inventory_reservations",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_inventory_reservation_key",
-                columnNames = "reservation_key"
-        )
-)
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_inventory_reservation_key",
+                        columnNames = "reservation_key"))
 @Getter
 @Setter
 public class InventoryReservation {
@@ -63,16 +66,31 @@ public class InventoryReservation {
     @Column(nullable = false)
     private Long version;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryReservation.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryReservation.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryReservation.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryReservation.class, "onUpdate()");
+        }
     }
 }
-

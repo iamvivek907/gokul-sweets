@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.inventory.dto;
 
+/** Immutable inventory catalogue summary response data contract. */
 public record InventoryCatalogueSummaryResponse(
         long totalProducts,
         long onlineEnabled,
@@ -7,6 +8,4 @@ public record InventoryCatalogueSummaryResponse(
         long needsAttention,
         long notConfigured,
         long delayed,
-        long unavailable
-) {
-}
+        long unavailable) {}

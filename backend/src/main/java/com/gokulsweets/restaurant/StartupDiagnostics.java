@@ -1,5 +1,7 @@
 package com.gokulsweets.restaurant;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -12,30 +14,74 @@ import java.util.List;
 
 /** Opt-in measurements for slow cold starts; no public diagnostics endpoint or tag values. */
 final class StartupDiagnostics {
+
     private StartupDiagnostics() {}
 
+    /**
+     * Configures the operation.
+     *
+     * @param application the application
+     * @param enabled the enabled
+     */
     static void configure(SpringApplication application, boolean enabled) {
-        if (!enabled) return;
-        var startup = new BufferingApplicationStartup(4096);
-        application.setApplicationStartup(startup);
-        application.addListeners((ApplicationListener<ApplicationReadyEvent>) event -> {
-            var log = LoggerFactory.getLogger(StartupDiagnostics.class);
-            var events = startup.drainBufferedTimeline().getEvents();
-            log.info("Startup diagnostics: readyMs={}, recordedSteps={}; nested durations overlap",
-                    event.getTimeTaken() == null ? null : event.getTimeTaken().toMillis(), events.size());
-            for (var step : slowest(events)) {
-                String bean = "";
-                for (var tag : step.getStartupStep().getTags()) {
-                    if ("beanName".equals(tag.getKey())) bean = tag.getValue();
-                }
-                log.info("Startup step: name={}, bean={}, durationMs={}",
-                        step.getStartupStep().getName(), bean, step.getDuration().toMillis());
-            }
-        });
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        StartupDiagnostics.class, "configure(SpringApplication,boolean)");
+        try {
+            if (!enabled) return;
+            var startup = new BufferingApplicationStartup(4096);
+            application.setApplicationStartup(startup);
+            application.addListeners(
+                    (ApplicationListener<ApplicationReadyEvent>)
+                            event -> {
+                                var log = LoggerFactory.getLogger(StartupDiagnostics.class);
+                                var events = startup.drainBufferedTimeline().getEvents();
+                                log.info(
+                                        "Startup diagnostics: readyMs={}, recordedSteps={}; nested"
+                                                + " durations overlap",
+                                        event.getTimeTaken() == null
+                                                ? null
+                                                : event.getTimeTaken().toMillis(),
+                                        events.size());
+                                for (var step : slowest(events)) {
+                                    String bean = "";
+                                    for (var tag : step.getStartupStep().getTags()) {
+                                        if ("beanName".equals(tag.getKey())) bean = tag.getValue();
+                                    }
+                                    log.info(
+                                            "Startup step: name={}, bean={}, durationMs={}",
+                                            step.getStartupStep().getName(),
+                                            bean,
+                                            step.getDuration().toMillis());
+                                }
+                            });
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    StartupDiagnostics.class,
+                    "configure(SpringApplication,boolean)");
+        }
     }
 
+    /**
+     * Slowests the operation.
+     *
+     * @param events the events
+     * @return the slowest result
+     */
     static List<TimelineEvent> slowest(List<TimelineEvent> events) {
-        return events.stream().sorted(Comparator.comparing(TimelineEvent::getDuration).reversed())
-                .limit(20).toList();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(StartupDiagnostics.class, "slowest(List<TimelineEvent>)");
+        try {
+            return events.stream()
+                    .sorted(Comparator.comparing(TimelineEvent::getDuration).reversed())
+                    .limit(20)
+                    .toList();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    StartupDiagnostics.class,
+                    "slowest(List<TimelineEvent>)");
+        }
     }
 }

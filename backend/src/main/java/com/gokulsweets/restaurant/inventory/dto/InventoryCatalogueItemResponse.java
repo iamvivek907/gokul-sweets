@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.inventory.dto;
 
+/** Immutable inventory catalogue item response data contract. */
 public record InventoryCatalogueItemResponse(
         Long branchProductId,
         Long productId,
@@ -13,6 +14,4 @@ public record InventoryCatalogueItemResponse(
         InventoryAllocationResponse allocation,
         boolean needsAttention,
         String attentionCode,
-        String attentionMessage
-) {
-}
+        String attentionMessage) {}

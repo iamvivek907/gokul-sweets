@@ -6,10 +6,9 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
+/** Immutable availability window request data contract. */
 public record AvailabilityWindowRequest(
         @NotBlank @Size(max = 120) String name,
         @NotNull LocalDate startDate,
         @NotNull LocalDate endDate,
-        boolean active
-) {
-}
+        boolean active) {}

@@ -6,19 +6,9 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
+/** Immutable create leave request data contract. */
 public record CreateLeaveRequest(
-
-        @NotNull
-        Long branchId,
-
-        @NotNull
-        LocalDate startDate,
-
-        @NotNull
-        LocalDate endDate,
-
-        @NotBlank
-        @Size(max = 1000)
-        String reason
-) {
-}
+        @NotNull Long branchId,
+        @NotNull LocalDate startDate,
+        @NotNull LocalDate endDate,
+        @NotBlank @Size(max = 1000) String reason) {}

@@ -5,20 +5,12 @@ import com.gokulsweets.restaurant.staff.approval.ApprovalRequestStatus;
 
 import java.time.LocalDateTime;
 
+/** Immutable payroll payment approval history response data contract. */
 public record PayrollPaymentApprovalHistoryResponse(
-
         Long id,
-
         ApprovalRequestAction action,
-
         ApprovalRequestStatus fromStatus,
-
         ApprovalRequestStatus toStatus,
-
         String actorName,
-
         String comment,
-
-        LocalDateTime createdAt
-) {
-}
+        LocalDateTime createdAt) {}

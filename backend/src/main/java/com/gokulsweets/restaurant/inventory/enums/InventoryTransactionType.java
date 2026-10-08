@@ -1,5 +1,6 @@
 package com.gokulsweets.restaurant.inventory.enums;
 
+/** Defines the supported inventory transaction type values. */
 public enum InventoryTransactionType {
     ALLOCATION_APPROVED,
     READY_STOCK_RECORDED,
@@ -12,4 +13,3 @@ public enum InventoryTransactionType {
     ADJUSTMENT,
     CARRY_FORWARD
 }
-

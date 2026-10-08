@@ -1,24 +1,26 @@
 package com.gokulsweets.restaurant.order.entity;
 
 import com.gokulsweets.restaurant.config.ApplicationClock;
-
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.product.Product;
 import com.gokulsweets.restaurant.product.ProductSaleMode;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted order item state. */
 @Entity
 @Table(
         name = "order_items",
         indexes = {
-                @Index(name = "idx_order_items_order_id", columnList = "order_id"),
-                @Index(name = "idx_order_items_product_id", columnList = "product_id")
-        }
-)
+            @Index(name = "idx_order_items_order_id", columnList = "order_id"),
+            @Index(name = "idx_order_items_product_id", columnList = "product_id")
+        })
 @Getter
 @Setter
 public class OrderItem {
@@ -65,8 +67,14 @@ public class OrderItem {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        createdAt = ApplicationClock.legacyTimestampNow();
+        final long __gokulMethodStartedNanos = MethodTiming.start(OrderItem.class, "onCreate()");
+        try {
+            createdAt = ApplicationClock.legacyTimestampNow();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, OrderItem.class, "onCreate()");
+        }
     }
 }

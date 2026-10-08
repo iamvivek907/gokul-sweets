@@ -6,21 +6,11 @@ import jakarta.validation.constraints.Size;
 
 import java.util.List;
 
+/** Immutable customer order history request data contract. */
 public record CustomerOrderHistoryRequest(
-
         @NotEmpty(message = "At least one order number is required.")
-        @Size(
-                max = 500,
-                message = "A maximum of 500 orders can be loaded at once."
-        )
-        List<
-                @NotBlank(message = "Order number cannot be blank.")
-                @Size(
-                        max = 50,
-                        message = "Order number is too long."
-                )
-                        String
-                > orderNumbers
-
-) {
-}
+                @Size(max = 500, message = "A maximum of 500 orders can be loaded at once.")
+                List<
+                                @NotBlank(message = "Order number cannot be blank.")
+                                @Size(max = 50, message = "Order number is too long.") String>
+                        orderNumbers) {}

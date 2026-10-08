@@ -1,9 +1,11 @@
 package com.gokulsweets.restaurant.staff;
 
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
+/** Persisted permission state. */
 @Entity
 @Table(name = "permissions")
 @Getter
@@ -11,17 +13,11 @@ import lombok.Setter;
 public class Permission {
 
     @Id
-    @GeneratedValue(
-            strategy = GenerationType.IDENTITY
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            nullable = false,
-            unique = true,
-            length = 80
-    )
+    @Column(nullable = false, unique = true, length = 80)
     private PermissionName name;
 
     @Column(length = 255)

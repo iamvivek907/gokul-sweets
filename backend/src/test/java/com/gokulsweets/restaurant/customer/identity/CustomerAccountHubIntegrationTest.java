@@ -1,5 +1,8 @@
 package com.gokulsweets.restaurant.customer.identity;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -8,9 +11,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @SpringBootTest
 @Transactional
@@ -23,24 +23,43 @@ class CustomerAccountHubIntegrationTest {
     void savedChoicesRemainScopedToSubjectAndEnvironmentAndDeletedAddressCannotBeRead() {
         var subject = UUID.randomUUID();
         var other = UUID.randomUUID();
-        jdbc.update("""
+        jdbc.update(
+                """
                 INSERT INTO verified_customer_subjects(id, environment, verified_phone)
                 VALUES (?, 'DEV', '+919876543210')
-                """, subject);
+                """,
+                subject);
         hub.savePreferences("DEV", subject, new CustomerAccountHub.Preferences("No nuts", null));
-        var address = hub.addAddress("DEV", subject,
-                new CustomerAccountHub.AddressInput("Home", "Main Road", "Tamkuhi", "274407"));
+        var address =
+                hub.addAddress(
+                        "DEV",
+                        subject,
+                        new CustomerAccountHub.AddressInput(
+                                "Home", "Main Road", "Tamkuhi", "274407"));
         assertThat(hub.snapshot("DEV", subject).preferences().dietaryNotes()).isEqualTo("No nuts");
         assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(1);
         assertThat(hub.snapshot("DEV", other).addresses()).isEmpty();
         assertThat(hub.snapshot("PROD", subject).preferences().dietaryNotes()).isNull();
-        assertThatThrownBy(() -> hub.updateAddress("DEV", other, address.id(),
-                new CustomerAccountHub.AddressInput("Office", "Park Road", "Tamkuhi", "274407")))
+        assertThatThrownBy(
+                        () ->
+                                hub.updateAddress(
+                                        "DEV",
+                                        other,
+                                        address.id(),
+                                        new CustomerAccountHub.AddressInput(
+                                                "Office", "Park Road", "Tamkuhi", "274407")))
                 .isInstanceOf(ResponseStatusException.class);
-        assertThat(hub.updateAddress("DEV", subject, address.id(),
-                new CustomerAccountHub.AddressInput("Office", "Park Road", "Tamkuhi", "274407"))
-                .label()).isEqualTo("Office");
-        assertThat(hub.snapshot("DEV", subject).addresses().getFirst().addressLine()).isEqualTo("Park Road");
+        assertThat(
+                        hub.updateAddress(
+                                        "DEV",
+                                        subject,
+                                        address.id(),
+                                        new CustomerAccountHub.AddressInput(
+                                                "Office", "Park Road", "Tamkuhi", "274407"))
+                                .label())
+                .isEqualTo("Office");
+        assertThat(hub.snapshot("DEV", subject).addresses().getFirst().addressLine())
+                .isEqualTo("Park Road");
         assertThatThrownBy(() -> hub.deleteAddress("DEV", other, address.id()))
                 .isInstanceOf(ResponseStatusException.class);
         hub.deleteAddress("DEV", subject, address.id());
@@ -50,24 +69,38 @@ class CustomerAccountHubIntegrationTest {
     @Test
     void tickCountIncludesPaidOwnedOrdersButNotGuestUnpaidOrCancelled() {
         var subject = UUID.randomUUID();
-        var branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, 'Test branch') RETURNING id",
-                Long.class, "HUB-" + UUID.randomUUID().toString().substring(0, 8));
-        var slot = jdbc.queryForObject("""
-                INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity)
-                VALUES (?, CURRENT_DATE, '10:00', '10:30', 2) RETURNING id
-                """, Long.class, branch);
+        var branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code, name) VALUES (?, 'Test branch') RETURNING id",
+                        Long.class,
+                        "HUB-" + UUID.randomUUID().toString().substring(0, 8));
+        var slot =
+                jdbc.queryForObject(
+                        """
+INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity)
+VALUES (?, CURRENT_DATE, '10:00', '10:30', 2) RETURNING id
+""",
+                        Long.class,
+                        branch);
         var paid = order(branch, slot, "CONFIRMED");
         var unpaid = order(branch, slot, "PENDING_PAYMENT");
         var cancelled = order(branch, slot, "CANCELLED");
         var guest = order(branch, slot, "CONFIRMED");
-        for (var id : new Long[]{paid, unpaid, cancelled}) jdbc.update("""
-                INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id)
-                VALUES (?, 'DEV', ?)
-                """, id, subject);
-        for (var id : new Long[]{paid, cancelled, guest}) jdbc.update("""
-                INSERT INTO payments(order_id, provider, amount, payment_status)
-                VALUES (?, 'PHONEPE', 100, 'PAID')
-                """, id);
+        for (var id : new Long[] {paid, unpaid, cancelled})
+            jdbc.update(
+                    """
+INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id)
+VALUES (?, 'DEV', ?)
+""",
+                    id,
+                    subject);
+        for (var id : new Long[] {paid, cancelled, guest})
+            jdbc.update(
+                    """
+                    INSERT INTO payments(order_id, provider, amount, payment_status)
+                    VALUES (?, 'PHONEPE', 100, 'PAID')
+                    """,
+                    id);
         assertThat(hub.snapshot("DEV", subject).paidOrders()).isEqualTo(1);
         assertThat(hub.snapshot("DEV", UUID.randomUUID()).paidOrders()).isZero();
         assertThat(hub.snapshot("PROD", subject).paidOrders()).isZero();
@@ -77,37 +110,71 @@ class CustomerAccountHubIntegrationTest {
 
     @Test
     void historyCursorIsBoundedStableAndOwnerScopedWithEqualTimestamps() {
-        var subject=UUID.randomUUID();
-        jdbc.update("INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES (?, 'DEV', '+919876543210')",subject);
-        var branch=jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?, 'Paging') RETURNING id",Long.class,"PAGE-"+UUID.randomUUID().toString().substring(0,8));
-        var slot=jdbc.queryForObject("INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity) VALUES (?,CURRENT_DATE,'10:00','10:30',20) RETURNING id",Long.class,branch);
-        var expected=new java.util.ArrayList<String>();
-        for(int i=0;i<12;i++){
-            var id=order(branch,slot,"CONFIRMED");
-            jdbc.update("INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id) VALUES (?, 'DEV', ?)",id,subject);
-            expected.addFirst(jdbc.queryForObject("SELECT order_number FROM orders WHERE id=?",String.class,id));
+        var subject = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543210')",
+                subject);
+        var branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?, 'Paging') RETURNING id",
+                        Long.class,
+                        "PAGE-" + UUID.randomUUID().toString().substring(0, 8));
+        var slot =
+                jdbc.queryForObject(
+                        "INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)"
+                                + " VALUES (?,CURRENT_DATE,'10:00','10:30',20) RETURNING id",
+                        Long.class,
+                        branch);
+        var expected = new java.util.ArrayList<String>();
+        for (int i = 0; i < 12; i++) {
+            var id = order(branch, slot, "CONFIRMED");
+            jdbc.update(
+                    "INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id)"
+                            + " VALUES (?, 'DEV', ?)",
+                    id,
+                    subject);
+            expected.addFirst(
+                    jdbc.queryForObject(
+                            "SELECT order_number FROM orders WHERE id=?", String.class, id));
         }
-        var first=ownership.orderNumberPage("DEV",subject,null,5);
-        assertThat(first).containsExactlyElementsOf(expected.subList(0,6));
+        var first = ownership.orderNumberPage("DEV", subject, null, 5);
+        assertThat(first).containsExactlyElementsOf(expected.subList(0, 6));
         // An inserted order cannot shift the next page behind the existing cursor.
-        var newer=order(branch,slot,"CONFIRMED");
-        jdbc.update("INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id) VALUES (?, 'DEV', ?)",newer,subject);
-        assertThat(ownership.orderNumberPage("DEV",subject,first.get(4),5)).containsExactlyElementsOf(expected.subList(5,11));
-        assertThat(ownership.orderNumberPage("DEV",subject,expected.get(9),5)).containsExactlyElementsOf(expected.subList(10,12));
-        assertThat(ownership.orderNumberPage("PROD",subject,null,5)).isEmpty();
-        assertThat(ownership.orderNumberPage("DEV",UUID.randomUUID(),null,5)).isEmpty();
-        var guest=order(branch,slot,"CONFIRMED");
-        var foreign=jdbc.queryForObject("SELECT order_number FROM orders WHERE id=?",String.class,guest);
-        assertThatThrownBy(()->ownership.orderNumberPage("DEV",subject,foreign,5)).isInstanceOf(ResponseStatusException.class);
-        assertThatThrownBy(()->ownership.orderNumberPage("DEV",subject,null,51)).isInstanceOf(ResponseStatusException.class);
+        var newer = order(branch, slot, "CONFIRMED");
+        jdbc.update(
+                "INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id)"
+                        + " VALUES (?, 'DEV', ?)",
+                newer,
+                subject);
+        assertThat(ownership.orderNumberPage("DEV", subject, first.get(4), 5))
+                .containsExactlyElementsOf(expected.subList(5, 11));
+        assertThat(ownership.orderNumberPage("DEV", subject, expected.get(9), 5))
+                .containsExactlyElementsOf(expected.subList(10, 12));
+        assertThat(ownership.orderNumberPage("PROD", subject, null, 5)).isEmpty();
+        assertThat(ownership.orderNumberPage("DEV", UUID.randomUUID(), null, 5)).isEmpty();
+        var guest = order(branch, slot, "CONFIRMED");
+        var foreign =
+                jdbc.queryForObject(
+                        "SELECT order_number FROM orders WHERE id=?", String.class, guest);
+        assertThatThrownBy(() -> ownership.orderNumberPage("DEV", subject, foreign, 5))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> ownership.orderNumberPage("DEV", subject, null, 51))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     private Long order(Long branch, Long slot, String status) {
-        return jdbc.queryForObject("""
+        return jdbc.queryForObject(
+                """
                 INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name,
                     customer_phone, pickup_type, order_status, reservation_expires_at)
                 VALUES (?, ?, ?, 'Customer', '9876543210', 'NORMAL', ?, CURRENT_TIMESTAMP)
                 RETURNING id
-                """, Long.class, "GKS-HUB-" + UUID.randomUUID(), branch, slot, status);
+                """,
+                Long.class,
+                "GKS-HUB-" + UUID.randomUUID(),
+                branch,
+                slot,
+                status);
     }
 }

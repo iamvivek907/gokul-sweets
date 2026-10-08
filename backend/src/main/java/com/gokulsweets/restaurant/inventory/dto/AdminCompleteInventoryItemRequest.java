@@ -6,34 +6,28 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Immutable admin complete inventory item request data contract. */
 public record AdminCompleteInventoryItemRequest(
-        @NotNull(message = "Branch product ID is required.")
-        Long branchProductId,
-
+        @NotNull(message = "Branch product ID is required.") Long branchProductId,
         @NotNull(message = "Approved quantity is required.")
-        @DecimalMin(value = "0.001", message = "Approved quantity must be greater than zero.")
-        BigDecimal approvedQuantity,
-
+                @DecimalMin(
+                        value = "0.001",
+                        message = "Approved quantity must be greater than zero.")
+                BigDecimal approvedQuantity,
         @NotNull(message = "Ready quantity is required.")
-        @DecimalMin(value = "0.000", message = "Ready quantity cannot be negative.")
-        BigDecimal readyQuantity,
-
-        /*
+                @DecimalMin(value = "0.000", message = "Ready quantity cannot be negative.")
+                BigDecimal readyQuantity, /*
          * Null keeps older frontend clients backward compatible:
          * they historically used this endpoint only for READY stock.
          */
         Boolean markReady,
-
         @DecimalMin(value = "0.000", message = "Safety buffer cannot be negative.")
-        BigDecimal safetyBufferQuantity,
-
+                BigDecimal safetyBufferQuantity,
         @DecimalMin(value = "0.000", message = "Forecast quantity cannot be negative.")
-        BigDecimal forecastQuantity,
-
+                BigDecimal forecastQuantity,
         String forecastConfidence,
         LocalDateTime expectedReadyAt,
-        String note
-) {
+        String note) {
 
     public AdminCompleteInventoryItemRequest(
             Long branchProductId,
@@ -43,8 +37,7 @@ public record AdminCompleteInventoryItemRequest(
             BigDecimal forecastQuantity,
             String forecastConfidence,
             LocalDateTime expectedReadyAt,
-            String note
-    ) {
+            String note) {
         this(
                 branchProductId,
                 approvedQuantity,
@@ -54,7 +47,6 @@ public record AdminCompleteInventoryItemRequest(
                 forecastQuantity,
                 forecastConfidence,
                 expectedReadyAt,
-                note
-        );
+                note);
     }
 }

@@ -1,6 +1,4 @@
 package com.gokulsweets.restaurant.payment.dto;
 
-public record PaymentLookupResponse(
-        PaymentResponse payment
-) {
-}
+/** Immutable payment lookup response data contract. */
+public record PaymentLookupResponse(PaymentResponse payment) {}

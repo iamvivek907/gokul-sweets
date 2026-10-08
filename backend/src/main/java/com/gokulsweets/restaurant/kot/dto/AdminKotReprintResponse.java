@@ -6,34 +6,19 @@ import com.gokulsweets.restaurant.printing.enums.PrinterStation;
 
 import java.time.LocalDateTime;
 
+/** Immutable admin kot reprint response data contract. */
 public record AdminKotReprintResponse(
-
         Long printJobId,
-
         Long kotId,
-
         String kotNumber,
-
         String orderNumber,
-
         Long branchId,
-
         PrintJobPurpose purpose,
-
         PrinterStation station,
-
         PrintJobStatus status,
-
         Long printerId,
-
         String printerName,
-
         Integer attemptCount,
-
         Integer maxAttempts,
-
         LocalDateTime queuedAt,
-
-        LocalDateTime nextAttemptAt
-) {
-}
+        LocalDateTime nextAttemptAt) {}

@@ -4,11 +4,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+/** Immutable production plan response data contract. */
 public record ProductionPlanResponse(
         Long branchId,
         LocalDate serviceDate,
         LocalDateTime generatedAt,
         ProductionPlanSummaryResponse summary,
-        List<ProductionPlanItemResponse> items
-) {
-}
+        List<ProductionPlanItemResponse> items) {}

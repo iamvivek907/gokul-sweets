@@ -6,14 +6,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
+/** Immutable customer inventory check response data contract. */
 public record CustomerInventoryCheckResponse(
         boolean enforcementEnabled,
         LocalDate requestedDate,
         boolean orderable,
         LocalDate suggestedDate,
         boolean callBranchRecommended,
-        List<Item> items
-) {
+        List<Item> items) {
+
+    /** Immutable item data contract. */
     public record Item(
             Long productId,
             String productName,
@@ -21,7 +23,5 @@ public record CustomerInventoryCheckResponse(
             BigDecimal requestedQuantity,
             BigDecimal availableQuantity,
             boolean orderable,
-            String unavailableReason
-    ) {
-    }
+            String unavailableReason) {}
 }
