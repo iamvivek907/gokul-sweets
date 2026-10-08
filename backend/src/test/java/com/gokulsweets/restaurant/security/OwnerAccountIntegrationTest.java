@@ -250,4 +250,14 @@ class OwnerAccountIntegrationTest {
         jdbc.update("UPDATE staff_users SET updated_at=updated_at+INTERVAL '1 second' WHERE id=?",owner);
         assertThatThrownBy(()->sessions(mock(com.gokulsweets.restaurant.staff.StaffUserRepository.class)).enrollment(token)).isInstanceOf(IllegalArgumentException.class);
     }
+    @Test void staleLimiterCleanupSkipsACounterBeingRefreshedByAnotherRequest() throws Exception {
+        String bucket="owner:"+StaffSessionService.hash("setup:client");
+        jdbc.update("INSERT INTO staff_login_limits(username,failures,updated_at) VALUES (?,99,CURRENT_TIMESTAMP-INTERVAL '2 days')",bucket);
+        try(var connection=dataSource.getConnection();var update=connection.prepareStatement("UPDATE staff_login_limits SET failures=7,updated_at=CURRENT_TIMESTAMP WHERE username=?")) {
+            connection.setAutoCommit(false);update.setString(1,bucket);update.executeUpdate();
+            // Cleanup must not wait for, or delete, this freshly updated but uncommitted counter.
+            service.limit("setup","other-client");connection.commit();
+        }
+        assertThat(jdbc.queryForObject("SELECT failures FROM staff_login_limits WHERE username=?",Integer.class,bucket)).isEqualTo(7);
+    }
 }

@@ -61,7 +61,7 @@ public class OwnerAccountService {
         Integer attempts=tx.execute(status->{
             deadlines();
             // Only this feature’s stale buckets; never alter existing login throttles.
-            jdbc.update("DELETE FROM staff_login_limits WHERE username IN (SELECT username FROM staff_login_limits WHERE username LIKE 'owner:%' AND updated_at<CURRENT_TIMESTAMP-INTERVAL '1 day' LIMIT 200)");
+            jdbc.update("DELETE FROM staff_login_limits WHERE username IN (SELECT username FROM staff_login_limits WHERE username LIKE 'owner:%' AND updated_at<CURRENT_TIMESTAMP-INTERVAL '1 day' LIMIT 200 FOR UPDATE SKIP LOCKED)");
         return jdbc.queryForObject("""
             INSERT INTO staff_login_limits(username,failures,updated_at) VALUES (?,1,CURRENT_TIMESTAMP)
             ON CONFLICT(username) DO UPDATE SET failures=CASE WHEN staff_login_limits.updated_at<CURRENT_TIMESTAMP-INTERVAL '10 minutes'
