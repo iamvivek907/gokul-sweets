@@ -44,6 +44,7 @@ try {
    else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
    else if(path==='/api/menu')json=[{id:1,name:'Snacks',products}];
    else if(path==='/api/menu/portion-groups')json={groups:[group]};
+   else if(path==='/api/branches/1/storefront-highlights')json={latestProductIds:[3]};
    else if(path==='/api/storefront/customer-identity')json={enabled:false};
    await route.fulfill({json,headers});
   });
@@ -60,6 +61,7 @@ try {
    await dialog.getByRole('img',{name:'Veg',exact:true}).waitFor();await dialog.getByRole('img',{name:'Non-veg',exact:true}).waitFor();await dialog.getByRole('button',{name:'Done',exact:true}).click();
   }
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  if(width===390&&modern&&process.env.DIETARY_SCREENSHOT){await page.evaluate(()=>window.scrollTo(0,0));const clip=await page.locator('.gokul-menu-product-grid').boundingBox();assert.ok(clip);await page.screenshot({path:process.env.DIETARY_SCREENSHOT,fullPage:true,clip});}
   if(width===390&&modern){await page.evaluate(()=>{localStorage.setItem('gokul-language','hi');});await page.reload();await page.locator('#gokul-product-2').getByRole('img',{name:'मांसाहारी',exact:true}).waitFor();}
   await context.close();console.log(`Dietary customer ${width}px modern=${modern} passed`);
  }

@@ -57,7 +57,7 @@ export default function NewBranchItems({branch, products, onSelect,portionGroups
             </div>
         </div>
         <div className={styles.row} ref={row}>
-            {mobileMenuRows(shownItems,portionGroups??[]).map(row => {const product=row.group?{...row.product,name:row.group.title}:row.product;return <button type="button" key={product.id} className={styles.item}
+            {mobileMenuRows(shownItems,portionGroups??[],products).map(row => {const product=row.group?{...row.product,name:row.group.title}:row.product;return <button type="button" key={product.id} className={styles.item}
                 onClick={() => onSelect(product)} aria-label={`View ${product.name} on the menu`}>
                 <span className={styles.photo}>
                     {product.imageUrl && !failedPhotos.includes(product.imageUrl)
