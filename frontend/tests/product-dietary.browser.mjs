@@ -61,7 +61,7 @@ try {
    await dialog.getByRole('img',{name:'Veg',exact:true}).waitFor();await dialog.getByRole('img',{name:'Non-veg',exact:true}).waitFor();await dialog.getByRole('button',{name:'Done',exact:true}).click();
   }
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  if(width===390&&modern&&process.env.DIETARY_SCREENSHOT){await page.evaluate(()=>window.scrollTo(0,0));const clip=await page.locator('.gokul-menu-product-grid').boundingBox();assert.ok(clip);await page.screenshot({path:process.env.DIETARY_SCREENSHOT,fullPage:true,clip});}
+  if(width===390&&modern&&process.env.DIETARY_SCREENSHOT){await page.locator('.gokul-menu-product-grid').screenshot({path:process.env.DIETARY_SCREENSHOT,style:'.customer-site-header{visibility:hidden!important}'});}
   if(width===390&&modern){await page.evaluate(()=>{localStorage.setItem('gokul-language','hi');});await page.reload();await page.locator('#gokul-product-2').getByRole('img',{name:'मांसाहारी',exact:true}).waitFor();}
   await context.close();console.log(`Dietary customer ${width}px modern=${modern} passed`);
  }
