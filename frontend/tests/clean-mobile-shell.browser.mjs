@@ -36,7 +36,7 @@ try{for(const [width,motion] of [[320,'no-preference'],[390,'no-preference'],[39
  await page.getByRole('heading',{name:'How was the Gokul experience?',exact:true}).waitFor();
  await page.screenshot({path:`/tmp/clean-branch-home-${width}-${motion}.png`});
  await page.getByRole('link',{name:'Browse menu',exact:false}).filter({hasText:'Browse menu'}).click();await page.waitForURL('**/menu');await page.locator('#gokul-product-1').waitFor();
- const regular=page.locator('#gokul-product-1');await regular.getByText('Unavailable for selected pickup',{exact:true}).waitFor();assert.equal(await regular.locator('.menu-availability-note').count(),0);assert.equal(await regular.locator('.menu-availability-chip').count(),0);assert.equal(await regular.getByText('Unavailable for selected pickup',{exact:true}).count(),1);
+ const regular=page.locator('#gokul-product-1');await regular.getByText('Choose pickup to add',{exact:true}).waitFor();assert.equal(await regular.locator('.menu-availability-note').count(),0);assert.equal(await regular.locator('.menu-availability-chip').count(),0);assert.equal(await regular.getByText('Choose pickup to add',{exact:true}).count(),1);
  const nav=page.locator('.customer-bottom-navigation');
  await page.evaluate(()=>{document.activeElement?.blur();document.documentElement.style.scrollBehavior='auto';window.scrollTo({top:450,behavior:'instant'});});
  if(motion==='reduce'){await page.waitForTimeout(100);assert.notEqual(await nav.getAttribute('data-scroll-hidden'),'true');}

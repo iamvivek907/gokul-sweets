@@ -236,3 +236,8 @@ Food/photo proportions, lavender pairing cards, mint banner, compact retail rows
 
 
 PR #181 layout recovery: All and Filters remain accessible in every mobile collection. The public offer strip keeps a compact 64px button during loading, empty results, refresh and failure. Pairing loading, populated, empty and failed states retain the same inline region; unavailable pairings show a status and failed branch reads expose Retry pairings. Late optional results must not move subsequent product controls. These review fixes supersede the earlier empty-pairing collapse and family-specific chip hiding rules.
+
+
+## Pickup-aware All menu (8 October 2026)
+
+The owner supersedes the Food default and explicit-empty-pickup rules above. The menu starts on All unless a customer explicitly chooses a category. A fresh empty visit defaults only today’s earliest normal slot where at least one live item fits stock, preparation, service hours, booking cutoff and capacity. Priority fees and another date are never automatic. An empty old-day visit may start today; carts, same-day expired choices, retained dates and unfinished checkout attempts require an explicit choice. Saved selections remain unchanged on refresh. The menu shows eligible items before other menu items, retaining category anchors and grouped SKU identity; every size retains its own eligibility. When all items fit, the current category layout returns. Items outside service show their server reason, not sold-out wording. Unknown or failed checks block additions while preserving cart reductions. Visible minute refresh and resume checks update eligibility without changing pickup. Checkout still requires its existing explicit confirmation and authoritative rechecks.

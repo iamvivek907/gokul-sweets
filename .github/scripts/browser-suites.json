@@ -16,6 +16,8 @@
     "tests/menu-service-hours.browser.mjs"
   ],
   "menu": [
+    "tests/menu-pickup-groups.browser.mjs",
+    "tests/menu-pickup-default.browser.mjs",
     "tests/menu-category-speed.browser.mjs",
     "tests/reference-ordering.browser.mjs",
     "tests/menu-pairings-speed.browser.mjs",

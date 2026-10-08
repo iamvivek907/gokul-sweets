@@ -34,7 +34,10 @@ try{for(const width of [320,390,640]){
  for(const control of ['.language-trigger','.customer-notification-bell','.customer-account-link']){const box=await page.locator(control).boundingBox();assert.ok(Math.abs(brandBox.y+brandBox.height/2-box.y-box.height/2)<3,'brand and customer controls share a row');}
  await mkdir(screenshotDir,{recursive:true});
  const capture=async name=>{await page.evaluate(async()=>{await document.fonts.ready;await Promise.all([...document.images].filter(img=>img.complete).map(img=>img.decode().catch(()=>{})));window.scrollTo({top:0,behavior:'instant'});});await page.waitForTimeout(600);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:`${screenshotDir}/${name}-${width}.png`});};
- assert.equal(await page.getByRole('button',{name:'Browse Food',exact:true}).getAttribute('aria-current'),'true','initial Food collection reflects the reference');
+ assert.equal(await page.locator('.menu-category-tile[aria-current=true]').count(),0,'initial menu defaults to All');
+ await page.locator('#gokul-product-1').waitFor();
+ await page.getByRole('button',{name:'Browse Food',exact:true}).click();
+ assert.equal(await page.getByRole('button',{name:'Browse Food',exact:true}).getAttribute('aria-current'),'true','Food remains an explicit collection choice');
  assert.equal(await page.locator('#gokul-product-1').count(),0,'initial Food collection excludes other families');
  await capture('food');
  await page.getByRole('button',{name:'Browse Food',exact:true}).click();

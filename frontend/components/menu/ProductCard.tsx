@@ -15,6 +15,7 @@ interface ProductCardProps {
     premium?: boolean;
     priceFrom?: boolean;
     unavailableForPickup?: boolean;
+    pickupMessage?: string;
     product: MenuProduct;
     ratingSummary: ProductRatingSummary | null;
     ratingLoading: boolean;
@@ -70,6 +71,7 @@ export default function ProductCard({
     premium = false,
     priceFrom = false,
     unavailableForPickup = false,
+    pickupMessage,
     product,
     ratingSummary,
     ratingLoading,
@@ -209,7 +211,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                <T text={isAvailable ? "Unavailable for selected pickup" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
+                                <T text={isAvailable ? pickupMessage ?? "Unavailable for selected pickup" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
                             </span>
                         </div>
                     )

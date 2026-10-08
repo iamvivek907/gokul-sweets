@@ -29,7 +29,8 @@ export function usePickupIntent(branchId?: number | null) {
         if (value?.branchId === branchId && validPickupDate(value.date,value.date,0)) date = value.date;
     } catch { /* Ignore a malformed local preference; never treat it as availability. */ }
     if (!date && selection && selection.slot.branchId === branchId) date = selection.date;
+    const previousDate = saved && saved.slot.branchId === branchId ? saved.date : date;
     const expired=!!saved && !selection || !!date && !!now && date < indiaToday(new Date(now));
     if (date && now && date < indiaToday(new Date(now))) date=null;
-    return {date, expired, selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
+    return {date, expired, previousDate, selection: selection && selection.slot.branchId === branchId && selection.date === date ? selection : null};
 }

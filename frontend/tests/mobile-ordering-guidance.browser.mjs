@@ -53,7 +53,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
  await page.goto(`${base}/menu`);await page.locator('.gokul-product-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  if(enabled)assert.equal(catalogReads,1,'first menu visit loads one versioned catalog');
  const compact=width<=640&&enabled;
- assert.equal(await page.locator('.mobile-menu-pickup').count(),compact?1:0);
+ assert.equal(await page.locator('.mobile-menu-pickup').count(),1,'smart pickup control remains available on every menu viewport');
  if(compact){
   const tabs=page.getByRole('navigation',{name:'Branch pages'});assert.equal(await tabs.isVisible(),false,'phone menu removes duplicate ribbon');await page.setViewportSize({width:1280,height:900});await tabs.getByRole('button',{name:'Branch details',exact:true}).click();
   const details=page.getByRole('region',{name:`${branch.name} details`,exact:true});await details.waitFor();await details.getByRole('heading',{name:'Address',exact:true}).waitFor();

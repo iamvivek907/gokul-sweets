@@ -46,7 +46,7 @@ try{
   const routes=[['/branches/1','.branch-home-hero'],['/menu','#gokul-product-1'],['/profile','.account-cover'],['/profile/rewards','.customer-rewards-page'],['/profile/orders','.profile-focused-route'],['/notifications','.notification-page-heading'],['/orders','h1:visible'],[width<=640&&themed?'/checkout/mobile':'/cart',width<=640&&themed?'.mobile-empty-cart':'h1:visible'],['/occasions','.occasion-hero'],['/occasions/requests','#occasion-tracker'],['/about','h1:visible'],['/careers','h1:visible'],['/cancellation-policy','h1:visible'],['/profile/privacy','h1:visible'],['/','h1:visible']];
   for(const [route,ready] of routes){
    console.log(`Checking customer design ${width}px themed=${themed} ${route}`);
-   await page.goto(`${base}${route}`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator(ready).first().waitFor();
+   await page.goto(`${base}${route}`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator(ready).first().waitFor().catch(async error=>{console.error('Customer design rendering errors',errors,await page.locator('body').innerText());throw error;});
    if(themed){
     const shell=page.locator('[data-customer-design=reference]');await shell.waitFor();
     assert.equal(await shell.evaluate(node=>getComputedStyle(node).getPropertyValue('--customer-brand').trim()),'#980c31',`${route} shares the maroon brand token`);

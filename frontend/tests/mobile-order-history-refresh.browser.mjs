@@ -37,6 +37,10 @@ try {for(const [width,enabled] of [[390,true],[1280,true],[390,false]]) {
  await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  await page.locator('article').first().waitFor();
  await page.clock.pauseAt(await page.evaluate(()=>Date.now()+1000));
+ // The initial hidden check can precede hydration. Advance the launch timeout
+ // before clicking with a paused clock, while keeping the 15s poll below untouched.
+ await page.clock.fastForward(3000);
+ await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const previous=reads;
  if(width<=640&&enabled){
   await page.getByRole('searchbox',{name:'Find an order'}).fill('REFRESH-1');

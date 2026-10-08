@@ -33,6 +33,7 @@ import "./customer-polish.css";
 import "./profile-history-polish.css";
 import "./menu-premium.css";
 import "./customer-design.css";
+import "./menu-pickup.css";
 import MobileEdgeBack from "./MobileEdgeBack";
 
 
