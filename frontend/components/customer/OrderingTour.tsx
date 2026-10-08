@@ -16,16 +16,18 @@ const steps = [
     {title: "Pay, then collect", icon: "receipt" as const, description: "Verify your phone when asked, confirm pickup and review the full price before paying. Wait for payment confirmation, then find your order in Orders.", hint: "For pickup, show the order and its pickup code when it is ready. If payment is uncertain, check Orders before trying again."}
 ];
 
-export default function OrderingTour({pathname}: {pathname: string}) {
+export default function OrderingTour({pathname, onActivityChange}: {pathname: string; onActivityChange: (active: boolean) => void}) {
     const seen = useSyncExternalStore(subscribeOrderingTour, orderingTourSeen, orderingTourServerSnapshot);
     const order = parsePendingOrder(useSyncExternalStore(subscribeToPendingOrder, getPendingOrderSnapshot, getServerPendingOrderSnapshot));
     const payment = parsePendingPayment(useSyncExternalStore(subscribeToPendingPayment, getPendingPaymentSnapshot, getServerPendingPaymentSnapshot));
     const {isEmpty} = useCart();
     const [open, setOpen] = useState(false);
-    const begin = () => { dismissOrderingTour(); setOpen(true); };
+    const [opener, setOpener] = useState<HTMLElement | null>(null);
+    const begin = () => { setOpener(document.activeElement as HTMLElement | null); dismissOrderingTour(); setOpen(true); };
     useEffect(() => {
         const replay = () => {
             if (document.querySelector("dialog[open], [aria-modal=true]")) return;
+            setOpener(document.activeElement as HTMLElement | null);
             dismissOrderingTour(); setOpen(true);
         };
         window.addEventListener(OPEN_ORDERING_TOUR, replay);
@@ -33,27 +35,32 @@ export default function OrderingTour({pathname}: {pathname: string}) {
     }, []);
     const invite = !seen && isEmpty && !order && payment?.paymentStatus !== "PENDING"
         && ["/", "/home", "/menu", "/branches"].includes(pathname);
+    const active = invite || open;
+    useEffect(() => {
+        onActivityChange(active);
+        return () => onActivityChange(false);
+    }, [active, onActivityChange]);
     return <>
         {invite && <aside className="ordering-tour-invite" aria-label="Ordering guide">
             <div><strong><T text="First visit?" /></strong><span><T text="See how to book a pickup in four quick steps." /></span></div>
             <button type="button" onClick={begin}><T text="Show me how" /></button>
             <button type="button" className="ordering-tour-skip" onClick={dismissOrderingTour}><T text="Not now" /></button>
         </aside>}
-        {open && <TourDialog onClose={() => setOpen(false)} />}
+        {open && <TourDialog opener={opener} onClose={() => setOpen(false)} />}
     </>;
 }
 
-function TourDialog({onClose}: {onClose: () => void}) {
+function TourDialog({onClose, opener}: {onClose: () => void; opener: HTMLElement | null}) {
     const [step, setStep] = useState(0);
     const dialog = useRef<HTMLDialogElement>(null);
     const title = useRef<HTMLHeadingElement>(null);
     const translate = useTranslation();
     useEffect(() => {
-        const surface = dialog.current, previous = document.activeElement as HTMLElement | null;
+        const surface = dialog.current;
         const overflow = document.body.style.overflow;
         surface?.showModal(); document.body.style.overflow = "hidden";
-        return () => { surface?.close(); document.body.style.overflow = overflow; const target = previous?.isConnected ? previous : document.querySelector<HTMLButtonElement>(".ordering-tour-replay"); target?.focus({preventScroll: true}); };
-    }, []);
+        return () => { surface?.close(); document.body.style.overflow = overflow; const target = opener?.isConnected ? opener : document.querySelector<HTMLButtonElement>(".ordering-tour-replay"); target?.focus({preventScroll: true}); };
+    }, [opener]);
     useEffect(() => { title.current?.focus({preventScroll: true}); }, [step]);
     const current = steps[step], last = step === steps.length - 1;
     return <dialog ref={dialog} className="ordering-tour-dialog" aria-labelledby="ordering-tour-title" onCancel={event => { event.preventDefault(); onClose(); }}>

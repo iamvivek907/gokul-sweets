@@ -46,7 +46,7 @@ export function mergePaymentResponse(
 }
 
 
-export async function refreshKnownPayment(known: PaymentResponse, resilient: boolean): Promise<PaymentResponse> {
+export async function refreshKnownPayment(known: PaymentResponse, resilient: boolean, {allowTemporaryFallback = true}: {allowTemporaryFallback?: boolean} = {}): Promise<PaymentResponse> {
     // History, another tab and restored pages can retain a stale PENDING snapshot.
     const lookup = await getPaymentForOrder(known.orderNumber);
     if (!lookup.payment || lookup.payment.orderNumber !== known.orderNumber) throw new Error("This payment could not be recovered. Please check My Orders before paying again.");
@@ -56,7 +56,9 @@ export async function refreshKnownPayment(known: PaymentResponse, resilient: boo
     try {
         return mergePaymentResponse(await refreshPayment(current.paymentId), current);
     } catch (error) {
-        if (resilient && error instanceof ApiError && isTemporaryPaymentFailure(error.status)) return current;
+        // Read-only recovery may keep showing the known pending attempt during
+        // an outage. A deliberate gateway launch must confirm its latest state.
+        if (allowTemporaryFallback && resilient && error instanceof ApiError && isTemporaryPaymentFailure(error.status)) return current;
         throw error;
     }
 }

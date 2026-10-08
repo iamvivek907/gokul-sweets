@@ -22,7 +22,6 @@ try {
         });
         await context.addInitScript(branch => {
             localStorage.setItem('gokul-selected-branch', JSON.stringify(branch));
-            localStorage.setItem('gokul-social-follow-popup-seen', 'true');
         }, branch);
         await page.goto(`${base}/branches`);
         await page.locator('.gokul-mobile-launch').waitFor({state: 'hidden'});
@@ -31,6 +30,10 @@ try {
         await dialog.getByRole('heading', {name: 'Choose your branch', exact: true}).waitFor();
         assert.equal(await dialog.evaluate(node => node.matches(':modal')), true);
         assert.equal(await page.evaluate(() => document.body.style.overflow), 'hidden');
+        // The existing social popup is scheduled after 4.5 seconds. A fresh
+        // customer reading the guide must not have two competing prompts.
+        await page.waitForTimeout(4700);
+        assert.equal(await page.locator('#social-follow-title').count(), 0, 'social promotion waits until the guide is closed');
         if (process.env.SCREENSHOT_DIR) {
             await mkdir(process.env.SCREENSHOT_DIR, {recursive: true});
             await page.screenshot({path: `${process.env.SCREENSHOT_DIR}/ordering-tour-${width}.png`});
@@ -41,6 +44,7 @@ try {
         await dialog.getByRole('heading', {name: 'Choose your branch', exact: true}).waitFor();
         await page.keyboard.press('Escape'); await dialog.waitFor({state: 'hidden'});
         assert.notEqual(await page.evaluate(() => document.body.style.overflow), 'hidden');
+        assert.equal(await page.getByRole('button', {name: 'How to order', exact: true}).evaluate(node => node === document.activeElement), true, 'removed invitation restores focus to the replay control');
         await page.reload(); await page.locator('.gokul-mobile-launch').waitFor({state: 'hidden'});
         assert.equal(await page.locator('.ordering-tour-invite').count(), 0, 'starting/skipping persists across refresh');
         await page.getByRole('button', {name: 'How to order', exact: true}).click();
@@ -50,6 +54,7 @@ try {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
         await dialog.getByRole('button', {name: 'Got it', exact: true}).click();
         await dialog.waitFor({state: 'hidden'});
+        assert.equal(await page.getByRole('button', {name: 'How to order', exact: true}).evaluate(node => node === document.activeElement), true, 'replay returns focus to its original trigger');
         await page.evaluate(() => {
             localStorage.removeItem('gokul-ordering-tour:v1');
             localStorage.setItem('gokul-cart', JSON.stringify({branchId: 1, items: [{product: {id: 1, name: 'Sweet', price: 100, available: true, saleMode: 'UNIT'}, quantity: 1, weightGrams: null}]}));

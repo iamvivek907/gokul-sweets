@@ -2,9 +2,7 @@
 import "@/lib/paymentNavigation";
 
 import {usePathname} from "next/navigation";
-import type {
-    ReactNode
-} from "react";
+import {useState, type ReactNode} from "react";
 
 import BranchOperationalGuard from "./BranchOperationalGuard";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
@@ -59,6 +57,7 @@ export default function AppShell({
     const features = useStorefrontFeatures();
     const futuristic = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
     const tourAllowed = futuristic && !pathname.startsWith("/checkout") && !/^\/orders\/[^/]+/.test(pathname);
+    const [orderingGuideActive, setOrderingGuideActive] = useState(false);
 
     return (
         <div
@@ -102,13 +101,13 @@ export default function AppShell({
             >
                 {futuristic && <CustomerBreadcrumbs />}
                 {futuristic && <InstallAppBanner compact />}
-                {tourAllowed && <OrderingTour key={pathname} pathname={pathname} />}
+                {tourAllowed && <OrderingTour key={pathname} pathname={pathname} onActivityChange={setOrderingGuideActive} />}
                 {children}
             </main>
 
             <CustomerFooter onHowToOrder={tourAllowed ? () => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR)) : undefined} />
 
-            {showSocialPopup && <SocialFollowPopup />}
+            {showSocialPopup && !orderingGuideActive && <SocialFollowPopup />}
             </BranchOperationalGuard>
 
             <BottomNavigation />

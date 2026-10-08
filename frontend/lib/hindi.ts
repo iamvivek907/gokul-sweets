@@ -1,4 +1,6 @@
 export const hindi: Record<string,string> = {
+ "Your checkout changed while payment was being checked. Review your order before paying.": "भुगतान की जाँच के दौरान आपका चेकआउट बदल गया। भुगतान से पहले अपना ऑर्डर जाँचें।",
+ "Payment details changed. Review them before continuing.": "भुगतान की जानकारी बदल गई है। आगे बढ़ने से पहले उसे जाँचें।",
  "How to order": "ऑर्डर कैसे करें",
  "First visit?": "पहली बार आए हैं?",
  "See how to book a pickup in four quick steps.": "चार आसान चरणों में पिकअप बुक करना सीखें।",

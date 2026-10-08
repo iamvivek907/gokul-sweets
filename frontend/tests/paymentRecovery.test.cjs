@@ -52,3 +52,8 @@ test('opened checkout refresh keeps the same attempt on a temporary outage', asy
     assert.equal((await service.refreshKnownPayment(known, true)).paymentId, 1);
     assert.deepEqual(service.calls, [['lookup', 'A'], ['refresh', 1]]);
 });
+test('deliberate Pay cannot fall back to pending when provider confirmation fails', async () => {
+    const service = load({...known, paymentUrl: null}, {opened: true, refreshError: 503});
+    await assert.rejects(service.refreshKnownPayment(known, true, {allowTemporaryFallback: false}), /provider unavailable/);
+    assert.deepEqual(service.calls, [['lookup', 'A'], ['refresh', 1]]);
+});

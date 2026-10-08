@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import {mergePaymentResponse, refreshKnownPayment} from "@/lib/paymentRecovery";
+import {getCartSnapshot} from "@/lib/cartStorage";
 
 import BrandLoading from "@/components/common/BrandLoading";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
@@ -190,20 +191,6 @@ function statusBadgeClass(
             return "bg-[#fff4e5] text-[#7a1625]";
     }
 }
-
-
-/*
- * =========================================================
- * PAYMENT RESPONSE MERGE
- * =========================================================
- *
- * refreshPayment() intentionally returns provider-specific
- * checkout fields as null because those fields are not
- * persisted in the Payment entity.
- *
- * Preserve the locally-known values when they exist.
- */
-
 
 
 /*
@@ -1296,7 +1283,7 @@ export default function PaymentPage() {
         let alive = true;
         const restored = (event: PageTransitionEvent) => {
             const state = recoveryState.current;
-            if (!event.persisted || !state.payment) return;
+            if (!event.persisted || !state.payment || state.payment.orderNumber !== orderNumber) return;
             void refreshKnownPayment(state.payment, state.paymentPollingV2)
                 .then(current => { if (alive) recoveryState.current.applyPaymentResult(current); })
                 .catch(error => { if (alive) setError(error instanceof Error ? error.message : "Unable to check payment. Please check My Orders."); });
@@ -1309,7 +1296,7 @@ export default function PaymentPage() {
         Promise<void> {
 
         if (
-            !payment || cancelling || cancellationRunning.current || refreshing || paymentLaunchRunning.current
+            !payment || payment.orderNumber !== orderNumber || cancelling || cancellationRunning.current || refreshing || paymentLaunchRunning.current
         ) {
 
             return;
@@ -1346,14 +1333,24 @@ export default function PaymentPage() {
         paymentLaunchRunning.current = true;
         setOpeningPayment(true);
         setError(null);
-
         let gatewayInvoked = false;
         try {
-            const current = await refreshKnownPayment(payment, paymentPollingV2);
+            const cartBeforeCheck = getCartSnapshot();
+            const checkoutBeforeCheck = getPendingOrderSnapshot();
+            const current = await refreshKnownPayment(payment, paymentPollingV2, {allowTemporaryFallback: false});
             applyPaymentResult(current);
             if (current.paymentStatus !== "PENDING") return;
-            if (current.paymentId !== payment.paymentId || current.provider !== payment.provider || current.amount !== payment.amount) {
+            if (cartBeforeCheck !== getCartSnapshot() || checkoutBeforeCheck !== getPendingOrderSnapshot()) {
+                setError("Your checkout changed while payment was being checked. Review your order before paying.");
+                return;
+            }
+            if (current.paymentId !== payment.paymentId || current.provider !== payment.provider || current.amount !== payment.amount || current.currency !== payment.currency) {
                 setError("Payment details changed. Review them before continuing.");
+                return;
+            }
+            const expiresAt = parseBusinessTimestamp(current.expiresAt).getTime();
+            if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+                setError("This payment window has closed. Please check its status before starting another checkout.");
                 return;
             }
             if (current.provider === "PHONEPE" && !current.paymentUrl) {
