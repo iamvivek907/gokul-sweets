@@ -13,7 +13,10 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
 import {availabilityItems, checkCartAvailability, checkMenuAvailability, type CartAvailability} from "@/services/availabilityApi";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
-import {clearPickupSlot} from "@/lib/checkoutStorage";
+import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/checkoutStorage";
+import {getCartSnapshot, parseCart} from "@/lib/cartStorage";
+import {getStoredBranchSnapshot} from "@/lib/branchStorage";
+import {earliestNormalMenuPickup, noDefaultPickupMessage} from "@/lib/menuPickupPresentation";
 import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 import type {MenuProduct} from "@/types/menu";
 
@@ -35,27 +38,54 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))];
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
+    // A fresh, empty menu visit may default today; retained dates/carts require customer action.
+    // At a new IST day an empty cart can start again; a same-day expired slot is never moved.
+    const mayDefault = menuPreview && !intent.date && cart.isEmpty && (!intent.expired || !!intent.previousDate && intent.previousDate < today);
+    const requestDate = intent.date ?? (mayDefault ? today : null);
     // Service-rule edits change the live menu revision even when all SKUs remain browsable.
     const menuRevision = products?.[0]?.availabilityRevision ?? null;
-    const key = JSON.stringify([branch?.id, intent.date, itemsJson, revision, features?.smartAvailability,menuPreview,menuRevision]);
+    const key = JSON.stringify([branch?.id, requestDate, itemsJson, revision, features?.smartAvailability,menuPreview,menuRevision]);
     // Retain the last preview while quantities refresh, but never across branch,
     // date, slot, or catalogue changes. Checkout still checks the exact cart.
     const scope = JSON.stringify([branch?.id,intent.date,intent.selection?.slot.id,intent.selection?.pickupType,features?.smartAvailability,menuPreview,candidates,menuRevision]);
-    const validDate = intent.date && features && validPickupDate(intent.date,today,features.futureOrderingDays);
+    const validDate = requestDate && features && validPickupDate(requestDate,today,features.futureOrderingDays);
     useEffect(() => {
-        if (!features?.smartAvailability || !branch || !intent.date || !validDate || !JSON.parse(itemsJson).length) return;
+        if (!features?.smartAvailability || !branch || !requestDate || !validDate || !JSON.parse(itemsJson).length) return;
+        const branchBefore = getStoredBranchSnapshot(), pickupBefore = getPickupSlotSnapshot(), cartBefore = getCartSnapshot();
+        const intentBefore = localStorage.getItem("gokul-pickup-intent");
+        const pendingBefore = [localStorage.getItem("gokul-pending-order"), localStorage.getItem("gokul-pending-payment")];
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
-            void (menuPreview ? checkMenuAvailability : checkCartAvailability)(branch.id, intent.date!, 1, JSON.parse(itemsJson),
+            void (menuPreview ? checkMenuAvailability : checkCartAvailability)(branch.id, requestDate, 1, JSON.parse(itemsJson),
                 AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),menuPreview)
-                .then(data => {if (!controller.signal.aborted) setResult({key, scope, data});})
+                .then(data => {
+                    if (controller.signal.aborted) return;
+                    setResult({key, scope, data});
+                    if (mayDefault && !sessionStorage.getItem("gokul-mobile-order-attempt") && !pendingBefore.some(Boolean)
+                        && branchBefore === getStoredBranchSnapshot() && pickupBefore === getPickupSlotSnapshot()
+                        && cartBefore === getCartSnapshot() && !parseCart(getCartSnapshot()).items.length
+                        && intentBefore === localStorage.getItem("gokul-pickup-intent")
+                        && !localStorage.getItem("gokul-pending-order") && !localStorage.getItem("gokul-pending-payment")
+                        && requestDate === indiaToday()) {
+                        const first = earliestNormalMenuPickup(data, JSON.parse(itemsJson).map((item: {productId: number}) => item.productId), requestDate);
+                        if (first) {savePickupIntent(branch.id, first.date); savePickupSlot(first);}
+                    }
+                })
                 .catch(error => {if (!controller.signal.aborted) {
                     console.warn("Date availability check failed.", error);
                     setResult({key, scope, error: "We couldn't check this pickup. Your cart is saved. Try again."});
                 }});
         }, 350);
         return () => {controller.abort(); window.clearTimeout(timer);};
-    }, [features?.smartAvailability, branch, intent.date, validDate, itemsJson, key,scope,menuPreview]);
+    }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview,mayDefault]);
+    // Recheck slot capacity, cutoff and preparation as time passes, without changing the pickup.
+    useEffect(() => {
+        if (!menuPreview || !features?.smartAvailability) return;
+        const refresh = () => {if (navigator.onLine && document.visibilityState === "visible") setRevision(value => value + 1);};
+        const timer = window.setInterval(refresh, 60000);
+        window.addEventListener("online", refresh); document.addEventListener("visibilitychange", refresh);
+        return () => {clearInterval(timer); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh);};
+    }, [menuPreview, features?.smartAvailability]);
     const data = result?.key === key ? result.data : undefined;
     const preview = data ?? (menuPreview && result?.scope === scope ? result.data : undefined);
     const day = preview?.dates[0];
@@ -68,9 +98,14 @@ export function useDateAvailability(products?: MenuProduct[]) {
             ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0
             : selectedSlot.slot.remainingCapacity <= 0)
         || selectedSlot.issues?.some(issue => cartIds.has(issue.productId)));
-    const items = day?.items?.map(item => selectedSlot?.issues?.find(issue => issue.productId === item.productId) ?? item);
+    const slotUnavailable = !!intent.selection && !!day && (!selectedSlot || selectedSlot.code === "PICKUP_WINDOW"
+        || (intent.selection.pickupType === "PRIORITY" ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0 : selectedSlot.slot.remainingCapacity <= 0));
+    const items = day?.items?.map(item => slotUnavailable ? {...item, available: false, code: selectedSlot?.code ?? "NO_SLOTS", reason: selectedSlot?.reason ?? "Choose another pickup time."}
+        : selectedSlot?.issues?.find(issue => issue.productId === item.productId) ?? item);
+    const noPickupMessage = menuPreview && !intent.selection && data && mayDefault && !earliestNormalMenuPickup(data,candidates.map(item=>item.productId),today) ? noDefaultPickupMessage(data,today) : null;
+    const pickupRequired = menuPreview && !!features?.smartAvailability && !intent.selection;
     return {features, today, branch, intent, data, items, selectionUnavailable, error: result?.key === key ? result.error : null,
-        hasItems: requested.length > 0, retry: () => setRevision(value => value + 1)};
+        noPickupMessage, pickupRequired, hasItems: requested.length > 0, retry: () => setRevision(value => value + 1)};
 }
 
 export default function PickupContext({check, cart = false}: {check: ReturnType<typeof useDateAvailability>; cart?: boolean}) {
@@ -108,11 +143,12 @@ export default function PickupContext({check, cart = false}: {check: ReturnType<
                         className="ml-3 min-h-11 rounded-xl border border-[#eadfd6] px-3" />
                 </label></div>
             {intent.selection && <Link href="/checkout/pickup" className="min-h-11 py-3 text-sm underline">
-                {intent.selection.slot.startTime.slice(0, 5)} <T text="pickup · Change time" /><LinkFeedback /></Link>}
+                {intent.selection.date === today ? "Today" : intent.selection.date} · {intent.selection.slot.startTime.slice(0, 5)} IST <T text="pickup · Change time" /><LinkFeedback /></Link>}
         </div>
         {dateError && <p role="alert" className="mt-2 text-sm text-red-700">{dateError}</p>}
         {intent.expired && <p role="status" className="mt-2 text-sm"><T text="Your previous pickup has passed. Choose a new date; your cart is saved." /></p>}
-        {!intent.date ? <p className="mt-2 text-sm text-[#756763]"><T text="Choose pickup to check availability. Browse and build your cart first if you prefer." /></p>
+        {check.noPickupMessage && <p role="status" className="mt-3 text-sm font-semibold text-[#7a1625]">{check.noPickupMessage} <Link href="/checkout/pickup" className="underline">Choose pickup</Link></p>}
+        {!intent.date ? <p className="mt-2 text-sm text-[#756763]"><T text="Choose a pickup date and time to see which items you can add." /></p>
             : intent.date < today ? <p role="alert" className="mt-2 text-sm"><T text="That pickup date has passed. Choose a new date; your cart is saved." /></p>
             : error ? <div role="alert"><p className="mt-2 text-sm">{error}</p><button onClick={retry} className="min-h-11 underline"><T text="Try again" /></button></div>
             : !data && hasItems ? <p role="status" className="mt-2 text-sm"><T text="Checking your pickup date..." /></p>

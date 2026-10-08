@@ -1,6 +1,7 @@
 "use client";
 import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
+import {partitionPickupProducts} from "@/lib/menuPickupPresentation";
 import {menuFamily,retailCollections} from "@/lib/menuPresentation";
 import RetailSweetRail from "./RetailSweetRail";
 import MobileMenuHighlights from "./MobileMenuHighlights";
@@ -690,8 +691,8 @@ export default function MenuScreen() {
     const mobileFeatures=useStorefrontFeatures();
     const phoneMenu=phone===true&&(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true;
     const [browseCategory,setBrowseCategory]=useState<{branchId:number;id:number}|null|undefined>(undefined);
-    const initialFoodId=browseCategory===undefined?(effectiveCategoryId??categories.find(c=>menuFamily(c.name)==="Food")?.id):undefined;
-    const activeBrowseId=phoneMenu?(browseCategory?.branchId===branch?.id?browseCategory?.id:initialFoodId):undefined;
+    const initialCategoryId=browseCategory===undefined?(effectiveCategoryId??undefined):undefined;
+    const activeBrowseId=phoneMenu?(browseCategory?.branchId===branch?.id?browseCategory?.id:initialCategoryId):undefined;
     const activeBrowse=categories.find(c=>c.id===activeBrowseId);
     const retailBrowse=!!activeBrowse&&/snack|dairy|drink|beverage|biscuit|namkeen/i.test(activeBrowse.name);
     const [mobileCategories,setMobileCategories]=useState<number[]|null>(null);
@@ -786,6 +787,20 @@ export default function MenuScreen() {
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
     const pickupCheck = useDateAvailability(allProducts);
+    const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || !pickupCheck.items || !!pickupCheck.error);
+    const pickupPartition = pickupCheck.intent.selection && pickupCheck.items && !pickupCheck.error
+        ? partitionPickupProducts(filteredProducts,pickupCheck.items,phoneMenu?portionGroups:[]) : null;
+    const splitPickup = !!pickupPartition && pickupPartition.other.length > 0;
+    const pickupTimeLabel = pickupCheck.intent.selection ? new Intl.DateTimeFormat("en-IN",{hour:"numeric",minute:"2-digit",hour12:true,timeZone:"Asia/Kolkata"})
+        .format(new Date(`${pickupCheck.intent.selection.date}T${pickupCheck.intent.selection.slot.startTime}+05:30`)) : "";
+    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
+    const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
+    const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
+        portionGroups={phoneMenu?portionGroups:undefined} catalogProducts={phoneMenu?allProducts:undefined}
+        refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
+        pickupChecking={pickupChecking} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
+        ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
+        onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
     const [menuOffer,setMenuOffer]=useState<{key:string;target:AvailableRebateResponse|null}|null>(null);
     const offerContext=JSON.stringify([branch?.id,items,pickupCheck.intent.selection]);
     const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
@@ -797,7 +812,7 @@ export default function MenuScreen() {
         product: MenuProduct
     ) {
 
-        if (!product.available) return;
+        if (!product.available || !pickupAllows(product.id)) return;
         if (product.saleMode === "WEIGHT") {
             setWeightProduct(product);
             return;
@@ -831,7 +846,7 @@ export default function MenuScreen() {
         });
 
         const liveProduct=categories.flatMap(category=>category.products).find(item=>item.id===product.id);
-        if(!liveProduct?.available){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
+        if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         const result =
             addItem(
                 product,
@@ -1251,7 +1266,7 @@ export default function MenuScreen() {
 
                 {!phoneMenu&&<PickupContext check={pickupCheck} />}
 
-                {phoneMenu&&mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable}/>}
+                {mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.error} onRetry={pickupCheck.retry}/>}
 
                 <div
                     className="gokul-menu-tools
@@ -1439,9 +1454,20 @@ export default function MenuScreen() {
                                 </div>
 
 
-                                {phoneMenu&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
+                                {phoneMenu&&!splitPickup&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
-                                {pickupCheck.features?.contextualStorefrontV2 ? (phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories, filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group => <MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>
+                                {splitPickup && pickupPartition ? <div className="menu-pickup-sections">
+                                    <section aria-label="Available for selected pickup" className="menu-pickup-section">
+                                        <h2>Available for your {pickupTimeLabel} pickup</h2>
+                                        <p>{pickupPartition.available.length ? "These items fit your selected pickup." : "No items in this view fit your selected pickup. Change time or clear filters."}</p>
+                                        {groupMenuProducts(categories,pickupPartition.available).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={group.id} id={group.id} name={group.name} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
+                                    </section>
+                                    <section aria-label="Other menu items" className="menu-pickup-section menu-pickup-section--other">
+                                        <h2>Other menu items</h2><p>Service times and stock vary. Review each item or change pickup.</p>
+                                        <button type="button" className="menu-change-pickup" onClick={()=>document.querySelector<HTMLButtonElement>('.mobile-menu-pickup > button')?.click()}>Change pickup</button>
+                                        {groupMenuProducts(categories,pickupPartition.other).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={group.id} id={group.id} anchorId={pickupPartition.available.some(product=>product.categoryId===group.id)?`menu-later-category-${group.id}`:undefined} name={group.name} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
+                                    </section>
+                                </div> : pickupCheck.features?.contextualStorefrontV2 ? (phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories, filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group => <MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={retailBrowse?null:pairing}
@@ -1449,7 +1475,7 @@ export default function MenuScreen() {
                                     catalogProducts={phoneMenu?allProducts:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
-                                    pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
+                                    pickupChecking={pickupChecking}
                                     dateAware={!!pickupCheck.features?.smartAvailability}
                                     products={
                                         group.products
@@ -1467,7 +1493,7 @@ export default function MenuScreen() {
                                         productWeights
                                     }
                                     onIncrease={
-                                        increaseQuantity
+                                        guardedIncrease
                                     }
                                     onDecrease={
                                         decreaseQuantity
@@ -1484,7 +1510,7 @@ export default function MenuScreen() {
                                     catalogProducts={phoneMenu?allProducts:undefined}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
-                                    pickupChecking={!!pickupCheck.features?.smartAvailability && !!pickupCheck.intent.date && !pickupCheck.data}
+                                    pickupChecking={pickupChecking}
                                     dateAware={!!pickupCheck.features?.smartAvailability}
                                     products={
                                         filteredProducts
@@ -1502,7 +1528,7 @@ export default function MenuScreen() {
                                         productWeights
                                     }
                                     onIncrease={
-                                        increaseQuantity
+                                        guardedIncrease
                                     }
                                     onDecrease={
                                         decreaseQuantity
@@ -1513,7 +1539,7 @@ export default function MenuScreen() {
                                 />
                                 )}
 
-                                {phoneMenu&&retailBrowse&&!search.trim()&&<RetailSweetRail products={allProducts} onBrowse={browseMenu}/>}
+                                {phoneMenu&&!splitPickup&&retailBrowse&&!search.trim()&&<RetailSweetRail products={allProducts} onBrowse={browseMenu}/>}
                             </>
                         )}
 

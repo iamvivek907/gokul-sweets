@@ -33,7 +33,7 @@ try{
   const pickup=page.getByRole('region',{name:'Menu pickup time'});await pickup.getByText('Choose pickup date & time',{exact:true}).waitFor();
   const recommendations=page.locator('#gokul-menu-items');
   await recommendations.getByRole('button',{name:'Add Meal 1 to cart'}).waitFor();
-  assert.equal(await recommendations.getByText('Unavailable for selected pickup',{exact:true}).count(),0);assert.equal(checks,0);
+  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Meal 1 to cart"]')?.disabled===true);assert.ok(checks>0,'a fresh visit checks today before offering a default');
   // Discovery is a draft: even the first available slot requires a deliberate tap.
   await pickup.getByRole('button',{name:'Choose time',exact:true}).click();
   const dialog=page.getByRole('dialog',{name:'Choose pickup date & time'});
@@ -42,9 +42,9 @@ try{
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
   await page.getByLabel('Find a favourite',{exact:true}).fill('Meal 1');
   await page.evaluate(date=>{localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));window.dispatchEvent(new Event('gokul-pickup-intent-change'));},date);
-  await pickup.getByText(/Time not selected/).waitFor();await pickup.getByText('Item availability is checked for the date shown above. Confirm your pickup at checkout.',{exact:true}).waitFor();
+  await pickup.getByText(/Time not selected/).waitFor();await pickup.getByText('Availability follows your selected pickup time. Confirm it at checkout.',{exact:true}).waitFor();
   await page.getByLabel('Find a favourite',{exact:true}).fill('');
-  await recommendations.getByText('Unavailable for selected pickup',{exact:true}).nth(1).waitFor();
+  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Meal 2 to cart"]')?.disabled===true);
   assert.equal(await recommendations.getByRole('button',{name:'Add Meal 1 to cart'}).isDisabled(),true);
   assert.equal(await recommendations.getByRole('button',{name:'Add Meal 2 to cart'}).isDisabled(),true);
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
@@ -57,7 +57,7 @@ try{
   assert.ok(checks>before,'changed menu revision rechecks service hours for the selected date');
   assert.equal(await recommendations.getByRole('button',{name:'Add Meal 2 to cart'}).isEnabled(),true);
   menuRevision='v3';blocked=true;await page.clock.fastForward(31000);
-  await recommendations.getByText('Unavailable for selected pickup',{exact:true}).nth(1).waitFor();
+  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Meal 2 to cart"]')?.disabled===true);
   assert.equal(await recommendations.getByRole('button',{name:'Add Meal 2 to cart'}).isDisabled(),true);
   assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))),{date,slot,pickupType:'NORMAL'},'background rechecks preserve the customer’s chosen pickup');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);

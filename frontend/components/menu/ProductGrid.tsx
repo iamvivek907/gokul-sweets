@@ -129,9 +129,9 @@ export default function ProductGrid({
             <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
                 {mobileMenuRows(products,portionGroups??[],catalogProducts??products).map(row => {
                     const product=row.product;
-                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
+                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
                     const pickup = pickupItems?.find(item => item.productId === product.id);
-                    const unavailable = dateAware && pickup?.available === false;
+                    const unavailable = !!dateAware && (pickupChecking || pickup?.available !== true);
                     return (
                         <Fragment key={product.id}><div id={`gokul-product-${product.id}`} className="relative min-w-0 scroll-mt-24">
                             {dateAware && (pickup || pickupChecking) && !(refined && unavailable) && (
@@ -143,7 +143,8 @@ export default function ProductGrid({
                             <ProductCard
                                 premium={portionGroups!==undefined}
                                 refined={refined}
-                                unavailableForPickup={refined && unavailable}
+                                unavailableForPickup={unavailable}
+                                pickupMessage={pickupChecking ? "Choose pickup to add" : undefined}
                                 product={product}
                                 ratingSummary={ratingSummaries[product.id] ?? null}
                                 ratingLoading={ratingsLoading}
@@ -153,7 +154,7 @@ export default function ProductGrid({
                                 onDecrease={onDecrease}
                                 onAdd={onAdd}
                             />
-                            {unavailable && (!refined || pickup?.code === "QUANTITY_TOO_LARGE") && (
+                            {unavailable && (!refined || pickup?.code === "QUANTITY_TOO_LARGE" || pickup?.code === "OUTSIDE_SERVICE" || pickup?.code === "DEPENDENCY_UNAVAILABLE") && (
                                 <p role="status" className="menu-availability-note">
                                     {describePickupAvailability(pickup, false)}
                                 </p>
