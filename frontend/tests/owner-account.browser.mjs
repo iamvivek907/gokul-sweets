@@ -29,7 +29,7 @@ try {
  for(const width of [390,1280]){
   for(const mode of ['setup','recover']){
    const context=await browser.newContext({viewport:{width,height:950},serviceWorkers:'block'}),page=await context.newPage();
-   let calls=0,fail=true;
+   let calls=0,fail=true,profileLoads=0;
    // Even when a staff cookie exists, public credential recovery must not send it.
    await context.addCookies([{name:'gokul_staff',value:'existing-cookie',domain:'api-ci.example.invalid',path:'/',secure:true,httpOnly:true}]);
    await mock(context,async(route,path,request)=>{
@@ -41,7 +41,7 @@ try {
      await route.fulfill({status:fail?403:200,json:fail?{message:'Account verification failed.'}:{username:'first.owner',recoveryKey:replacement},headers:headers()});return true;
     }
     return false;
-   });
+   },()=>{profileLoads++;return mode==='recover'&&calls<2?owner:null;});
    await page.goto(`${base}/admin/${mode}`);await page.getByLabel(mode==='setup'?'Setup key':'Saved recovery key',{exact:true}).waitFor();
    assert.equal(new URL(page.url()).pathname,`/admin/${mode}`,'unauthenticated setup/recovery must not redirect to login');
    await fillPublic(page,mode);await page.getByLabel('Confirm new password',{exact:true}).fill('Different-password-2026');
@@ -57,7 +57,10 @@ try {
    await page.getByLabel('I saved the recovery key offline').check();await page.getByRole('link',{name:'Go to admin login',exact:true}).waitFor();
    await noPersistedSecret(page,replacement);await noPersistedSecret(page,mode==='setup'?setupKey:recoveryKey);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-   await page.reload();assert.equal(await page.getByLabel('Recovery key',{exact:true}).count(),0,'raw recovery key is not retained across reloads');
+   const beforeLogin=profileLoads;const refreshed=page.waitForResponse(response=>response.url().endsWith('/api/admin/auth/me'));
+   await page.getByRole('link',{name:'Go to admin login',exact:true}).click();await refreshed;await page.waitForURL('**/admin/login');
+   assert.equal(profileLoads>beforeLogin,true,'login navigation reloads auth after credential recovery revoked the old session');
+   assert.equal(await page.getByLabel('Recovery key',{exact:true}).count(),0,'raw recovery key is not retained after leaving');
    await context.close();console.log(`Owner ${mode} passed at ${width}px`);
   }
   const context=await browser.newContext({viewport:{width,height:950},serviceWorkers:'block'}),page=await context.newPage();let mutations=0,fail=true,renames=0,logouts=0;

@@ -11,7 +11,8 @@ export function SavedOwnerKey({result}:{result:OwnerResult}) {
         <label className="block text-sm font-semibold">Recovery key<input readOnly value={result.recoveryKey} type={visible?"text":"password"} autoComplete="off" className="mt-2 w-full rounded-lg border p-3 font-mono text-sm"/></label>
         <div className="flex flex-wrap gap-3"><button type="button" className="underline" onClick={()=>setVisible(!visible)}>{visible?"Hide key":"Show key"}</button><button type="button" className="underline" onClick={async()=>{try{await navigator.clipboard.writeText(result.recoveryKey);setCopied(true);}catch{setVisible(true);}}}>{copied?"Copied":"Copy key"}</button></div>
         <label className="flex items-center gap-2"><input type="checkbox" checked={saved} onChange={e=>setSaved(e.target.checked)}/>I saved the recovery key offline</label>
-        {saved&&<Link href="/admin/login" className="inline-flex min-h-11 items-center rounded-xl bg-[#7a1625] px-4 text-white">Go to admin login</Link>}
+        {/* Reload the auth provider after recovery has revoked the old session. */}
+        {saved&&<a href="/admin/login" className="inline-flex min-h-11 items-center rounded-xl bg-[#7a1625] px-4 text-white">Go to admin login</a>}
     </section>;
 }
 async function publicApi<T>(path:string,signal:AbortSignal,body?:unknown):Promise<T> {
