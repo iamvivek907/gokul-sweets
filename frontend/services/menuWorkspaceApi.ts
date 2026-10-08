@@ -37,6 +37,19 @@ export type WorkspacePage = {
   branchCategories: { id: number; name: string }[];
   taxes: { id: number; name: string }[];
 };
+export type ItemServiceHours = {
+  enabled: boolean;
+  revision: number;
+  item: {branchProductId:number;startsAt:string|null;endsAt:string|null;weekdays:number;soldOut:boolean;requiresBranchProductId:number|null};
+};
+export async function serviceHoursRequest(branch:number,branchProductId:number,init:RequestInit={}):Promise<ItemServiceHours> {
+  const response=await adminFetch(`/api/admin/branches/${branch}/menu-service-windows/${branchProductId}/hours`,"staff-session",init);
+  if(!response.ok){
+    const data=await response.json().catch(()=>null);
+    throw new Error(data?.message??(response.status===409?"Service rules changed. Reload saved hours before applying your edit.":"Could not load or save service hours. Please retry."));
+  }
+  return response.json();
+}
 export type Group = {
   key: string;
   title: string;

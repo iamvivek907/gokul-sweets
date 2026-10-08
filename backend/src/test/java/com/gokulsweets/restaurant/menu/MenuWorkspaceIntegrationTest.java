@@ -24,11 +24,46 @@ class MenuWorkspaceIntegrationTest {
  @Autowired java.time.Clock inventoryClock;
  @Autowired JdbcTemplate jdbc;@Autowired MenuWorkspaceService workspace;@Autowired MobileMenuOptionsService groups;
  @MockitoBean StaffAuthorizationService staff;
+ @Autowired MenuServiceWindows windows;
  @BeforeEach void actor(){var actor=new StaffUser();actor.setUsername("workspace-test");when(staff.getCurrentStaff()).thenReturn(actor);}
  long branch(){return jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?, 'Workspace') RETURNING id",Long.class,UUID.randomUUID().toString());}
  long category(){return jdbc.queryForObject("INSERT INTO categories(code,name) VALUES (?, 'Sweets') RETURNING id",Long.class,UUID.randomUUID().toString());}
  MenuWorkspaceService.Details details(long c,String code,long version){return new MenuWorkspaceService.Details("Test product",code,c,"Fresh",BigDecimal.valueOf(120),ProductSaleMode.UNIT,null,null,null,version);}
  long product(long b,long c){return workspace.create(b,details(c,UUID.randomUUID().toString(),0),List.of(b));}
+ long branchProduct(long b,long product){return jdbc.queryForObject("SELECT id FROM branch_products WHERE branch_id=? AND product_id=?",Long.class,b,product);}
+ @Test void individualHoursPreserveOtherItemsAndAllNonTimingRules(){
+  long b=branch(),c=category(),a=branchProduct(b,product(b,c)),d=branchProduct(b,product(b,c));
+  var original=new MenuServiceWindows.Item(a,java.time.LocalTime.of(8,0),java.time.LocalTime.of(9,30),31,true,d);
+  var other=new MenuServiceWindows.Item(d,java.time.LocalTime.of(11,0),java.time.LocalTime.of(21,30),127,false,null);
+  windows.save(b,new MenuServiceWindows.Settings(true,0,List.of(original,other)));
+  var saved=windows.saveHours(b,a,new MenuServiceWindows.HoursEdit(1,java.time.LocalTime.of(22,0),java.time.LocalTime.of(2,0)));
+  assertThat(saved.revision()).isEqualTo(2);assertThat(saved.enabled()).isTrue();
+  assertThat(saved.item().weekdays()).isEqualTo(31);assertThat(saved.item().soldOut()).isTrue();assertThat(saved.item().requiresBranchProductId()).isEqualTo(d);
+  assertThat(windows.hours(b,d).item()).isEqualTo(other);
+  var cleared=windows.saveHours(b,a,new MenuServiceWindows.HoursEdit(2,null,null));
+  assertThat(cleared.item().startsAt()).isNull();assertThat(cleared.item().endsAt()).isNull();assertThat(cleared.item().soldOut()).isTrue();assertThat(cleared.item().requiresBranchProductId()).isEqualTo(d);assertThat(cleared.item().weekdays()).isEqualTo(31);
+ }
+ @Test void individualHoursRejectStaleDraftsAndNeverEnableTheBranchImplicitly(){
+  long b=branch(),c=category(),a=branchProduct(b,product(b,c));
+  var initial=windows.hours(b,a);assertThat(initial.enabled()).isFalse();assertThat(initial.revision()).isZero();assertThat(initial.item().weekdays()).isEqualTo(127);
+  var edit=new MenuServiceWindows.HoursEdit(0,java.time.LocalTime.of(8,0),java.time.LocalTime.of(9,30));
+  var saved=windows.saveHours(b,a,edit);assertThat(saved.enabled()).isFalse();assertThat(saved.revision()).isEqualTo(1);
+  assertThatThrownBy(()->windows.saveHours(b,a,edit)).isInstanceOf(ResponseStatusException.class).hasMessageContaining("Reload");
+  assertThat(windows.hours(b,a)).isEqualTo(saved);
+  windows.save(b,new MenuServiceWindows.Settings(false,1,List.of(saved.item())));
+  assertThatThrownBy(()->windows.saveHours(b,a,new MenuServiceWindows.HoursEdit(1,null,null))).isInstanceOf(ResponseStatusException.class);
+ }
+ @Test void individualHoursValidatePairedTimesAndBranchScope(){
+  long b=branch(),c=category(),a=branchProduct(b,product(b,c)),other=branch();
+  for(var edit:List.of(new MenuServiceWindows.HoursEdit(0,java.time.LocalTime.NOON,null),new MenuServiceWindows.HoursEdit(0,java.time.LocalTime.NOON,java.time.LocalTime.NOON))){
+   assertThatThrownBy(()->windows.saveHours(b,a,edit)).isInstanceOf(IllegalArgumentException.class);
+  }
+  assertThatThrownBy(()->windows.hours(other,a)).isInstanceOf(ResponseStatusException.class);
+  assertThatThrownBy(()->windows.saveHours(other,a,new MenuServiceWindows.HoursEdit(0,null,null))).isInstanceOf(ResponseStatusException.class);
+  assertThat(windows.hours(b,a).revision()).isZero();
+  doThrow(new AccessDeniedException("Branch denied")).when(staff).requireBranchAccess(b);
+  assertThatThrownBy(()->windows.saveHours(b,a,new MenuServiceWindows.HoursEdit(0,null,null))).isInstanceOf(AccessDeniedException.class);
+ }
  @Test void boundedPagesSearchAndNewProductsStartUnavailable(){long b=branch(),c=category();for(int i=0;i<31;i++)product(b,c);var first=workspace.list(b,LocalDate.now(inventoryClock),"",null,"ALL",0,25);var next=workspace.list(b,LocalDate.now(inventoryClock),"",null,"ALL",1,25);assertThat(first.content()).hasSize(25);assertThat(next.content()).hasSize(6);assertThat(first.totalElements()).isEqualTo(31);assertThat(first.content()).allSatisfy(p->assertThat(p.get("available")).isEqualTo(false));assertThat(workspace.list(b,LocalDate.now(inventoryClock),"no match",null,"ALL",0,25).content()).isEmpty();assertThatThrownBy(()->workspace.list(b,LocalDate.now(inventoryClock),"",null,"ALL",0,1000)).isInstanceOf(IllegalArgumentException.class);}
  @Test void appearanceCategoriesAreBranchScopedButCreationCategoriesRemainGlobal(){long b=branch(),other=branch(),c=category(),foreign=category();product(b,c);product(other,foreign);var page=workspace.list(b,LocalDate.now(inventoryClock),"",null,"ALL",0,25);assertThat(page.categories()).extracting(MenuWorkspaceService.Option::id).contains(c,foreign);assertThat(page.branchCategories()).extracting(MenuWorkspaceService.Option::id).contains(c).doesNotContain(foreign);}
  @Test void countSkuPickerFiltersBeforePagination(){long b=branch(),c=category();for(int i=0;i<26;i++)product(b,c);workspace.create(b,new MenuWorkspaceService.Details("Loose sweet",UUID.randomUUID().toString(),c,"Fresh",BigDecimal.TEN,ProductSaleMode.WEIGHT,250,250,null,0L),List.of(b));var first=workspace.list(b,LocalDate.now(inventoryClock),"",null,"COUNT_SKU",0,25);var second=workspace.list(b,LocalDate.now(inventoryClock),"",null,"COUNT_SKU",1,25);assertThat(first.totalElements()).isEqualTo(26);assertThat(first.content()).hasSize(25);assertThat(second.content()).hasSize(1);assertThat(first.content()).allMatch(row->row.get("saleMode").equals("UNIT"));}

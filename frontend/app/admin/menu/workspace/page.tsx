@@ -23,6 +23,7 @@ import {
 import WorkspaceProductEditor, {
   type EditMode,
 } from "@/components/admin/WorkspaceProductEditor";
+import WorkspaceServiceHoursEditor from "@/components/admin/WorkspaceServiceHoursEditor";
 import WorkspaceGroupEditor from "@/components/admin/WorkspaceGroupEditor";
 import WorkspaceAppearance from "@/components/admin/WorkspaceAppearance";
 import WorkspaceDialog from "@/components/admin/WorkspaceDialog";
@@ -653,6 +654,7 @@ export default function MenuWorkspace() {
                     ["availability", "Availability"],
                     ["details", "Details"],
                     ["stock", "Stock"],
+                    ["service-hours", "Service hours"],
                     ["delete", "Delete from branch"],
                   ] as [EditMode, string][]
                 ).map(([mode, label]) => (
@@ -759,7 +761,11 @@ export default function MenuWorkspace() {
         </div>
       )}
       {editor && branch && (
-        <WorkspaceProductEditor
+        editor.mode==="service-hours"&&editor.item?<WorkspaceServiceHoursEditor
+          key={`${branch}-hours-${editor.item.productId}`}
+          draftKey={`${workspaceKey}:product:${branch}:service-hours:${editor.item.productId}:`}
+          branch={branch} item={editor.item} onClose={()=>setEditor(null)} onSaved={reload}
+        />:<WorkspaceProductEditor
           key={`${branch}-${editor.mode}-${editor.item?.productId ?? "new"}`}
           draftKey={`${workspaceKey}:product:${branch}:${editor.mode}:${editor.item?.productId ?? "new"}:${editor.mode === "stock" ? date : ""}`}
           item={editor.item}

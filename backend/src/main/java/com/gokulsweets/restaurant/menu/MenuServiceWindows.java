@@ -21,6 +21,8 @@ public class MenuServiceWindows {
     public record Item(long branchProductId, LocalTime startsAt, LocalTime endsAt, int weekdays,
                        boolean soldOut, Long requiresBranchProductId) {}
     public record Settings(boolean enabled, long revision, List<Item> items) {}
+    public record ItemHours(boolean enabled, long revision, Item item) {}
+    public record HoursEdit(@jakarta.validation.constraints.Min(0) long revision, LocalTime startsAt, LocalTime endsAt) {}
     public record Status(boolean available, String code, String message, Instant nextChangeAt,Instant evaluatedAt) {
         public Status(boolean available,String code,String message,Instant nextChangeAt){this(available,code,message,nextChangeAt,null);}
     }
@@ -40,6 +42,35 @@ public class MenuServiceWindows {
         authorization.requirePermission(PermissionName.MENU_MANAGE); authorization.requireBranchAccess(branchId);
         if (!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM branches WHERE id=?)",Boolean.class,branchId)))
             throw new IllegalArgumentException("Branch not found.");
+    }
+    @Transactional(readOnly=true)
+    public ItemHours hours(long branchId, long branchProductId) {
+        authorize(branchId);
+        return readHours(branchId,branchProductId);
+    }
+    private ItemHours readHours(long branchId,long branchProductId) {
+        // One statement gives the rule and its optimistic revision from the same snapshot.
+        var rows=jdbc.query("SELECT COALESCE(p.enabled,false) enabled,COALESCE(p.revision,0) revision,s.starts_at,s.ends_at,COALESCE(s.weekdays,127) weekdays,COALESCE(s.sold_out,false) sold_out,s.requires_branch_product_id FROM branch_products b LEFT JOIN menu_service_policies p ON p.branch_id=b.branch_id LEFT JOIN menu_service_items s ON s.branch_product_id=b.id WHERE b.branch_id=? AND b.id=?",
+                (r,n)->new ItemHours(r.getBoolean("enabled"),r.getLong("revision"),new Item(branchProductId,r.getObject("starts_at",LocalTime.class),r.getObject("ends_at",LocalTime.class),r.getInt("weekdays"),r.getBoolean("sold_out"),(Long)r.getObject("requires_branch_product_id"))),branchId,branchProductId);
+        if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Item not assigned to this branch.");
+        return rows.getFirst();
+    }
+    @Transactional
+    public ItemHours saveHours(long branchId,long branchProductId,HoursEdit input) {
+        authorize(branchId);
+        if(input==null||input.revision()<0||(input.startsAt()==null)!=(input.endsAt()==null)
+                ||input.startsAt()!=null&&input.startsAt().equals(input.endsAt()))
+            throw new IllegalArgumentException("Enter both service times with different start and end times, or clear both.");
+        // Serialize with branch-wide rules, inventory batches and order acceptance.
+        jdbc.queryForObject("SELECT id FROM branches WHERE id=? FOR UPDATE",Long.class,branchId);
+        var assigned=jdbc.queryForList("SELECT id FROM branch_products WHERE branch_id=? AND id=? FOR UPDATE",Long.class,branchId,branchProductId);
+        if(assigned.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"Item not assigned to this branch.");
+        var current=readHours(branchId,branchProductId);
+        if(current.revision()!=input.revision())throw new ResponseStatusException(HttpStatus.CONFLICT,"Service rules changed. Reload saved hours before applying your edit.");
+        jdbc.update("INSERT INTO menu_service_items(branch_product_id,starts_at,ends_at,weekdays,sold_out,requires_branch_product_id) VALUES (?,?,?,127,false,NULL) ON CONFLICT(branch_product_id) DO UPDATE SET starts_at=EXCLUDED.starts_at,ends_at=EXCLUDED.ends_at",branchProductId,input.startsAt(),input.endsAt());
+        // An individual item edit must never enable all saved rules for the branch implicitly.
+        jdbc.update("INSERT INTO menu_service_policies(branch_id,enabled,revision) VALUES (?,false,1) ON CONFLICT(branch_id) DO UPDATE SET revision=menu_service_policies.revision+1",branchId);
+        return readHours(branchId,branchProductId);
     }
     private Settings readSettings(long branchId) {return readSettings(branchId,true);}
     private Settings readSettings(long branchId,boolean includeDisabledItems) {

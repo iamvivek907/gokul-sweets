@@ -22,6 +22,7 @@ export type EditMode =
   | "availability"
   | "photo"
   | "stock"
+  | "service-hours"
   | "delete";
 export default function WorkspaceProductEditor({
   item,
@@ -159,7 +160,7 @@ export default function WorkspaceProductEditor({
   const title =
     mode === "add"
       ? "Add product"
-      : `${{ details: "Edit details", price: "Edit branch price", availability: "Set availability", photo: "Edit product photo", stock: "Stock details", delete: "Delete from branch" }[mode]} · ${item?.name}`;
+      : `${{ details: "Edit details", price: "Edit branch price", availability: "Set availability", photo: "Edit product photo", stock: "Stock details", "service-hours": "Service hours", delete: "Delete from branch" }[mode]} · ${item?.name}`;
   async function save() {
     if (lock.current) return;
     lock.current = true;
