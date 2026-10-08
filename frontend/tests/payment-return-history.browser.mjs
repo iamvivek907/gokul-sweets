@@ -29,7 +29,7 @@ try {
         });
         await context.addInitScript(branch => {localStorage.setItem('gokul-selected-branch', JSON.stringify(branch)); localStorage.setItem('gokul-social-follow-popup-seen', 'true'); localStorage.setItem('gokul-ordering-tour:v1', 'seen');}, branch);
         const seed = async () => page.evaluate(payment => localStorage.setItem('gokul-pending-payment', JSON.stringify({...payment, paymentStatus: 'PENDING', paymentUrl: 'https://gateway.example.invalid/pay', cartFingerprint: ''})), payment());
-        const pay = () => page.getByRole('button', {name: width <= 640 ? 'Continue payment' : /^Pay ₹/, exact: width <= 640});
+        const pay = () => page.getByRole('button', {name: width <= 640 ? 'Continue payment' : /^(?:Pay|Retry payment) ₹/, exact: width <= 640});
         await page.goto(`${base}/branches`); await seed();
         await page.goto(`${base}/checkout/payment/TEST-HISTORY`); await pay().waitFor();
         await pay().click(); await page.waitForURL('https://gateway.example.invalid/pay');
@@ -61,6 +61,7 @@ try {
         status = 'PAID'; await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', {persisted: true})));
         await page.waitForURL('**/orders/TEST-HISTORY').catch(async error => {console.error('Cache restoration state:', page.url(), await page.locator('body').innerText()); throw error;});
         assert.equal(gatewayVisits, 1); assert.equal(creates, 0);
+        console.log(`PASS: payment history and restoration at ${width}px`);
         await context.close();
     }
     console.log('PASS: PhonePe history replacement, stale paid/cancelled snapshots, pre-Pay recheck and browser-cache restoration.');
