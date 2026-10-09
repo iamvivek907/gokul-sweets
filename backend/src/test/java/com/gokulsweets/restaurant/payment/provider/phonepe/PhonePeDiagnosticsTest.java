@@ -118,6 +118,72 @@ class PhonePeDiagnosticsTest {
                 .isInstanceOf(PaymentSignatureException.class);
     }
 
+    @Test
+    void allSupportedEncodingsAuthenticateTheSameDigestAndRejectTampering() throws Exception {
+        var properties = properties();
+        properties.setWebhookChecksumKeyId("test-key");
+        properties.setWebhookChecksumSecret("test-secret");
+        var client = new PhonePeClient(properties, new ObjectMapper());
+        byte[] body =
+                "{\"event\":\"checkout.order.completed\",\"name\":\"मिठाई\"}\n"
+                        .getBytes(StandardCharsets.UTF_8);
+        var mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        byte[] digest = mac.doFinal(body);
+        var signatures =
+                List.of(
+                        HexFormat.of().formatHex(digest),
+                        HexFormat.of().withUpperCase().formatHex(digest),
+                        Base64.getEncoder().encodeToString(digest));
+        for (String signature : signatures) {
+            assertThatCode(() -> client.verifyWebhookSignature(body, "test-key", signature))
+                    .doesNotThrowAnyException();
+            byte[] changed = Arrays.copyOf(body, body.length - 1);
+            assertThatThrownBy(() -> client.verifyWebhookSignature(changed, "test-key", signature))
+                    .isInstanceOf(PaymentSignatureException.class);
+            assertThatThrownBy(() -> client.verifyWebhookSignature(body, "wrong-key", signature))
+                    .isInstanceOf(PaymentSignatureException.class);
+            properties.setWebhookChecksumSecret("wrong-secret");
+            assertThatThrownBy(() -> client.verifyWebhookSignature(body, "test-key", signature))
+                    .isInstanceOf(PaymentSignatureException.class);
+            properties.setWebhookChecksumSecret("test-secret");
+        }
+    }
+
+    @Test
+    void malformedTruncatedAndIncorrectDigestsRemainRejected() throws Exception {
+        var properties = properties();
+        properties.setWebhookChecksumKeyId("test-key");
+        properties.setWebhookChecksumSecret("test-secret");
+        var client = new PhonePeClient(properties, new ObjectMapper());
+        byte[] body = "{}".getBytes(StandardCharsets.UTF_8);
+        var mac = Mac.getInstance("HmacSHA256");
+        mac.init(new SecretKeySpec("test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+        String valid = Base64.getEncoder().encodeToString(mac.doFinal(body));
+        for (String invalid :
+                List.of(
+                        "!".repeat(44),
+                        "0".repeat(63),
+                        "g".repeat(64),
+                        valid.substring(0, 43),
+                        valid.substring(0, 20) + " " + valid.substring(21),
+                        Base64.getEncoder().encodeToString(new byte[31]),
+                        Base64.getEncoder().encodeToString(new byte[33]),
+                        Base64.getEncoder().encodeToString(new byte[32]),
+                        "0".repeat(64))) {
+            assertThatThrownBy(() -> client.verifyWebhookSignature(body, "test-key", invalid))
+                    .isInstanceOf(PaymentSignatureException.class);
+        }
+        // Noncanonical padding bits can decode to the valid digest; require canonical text.
+        String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        int lastIndex = alphabet.indexOf(valid.charAt(42));
+        String noncanonical = valid.substring(0, 42) + alphabet.charAt(lastIndex + 1) + "=";
+        assertThat(Base64.getDecoder().decode(noncanonical))
+                .isEqualTo(Base64.getDecoder().decode(valid));
+        assertThatThrownBy(() -> client.verifyWebhookSignature(body, "test-key", noncanonical))
+                .isInstanceOf(PaymentSignatureException.class);
+    }
+
     private PhonePeProperties properties() {
         var properties = new PhonePeProperties();
         properties.setClientId("test-client");

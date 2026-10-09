@@ -24,6 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.HexFormat;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -210,7 +211,8 @@ public class PhonePeClient {
      * <p>x-phonepe-checksum-key-id x-phonepe-checksum-signature
      *
      * <p>The configured key ID is checked first, then the raw request body is verified using
-     * HMAC-SHA256.
+     * HMAC-SHA256. Hexadecimal and canonical padded standard Base64 encode the same digest; neither
+     * changes the configured secret or raw body.
      *
      * @param rawBody the raw body
      * @param checksumKeyId the checksum key id
@@ -244,10 +246,9 @@ public class PhonePeClient {
                         "INVALID_PHONEPE_WEBHOOK_KEY_ID",
                         "PhonePe webhook checksum key ID is invalid.");
             }
-            String expected = hmacSha256Hex(rawBody, properties.getWebhookChecksumSecret());
-            if (!MessageDigest.isEqual(
-                    expected.getBytes(StandardCharsets.UTF_8),
-                    checksumSignature.trim().getBytes(StandardCharsets.UTF_8))) {
+            byte[] expected = hmacSha256(rawBody, properties.getWebhookChecksumSecret());
+            byte[] supplied = decodeWebhookSignature(checksumSignature.trim());
+            if (!MessageDigest.isEqual(expected, supplied)) {
                 // Shape only: never record secrets, signatures, expected hashes or payloads.
                 try {
                     log.warn(
@@ -760,27 +761,60 @@ public class PhonePeClient {
     }
 
     /**
-     * Hmacs sha256 hex.
+     * Calculates the raw HMAC-SHA256 digest using the configured UTF-8 secret.
      *
      * @param payload the payload
      * @param secret the secret
-     * @return the hmac sha256 hex result
+     * @return the 32-byte digest
      */
-    private String hmacSha256Hex(byte[] payload, String secret) {
+    private byte[] hmacSha256(byte[] payload, String secret) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(PhonePeClient.class, "hmacSha256Hex(byte[],String)");
+                MethodTiming.start(PhonePeClient.class, "hmacSha256(byte[],String)");
         try {
             try {
                 Mac mac = Mac.getInstance("HmacSHA256");
                 mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-                return HexFormat.of().formatHex(mac.doFinal(payload));
+                return mac.doFinal(payload);
             } catch (Exception exception) {
                 throw new IllegalStateException(
                         "Unable to calculate PhonePe webhook signature.", exception);
             }
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos, PhonePeClient.class, "hmacSha256Hex(byte[],String)");
+                    __gokulMethodStartedNanos, PhonePeClient.class, "hmacSha256(byte[],String)");
+        }
+    }
+
+    /**
+     * Decodes only full SHA-256 digests; malformed encodings fail the normal signature check.
+     *
+     * @param signature the trimmed header, never logged
+     * @return the decoded digest, or an empty array for unsupported or malformed input
+     */
+    private byte[] decodeWebhookSignature(String signature) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(PhonePeClient.class, "decodeWebhookSignature(String)");
+        try {
+            if (signature.matches("[0-9a-fA-F]{64}")) {
+                return HexFormat.of().parseHex(signature);
+            }
+            if (signature.length() == 44 && signature.matches("[A-Za-z0-9+/]{43}=")) {
+                try {
+                    byte[] decoded = Base64.getDecoder().decode(signature);
+                    if (decoded.length == 32
+                            && Base64.getEncoder().encodeToString(decoded).equals(signature)) {
+                        return decoded;
+                    }
+                } catch (IllegalArgumentException malformed) {
+                    // Unsupported encodings are rejected, never treated as authenticated.
+                }
+            }
+            return new byte[0];
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    PhonePeClient.class,
+                    "decodeWebhookSignature(String)");
         }
     }
 

@@ -109,3 +109,37 @@ Both owners and independent fallback previews use a separate read-only transacti
 Regression coverage includes follower timeout, interruption, remaining-budget handling, owner survival, original error propagation, fresh retry, fallback sharing behavior and transaction rollback. The PostgreSQL integration regression uses `pg_sleep`, confirms JDBC and Hibernate share the same connection, checks cancellation and local-setting reset, then retries through the coordinator. PostgreSQL integration execution requires the CI database.
 
 Follow-up local checks pass: 23 targeted backend tests, Java formatting, documentation/timing coverage for 2,085 methods and 10 workload/JVM tests. The earlier PR CI passed backend and browser suites but stopped before Docker workload execution because the JVM fixture relied on runner cgroup paths. That fixture now uses controlled files for cgroup v1/v2, absent limits and operator overrides; runtime sizing behavior is unchanged.
+
+
+## Follow-up: webhook compatibility and targeted runtime capture
+
+The October 9 DEV excerpt contains a webhook rejection with a matching key ID and a 44-character non-hexadecimal signature. The old verifier compares a 64-character hexadecimal HMAC string. A synthetic fixture reproduces rejection of the same valid 32-byte HMAC encoded as standard Base64. The verifier now decodes full hexadecimal (either case) or canonical padded standard Base64 and compares digest bytes with `MessageDigest.isEqual`. The exact raw body and configured UTF-8 secret remain authoritative. Malformed, truncated, unpadded, noncanonical and incorrectly signed headers fail. No secret decoding fallback, body reserialization, signature bypass, or authentication-mode switch is introduced. This establishes compatibility, not proof that the recorded webhook was genuine or that its configured secret is correct. Validate a real DEV payment and refund webhook after deployment.
+
+The public PhonePe HMAC guide does not specify digest/secret encoding; the inspected official Node SDK 2.0.6 callback implementation uses username/password SHA authentication instead. Do not infer secret Base64 decoding from the signature shape.
+
+For a short DEV observation after merging, add these Render environment values:
+
+```text
+GOKUL_MEMORY_DIAGNOSTICS_ENABLED=true
+GOKUL_GC_DIAGNOSTICS_ENABLED=true
+GOKUL_SQL_SLOW_QUERY_MS=250
+```
+
+GC logging is opt-in at container startup. It adds `-Xlog:gc*,safepoint=info:stdout:time,uptime,level,tags` before the application JAR and preserves automatic memory sizing and any explicit `JAVA_TOOL_OPTIONS`. Do not replace the 512 MiB profile with a standalone logging-only `JAVA_TOOL_OPTIONS`: an explicit value disables automatic heap selection. The 192 MiB Serial profile, five-connection default and 24 HTTP threads are unchanged.
+
+The existing memory diagnostic switch also controls the new per-memory-pool used/committed/max snapshots and cgroup v2 samples. `memory.stat` reports selected `anon`, `file`, `kernel`, `slab` and `sock` byte counters. These fields overlap (for example, slab is part of kernel memory); do not sum them. `memory.events` and `cpu.stat` are cumulative counters: compare two samples for memory-limit/OOM events and CPU throttling. Missing files/counters are omitted, never reported as zero; cgroup v1 and non-Linux still retain the existing memory/GC diagnostics. JVM pools distinguish metaspace/class space and code cache from heap. Kernel file-cache accounting helps interpret a near-limit container reading without assuming a heap leak.
+
+Slow SQL uses Hibernate's `hibernate.log_slow_query` threshold in milliseconds; 0 disables it (the default). It measures JDBC execution, not an entire request, connection acquisition, commit, or every possible network/ORM cost. It logs statement text; review SQL literals before exporting logs. Do not enable bind-value, all-SQL, or all-method DEBUG/TRACE logging. No credentials, webhook signatures or bodies are added to diagnostics.
+
+Capture the following with timestamps over several representative requests:
+
+1. A first payment after a restart and later payments using a cached token. Existing refresh logs separate lock wait and HTTP request time; a 3.61-second sample was dominated by the token HTTP request, not lock contention. No preemptive token worker is introduced without repeat evidence.
+2. Menu loads and checks with different dates, carts and quantities; record successful responses and failures separately.
+3. Order creation stages, `org.hibernate.SQL_SLOW` entries, Hikari waiting and GC/safepoint pauses during the same interval. Pool-wide percentile samples cannot attribute waiting to a particular order.
+4. Real DEV payment/refund callbacks: accepted signatures, persisted payment/refund outcome, and rejection of tampered fixture payloads.
+
+The sample order spent about 1.50 seconds in persistence, 0.80 in inventory and 0.40 in linking. The native idempotency update can trigger Hibernate AUTO flushing of pending changes, so its label is not an isolated SQL execution measurement. `IDENTITY` IDs prevent JDBC insert batching for these entities; merely enabling a batch-size setting would not batch their inserts. The idempotency key already has a unique index. No new index, changed flush mode, removed inventory lock, or ID migration is justified by this excerpt alone.
+
+Turn `GOKUL_GC_DIAGNOSTICS_ENABLED=false` and `GOKUL_SQL_SLOW_QUERY_MS=0` after capturing the window, and disable memory diagnostics if periodic samples are no longer needed. GC changes require a restart; no Render configuration is changed by this repository update. A successful local test does not establish real provider delivery, Render capacity, PostgreSQL locking behavior or end-to-end latency improvements.
+
+Primary references: [PhonePe webhook guide](https://developer.phonepe.com/payment-gateway/website-integration/standard-checkout/api-integration/api-reference/webhook), [Hibernate flushing/batching](https://docs.hibernate.org/orm/7.2/userguide/html_single/), [Java 21 unified logging](https://docs.oracle.com/en/java/javase/21/docs/specs/man/java.html), [Linux cgroup v2 counters](https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html).
