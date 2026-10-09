@@ -2,7 +2,7 @@
 export function installAbortSignalCompatibility(Signal: typeof AbortSignal = AbortSignal): void {
     if (typeof Signal.prototype.throwIfAborted !== "function") {
         Object.defineProperty(Signal.prototype, "throwIfAborted", {configurable: true, writable: true, value: function(this: AbortSignal) {
-            if (this.aborted) throw this.reason ?? new DOMException("Request aborted", "AbortError");
+            if (this.aborted) throw "reason" in this ? this.reason : new DOMException("Request aborted", "AbortError");
         }});
     }
     if (typeof Signal.timeout !== "function") {

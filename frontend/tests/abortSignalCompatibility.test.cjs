@@ -37,3 +37,14 @@ test('legacy abort checks allow live reads and preserve cancellation reasons',()
  controller.abort(reason);assert.throws(()=>f.Signal.prototype.throwIfAborted.call(controller.signal),error=>error===reason);
  assert.throws(()=>f.Signal.prototype.throwIfAborted.call({aborted:true}),{name:'AbortError'});
 });
+test('fallback matches native checks for explicit null and falsy cancellation reasons',()=>{
+ const f=fixture();
+ for(const reason of [null,false,0,'']){
+  const controller=new AbortController();controller.abort(reason);
+  for(const method of [AbortSignal.prototype.throwIfAborted,f.Signal.prototype.throwIfAborted]){
+   let threw=false,caught;
+   try{method.call(controller.signal);}catch(error){threw=true;caught=error;}
+   assert.equal(threw,true);assert.equal(caught,reason);
+  }
+ }
+});

@@ -4,18 +4,26 @@ import datetime
 import http.client
 import io
 import json
+import os
 import statistics
 import time
 import urllib.request
 from zoneinfo import ZoneInfo
 
 BASE = 'http://127.0.0.1:10000'
-with urllib.request.urlopen(BASE + '/api/menu?branchId=10001') as response:
-    menu = json.load(response)
-ITEMS = [dict(productId=p['id'], quantity=1) for category in menu for p in category['products']][:5]
-MENU_ITEMS = [dict(productId=p['id'], quantity=1) for category in menu for p in category['products']]
-MENU_BATCHES = [MENU_ITEMS[offset:offset + 100] for offset in range(0, len(MENU_ITEMS), 100)]
+ITEMS, MENU_ITEMS, MENU_BATCHES = [], [], []
 TODAY = datetime.datetime.now(ZoneInfo('Asia/Kolkata')).date()
+PREVIEW_DEADLINE_SECONDS = 8
+PREVIEW_USERS = tuple(int(value) for value in os.environ.get('GOKUL_CI_PREVIEW_USERS', '100,500').split(','))
+
+
+def load_fixture():
+    global ITEMS, MENU_ITEMS, MENU_BATCHES
+    with urllib.request.urlopen(BASE + '/api/menu?branchId=10001') as response:
+        menu = json.load(response)
+    MENU_ITEMS = [dict(productId=p['id'], quantity=1) for category in menu for p in category['products']]
+    ITEMS = MENU_ITEMS[:5]
+    MENU_BATCHES = [MENU_ITEMS[offset:offset + 100] for offset in range(0, len(MENU_ITEMS), 100)]
 
 
 async def http_json(path, payload=None, headers=None):
@@ -43,7 +51,11 @@ async def http_json(path, payload=None, headers=None):
     finally:
         if writer is not None:
             writer.close()
-            await writer.wait_closed()
+            try:
+                async with asyncio.timeout(1):
+                    await writer.wait_closed()
+            except (TimeoutError, ConnectionError, OSError):
+                pass  # Closing a cancelled response must not replace the original deadline error.
 
 
 async def request(user, iteration):
@@ -78,7 +90,7 @@ async def discovery(user, iteration):
         raise ValueError('Expected lightweight dates without item inventory matrix')
 
 
-async def menu_preview(user, iteration):
+async def menu_preview_batches(user, iteration):
     """Match the browser's full-menu, selected-date preview and sequential 100-item batches."""
     date = (TODAY + datetime.timedelta(days=1)).isoformat()
     for batch in MENU_BATCHES:
@@ -98,8 +110,19 @@ async def menu_preview(user, iteration):
             raise ValueError('Full-menu preview must return every requested item for the selected date')
 
 
+async def menu_preview(user, iteration):
+    # One deadline for the complete preview, not a fresh budget for each batch.
+    # Cancellation stops later batches and closes the active HTTP connection in http_json.
+    started = time.monotonic()
+    async with asyncio.timeout(PREVIEW_DEADLINE_SECONDS):
+        await menu_preview_batches(user, iteration)
+    # Also reject overruns from synchronous JSON parsing before the timer can run.
+    if time.monotonic() - started >= PREVIEW_DEADLINE_SECONDS:
+        raise TimeoutError
+
+
 async def stage(users, action, rounds, scenario):
-    timings, errors = [], []
+    timings, successful_timings, errors = [], [], []
     active = peak = 0
     for iteration in range(rounds):
         gate = asyncio.Event()
@@ -121,18 +144,28 @@ async def stage(users, action, rounds, scenario):
         gate.set()
         results = await asyncio.gather(*tasks)
         timings.extend(duration for duration, error in results)
+        successful_timings.extend(duration for duration, error in results if not error)
         errors.extend(error for duration, error in results if error)
         if iteration + 1 < rounds:
             await asyncio.sleep(1)
     timings.sort()
-    print(json.dumps(dict(scenario=scenario, users=users, peak_in_flight=peak, requests=len(timings),
+    successful_timings.sort()
+    print(json.dumps(dict(scenario=scenario, memory_profile=os.environ.get('GOKUL_CI_MEMORY_PROFILE', 'unspecified'),
+                          cpu_limit=os.environ.get('GOKUL_CI_CPU_LIMIT') or 'runner-default',
+                          users=users, peak_in_flight=peak, requests=len(timings),
                           errors=len(errors), p50_seconds=round(statistics.median(timings), 3),
                           p95_seconds=round(timings[max(0, int(len(timings)*.95)-1)], 3),
-                          max_seconds=round(max(timings), 3), error_samples=errors[:3])), flush=True)
+                          max_seconds=round(max(timings), 3),
+                          completed=len(successful_timings),
+                          successful_p95_seconds=round(successful_timings[max(0, int(len(successful_timings)*.95)-1)], 3) if successful_timings else None,
+                          deadline_seconds=PREVIEW_DEADLINE_SECONDS if action is menu_preview else None,
+                          deadline_exceeded=sum(error == 'TimeoutError' for error in errors) if action is menu_preview else None,
+                          error_samples=errors[:3])), flush=True)
     return bool(errors) or peak != users
 
 
 async def main():
+    load_fixture()
     failed = False
     for users in (1, 10, 50, 100, 500, 1000):
         failed |= await stage(users, request, 5, 'mixed-customer-staff')
@@ -140,9 +173,10 @@ async def main():
         failed |= await stage(users, discovery, 1, 'lightweight-31-day-pickup-discovery')
     # Each completed preview here is four sequential POSTs for the 379-item fixture.
     # Report complete-preview latency; the earlier stages are individual HTTP request timings.
-    for users in (100, 500):
+    for users in PREVIEW_USERS:
         failed |= await stage(users, menu_preview, 1, 'full-menu-selected-date-preview')
     return 1 if failed else 0
 
 
-raise SystemExit(asyncio.run(main()))
+if __name__ == '__main__':
+    raise SystemExit(asyncio.run(main()))
