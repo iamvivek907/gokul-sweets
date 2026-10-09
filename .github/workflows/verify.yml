@@ -356,6 +356,9 @@ jobs:
                   sleep 5
                 done
                 python3 backend/scripts/memory-workload.py
+                echo 'Checking growing-history query plans on disposable temporary tables'
+                docker exec -i "$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')" \
+                  psql -U gokul_test -d restaurant_test -v ON_ERROR_STOP=1 < backend/scripts/growth-query-plans.sql
                 curl --silent --show-error --fail --max-time 10 http://127.0.0.1:10000/actuator/health
                 exit 0
               fi
