@@ -173,7 +173,8 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17
+        # Docker Official Images mirror avoids anonymous Docker Hub quotas at job initialization.
+        image: public.ecr.aws/docker/library/postgres:17
         env:
           POSTGRES_USER: gokul_test
           POSTGRES_PASSWORD: test-only
@@ -260,7 +261,8 @@ jobs:
             java-options: ''
     services:
       postgres:
-        image: postgres:17
+        # Docker Official Images mirror avoids anonymous Docker Hub quotas at job initialization.
+        image: public.ecr.aws/docker/library/postgres:17
         env:
           POSTGRES_USER: gokul_test
           POSTGRES_PASSWORD: test-only
@@ -300,7 +302,10 @@ jobs:
           build_log=$(mktemp)
           trap 'rm -f "$build_log"' EXIT
           for attempt in 1 2 3; do
-            if docker build --pull --no-cache --progress=plain --tag gokul-render-ci backend 2>&1 | tee "$build_log"; then
+            if docker build --pull --no-cache --progress=plain \
+                --build-arg JAVA_BUILD_IMAGE=public.ecr.aws/docker/library/eclipse-temurin:21-jdk \
+                --build-arg JAVA_RUNTIME_IMAGE=public.ecr.aws/docker/library/eclipse-temurin:21-jre \
+                --tag gokul-render-ci backend 2>&1 | tee "$build_log"; then
               exit 0
             fi
             # Retry registry rate limits only; compiler, dependency and image errors fail immediately.
@@ -336,7 +341,7 @@ jobs:
             fi
             if curl --silent --show-error --fail --max-time 5 http://127.0.0.1:10000/actuator/health > /tmp/gokul-health.json; then
               if python3 -c 'import json; assert json.load(open("/tmp/gokul-health.json"))["status"] == "UP"'; then
-                docker exec -i "$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')" psql -U gokul_test -d restaurant_test -v ON_ERROR_STOP=1 <<'SQL'
+                docker exec -i "$(docker ps --filter ancestor=public.ecr.aws/docker/library/postgres:17 --format '{{.ID}}')" psql -U gokul_test -d restaurant_test -v ON_ERROR_STOP=1 <<'SQL'
           INSERT INTO branches(id,code,name) VALUES (10001,'MEMORY_CI','Memory workload');
           INSERT INTO categories(id,code,name) VALUES (10001,'MEMORY_CI','Memory workload');
           INSERT INTO tax_categories(id,code,name,cgst_rate,sgst_rate) VALUES (10001,'MEMORY_CI','Synthetic tax',2.5,2.5);
@@ -377,7 +382,7 @@ jobs:
                 done
                 python3 backend/scripts/memory-workload.py
                 echo 'Checking growing-history query plans on disposable temporary tables'
-                docker exec -i "$(docker ps --filter ancestor=postgres:17 --format '{{.ID}}')" \
+                docker exec -i "$(docker ps --filter ancestor=public.ecr.aws/docker/library/postgres:17 --format '{{.ID}}')" \
                   psql -U gokul_test -d restaurant_test -v ON_ERROR_STOP=1 < backend/scripts/growth-query-plans.sql
                 curl --silent --show-error --fail --max-time 10 http://127.0.0.1:10000/actuator/health
                 exit 0

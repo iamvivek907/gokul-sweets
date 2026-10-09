@@ -1,4 +1,7 @@
-FROM eclipse-temurin:21-jdk AS build
+ARG JAVA_BUILD_IMAGE=eclipse-temurin:21-jdk
+ARG JAVA_RUNTIME_IMAGE=eclipse-temurin:21-jre
+
+FROM ${JAVA_BUILD_IMAGE} AS build
 
 WORKDIR /app
 
@@ -8,7 +11,7 @@ RUN chmod +x gradlew
 RUN ./gradlew --no-daemon clean bootJar
 
 
-FROM eclipse-temurin:21-jre
+FROM ${JAVA_RUNTIME_IMAGE}
 
 # Runtime selects the tested small or 2 GiB cgroup profile.
 # Explicit Render JAVA_TOOL_OPTIONS always takes precedence.
