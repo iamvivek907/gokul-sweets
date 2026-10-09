@@ -10,6 +10,9 @@ export type PrintStation = {
         devices?: {usb?: string[]; bluetooth?: string[]}};
     command?: {id?: string}; commandResult?: {status?: string; message?: string};
 };
+export class PrintStationRequestError extends Error {
+    constructor(message: string, readonly status: number) {super(message);}
+}
 export async function printStationRequest(authorization: string, branchId: number, station: string,
     operation = "", body?: object, signal?: AbortSignal): Promise<PrintStation> {
     const params = new URLSearchParams({branchId: String(branchId), station});
@@ -18,7 +21,7 @@ export async function printStationRequest(authorization: string, branchId: numbe
             body: body ? JSON.stringify(body) : undefined, signal});
     if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.message || error.detail || "Unable to update printer setup. Check your permissions and connection.");
+        throw new PrintStationRequestError(error.message || error.detail || "Unable to update printer setup. Check your permissions and connection.", response.status);
     }
     return response.json();
 }

@@ -40,6 +40,8 @@ Validation errors without a pending write also hold new claims. Pause, correct t
 
 Pause printing in Admin, inspect the paper and Windows spooler, then choose the appropriate recovery button. The checkbox means you checked this specific ticket. Tests are blocked while a KOT is unresolved. If the backend already committed a printed acknowledgement but its response was lost, the agent reconciles its authenticated, scoped `PRINTED` status without printing again. If another agent reclaimed the job or the claim changed, recovery remains blocked: your administrator must reconcile the queue and paper. A failed recovery request does not clear the local journal.
 
+Admin action requests have a 30-second deadline. If a reply is lost, the page resumes read-only status checks and blocks further actions until a fresh server response confirms the station state. It never automatically resends the action. Inspect paper and the reported result before explicitly requesting another print.
+
 Operator commands expire after 60 seconds if they have not begun, so an old test or recovery request is not executed unexpectedly after a long disconnection. A command already in progress finishes normally.
 
 If the backend accepts **Approve another attempt** but its reply is lost, inspect paper and approve recovery again. The backend recognizes the same agent/claim receipt without rescheduling the job or changing a newer claim; the agent clears its pending journal only after a successful acknowledgement.

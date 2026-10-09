@@ -4,8 +4,10 @@ import Link from "next/link";
 import {useEffect, useRef, useState, type FormEvent} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
-import {printStationRequest, type PrinterProfile, type PrintStation} from "@/services/printStationApi";
+import {printStationRequest, PrintStationRequestError, type PrinterProfile, type PrintStation} from "@/services/printStationApi";
 
+const ACTION_UNCONFIRMED_MESSAGE = "The action reply was lost. Checking server status before another action; inspect the paper before requesting another print.";
+const ACTION_RECONCILED_MESSAGE = "Server status refreshed. Check the paper and action result before requesting another printer action.";
 const STATUS_TIMEOUT_MESSAGE = "Printer status request timed out. Retrying automatically.";
 const stations = ["KITCHEN", "SWEETS", "BEVERAGE", "FAST_FOOD", "BILLING"];
 function exportProfile(profile: PrinterProfile, origin: string) {
@@ -32,6 +34,8 @@ export default function PrinterSetupPage() {
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
     const [checkedPaper, setCheckedPaper] = useState(false);
+    const [unconfirmedScope, setUnconfirmedScope] = useState<string | null>(null);
+    const unconfirmedScopeRef = useRef<string | null>(null);
     const revision = useRef(0);
     const busyRef = useRef(false);
     const observedProfile = useRef("");
@@ -67,7 +71,14 @@ export default function PrinterSetupPage() {
                 const result = await printStationRequest(authorization!, branchId!, station, "", undefined, signal);
                 if (version === revision.current && scope === currentScope.current) {
                     setState(result);
-                    setMessage(current => current === STATUS_TIMEOUT_MESSAGE ? "" : current);
+                    if (unconfirmedScopeRef.current === scope) {
+                        unconfirmedScopeRef.current = null;
+                        setUnconfirmedScope(null);
+                        setCheckedPaper(false);
+                        setMessage(ACTION_RECONCILED_MESSAGE);
+                    } else {
+                        setMessage(current => current === STATUS_TIMEOUT_MESSAGE ? "" : current);
+                    }
                     const encoded = JSON.stringify(result.profile);
                     if (encoded !== observedProfile.current) {
                         observedProfile.current = encoded;
@@ -93,15 +104,25 @@ export default function PrinterSetupPage() {
     async function mutate(operation: string, body: object) {
         if (!authorization || branchId === null) return;
         const scope = currentScope.current;
+        if (busyRef.current || unconfirmedScopeRef.current === scope) return;
         ++revision.current; busyRef.current = true; setBusy(true); setMessage("");
         try {
-            const result = await printStationRequest(authorization, branchId, station, operation, body);
+            const result = await printStationRequest(authorization, branchId, station, operation, body, AbortSignal.timeout(30000));
             if (scope === currentScope.current) {
                 setState(result); setCheckedPaper(false);
                 setMessage(operation === "/profile" ? "Printer saved and paused. Install the agent or test the updated device, then Start printing." : "Request saved. Wait for the station to report the result.");
             }
         } catch (error) {
-            if (scope === currentScope.current) setMessage(error instanceof Error ? error.message : "Printer action failed.");
+            if (scope === currentScope.current) {
+                setCheckedPaper(false);
+                if (error instanceof PrintStationRequestError && error.status < 500) {
+                    setMessage(error.message);
+                } else {
+                    unconfirmedScopeRef.current = scope;
+                    setUnconfirmedScope(scope);
+                    setMessage(`${ACTION_UNCONFIRMED_MESSAGE} ${error instanceof Error ? error.message : "Printer action failed."}`);
+                }
+            }
         } finally {busyRef.current = false; setBusy(false);}
     }
 
@@ -118,6 +139,7 @@ export default function PrinterSetupPage() {
     if (!hasPermission("ORDER_VIEW")) return <p className="p-6">You need permission to view orders to use printer setup.</p>;
     const field = "mt-1 w-full rounded border border-stone-300 bg-white p-2";
     const button = "rounded bg-stone-800 px-4 py-3 font-semibold text-white disabled:opacity-40";
+    const actionBlocked = busy || unconfirmedScope === `${branchId}:${station}`;
     const pending = state?.runtime?.pendingJobId;
     const canOperate = hasPermission("ORDER_START_PREPARATION");
     const canConfigure = hasPermission("BRANCH_MANAGE");
@@ -136,9 +158,9 @@ export default function PrinterSetupPage() {
             <p role="status"><strong>{status}</strong>{state?.command?.id && " — printer action pending"}</p>
             <p>Pause stops new tickets; a ticket already in progress finishes. Start resumes queued tickets. An offline computer must be signed in and connected before it can print.</p>
             <div className="flex flex-wrap gap-3">
-                <button className={button} disabled={busy || !canOperate || !state?.configured || !!pending || !!state.command?.id || !!state.enabled} onClick={() => void mutate("/mode", {enabled: true})}>Start printing</button>
-                <button className={button} disabled={busy || !canOperate || !state?.configured || !state.enabled} onClick={() => void mutate("/mode", {enabled: false})}>Pause printing</button>
-                <button className={button} disabled={busy || !canOperate || !state?.online || state.enabled || !!pending || !!state.command?.id} onClick={() => void mutate("/command", {action: "TEST"})}>Print test ticket</button>
+                <button className={button} disabled={actionBlocked || !canOperate || !state?.configured || !!pending || !!state.command?.id || !!state.enabled} onClick={() => void mutate("/mode", {enabled: true})}>Start printing</button>
+                <button className={button} disabled={actionBlocked || !canOperate || !state?.configured || !state.enabled} onClick={() => void mutate("/mode", {enabled: false})}>Pause printing</button>
+                <button className={button} disabled={actionBlocked || !canOperate || !state?.online || state.enabled || !!pending || !!state.command?.id} onClick={() => void mutate("/command", {action: "TEST"})}>Print test ticket</button>
             </div>
             {state?.runtime?.message && <p>{state.runtime.message}</p>}
             {state?.commandResult?.message && <p role="status">{state.commandResult.message}</p>}
@@ -146,8 +168,8 @@ export default function PrinterSetupPage() {
                 <p><strong>Check ticket #{pending} on paper.</strong> Printing is held because its result is uncertain. Check the Windows spooler and cancel any unfinished copy before approving another attempt.</p>
                 <label className="block"><input type="checkbox" checked={checkedPaper} onChange={event => setCheckedPaper(event.target.checked)} /> I checked the paper and spooler for this ticket.</label>
                 <div className="flex flex-wrap gap-3">
-                    <button className={button} disabled={busy || !canOperate || !checkedPaper || !state?.online || state.enabled || !!state.command?.id} onClick={() => void mutate("/command", {action: "PRINTED", jobId: pending})}>Ticket already printed</button>
-                    <button className={button} disabled={busy || !canOperate || !checkedPaper || !state?.online || state.enabled || !!state.command?.id} onClick={() => void mutate("/command", {action: "RETRY", jobId: pending})}>Approve another attempt</button>
+                    <button className={button} disabled={actionBlocked || !canOperate || !checkedPaper || !state?.online || state.enabled || !!state.command?.id} onClick={() => void mutate("/command", {action: "PRINTED", jobId: pending})}>Ticket already printed</button>
+                    <button className={button} disabled={actionBlocked || !canOperate || !checkedPaper || !state?.online || state.enabled || !!state.command?.id} onClick={() => void mutate("/command", {action: "RETRY", jobId: pending})}>Approve another attempt</button>
                 </div>
             </div>}
         </section>
@@ -178,7 +200,7 @@ export default function PrinterSetupPage() {
             <label>Paper width<select className={field} name="paperWidthMm" defaultValue={state?.profile?.paperWidthMm ?? 80}><option value="58">58 mm</option><option value="80">80 mm</option></select></label>
             <label>Bluetooth baud rate<select className={field} name="baudRate" defaultValue={state?.profile?.baudRate ?? 9600}>{[9600, 19200, 38400, 57600, 115200].map(value => <option key={value}>{value}</option>)}</select></label>
             <label><input name="autoCut" type="checkbox" defaultChecked={state?.profile?.autoCut ?? false} /> Enable cutter only if the printer has one</label>
-            <button className={button} type="submit" disabled={busy || !canConfigure || !state || branchId === null || !!state.enabled || !!pending || !!state.command?.id}>Save printer settings</button>
+            <button className={button} type="submit" disabled={actionBlocked || !canConfigure || !state || branchId === null || !!state.enabled || !!pending || !!state.command?.id}>Save printer settings</button>
         </form>
         {message && <p role="status" className="rounded border border-stone-300 p-3">{message}</p>}
         <p>Only one agent and active printer per branch/station. English/ASCII KOTs are supported. Invoice printing and other languages need separate validation; selecting another station does not add routing rules.</p>
