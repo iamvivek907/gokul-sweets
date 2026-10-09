@@ -383,6 +383,24 @@ class AgentTest(unittest.TestCase):
         self.assertNotIn("claimToken", json.dumps(report))
         self.assertEqual([call.args[0] for call in self.api.post.call_args_list], ["control", "heartbeat"])
 
+    def test_invalid_job_holds_background_claims_until_operator_fixes_or_tests(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        bad = dict(self.job, copies=0)
+        reports = []
+        def post(path, body):
+            if path == "control":
+                reports.append(body["runtime"])
+                return {"profile": self.remote_profile(), "enabled": True, "command": {}}
+            return bad if path == "jobs/claim" else None
+        self.api.post.side_effect = post
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent.time, "sleep", side_effect=[None, KeyboardInterrupt]), patch.object(agent, "deliver") as send:
+                with self.assertRaises(KeyboardInterrupt):
+                    agent.managed(self.cfg, Path(directory) / "profile.json")
+                send.assert_not_called()
+        self.assertEqual(sum(call.args[0] == "jobs/claim" for call in self.api.post.call_args_list), 1)
+        self.assertEqual(reports[-1]["status"], "ERROR")
+
     @unittest.skipUnless(agent.sys.platform == "win32", "Windows DPAPI")
     def test_installer_secret_can_be_decrypted_only_through_windows_dpapi(self):
         import win32crypt

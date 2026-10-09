@@ -405,7 +405,10 @@ def managed(cfg, path):
                 if time.monotonic() >= next_heartbeat:
                     api.post("heartbeat", api.identity())
                     next_heartbeat = time.monotonic() + 20
-                cfg = managed_profile(cfg, state["profile"])
+                updated = managed_profile(cfg, state["profile"])
+                if updated != cfg:
+                    runtime_error = None
+                cfg = updated
                 api.cfg = cfg
                 command = state.get("command")
                 if command:
@@ -418,7 +421,7 @@ def managed(cfg, path):
                     except Exception:
                         completed_result = {"status": "NEEDS_ATTENTION", "message": "Action failed. Inspect paper, connection and pending ticket before retrying."}
                         runtime_error = completed_result["message"]
-                elif state.get("enabled") and not pending:
+                elif state.get("enabled") and not pending and not runtime_error:
                     job = api.post("jobs/claim", api.identity())
                     if job:
                         process_job(api, db, cfg, job)

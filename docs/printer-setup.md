@@ -36,6 +36,8 @@ The agent polls approximately every two seconds. The Admin panel refreshes every
 
 Physical transport is bounded to 30 seconds and isolated in a child process. The agent records an uncertain ticket before sending data and retains the journal if the transport or acknowledgement fails. It keeps reporting online, but claims no further KOTs while a pending ticket exists. **Do not delete the journal or blindly restart/retry to clear it.**
 
+Validation errors without a pending write also hold new claims. Pause, correct the connection settings or complete a successful test, then Start printing. Review the failed job in Printer Queue before retrying it.
+
 Pause printing in Admin, inspect the paper and Windows spooler, then choose the appropriate recovery button. The checkbox means you checked this specific ticket. Tests are blocked while a KOT is unresolved. If the backend already committed a printed acknowledgement but its response was lost, the agent reconciles its authenticated, scoped `PRINTED` status without printing again. If another agent reclaimed the job or the claim changed, recovery remains blocked: your administrator must reconcile the queue and paper. A failed recovery request does not clear the local journal.
 
 Operator commands expire after 60 seconds if they have not begun, so an old test or recovery request is not executed unexpectedly after a long disconnection. A command already in progress finishes normally.
