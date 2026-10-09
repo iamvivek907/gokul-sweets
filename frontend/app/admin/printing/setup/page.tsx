@@ -6,6 +6,7 @@ import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {printStationRequest, type PrinterProfile, type PrintStation} from "@/services/printStationApi";
 
+const STATUS_TIMEOUT_MESSAGE = "Printer status request timed out. Retrying automatically.";
 const stations = ["KITCHEN", "SWEETS", "BEVERAGE", "FAST_FOOD", "BILLING"];
 function exportProfile(profile: PrinterProfile, origin: string) {
     const url = new URL(origin);
@@ -62,9 +63,11 @@ export default function PrinterSetupPage() {
             refreshing = true;
             const version = ++revision.current;
             try {
-                const result = await printStationRequest(authorization!, branchId!, station, "", undefined, controller.signal);
+                const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]);
+                const result = await printStationRequest(authorization!, branchId!, station, "", undefined, signal);
                 if (version === revision.current && scope === currentScope.current) {
                     setState(result);
+                    setMessage(current => current === STATUS_TIMEOUT_MESSAGE ? "" : current);
                     const encoded = JSON.stringify(result.profile);
                     if (encoded !== observedProfile.current) {
                         observedProfile.current = encoded;
@@ -76,7 +79,8 @@ export default function PrinterSetupPage() {
                     }
                 }
             } catch (error) {
-                if (!controller.signal.aborted && version === revision.current) setMessage(error instanceof Error ? error.message : "Unable to load station.");
+                if (!controller.signal.aborted && version === revision.current)
+                    setMessage(error instanceof Error && error.name === "TimeoutError" ? STATUS_TIMEOUT_MESSAGE : error instanceof Error ? error.message : "Unable to load station.");
             } finally {
                 refreshing = false;
             }

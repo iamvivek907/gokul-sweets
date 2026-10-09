@@ -6,6 +6,11 @@ try {
  for(const width of [390,1280]) {
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
   await page.clock.install();
+  await context.addInitScript(()=>{AbortSignal.timeout=milliseconds=>{
+   const controller=new AbortController();
+   setTimeout(()=>controller.abort(new DOMException('Request deadline exceeded','TimeoutError')),milliseconds);
+   return controller.signal;
+  };});
   let reads=0,release,started;
   const firstStarted=new Promise(resolve=>{started=resolve;});
   let gate=new Promise(resolve=>{release=resolve;});
@@ -24,7 +29,8 @@ try {
     assert.equal(request.headers()['x-staff-csrf'],'test-csrf');
     state={...state,enabled:request.postDataJSON().enabled};json=state;
    }
-   await route.fulfill({json,headers});
+   try {await route.fulfill({json,headers});}
+   catch(error){if(!request.failure())throw error;}
   });
   await page.goto(`${base}/admin/printing/setup`);await firstStarted;
   await page.clock.fastForward(15000);
@@ -44,6 +50,23 @@ try {
   assert.equal(await page.getByText('Running',{exact:true}).isVisible(),true);
   assert.equal(await page.getByRole('button',{name:'Pause printing',exact:true}).isEnabled(),true);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
-  await context.close();console.log(`Printer setup slow polling and mutation ordering passed at ${width}px`);
+  // An unresponsive poll must time out and allow the next poll to recover.
+  const stalledStarted=new Promise(resolve=>{started=resolve;});
+  gate=new Promise(resolve=>{release=resolve;});
+  await page.clock.fastForward(5000);await stalledStarted;
+  const stalledReads=reads;
+  await page.clock.fastForward(30001);
+  await page.getByText('Printer status request timed out. Retrying automatically.',{exact:true}).waitFor();
+  assert.equal(reads,stalledReads,'A stuck request must be aborted before a new poll starts');
+  // Abort left the old route pending; release it before starting a healthy read.
+  const releaseStalled=release;gate=null;releaseStalled();
+  state={...state,enabled:false};
+  const recoveredReply=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/printing/station');
+  await page.clock.fastForward(5000);await recoveredReply;
+  await page.getByText('Paused',{exact:true}).waitFor();
+  await page.waitForFunction(()=>!document.body.textContent.includes('Printer status request timed out. Retrying automatically.'));
+  assert.equal(reads,stalledReads+1);
+  assert.equal(await start.isEnabled(),true);
+  await context.close();console.log(`Printer setup slow polling, mutation ordering and stalled-request recovery passed at ${width}px`);
  }
 } finally {await browser.close();}
