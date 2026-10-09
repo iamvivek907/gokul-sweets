@@ -14,6 +14,7 @@ BASE = 'http://127.0.0.1:10000'
 ITEMS, MENU_ITEMS, MENU_BATCHES = [], [], []
 TODAY = datetime.datetime.now(ZoneInfo('Asia/Kolkata')).date()
 PREVIEW_DEADLINE_SECONDS = 8
+VARIED_USERS = tuple(int(value) for value in os.environ.get('GOKUL_CI_VARIED_USERS', '10,100').split(','))
 PREVIEW_USERS = tuple(int(value) for value in os.environ.get('GOKUL_CI_PREVIEW_USERS', '100,500').split(','))
 
 
@@ -90,10 +91,11 @@ async def discovery(user, iteration):
         raise ValueError('Expected lightweight dates without item inventory matrix')
 
 
-async def menu_preview_batches(user, iteration):
+async def menu_preview_batches(user, iteration, varied=False):
     """Match the browser's full-menu, selected-date preview and sequential 100-item batches."""
-    date = (TODAY + datetime.timedelta(days=1)).isoformat()
-    for batch in MENU_BATCHES:
+    date = (TODAY + datetime.timedelta(days=1 + user % 7 if varied else 1)).isoformat()
+    for original in MENU_BATCHES:
+        batch = [dict(item, quantity=user + 1 if index == 0 else 1) for index, item in enumerate(original)] if varied else original
         result = await http_json('/api/branches/10001/availability?menuPreview=true&compact=true',
                                  dict(startDate=date, days=1, items=batch, fulfilmentType='PICKUP'))
         dates = result.get('dates', [])
@@ -110,15 +112,30 @@ async def menu_preview_batches(user, iteration):
             raise ValueError('Full-menu preview must return every requested item for the selected date')
 
 
-async def menu_preview(user, iteration):
+async def menu_preview(user, iteration, varied=False):
     # One deadline for the complete preview, not a fresh budget for each batch.
     # Cancellation stops later batches and closes the active HTTP connection in http_json.
     started = time.monotonic()
     async with asyncio.timeout(PREVIEW_DEADLINE_SECONDS):
-        await menu_preview_batches(user, iteration)
+        await menu_preview_batches(user, iteration, True) if varied else await menu_preview_batches(user, iteration)
     # Also reject overruns from synchronous JSON parsing before the timer can run.
     if time.monotonic() - started >= PREVIEW_DEADLINE_SECONDS:
         raise TimeoutError
+
+
+async def varied_preview(user, iteration):
+    await menu_preview(user, iteration, True)
+
+
+async def varied_cart(user, iteration):
+    date = (TODAY + datetime.timedelta(days=1 + (user + iteration) % 7)).isoformat()
+    # Different subsets and quantities prevent identical-request coordination.
+    offset = (user * 13 + iteration) % max(1, len(MENU_ITEMS) - 5)
+    items = [dict(item, quantity=1 + user + index) for index, item in enumerate(MENU_ITEMS[offset:offset + 1 + user % 5])]
+    result = await http_json('/api/branches/10001/availability', dict(startDate=date, days=1, items=items, fulfilmentType='PICKUP'))
+    dates = result.get('dates', [])
+    if len(dates) != 1 or dates[0]['date'] != date or {i['productId'] for i in dates[0].get('items', [])} != {i['productId'] for i in items}:
+        raise ValueError('Authoritative cart response changed its requested scope')
 
 
 async def stage(users, action, rounds, scenario):
@@ -152,15 +169,21 @@ async def stage(users, action, rounds, scenario):
     successful_timings.sort()
     print(json.dumps(dict(scenario=scenario, memory_profile=os.environ.get('GOKUL_CI_MEMORY_PROFILE', 'unspecified'),
                           cpu_limit=os.environ.get('GOKUL_CI_CPU_LIMIT') or 'runner-default',
+                          db_pool=os.environ.get('GOKUL_DB_POOL_SIZE', '5'),
                           users=users, peak_in_flight=peak, requests=len(timings),
                           errors=len(errors), p50_seconds=round(statistics.median(timings), 3),
+                          p99_seconds=round(timings[max(0, int(len(timings)*.99)-1)], 3),
                           p95_seconds=round(timings[max(0, int(len(timings)*.95)-1)], 3),
                           max_seconds=round(max(timings), 3),
                           completed=len(successful_timings),
                           successful_p95_seconds=round(successful_timings[max(0, int(len(successful_timings)*.95)-1)], 3) if successful_timings else None,
-                          deadline_seconds=PREVIEW_DEADLINE_SECONDS if action is menu_preview else None,
-                          deadline_exceeded=sum(error == 'TimeoutError' for error in errors) if action is menu_preview else None,
+                          deadline_seconds=PREVIEW_DEADLINE_SECONDS if action in (menu_preview, varied_preview) else None,
+                          deadline_exceeded=sum(error == 'TimeoutError' for error in errors) if action in (menu_preview, varied_preview) else None,
                           error_samples=errors[:3])), flush=True)
+    if action is varied_preview:
+        # Capacity exploration: report deadline misses honestly without requiring
+        # a previously unvalidated 100-unique-preview capacity. Other errors fail.
+        return any(error != 'TimeoutError' for error in errors) or peak != users
     return bool(errors) or peak != users
 
 
@@ -175,6 +198,9 @@ async def main():
     # Report complete-preview latency; the earlier stages are individual HTTP request timings.
     for users in PREVIEW_USERS:
         failed |= await stage(users, menu_preview, 1, 'full-menu-selected-date-preview')
+    for users in VARIED_USERS:
+        failed |= await stage(users, varied_cart, 1, 'varied-authoritative-carts')
+        failed |= await stage(users, varied_preview, 1, 'varied-full-menu-capacity-observation')
     return 1 if failed else 0
 
 

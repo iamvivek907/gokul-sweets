@@ -42,9 +42,9 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
  await page.goto(`${base}/profile/orders`);await page.locator('.profile-order-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const nav=page.getByRole('navigation',{name:'Order history pages'});
  assert.equal(await page.locator('.profile-order-card').count(),10);pageFailure=true;
- await nav.getByRole('button',{name:'Next',exact:true}).click();await page.getByText('The next page could not load.',{exact:false}).waitFor();assert.equal(await page.locator('.profile-order-card').count(),10);
- pageFailure=false;await nav.getByRole('button',{name:'Next',exact:true}).click();await nav.getByText('Page 2',{exact:true}).waitFor();assert.equal(await page.locator('.profile-order-card').count(),3);assert.equal(await nav.getByRole('button',{name:'Next',exact:true}).isDisabled(),true);
- const pageReads=pages;await nav.getByRole('button',{name:'Previous',exact:true}).click();await nav.getByText('Page 1',{exact:true}).waitFor();assert.equal(pages,pageReads,'previous uses its cached bounded page');
+ await nav.getByRole('button',{name:'Load more',exact:true}).click();await page.getByText('The next page could not load.',{exact:false}).waitFor();assert.equal(await page.locator('.profile-order-card').count(),10);
+ pageFailure=false;await nav.getByRole('button',{name:'Load more',exact:true}).click();await nav.getByText('13 orders loaded',{exact:true}).waitFor();assert.equal(await page.locator('.profile-order-card').count(),13);assert.equal(await nav.getByRole('button',{name:'Load more',exact:true}).count(),0);
+ assert.equal(pages,3,'failed page retry appends without refetching earlier pages');
  const open=async()=>{await page.locator('.profile-order-card').first().getByRole('button',{name:'Reorder',exact:true}).click();await page.getByRole('dialog',{name:'Reorder for pickup'}).waitFor();};
  const dialog=page.getByRole('dialog',{name:'Reorder for pickup'}),continueButton=dialog.getByRole('button',{name:'Continue to checkout',exact:true});
  if(!smart){

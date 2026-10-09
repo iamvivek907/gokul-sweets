@@ -39,4 +39,41 @@ class StorefrontVitalsControllerTest {
                                 .value())
                 .isEqualTo(400);
     }
+
+    @Test
+    void aggregateLoadingStagesHaveNoArbitraryLabelsOrQualityRating() {
+        features.setAccessibleOrderingV2(true);
+        assertThat(
+                        controller
+                                .receive(
+                                        new StorefrontVitalsController.Vital(
+                                                "MENU_PREVIEW", 200, "measured", "menu"))
+                                .getStatusCode()
+                                .value())
+                .isEqualTo(204);
+        assertThat(
+                        controller
+                                .receive(
+                                        new StorefrontVitalsController.Vital(
+                                                "MENU_PREVIEW", 200, "good", "menu"))
+                                .getStatusCode()
+                                .value())
+                .isEqualTo(400);
+        assertThat(
+                        controller
+                                .receive(
+                                        new StorefrontVitalsController.Vital(
+                                                "MENU_ORDER_123", 200, "measured", "menu"))
+                                .getStatusCode()
+                                .value())
+                .isEqualTo(400);
+        assertThat(
+                        controller
+                                .receive(
+                                        new StorefrontVitalsController.Vital(
+                                                null, 200, "measured", "menu"))
+                                .getStatusCode()
+                                .value())
+                .isEqualTo(400);
+    }
 }

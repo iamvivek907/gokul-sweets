@@ -42,12 +42,13 @@ class SmartOrderingRulesTest {
         rules.validateWindow(slot(LocalDate.of(2025, 1, 1), LocalTime.NOON));
         verifyNoInteractions(settings);
         var service = mock(CartAvailabilityService.class);
+        var previewQuery = mock(MenuPreviewQuery.class);
         var controller =
                 new CartAvailabilityController(
                         features,
                         service,
                         mock(com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService.class),
-                        new MenuPreviewReads(service, clock));
+                        new MenuPreviewReads(previewQuery, clock));
         var request =
                 new CartAvailabilityController.Request(
                         LocalDate.now(clock),
@@ -58,7 +59,7 @@ class SmartOrderingRulesTest {
                 .isEqualTo(404);
         assertThat(controller.check(1L, request, true, true).getStatusCode().value())
                 .isEqualTo(404);
-        verifyNoInteractions(service);
+        verifyNoInteractions(service, previewQuery);
     }
 
     @Test

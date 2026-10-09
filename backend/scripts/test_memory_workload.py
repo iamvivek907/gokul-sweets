@@ -66,3 +66,27 @@ class PreviewDeadlineTest(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class VariedScopeTest(unittest.IsolatedAsyncioTestCase):
+    async def test_unique_quantities_dates_and_all_batches(self):
+        calls = []
+        async def response(path, body):
+            calls.append(body)
+            return dict(issueCatalog=[], dates=[dict(date=body['startDate'], slots=[], items=body['items'])])
+        with patch.object(workload, 'MENU_BATCHES', [[dict(productId=i, quantity=1)] for i in (1, 2)]), patch.object(workload, 'http_json', response):
+            await workload.varied_preview(0, 0)
+            await workload.varied_preview(8, 0)
+        self.assertEqual([c['items'][0]['quantity'] for c in calls], [1, 1, 9, 9])
+        self.assertNotEqual(calls[0]['startDate'], calls[2]['startDate'])
+
+    async def test_capacity_misses_are_reported_but_data_errors_fail(self):
+        output = io.StringIO()
+        with patch.object(workload, 'varied_preview', AsyncMock(side_effect=TimeoutError)), contextlib.redirect_stdout(output):
+            # patched identity is still the action recognized by stage
+            failed = await workload.stage(1, workload.varied_preview, 1, 'varied-capacity')
+        report = json.loads(output.getvalue())
+        self.assertFalse(failed)
+        self.assertEqual(report['deadline_exceeded'], 1)
+        self.assertEqual(report['completed'], 0)
+        with patch.object(workload, 'varied_preview', AsyncMock(side_effect=ValueError('wrong scope'))), contextlib.redirect_stdout(io.StringIO()):
+            self.assertTrue(await workload.stage(1, workload.varied_preview, 1, 'varied-capacity'))

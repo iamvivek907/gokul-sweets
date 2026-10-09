@@ -7,6 +7,12 @@ on:
   pull_request:
     branches: [dev, main]
   workflow_dispatch:
+    inputs:
+      db-pool-size:
+        description: 'Measured comparison only: repeat the same workload with 3, 5 or 8 connections'
+        type: choice
+        default: '5'
+        options: ['3', '5', '8']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
@@ -251,7 +257,7 @@ jobs:
           - memory: 2g
             cpus: '1'
             preview-users: '100,500'
-            java-options: '-Xms128m -Xmx768m -XX:+UseG1GC -XX:ReservedCodeCacheSize=96m -XX:MaxDirectMemorySize=64m -XX:+ExitOnOutOfMemoryError'
+            java-options: ''
     services:
       postgres:
         image: postgres:17
@@ -280,6 +286,7 @@ jobs:
       # Test-only 32-byte key so ON-by-default staff sessions can bootstrap in CI.
       STAFF_MFA_ENCRYPTION_KEY: 'Y2ktb25seS1ub3QtZm9yLXByb2R1Y3Rpb24tc2VjcmU='
       PORT: '10000'
+      GOKUL_DB_POOL_SIZE: ${{ inputs.db-pool-size || '5' }}
       GOKUL_CI_MEMORY_PROFILE: ${{ matrix.memory }}
       GOKUL_CI_CPU_LIMIT: ${{ matrix.cpus }}
       GOKUL_CI_PREVIEW_USERS: ${{ matrix.preview-users }}
@@ -287,7 +294,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify complete-preview deadline regressions
-        run: python3 -B -m unittest discover -s backend/scripts -p 'test_memory_workload.py'
+        run: python3 -B -m unittest discover -s backend/scripts -p 'test_*.py'
       - name: Build actual deployment image without cached Gradle or Docker layers
         run: docker build --pull --no-cache --progress=plain --tag gokul-render-ci backend
       - name: Start deployment image and verify database-backed health
@@ -302,7 +309,7 @@ jobs:
           fi
           docker run --detach --name gokul-render-smoke --network host \
             --memory="$GOKUL_CI_MEMORY_PROFILE" "${jvm_args[@]}" "${cpu_args[@]}" \
-            --env DATABASE_URL --env DATABASE_USERNAME --env DATABASE_PASSWORD \
+            --env DATABASE_URL --env DATABASE_USERNAME --env DATABASE_PASSWORD --env GOKUL_DB_POOL_SIZE \
             --env R2_ACCOUNT_ID --env R2_ACCESS_KEY_ID --env R2_SECRET_ACCESS_KEY \
             --env PHONEPE_CLIENT_ID --env PHONEPE_CLIENT_SECRET --env PHONEPE_REDIRECT_URL \
             --env INVENTORY_AUTOMATION_SCHEDULER_ENABLED --env GOKUL_REPORTING_AUTOMATIC_REFRESH \

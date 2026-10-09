@@ -160,12 +160,9 @@ export default function ProductCard({
                                     product.name
                                 }
                                 fill
-                                sizes="
-                                    (max-width: 639px) 136px,
-                                    (max-width: 768px) 45vw,
-                                    (max-width: 1024px) 30vw,
-                                    280px
-                                "
+                                sizes={refined ? "(max-width: 640px) 136px, (max-width: 768px) 45vw, (max-width: 1024px) 30vw, 280px" : "(max-width: 639px) 112px, (max-width: 768px) 45vw, (max-width: 1024px) 30vw, 280px"}
+                                loading="lazy"
+                                quality={75}
                                 className="
                                     object-cover
                                     transition
@@ -214,7 +211,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                <T text={isAvailable ? pickupMessage ?? "Not at this time" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
+                                <T text={isAvailable ? pickupMessage ?? "Not at this time" : product.serviceAvailability?.code === "CHECKING" ? "Checking pickup" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
                             </span>
                         </div>
                     )

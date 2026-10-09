@@ -12,6 +12,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.convention.TestBean;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -39,7 +40,7 @@ class MenuServiceWindowsIntegrationTest {
     @Autowired PlatformTransactionManager manager;
     @MockitoBean StaffAuthorizationService authorization;
 
-    @org.springframework.test.context.bean.override.mockito.MockitoSpyBean(name = "inventoryClock")
+    @TestBean(name = "inventoryClock", methodName = "testClock")
     Clock clock;
 
     long branch, category, samosa, chola, samosaBp, cholaBp;
@@ -64,10 +65,36 @@ class MenuServiceWindowsIntegrationTest {
         cholaBp = bp(chola);
     }
 
-    // Stub the shared spy without invoking real clock methods while scheduled readers are active.
+    /** Supplies a real clock so scheduled readers never race with Mockito stubbing. */
+    static Clock testClock() {
+        return new AdjustableClock(Instant.parse("2026-10-05T05:30:00Z"));
+    }
+
+    static final class AdjustableClock extends Clock {
+        private volatile Instant current;
+
+        AdjustableClock(Instant current) {
+            this.current = current;
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneId.of("Asia/Kolkata");
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(current, zone);
+        }
+
+        @Override
+        public Instant instant() {
+            return current;
+        }
+    }
+
     void time(String instant) {
-        doReturn(Instant.parse(instant)).when(clock).instant();
-        doReturn(ZoneId.of("Asia/Kolkata")).when(clock).getZone();
+        ((AdjustableClock) clock).current = Instant.parse(instant);
     }
 
     long product(String code, String name) {

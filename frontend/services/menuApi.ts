@@ -1,4 +1,3 @@
-import {constrainedPhoneConnection} from "@/lib/mobileConnection";
 import {
     apiClient, ApiError
 } from "@/services/apiClient";
@@ -130,10 +129,9 @@ export async function warmMenu(branchId: number): Promise<void> {
     try {
         const categories = await request;
         if (warmedMenus.get(branchId) !== entry) return;
-        if (constrainedPhoneConnection()) return;
-        for (const product of categories.flatMap(category => category.products).slice(0, 8)) {
-            if (product.imageUrl) {const image = new Image(); image.src = product.imageUrl;}
-        }
+        // Responsive next/image requests begin when the menu mounts. Avoid fetching
+        // full-resolution originals here as well as their optimized variants.
+        void categories;
     } catch {discardWarmMenu(branchId, entry);}
     finally {
         entry.settled = true;
@@ -154,25 +152,43 @@ function waitForWarmMenu(request: Promise<MenuCategory[]>, signal?: AbortSignal)
         request.then(value => {signal.removeEventListener("abort", abort); resolve(value);}, error => {signal.removeEventListener("abort", abort); reject(error);});
     });
 }
-export async function getMenu(branchId: number, signal?: AbortSignal): Promise<MenuCategory[]> {
+/** Publish display-only catalog data while the independent live check is pending. */
+export async function getMenu(branchId: number, signal?: AbortSignal, onCatalog?: (categories: MenuCategory[]) => void): Promise<MenuCategory[]> {
     const deadline = AbortSignal.timeout(8000);
     signal = signal ? AbortSignal.any([signal, deadline]) : deadline;
     const entry = warmedMenus.get(branchId);
     const warm = entry && !entry.consumed ? entry : undefined;
-    if (warm) {
-        warm.consumed = true;
-        if (warm.settled) {
-            warmedMenus.delete(branchId);
-            clearTimeout(warm.timer);
+    const displayController = new AbortController();
+    if (onCatalog && !USE_MOCK_MENU && !warm?.settled) {
+        // Catalog prices/photos are display-only; no catalog response grants ordering.
+        void apiClient<Catalog>(`/api/menu/catalog?branchId=${encodeURIComponent(branchId)}`, {
+            signal: AbortSignal.any([signal, displayController.signal]), cacheMode: "default"
+        }).then(catalog => {
+            if (displayController.signal.aborted || signal?.aborted || !Array.isArray(catalog.categories)) return;
+            // Reuse only display data when the independent live revision matches.
+            // Availability is always merged from the fresh live response.
+            if (typeof catalog.revision === "string") rememberCatalog(branchId, catalog);
+            onCatalog(catalog.categories.map(category => ({...category, products: category.products.map(product => ({
+                ...product, available: false, serviceAvailability: {available: false, code: "CHECKING", message: "Checking pickup", nextChangeAt: null}
+            }))})));
+        }).catch(() => { /* Display-only failure must not replace the live check. */ });
+    }
+    try {
+        if (warm) {
+            warm.consumed = true;
+            if (warm.settled) {
+                warmedMenus.delete(branchId);
+                clearTimeout(warm.timer);
+            }
         }
-    }
-    if (warm && Date.now() - warm.started < WARM_MENU_TTL) {
-        try {
-            const result = await waitForWarmMenu(warm.request, signal);
-            if (signal?.aborted) throw new DOMException("Request aborted", "AbortError");
-            return result;
-        } catch (error) {if (signal?.aborted) throw error;}
-    }
-    if (warm) discardWarmMenu(branchId, warm);
-    return loadMenu(branchId, signal);
+        if (warm && Date.now() - warm.started < WARM_MENU_TTL) {
+            try {
+                const result = await waitForWarmMenu(warm.request, signal);
+                signal.throwIfAborted();
+                return result;
+            } catch (error) {if (signal.aborted) throw error;}
+        }
+        if (warm) discardWarmMenu(branchId, warm);
+        return await loadMenu(branchId, signal);
+    } finally {displayController.abort();}
 }
