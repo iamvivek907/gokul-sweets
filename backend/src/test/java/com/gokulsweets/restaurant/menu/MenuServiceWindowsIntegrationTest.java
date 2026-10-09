@@ -225,8 +225,7 @@ class MenuServiceWindowsIntegrationTest {
                                 .InventoryAvailabilityService(),
                         slots,
                         settings,
-                        clock,
-                        windows);
+                        clock);
         var preview = calendar.check(branch, date, 1, requested).dates().getFirst();
         assertThat(preview.available()).isTrue();
         assertThat(preview.items().getFirst().available()).isTrue();

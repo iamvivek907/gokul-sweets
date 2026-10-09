@@ -6,6 +6,18 @@ package com.gokulsweets.restaurant.order.service;
  */
 public final class AppConstant {
 
+    /** Returns one latest status per requested order using the existing highest-ID semantics. */
+    public static final String ORDER_PAGE_PAYMENT_STATUSES =
+            "SELECT o.id,p.payment_status FROM orders o JOIN LATERAL (SELECT payment_status FROM"
+                + " payments WHERE order_id=o.id ORDER BY id DESC LIMIT 1) p ON true WHERE o.id IN"
+                + " (";
+
+    /** Maximum number of distinct in-progress public preview batches retained at once. */
+    public static final int MENU_PREVIEW_MAX_PENDING = 64;
+
+    /** Maximum age at which another request can join an unfinished preview; never a result TTL. */
+    public static final int MENU_PREVIEW_JOIN_MILLIS = 250;
+
     /** Creates a app constant instance. */
     private AppConstant() {}
 

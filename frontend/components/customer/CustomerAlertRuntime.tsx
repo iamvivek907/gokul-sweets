@@ -3,6 +3,8 @@
 import {useEffect} from "react";
 import {apiClient, ApiError} from "@/services/apiClient";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {readCustomerInbox} from "@/services/customerInbox";
+import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import {API_BASE_URL} from "@/lib/constants";
 import {inQuietHours, playChime, type AlertSettings} from "@/lib/notificationAlerts";
 
@@ -11,15 +13,18 @@ export default function CustomerAlertRuntime() {
     const features = useStorefrontFeatures();
     useEffect(() => {
         if (!features?.notificationAlerts) return;
-        let active = true, pending = false, paused = false, initial = true, scope = "";
-        const controller = new AbortController();
+        let active = true, paused = false, initial = true, scope = "";
+        let pending: AbortController | null = null;
         async function poll() {
             if (!active || pending || paused || document.visibilityState !== "visible" || !navigator.onLine) return;
-            pending = true;
+            const controller = new AbortController();
+            pending = controller;
             try {
-                const settings = await apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {credentials: "include", signal: controller.signal});
-                const inbox = await apiClient<{messages: Array<{id: number; readAt: string | null; createdAt: string}>}>("/api/customer/identity/notifications", {credentials: "include", signal: controller.signal});
-                if (!active) return;
+                const [settings, inbox] = await Promise.all([
+                    apiClient<AlertSettings>("/api/customer/identity/notification-alerts", {credentials: "include", signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)])}),
+                    readCustomerInbox(controller.signal)
+                ]);
+                if (!active || pending !== controller || controller.signal.aborted) return;
                 const max = Math.max(0, ...inbox.messages.map(message => message.id));
                 const key = `gokul-alert-cursor:${API_BASE_URL}:${settings.scopeId}`;
                 const baseline = initial || scope !== settings.scopeId;
@@ -27,7 +32,7 @@ export default function CustomerAlertRuntime() {
                 // Cross-tab lock + cursor. Unsupported locks/storage use the silent inbox fallback.
                 if (!navigator.locks) return;
                 await navigator.locks.request(key, {ifAvailable: true}, lock => {
-                    if (!lock || !active) return;
+                    if (!lock || !active || pending !== controller || controller.signal.aborted) return;
                     try {
                         const previous = Number(localStorage.getItem(key) ?? 0);
                         localStorage.setItem(key, String(Math.max(previous, max)));
@@ -36,23 +41,29 @@ export default function CustomerAlertRuntime() {
                     } catch { /* Storage unavailable: preserve a silent, duplicate-free fallback. */ }
                 });
             } catch (reason) {
-                if (reason instanceof ApiError && [401, 403, 404].includes(reason.status)) paused = true;
-            } finally {pending = false;}
+                if (pending === controller && reason instanceof ApiError && [401, 403, 404].includes(reason.status)) paused = true;
+            } finally {controller.abort(); if (pending === controller) pending = null;}
         }
-        const identityChanged = () => {paused = false; initial = true; void poll();};
+        const identityChanged = () => {pending?.abort(); pending = null; paused = false; initial = true; void poll();};
         const refresh = () => {void poll();};
         void poll();
         const timer = window.setInterval(refresh, 30_000);
-        window.addEventListener("gokul-customer-identity-changed", identityChanged);
+        const stopIdentity = subscribeCustomerIdentityChanges(identityChanged, {revalidateOnResume: false});
         window.addEventListener("gokul-alert-preferences-changed", refresh);
-        window.addEventListener("online", refresh);
-        document.addEventListener("visibilitychange", refresh);
+        const resume = () => {if (document.visibilityState === "visible") {paused = false; void poll();}};
+        const pageshow = (event: PageTransitionEvent) => {if (event.persisted) resume();};
+        window.addEventListener("focus", resume);
+        window.addEventListener("pageshow", pageshow);
+        window.addEventListener("online", resume);
+        document.addEventListener("visibilitychange", resume);
         return () => {
-            active = false; controller.abort(); window.clearInterval(timer);
-            window.removeEventListener("gokul-customer-identity-changed", identityChanged);
+            active = false; pending?.abort(); window.clearInterval(timer);
+            stopIdentity();
             window.removeEventListener("gokul-alert-preferences-changed", refresh);
-            window.removeEventListener("online", refresh);
-            document.removeEventListener("visibilitychange", refresh);
+            window.removeEventListener("focus", resume);
+            window.removeEventListener("pageshow", pageshow);
+            window.removeEventListener("online", resume);
+            document.removeEventListener("visibilitychange", resume);
         };
     }, [features?.notificationAlerts]);
     return null;

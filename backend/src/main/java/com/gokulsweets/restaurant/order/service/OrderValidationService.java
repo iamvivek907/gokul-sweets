@@ -11,6 +11,7 @@ import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.service.model.ValidatedOrderData;
 import com.gokulsweets.restaurant.order.service.model.ValidatedOrderItem;
+import com.gokulsweets.restaurant.order.service.model.ValidatedPickupCart;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
 import com.gokulsweets.restaurant.pickup.PickupSlotValidationService;
 import com.gokulsweets.restaurant.pickup.repository.PickupSlotRepository;
@@ -89,13 +90,41 @@ public class OrderValidationService {
                         OrderValidationService.class,
                         "validatePickupCart(Long,List<CreateOrderItemRequest>)");
         try {
-            validateBranch(branchId);
-            return validateProducts(branchId, normalizeItems(items), true, null);
+            return validatePickupCartWithWindows(branchId, items).items();
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     OrderValidationService.class,
                     "validatePickupCart(Long,List<CreateOrderItemRequest>)");
+        }
+    }
+
+    /**
+     * Validates pickup items and loads service rules once for the entire dated preview. Manual
+     * availability and dependency checks still run before per-slot evaluation.
+     *
+     * @param branchId selected branch
+     * @param items requested product quantities or weights
+     * @return validated items and a request-local service-window evaluator
+     */
+    @Transactional(readOnly = true)
+    public ValidatedPickupCart validatePickupCartWithWindows(
+            Long branchId, List<CreateOrderItemRequest> items) {
+        long started =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validatePickupCartWithWindows(Long,List<CreateOrderItemRequest>)");
+        try {
+            validateBranch(branchId);
+            var requested = normalizeItems(items);
+            var serviceAt = serviceWindows.pickupEvaluator(branchId, requested.keySet());
+            var validated = validateProducts(branchId, requested, serviceAt.apply(null));
+            return new ValidatedPickupCart(validated, serviceAt);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    OrderValidationService.class,
+                    "validatePickupCartWithWindows(Long,List<CreateOrderItemRequest>)");
         }
     }
 

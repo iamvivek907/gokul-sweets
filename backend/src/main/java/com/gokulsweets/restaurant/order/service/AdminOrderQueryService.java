@@ -40,7 +40,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /** Coordinates admin order query operations. */
 @Service
@@ -500,12 +499,18 @@ public class AdminOrderQueryService {
                 return Collections.emptyMap();
             }
             List<Long> orderIds = orders.stream().map(Order::getId).toList();
-            return paymentRepository.findLatestPaymentsForOrders(orderIds).stream()
-                    .collect(
-                            Collectors.toMap(
-                                    payment -> payment.getOrder().getId(),
-                                    Payment::getPaymentStatus,
-                                    (first, second) -> first));
+            Map<Long, PaymentStatus> statuses = new java.util.HashMap<>();
+            jdbc.query(
+                    AppConstant.ORDER_PAGE_PAYMENT_STATUSES
+                            + String.join(",", Collections.nCopies(orderIds.size(), "?"))
+                            + ")",
+                    (org.springframework.jdbc.core.RowCallbackHandler)
+                            row ->
+                                    statuses.put(
+                                            row.getLong("id"),
+                                            PaymentStatus.valueOf(row.getString("payment_status"))),
+                    orderIds.toArray());
+            return statuses;
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

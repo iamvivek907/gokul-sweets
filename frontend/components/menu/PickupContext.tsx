@@ -90,8 +90,9 @@ export function useDateAvailability(products?: MenuProduct[]) {
         || selectedSlot.issues?.some(issue => cartIds.has(issue.productId)));
     const slotUnavailable = !!intent.selection && !!day && (!selectedSlot || selectedSlot.code === "PICKUP_WINDOW"
         || (intent.selection.pickupType === "PRIORITY" ? !selectedSlot.slot.priorityEnabled || selectedSlot.slot.priorityRemainingCapacity <= 0 : selectedSlot.slot.remainingCapacity <= 0));
+    const slotIssues = new Map(selectedSlot?.issues?.map(issue => [issue.productId, issue]));
     const items = day?.items?.map(item => slotUnavailable ? {...item, available: false, code: selectedSlot?.code ?? "NO_SLOTS", reason: selectedSlot?.reason ?? "Choose another pickup time."}
-        : selectedSlot?.issues?.find(issue => issue.productId === item.productId) ?? item);
+        : slotIssues.get(item.productId) ?? item);
     // Match the date-intent snapshot guard below: date-only changes must abort
     // the old verification and start a new one, even when slot/mode stay equal.
     const autoKey = JSON.stringify([branch?.id,today,features?.futureOrderingDays,itemsJson,intent.dateRaw,intent.pickupRaw,intent.modeRaw,revision,menuRevision,choosing,cart.isEmpty]);

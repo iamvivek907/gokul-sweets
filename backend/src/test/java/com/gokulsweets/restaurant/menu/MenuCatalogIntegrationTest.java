@@ -97,7 +97,7 @@ class MenuCatalogIntegrationTest {
         try (var executor = Executors.newSingleThreadExecutor()) {
             org.mockito.Mockito.doAnswer(
                             invocation -> {
-                                if (calls.incrementAndGet() == 2)
+                                if (calls.incrementAndGet() == 3)
                                     executor.submit(
                                                     () -> {
                                                         jdbc.update(

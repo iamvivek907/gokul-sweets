@@ -248,6 +248,17 @@ public class PhonePeClient {
             if (!MessageDigest.isEqual(
                     expected.getBytes(StandardCharsets.UTF_8),
                     checksumSignature.trim().getBytes(StandardCharsets.UTF_8))) {
+                // Shape only: never record secrets, signatures, expected hashes or payloads.
+                try {
+                    log.warn(
+                            "PhonePe webhook HMAC rejected: keyIdMatched=true, bodyBytes={},"
+                                    + " signatureChars={}, hexSignature={}",
+                            rawBody.length,
+                            checksumSignature.trim().length(),
+                            checksumSignature.trim().matches("[0-9a-fA-F]{64}"));
+                } catch (RuntimeException loggingFailure) {
+                    // Diagnostics must not replace verification or gateway outcomes.
+                }
                 throw new PaymentSignatureException(
                         "INVALID_PHONEPE_WEBHOOK_SIGNATURE",
                         "PhonePe webhook checksum signature is invalid.");
@@ -562,16 +573,20 @@ public class PhonePeClient {
                 MethodTiming.start(PhonePeClient.class, "getAccessToken()");
         try {
             AccessToken current = accessToken;
-            if (current != null && !current.isExpired()) {
+            if (current != null && !current.isExpired(properties.getTokenExpirySafetySeconds())) {
                 return current.value();
             }
+            long lockStarted = System.nanoTime();
             tokenLock.lock();
+            long lockWaitNanos = System.nanoTime() - lockStarted;
             try {
                 current = accessToken;
-                if (current != null && !current.isExpired()) {
+                if (current != null
+                        && !current.isExpired(properties.getTokenExpirySafetySeconds())) {
                     return current.value();
                 }
                 properties.requireApiConfiguration();
+                long requestStarted = System.nanoTime();
                 try {
                     String form =
                             "client_id="
@@ -617,6 +632,14 @@ public class PhonePeClient {
                     }
                     AccessToken created = new AccessToken(token, Instant.ofEpochSecond(expiresAt));
                     accessToken = created;
+                    try {
+                        log.info(
+                                "PhonePe token refreshed: lockWaitMs={}, requestMs={}",
+                                lockWaitNanos / 1_000_000.0,
+                                (System.nanoTime() - requestStarted) / 1_000_000.0);
+                    } catch (RuntimeException loggingFailure) {
+                        // Diagnostics must not replace verification or gateway outcomes.
+                    }
                     return created.value();
                 } catch (PaymentGatewayException exception) {
                     throw exception;
@@ -955,18 +978,21 @@ public class PhonePeClient {
     private record AccessToken(String value, Instant expiresAt) {
 
         /**
-         * Reports whether expired.
+         * Reports whether the token expires inside the configured safety window.
          *
+         * @param safetySeconds seconds of remaining validity required before reuse
          * @return the is expired result
          */
-        boolean isExpired() {
+        boolean isExpired(int safetySeconds) {
             final long __gokulMethodStartedNanos =
-                    MethodTiming.start(PhonePeClient.AccessToken.class, "isExpired()");
+                    MethodTiming.start(PhonePeClient.AccessToken.class, "isExpired(int)");
             try {
-                return expiresAt.isBefore(Instant.now().plusSeconds(30));
+                return expiresAt.isBefore(Instant.now().plusSeconds(safetySeconds));
             } finally {
                 MethodTiming.finish(
-                        __gokulMethodStartedNanos, PhonePeClient.AccessToken.class, "isExpired()");
+                        __gokulMethodStartedNanos,
+                        PhonePeClient.AccessToken.class,
+                        "isExpired(int)");
             }
         }
     }

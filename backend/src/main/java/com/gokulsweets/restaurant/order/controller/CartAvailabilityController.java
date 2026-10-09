@@ -27,6 +27,8 @@ public class CartAvailabilityController {
 
     private final com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService discovery;
 
+    private final com.gokulsweets.restaurant.order.service.MenuPreviewReads previewReads;
+
     /**
      * Handles {@code GET /api/branches/{branchId}/pickup-discovery} for cart availability.
      *
@@ -64,29 +66,41 @@ public class CartAvailabilityController {
      * @param branchId the branch id supplied to this method
      * @param request the request supplied to this method
      * @param menuPreview the menu preview supplied to this method
-     * @return the {@code ResponseEntity<CartAvailabilityService.Availability>} result
+     * @param compact whether to index repeated issues for an opt-in menu preview
+     * @return the full availability or compact menu-preview transport
      */
     @PostMapping("/api/branches/{branchId}/availability")
-    public ResponseEntity<CartAvailabilityService.Availability> check(
+    public ResponseEntity<?> check(
             @PathVariable Long branchId,
             @Valid @RequestBody Request request,
-            @RequestParam(defaultValue = "false") boolean menuPreview) {
+            @RequestParam(defaultValue = "false") boolean menuPreview,
+            @RequestParam(defaultValue = "false") boolean compact) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(CartAvailabilityController.class, "check(Long,Request,boolean)");
+                MethodTiming.start(
+                        CartAvailabilityController.class, "check(Long,Request,boolean,boolean)");
         try {
             if (!features.isSmartAvailability()) return ResponseEntity.notFound().build();
-            return ResponseEntity.ok(
-                    service.check(
-                            branchId,
-                            request.startDate(),
-                            request.days(),
-                            request.items(),
-                            menuPreview));
+            var availability =
+                    menuPreview && compact && request.days() == 1
+                            ? previewReads.check(branchId, request.startDate(), request.items())
+                            : service.check(
+                                    branchId,
+                                    request.startDate(),
+                                    request.days(),
+                                    request.items(),
+                                    menuPreview);
+            return ResponseEntity.ok()
+                    .cacheControl(org.springframework.http.CacheControl.noStore())
+                    .body(
+                            menuPreview && compact
+                                    ? com.gokulsweets.restaurant.order.dto.CompactMenuAvailability
+                                            .from(availability)
+                                    : availability);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     CartAvailabilityController.class,
-                    "check(Long,Request,boolean)");
+                    "check(Long,Request,boolean,boolean)");
         }
     }
 

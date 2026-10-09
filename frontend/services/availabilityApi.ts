@@ -23,6 +23,28 @@ export interface CartAvailability {
         plannedProduction?: boolean}[];
 }
 
+type CompactMenuAvailability = Omit<CartAvailability, "dates"> & {
+    issueCatalog: ItemAvailability[];
+    dates: Array<Omit<CartAvailability["dates"][number], "slots"> & {
+        slots: Array<Omit<SlotAvailability, "issues"> & {issueIndexes: number[]}>;
+    }>;
+};
+
+/** Restore the existing UI contract; accept full responses from older backend deployments. */
+function expandMenuPreview(data: CartAvailability | CompactMenuAvailability): CartAvailability {
+    if (!("issueCatalog" in data)) return data;
+    const {issueCatalog, dates, ...header} = data;
+    return {...header, dates: dates.map(date => ({...date, slots: date.slots.map(slot => {
+        const {issueIndexes, ...decision} = slot;
+        return {...decision, issues: issueIndexes.map(index => {
+            if (!Number.isInteger(index) || index < 0 || index >= issueCatalog.length) {
+                throw new Error("Invalid menu preview issue index");
+            }
+            return issueCatalog[index];
+        })};
+    })}))};
+}
+
 export function availabilityItems(items: CartItem[]) {
     return items.map(item => ({
         productId: item.product.id,
@@ -31,13 +53,14 @@ export function availabilityItems(items: CartItem[]) {
     }));
 }
 
-export function checkCartAvailability(
+export async function checkCartAvailability(
     branchId: number, startDate: string, days: number,
     items: ReturnType<typeof availabilityItems>, signal?: AbortSignal, menuPreview = false
 ) {
-    return apiClient<CartAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true" : ""}`, {
+    const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true&compact=true" : ""}`, {
         method: "POST", signal, body: JSON.stringify({startDate, days, items, fulfilmentType: "PICKUP"})
     });
+    return expandMenuPreview(data);
 }
 
 /** Branch capacity only; item validation follows on the selected date. */

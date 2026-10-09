@@ -624,6 +624,7 @@ public class MenuServiceWindows {
                 var statuses = new HashMap<Long, Status>();
                 var at = pickupAt == null ? null : pickupAt.atZone(ZoneId.of("Asia/Kolkata"));
                 var observedAt = inventoryClock.instant();
+                var windowEvaluations = new WindowEvaluations(at);
                 requestedIds.forEach(
                         id -> {
                             var p = products.get(id);
@@ -639,7 +640,8 @@ public class MenuServiceWindows {
                                                     byBranchProduct,
                                                     rules,
                                                     at,
-                                                    new HashSet<>());
+                                                    new HashSet<>(),
+                                                    windowEvaluations);
                             statuses.put(
                                     id,
                                     new Status(
@@ -675,11 +677,12 @@ public class MenuServiceWindows {
             Map<Long, ProductState> products,
             Map<Long, Item> rules,
             ZonedDateTime now,
-            Set<Long> visited) {
+            Set<Long> visited,
+            WindowEvaluations windowEvaluations) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         MenuServiceWindows.class,
-                        "evaluate(long,Map<Long,ProductState>,Map<Long,Item>,ZonedDateTime,Set<Long>)");
+                        "evaluate(long,Map<Long,ProductState>,Map<Long,Item>,ZonedDateTime,Set<Long>,WindowEvaluations)");
         try {
             var product = products.get(id);
             var rule = rules.get(id);
@@ -691,7 +694,8 @@ public class MenuServiceWindows {
             Instant next = null;
             if (rule != null) {
                 var window = new ServiceWindow(rule.startsAt(), rule.endsAt(), rule.weekdays());
-                next = now == null ? null : window.nextChange(now);
+                var evaluatedWindow = windowEvaluations.get(window);
+                next = evaluatedWindow.nextChange();
                 Status dependency =
                         rule.requiresBranchProductId() == null
                                 ? null
@@ -700,14 +704,15 @@ public class MenuServiceWindows {
                                         products,
                                         rules,
                                         now,
-                                        visited);
+                                        visited,
+                                        windowEvaluations);
                 if (dependency != null && dependency.code().equals("SOLD_OUT"))
                     return new Status(
                             false,
                             "SOLD_OUT",
                             product.name() + " is unavailable: " + dependency.message(),
                             null);
-                if (now != null && !window.contains(now)) {
+                if (now != null && !evaluatedWindow.active()) {
                     String time =
                             next == null
                                     ? "later"
@@ -742,7 +747,7 @@ public class MenuServiceWindows {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     MenuServiceWindows.class,
-                    "evaluate(long,Map<Long,ProductState>,Map<Long,Item>,ZonedDateTime,Set<Long>)");
+                    "evaluate(long,Map<Long,ProductState>,Map<Long,Item>,ZonedDateTime,Set<Long>,WindowEvaluations)");
         }
     }
 }

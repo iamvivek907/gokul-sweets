@@ -24,6 +24,12 @@ public class MenuAvailabilityService {
 
     private final Map<Long, Cached> cache = new LinkedHashMap<>(16, .75f, true);
 
+    // Fixed stripes keep lock storage bounded; database work never holds the shared LRU lock.
+    private final Object[] branchLocks =
+            java.util.stream.IntStream.range(0, AppConstant.MENU_CACHE_LOCK_STRIPES)
+                    .mapToObj(ignored -> new Object())
+                    .toArray();
+
     /**
      * Immutable item data contract.
      *
@@ -81,11 +87,32 @@ public class MenuAvailabilityService {
         try {
             // Menu flags are advisory. Never cache dated quantities, holds, or checkout acceptance.
             boolean publish = TransactionSynchronizationManager.isCurrentTransactionReadOnly();
-            synchronized (cache) {
+            if (publish) {
+                var observedCatalog = catalog.get(branchId);
+                Instant observedNow = inventoryClock.instant();
+                Cached observed;
+                synchronized (cache) {
+                    observed = cache.get(branchId);
+                }
+                if (observed != null
+                        && observed.value().revision().equals(observedCatalog.revision())
+                        && !observedNow.isBefore(observed.evaluatedAt())
+                        && observedNow.isBefore(observed.until())) {
+                    return new Availability(
+                            observed.value().revision(),
+                            observed.value().serviceWindowsEnabled(),
+                            observed.value().items(),
+                            observedNow);
+                }
+            }
+            synchronized (branchLocks[Math.floorMod(branchId, branchLocks.length)]) {
                 for (int attempt = 0; attempt < 3; attempt++) {
                     var snapshot = catalog.get(branchId);
                     Instant now = inventoryClock.instant();
-                    var cached = cache.get(branchId);
+                    Cached cached;
+                    synchronized (cache) {
+                        cached = cache.get(branchId);
+                    }
                     if (publish
                             && cached != null
                             && cached.value().revision().equals(snapshot.revision())
@@ -120,14 +147,21 @@ public class MenuAvailabilityService {
                                     && item.serviceAvailability().nextChangeAt() != null
                                     && item.serviceAvailability().nextChangeAt().isBefore(until))
                                 until = item.serviceAvailability().nextChangeAt();
-                        cache.put(branchId, new Cached(now, until, result));
-                        while (cache.size() > 16
-                                || cache.values().stream()
-                                                .mapToLong(
-                                                        c -> 256L + 256L * c.value().items().size())
-                                                .sum()
-                                        > 4 * 1024 * 1024)
-                            cache.remove(cache.keySet().iterator().next());
+                        synchronized (cache) {
+                            cache.put(branchId, new Cached(now, until, result));
+                            while (cache.size() > 16
+                                    || cache.values().stream()
+                                                    .mapToLong(
+                                                            c ->
+                                                                    256L
+                                                                            + 256L
+                                                                                    * c.value()
+                                                                                            .items()
+                                                                                            .size())
+                                                    .sum()
+                                            > 4 * 1024 * 1024)
+                                cache.remove(cache.keySet().iterator().next());
+                        }
                     }
                     return result;
                 }

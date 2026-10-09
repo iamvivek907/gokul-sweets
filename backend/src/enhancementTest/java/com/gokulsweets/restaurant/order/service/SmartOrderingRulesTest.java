@@ -46,15 +46,18 @@ class SmartOrderingRulesTest {
                 new CartAvailabilityController(
                         features,
                         service,
-                        mock(com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService.class));
+                        mock(com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService.class),
+                        new MenuPreviewReads(service, clock));
         var request =
                 new CartAvailabilityController.Request(
                         LocalDate.now(clock),
                         1,
                         List.of(new CreateOrderItemRequest(1L, 1, null)),
                         null);
-        assertThat(controller.check(1L, request, false).getStatusCode().value()).isEqualTo(404);
-        assertThat(controller.check(1L, request, true).getStatusCode().value()).isEqualTo(404);
+        assertThat(controller.check(1L, request, false, true).getStatusCode().value())
+                .isEqualTo(404);
+        assertThat(controller.check(1L, request, true, true).getStatusCode().value())
+                .isEqualTo(404);
         verifyNoInteractions(service);
     }
 
