@@ -19,4 +19,8 @@ if [ "${JAVA_TOOL_OPTIONS+x}" != x ]; then
     fi
     export JAVA_TOOL_OPTIONS
 fi
+# Opt-in cause/pause timestamps; keeps automatic heap sizing and operator options intact.
+if [ "${GOKUL_GC_DIAGNOSTICS_ENABLED:-false}" = true ]; then
+    exec java '-Xlog:gc*,safepoint=info:stdout:time,uptime,level,tags' -jar /app/app.jar "$@"
+fi
 exec java -jar /app/app.jar "$@"

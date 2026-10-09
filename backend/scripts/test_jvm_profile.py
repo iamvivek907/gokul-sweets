@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 class JvmProfileTest(unittest.TestCase):
-    def run_profile(self, limit, override=None, version=2):
+    def run_profile(self, limit, override=None, version=2, gc=False):
         with tempfile.TemporaryDirectory() as directory:
             folder = pathlib.Path(directory)
             java = folder / 'java'
@@ -26,6 +26,7 @@ class JvmProfileTest(unittest.TestCase):
             entrypoint.write_text(source)
             env = dict(os.environ, PATH=directory + ':' + os.environ['PATH'])
             env.pop('JAVA_TOOL_OPTIONS', None)
+            env['GOKUL_GC_DIAGNOSTICS_ENABLED'] = 'true' if gc else 'false'
             if override is not None:
                 env['JAVA_TOOL_OPTIONS'] = override
             return subprocess.check_output(['sh', str(entrypoint), 'extra'], env=env, text=True)
@@ -48,3 +49,12 @@ class JvmProfileTest(unittest.TestCase):
         output = self.run_profile('2147483648', '-Xmx160m')
         self.assertTrue(output.startswith('-Xmx160m\n'))
         self.assertTrue(output.endswith('-jar\n/app/app.jar\nextra\n'))
+
+    def test_gc_diagnostics_preserve_heap_override_and_application_arguments(self):
+        output = self.run_profile('536870912', gc=True)
+        self.assertIn('-Xmx192m -XX:+UseSerialGC', output)
+        self.assertIn('-Xlog:gc*,safepoint=info:stdout:time,uptime,level,tags\n-jar', output)
+        output = self.run_profile('536870912', '-Xmx160m', gc=True)
+        self.assertTrue(output.startswith('-Xmx160m\n'))
+        self.assertTrue(output.endswith('-jar\n/app/app.jar\nextra\n'))
+        self.assertNotIn('-Xlog:', self.run_profile('536870912'))
