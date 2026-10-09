@@ -172,7 +172,11 @@ class CompactMenuAvailabilityTest {
         var service = mock(CartAvailabilityService.class);
         var controller =
                 new CartAvailabilityController(
-                        features, service, mock(MenuPickupDiscoveryService.class));
+                        features,
+                        service,
+                        mock(MenuPickupDiscoveryService.class),
+                        new com.gokulsweets.restaurant.order.service.MenuPreviewReads(
+                                service, java.time.Clock.systemUTC()));
         var request =
                 new CartAvailabilityController.Request(preview().today(), 1, List.of(), "PICKUP");
         when(service.check(1L, request.startDate(), 1, request.items(), false))
@@ -194,7 +198,12 @@ class CompactMenuAvailabilityTest {
         var mvc =
                 org.springframework.test.web.servlet.setup.MockMvcBuilders.standaloneSetup(
                                 new CartAvailabilityController(
-                                        features, service, mock(MenuPickupDiscoveryService.class)))
+                                        features,
+                                        service,
+                                        mock(MenuPickupDiscoveryService.class),
+                                        new com.gokulsweets.restaurant.order.service
+                                                .MenuPreviewReads(
+                                                service, java.time.Clock.systemUTC())))
                         .build();
         String body =
                 "{\"startDate\":\"2026-10-10\",\"days\":1,\"items\":[{\"productId\":1,\"quantity\":1}],\"fulfilmentType\":\"PICKUP\"}";

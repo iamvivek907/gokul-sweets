@@ -27,6 +27,8 @@ public class CartAvailabilityController {
 
     private final com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService discovery;
 
+    private final com.gokulsweets.restaurant.order.service.MenuPreviewReads previewReads;
+
     /**
      * Handles {@code GET /api/branches/{branchId}/pickup-discovery} for cart availability.
      *
@@ -79,12 +81,14 @@ public class CartAvailabilityController {
         try {
             if (!features.isSmartAvailability()) return ResponseEntity.notFound().build();
             var availability =
-                    service.check(
-                            branchId,
-                            request.startDate(),
-                            request.days(),
-                            request.items(),
-                            menuPreview);
+                    menuPreview && compact && request.days() == 1
+                            ? previewReads.check(branchId, request.startDate(), request.items())
+                            : service.check(
+                                    branchId,
+                                    request.startDate(),
+                                    request.days(),
+                                    request.items(),
+                                    menuPreview);
             return ResponseEntity.ok()
                     .cacheControl(org.springframework.http.CacheControl.noStore())
                     .body(

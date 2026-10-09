@@ -6,6 +6,12 @@ package com.gokulsweets.restaurant.order.service;
  */
 public final class AppConstant {
 
+    /** Maximum number of distinct in-progress public preview batches retained at once. */
+    public static final int MENU_PREVIEW_MAX_PENDING = 64;
+
+    /** Maximum age at which another request can join an unfinished preview; never a result TTL. */
+    public static final int MENU_PREVIEW_JOIN_MILLIS = 250;
+
     /** Creates a app constant instance. */
     private AppConstant() {}
 
