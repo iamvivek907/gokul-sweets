@@ -56,9 +56,9 @@ class AdminDeliveryOrderViewIntegrationTest {
         long id =
                 jdbc.queryForObject(
                         "INSERT INTO"
-                            + " orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status)"
-                            + " VALUES(?,?,?,'Test','9999999999','NORMAL','CONFIRMED') RETURNING"
-                            + " id",
+                            + " orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,reservation_expires_at)"
+                            + " VALUES(?,?,?,'Test','9999999999','NORMAL','CONFIRMED',CURRENT_TIMESTAMP+interval"
+                            + " '1 hour') RETURNING id",
                         Long.class,
                         key,
                         branchId,
@@ -66,9 +66,9 @@ class AdminDeliveryOrderViewIntegrationTest {
         long other =
                 jdbc.queryForObject(
                         "INSERT INTO"
-                            + " orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status)"
-                            + " VALUES(?,?,?,'Test','9999999999','NORMAL','CONFIRMED') RETURNING"
-                            + " id",
+                            + " orders(order_number,branch_id,pickup_slot_id,customer_name,customer_phone,pickup_type,order_status,reservation_expires_at)"
+                            + " VALUES(?,?,?,'Test','9999999999','NORMAL','CONFIRMED',CURRENT_TIMESTAMP+interval"
+                            + " '1 hour') RETURNING id",
                         Long.class,
                         key + "X",
                         branchId,
