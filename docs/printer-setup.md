@@ -26,6 +26,41 @@ printing needs a model-specific code page or raster renderer.
 
 ## Prepare before hardware arrives
 
+### Example: you bought an 80 mm printer
+
+Your webpage uses the existing server KOT queue; the printer connects to a Windows
+computer in the shop. Android staff use the same webpage and queue. They do not
+need to pair their own phones to the printer for this setup.
+
+1. Load an **80 mm roll**, connect power, and confirm the model understands ESC/POS.
+   For USB install the vendor Windows driver and verify a Windows test print. For
+   Bluetooth pair its **Classic/SPP** service and locate the outgoing COM port.
+2. Install the local agent using the PowerShell commands below. Run
+   `.\.venv\Scripts\python.exe agent.py devices` to get the exact printer name
+   (USB) or outgoing COM port (Bluetooth). Use the manufacturer's Bluetooth baud rate.
+3. In **Admin → Printer queue → Set up a USB or Bluetooth printer**, enter the
+   backend HTTPS origin, selected branch ID and a unique agent ID such as
+   `shop-1-kitchen`. Choose **KITCHEN**, **80 mm**, the correct connection, and its
+   exact device identifier. Leave cut disabled unless the model has a cutter.
+   Save the downloaded `config.local.json` inside the `print-agent` folder.
+4. Run `validate`, `preview` and `test` with the venv Python. Check the real paper
+   ticket for readability, wrapping, feed and cut if supported.
+5. Deploy this backend version, then generate `registration-sql`. Have the backend
+   administrator review and apply it to the **DEV** database. Set the same private
+   `PRINT_AGENT_API_KEY` in DEV's backend and the trusted print station, as below.
+   Downloading a profile does not save a printer row; registration is required once.
+6. Run the agent and confirm its heartbeat in Printer Queue. In the webpage, open
+   a paid DEV order and choose **Prepare / KOT** or **Start preparation**. Confirm
+   one correct paper ticket and a Printed job. The current trigger is staff starting
+   preparation; customer checkout alone does not trigger this KOT workflow.
+7. Keep the station awake and the agent running. Perform the DEV acceptance checks
+   before configuring production's own backend origin, branch and key. Windows Task
+   Scheduler can start the agent after the manual setup has been accepted.
+
+The remaining sections give exact installation, registration, secret and recovery
+commands. Run commands in the `print-agent` folder. If you use the venv, use
+`.\.venv\Scripts\python.exe` everywhere the examples abbreviate it to `python`.
+
 1. Open **Admin → Printer queue → Set up a USB or Bluetooth printer**. Download a
    profile after choosing the connection, branch ID, station and printer code.
    The form stores no credential and does not register a server printer.
@@ -120,6 +155,10 @@ the profile to a second running station. A profile lock prevents concurrent loca
 commands, not agents on other computers. The server can reclaim an expired lease;
 paper printing and a database acknowledgement are not an atomic transaction.
 
+On Ctrl+C or an unexpected parent-side error, the agent stops and joins its active
+transport child before releasing the local profile lock. Already-spooled or printed
+data cannot be retracted by stopping that child; inspect paper and spooler first.
+
 If transport or the printed acknowledgement fails, or the machine restarts during
 a print, this agent stops before claiming another job. It does not automatically
 resend the uncertain ticket. Inspect paper and the Windows spooler first:
@@ -132,9 +171,17 @@ python agent.py resolve retry
 python agent.py run
 ```
 
+If a printed acknowledgement returns HTTP 409, `resolve printed` performs an
+authenticated, read-only check of that job in the profile's branch and station.
+Only an exact matching job already marked **PRINTED** clears the journal without
+sending paper again. This handles an acknowledgement committed by the server whose
+response was lost. Deploy the backend status endpoint before using this agent version.
+The lookup returns job identity/status only; it does not change claims or grant retries.
+
 `retry` tells the backend the old claim failed; normal retry delay/max-attempt
 rules apply. Never approve retry just because the paper was delayed. If the
-server rejects resolution (HTTP 409), another claim/status transition occurred:
+server rejects resolution and cannot confirm that exact job as PRINTED, another
+claim/status transition may have occurred:
 stop all agents, reconcile the job in Printer Queue, and reconcile the local
 journal before restarting. Escalate to the administrator; do not erase a journal
 while an unresolved claim or spooler job exists. Other-language/profile validation

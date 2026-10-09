@@ -6,6 +6,7 @@ import com.gokulsweets.restaurant.printing.dto.PrintAgentClaimResponse;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentFailedRequest;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentHeartbeatRequest;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentHeartbeatResponse;
+import com.gokulsweets.restaurant.printing.dto.PrintAgentJobStatusResponse;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentPrintedRequest;
 import com.gokulsweets.restaurant.printing.service.PrintAgentAuthenticationService;
 import com.gokulsweets.restaurant.printing.service.PrintAgentService;
@@ -28,6 +29,34 @@ public class PrintAgentController {
     private final PrintAgentAuthenticationService authenticationService;
 
     private final PrintAgentService printAgentService;
+
+    /**
+     * Reads scoped job status using the private agent key; does not print, acknowledge or claim
+     * work.
+     *
+     * @param apiKey the private print-agent credential
+     * @param printJobId the job being reconciled
+     * @param request the agent's branch and station identity
+     * @return the current job status within that branch and station
+     */
+    @PostMapping("/jobs/{printJobId}/status")
+    public ResponseEntity<PrintAgentJobStatusResponse> status(
+            @RequestHeader(value = API_KEY_HEADER, required = false) String apiKey,
+            @PathVariable Long printJobId,
+            @Valid @RequestBody PrintAgentClaimRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        PrintAgentController.class, "status(String,Long,PrintAgentClaimRequest)");
+        try {
+            authenticationService.authenticate(apiKey);
+            return ResponseEntity.ok(printAgentService.getJobStatus(printJobId, request));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    PrintAgentController.class,
+                    "status(String,Long,PrintAgentClaimRequest)");
+        }
+    }
 
     /*
      * =========================================================

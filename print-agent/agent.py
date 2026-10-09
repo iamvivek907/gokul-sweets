@@ -167,15 +167,18 @@ def deliver(cfg, data):
         writer.close()
         worker.join(30)
         if worker.is_alive():
+            raise TimeoutError("Printer transport timed out; inspect paper/spooler")
+        if worker.exitcode != 0 or not reader.poll() or not reader.recv():
+            raise IOError("Printer transport failed; inspect paper/spooler")
+    finally:
+        # Ctrl+C and unexpected failures must stop the transport before the caller
+        # releases its profile lock. A live worker could otherwise overlap recovery.
+        if worker.pid is not None and worker.is_alive():
             worker.terminate()
             worker.join(5)
             if worker.is_alive():
                 worker.kill()
                 worker.join()
-            raise TimeoutError("Printer transport timed out; inspect paper/spooler")
-        if worker.exitcode != 0 or not reader.poll() or not reader.recv():
-            raise IOError("Printer transport failed; inspect paper/spooler")
-    finally:
         reader.close()
         writer.close()
 
@@ -222,7 +225,21 @@ def acknowledge(api, job, outcome):
     body = {"agentId": api.cfg["agent_id"], "claimToken": job["claimToken"]}
     if outcome == "retry":
         body.update(errorCode="OPERATOR_APPROVED_RETRY", errorMessage="Operator checked paper and approved retry")
-    api.post(f"jobs/{int(job['printJobId'])}/" + ("failed" if outcome == "retry" else "printed"), body)
+    path = f"jobs/{int(job['printJobId'])}/"
+    try:
+        api.post(path + ("failed" if outcome == "retry" else "printed"), body)
+    except error.HTTPError as exc:
+        if outcome != "printed" or exc.code != 409:
+            raise
+        # The server may have committed the first acknowledgement before its
+        # response was lost. Only its scoped terminal status can resolve that case.
+        status = api.post(path + "status", api.identity())
+        if (not isinstance(status, dict)
+                or status.get("printJobId") != job["printJobId"]
+                or status.get("branchId") != api.cfg["branch_id"]
+                or status.get("station") != api.cfg["station"]
+                or status.get("status") != "PRINTED"):
+            raise ValueError("Job is not confirmed printed in this branch/station; keep journal and reconcile in Printer Queue") from exc
 
 
 def process_job(api, db, cfg, job):

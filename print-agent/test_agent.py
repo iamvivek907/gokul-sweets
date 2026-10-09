@@ -169,12 +169,87 @@ class AgentTest(unittest.TestCase):
         reader, writer, worker = Mock(), Mock(), Mock()
         ctx.Pipe.return_value = (reader, writer)
         ctx.Process.return_value = worker
-        worker.is_alive.side_effect = [True, False]
+        worker.is_alive.side_effect = [True, True, False]
         with patch.object(agent.multiprocessing, "get_context", return_value=ctx):
             with self.assertRaises(TimeoutError):
                 agent.deliver(self.cfg, b"data")
         worker.terminate.assert_called_once()
         reader.close.assert_called_once()
+
+    def test_keyboard_interrupt_stops_worker_before_returning_to_profile_lock(self):
+        ctx = Mock()
+        reader, writer, worker = Mock(), Mock(), Mock()
+        ctx.Pipe.return_value = (reader, writer)
+        ctx.Process.return_value = worker
+        worker.pid = 99
+        worker.join.side_effect = [KeyboardInterrupt(), None]
+        worker.is_alive.side_effect = [True, False]
+        with patch.object(agent.multiprocessing, "get_context", return_value=ctx):
+            with self.assertRaises(KeyboardInterrupt):
+                agent.deliver(self.cfg, b"data")
+        worker.terminate.assert_called_once()
+        self.assertEqual(worker.join.call_args_list[-1].args, (5,))
+        reader.close.assert_called_once()
+        self.api.post.assert_not_called()
+
+    def test_cleanup_kills_worker_if_termination_does_not_finish(self):
+        ctx = Mock()
+        reader, writer, worker = Mock(), Mock(), Mock()
+        ctx.Pipe.return_value = (reader, writer)
+        ctx.Process.return_value = worker
+        worker.join.side_effect = [KeyboardInterrupt(), None, None]
+        worker.is_alive.return_value = True
+        with patch.object(agent.multiprocessing, "get_context", return_value=ctx):
+            with self.assertRaises(KeyboardInterrupt):
+                agent.deliver(self.cfg, b"data")
+        worker.terminate.assert_called_once()
+        worker.kill.assert_called_once()
+        self.assertEqual(worker.join.call_args_list[-1].args, ())
+
+    def test_lost_committed_ack_is_reconciled_without_resending(self):
+        class CommittedAckApi:
+            def __init__(self, cfg):
+                self.cfg = cfg
+                self.printed = False
+            def identity(self):
+                return {"branchId": self.cfg["branch_id"], "agentId": self.cfg["agent_id"], "station": self.cfg["station"]}
+            def post(self, path, body):
+                if path.endswith("/status"):
+                    return {"printJobId": 12, "branchId": self.cfg["branch_id"], "station": self.cfg["station"], "status": "PRINTED"}
+                if self.printed:
+                    raise HTTPError("https://example.com", 409, "already printed", {}, None)
+                self.printed = True
+                raise TimeoutError("Response lost after backend commit")
+        api = CommittedAckApi(self.cfg)
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory) / "profile.json"
+            with patch.object(agent, "deliver") as send:
+                with contextlib.closing(sqlite3.connect(str(profile) + ".sqlite3")) as db:
+                    db.execute("CREATE TABLE pending (id INTEGER PRIMARY KEY, payload TEXT)")
+                    with self.assertRaises(TimeoutError):
+                        agent.process_job(api, db, self.cfg, self.job)
+                send.assert_called_once()
+                with patch.object(agent, "Api", return_value=api), contextlib.redirect_stdout(io.StringIO()):
+                    agent.consume(self.cfg, profile, "printed")
+                send.assert_called_once()
+            with contextlib.closing(sqlite3.connect(str(profile) + ".sqlite3")) as db:
+                self.assertIsNone(db.execute("SELECT * FROM pending").fetchone())
+
+    def test_conflict_recovery_rejects_non_terminal_or_wrong_scope_status(self):
+        self.api.identity.return_value = {"branchId": 1, "station": "KITCHEN", "agentId": "test"}
+        good = {"printJobId": 12, "branchId": 1, "station": "KITCHEN", "status": "PRINTED"}
+        for change in ({"status": "CLAIMED"}, {"status": "FAILED"}, {"branchId": 2},
+                       {"station": "BILLING"}, {"printJobId": 99}):
+            with self.subTest(change=change):
+                self.api.post.side_effect = [HTTPError("https://example.com", 409, "conflict", {}, None), good | change]
+                with self.assertRaises(ValueError):
+                    agent.acknowledge(self.api, self.job, "printed")
+
+    def test_retry_conflict_does_not_treat_printed_status_as_retry_approval(self):
+        self.api.post.side_effect = HTTPError("https://example.com", 409, "conflict", {}, None)
+        with self.assertRaises(HTTPError):
+            agent.acknowledge(self.api, self.job, "retry")
+        self.api.post.assert_called_once()
 
     def test_child_transport_reports_failure_without_acknowledgement(self):
         ctx = Mock()

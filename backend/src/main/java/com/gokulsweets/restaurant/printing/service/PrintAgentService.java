@@ -12,6 +12,7 @@ import com.gokulsweets.restaurant.printing.dto.PrintAgentClaimResponse;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentFailedRequest;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentHeartbeatRequest;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentHeartbeatResponse;
+import com.gokulsweets.restaurant.printing.dto.PrintAgentJobStatusResponse;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentPrintedRequest;
 import com.gokulsweets.restaurant.printing.entity.PrintJob;
 import com.gokulsweets.restaurant.printing.entity.PrinterDevice;
@@ -59,6 +60,42 @@ public class PrintAgentService {
     private final KotRepository kotRepository;
 
     private final DeliveryOrderWindowLookup deliveryWindows;
+
+    /**
+     * Reads job status for acknowledgement recovery without changing claims or retry state.
+     *
+     * @param printJobId the job being reconciled
+     * @param request the agent's branch and station identity
+     * @return the current status of a job in the requested branch and station
+     * @throws ResponseStatusException if the job is missing or belongs to another branch or station
+     */
+    @Transactional(readOnly = true)
+    public PrintAgentJobStatusResponse getJobStatus(
+            Long printJobId, PrintAgentClaimRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        PrintAgentService.class, "getJobStatus(Long,PrintAgentClaimRequest)");
+        try {
+            PrintJob job =
+                    printJobRepository
+                            .findById(printJobId)
+                            .filter(
+                                    value ->
+                                            request.branchId().equals(value.getBranch().getId())
+                                                    && request.station() == value.getStation())
+                            .orElseThrow(
+                                    () ->
+                                            new ResponseStatusException(
+                                                    HttpStatus.NOT_FOUND, "Print job not found."));
+            return new PrintAgentJobStatusResponse(
+                    job.getId(), request.branchId(), job.getStation(), job.getStatus());
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    PrintAgentService.class,
+                    "getJobStatus(Long,PrintAgentClaimRequest)");
+        }
+    }
 
     /*
      * =========================================================
