@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import {T} from "@/lib/language";
 
 import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
@@ -1131,6 +1132,11 @@ export default function AdminPrintingPage() {
                             Monitor automatic KOT printing, failures and retries.
                         </p>
 
+                        <Link href="/admin/printing/setup" className="mt-3 inline-block font-semibold text-[#9b6411] underline">
+                            Set up a USB or Bluetooth printer
+                        </Link>
+                        {selectedBranchId !== null && <p className="mt-1 text-sm text-[#756763]">Selected branch ID for setup: {selectedBranchId}</p>}
+
                     </div>
 
 
@@ -1631,9 +1637,9 @@ export default function AdminPrintingPage() {
                                     >
                                         {
                                             health?.printer.host
-                                            &&
-                                            health.printer.port
-                                                ? `${health.printer.host}:${health.printer.port}`
+                                                ? health.printer.protocol === "ESC_POS_TCP"
+                                                    ? `${health.printer.host}:${health.printer.port}`
+                                                    : health.printer.host
                                                 : "—"
                                         }
                                     </dd>

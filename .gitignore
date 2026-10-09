@@ -53,3 +53,10 @@ backend/build/
 
 *.tmp
 *.temp
+
+# Local physical printer profiles and durable claim journal
+print-agent/config.local*.json
+print-agent/*.sqlite3*
+print-agent/*.lock
+print-agent/.venv/
+print-agent/__pycache__/
