@@ -1,5 +1,20 @@
 # Run once as the shop's Windows account. No secret is sent to the website or command line.
+param([switch]$VerifyPaths)
 $ErrorActionPreference = 'Stop'
+function Get-AgentPaths([string]$BranchStation) {
+    $folder = Join-Path (Join-Path $env:LOCALAPPDATA 'GokulPrint') $BranchStation
+    $pythonRoot = Join-Path (Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Programs') 'Python') 'Python313') 'python.exe'
+    $scripts = Join-Path (Join-Path $folder '.venv') 'Scripts'
+    return @{ Folder = $folder; Python = $pythonRoot; Runtime = (Join-Path $scripts 'python.exe'); Background = (Join-Path $scripts 'pythonw.exe') }
+}
+if ($VerifyPaths) {
+    $paths = Get-AgentPaths '1-KITCHEN'
+    $expectedFolder = [IO.Path]::Combine($env:LOCALAPPDATA, 'GokulPrint', '1-KITCHEN')
+    $expectedPython = [IO.Path]::Combine([IO.Path]::Combine($env:LOCALAPPDATA, 'Programs', 'Python', 'Python313'), 'python.exe')
+    if ($paths.Folder -ne $expectedFolder -or $paths.Python -ne $expectedPython -or $paths.Runtime -ne [IO.Path]::Combine($expectedFolder, '.venv', 'Scripts', 'python.exe') -or $paths.Background -ne [IO.Path]::Combine($expectedFolder, '.venv', 'Scripts', 'pythonw.exe')) { throw 'Installer path verification failed.' }
+    Write-Host 'Installer runtime and startup paths verified.'
+    exit 0
+}
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Security
 try {
@@ -8,10 +23,12 @@ try {
     $picker.Filter = 'Printer profile (config.local.json)|config.local.json'
     if ($picker.ShowDialog() -ne 'OK') { exit 0 }
     $profile = Get-Content -LiteralPath $picker.FileName -Raw | ConvertFrom-Json
-    if ($profile.branch_id -lt 1 -or $profile.station -notin @('KITCHEN','SWEETS','BEVERAGE','FAST_FOOD','BILLING')) { throw 'Invalid printer profile.' }
-    $folder = Join-Path $env:LOCALAPPDATA "GokulPrint$($profile.branch_id)-$($profile.station)"
+    [long]$branchNumber = 0
+    if (![long]::TryParse([string]$profile.branch_id, [ref]$branchNumber) -or $branchNumber -lt 1 -or $profile.station -notin @('KITCHEN','SWEETS','BEVERAGE','FAST_FOOD','BILLING')) { throw 'Invalid printer profile.' }
+    $paths = Get-AgentPaths "$branchNumber-$($profile.station)"
+    $folder = $paths.Folder
     if (Test-Path (Join-Path $folder 'config.local.json')) { throw 'This station is already installed. Manage it in Admin setup. Contact your administrator for an agent software upgrade.' }
-    $python = Join-Path $env:LOCALAPPDATA 'ProgramsPythonPython313python.exe'
+    $python = $paths.Python
     if (!(Test-Path $python)) {
         Write-Host 'Installing Python 3.13 using Windows Package Manager...'
         if (!(Get-Command winget -ErrorAction SilentlyContinue)) { throw 'Install Microsoft App Installer (WinGet) first, then run this installer again.' }
@@ -22,7 +39,7 @@ try {
     foreach ($file in @('agent.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
     & $python -m venv (Join-Path $folder '.venv')
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the agent environment.' }
-    $runtime = Join-Path $folder '.venvScriptspython.exe'
+    $runtime = $paths.Runtime
     & $runtime -m pip install -r (Join-Path $folder 'requirements.txt')
     if ($LASTEXITCODE -ne 0) { throw 'Agent dependency installation failed.' }
     & $runtime (Join-Path $folder 'agent.py') --config $picker.FileName validate
@@ -34,8 +51,8 @@ try {
     [IO.File]::WriteAllBytes((Join-Path $folder 'key.dpapi'), $encrypted)
     $plainKey = $null
     $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $taskName = "GokulPrint-$($profile.branch_id)-$($profile.station)"
-    $action = New-ScheduledTaskAction -Execute (Join-Path $folder '.venvScriptspythonw.exe') -Argument ('"' + (Join-Path $folder 'background.py') + '"') -WorkingDirectory $folder
+    $taskName = "GokulPrint-$branchNumber-$($profile.station)"
+    $action = New-ScheduledTaskAction -Execute $paths.Background -Argument ('"' + (Join-Path $folder 'background.py') + '"') -WorkingDirectory $folder
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
     $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
     $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries

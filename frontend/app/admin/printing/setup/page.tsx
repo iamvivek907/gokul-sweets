@@ -27,7 +27,7 @@ export default function PrinterSetupPage() {
     const [station, setStation] = useState("KITCHEN");
     const [state, setState] = useState<PrintStation | null>(null);
     const [connection, setConnection] = useState("ESC_POS_USB");
-    const [backend, setBackend] = useState(ADMIN_API_BASE_URL);
+    const backend = ADMIN_API_BASE_URL;
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
     const [checkedPaper, setCheckedPaper] = useState(false);
@@ -153,7 +153,7 @@ export default function PrinterSetupPage() {
             </ol>
             <p>Windows starts the agent in the background after the installing account signs in. No daily PowerShell commands are needed. Closing this webpage does not stop printing. Hardware pairing, paper changes and fixing a disconnected computer still happen at the shop.</p>
             <a href="/downloads/gokul-print-agent.zip" download className="inline-block rounded bg-stone-800 px-4 py-3 font-semibold text-white">Download Windows installer</a>
-            <label className="block">Backend HTTPS address<input className={field} type="url" value={backend} onChange={event => setBackend(event.target.value)} /></label>
+            <label className="block">Backend HTTPS address (this environment)<input className={field} type="url" value={backend} readOnly /></label>
             <button className={button} disabled={!state?.profile || busy} onClick={() => {
                 try {if (state?.profile) exportProfile(state.profile, backend);}
                 catch (error) {setMessage(error instanceof Error ? error.message : "Profile download failed.");}
