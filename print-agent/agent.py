@@ -20,6 +20,10 @@ STATIONS = ("KITCHEN", "SWEETS", "BEVERAGE", "FAST_FOOD", "BILLING")
 
 def load_config(path):
     cfg = json.loads(Path(path).read_text(encoding="utf-8"))
+    return validate_config(cfg)
+
+
+def validate_config(cfg):
     url = parse.urlsplit(cfg["api_url"])
     if (url.scheme != "https" or not url.hostname or url.username or url.password
             or url.query or url.fragment or url.path not in ("", "/")):
@@ -104,7 +108,12 @@ def ticket(cfg, kot=None):
             if not label:
                 label = (str(item.get("weightGrams")) + " g" if item.get("saleMode") == "WEIGHT"
                          else str(item["quantity"]) + " pcs")
-            lines.append(clean(label) + "  " + clean(item["productName"]))
+            name = item["productName"]
+            # Backend includes this suffix for older agents. Quantity is already separate.
+            suffix = " · " + str(label)
+            if item.get("saleMode") == "WEIGHT" and name.endswith(suffix):
+                name = name[:-len(suffix)]
+            lines.append(clean(label) + "  " + clean(name))
     # ASCII deliberately fails closed: do not silently lose non-English product names.
     text = "\n".join(part for line in lines for part in
                      (textwrap.wrap(line, width=width) or [""])) + "\n\n\n\n"
@@ -303,6 +312,125 @@ def consume(cfg, path, resolve=None):
             time.sleep(2)
 
 
+def devices_snapshot():
+    result = {"usb": [], "bluetooth": []}
+    if sys.platform == "win32":
+        import win32print
+        result["usb"] = [str(row[2])[:255] for row in win32print.EnumPrinters(
+            win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)][:30]
+    from serial.tools import list_ports
+    result["bluetooth"] = [str(row.device)[:255] for row in list_ports.comports()][:30]
+    return result
+
+
+def managed_profile(cfg, profile):
+    # Only connection fields may change remotely. Backend origin and installed identity stay local.
+    if (profile.get("branchId") != cfg["branch_id"] or profile.get("station") != cfg["station"]
+            or profile.get("agentId") != cfg["agent_id"] or profile.get("printerCode") != cfg["printer_code"]):
+        raise ValueError("Installed identity differs from Admin profile")
+    updated = dict(cfg)
+    for local, remote in (("protocol", "protocol"), ("target", "target"), ("port", "port"),
+                          ("baud_rate", "baudRate"), ("paper_width_mm", "paperWidthMm"), ("auto_cut", "autoCut")):
+        updated[local] = profile[remote]
+    return validate_config(updated)
+
+
+def managed_command(api, db, cfg, command):
+    command_id = command["id"]
+    receipt = db.execute("SELECT result FROM commands WHERE id=?", (command_id,)).fetchone()
+    if receipt:
+        return json.loads(receipt[0])
+    if time.time() * 1000 > command.get("expiresAt", float("inf")):
+        result = {"status": "EXPIRED", "message": "Printer action expired while disconnected. Check the station and request it again."}
+        with db:
+            db.execute("INSERT INTO commands VALUES (?,?)", (command_id, json.dumps(result)))
+        return result
+    row = db.execute("SELECT payload FROM pending").fetchone()
+    pending = json.loads(row[0]) if row else None
+    action = command["action"]
+    if action == "TEST" and pending:
+        raise ValueError("Resolve pending KOT before a test")
+    if action in ("PRINTED", "RETRY"):
+        if not pending or pending["job"]["printJobId"] != command.get("jobId"):
+            raise ValueError("Recovery ticket changed; inspect paper and refresh")
+        if any(cfg[key] != value for key, value in pending["identity"].items()):
+            raise ValueError("Restore original profile before recovery")
+    if action not in ("TEST", "PRINTED", "RETRY"):
+        raise ValueError("Unknown printer command")
+    if action == "TEST":
+        # Record before physical output. A restart must never repeat an uncertain test.
+        result = {"status": "NEEDS_ATTENTION", "message": "Test output uncertain. Inspect paper before requesting another test."}
+        with db:
+            db.execute("INSERT INTO commands VALUES (?,?)", (command_id, json.dumps(result)))
+        deliver(cfg, ticket(cfg))
+    else:
+        acknowledge(api, pending["job"], "printed" if action == "PRINTED" else "retry")
+    result = {"status": "DONE", "message": "Test sent: check paper." if action == "TEST" else "Pending ticket resolved. Start printing when ready."}
+    with db:
+        if action != "TEST":
+            db.execute("DELETE FROM pending")
+        db.execute("INSERT OR REPLACE INTO commands VALUES (?,?)", (command_id, json.dumps(result)))
+    return result
+
+
+def managed(cfg, path):
+    api = Api(cfg)
+    with exclusive_profile(path), contextlib.closing(sqlite3.connect(str(path) + ".sqlite3")) as db:
+        db.execute("PRAGMA synchronous=FULL")
+        db.execute("CREATE TABLE IF NOT EXISTS pending (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS commands (id TEXT PRIMARY KEY, result TEXT NOT NULL)")
+        completed_id, completed_result = None, None
+        runtime_error = None
+        hardware = {"usb": [], "bluetooth": []}
+        next_devices = next_heartbeat = 0
+        while True:
+            try:
+                row = db.execute("SELECT payload FROM pending").fetchone()
+                pending = json.loads(row[0]) if row else None
+                if time.monotonic() >= next_devices:
+                    try:
+                        hardware = devices_snapshot()
+                    except Exception:
+                        runtime_error = "Device discovery failed; check Windows drivers and pairing."
+                    next_devices = time.monotonic() + 60
+                runtime = {"status": "NEEDS_ATTENTION" if pending else "ERROR" if runtime_error else "READY",
+                           "message": runtime_error, "devices": hardware,
+                           "pendingJobId": pending["job"]["printJobId"] if pending else None,
+                           "pendingState": pending["state"] if pending else None}
+                state = api.post("control", dict(api.identity(), runtime=runtime,
+                                 completedCommandId=completed_id, commandResult=completed_result))
+                completed_id, completed_result = None, None
+                if runtime_error and runtime_error.startswith("Backend connection"):
+                    runtime_error = None
+                if time.monotonic() >= next_heartbeat:
+                    api.post("heartbeat", api.identity())
+                    next_heartbeat = time.monotonic() + 20
+                cfg = managed_profile(cfg, state["profile"])
+                api.cfg = cfg
+                command = state.get("command")
+                if command:
+                    if state.get("enabled"):
+                        raise ValueError("Pause printing before a printer action")
+                    completed_id = command["id"]
+                    try:
+                        completed_result = managed_command(api, db, cfg, command)
+                        runtime_error = None
+                    except Exception:
+                        completed_result = {"status": "NEEDS_ATTENTION", "message": "Action failed. Inspect paper, connection and pending ticket before retrying."}
+                        runtime_error = completed_result["message"]
+                elif state.get("enabled") and not pending:
+                    job = api.post("jobs/claim", api.identity())
+                    if job:
+                        process_job(api, db, cfg, job)
+                        runtime_error = None
+            except (error.URLError, TimeoutError):
+                # Durable pending/command receipts prevent resend after any connection failure.
+                runtime_error = "Backend connection interrupted; reconnecting. Pending tickets are held."
+            except Exception:
+                runtime_error = "Printing needs attention. Check Admin setup, credentials and hardware."
+            time.sleep(2)
+
+
 def devices():
     if sys.platform == "win32":
         import win32print
@@ -333,7 +461,7 @@ COMMIT;"""
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config.local.json")
-    parser.add_argument("command", choices=("devices", "validate", "preview", "test", "registration-sql", "run", "resolve"))
+    parser.add_argument("command", choices=("devices", "validate", "preview", "test", "registration-sql", "run", "managed", "resolve"))
     parser.add_argument("outcome", nargs="?", choices=("printed", "retry"))
     args = parser.parse_args()
     if args.command == "devices":
@@ -355,6 +483,8 @@ def main():
                         raise ValueError("Resolve pending KOT before a setup test")
             deliver(cfg, ticket(cfg))
             print("Test sent. Confirm the physical ticket yourself.")
+    elif args.command == "managed":
+        managed(cfg, path)
     else:
         if args.command == "resolve" and not args.outcome:
             parser.error("resolve requires printed or retry")

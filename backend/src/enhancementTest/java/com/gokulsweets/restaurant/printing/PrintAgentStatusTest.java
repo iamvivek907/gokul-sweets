@@ -30,7 +30,10 @@ class PrintAgentStatusTest {
                     jobs,
                     mock(PrinterDeviceRepository.class),
                     mock(KotRepository.class),
-                    mock(DeliveryOrderWindowLookup.class));
+                    mock(DeliveryOrderWindowLookup.class),
+                    mock(
+                            com.gokulsweets.restaurant.printing.service.PrintStationControlService
+                                    .class));
 
     private PrintJob job(PrintJobStatus status) {
         Branch branch = new Branch();

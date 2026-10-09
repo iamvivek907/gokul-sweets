@@ -285,5 +285,112 @@ class AgentTest(unittest.TestCase):
         self.assertIn("'Shop''s printer'", agent.sql(self.cfg))
 
 
+    def test_weighted_backend_compatibility_suffix_is_not_printed_twice(self):
+        self.kot["items"][0].update(productName="Sweet · 500 g", saleMode="WEIGHT")
+        output = agent.ticket(self.cfg, self.kot)
+        self.assertEqual(output.count(b"500 g"), 1)
+        self.assertIn(b"500 g  Sweet", output)
+
+    def managed_db(self):
+        self.db.execute("CREATE TABLE commands (id TEXT PRIMARY KEY, result TEXT NOT NULL)")
+
+    def test_remote_test_receipt_prevents_duplicate_after_restart_or_lost_reply(self):
+        self.managed_db()
+        command = {"id": "test-1", "action": "TEST"}
+        with patch.object(agent, "deliver") as send:
+            result = agent.managed_command(self.api, self.db, self.cfg, command)
+            again = agent.managed_command(self.api, self.db, self.cfg, command)
+        self.assertEqual(result, again)
+        send.assert_called_once()
+        self.api.post.assert_not_called()
+
+    def test_expired_command_does_not_print_when_station_reconnects(self):
+        self.managed_db()
+        with patch.object(agent, "deliver") as send:
+            result = agent.managed_command(self.api, self.db, self.cfg, {"id": "expired", "action": "TEST", "expiresAt": 0})
+        self.assertEqual(result["status"], "EXPIRED")
+        send.assert_not_called()
+
+    def test_failed_remote_test_is_never_automatically_resent(self):
+        self.managed_db()
+        command = {"id": "test-2", "action": "TEST"}
+        with patch.object(agent, "deliver", side_effect=TimeoutError()) as send:
+            with self.assertRaises(TimeoutError):
+                agent.managed_command(self.api, self.db, self.cfg, command)
+            result = agent.managed_command(self.api, self.db, self.cfg, command)
+        self.assertEqual(result["status"], "NEEDS_ATTENTION")
+        send.assert_called_once()
+
+    def test_remote_recovery_requires_exact_pending_job_and_never_writes_paper(self):
+        self.managed_db()
+        agent.save_pending(self.db, self.cfg, self.job, "uncertain")
+        with patch.object(agent, "deliver") as send:
+            for command in ({"id": "wrong", "action": "PRINTED", "jobId": 99}, {"id": "test", "action": "TEST"}):
+                with self.assertRaises(ValueError):
+                    agent.managed_command(self.api, self.db, self.cfg, command)
+            result = agent.managed_command(self.api, self.db, self.cfg,
+                         {"id": "correct", "action": "PRINTED", "jobId": 12})
+            self.assertEqual(result["status"], "DONE")
+            self.api.post.assert_called_once_with("jobs/12/printed", {"agentId": self.cfg["agent_id"], "claimToken": "private-claim"})
+            send.assert_not_called()
+            self.assertIsNone(self.db.execute("SELECT * FROM pending").fetchone())
+
+    def test_failed_recovery_keeps_pending_ticket(self):
+        self.managed_db()
+        agent.save_pending(self.db, self.cfg, self.job, "uncertain")
+        self.api.post.side_effect = TimeoutError()
+        with self.assertRaises(TimeoutError):
+            agent.managed_command(self.api, self.db, self.cfg, {"id": "retry", "action": "RETRY", "jobId": 12})
+        self.assertIsNotNone(self.db.execute("SELECT * FROM pending").fetchone())
+
+    def remote_profile(self):
+        return {"branchId": self.cfg["branch_id"], "station": self.cfg["station"],
+                "agentId": self.cfg["agent_id"], "printerCode": self.cfg["printer_code"],
+                "protocol": self.cfg["protocol"], "target": self.cfg["target"], "port": 9100,
+                "baudRate": 9600, "paperWidthMm": 80, "autoCut": False}
+
+    def test_remote_profile_updates_connection_but_cannot_change_identity_or_origin(self):
+        profile = self.remote_profile() | {"target": "New queue", "api_url": "https://attacker.example"}
+        updated = agent.managed_profile(self.cfg, profile)
+        self.assertEqual(updated["target"], "New queue")
+        self.assertEqual(updated["api_url"], self.cfg["api_url"])
+        with self.assertRaises(ValueError):
+            agent.managed_profile(self.cfg, profile | {"branchId": 99})
+
+    def test_background_paused_agent_reports_but_does_not_claim(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        self.api.post.side_effect = [{"profile": self.remote_profile(), "enabled": False, "command": {}}, {}]
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent.time, "sleep", side_effect=KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    agent.managed(self.cfg, Path(directory) / "profile.json")
+        self.assertEqual([call.args[0] for call in self.api.post.call_args_list], ["control", "heartbeat"])
+
+    def test_background_with_pending_ticket_stays_online_without_claiming(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        self.api.post.side_effect = [{"profile": self.remote_profile(), "enabled": True, "command": {}}, {}]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            with contextlib.closing(sqlite3.connect(str(path) + ".sqlite3")) as db:
+                db.execute("CREATE TABLE pending (id INTEGER PRIMARY KEY, payload TEXT)")
+                agent.save_pending(db, self.cfg, self.job, "uncertain")
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent.time, "sleep", side_effect=KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    agent.managed(self.cfg, path)
+        report = self.api.post.call_args_list[0].args[1]["runtime"]
+        self.assertEqual(report["status"], "NEEDS_ATTENTION")
+        self.assertEqual(report["pendingJobId"], 12)
+        self.assertNotIn("claimToken", json.dumps(report))
+        self.assertEqual([call.args[0] for call in self.api.post.call_args_list], ["control", "heartbeat"])
+
+    @unittest.skipUnless(agent.sys.platform == "win32", "Windows DPAPI")
+    def test_installer_secret_can_be_decrypted_only_through_windows_dpapi(self):
+        import win32crypt
+        secret = b"test-only-secret"
+        encrypted = win32crypt.CryptProtectData(secret, "Gokul print agent", None, None, None, 0)
+        self.assertNotIn(secret, encrypted)
+        self.assertEqual(win32crypt.CryptUnprotectData(encrypted, None, None, None, 0)[1], secret)
+
+
 if __name__ == "__main__":
     unittest.main()

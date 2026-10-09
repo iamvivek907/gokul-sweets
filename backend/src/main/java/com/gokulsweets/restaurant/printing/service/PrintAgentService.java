@@ -61,6 +61,8 @@ public class PrintAgentService {
 
     private final DeliveryOrderWindowLookup deliveryWindows;
 
+    private final PrintStationControlService stationControl;
+
     /**
      * Reads job status for acknowledgement recovery without changing claims or retry state.
      *
@@ -155,6 +157,9 @@ public class PrintAgentService {
                 MethodTiming.start(PrintAgentService.class, "claimNext(PrintAgentClaimRequest)");
         try {
             String agentId = normalizeAgentId(request.agentId());
+            if (!stationControl.allowsClaim(request.branchId(), request.station(), agentId)) {
+                return Optional.empty();
+            }
             /*
              * A physical printer must currently be configured before
              * the agent can claim work.
