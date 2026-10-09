@@ -5,6 +5,7 @@ export type PrinterProfile = {
     protocol: string; target: string; port: number; baudRate: number; paperWidthMm: number; autoCut: boolean;
 };
 export type PrintStation = {
+    actionReceipt?: {requestId: string; outcome: "ACCEPTED" | "CANCELLED"};
     configured: boolean; profile?: PrinterProfile; enabled?: boolean; online?: boolean;
     runtime?: {status?: string; message?: string; pendingJobId?: number; pendingState?: string;
         devices?: {usb?: string[]; bluetooth?: string[]}};
@@ -14,8 +15,9 @@ export class PrintStationRequestError extends Error {
     constructor(message: string, readonly status: number) {super(message);}
 }
 export async function printStationRequest(authorization: string, branchId: number, station: string,
-    operation = "", body?: object, signal?: AbortSignal): Promise<PrintStation> {
+    operation = "", body?: object, signal?: AbortSignal, requestId?: string): Promise<PrintStation> {
     const params = new URLSearchParams({branchId: String(branchId), station});
+    if (requestId) params.set("requestId", requestId);
     const response = await adminFetch(`/api/admin/printing/station${operation}?${params}`, authorization,
         {method: body ? "POST" : "GET", headers: body ? {"Content-Type": "application/json"} : undefined,
             body: body ? JSON.stringify(body) : undefined, signal});

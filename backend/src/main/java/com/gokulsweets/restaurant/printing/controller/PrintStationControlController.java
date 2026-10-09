@@ -14,6 +14,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Authenticated Admin controls and private-key agent mailbox, without browser-to-localhost access.
@@ -22,6 +23,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class PrintStationControlController {
     private final PrintStationControlService service;
+    private final PrintStationActionService actions;
     private final PrintAgentAuthenticationService authentication;
 
     /** Requested future printing mode. */
@@ -49,15 +51,18 @@ public class PrintStationControlController {
     /** Registers a printer without requiring SQL. */
     @PostMapping("/api/admin/printing/station/profile")
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
-    public Map<String, Object> save(@Valid @RequestBody PrinterSetupRequest profile) {
+    public Map<String, Object> save(
+            @Valid @RequestBody PrinterSetupRequest profile,
+            @RequestParam(required = false) UUID requestId) {
         final long started =
                 MethodTiming.start(
-                        PrintStationControlController.class, "save(PrinterSetupRequest)");
+                        PrintStationControlController.class, "save(PrinterSetupRequest,UUID)");
         try {
-            return service.save(profile);
+            return actions.perform(
+                    profile.branchId(), profile.station(), requestId, () -> service.save(profile));
         } finally {
             MethodTiming.finish(
-                    started, PrintStationControlController.class, "save(PrinterSetupRequest)");
+                    started, PrintStationControlController.class, "save(PrinterSetupRequest,UUID)");
         }
     }
 
@@ -67,15 +72,22 @@ public class PrintStationControlController {
     public Map<String, Object> mode(
             @RequestParam Long branchId,
             @RequestParam PrinterStation station,
-            @Valid @RequestBody Mode mode) {
+            @Valid @RequestBody Mode mode,
+            @RequestParam(required = false) UUID requestId) {
         final long started =
                 MethodTiming.start(
-                        PrintStationControlController.class, "mode(Long,PrinterStation,Mode)");
+                        PrintStationControlController.class, "mode(Long,PrinterStation,Mode,UUID)");
         try {
-            return service.setEnabled(branchId, station, mode.enabled());
+            return actions.perform(
+                    branchId,
+                    station,
+                    requestId,
+                    () -> service.setEnabled(branchId, station, mode.enabled()));
         } finally {
             MethodTiming.finish(
-                    started, PrintStationControlController.class, "mode(Long,PrinterStation,Mode)");
+                    started,
+                    PrintStationControlController.class,
+                    "mode(Long,PrinterStation,Mode,UUID)");
         }
     }
 
@@ -85,18 +97,43 @@ public class PrintStationControlController {
     public Map<String, Object> command(
             @RequestParam Long branchId,
             @RequestParam PrinterStation station,
-            @Valid @RequestBody Command command) {
+            @Valid @RequestBody Command command,
+            @RequestParam(required = false) UUID requestId) {
         final long started =
                 MethodTiming.start(
                         PrintStationControlController.class,
-                        "command(Long,PrinterStation,Command)");
+                        "command(Long,PrinterStation,Command,UUID)");
         try {
-            return service.command(branchId, station, command.action(), command.jobId());
+            return actions.perform(
+                    branchId,
+                    station,
+                    requestId,
+                    () -> service.command(branchId, station, command.action(), command.jobId()));
         } finally {
             MethodTiming.finish(
                     started,
                     PrintStationControlController.class,
-                    "command(Long,PrinterStation,Command)");
+                    "command(Long,PrinterStation,Command,UUID)");
+        }
+    }
+
+    /** Resolves one uncertain action without relying on an unrelated status snapshot. */
+    @PostMapping("/api/admin/printing/station/reconcile")
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    public Map<String, Object> reconcile(
+            @RequestParam Long branchId,
+            @RequestParam PrinterStation station,
+            @RequestParam UUID requestId) {
+        final long started =
+                MethodTiming.start(
+                        PrintStationControlController.class, "reconcile(Long,PrinterStation,UUID)");
+        try {
+            return actions.reconcile(branchId, station, requestId);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    PrintStationControlController.class,
+                    "reconcile(Long,PrinterStation,UUID)");
         }
     }
 

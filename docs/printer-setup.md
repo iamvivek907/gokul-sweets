@@ -65,3 +65,14 @@ Before production, test the real USB/COM driver and model, then validate: 80 mm 
 ## Manual technician fallback
 
 The original command-line tools remain available for diagnosis: `devices`, `validate`, `preview`, `test`, `registration-sql`, `run`, `resolve printed`, and `resolve retry`. `managed` runs the Admin-controlled loop. Put `--config <path>` before the command when overriding the default profile. Never run foreground commands concurrently with the installed task. Normal restaurant operation uses the Admin controls above.
+
+### Lost Admin action replies
+
+Each new Admin action carries a request ID, retained in this browser tab until resolved.
+After a timeout or lost reply, controls remain blocked for that station while Admin
+reconciles that exact request. Reconciliation waits for an in-flight database transaction:
+an accepted action returns its durable receipt even after the agent finishes it.
+If the request has not been accepted, reconciliation saves a cancellation receipt;
+a delayed original request then cannot execute. A normal status refresh cannot clear
+this guard. Reloading the page restores pending request IDs. No uncertain action is
+automatically resent. Inspect the paper and spooler before asking for another print.

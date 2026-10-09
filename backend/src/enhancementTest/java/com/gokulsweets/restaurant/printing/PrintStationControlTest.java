@@ -195,7 +195,9 @@ class PrintStationControlTest {
         var auth = mock(PrintAgentAuthenticationService.class);
         var controls = mock(PrintStationControlService.class);
         doThrow(new AccessDeniedException("Invalid key")).when(auth).authenticate("bad");
-        var controller = new PrintStationControlController(controls, auth);
+        var controller =
+                new PrintStationControlController(
+                        controls, mock(PrintStationActionService.class), auth);
         assertThatThrownBy(
                         () ->
                                 controller.report(
