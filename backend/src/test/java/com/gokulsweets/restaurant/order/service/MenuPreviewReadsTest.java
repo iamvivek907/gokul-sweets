@@ -28,14 +28,14 @@ class MenuPreviewReadsTest {
 
     @Test
     void overlappingIdenticalReadsShareWorkButCompletedResultsAreNeverCached() throws Exception {
-        var service = mock(CartAvailabilityService.class);
+        var service = mock(MenuPreviewQuery.class);
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var firstResult = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
         var secondResult =
                 new CartAvailabilityService.Availability(
                         "PICKUP", date, date.plusDays(1), List.of());
-        when(service.check(1L, date, 1, items, true))
+        when(service.check(1L, date, items))
                 .thenAnswer(
                         call -> {
                             entered.countDown();
@@ -51,7 +51,7 @@ class MenuPreviewReadsTest {
         try {
             follower.start();
             awaitWaiting(follower);
-            verify(service, times(1)).check(1L, date, 1, items, true);
+            verify(service, times(1)).check(1L, date, items);
         } finally {
             release.countDown();
         }
@@ -60,21 +60,21 @@ class MenuPreviewReadsTest {
         assertThat(follower.isAlive()).isFalse();
         assertThat(followerResult.get()).isSameAs(firstResult);
         assertThat(reads.check(1L, date, items)).isSameAs(secondResult);
-        verify(service, times(2)).check(1L, date, 1, items, true);
+        verify(service, times(2)).check(1L, date, items);
     }
 
     @Test
     void branchDateQuantityWeightAndItemOrderAreNeverMixed() throws Exception {
-        var service = mock(CartAvailabilityService.class);
+        var service = mock(MenuPreviewQuery.class);
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
-        when(service.check(anyLong(), any(), eq(1), anyList(), eq(true)))
+        when(service.check(anyLong(), any(), anyList()))
                 .thenAnswer(
                         call -> {
                             if (call.getArgument(0).equals(1L)
                                     && call.getArgument(1).equals(date)
-                                    && call.getArgument(3).equals(items)) {
+                                    && call.getArgument(2).equals(items)) {
                                 entered.countDown();
                                 assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
                             }
@@ -92,7 +92,7 @@ class MenuPreviewReadsTest {
                     1L, date, List.of(items.getFirst(), new CreateOrderItemRequest(2L, 1, null)));
             reads.check(
                     1L, date, List.of(new CreateOrderItemRequest(2L, 1, null), items.getFirst()));
-            verify(service, times(7)).check(anyLong(), any(), eq(1), anyList(), eq(true));
+            verify(service, times(7)).check(anyLong(), any(), anyList());
         } finally {
             release.countDown();
         }
@@ -101,12 +101,12 @@ class MenuPreviewReadsTest {
 
     @Test
     void oldPendingReadsAreNotJoined() throws Exception {
-        var service = mock(CartAvailabilityService.class);
+        var service = mock(MenuPreviewQuery.class);
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var ticks = new AtomicLong();
         var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
-        when(service.check(1L, date, 1, items, true))
+        when(service.check(1L, date, items))
                 .thenAnswer(
                         call -> {
                             entered.countDown();
@@ -120,7 +120,7 @@ class MenuPreviewReadsTest {
         try {
             ticks.set(TimeUnit.MILLISECONDS.toNanos(AppConstant.MENU_PREVIEW_JOIN_MILLIS + 1));
             assertThat(reads.check(1L, date, items)).isSameAs(result);
-            verify(service, times(2)).check(1L, date, 1, items, true);
+            verify(service, times(2)).check(1L, date, items);
         } finally {
             release.countDown();
         }
@@ -129,13 +129,13 @@ class MenuPreviewReadsTest {
 
     @Test
     void crossingAClockBoundaryReadsAgainEvenWhileTheEarlierReadIsPending() throws Exception {
-        var service = mock(CartAvailabilityService.class);
+        var service = mock(MenuPreviewQuery.class);
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var movingClock = mock(Clock.class);
         when(movingClock.instant()).thenReturn(clock.instant());
         var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
-        when(service.check(1L, date, 1, items, true))
+        when(service.check(1L, date, items))
                 .thenAnswer(
                         call -> {
                             entered.countDown();
@@ -149,7 +149,7 @@ class MenuPreviewReadsTest {
         try {
             when(movingClock.instant()).thenReturn(clock.instant().plusSeconds(1));
             assertThat(reads.check(1L, date, items)).isSameAs(result);
-            verify(service, times(2)).check(1L, date, 1, items, true);
+            verify(service, times(2)).check(1L, date, items);
         } finally {
             release.countDown();
         }
@@ -158,12 +158,12 @@ class MenuPreviewReadsTest {
 
     @Test
     void failedReadsPreserveOriginalExceptionAndDoNotPoisonLaterRequests() throws Exception {
-        var service = mock(CartAvailabilityService.class);
+        var service = mock(MenuPreviewQuery.class);
         var entered = new CountDownLatch(1);
         var release = new CountDownLatch(1);
         var failure = new IllegalArgumentException("Branch closed");
         var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
-        when(service.check(1L, date, 1, items, true))
+        when(service.check(1L, date, items))
                 .thenAnswer(
                         call -> {
                             entered.countDown();
@@ -200,12 +200,12 @@ class MenuPreviewReadsTest {
     @Test
     void saturatedRegistryFallsBackToFreshReadsWithoutGrowingOrBlockingOtherKeys()
             throws Exception {
-        var service = mock(CartAvailabilityService.class);
+        var service = mock(MenuPreviewQuery.class);
         var firstOwners = new CountDownLatch(AppConstant.MENU_PREVIEW_MAX_PENDING);
         var overflowReads = new CountDownLatch(2);
         var release = new CountDownLatch(1);
         var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
-        when(service.check(anyLong(), any(), eq(1), anyList(), eq(true)))
+        when(service.check(anyLong(), any(), anyList()))
                 .thenAnswer(
                         call -> {
                             if ((Long) call.getArgument(0) <= AppConstant.MENU_PREVIEW_MAX_PENDING)
@@ -229,8 +229,8 @@ class MenuPreviewReadsTest {
             workers.add(follower);
             follower.start();
             awaitWaiting(follower);
-            verify(service, times(1)).check(1L, date, 1, items, true);
-            verify(service, times(2)).check(100L, date, 1, items, true);
+            verify(service, times(1)).check(1L, date, items);
+            verify(service, times(2)).check(100L, date, items);
         } finally {
             release.countDown();
             for (var worker : workers) worker.join(5000);
@@ -238,13 +238,132 @@ class MenuPreviewReadsTest {
         assertThat(workers).allMatch(worker -> !worker.isAlive());
     }
 
+    @Test
+    void timeoutDoesNotCancelOwnerOrOtherFollowersAndLaterRequestsAreFresh() throws Exception {
+        var service = mock(MenuPreviewQuery.class);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
+        when(service.check(1L, date, items))
+                .thenAnswer(
+                        call -> {
+                            entered.countDown();
+                            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+                            return result;
+                        })
+                .thenReturn(result);
+        var reads =
+                new MenuPreviewReads(service, clock, () -> 0L, TimeUnit.MILLISECONDS.toNanos(200));
+        var owner = CompletableFuture.supplyAsync(() -> reads.check(1L, date, items));
+        assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+        var survivorResult = new AtomicReference<CartAvailabilityService.Availability>();
+        var survivor = new Thread(() -> survivorResult.set(reads.check(1L, date, items)));
+        try {
+            assertThatThrownBy(() -> reads.check(1L, date, items))
+                    .isInstanceOfSatisfying(
+                            org.springframework.web.server.ResponseStatusException.class,
+                            failure -> assertThat(failure.getStatusCode().value()).isEqualTo(503))
+                    .hasCauseInstanceOf(java.util.concurrent.TimeoutException.class);
+            assertThat(owner.isDone()).isFalse();
+            survivor.start();
+            awaitWaiting(survivor);
+            verify(service, times(1)).check(1L, date, items);
+        } finally {
+            release.countDown();
+            survivor.join(5000);
+        }
+        assertThat(owner.get(5, TimeUnit.SECONDS)).isSameAs(result);
+        assertThat(survivorResult.get()).isSameAs(result);
+        assertThat(reads.check(1L, date, items)).isSameAs(result);
+        verify(service, times(2)).check(1L, date, items);
+    }
+
+    @Test
+    void interruptionReturnsPromptlyPreservesFlagAndDoesNotCancelOwner() throws Exception {
+        var service = mock(MenuPreviewQuery.class);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
+        when(service.check(1L, date, items))
+                .thenAnswer(
+                        call -> {
+                            entered.countDown();
+                            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+                            return result;
+                        });
+        var reads = new MenuPreviewReads(service, clock, () -> 0L);
+        var owner = CompletableFuture.supplyAsync(() -> reads.check(1L, date, items));
+        assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+        var failure = new AtomicReference<Throwable>();
+        var interrupted = new java.util.concurrent.atomic.AtomicBoolean();
+        var follower =
+                new Thread(
+                        () -> {
+                            try {
+                                reads.check(1L, date, items);
+                            } catch (Throwable thrown) {
+                                failure.set(thrown);
+                                interrupted.set(Thread.currentThread().isInterrupted());
+                            }
+                        });
+        try {
+            follower.start();
+            awaitWaiting(follower);
+            follower.interrupt();
+            follower.join(1000);
+            assertThat(follower.isAlive()).isFalse();
+            assertThat(interrupted).isTrue();
+            assertThat(failure.get())
+                    .isInstanceOfSatisfying(
+                            org.springframework.web.server.ResponseStatusException.class,
+                            thrown -> assertThat(thrown.getStatusCode().value()).isEqualTo(503))
+                    .hasCauseInstanceOf(InterruptedException.class);
+            assertThat(owner.isDone()).isFalse();
+            verify(service, times(1)).check(1L, date, items);
+        } finally {
+            release.countDown();
+        }
+        assertThat(owner.get(5, TimeUnit.SECONDS)).isSameAs(result);
+    }
+
+    @Test
+    void joiningDoesNotRestartOwnersWaitBudget() throws Exception {
+        var service = mock(MenuPreviewQuery.class);
+        var entered = new CountDownLatch(1);
+        var release = new CountDownLatch(1);
+        var ticks = new AtomicLong();
+        var result = new CartAvailabilityService.Availability("PICKUP", date, date, List.of());
+        when(service.check(1L, date, items))
+                .thenAnswer(
+                        call -> {
+                            entered.countDown();
+                            assertThat(release.await(5, TimeUnit.SECONDS)).isTrue();
+                            return result;
+                        });
+        var reads =
+                new MenuPreviewReads(
+                        service, clock, ticks::get, TimeUnit.MILLISECONDS.toNanos(100));
+        var owner = CompletableFuture.supplyAsync(() -> reads.check(1L, date, items));
+        assertThat(entered.await(5, TimeUnit.SECONDS)).isTrue();
+        try {
+            ticks.set(TimeUnit.MILLISECONDS.toNanos(100));
+            assertThatThrownBy(() -> reads.check(1L, date, items))
+                    .isInstanceOf(org.springframework.web.server.ResponseStatusException.class)
+                    .hasCauseInstanceOf(java.util.concurrent.TimeoutException.class);
+            verify(service, times(1)).check(1L, date, items);
+        } finally {
+            release.countDown();
+        }
+        assertThat(owner.get(5, TimeUnit.SECONDS)).isSameAs(result);
+    }
+
     private void awaitWaiting(Thread follower) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(3);
-        while (follower.getState() != Thread.State.WAITING
+        while (follower.getState() != Thread.State.TIMED_WAITING
                 && follower.isAlive()
                 && System.nanoTime() < deadline) {
             Thread.sleep(1);
         }
-        assertThat(follower.getState()).isEqualTo(Thread.State.WAITING);
+        assertThat(follower.getState()).isEqualTo(Thread.State.TIMED_WAITING);
     }
 }

@@ -18,6 +18,9 @@ public final class AppConstant {
     /** Maximum age at which another request can join an unfinished preview; never a result TTL. */
     public static final int MENU_PREVIEW_JOIN_MILLIS = 250;
 
+    /** Transaction and shared-wait budget for advisory previews only. */
+    public static final int MENU_PREVIEW_TIMEOUT_SECONDS = 5;
+
     /** Creates a app constant instance. */
     private AppConstant() {}
 
