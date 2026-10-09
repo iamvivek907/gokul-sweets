@@ -2,7 +2,9 @@ package com.gokulsweets.restaurant.order.lifecycle.repository;
 
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
+
 import jakarta.persistence.LockModeType;
+
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,10 +17,20 @@ import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface PickupLifecycleOrderRepository
-        extends JpaRepository<Order, Long> {
+/** Persistence operations for pickup lifecycle order records. */
+public interface PickupLifecycleOrderRepository extends JpaRepository<Order, Long> {
 
-    @Query("""
+    /**
+     * Finds due order numbers.
+     *
+     * @param status the status
+     * @param cutoffDate the cutoff date
+     * @param cutoffTime the cutoff time
+     * @param pageable the pageable
+     * @return the find due order numbers result
+     */
+    @Query(
+            """
             SELECT o.orderNumber
             FROM Order o
             JOIN o.pickupSlot slot
@@ -36,13 +48,16 @@ public interface PickupLifecycleOrderRepository
             @Param("status") OrderStatus status,
             @Param("cutoffDate") LocalDate cutoffDate,
             @Param("cutoffTime") LocalTime cutoffTime,
-            Pageable pageable
-    );
+            Pageable pageable);
 
+    /**
+     * Finds by order number for update.
+     *
+     * @param orderNumber the order number
+     * @return the find by order number for update result
+     */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @EntityGraph(attributePaths = {"branch", "pickupSlot"})
     @Query("SELECT o FROM Order o WHERE o.orderNumber = :orderNumber")
-    Optional<Order> findByOrderNumberForUpdate(
-            @Param("orderNumber") String orderNumber
-    );
+    Optional<Order> findByOrderNumberForUpdate(@Param("orderNumber") String orderNumber);
 }

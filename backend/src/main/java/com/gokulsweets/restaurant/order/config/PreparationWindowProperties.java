@@ -2,13 +2,13 @@ package com.gokulsweets.restaurant.order.config;
 
 import lombok.Getter;
 import lombok.Setter;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+/** Backend preparation window properties contract and implementation. */
 @Component
-@ConfigurationProperties(
-        prefix = "gokul.orders.preparation"
-)
+@ConfigurationProperties(prefix = "gokul.orders.preparation")
 @Getter
 @Setter
 public class PreparationWindowProperties {
@@ -16,17 +16,13 @@ public class PreparationWindowProperties {
     /*
      * Default preparation window for normal pickup orders.
      */
-    private int normalLeadMinutes =
-            60;
-
+    private int normalLeadMinutes = 60;
 
     /*
      * Priority orders are expected to enter preparation
      * closer to pickup time.
      */
-    private int priorityLeadMinutes =
-            30;
-
+    private int priorityLeadMinutes = 30;
 
     /*
      * ADMIN_OVERRIDE describes pickup-capacity handling,
@@ -34,8 +30,7 @@ public class PreparationWindowProperties {
      *
      * Therefore it currently follows the normal window.
      */
-    private int adminOverrideLeadMinutes =
-            60;
+    private int adminOverrideLeadMinutes = 60;
 
     /** Minutes before a selected IST rider window when delivery preparation may begin. */
     private int deliveryLeadMinutes = 60;

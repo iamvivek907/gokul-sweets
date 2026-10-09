@@ -1,12 +1,13 @@
 package com.gokulsweets.restaurant.customer.identity;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
+
 import com.gokulsweets.restaurant.customer.consent.ConsentEnvironment;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.*;
 
 class VerifiedIdentityExchangeTest {
     @Test
@@ -14,9 +15,17 @@ class VerifiedIdentityExchangeTest {
         var verifier = mock(Msg91WidgetProofVerifier.class);
         var issuance = mock(VerifiedIdentityIssuance.class);
         var limiter = mock(IdentityExchangeRateLimiter.class);
-        when(verifier.verifiedPhone("bad-proof")).thenThrow(new IllegalStateException("provider rejected"));
+        when(verifier.verifiedPhone("bad-proof"))
+                .thenThrow(new IllegalStateException("provider rejected"));
         var exchange = new VerifiedIdentityExchange(verifier, issuance, limiter);
-        assertThatThrownBy(() -> exchange.exchange(ConsentEnvironment.DEV, "127.0.0.1", "a".repeat(64), "bad-proof", Instant.now()))
+        assertThatThrownBy(
+                        () ->
+                                exchange.exchange(
+                                        ConsentEnvironment.DEV,
+                                        "127.0.0.1",
+                                        "a".repeat(64),
+                                        "bad-proof",
+                                        Instant.now()))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(issuance);
     }
@@ -27,10 +36,18 @@ class VerifiedIdentityExchangeTest {
         var issuance = mock(VerifiedIdentityIssuance.class);
         var limiter = mock(IdentityExchangeRateLimiter.class);
         var now = Instant.now();
-        doThrow(new IllegalStateException("limited")).when(limiter)
+        doThrow(new IllegalStateException("limited"))
+                .when(limiter)
                 .checkSource(ConsentEnvironment.DEV, "127.0.0.1", now);
         var exchange = new VerifiedIdentityExchange(verifier, issuance, limiter);
-        assertThatThrownBy(() -> exchange.exchange(ConsentEnvironment.DEV, "127.0.0.1", "a".repeat(64), "proof", now))
+        assertThatThrownBy(
+                        () ->
+                                exchange.exchange(
+                                        ConsentEnvironment.DEV,
+                                        "127.0.0.1",
+                                        "a".repeat(64),
+                                        "proof",
+                                        now))
                 .isInstanceOf(IllegalStateException.class);
         verifyNoInteractions(verifier, issuance);
     }

@@ -1,16 +1,17 @@
 package com.gokulsweets.restaurant.payment.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.payment.entity.Payment;
 import com.gokulsweets.restaurant.payment.provider.paytm.dto.PaytmStatusResponse;
+
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PaymentReconciliationPolicyTest {
     private final EnhancementProperties features = new EnhancementProperties();
@@ -39,14 +40,20 @@ class PaymentReconciliationPolicyTest {
         payment.setAmount(new BigDecimal("105.00"));
         features.setPaymentReconciliationV2(true);
         policy.validatePaytmStatus(payment, status("GKS-PAY-41", "105.0"));
-        assertThatThrownBy(() -> policy.validatePaytmStatus(payment, status("wrong-order", "105.00")))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("order ID");
-        assertThatThrownBy(() -> policy.validatePaytmStatus(payment, status("GKS-PAY-41", "106.00")))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("amount");
+        assertThatThrownBy(
+                        () -> policy.validatePaytmStatus(payment, status("wrong-order", "105.00")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("order ID");
+        assertThatThrownBy(
+                        () -> policy.validatePaytmStatus(payment, status("GKS-PAY-41", "106.00")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("amount");
         assertThatThrownBy(() -> policy.validatePaytmStatus(payment, status("GKS-PAY-41", "bad")))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("invalid");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("invalid");
         assertThatThrownBy(() -> policy.validatePaytmStatus(payment, status("GKS-PAY-41", null)))
-                .isInstanceOf(IllegalStateException.class).hasMessageContaining("amount");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("amount");
         features.setPaymentReconciliationV2(false);
         policy.validatePaytmStatus(payment, status("wrong-order", "106.00"));
     }

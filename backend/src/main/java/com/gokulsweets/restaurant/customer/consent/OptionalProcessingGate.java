@@ -1,7 +1,10 @@
 package com.gokulsweets.restaurant.customer.consent;
 
 import com.gokulsweets.restaurant.config.EnhancementProperties;
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
@@ -11,22 +14,55 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class OptionalProcessingGate {
+
     private final ConsentLedger ledger;
+
     private final EnhancementProperties features;
+
     private final Environment settings;
 
-    public boolean allows(ConsentEnvironment environment, UUID verifiedSubjectId, ConsentPurpose purpose) {
-        if (environment == null || verifiedSubjectId == null || purpose == null
-                || !features.isCustomerOtpIdentity() || !features.isCustomerConsentControls()
-                || !settings.getProperty("gokul.environment-isolation.enabled", Boolean.class, false)
-                || !settings.getProperty("gokul.web.environment-cors-enabled", Boolean.class, false)
-                || !settings.getProperty("gokul.identity.provider-abuse-controls-verified", Boolean.class, false)
-                || !environment.name().equals(settings.getProperty("gokul.environment-isolation.environment", ""))) {
-            return false;
+    /**
+     * Returns allows information for optional processing gate.
+     *
+     * @param environment the environment supplied to this method
+     * @param verifiedSubjectId the verified subject id supplied to this method
+     * @param purpose the purpose supplied to this method
+     * @return the {@code boolean} result
+     */
+    public boolean allows(
+            ConsentEnvironment environment, UUID verifiedSubjectId, ConsentPurpose purpose) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OptionalProcessingGate.class,
+                        "allows(ConsentEnvironment,UUID,ConsentPurpose)");
+        try {
+            if (environment == null
+                    || verifiedSubjectId == null
+                    || purpose == null
+                    || !features.isCustomerOtpIdentity()
+                    || !features.isCustomerConsentControls()
+                    || !settings.getProperty(
+                            "gokul.environment-isolation.enabled", Boolean.class, false)
+                    || !settings.getProperty(
+                            "gokul.web.environment-cors-enabled", Boolean.class, false)
+                    || !settings.getProperty(
+                            "gokul.identity.provider-abuse-controls-verified", Boolean.class, false)
+                    || !environment
+                            .name()
+                            .equals(
+                                    settings.getProperty(
+                                            "gokul.environment-isolation.environment", ""))) {
+                return false;
+            }
+            String policy = settings.getProperty("gokul.consent.policy-version", "");
+            if (!policy.matches("[A-Za-z0-9._-]{1,40}")) return false;
+            var decision = ledger.current(environment, verifiedSubjectId, purpose);
+            return decision.granted() && policy.equals(decision.policyVersion());
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OptionalProcessingGate.class,
+                    "allows(ConsentEnvironment,UUID,ConsentPurpose)");
         }
-        String policy = settings.getProperty("gokul.consent.policy-version", "");
-        if (!policy.matches("[A-Za-z0-9._-]{1,40}")) return false;
-        var decision = ledger.current(environment, verifiedSubjectId, purpose);
-        return decision.granted() && policy.equals(decision.policyVersion());
     }
 }

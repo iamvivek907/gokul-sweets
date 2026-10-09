@@ -1,5 +1,9 @@
 package com.gokulsweets.restaurant.order;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
 import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.delivery.DeliveryPreparationQueue;
@@ -14,6 +18,7 @@ import com.gokulsweets.restaurant.order.service.PreparationEligibilityService;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,10 +33,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
-
 @SpringBootTest
 @Transactional
 class AdminDeliveryOrderViewIntegrationTest {
@@ -41,16 +42,31 @@ class AdminDeliveryOrderViewIntegrationTest {
     @Test
     void staffDetailAndListShowDeliveryWithoutDereferencingPickupSlot() {
         String key = UUID.randomUUID().toString().substring(0, 8);
-        Long branchId = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, ?) RETURNING id",
-                Long.class, "ADV-" + key, "Branch " + key);
-        Long zoneId = jdbc.queryForObject("""
-                INSERT INTO delivery_zones(branch_id, locality_key, postal_code, opens_at, closes_at)
-                VALUES (?, 'hazratganj', '226001', '10:00', '20:00') RETURNING id
-                """, Long.class, branchId);
-        Long windowId = jdbc.queryForObject("""
-                INSERT INTO delivery_capacity_windows(zone_id, service_date, starts_at, ends_at, rider_capacity)
-                VALUES (?, ?, ?, ?, 1) RETURNING id
-                """, Long.class, zoneId, LocalDate.of(2026, 10, 1), LocalTime.of(11, 0), LocalTime.of(12, 0));
+        Long branchId =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code, name) VALUES (?, ?) RETURNING id",
+                        Long.class,
+                        "ADV-" + key,
+                        "Branch " + key);
+        Long zoneId =
+                jdbc.queryForObject(
+                        """
+INSERT INTO delivery_zones(branch_id, locality_key, postal_code, opens_at, closes_at)
+VALUES (?, 'hazratganj', '226001', '10:00', '20:00') RETURNING id
+""",
+                        Long.class,
+                        branchId);
+        Long windowId =
+                jdbc.queryForObject(
+                        """
+INSERT INTO delivery_capacity_windows(zone_id, service_date, starts_at, ends_at, rider_capacity)
+VALUES (?, ?, ?, ?, 1) RETURNING id
+""",
+                        Long.class,
+                        zoneId,
+                        LocalDate.of(2026, 10, 1),
+                        LocalTime.of(11, 0),
+                        LocalTime.of(12, 0));
         var branch = new Branch();
         branch.setId(branchId);
         branch.setName("Branch " + key);
@@ -70,9 +86,16 @@ class AdminDeliveryOrderViewIntegrationTest {
         var repo = mock(OrderRepository.class);
         when(repo.findDetailedByOrderNumber(order.getOrderNumber())).thenReturn(Optional.of(order));
         when(repo.findByBranchId(eq(branchId), any())).thenReturn(new PageImpl<>(List.of(order)));
-        var service = new AdminOrderQueryService(repo, mock(PaymentRepository.class),
-                mock(StaffAuthorizationService.class), mock(PreparationEligibilityService.class),
-                new PreparationWindowProperties(), clock, jdbc, mock(DeliveryPreparationQueue.class));
+        var service =
+                new AdminOrderQueryService(
+                        repo,
+                        mock(PaymentRepository.class),
+                        mock(StaffAuthorizationService.class),
+                        mock(PreparationEligibilityService.class),
+                        new PreparationWindowProperties(),
+                        clock,
+                        jdbc,
+                        mock(DeliveryPreparationQueue.class));
 
         var detail = service.getOrder(order.getOrderNumber());
         assertThat(detail.pickupDate()).isNull();
@@ -102,11 +125,19 @@ class AdminDeliveryOrderViewIntegrationTest {
         var repo = mock(OrderRepository.class);
         when(repo.findDetailedByOrderNumber("ADV-PICKUP")).thenReturn(Optional.of(order));
         when(repo.findByBranchId(eq(10L), any())).thenReturn(new PageImpl<>(List.of(order)));
-        var service = new AdminOrderQueryService(repo, mock(PaymentRepository.class),
-                mock(StaffAuthorizationService.class), mock(PreparationEligibilityService.class),
-                new PreparationWindowProperties(), clock, jdbc, mock(DeliveryPreparationQueue.class));
+        var service =
+                new AdminOrderQueryService(
+                        repo,
+                        mock(PaymentRepository.class),
+                        mock(StaffAuthorizationService.class),
+                        mock(PreparationEligibilityService.class),
+                        new PreparationWindowProperties(),
+                        clock,
+                        jdbc,
+                        mock(DeliveryPreparationQueue.class));
 
-        assertThat(service.getOrder("ADV-PICKUP").pickupDate()).isEqualTo(LocalDate.of(2026, 10, 1));
+        assertThat(service.getOrder("ADV-PICKUP").pickupDate())
+                .isEqualTo(LocalDate.of(2026, 10, 1));
         assertThat(service.getOrders(10L, null, 0, 10).orders().getFirst().deliveryDate()).isNull();
     }
 }

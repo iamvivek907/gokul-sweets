@@ -4,10 +4,14 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
-public interface RoleRepository
-        extends JpaRepository<Role, Long> {
+/** Persistence operations for role records. */
+public interface RoleRepository extends JpaRepository<Role, Long> {
 
-    Optional<Role> findByName(
-            String name
-    );
+    /**
+     * Finds by name.
+     *
+     * @param name the name
+     * @return the find by name result
+     */
+    Optional<Role> findByName(String name);
 }

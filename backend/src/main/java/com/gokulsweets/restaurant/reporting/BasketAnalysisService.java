@@ -1,11 +1,14 @@
 package com.gokulsweets.restaurant.reporting;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.reporting.dto.BasketAnalysisResponse;
 import com.gokulsweets.restaurant.reporting.dto.BasketAnalysisSummaryResponse;
 import com.gokulsweets.restaurant.reporting.dto.BasketPairResponse;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import com.gokulsweets.restaurant.staff.PermissionName;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,165 +21,102 @@ import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
+/** Coordinates basket analysis operations. */
 @Service
 @RequiredArgsConstructor
 public class BasketAnalysisService {
 
-    private static final ZoneId BUSINESS_ZONE =
-            ZoneId.of(
-                    "Asia/Kolkata"
-            );
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
 
-    private static final BigDecimal ZERO =
-            new BigDecimal(
-                    "0.00"
-            );
+    private static final BigDecimal ZERO = new BigDecimal("0.00");
 
     private final JdbcTemplate jdbcTemplate;
 
-    private final StaffAuthorizationService
-            staffAuthorizationService;
+    private final StaffAuthorizationService staffAuthorizationService;
 
-
+    /**
+     * Returns basket analysis.
+     *
+     * @param fromDate the from date
+     * @param toDate the to date
+     * @param branchId the branch id
+     * @return the get basket analysis result
+     */
     @Transactional(readOnly = true)
     public BasketAnalysisResponse getBasketAnalysis(
-            LocalDate fromDate,
-            LocalDate toDate,
-            Long branchId
-    ) {
-
-        staffAuthorizationService
-                .requirePermission(
-                        PermissionName.REPORT_VIEW
-                );
-
-
-        LocalDate today =
-                LocalDate.now(
-                        BUSINESS_ZONE
-                );
-
-        LocalDate safeTo =
-                toDate == null
-                        ? today
-                        : toDate;
-
-        LocalDate safeFrom =
-                fromDate == null
-                        ? safeTo.minusDays(
-                        29
-                )
-                        : fromDate;
-
-
-        if (
-                safeFrom.isAfter(
-                        safeTo
-                )
-        ) {
-
-            throw new IllegalArgumentException(
-                    "From date cannot be after to date."
-            );
+            LocalDate fromDate, LocalDate toDate, Long branchId) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        BasketAnalysisService.class, "getBasketAnalysis(LocalDate,LocalDate,Long)");
+        try {
+            staffAuthorizationService.requirePermission(PermissionName.REPORT_VIEW);
+            LocalDate today = LocalDate.now(BUSINESS_ZONE);
+            LocalDate safeTo = toDate == null ? today : toDate;
+            LocalDate safeFrom = fromDate == null ? safeTo.minusDays(29) : fromDate;
+            if (safeFrom.isAfter(safeTo)) {
+                throw new IllegalArgumentException("From date cannot be after to date.");
+            }
+            long inclusiveDays = ChronoUnit.DAYS.between(safeFrom, safeTo) + 1;
+            if (inclusiveDays > 366) {
+                throw new IllegalArgumentException(
+                        "Basket analysis date range cannot exceed 366 days.");
+            }
+            long totalCompletedOrders = loadCompletedOrders(safeFrom, safeTo, branchId);
+            List<PairRow> rows = loadPairs(safeFrom, safeTo, branchId);
+            List<BasketPairResponse> pairs =
+                    rows.stream().map(row -> toResponse(row, totalCompletedOrders)).toList();
+            long productsInOrders = loadProductsInOrders(safeFrom, safeTo, branchId);
+            BasketAnalysisSummaryResponse summary =
+                    new BasketAnalysisSummaryResponse(
+                            totalCompletedOrders,
+                            productsInOrders,
+                            pairs.size(),
+                            pairs.stream()
+                                    .filter(pair -> pair.strength() == BasketPairStrength.STRONG)
+                                    .count(),
+                            pairs.stream()
+                                    .filter(pair -> pair.strength() == BasketPairStrength.MODERATE)
+                                    .count());
+            return new BasketAnalysisResponse(safeFrom, safeTo, branchId, summary, pairs);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BasketAnalysisService.class,
+                    "getBasketAnalysis(LocalDate,LocalDate,Long)");
         }
-
-
-        long inclusiveDays =
-                ChronoUnit.DAYS.between(
-                        safeFrom,
-                        safeTo
-                )
-                        + 1;
-
-
-        if (
-                inclusiveDays > 366
-        ) {
-
-            throw new IllegalArgumentException(
-                    "Basket analysis date range cannot exceed 366 days."
-            );
-        }
-
-
-        long totalCompletedOrders =
-                loadCompletedOrders(
-                        safeFrom,
-                        safeTo,
-                        branchId
-                );
-
-
-        List<PairRow> rows =
-                loadPairs(
-                        safeFrom,
-                        safeTo,
-                        branchId
-                );
-
-
-        List<BasketPairResponse> pairs =
-                rows.stream()
-                        .map(
-                                row ->
-                                        toResponse(
-                                                row,
-                                                totalCompletedOrders
-                                        )
-                        )
-                        .toList();
-
-
-        long productsInOrders =
-                loadProductsInOrders(
-                        safeFrom,
-                        safeTo,
-                        branchId
-                );
-
-
-        BasketAnalysisSummaryResponse summary =
-                new BasketAnalysisSummaryResponse(
-                        totalCompletedOrders,
-                        productsInOrders,
-                        pairs.size(),
-                        pairs.stream()
-                                .filter(
-                                        pair ->
-                                                pair.strength()
-                                                        == BasketPairStrength.STRONG
-                                )
-                                .count(),
-                        pairs.stream()
-                                .filter(
-                                        pair ->
-                                                pair.strength()
-                                                        == BasketPairStrength.MODERATE
-                                )
-                                .count()
-                );
-
-
-        return new BasketAnalysisResponse(
-                safeFrom,
-                safeTo,
-                branchId,
-                summary,
-                pairs
-        );
     }
 
-
-    private long loadCompletedOrders(
-            LocalDate fromDate,
-            LocalDate toDate,
-            Long branchId
-    ) {
-
-        if (
-                branchId == null
-        ) {
-
+    /**
+     * Loads completed orders.
+     *
+     * @param fromDate the from date
+     * @param toDate the to date
+     * @param branchId the branch id
+     * @return the load completed orders result
+     */
+    private long loadCompletedOrders(LocalDate fromDate, LocalDate toDate, Long branchId) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        BasketAnalysisService.class,
+                        "loadCompletedOrders(LocalDate,LocalDate,Long)");
+        try {
+            if (branchId == null) {
+                Long value =
+                        jdbcTemplate.queryForObject(
+                                """
+                                SELECT
+                                    COALESCE(
+                                        SUM(completed_orders),
+                                        0
+                                    )
+                                FROM analytics_sales_daily
+                                WHERE business_date BETWEEN ? AND ?
+                                """,
+                                Long.class,
+                                Date.valueOf(fromDate),
+                                Date.valueOf(toDate));
+                return value == null ? 0L : value;
+            }
             Long value =
                     jdbcTemplate.queryForObject(
                             """
@@ -185,517 +125,382 @@ public class BasketAnalysisService {
                                     SUM(completed_orders),
                                     0
                                 )
-                            FROM analytics_sales_daily
+                            FROM analytics_branch_daily
                             WHERE business_date BETWEEN ? AND ?
+                              AND branch_id = ?
                             """,
                             Long.class,
-                            Date.valueOf(
-                                    fromDate
-                            ),
-                            Date.valueOf(
-                                    toDate
-                            )
-                    );
-
-            return value == null
-                    ? 0L
-                    : value;
+                            Date.valueOf(fromDate),
+                            Date.valueOf(toDate),
+                            branchId);
+            return value == null ? 0L : value;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BasketAnalysisService.class,
+                    "loadCompletedOrders(LocalDate,LocalDate,Long)");
         }
+    }
 
+    /**
+     * Loads products in orders.
+     *
+     * @param fromDate the from date
+     * @param toDate the to date
+     * @param branchId the branch id
+     * @return the load products in orders result
+     */
+    private long loadProductsInOrders(LocalDate fromDate, LocalDate toDate, Long branchId) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        BasketAnalysisService.class,
+                        "loadProductsInOrders(LocalDate,LocalDate,Long)");
+        try {
+            String branchPredicate = branchId == null ? "" : " AND branch_id = ? ";
+            String sql =
+                    """
+                    SELECT
+                        COUNT(
+                            DISTINCT product_id
+                        )
+                    FROM analytics_product_daily
+                    WHERE business_date BETWEEN ? AND ?
+                    """
+                            + branchPredicate;
+            Object[] args =
+                    branchId == null
+                            ? new Object[] {Date.valueOf(fromDate), Date.valueOf(toDate)}
+                            : new Object[] {Date.valueOf(fromDate), Date.valueOf(toDate), branchId};
+            Long value = jdbcTemplate.queryForObject(sql, Long.class, args);
+            return value == null ? 0L : value;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BasketAnalysisService.class,
+                    "loadProductsInOrders(LocalDate,LocalDate,Long)");
+        }
+    }
 
-        Long value =
-                jdbcTemplate.queryForObject(
-                        """
+    /**
+     * Loads pairs.
+     *
+     * @param fromDate the from date
+     * @param toDate the to date
+     * @param branchId the branch id
+     * @return the load pairs result
+     */
+    private List<PairRow> loadPairs(LocalDate fromDate, LocalDate toDate, Long branchId) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        BasketAnalysisService.class, "loadPairs(LocalDate,LocalDate,Long)");
+        try {
+            String branchPredicatePairs = branchId == null ? "" : " AND appd.branch_id = ? ";
+            String branchPredicateProducts = branchId == null ? "" : " AND apd.branch_id = ? ";
+            String sql =
+                    """
+                    WITH pair_rollup AS (
                         SELECT
-                            COALESCE(
-                                SUM(completed_orders),
-                                0
-                            )
-                        FROM analytics_branch_daily
-                        WHERE business_date BETWEEN ? AND ?
-                          AND branch_id = ?
-                        """,
-                        Long.class,
-                        Date.valueOf(
-                                fromDate
-                        ),
-                        Date.valueOf(
-                                toDate
-                        ),
-                        branchId
-                );
+                            appd.product_a_id,
+                            appd.product_b_id,
+                            SUM(
+                                appd.pair_order_count
+                            ) AS pair_order_count
+                        FROM analytics_product_pair_daily appd
+                        WHERE appd.business_date BETWEEN ? AND ?
+                    """
+                            + branchPredicatePairs
+                            + """
+                                  GROUP BY
+                                      appd.product_a_id,
+                                      appd.product_b_id
+                              ),
+                              product_rollup AS (
+                                  SELECT
+                                      apd.product_id,
+                                      SUM(
+                                          apd.order_count
+                                      ) AS order_count
+                                  FROM analytics_product_daily apd
+                                  WHERE apd.business_date BETWEEN ? AND ?
+                              """
+                            + branchPredicateProducts
+                            + """
+                                  GROUP BY
+                                      apd.product_id
+                              )
+                              SELECT
+                                  pair_rollup.product_a_id,
+                                  pa.code AS product_a_code,
+                                  pa.name AS product_a_name,
 
+                                  pair_rollup.product_b_id,
+                                  pb.code AS product_b_code,
+                                  pb.name AS product_b_name,
 
-        return value == null
-                ? 0L
-                : value;
-    }
+                                  pair_rollup.pair_order_count,
 
+                                  COALESCE(
+                                      product_a.order_count,
+                                      0
+                                  ) AS product_a_order_count,
 
-    private long loadProductsInOrders(
-            LocalDate fromDate,
-            LocalDate toDate,
-            Long branchId
-    ) {
+                                  COALESCE(
+                                      product_b.order_count,
+                                      0
+                                  ) AS product_b_order_count
 
-        String branchPredicate =
-                branchId == null
-                        ? ""
-                        : " AND branch_id = ? ";
+                              FROM pair_rollup
 
+                              JOIN products pa
+                                  ON pa.id = pair_rollup.product_a_id
 
-        String sql =
-                """
-                SELECT
-                    COUNT(
-                        DISTINCT product_id
-                    )
-                FROM analytics_product_daily
-                WHERE business_date BETWEEN ? AND ?
-                """
-                        + branchPredicate;
+                              JOIN products pb
+                                  ON pb.id = pair_rollup.product_b_id
 
+                              LEFT JOIN product_rollup product_a
+                                  ON product_a.product_id = pair_rollup.product_a_id
 
-        Object[] args =
-                branchId == null
-                        ? new Object[]{
-                        Date.valueOf(
-                                fromDate
-                        ),
-                        Date.valueOf(
-                                toDate
-                        )
-                }
-                        : new Object[]{
-                        Date.valueOf(
-                                fromDate
-                        ),
-                        Date.valueOf(
-                                toDate
-                        ),
-                        branchId
-                };
+                              LEFT JOIN product_rollup product_b
+                                  ON product_b.product_id = pair_rollup.product_b_id
 
+                              WHERE pair_rollup.pair_order_count > 0
 
-        Long value =
-                jdbcTemplate.queryForObject(
-                        sql,
-                        Long.class,
-                        args
-                );
-
-
-        return value == null
-                ? 0L
-                : value;
-    }
-
-
-    private List<PairRow> loadPairs(
-            LocalDate fromDate,
-            LocalDate toDate,
-            Long branchId
-    ) {
-
-        String branchPredicatePairs =
-                branchId == null
-                        ? ""
-                        : " AND appd.branch_id = ? ";
-
-
-        String branchPredicateProducts =
-                branchId == null
-                        ? ""
-                        : " AND apd.branch_id = ? ";
-
-
-        String sql =
-                """
-                WITH pair_rollup AS (
-                    SELECT
-                        appd.product_a_id,
-                        appd.product_b_id,
-                        SUM(
-                            appd.pair_order_count
-                        ) AS pair_order_count
-                    FROM analytics_product_pair_daily appd
-                    WHERE appd.business_date BETWEEN ? AND ?
-                """
-                        + branchPredicatePairs
-                        + """
-                    GROUP BY
-                        appd.product_a_id,
-                        appd.product_b_id
-                ),
-                product_rollup AS (
-                    SELECT
-                        apd.product_id,
-                        SUM(
-                            apd.order_count
-                        ) AS order_count
-                    FROM analytics_product_daily apd
-                    WHERE apd.business_date BETWEEN ? AND ?
-                """
-                        + branchPredicateProducts
-                        + """
-                    GROUP BY
-                        apd.product_id
-                )
-                SELECT
-                    pair_rollup.product_a_id,
-                    pa.code AS product_a_code,
-                    pa.name AS product_a_name,
-
-                    pair_rollup.product_b_id,
-                    pb.code AS product_b_code,
-                    pb.name AS product_b_name,
-
-                    pair_rollup.pair_order_count,
-
-                    COALESCE(
-                        product_a.order_count,
-                        0
-                    ) AS product_a_order_count,
-
-                    COALESCE(
-                        product_b.order_count,
-                        0
-                    ) AS product_b_order_count
-
-                FROM pair_rollup
-
-                JOIN products pa
-                    ON pa.id = pair_rollup.product_a_id
-
-                JOIN products pb
-                    ON pb.id = pair_rollup.product_b_id
-
-                LEFT JOIN product_rollup product_a
-                    ON product_a.product_id = pair_rollup.product_a_id
-
-                LEFT JOIN product_rollup product_b
-                    ON product_b.product_id = pair_rollup.product_b_id
-
-                WHERE pair_rollup.pair_order_count > 0
-
-                ORDER BY
-                    pair_rollup.pair_order_count DESC,
-                    pa.name ASC,
-                    pb.name ASC
-                """;
-
-
-        Object[] args;
-
-        if (
-                branchId == null
-        ) {
-
-            args =
-                    new Object[]{
-                            Date.valueOf(
-                                    fromDate
-                            ),
-                            Date.valueOf(
-                                    toDate
-                            ),
-                            Date.valueOf(
-                                    fromDate
-                            ),
-                            Date.valueOf(
-                                    toDate
-                            )
-                    };
-
-        } else {
-
-            args =
-                    new Object[]{
-                            Date.valueOf(
-                                    fromDate
-                            ),
-                            Date.valueOf(
-                                    toDate
-                            ),
+                              ORDER BY
+                                  pair_rollup.pair_order_count DESC,
+                                  pa.name ASC,
+                                  pb.name ASC
+                              """;
+            Object[] args;
+            if (branchId == null) {
+                args =
+                        new Object[] {
+                            Date.valueOf(fromDate),
+                            Date.valueOf(toDate),
+                            Date.valueOf(fromDate),
+                            Date.valueOf(toDate)
+                        };
+            } else {
+                args =
+                        new Object[] {
+                            Date.valueOf(fromDate),
+                            Date.valueOf(toDate),
                             branchId,
-                            Date.valueOf(
-                                    fromDate
-                            ),
-                            Date.valueOf(
-                                    toDate
-                            ),
+                            Date.valueOf(fromDate),
+                            Date.valueOf(toDate),
                             branchId
-                    };
+                        };
+            }
+            return jdbcTemplate.query(
+                    sql,
+                    (rs, rowNum) ->
+                            new PairRow(
+                                    rs.getLong("product_a_id"),
+                                    rs.getString("product_a_code"),
+                                    rs.getString("product_a_name"),
+                                    rs.getLong("product_b_id"),
+                                    rs.getString("product_b_code"),
+                                    rs.getString("product_b_name"),
+                                    rs.getLong("pair_order_count"),
+                                    rs.getLong("product_a_order_count"),
+                                    rs.getLong("product_b_order_count")),
+                    args);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BasketAnalysisService.class,
+                    "loadPairs(LocalDate,LocalDate,Long)");
         }
-
-
-        return jdbcTemplate.query(
-                sql,
-                (rs, rowNum) ->
-                        new PairRow(
-                                rs.getLong(
-                                        "product_a_id"
-                                ),
-                                rs.getString(
-                                        "product_a_code"
-                                ),
-                                rs.getString(
-                                        "product_a_name"
-                                ),
-                                rs.getLong(
-                                        "product_b_id"
-                                ),
-                                rs.getString(
-                                        "product_b_code"
-                                ),
-                                rs.getString(
-                                        "product_b_name"
-                                ),
-                                rs.getLong(
-                                        "pair_order_count"
-                                ),
-                                rs.getLong(
-                                        "product_a_order_count"
-                                ),
-                                rs.getLong(
-                                        "product_b_order_count"
-                                )
-                        ),
-                args
-        );
     }
 
-
-    private BasketPairResponse toResponse(
-            PairRow row,
-            long totalCompletedOrders
-    ) {
-
-        BigDecimal support =
-                percent(
-                        row.pairOrderCount,
-                        totalCompletedOrders
-                );
-
-
-        BigDecimal confidenceAToB =
-                percent(
-                        row.pairOrderCount,
-                        row.productAOrderCount
-                );
-
-
-        BigDecimal confidenceBToA =
-                percent(
-                        row.pairOrderCount,
-                        row.productBOrderCount
-                );
-
-
-        BigDecimal probabilityB =
-                ratio(
-                        row.productBOrderCount,
-                        totalCompletedOrders
-                );
-
-
-        BigDecimal confidenceAToBRatio =
-                ratio(
-                        row.pairOrderCount,
-                        row.productAOrderCount
-                );
-
-
-        BigDecimal lift =
-                probabilityB.compareTo(
-                        BigDecimal.ZERO
-                ) == 0
-                        ? ZERO
-                        : confidenceAToBRatio
-                        .divide(
-                                probabilityB,
-                                4,
-                                RoundingMode.HALF_UP
-                        );
-
-
-        BasketPairStrength strength =
-                classify(
-                        row.pairOrderCount,
-                        support,
-                        lift
-                );
-
-
-        return new BasketPairResponse(
-                row.productAId,
-                row.productACode,
-                row.productAName,
-                row.productBId,
-                row.productBCode,
-                row.productBName,
-                row.pairOrderCount,
-                row.productAOrderCount,
-                row.productBOrderCount,
-                totalCompletedOrders,
-                support,
-                confidenceAToB,
-                confidenceBToA,
-                lift,
-                strength,
-                explanation(
-                        row,
-                        support,
-                        confidenceAToB,
-                        confidenceBToA,
-                        lift,
-                        strength
-                )
-        );
+    /**
+     * Tos response.
+     *
+     * @param row the row
+     * @param totalCompletedOrders the total completed orders
+     * @return the to response result
+     */
+    private BasketPairResponse toResponse(PairRow row, long totalCompletedOrders) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BasketAnalysisService.class, "toResponse(PairRow,long)");
+        try {
+            BigDecimal support = percent(row.pairOrderCount, totalCompletedOrders);
+            BigDecimal confidenceAToB = percent(row.pairOrderCount, row.productAOrderCount);
+            BigDecimal confidenceBToA = percent(row.pairOrderCount, row.productBOrderCount);
+            BigDecimal probabilityB = ratio(row.productBOrderCount, totalCompletedOrders);
+            BigDecimal confidenceAToBRatio = ratio(row.pairOrderCount, row.productAOrderCount);
+            BigDecimal lift =
+                    probabilityB.compareTo(BigDecimal.ZERO) == 0
+                            ? ZERO
+                            : confidenceAToBRatio.divide(probabilityB, 4, RoundingMode.HALF_UP);
+            BasketPairStrength strength = classify(row.pairOrderCount, support, lift);
+            return new BasketPairResponse(
+                    row.productAId,
+                    row.productACode,
+                    row.productAName,
+                    row.productBId,
+                    row.productBCode,
+                    row.productBName,
+                    row.pairOrderCount,
+                    row.productAOrderCount,
+                    row.productBOrderCount,
+                    totalCompletedOrders,
+                    support,
+                    confidenceAToB,
+                    confidenceBToA,
+                    lift,
+                    strength,
+                    explanation(row, support, confidenceAToB, confidenceBToA, lift, strength));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BasketAnalysisService.class,
+                    "toResponse(PairRow,long)");
+        }
     }
 
-
-    private BasketPairStrength classify(
-            long pairOrders,
-            BigDecimal support,
-            BigDecimal lift
-    ) {
-
-        if (
-                pairOrders < 3
-        ) {
-
-            return BasketPairStrength.INSUFFICIENT_DATA;
+    /**
+     * Classifies basket analysis data and returns the {@code BasketPairStrength} result.
+     *
+     * @param pairOrders the pair orders supplied to this method
+     * @param support the support supplied to this method
+     * @param lift the lift supplied to this method
+     * @return the {@code BasketPairStrength} result
+     */
+    private BasketPairStrength classify(long pairOrders, BigDecimal support, BigDecimal lift) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        BasketAnalysisService.class, "classify(long,BigDecimal,BigDecimal)");
+        try {
+            if (pairOrders < 3) {
+                return BasketPairStrength.INSUFFICIENT_DATA;
+            }
+            if (support.compareTo(new BigDecimal("10.00")) >= 0
+                    && lift.compareTo(new BigDecimal("1.50")) >= 0) {
+                return BasketPairStrength.STRONG;
+            }
+            if (support.compareTo(new BigDecimal("5.00")) >= 0
+                    && lift.compareTo(new BigDecimal("1.10")) > 0) {
+                return BasketPairStrength.MODERATE;
+            }
+            return BasketPairStrength.WEAK;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BasketAnalysisService.class,
+                    "classify(long,BigDecimal,BigDecimal)");
         }
-
-
-        if (
-                support.compareTo(
-                        new BigDecimal(
-                                "10.00"
-                        )
-                ) >= 0
-                        &&
-                        lift.compareTo(
-                                new BigDecimal(
-                                        "1.50"
-                                )
-                        ) >= 0
-        ) {
-
-            return BasketPairStrength.STRONG;
-        }
-
-
-        if (
-                support.compareTo(
-                        new BigDecimal(
-                                "5.00"
-                        )
-                ) >= 0
-                        &&
-                        lift.compareTo(
-                                new BigDecimal(
-                                        "1.10"
-                                )
-                        ) > 0
-        ) {
-
-            return BasketPairStrength.MODERATE;
-        }
-
-
-        return BasketPairStrength.WEAK;
     }
 
-
+    /**
+     * Returns explanation information for basket analysis.
+     *
+     * @param row the row supplied to this method
+     * @param support the support supplied to this method
+     * @param confidenceAToB the confidence a to b supplied to this method
+     * @param confidenceBToA the confidence b to a supplied to this method
+     * @param lift the lift supplied to this method
+     * @param strength the strength supplied to this method
+     * @return the {@code String} result
+     */
     private String explanation(
             PairRow row,
             BigDecimal support,
             BigDecimal confidenceAToB,
             BigDecimal confidenceBToA,
             BigDecimal lift,
-            BasketPairStrength strength
-    ) {
-
-        if (
-                strength
-                        == BasketPairStrength.INSUFFICIENT_DATA
-        ) {
-
-            return "This pair has appeared in only "
-                    + row.pairOrderCount
-                    + " completed orders, so there is not enough evidence yet for a stable basket relationship.";
+            BasketPairStrength strength) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        BasketAnalysisService.class,
+                        "explanation(PairRow,BigDecimal,BigDecimal,BigDecimal,BigDecimal,BasketPairStrength)");
+        try {
+            if (strength == BasketPairStrength.INSUFFICIENT_DATA) {
+                return "This pair has appeared in only "
+                        + row.pairOrderCount
+                        + " completed orders, so there is not enough evidence yet for a stable"
+                        + " basket relationship.";
+            }
+            return row.productAName
+                    + " and "
+                    + row.productBName
+                    + " appear together in "
+                    + support
+                    + "% of completed orders. "
+                    + "When "
+                    + row.productAName
+                    + " is purchased, "
+                    + row.productBName
+                    + " is also present "
+                    + confidenceAToB
+                    + "% of the time; the reverse confidence is "
+                    + confidenceBToA
+                    + "%. Lift is "
+                    + lift
+                    + "×, where values above 1 indicate the pair occurs together more often than"
+                    + " expected from their individual popularity.";
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BasketAnalysisService.class,
+                    "explanation(PairRow,BigDecimal,BigDecimal,BigDecimal,BigDecimal,BasketPairStrength)");
         }
-
-
-        return row.productAName
-                + " and "
-                + row.productBName
-                + " appear together in "
-                + support
-                + "% of completed orders. "
-                + "When "
-                + row.productAName
-                + " is purchased, "
-                + row.productBName
-                + " is also present "
-                + confidenceAToB
-                + "% of the time; the reverse confidence is "
-                + confidenceBToA
-                + "%. Lift is "
-                + lift
-                + "×, where values above 1 indicate the pair occurs together more often than expected from their individual popularity.";
     }
 
-
-    private BigDecimal percent(
-            long numerator,
-            long denominator
-    ) {
-
-        return ratio(
-                numerator,
-                denominator
-        )
-                .multiply(
-                        new BigDecimal(
-                                "100"
-                        )
-                )
-                .setScale(
-                        2,
-                        RoundingMode.HALF_UP
-                );
-    }
-
-
-    private BigDecimal ratio(
-            long numerator,
-            long denominator
-    ) {
-
-        if (
-                denominator <= 0
-        ) {
-
-            return ZERO;
+    /**
+     * Returns percent information for basket analysis.
+     *
+     * @param numerator the numerator supplied to this method
+     * @param denominator the denominator supplied to this method
+     * @return the {@code BigDecimal} result
+     */
+    private BigDecimal percent(long numerator, long denominator) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BasketAnalysisService.class, "percent(long,long)");
+        try {
+            return ratio(numerator, denominator)
+                    .multiply(new BigDecimal("100"))
+                    .setScale(2, RoundingMode.HALF_UP);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, BasketAnalysisService.class, "percent(long,long)");
         }
-
-
-        return BigDecimal.valueOf(
-                        numerator
-                )
-                .divide(
-                        BigDecimal.valueOf(
-                                denominator
-                        ),
-                        6,
-                        RoundingMode.HALF_UP
-                );
     }
 
+    /**
+     * Returns ratio information for basket analysis.
+     *
+     * @param numerator the numerator supplied to this method
+     * @param denominator the denominator supplied to this method
+     * @return the {@code BigDecimal} result
+     */
+    private BigDecimal ratio(long numerator, long denominator) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BasketAnalysisService.class, "ratio(long,long)");
+        try {
+            if (denominator <= 0) {
+                return ZERO;
+            }
+            return BigDecimal.valueOf(numerator)
+                    .divide(BigDecimal.valueOf(denominator), 6, RoundingMode.HALF_UP);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, BasketAnalysisService.class, "ratio(long,long)");
+        }
+    }
 
+    /**
+     * Immutable pair row data contract.
+     *
+     * @param productAId the product aid
+     * @param productACode the product acode
+     * @param productAName the product aname
+     * @param productBId the product bid
+     * @param productBCode the product bcode
+     * @param productBName the product bname
+     * @param pairOrderCount the pair order count
+     * @param productAOrderCount the product aorder count
+     * @param productBOrderCount the product border count
+     */
     private record PairRow(
             Long productAId,
             String productACode,
@@ -705,7 +510,5 @@ public class BasketAnalysisService {
             String productBName,
             long pairOrderCount,
             long productAOrderCount,
-            long productBOrderCount
-    ) {
-    }
+            long productBOrderCount) {}
 }

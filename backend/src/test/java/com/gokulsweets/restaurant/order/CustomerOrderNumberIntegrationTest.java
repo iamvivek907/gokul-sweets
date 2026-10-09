@@ -1,8 +1,11 @@
 package com.gokulsweets.restaurant.order;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.repository.OrderRepository;
 import com.gokulsweets.restaurant.order.service.OrderQueryService;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -18,8 +21,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 @SpringBootTest
 class CustomerOrderNumberIntegrationTest {
     @Autowired JdbcTemplate jdbc;
@@ -28,42 +29,61 @@ class CustomerOrderNumberIntegrationTest {
     @Autowired PlatformTransactionManager transactions;
 
     private long branch() {
-        long id = jdbc.queryForObject("INSERT INTO branches(code,name) VALUES (?,'Number test') RETURNING id",
-                Long.class, "NUM-" + UUID.randomUUID().toString().substring(0, 8));
-        jdbc.update("""
-                INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)
-                VALUES (?,(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date+1,'10:00','10:30',500)
-                """, id);
+        long id =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?,'Number test') RETURNING id",
+                        Long.class,
+                        "NUM-" + UUID.randomUUID().toString().substring(0, 8));
+        jdbc.update(
+                """
+INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)
+VALUES (?,(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Kolkata')::date+1,'10:00','10:30',500)
+""",
+                id);
         return id;
     }
 
     private long pending(long branch) {
-        return jdbc.queryForObject("""
-                INSERT INTO orders(order_number,branch_id,pickup_slot_id,pickup_type,customer_name,customer_phone,order_status,reservation_expires_at)
-                VALUES (?, ?, (SELECT id FROM pickup_slots WHERE branch_id=? ORDER BY id LIMIT 1),
-                        'NORMAL','Number test','9876543210','PENDING_PAYMENT',CURRENT_TIMESTAMP+INTERVAL '15 minutes') RETURNING id
-                """, Long.class, ("NUM-" + UUID.randomUUID()).toUpperCase(java.util.Locale.ROOT), branch, branch);
+        return jdbc.queryForObject(
+                """
+INSERT INTO orders(order_number,branch_id,pickup_slot_id,pickup_type,customer_name,customer_phone,order_status,reservation_expires_at)
+VALUES (?, ?, (SELECT id FROM pickup_slots WHERE branch_id=? ORDER BY id LIMIT 1),
+        'NORMAL','Number test','9876543210','PENDING_PAYMENT',CURRENT_TIMESTAMP+INTERVAL '15 minutes') RETURNING id
+""",
+                Long.class,
+                ("NUM-" + UUID.randomUUID()).toUpperCase(java.util.Locale.ROOT),
+                branch,
+                branch);
     }
 
     private Long number(long id) {
-        return jdbc.queryForObject("SELECT customer_order_number FROM orders WHERE id=?", Long.class, id);
+        return jdbc.queryForObject(
+                "SELECT customer_order_number FROM orders WHERE id=?", Long.class, id);
     }
 
     @Test
     void generatedNumberIsRetrievedByHibernateAndExposedAlongsideOpaqueReference() {
         long id = pending(branch());
         assertThat(number(id)).isNull();
-        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
-            var order = repository.findById(id).orElseThrow();
-            order.setOrderStatus(OrderStatus.CONFIRMED);
-            repository.saveAndFlush(order);
-            assertThat(order.getCustomerOrderNumber()).isPositive();
-            var detail = customerOrders.getCustomerOrder(order.getOrderNumber());
-            assertThat(detail.orderNumber()).isEqualTo(order.getOrderNumber());
-            assertThat(detail.customerOrderNumber()).isEqualTo(order.getCustomerOrderNumber());
-            assertThat(customerOrders.getCustomerOrderHistory(List.of(order.getOrderNumber())).getFirst().customerOrderNumber())
-                    .isEqualTo(order.getCustomerOrderNumber());
-        });
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(
+                        tx -> {
+                            var order = repository.findById(id).orElseThrow();
+                            order.setOrderStatus(OrderStatus.CONFIRMED);
+                            repository.saveAndFlush(order);
+                            assertThat(order.getCustomerOrderNumber()).isPositive();
+                            var detail = customerOrders.getCustomerOrder(order.getOrderNumber());
+                            assertThat(detail.orderNumber()).isEqualTo(order.getOrderNumber());
+                            assertThat(detail.customerOrderNumber())
+                                    .isEqualTo(order.getCustomerOrderNumber());
+                            assertThat(
+                                            customerOrders
+                                                    .getCustomerOrderHistory(
+                                                            List.of(order.getOrderNumber()))
+                                                    .getFirst()
+                                                    .customerOrderNumber())
+                                    .isEqualTo(order.getCustomerOrderNumber());
+                        });
     }
 
     @Test
@@ -73,14 +93,25 @@ class CustomerOrderNumberIntegrationTest {
         for (int i = 0; i < 100; i++) ids.add(pending(i % 2 == 0 ? first : second));
         var start = new CountDownLatch(1);
         try (var executor = Executors.newFixedThreadPool(12)) {
-            var results = ids.stream().map(id -> executor.submit(() -> {
-                start.await();
-                jdbc.update("UPDATE orders SET order_status='CONFIRMED' WHERE id=?", id);
-                return number(id);
-            })).toList();
+            var results =
+                    ids.stream()
+                            .map(
+                                    id ->
+                                            executor.submit(
+                                                    () -> {
+                                                        start.await();
+                                                        jdbc.update(
+                                                                "UPDATE orders SET"
+                                                                    + " order_status='CONFIRMED'"
+                                                                    + " WHERE id=?",
+                                                                id);
+                                                        return number(id);
+                                                    }))
+                            .toList();
             start.countDown();
             var numbers = new HashSet<Long>();
-            for (var result : results) assertThat(numbers.add(result.get(30, TimeUnit.SECONDS))).isTrue();
+            for (var result : results)
+                assertThat(numbers.add(result.get(30, TimeUnit.SECONDS))).isTrue();
             assertThat(numbers).hasSize(100).allMatch(value -> value != null && value > 0);
         }
     }
@@ -92,11 +123,20 @@ class CustomerOrderNumberIntegrationTest {
         Long assigned = number(id);
         try (var executor = Executors.newFixedThreadPool(8)) {
             var futures = new ArrayList<java.util.concurrent.Future<?>>();
-            for (int i = 0; i < 50; i++) futures.add(executor.submit(() ->
-                    jdbc.update("UPDATE orders SET order_status='CONFIRMED' WHERE id=?", id)));
+            for (int i = 0; i < 50; i++)
+                futures.add(
+                        executor.submit(
+                                () ->
+                                        jdbc.update(
+                                                "UPDATE orders SET order_status='CONFIRMED' WHERE"
+                                                        + " id=?",
+                                                id)));
             for (var future : futures) future.get(30, TimeUnit.SECONDS);
         }
-        jdbc.update("UPDATE orders SET order_status='CANCELLED',customer_order_number=999999999 WHERE id=?", id);
+        jdbc.update(
+                "UPDATE orders SET order_status='CANCELLED',customer_order_number=999999999 WHERE"
+                        + " id=?",
+                id);
         assertThat(number(id)).isEqualTo(assigned);
         jdbc.update("UPDATE orders SET customer_order_number=NULL WHERE id=?", id);
         assertThat(number(id)).isEqualTo(assigned);
@@ -105,14 +145,20 @@ class CustomerOrderNumberIntegrationTest {
     @Test
     void failedPaymentsHaveNoPublicNumberAndRolledBackConfirmationsDoNotReuseNumbers() {
         long id = pending(branch());
-        jdbc.update("UPDATE orders SET order_status='PAYMENT_FAILED',customer_order_number=1 WHERE id=?", id);
+        jdbc.update(
+                "UPDATE orders SET order_status='PAYMENT_FAILED',customer_order_number=1 WHERE"
+                        + " id=?",
+                id);
         assertThat(number(id)).isNull();
         var reserved = new long[1];
-        new TransactionTemplate(transactions).executeWithoutResult(tx -> {
-            jdbc.update("UPDATE orders SET order_status='CONFIRMED' WHERE id=?", id);
-            reserved[0] = number(id);
-            tx.setRollbackOnly();
-        });
+        new TransactionTemplate(transactions)
+                .executeWithoutResult(
+                        tx -> {
+                            jdbc.update(
+                                    "UPDATE orders SET order_status='CONFIRMED' WHERE id=?", id);
+                            reserved[0] = number(id);
+                            tx.setRollbackOnly();
+                        });
         assertThat(number(id)).isNull();
         long another = pending(branch());
         jdbc.update("UPDATE orders SET order_status='CONFIRMED' WHERE id=?", another);

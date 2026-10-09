@@ -1,5 +1,8 @@
 package com.gokulsweets.restaurant.order.lifecycle.service;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
+
 import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.delivery.DeliveryRiderHoldService;
 import com.gokulsweets.restaurant.inventory.exception.InventoryConflictException;
@@ -13,12 +16,10 @@ import com.gokulsweets.restaurant.order.service.AdminOrderWorkflowService;
 import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
 import com.gokulsweets.restaurant.pickup.service.PickupSlotReservationService;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.*;
 
 class DeliveryHandoffLifecycleTest {
     private final OrderRepository orders = mock(OrderRepository.class);
@@ -28,9 +29,23 @@ class DeliveryHandoffLifecycleTest {
     private final StaffAuthorizationService staff = mock(StaffAuthorizationService.class);
     private final PickupSlotReservationService pickup = mock(PickupSlotReservationService.class);
     private final DeliveryRiderHoldService riders = mock(DeliveryRiderHoldService.class);
-    private final OrderInventoryLifecycleService inventory = mock(OrderInventoryLifecycleService.class);
-    private final AdminOrderLifecycleCoordinator coordinator = new AdminOrderLifecycleCoordinator(
-            mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class), orders, payments, workflow, queries, staff, pickup, riders, inventory, mock(com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox.class),mock(com.gokulsweets.restaurant.order.service.PickupCodeService.class));
+    private final OrderInventoryLifecycleService inventory =
+            mock(OrderInventoryLifecycleService.class);
+    private final AdminOrderLifecycleCoordinator coordinator =
+            new AdminOrderLifecycleCoordinator(
+                    mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
+                    orders,
+                    payments,
+                    workflow,
+                    queries,
+                    staff,
+                    pickup,
+                    riders,
+                    inventory,
+                    mock(
+                            com.gokulsweets.restaurant.customer.notification
+                                    .CustomerNotificationInbox.class),
+                    mock(com.gokulsweets.restaurant.order.service.PickupCodeService.class));
 
     @Test
     void inventoryIsFulfilledOnDeliveredButNotOnDispatchAndRetriesAreIdempotent() {
@@ -48,7 +63,8 @@ class DeliveryHandoffLifecycleTest {
         when(orders.findForUpdate("DEL-1")).thenReturn(Optional.of(order));
         when(payments.existsByOrderId(1L)).thenReturn(true);
 
-        assertThrows(InventoryConflictException.class,
+        assertThrows(
+                InventoryConflictException.class,
                 () -> coordinator.cancelUnpaidOrder("DEL-1", "Customer request"));
         verifyNoInteractions(riders, inventory);
         verify(orders, never()).saveAndFlush(any());
@@ -59,10 +75,10 @@ class DeliveryHandoffLifecycleTest {
         Order order = deliveryOrder(OrderStatus.OUT_FOR_DELIVERY);
         when(orders.findForUpdate("DEL-1")).thenReturn(Optional.of(order));
 
-        assertThrows(IllegalStateException.class,
+        assertThrows(
+                IllegalStateException.class,
                 () -> coordinator.cancelUnpaidOrder("DEL-1", "Customer request"));
-        assertThrows(IllegalStateException.class,
-                () -> coordinator.collectLateOrder("DEL-1"));
+        assertThrows(IllegalStateException.class, () -> coordinator.collectLateOrder("DEL-1"));
         verifyNoInteractions(riders, inventory);
     }
 

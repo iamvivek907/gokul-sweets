@@ -84,3 +84,82 @@ tasks.register('enhancementTest', Test) {
 tasks.named('check') {
 	dependsOn tasks.named('enhancementTest')
 }
+
+// Development-only tools; neither formatter nor parser enters the deployment runtime.
+configurations {
+    javaFormatting
+    maintenanceVerification
+}
+dependencies {
+    javaFormatting 'com.google.googlejavaformat:google-java-format:1.24.0:all-deps'
+    maintenanceVerification 'com.github.javaparser:javaparser-core:3.27.1'
+}
+
+def maintainedJava = fileTree('src') { include '**/*.java' } + fileTree('tools') { include '**/*.java' }
+tasks.register('formatJava', JavaExec) {
+    group = 'formatting'
+    description = 'Formats maintained Java sources with four-space AOSP Java style.'
+    classpath = configurations.javaFormatting
+    mainClass = 'com.google.googlejavaformat.java.Main'
+    // Match the formatter JAR's Add-Exports manifest when launched through a classpath.
+    jvmArgs = ['api', 'code', 'file', 'parser', 'tree', 'util'].collect {
+        '--add-exports=jdk.compiler/com.sun.tools.javac.' + it + '=ALL-UNNAMED'
+    }
+    maxHeapSize = '256m'
+    doFirst { args = ['--aosp', '--replace'] + maintainedJava.files.sort().collect { it.absolutePath } }
+}
+tasks.register('checkJavaFormat', JavaExec) {
+    group = 'verification'
+    description = 'Rejects Java formatting drift without rewriting files.'
+    classpath = configurations.javaFormatting
+    mainClass = 'com.google.googlejavaformat.java.Main'
+    // Match the formatter JAR's Add-Exports manifest when launched through a classpath.
+    jvmArgs = ['api', 'code', 'file', 'parser', 'tree', 'util'].collect {
+        '--add-exports=jdk.compiler/com.sun.tools.javac.' + it + '=ALL-UNNAMED'
+    }
+    maxHeapSize = '256m'
+    doFirst { args = ['--aosp', '--dry-run', '--set-exit-if-changed'] + maintainedJava.files.sort().collect { it.absolutePath } }
+}
+tasks.named('check') { dependsOn tasks.named('checkJavaFormat') }
+
+tasks.register('compileMaintenanceVerification', JavaCompile) {
+    source = fileTree('tools') { include '**/*.java' }
+    classpath = configurations.maintenanceVerification
+    destinationDirectory = layout.buildDirectory.dir('maintenance-verification')
+    options.release = 21
+}
+tasks.register('verifyBehaviorPreservation', JavaExec) {
+    group = 'verification'
+    description = 'Compares this maintenance refactor with an explicit base Git revision.'
+    dependsOn tasks.named('compileMaintenanceVerification')
+    classpath = files(layout.buildDirectory.dir('maintenance-verification')) + configurations.maintenanceVerification
+    mainClass = 'BehaviorPreservationCheck'
+    maxHeapSize = '256m'
+    doFirst {
+        if (!project.hasProperty('maintenanceBaseRevision')) {
+            throw new GradleException('Supply -PmaintenanceBaseRevision=<Git revision> for this one-time maintenance comparison.')
+        }
+        args = [rootProject.projectDir.parentFile.absolutePath, project.property('maintenanceBaseRevision').toString()]
+    }
+}
+
+tasks.register('checkMethodTimingCoverage', JavaExec) {
+    group = 'verification'
+    description = 'Enforces JavaDoc and timing coverage for explicitly declared backend methods.'
+    dependsOn tasks.named('compileMaintenanceVerification')
+    classpath = files(layout.buildDirectory.dir('maintenance-verification')) + configurations.maintenanceVerification
+    mainClass = 'MethodTimingCoverageCheck'
+    maxHeapSize = '256m'
+    args = [file('src/main/java').absolutePath]
+}
+tasks.named('check') { dependsOn tasks.named('checkMethodTimingCoverage') }
+
+// Test the verifier itself: paired but copied labels must not pass future source checks.
+tasks.register('testMethodTimingCoverage', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('compileMaintenanceVerification')
+    classpath = files(layout.buildDirectory.dir('maintenance-verification')) + configurations.maintenanceVerification
+    mainClass = 'MethodTimingCoverageCheckTest'
+    maxHeapSize = '256m'
+}
+tasks.named('check') { dependsOn tasks.named('testMethodTimingCoverage') }

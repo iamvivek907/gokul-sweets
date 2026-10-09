@@ -1,15 +1,16 @@
 package com.gokulsweets.restaurant.payment.provider;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
 import com.gokulsweets.restaurant.order.entity.Order;
 import com.gokulsweets.restaurant.payment.entity.Payment;
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PaymentProviderRegistryTest {
 
@@ -42,8 +43,7 @@ class PaymentProviderRegistryTest {
                 .containsExactlyInAnyOrder(
                         PaymentProviderType.RAZORPAY,
                         PaymentProviderType.PAYTM,
-                        PaymentProviderType.PHONEPE
-                );
+                        PaymentProviderType.PHONEPE);
     }
 
     private PaymentProviderRegistry registry(String enabled, String defaultProvider) {
@@ -51,11 +51,9 @@ class PaymentProviderRegistryTest {
                 List.of(
                         provider(PaymentProviderType.RAZORPAY),
                         provider(PaymentProviderType.PAYTM),
-                        provider(PaymentProviderType.PHONEPE)
-                ),
+                        provider(PaymentProviderType.PHONEPE)),
                 enabled,
-                defaultProvider
-        );
+                defaultProvider);
     }
 
     private PaymentProvider provider(PaymentProviderType type) {

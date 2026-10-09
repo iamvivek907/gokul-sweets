@@ -202,6 +202,13 @@ jobs:
           distribution: temurin
           java-version: '21'
       - uses: gradle/actions/setup-gradle@v4
+      - name: Verify maintenance-only behavior preservation
+        if: github.event_name == 'pull_request' && github.head_ref == 'codex/backend-maintainability'
+        env:
+          MAINTENANCE_BASE_REVISION: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --depth=1 origin "$MAINTENANCE_BASE_REVISION"
+          ./gradlew --no-daemon verifyBehaviorPreservation -PmaintenanceBaseRevision="$MAINTENANCE_BASE_REVISION"
       - name: JUnit, enhancement regressions, and build
         run: ./gradlew --no-daemon clean build bootJar
       - name: Show test failure details

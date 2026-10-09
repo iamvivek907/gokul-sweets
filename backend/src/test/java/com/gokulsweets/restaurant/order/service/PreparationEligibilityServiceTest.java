@@ -1,71 +1,72 @@
 package com.gokulsweets.restaurant.order.service;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.order.config.PreparationWindowProperties;
 import com.gokulsweets.restaurant.order.entity.Order;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
 import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.order.enums.PreparationEligibilityStatus;
-import com.gokulsweets.restaurant.order.enums.FulfillmentType;
-import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.core.RowMapper;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
 
 class PreparationEligibilityServiceTest {
 
     private PreparationEligibilityService service;
     private JdbcTemplate jdbc;
 
-
     @BeforeEach
     void setUp() {
 
-        PreparationWindowProperties properties =
-                new PreparationWindowProperties();
+        PreparationWindowProperties properties = new PreparationWindowProperties();
 
+        properties.setNormalLeadMinutes(60);
 
-        properties.setNormalLeadMinutes(
-                60
-        );
+        properties.setPriorityLeadMinutes(30);
 
-
-        properties.setPriorityLeadMinutes(
-                30
-        );
-
-
-        properties.setAdminOverrideLeadMinutes(
-                60
-        );
-
+        properties.setAdminOverrideLeadMinutes(60);
 
         jdbc = mock(JdbcTemplate.class);
-        service =
-                new PreparationEligibilityService(
-                        properties, jdbc
-                );
+        service = new PreparationEligibilityService(properties, jdbc);
     }
 
     @Test
     void earlyPackingUsesExplicitWholeBasketPolicyAndOnlyThePickupDay() {
-        var branch=new Branch();branch.setId(1L);
-        var slot=new PickupSlot();slot.setSlotDate(LocalDate.of(2026,10,5));slot.setStartTime(LocalTime.of(20,0));
-        var order=new Order();order.setId(11L);order.setBranch(branch);order.setPickupSlot(slot);order.setPickupType(PickupType.NORMAL);order.setOrderStatus(OrderStatus.CONFIRMED);
-        when(jdbc.queryForObject(anyString(),eq(Boolean.class),eq(1L),eq(11L))).thenReturn(true);
-        assertEquals(PreparationEligibilityStatus.ELIGIBLE,service.evaluate(order,LocalDateTime.of(2026,10,5,12,0)).status());
-        assertEquals(PreparationEligibilityStatus.SCHEDULED,service.evaluate(order,LocalDateTime.of(2026,10,4,12,0)).status());
-        when(jdbc.queryForObject(anyString(),eq(Boolean.class),eq(1L),eq(11L))).thenReturn(false);
-        assertEquals(PreparationEligibilityStatus.SCHEDULED,service.evaluate(order,LocalDateTime.of(2026,10,5,12,0)).status());
+        var branch = new Branch();
+        branch.setId(1L);
+        var slot = new PickupSlot();
+        slot.setSlotDate(LocalDate.of(2026, 10, 5));
+        slot.setStartTime(LocalTime.of(20, 0));
+        var order = new Order();
+        order.setId(11L);
+        order.setBranch(branch);
+        order.setPickupSlot(slot);
+        order.setPickupType(PickupType.NORMAL);
+        order.setOrderStatus(OrderStatus.CONFIRMED);
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(1L), eq(11L))).thenReturn(true);
+        assertEquals(
+                PreparationEligibilityStatus.ELIGIBLE,
+                service.evaluate(order, LocalDateTime.of(2026, 10, 5, 12, 0)).status());
+        assertEquals(
+                PreparationEligibilityStatus.SCHEDULED,
+                service.evaluate(order, LocalDateTime.of(2026, 10, 4, 12, 0)).status());
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq(1L), eq(11L)))
+                .thenReturn(false);
+        assertEquals(
+                PreparationEligibilityStatus.SCHEDULED,
+                service.evaluate(order, LocalDateTime.of(2026, 10, 5, 12, 0)).status());
     }
 
     @Test
@@ -77,16 +78,27 @@ class PreparationEligibilityServiceTest {
         var branch = new Branch();
         branch.setId(7L);
         order.setBranch(branch);
-        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
-                eq(91L), eq(7L))).thenReturn(java.util.List.of(LocalDateTime.of(2026, 9, 27, 19, 30)));
-        assertEquals(PreparationEligibilityStatus.SCHEDULED,
+        when(jdbc.query(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
+                        eq(91L),
+                        eq(7L)))
+                .thenReturn(java.util.List.of(LocalDateTime.of(2026, 9, 27, 19, 30)));
+        assertEquals(
+                PreparationEligibilityStatus.SCHEDULED,
                 service.evaluate(order, LocalDateTime.of(2026, 9, 27, 18, 29)).status());
-        assertEquals(PreparationEligibilityStatus.ELIGIBLE,
+        assertEquals(
+                PreparationEligibilityStatus.ELIGIBLE,
                 service.evaluate(order, LocalDateTime.of(2026, 9, 27, 18, 30)).status());
-        assertEquals(PreparationEligibilityStatus.OVERDUE,
+        assertEquals(
+                PreparationEligibilityStatus.OVERDUE,
                 service.evaluate(order, LocalDateTime.of(2026, 9, 27, 19, 30)).status());
-        verify(jdbc, times(3)).query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
-                eq(91L), eq(7L));
+        verify(jdbc, times(3))
+                .query(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
+                        eq(91L),
+                        eq(7L));
     }
 
     @Test
@@ -95,13 +107,19 @@ class PreparationEligibilityServiceTest {
         order.setOrderStatus(OrderStatus.CONFIRMED);
         order.setFulfillmentType(FulfillmentType.DELIVERY);
         order.setDeliveryWindowId(91L);
-        var branch = new Branch(); branch.setId(7L); order.setBranch(branch);
-        when(jdbc.query(anyString(), org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
-                eq(91L), eq(7L))).thenReturn(java.util.List.of());
-        assertThrows(IllegalStateException.class,
+        var branch = new Branch();
+        branch.setId(7L);
+        order.setBranch(branch);
+        when(jdbc.query(
+                        anyString(),
+                        org.mockito.ArgumentMatchers.<RowMapper<LocalDateTime>>any(),
+                        eq(91L),
+                        eq(7L)))
+                .thenReturn(java.util.List.of());
+        assertThrows(
+                IllegalStateException.class,
                 () -> service.evaluate(order, LocalDateTime.of(2026, 9, 27, 18, 30)));
     }
-
 
     /*
      * =========================================================
@@ -114,59 +132,18 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.NORMAL,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
+                        PickupType.NORMAL, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
+        LocalDateTime now = LocalDateTime.of(2026, 9, 25, 18, 29);
 
-        LocalDateTime now =
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        18,
-                        29
-                );
+        PreparationEligibility result = service.evaluate(order, now);
 
+        assertEquals(PreparationEligibilityStatus.SCHEDULED, result.status());
 
-        PreparationEligibility result =
-                service.evaluate(
-                        order,
-                        now
-                );
+        assertFalse(result.canStartPreparation());
 
-
-        assertEquals(
-                PreparationEligibilityStatus.SCHEDULED,
-                result.status()
-        );
-
-
-        assertFalse(
-                result.canStartPreparation()
-        );
-
-
-        assertEquals(
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        18,
-                        30
-                ),
-                result.eligibleAt()
-        );
+        assertEquals(LocalDateTime.of(2026, 9, 25, 18, 30), result.eligibleAt());
     }
-
 
     /*
      * =========================================================
@@ -179,53 +156,18 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.NORMAL,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
+                        PickupType.NORMAL, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
+        LocalDateTime now = LocalDateTime.of(2026, 9, 25, 18, 30);
 
-        LocalDateTime now =
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        18,
-                        30
-                );
+        PreparationEligibility result = service.evaluate(order, now);
 
+        assertEquals(PreparationEligibilityStatus.ELIGIBLE, result.status());
 
-        PreparationEligibility result =
-                service.evaluate(
-                        order,
-                        now
-                );
+        assertTrue(result.canStartPreparation());
 
-
-        assertEquals(
-                PreparationEligibilityStatus.ELIGIBLE,
-                result.status()
-        );
-
-
-        assertTrue(
-                result.canStartPreparation()
-        );
-
-
-        assertEquals(
-                60,
-                result.minutesUntilPickup()
-        );
+        assertEquals(60, result.minutesUntilPickup());
     }
-
 
     /*
      * =========================================================
@@ -238,53 +180,18 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.NORMAL,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
+                        PickupType.NORMAL, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
+        LocalDateTime now = LocalDateTime.of(2026, 9, 25, 19, 0);
 
-        LocalDateTime now =
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        19,
-                        0
-                );
+        PreparationEligibility result = service.evaluate(order, now);
 
+        assertEquals(PreparationEligibilityStatus.ELIGIBLE, result.status());
 
-        PreparationEligibility result =
-                service.evaluate(
-                        order,
-                        now
-                );
+        assertTrue(result.canStartPreparation());
 
-
-        assertEquals(
-                PreparationEligibilityStatus.ELIGIBLE,
-                result.status()
-        );
-
-
-        assertTrue(
-                result.canStartPreparation()
-        );
-
-
-        assertEquals(
-                30,
-                result.minutesUntilPickup()
-        );
+        assertEquals(30, result.minutesUntilPickup());
     }
-
 
     /*
      * =========================================================
@@ -297,53 +204,18 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.NORMAL,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
+                        PickupType.NORMAL, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
+        LocalDateTime now = LocalDateTime.of(2026, 9, 25, 19, 30);
 
-        LocalDateTime now =
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        19,
-                        30
-                );
+        PreparationEligibility result = service.evaluate(order, now);
 
+        assertEquals(PreparationEligibilityStatus.OVERDUE, result.status());
 
-        PreparationEligibility result =
-                service.evaluate(
-                        order,
-                        now
-                );
+        assertTrue(result.canStartPreparation());
 
-
-        assertEquals(
-                PreparationEligibilityStatus.OVERDUE,
-                result.status()
-        );
-
-
-        assertTrue(
-                result.canStartPreparation()
-        );
-
-
-        assertEquals(
-                0,
-                result.minutesUntilPickup()
-        );
+        assertEquals(0, result.minutesUntilPickup());
     }
-
 
     /*
      * =========================================================
@@ -356,53 +228,18 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.NORMAL,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
+                        PickupType.NORMAL, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
+        LocalDateTime now = LocalDateTime.of(2026, 9, 25, 19, 45);
 
-        LocalDateTime now =
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        19,
-                        45
-                );
+        PreparationEligibility result = service.evaluate(order, now);
 
+        assertEquals(PreparationEligibilityStatus.OVERDUE, result.status());
 
-        PreparationEligibility result =
-                service.evaluate(
-                        order,
-                        now
-                );
+        assertTrue(result.canStartPreparation());
 
-
-        assertEquals(
-                PreparationEligibilityStatus.OVERDUE,
-                result.status()
-        );
-
-
-        assertTrue(
-                result.canStartPreparation()
-        );
-
-
-        assertEquals(
-                -15,
-                result.minutesUntilPickup()
-        );
+        assertEquals(-15, result.minutesUntilPickup());
     }
-
 
     /*
      * =========================================================
@@ -415,74 +252,22 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.PRIORITY,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
-
+                        PickupType.PRIORITY, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
         PreparationEligibility scheduled =
-                service.evaluate(
-                        order,
-                        LocalDateTime.of(
-                                2026,
-                                9,
-                                25,
-                                18,
-                                59
-                        )
-                );
+                service.evaluate(order, LocalDateTime.of(2026, 9, 25, 18, 59));
 
+        assertEquals(PreparationEligibilityStatus.SCHEDULED, scheduled.status());
 
-        assertEquals(
-                PreparationEligibilityStatus.SCHEDULED,
-                scheduled.status()
-        );
-
-
-        assertEquals(
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        19,
-                        0
-                ),
-                scheduled.eligibleAt()
-        );
-
+        assertEquals(LocalDateTime.of(2026, 9, 25, 19, 0), scheduled.eligibleAt());
 
         PreparationEligibility eligible =
-                service.evaluate(
-                        order,
-                        LocalDateTime.of(
-                                2026,
-                                9,
-                                25,
-                                19,
-                                0
-                        )
-                );
+                service.evaluate(order, LocalDateTime.of(2026, 9, 25, 19, 0));
 
+        assertEquals(PreparationEligibilityStatus.ELIGIBLE, eligible.status());
 
-        assertEquals(
-                PreparationEligibilityStatus.ELIGIBLE,
-                eligible.status()
-        );
-
-
-        assertTrue(
-                eligible.canStartPreparation()
-        );
+        assertTrue(eligible.canStartPreparation());
     }
-
 
     /*
      * =========================================================
@@ -495,55 +280,17 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.ADMIN_OVERRIDE,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
-
+                        PickupType.ADMIN_OVERRIDE, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
         PreparationEligibility result =
-                service.evaluate(
-                        order,
-                        LocalDateTime.of(
-                                2026,
-                                9,
-                                25,
-                                18,
-                                30
-                        )
-                );
+                service.evaluate(order, LocalDateTime.of(2026, 9, 25, 18, 30));
 
+        assertEquals(PreparationEligibilityStatus.ELIGIBLE, result.status());
 
-        assertEquals(
-                PreparationEligibilityStatus.ELIGIBLE,
-                result.status()
-        );
+        assertEquals(LocalDateTime.of(2026, 9, 25, 18, 30), result.eligibleAt());
 
-
-        assertEquals(
-                LocalDateTime.of(
-                        2026,
-                        9,
-                        25,
-                        18,
-                        30
-                ),
-                result.eligibleAt()
-        );
-
-
-        assertTrue(
-                result.canStartPreparation()
-        );
+        assertTrue(result.canStartPreparation());
     }
-
 
     /*
      * =========================================================
@@ -556,58 +303,21 @@ class PreparationEligibilityServiceTest {
 
         Order order =
                 createConfirmedOrder(
-                        PickupType.NORMAL,
-                        LocalDate.of(
-                                2026,
-                                9,
-                                25
-                        ),
-                        LocalTime.of(
-                                19,
-                                30
-                        )
-                );
+                        PickupType.NORMAL, LocalDate.of(2026, 9, 25), LocalTime.of(19, 30));
 
-
-        order.setOrderStatus(
-                OrderStatus.PREPARING
-        );
-
+        order.setOrderStatus(OrderStatus.PREPARING);
 
         PreparationEligibility result =
-                service.evaluate(
-                        order,
-                        LocalDateTime.of(
-                                2026,
-                                9,
-                                25,
-                                18,
-                                45
-                        )
-                );
+                service.evaluate(order, LocalDateTime.of(2026, 9, 25, 18, 45));
 
+        assertEquals(PreparationEligibilityStatus.NOT_APPLICABLE, result.status());
 
-        assertEquals(
-                PreparationEligibilityStatus.NOT_APPLICABLE,
-                result.status()
-        );
+        assertFalse(result.canStartPreparation());
 
+        assertNull(result.pickupAt());
 
-        assertFalse(
-                result.canStartPreparation()
-        );
-
-
-        assertNull(
-                result.pickupAt()
-        );
-
-
-        assertNull(
-                result.eligibleAt()
-        );
+        assertNull(result.eligibleAt());
     }
-
 
     /*
      * =========================================================
@@ -616,50 +326,23 @@ class PreparationEligibilityServiceTest {
      */
 
     private Order createConfirmedOrder(
-            PickupType pickupType,
-            LocalDate pickupDate,
-            LocalTime pickupStartTime
-    ) {
+            PickupType pickupType, LocalDate pickupDate, LocalTime pickupStartTime) {
 
-        PickupSlot pickupSlot =
-                new PickupSlot();
+        PickupSlot pickupSlot = new PickupSlot();
 
+        pickupSlot.setSlotDate(pickupDate);
 
-        pickupSlot.setSlotDate(
-                pickupDate
-        );
+        pickupSlot.setStartTime(pickupStartTime);
 
+        pickupSlot.setEndTime(pickupStartTime.plusMinutes(30));
 
-        pickupSlot.setStartTime(
-                pickupStartTime
-        );
+        Order order = new Order();
 
+        order.setOrderStatus(OrderStatus.CONFIRMED);
 
-        pickupSlot.setEndTime(
-                pickupStartTime.plusMinutes(
-                        30
-                )
-        );
+        order.setPickupType(pickupType);
 
-
-        Order order =
-                new Order();
-
-
-        order.setOrderStatus(
-                OrderStatus.CONFIRMED
-        );
-
-
-        order.setPickupType(
-                pickupType
-        );
-
-
-        order.setPickupSlot(
-                pickupSlot
-        );
-
+        order.setPickupSlot(pickupSlot);
 
         return order;
     }

@@ -1,24 +1,22 @@
 package com.gokulsweets.restaurant.product;
 
 import com.gokulsweets.restaurant.category.Category;
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.tax.TaxCategory;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted product state. */
 @Entity
 @Table(
         name = "products",
-        uniqueConstraints = {
-                @UniqueConstraint(
-                        name = "uk_products_code",
-                        columnNames = "code"
-                )
-        }
-)
+        uniqueConstraints = {@UniqueConstraint(name = "uk_products_code", columnNames = "code")})
 @Getter
 @Setter
 public class Product {
@@ -27,36 +25,18 @@ public class Product {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-
-    @Column(
-            nullable = false,
-            unique = true,
-            length = 100
-    )
+    @Column(nullable = false, unique = true, length = 100)
     private String code;
 
-
-    @ManyToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "category_id",
-            nullable = false
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
-
-    @Column(
-            nullable = false,
-            length = 150
-    )
+    @Column(nullable = false, length = 150)
     private String name;
-
 
     @Column(length = 500)
     private String description;
-
 
     /*
      * UNIT:
@@ -65,31 +45,18 @@ public class Product {
      * WEIGHT:
      * Price for one kilogram.
      */
-    @Column(
-            nullable = false,
-            precision = 12,
-            scale = 2
-    )
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal basePrice;
 
-
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "sale_mode",
-            nullable = false,
-            length = 20
-    )
-    private ProductSaleMode saleMode =
-            ProductSaleMode.UNIT;
-
+    @Column(name = "sale_mode", nullable = false, length = 20)
+    private ProductSaleMode saleMode = ProductSaleMode.UNIT;
 
     @Column(name = "minimum_weight_grams")
     private Integer minimumWeightGrams;
 
-
     @Column(name = "weight_step_grams")
     private Integer weightStepGrams;
-
 
     @Column(nullable = false)
     private boolean active = true;
@@ -99,7 +66,6 @@ public class Product {
     @Column(nullable = false, updatable = false)
     private boolean vegetarian = true;
 
-
     /*
      * Cloudflare R2 public image URL.
      *
@@ -107,42 +73,40 @@ public class Product {
      *
      * https://pub-1486d596635f4a65aa86b4afd04bec85.r2.dev/products/15.jpg
      */
-    @Column(
-            name = "image_url",
-            length = 1000
-    )
+    @Column(name = "image_url", length = 1000)
     private String imageUrl;
-
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-
     @Column(nullable = false)
     private LocalDateTime updatedAt;
-
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tax_category_id")
     private TaxCategory taxCategory;
 
-
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-
-        LocalDateTime now =
-                LocalDateTime.now();
-
-        createdAt = now;
-
-        updatedAt = now;
+        final long __gokulMethodStartedNanos = MethodTiming.start(Product.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Product.class, "onCreate()");
+        }
     }
 
-
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-
-        updatedAt =
-                LocalDateTime.now();
+        final long __gokulMethodStartedNanos = MethodTiming.start(Product.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Product.class, "onUpdate()");
+        }
     }
 }

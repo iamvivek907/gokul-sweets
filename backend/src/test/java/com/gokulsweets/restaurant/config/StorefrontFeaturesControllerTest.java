@@ -1,5 +1,7 @@
 package com.gokulsweets.restaurant.config;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.Test;
 
 import java.time.Clock;
@@ -7,10 +9,9 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 class StorefrontFeaturesControllerTest {
-    private final Clock clock = Clock.fixed(Instant.parse("2026-09-25T18:31:00Z"), ZoneId.of("Asia/Kolkata"));
+    private final Clock clock =
+            Clock.fixed(Instant.parse("2026-09-25T18:31:00Z"), ZoneId.of("Asia/Kolkata"));
 
     @Test
     void rewardsRequireTheirOwnSwitchIdentityAndAcceptedQuotes() {
@@ -209,8 +210,16 @@ class StorefrontFeaturesControllerTest {
         assertThat(previewEnabled.inPlaceBranchSwitch()).isTrue();
         assertThat(previewEnabled.smartAvailability()).isFalse();
         properties.setAuthoritativePickupCommitment(true);
-        assertThat(new StorefrontFeaturesController(properties, clock).features().authoritativePickupCommitment()).isFalse();
+        assertThat(
+                        new StorefrontFeaturesController(properties, clock)
+                                .features()
+                                .authoritativePickupCommitment())
+                .isFalse();
         properties.setSmartAvailability(true);
-        assertThat(new StorefrontFeaturesController(properties, clock).features().authoritativePickupCommitment()).isTrue();
+        assertThat(
+                        new StorefrontFeaturesController(properties, clock)
+                                .features()
+                                .authoritativePickupCommitment())
+                .isTrue();
     }
 }

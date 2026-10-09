@@ -1,8 +1,18 @@
 package com.gokulsweets.restaurant.delivery;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
+
 import com.gokulsweets.restaurant.branch.BranchRepository;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,21 +27,13 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
-
 @SpringBootTest
 @Transactional
 class DeliveryCapacityServiceIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired BranchRepository branches;
-    private static final Clock IST = Clock.fixed(Instant.parse("2026-09-27T18:35:00Z"), ZoneId.of("Asia/Kolkata"));
+    private static final Clock IST =
+            Clock.fixed(Instant.parse("2026-09-27T18:35:00Z"), ZoneId.of("Asia/Kolkata"));
     private static final LocalDate TODAY = LocalDate.of(2026, 9, 28);
 
     @Test
@@ -39,52 +41,120 @@ class DeliveryCapacityServiceIntegrationTest {
         var flags = flags();
         var zones = new DeliveryZoneService(flags, jdbc, branches);
         var stock = mock(DeliveryStockCheck.class);
-        when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(true, null));
+        when(stock.check(anyLong(), any(), anyList()))
+                .thenReturn(new DeliveryStockCheck.Check(true, null));
         var boundaries = mock(DeliveryBoundaryService.class);
         var service = new DeliveryCapacityService(flags, zones, jdbc, IST, stock, boundaries);
         var key = UUID.randomUUID().toString().substring(0, 8);
-        Long branch = jdbc.queryForObject("INSERT INTO branches (code, name) VALUES (?, ?) RETURNING id",
-                Long.class, "DWC-" + key, "Delivery " + key);
-        Long category = jdbc.queryForObject("INSERT INTO categories (code, name) VALUES (?, ?) RETURNING id",
-                Long.class, "DWC-C-" + key, "Category " + key);
-        Long product = jdbc.queryForObject("INSERT INTO products (code, category_id, name, base_price) VALUES (?, ?, ?, 100) RETURNING id",
-                Long.class, "DWC-P-" + key, category, "Product " + key);
-        jdbc.update("INSERT INTO branch_products (branch_id, product_id) VALUES (?, ?)", branch, product);
-        var zoneRequest = new DeliveryZoneService.Configuration("Hazratganj", "226001", LocalTime.of(10, 0),
-                LocalTime.of(20, 0), true, false, List.of(product));
+        Long branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches (code, name) VALUES (?, ?) RETURNING id",
+                        Long.class,
+                        "DWC-" + key,
+                        "Delivery " + key);
+        Long category =
+                jdbc.queryForObject(
+                        "INSERT INTO categories (code, name) VALUES (?, ?) RETURNING id",
+                        Long.class,
+                        "DWC-C-" + key,
+                        "Category " + key);
+        Long product =
+                jdbc.queryForObject(
+                        "INSERT INTO products (code, category_id, name, base_price) VALUES (?, ?,"
+                                + " ?, 100) RETURNING id",
+                        Long.class,
+                        "DWC-P-" + key,
+                        category,
+                        "Product " + key);
+        jdbc.update(
+                "INSERT INTO branch_products (branch_id, product_id) VALUES (?, ?)",
+                branch,
+                product);
+        var zoneRequest =
+                new DeliveryZoneService.Configuration(
+                        "Hazratganj",
+                        "226001",
+                        LocalTime.of(10, 0),
+                        LocalTime.of(20, 0),
+                        true,
+                        false,
+                        List.of(product));
         var zone = zones.configure(branch, zoneRequest);
-        var window = service.configure(branch, zone.id(), new DeliveryCapacityService.WindowConfiguration(
-                TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 2, false));
+        var window =
+                service.configure(
+                        branch,
+                        zone.id(),
+                        new DeliveryCapacityService.WindowConfiguration(
+                                TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 2, false));
         var items = List.of(new CreateOrderItemRequest(product, 1, null));
-        var quote = new DeliveryCapacityService.QuoteRequest(branch, " HAZRATGANJ ", "226001", TODAY, items);
+        var quote =
+                new DeliveryCapacityService.QuoteRequest(
+                        branch, " HAZRATGANJ ", "226001", TODAY, items);
 
-        assertThat(service.quote(quote).provisionalWindows()).singleElement()
-                .extracting(DeliveryCapacityService.Window::id).isEqualTo(window.id());
+        assertThat(service.quote(quote).provisionalWindows())
+                .singleElement()
+                .extracting(DeliveryCapacityService.Window::id)
+                .isEqualTo(window.id());
         assertThat(service.quote(quote).orderable()).isFalse();
         flags.setDeliveryAddressBoundaries(true);
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
         when(boundaries.contains(zone.id(), 26.85, 80.94)).thenReturn(true);
-        var pinned = new DeliveryCapacityService.QuoteRequest(branch, "HAZRATGANJ", "226001", TODAY,
-                items, 26.85, 80.94);
+        var pinned =
+                new DeliveryCapacityService.QuoteRequest(
+                        branch, "HAZRATGANJ", "226001", TODAY, items, 26.85, 80.94);
         assertThat(service.quote(pinned).provisionalWindows()).hasSize(1);
         flags.setDeliveryAddressBoundaries(false);
-        when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(false, "Insufficient stock."));
+        when(stock.check(anyLong(), any(), anyList()))
+                .thenReturn(new DeliveryStockCheck.Check(false, "Insufficient stock."));
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
-        when(stock.check(anyLong(), any(), anyList())).thenReturn(new DeliveryStockCheck.Check(true, null));
-        assertThat(service.quote(new DeliveryCapacityService.QuoteRequest(branch, "Hazratganj", "226002", TODAY,
-                items)).provisionalWindows()).isEmpty();
-        assertThat(service.quote(new DeliveryCapacityService.QuoteRequest(branch, "Nearby hamlet", "226001", TODAY,
-                items)).provisionalWindows()).isEmpty();
+        when(stock.check(anyLong(), any(), anyList()))
+                .thenReturn(new DeliveryStockCheck.Check(true, null));
+        assertThat(
+                        service.quote(
+                                        new DeliveryCapacityService.QuoteRequest(
+                                                branch, "Hazratganj", "226002", TODAY, items))
+                                .provisionalWindows())
+                .isEmpty();
+        assertThat(
+                        service.quote(
+                                        new DeliveryCapacityService.QuoteRequest(
+                                                branch, "Nearby hamlet", "226001", TODAY, items))
+                                .provisionalWindows())
+                .isEmpty();
 
-        jdbc.update("UPDATE delivery_capacity_windows SET reserved_count = rider_capacity WHERE id = ?", window.id());
+        jdbc.update(
+                "UPDATE delivery_capacity_windows SET reserved_count = rider_capacity WHERE id = ?",
+                window.id());
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
-        assertThatThrownBy(() -> service.configure(branch, zone.id(), new DeliveryCapacityService.WindowConfiguration(
-                TODAY, LocalTime.of(10, 0), LocalTime.of(11, 0), 1, false))).isInstanceOf(IllegalArgumentException.class);
-        jdbc.update("UPDATE delivery_capacity_windows SET reserved_count = 0, paused = true WHERE id = ?", window.id());
+        assertThatThrownBy(
+                        () ->
+                                service.configure(
+                                        branch,
+                                        zone.id(),
+                                        new DeliveryCapacityService.WindowConfiguration(
+                                                TODAY,
+                                                LocalTime.of(10, 0),
+                                                LocalTime.of(11, 0),
+                                                1,
+                                                false)))
+                .isInstanceOf(IllegalArgumentException.class);
+        jdbc.update(
+                "UPDATE delivery_capacity_windows SET reserved_count = 0, paused = true WHERE id ="
+                        + " ?",
+                window.id());
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
-        jdbc.update("UPDATE delivery_capacity_windows SET paused = false WHERE id = ?", window.id());
-        zones.configure(branch, new DeliveryZoneService.Configuration("Hazratganj", "226001", LocalTime.of(10, 0),
-                LocalTime.of(20, 0), true, true, List.of(product)));
+        jdbc.update(
+                "UPDATE delivery_capacity_windows SET paused = false WHERE id = ?", window.id());
+        zones.configure(
+                branch,
+                new DeliveryZoneService.Configuration(
+                        "Hazratganj",
+                        "226001",
+                        LocalTime.of(10, 0),
+                        LocalTime.of(20, 0),
+                        true,
+                        true,
+                        List.of(product)));
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
     }
 
@@ -92,13 +162,25 @@ class DeliveryCapacityServiceIntegrationTest {
     void missingFlagsAndIstBoundaryFailClosed() {
         var flags = flags();
         var zones = new DeliveryZoneService(flags, jdbc, branches);
-        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, mock(DeliveryStockCheck.class),
-                mock(DeliveryBoundaryService.class));
-        var request = new DeliveryCapacityService.QuoteRequest(1, "Hazratganj", "226001", TODAY.minusDays(1),
-                List.of(new CreateOrderItemRequest(1L, 1, null)));
+        var service =
+                new DeliveryCapacityService(
+                        flags,
+                        zones,
+                        jdbc,
+                        IST,
+                        mock(DeliveryStockCheck.class),
+                        mock(DeliveryBoundaryService.class));
+        var request =
+                new DeliveryCapacityService.QuoteRequest(
+                        1,
+                        "Hazratganj",
+                        "226001",
+                        TODAY.minusDays(1),
+                        List.of(new CreateOrderItemRequest(1L, 1, null)));
         assertThat(service.quote(request).provisionalWindows()).isEmpty();
         flags.setDeliveryCapacity(false);
-        assertThatThrownBy(() -> service.quote(request)).isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        assertThatThrownBy(() -> service.quote(request))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
     }
 
     @Test
@@ -106,25 +188,62 @@ class DeliveryCapacityServiceIntegrationTest {
         var flags = flags();
         var zones = new DeliveryZoneService(flags, jdbc, branches);
         var stock = mock(DeliveryStockCheck.class);
-        var service = new DeliveryCapacityService(flags, zones, jdbc, IST, stock,
-                mock(DeliveryBoundaryService.class));
+        var service =
+                new DeliveryCapacityService(
+                        flags, zones, jdbc, IST, stock, mock(DeliveryBoundaryService.class));
         var key = UUID.randomUUID().toString().substring(0, 8);
-        Long branch = jdbc.queryForObject("INSERT INTO branches(code, name) VALUES (?, ?) RETURNING id",
-                Long.class, "PDC-" + key, "Delivery " + key);
-        Long category = jdbc.queryForObject("INSERT INTO categories(code, name) VALUES (?, ?) RETURNING id",
-                Long.class, "PDC-C-" + key, "Category " + key);
-        Long product = jdbc.queryForObject("INSERT INTO products(code, category_id, name, base_price) VALUES (?, ?, ?, 100) RETURNING id",
-                Long.class, "PDC-P-" + key, category, "Product " + key);
-        jdbc.update("INSERT INTO branch_products(branch_id, product_id) VALUES (?, ?)", branch, product);
-        var zone = zones.configure(branch, new DeliveryZoneService.Configuration("Hazratganj", "226001",
-                LocalTime.of(10, 0), LocalTime.of(20, 0), true, false, List.of(product)));
+        Long branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code, name) VALUES (?, ?) RETURNING id",
+                        Long.class,
+                        "PDC-" + key,
+                        "Delivery " + key);
+        Long category =
+                jdbc.queryForObject(
+                        "INSERT INTO categories(code, name) VALUES (?, ?) RETURNING id",
+                        Long.class,
+                        "PDC-C-" + key,
+                        "Category " + key);
+        Long product =
+                jdbc.queryForObject(
+                        "INSERT INTO products(code, category_id, name, base_price) VALUES (?, ?, ?,"
+                                + " 100) RETURNING id",
+                        Long.class,
+                        "PDC-P-" + key,
+                        category,
+                        "Product " + key);
+        jdbc.update(
+                "INSERT INTO branch_products(branch_id, product_id) VALUES (?, ?)",
+                branch,
+                product);
+        var zone =
+                zones.configure(
+                        branch,
+                        new DeliveryZoneService.Configuration(
+                                "Hazratganj",
+                                "226001",
+                                LocalTime.of(10, 0),
+                                LocalTime.of(20, 0),
+                                true,
+                                false,
+                                List.of(product)));
         var date = TODAY.plusDays(1);
-        var early = service.configure(branch, zone.id(), new DeliveryCapacityService.WindowConfiguration(
-                date, LocalTime.of(10, 0), LocalTime.of(11, 0), 1, false));
-        var late = service.configure(branch, zone.id(), new DeliveryCapacityService.WindowConfiguration(
-                date, LocalTime.of(12, 0), LocalTime.of(13, 0), 1, false));
+        var early =
+                service.configure(
+                        branch,
+                        zone.id(),
+                        new DeliveryCapacityService.WindowConfiguration(
+                                date, LocalTime.of(10, 0), LocalTime.of(11, 0), 1, false));
+        var late =
+                service.configure(
+                        branch,
+                        zone.id(),
+                        new DeliveryCapacityService.WindowConfiguration(
+                                date, LocalTime.of(12, 0), LocalTime.of(13, 0), 1, false));
         var items = List.of(new CreateOrderItemRequest(product, 1, null));
-        var quote = new DeliveryCapacityService.QuoteRequest(branch, "Hazratganj", "226001", date, items);
+        var quote =
+                new DeliveryCapacityService.QuoteRequest(
+                        branch, "Hazratganj", "226001", date, items);
         assertThat(service.quote(quote).provisionalWindows()).isEmpty();
         verifyNoInteractions(stock);
         flags.setPlannedDeliveryProduction(true);
@@ -133,7 +252,8 @@ class DeliveryCapacityServiceIntegrationTest {
                 .thenReturn(new DeliveryStockCheck.Check(false, "Not ready"));
         when(stock.checkWindow(branch, date, late.startsAt(), items))
                 .thenReturn(new DeliveryStockCheck.Check(true, null));
-        assertThat(service.quote(quote).provisionalWindows()).extracting(DeliveryCapacityService.Window::id)
+        assertThat(service.quote(quote).provisionalWindows())
+                .extracting(DeliveryCapacityService.Window::id)
                 .containsExactly(late.id());
     }
 

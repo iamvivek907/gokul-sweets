@@ -1,5 +1,8 @@
 package com.gokulsweets.restaurant.order.service;
 
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
 import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.inventory.config.InventoryProperties;
@@ -12,81 +15,154 @@ import com.gokulsweets.restaurant.order.service.model.ValidatedOrderItem;
 import com.gokulsweets.restaurant.pickup.BranchPickupSettingsRepository;
 import com.gokulsweets.restaurant.pickup.repository.PickupSlotRepository;
 import com.gokulsweets.restaurant.product.*;
+
 import org.junit.jupiter.api.Test;
+
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.List;
-import static org.assertj.core.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 class CartAvailabilityServiceTest {
-    @Test void weightHoldsAndFullSlotsProduceSelectableAlternativeDate() {
+    @Test
+    void weightHoldsAndFullSlotsProduceSelectableAlternativeDate() {
         Clock clock = Clock.fixed(Instant.parse("2026-09-22T04:30:00Z"), ZoneId.of("Asia/Kolkata"));
         LocalDate today = LocalDate.now(clock);
         var features = new EnhancementProperties();
-        var inventory = new InventoryProperties(); inventory.setEnforcementEnabled(true);
+        var inventory = new InventoryProperties();
+        inventory.setEnforcementEnabled(true);
         var validation = mock(OrderValidationService.class);
         var policies = mock(BranchInventoryPolicyRepository.class);
         var allocations = mock(InventoryDailyAllocationRepository.class);
         var slots = mock(PickupSlotRepository.class);
         var settings = mock(BranchPickupSettingsRepository.class);
-        var product = new Product(); product.setId(11L); product.setName("Test sweet");
-        var bp = new BranchProduct(); bp.setId(22L); bp.setProduct(product);
-        var policy = new BranchInventoryPolicy(); policy.setBranchProduct(bp); policy.setOnlineEnabled(true);
-        policy.setInventoryUnit(InventoryUnit.GRAM); policy.setControlMode(InventoryControlMode.DAILY_PRODUCTION); policy.setBookingHorizonDays(30);
-        var todayStock = stock(bp, today); todayStock.setHeldQuantity(BigDecimal.valueOf(300));
+        var product = new Product();
+        product.setId(11L);
+        product.setName("Test sweet");
+        var bp = new BranchProduct();
+        bp.setId(22L);
+        bp.setProduct(product);
+        var policy = new BranchInventoryPolicy();
+        policy.setBranchProduct(bp);
+        policy.setOnlineEnabled(true);
+        policy.setInventoryUnit(InventoryUnit.GRAM);
+        policy.setControlMode(InventoryControlMode.DAILY_PRODUCTION);
+        policy.setBookingHorizonDays(30);
+        var todayStock = stock(bp, today);
+        todayStock.setHeldQuantity(BigDecimal.valueOf(300));
         var tomorrowStock = stock(bp, today.plusDays(1));
         var first = SmartOrderingRulesTest.slot(today, LocalTime.NOON);
-        var full = SmartOrderingRulesTest.slot(today.plusDays(1), LocalTime.NOON); full.setBookedCount(5);
-        var available = SmartOrderingRulesTest.slot(today.plusDays(1), LocalTime.of(13, 0)); available.setId(3L);
+        var full = SmartOrderingRulesTest.slot(today.plusDays(1), LocalTime.NOON);
+        full.setBookedCount(5);
+        var available = SmartOrderingRulesTest.slot(today.plusDays(1), LocalTime.of(13, 0));
+        available.setId(3L);
         var request = List.of(new CreateOrderItemRequest(11L, null, 250));
-        when(validation.validatePickupCart(1L, request)).thenReturn(List.of(new ValidatedOrderItem(product, bp, ProductSaleMode.WEIGHT, 1, 250)));
+        when(validation.validatePickupCart(1L, request))
+                .thenReturn(
+                        List.of(
+                                new ValidatedOrderItem(
+                                        product, bp, ProductSaleMode.WEIGHT, 1, 250)));
         when(policies.findByBranchProductIdIn(List.of(22L))).thenReturn(List.of(policy));
-        when(allocations.findByBranchProductIdInAndServiceDateBetween(List.of(22L), today, today.plusDays(1))).thenReturn(List.of(todayStock, tomorrowStock));
-        when(slots.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(1L, today, today.plusDays(1))).thenReturn(List.of(first, full, available));
+        when(allocations.findByBranchProductIdInAndServiceDateBetween(
+                        List.of(22L), today, today.plusDays(1)))
+                .thenReturn(List.of(todayStock, tomorrowStock));
+        when(slots.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+                        1L, today, today.plusDays(1)))
+                .thenReturn(List.of(first, full, available));
         var windows = mock(com.gokulsweets.restaurant.menu.MenuServiceWindows.class);
-        when(windows.pickupEvaluator(anyLong(), anySet())).thenReturn(at ->
-                new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false, java.util.Map.of()));
-        var service = new CartAvailabilityService(features, inventory, validation, new SmartOrderingRules(features, settings, clock),
-                policies, allocations, new InventoryAvailabilityService(), slots, settings, clock, windows);
+        when(windows.pickupEvaluator(anyLong(), anySet()))
+                .thenReturn(
+                        at ->
+                                new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(
+                                        false, java.util.Map.of()));
+        var service =
+                new CartAvailabilityService(
+                        features,
+                        inventory,
+                        validation,
+                        new SmartOrderingRules(features, settings, clock),
+                        policies,
+                        allocations,
+                        new InventoryAvailabilityService(),
+                        slots,
+                        settings,
+                        clock,
+                        windows);
         var result = service.check(1L, today, 2, request);
         assertThat(result.fulfilmentType()).isEqualTo("PICKUP");
         assertThat(result.dates().get(0).available()).isFalse();
         assertThat(result.dates().get(1).available()).isTrue();
         assertThat(result.dates().get(1).plannedProduction()).isFalse();
         features.setPlannedPickupProduction(true);
-        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction()).isTrue();
+        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction())
+                .isTrue();
         tomorrowStock.setStatus(InventoryAllocationStatus.DRAFT);
         tomorrowStock.setForecastQuantity(BigDecimal.valueOf(500));
-        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction()).isFalse();
+        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction())
+                .isFalse();
         tomorrowStock.setStatus(InventoryAllocationStatus.APPROVED);
         inventory.setEnforcementEnabled(false);
-        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction()).isFalse();
+        assertThat(service.check(1L, today, 2, request).dates().get(1).plannedProduction())
+                .isFalse();
         inventory.setEnforcementEnabled(true);
         assertThat(result.dates().get(1).slots().get(0).normalAvailable()).isFalse();
         assertThat(result.dates().get(1).slots().get(1).slot().id()).isEqualTo(3L);
-        assertThat(result.dates().getFirst().items().getFirst().code()).isEqualTo("QUANTITY_TOO_LARGE");
-        assertThat(result.dates().getFirst().items().getFirst().availableQuantity()).isEqualByComparingTo("200");
+        assertThat(result.dates().getFirst().items().getFirst().code())
+                .isEqualTo("QUANTITY_TOO_LARGE");
+        assertThat(result.dates().getFirst().items().getFirst().availableQuantity())
+                .isEqualByComparingTo("200");
         verify(validation, atLeastOnce()).validatePickupCart(1L, request);
-        verify(allocations, atLeastOnce()).findByBranchProductIdInAndServiceDateBetween(any(), any(), any());
+        verify(allocations, atLeastOnce())
+                .findByBranchProductIdInAndServiceDateBetween(any(), any(), any());
         verify(policies, atLeastOnce()).findByBranchProductIdIn(any());
         todayStock.setHeldQuantity(BigDecimal.ZERO);
         todayStock.setStatus(InventoryAllocationStatus.DRAFT);
-        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("AWAITING_APPROVAL");
+        assertThat(
+                        service.check(1L, today, 2, request)
+                                .dates()
+                                .getFirst()
+                                .items()
+                                .getFirst()
+                                .code())
+                .isEqualTo("AWAITING_APPROVAL");
         todayStock.setStatus(InventoryAllocationStatus.APPROVED);
         policy.setReadyStockRequired(true);
-        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("READY_STOCK_REQUIRED");
-        todayStock.setStatus(InventoryAllocationStatus.READY); todayStock.setReadyQuantity(BigDecimal.valueOf(500));
+        assertThat(
+                        service.check(1L, today, 2, request)
+                                .dates()
+                                .getFirst()
+                                .items()
+                                .getFirst()
+                                .code())
+                .isEqualTo("READY_STOCK_REQUIRED");
+        todayStock.setStatus(InventoryAllocationStatus.READY);
+        todayStock.setReadyQuantity(BigDecimal.valueOf(500));
         assertThat(service.check(1L, today, 2, request).dates().getFirst().available()).isTrue();
         first.setBookedCount(first.getCapacity());
-        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("SLOT_FULL");
+        assertThat(
+                        service.check(1L, today, 2, request)
+                                .dates()
+                                .getFirst()
+                                .items()
+                                .getFirst()
+                                .code())
+                .isEqualTo("SLOT_FULL");
         first.setActive(false);
-        assertThat(service.check(1L, today, 2, request).dates().getFirst().items().getFirst().code()).isEqualTo("NO_SLOTS");
+        assertThat(
+                        service.check(1L, today, 2, request)
+                                .dates()
+                                .getFirst()
+                                .items()
+                                .getFirst()
+                                .code())
+                .isEqualTo("NO_SLOTS");
     }
 
     private InventoryDailyAllocation stock(BranchProduct bp, LocalDate date) {
-        var result = new InventoryDailyAllocation(); result.setBranchProduct(bp); result.setServiceDate(date);
-        result.setInventoryUnit(InventoryUnit.GRAM); result.setStatus(InventoryAllocationStatus.APPROVED);
+        var result = new InventoryDailyAllocation();
+        result.setBranchProduct(bp);
+        result.setServiceDate(date);
+        result.setInventoryUnit(InventoryUnit.GRAM);
+        result.setStatus(InventoryAllocationStatus.APPROVED);
         result.setApprovedQuantity(BigDecimal.valueOf(500));
         return result;
     }

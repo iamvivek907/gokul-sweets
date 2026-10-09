@@ -3,12 +3,15 @@ package com.gokulsweets.restaurant.order.entity;
 import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.config.ApplicationClock;
 import com.gokulsweets.restaurant.customer.CustomerContact;
-import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.order.enums.OrderStatus;
 import com.gokulsweets.restaurant.order.enums.PickupType;
 import com.gokulsweets.restaurant.pickup.PickupSlot;
 import com.gokulsweets.restaurant.rebate.Rebate;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -17,110 +20,109 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/** Persisted order state. */
 @Entity
 @Table(
         name = "orders",
         indexes = {
-                @Index(
-                        name = "idx_orders_branch_id",
-                        columnList = "branch_id"
-                ),
-                @Index(
-                        name = "idx_orders_pickup_slot_id",
-                        columnList = "pickup_slot_id"
-                ),
-                @Index(
-                        name = "idx_orders_status",
-                        columnList = "order_status"
-                ),
-                @Index(
-                        name = "idx_orders_branch_status",
-                        columnList = "branch_id,order_status"
-                ),
-                @Index(
-                        name = "idx_orders_created_at",
-                        columnList = "created_at"
-                ),
-                @Index(
-                        name = "idx_orders_customer_phone",
-                        columnList = "customer_phone"
-                ),
-                @Index(
-                        name = "idx_orders_customer_phone_normalized",
-                        columnList = "customer_phone_normalized"
-                ),
-                @Index(
-                        name = "idx_orders_customer_contact_id",
-                        columnList = "customer_contact_id"
-                ),
-                @Index(
-                        name = "idx_orders_reservation_expiry",
-                        columnList = "order_status,reservation_expires_at"
-                )
-        }
-)
+            @Index(name = "idx_orders_branch_id", columnList = "branch_id"),
+            @Index(name = "idx_orders_pickup_slot_id", columnList = "pickup_slot_id"),
+            @Index(name = "idx_orders_status", columnList = "order_status"),
+            @Index(name = "idx_orders_branch_status", columnList = "branch_id,order_status"),
+            @Index(name = "idx_orders_created_at", columnList = "created_at"),
+            @Index(name = "idx_orders_customer_phone", columnList = "customer_phone"),
+            @Index(
+                    name = "idx_orders_customer_phone_normalized",
+                    columnList = "customer_phone_normalized"),
+            @Index(name = "idx_orders_customer_contact_id", columnList = "customer_contact_id"),
+            @Index(
+                    name = "idx_orders_reservation_expiry",
+                    columnList = "order_status,reservation_expires_at")
+        })
 @Getter
 @Setter
 public class Order {
-    @Column(nullable=false) private boolean rebateManualSelection;
-    @Column(nullable=false) private boolean loyaltyEnrolled;
-    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyEarningRupeesPerCoin=new BigDecimal("10");
-    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyQualifyingMinimum=new BigDecimal("149");
-    @Column(nullable=false) private int loyaltyWelcomeCoins;
-    @Column(nullable=false) private int loyaltyExpiryDays=180;
-    @Column(nullable=false) private boolean loyaltyTestOrder;
-    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyEligibleSubtotal=BigDecimal.ZERO;
-    @Column(nullable=false,precision=12,scale=2) private BigDecimal loyaltyDiscount=BigDecimal.ZERO;
-    @Column(length=40) private String loyaltyRewardCode;
-    @Column(nullable=false) private int loyaltyCoins;
-    @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFee=BigDecimal.ZERO;
-    @Column(nullable=false,precision=12,scale=2) private BigDecimal paymentFeeTax=BigDecimal.ZERO;
-    @Column(nullable=false,precision=5,scale=2) private BigDecimal paymentFeeRate=BigDecimal.ZERO;
-    @Column(nullable=false,precision=5,scale=2) private BigDecimal paymentFeeTaxRate=BigDecimal.ZERO;
 
-    @Column(nullable=false, precision=10, scale=2)
+    @Column(nullable = false)
+    private boolean rebateManualSelection;
+
+    @Column(nullable = false)
+    private boolean loyaltyEnrolled;
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal loyaltyEarningRupeesPerCoin = new BigDecimal("10");
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal loyaltyQualifyingMinimum = new BigDecimal("149");
+
+    @Column(nullable = false)
+    private int loyaltyWelcomeCoins;
+
+    @Column(nullable = false)
+    private int loyaltyExpiryDays = 180;
+
+    @Column(nullable = false)
+    private boolean loyaltyTestOrder;
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal loyaltyEligibleSubtotal = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal loyaltyDiscount = BigDecimal.ZERO;
+
+    @Column(length = 40)
+    private String loyaltyRewardCode;
+
+    @Column(nullable = false)
+    private int loyaltyCoins;
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal paymentFee = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal paymentFeeTax = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal paymentFeeRate = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal paymentFeeTaxRate = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal convenienceFee = BigDecimal.ZERO;
-    @Column(nullable=false, precision=10, scale=2)
-    private BigDecimal convenienceFeeTax = BigDecimal.ZERO;
-    @Column(nullable=false,precision=5,scale=2)
-    private BigDecimal convenienceFeeTaxRate = BigDecimal.ZERO;
 
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal convenienceFeeTax = BigDecimal.ZERO;
+
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal convenienceFeeTaxRate = BigDecimal.ZERO;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @jakarta.persistence.Transient
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private com.gokulsweets.restaurant.customer.identity.VerifiedOrderOwnership.Subject verifiedOfferSubject;
+    @jakarta.persistence.Transient @com.fasterxml.jackson.annotation.JsonIgnore
+    private com.gokulsweets.restaurant.customer.identity.VerifiedOrderOwnership.Subject
+            verifiedOfferSubject;
 
-    @Column(
-            name = "order_number",
-            nullable = false,
-            unique = true,
-            length = 50
-    )
+    @Column(name = "order_number", nullable = false, unique = true, length = 50)
     private String orderNumber;
 
     /** Database-assigned once on confirmation; never used as an access credential. */
-    @org.hibernate.annotations.Generated(event = {
-            org.hibernate.generator.EventType.INSERT, org.hibernate.generator.EventType.UPDATE
-    })
+    @org.hibernate.annotations.Generated(
+            event = {
+                org.hibernate.generator.EventType.INSERT,
+                org.hibernate.generator.EventType.UPDATE
+            })
     @Column(name = "customer_order_number", insertable = false, updatable = false, unique = true)
     private Long customerOrderNumber;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-            name = "branch_id",
-            nullable = false
-    )
+    @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "pickup_slot_id",
-            nullable = true
-    )
+    @JoinColumn(name = "pickup_slot_id", nullable = true)
     private PickupSlot pickupSlot;
 
     @Enumerated(EnumType.STRING)
@@ -149,11 +151,7 @@ public class Order {
      * Never replace this value from the customer-contact row.
      * It records the name entered for this exact order.
      */
-    @Column(
-            name = "customer_name",
-            nullable = false,
-            length = 150
-    )
+    @Column(name = "customer_name", nullable = false, length = 150)
     private String customerName;
 
     /*
@@ -161,11 +159,7 @@ public class Order {
      *
      * This is what the customer entered during checkout.
      */
-    @Column(
-            name = "customer_phone",
-            nullable = false,
-            length = 20
-    )
+    @Column(name = "customer_phone", nullable = false, length = 20)
     private String customerPhone;
 
     /*
@@ -175,10 +169,7 @@ public class Order {
      * normalized and therefore must not be treated as an
      * identity key.
      */
-    @Column(
-            name = "customer_phone_normalized",
-            length = 20
-    )
+    @Column(name = "customer_phone_normalized", length = 20)
     private String customerPhoneNormalized;
 
     // Staff-reported customer estimate; original pickup slot remains the booked slot.
@@ -198,63 +189,30 @@ public class Order {
      * phone input must never corrupt a different customer.
      */
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "customer_contact_id"
-    )
+    @JoinColumn(name = "customer_contact_id")
     private CustomerContact customerContact;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "pickup_type",
-            nullable = true,
-            length = 30
-    )
+    @Column(name = "pickup_type", nullable = true, length = 30)
     private PickupType pickupType;
 
-    @Column(
-            name = "priority_charge",
-            nullable = false,
-            precision = 10,
-            scale = 2
-    )
-    private BigDecimal priorityCharge =
-            BigDecimal.ZERO;
+    @Column(name = "priority_charge", nullable = false, precision = 10, scale = 2)
+    private BigDecimal priorityCharge = BigDecimal.ZERO;
 
     @Column(name = "delivery_fee", nullable = false, precision = 10, scale = 2)
     private BigDecimal deliveryFee = BigDecimal.ZERO;
 
-    @Column(
-            nullable = false,
-            precision = 12,
-            scale = 2
-    )
-    private BigDecimal subtotal =
-            BigDecimal.ZERO;
+    @Column(nullable = false, precision = 12, scale = 2)
+    private BigDecimal subtotal = BigDecimal.ZERO;
 
-    @Column(
-            name = "tax_amount",
-            nullable = false,
-            precision = 12,
-            scale = 2
-    )
-    private BigDecimal taxAmount =
-            BigDecimal.ZERO;
+    @Column(name = "tax_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal taxAmount = BigDecimal.ZERO;
 
-    @Column(
-            name = "total_amount",
-            nullable = false,
-            precision = 12,
-            scale = 2
-    )
-    private BigDecimal totalAmount =
-            BigDecimal.ZERO;
+    @Column(name = "total_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal totalAmount = BigDecimal.ZERO;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "order_status",
-            nullable = false,
-            length = 40
-    )
+    @Column(name = "order_status", nullable = false, length = 40)
     private OrderStatus orderStatus;
 
     /*
@@ -270,108 +228,87 @@ public class Order {
      * Updating cart items later must NOT extend
      * this timestamp.
      */
-    @Column(
-            name = "reservation_expires_at",
-            nullable = false
-    )
+    @Column(name = "reservation_expires_at", nullable = false)
     private LocalDateTime reservationExpiresAt;
 
-    @Column(
-            name = "admin_override",
-            nullable = false
-    )
+    @Column(name = "admin_override", nullable = false)
     private boolean adminOverride = false;
 
-    @Column(
-            name = "override_reason",
-            length = 500
-    )
+    @Column(name = "override_reason", length = 500)
     private String overrideReason;
 
-    @OneToMany(
-            mappedBy = "order",
-            cascade = CascadeType.ALL,
-            orphanRemoval = true
-    )
-    private List<OrderItem> items =
-            new ArrayList<>();
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderItem> items = new ArrayList<>();
 
-    @Column(
-            name = "created_at",
-            nullable = false
-    )
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(
-            name = "updated_at",
-            nullable = false
-    )
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-            name = "rebate_id"
-    )
+    @JoinColumn(name = "rebate_id")
     private Rebate rebate;
 
-    @Column(
-            name = "rebate_code",
-            length = 50
-    )
+    @Column(name = "rebate_code", length = 50)
     private String rebateCode;
 
-    @Column(
-            name = "rebate_discount_amount",
-            nullable = false,
-            precision = 12,
-            scale = 2
-    )
-    private BigDecimal rebateDiscountAmount =
-            BigDecimal.ZERO;
+    @Column(name = "rebate_discount_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal rebateDiscountAmount = BigDecimal.ZERO;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-
-        LocalDateTime now =
-                ApplicationClock.legacyTimestampNow();
-
-        createdAt =
-                now;
-
-        updatedAt =
-                now;
+        final long __gokulMethodStartedNanos = MethodTiming.start(Order.class, "onCreate()");
+        try {
+            LocalDateTime now = ApplicationClock.legacyTimestampNow();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Order.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-
-        updatedAt =
-                ApplicationClock.legacyTimestampNow();
+        final long __gokulMethodStartedNanos = MethodTiming.start(Order.class, "onUpdate()");
+        try {
+            updatedAt = ApplicationClock.legacyTimestampNow();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Order.class, "onUpdate()");
+        }
     }
 
-    public void addItem(
-            OrderItem item
-    ) {
-
-        items.add(
-                item
-        );
-
-        item.setOrder(
-                this
-        );
+    /**
+     * Adds item.
+     *
+     * @param item the item
+     */
+    public void addItem(OrderItem item) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(Order.class, "addItem(OrderItem)");
+        try {
+            items.add(item);
+            item.setOrder(this);
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Order.class, "addItem(OrderItem)");
+        }
     }
 
-    public void removeItem(
-            OrderItem item
-    ) {
-
-        items.remove(
-                item
-        );
-
-        item.setOrder(
-                null
-        );
+    /**
+     * Removes item.
+     *
+     * @param item the item
+     */
+    public void removeItem(OrderItem item) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(Order.class, "removeItem(OrderItem)");
+        try {
+            items.remove(item);
+            item.setOrder(null);
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Order.class, "removeItem(OrderItem)");
+        }
     }
 }

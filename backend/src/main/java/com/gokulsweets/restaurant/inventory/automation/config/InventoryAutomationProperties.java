@@ -2,18 +2,22 @@ package com.gokulsweets.restaurant.inventory.automation.config;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+
 import lombok.Getter;
 import lombok.Setter;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
+/** Backend inventory automation properties contract and implementation. */
 @Component
 @ConfigurationProperties(prefix = "inventory.automation")
 @Validated
 @Getter
 @Setter
 public class InventoryAutomationProperties {
+
     private boolean schedulerEnabled = false;
 
     @Min(1)

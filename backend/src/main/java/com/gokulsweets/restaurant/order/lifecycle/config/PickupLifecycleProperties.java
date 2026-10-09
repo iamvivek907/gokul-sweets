@@ -1,14 +1,19 @@
 package com.gokulsweets.restaurant.order.lifecycle.config;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+
 import lombok.Getter;
 import lombok.Setter;
+
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.validation.annotation.Validated;
 
+/** Backend pickup lifecycle properties contract and implementation. */
 @Component
 @ConfigurationProperties(prefix = "order.pickup-lifecycle")
 @Validated
@@ -30,8 +35,22 @@ public class PickupLifecycleProperties {
     @Max(1000)
     private int batchSize = 100;
 
+    /**
+     * Reports whether no show after expiry.
+     *
+     * @return the is no show after expiry result
+     */
     @AssertTrue(message = "No-show time must be later than pickup-expiry grace time.")
     public boolean isNoShowAfterExpiry() {
-        return noShowAfterMinutes > pickupExpiryGraceMinutes;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(PickupLifecycleProperties.class, "isNoShowAfterExpiry()");
+        try {
+            return noShowAfterMinutes > pickupExpiryGraceMinutes;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    PickupLifecycleProperties.class,
+                    "isNoShowAfterExpiry()");
+        }
     }
 }

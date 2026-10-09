@@ -4,6 +4,7 @@ import com.gokulsweets.restaurant.branch.Branch;
 import com.gokulsweets.restaurant.branch.BranchRepository;
 import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.branchproduct.BranchProductRepository;
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest;
 import com.gokulsweets.restaurant.order.dto.CreateOrderRequest;
 import com.gokulsweets.restaurant.order.entity.Order;
@@ -15,8 +16,10 @@ import com.gokulsweets.restaurant.pickup.PickupSlotValidationService;
 import com.gokulsweets.restaurant.pickup.repository.PickupSlotRepository;
 import com.gokulsweets.restaurant.product.Product;
 import com.gokulsweets.restaurant.product.ProductSaleMode;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +31,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+/** Coordinates order validation operations. */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -40,878 +44,765 @@ public class OrderValidationService {
     private final PickupSlotRepository pickupSlotRepository;
 
     private final PickupSlotValidationService pickupSlotValidationService;
+
     private final SmartOrderingRules smartOrderingRules;
+
     private final com.gokulsweets.restaurant.menu.MenuServiceWindows serviceWindows;
 
+    /**
+     * Validates cart.
+     *
+     * @param branchId the branch id
+     * @param items the items
+     * @return the validate cart result
+     */
     @Transactional(readOnly = true)
-    public List<ValidatedOrderItem> validateCart(Long branchId, List<CreateOrderItemRequest> items) {
-        validateBranch(branchId);
-        return validateProducts(branchId, normalizeItems(items));
+    public List<ValidatedOrderItem> validateCart(
+            Long branchId, List<CreateOrderItemRequest> items) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateCart(Long,List<CreateOrderItemRequest>)");
+        try {
+            validateBranch(branchId);
+            return validateProducts(branchId, normalizeItems(items));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateCart(Long,List<CreateOrderItemRequest>)");
+        }
     }
 
-    /** Product and manual availability checks before evaluating each pickup slot. */
+    /**
+     * Product and manual availability checks before evaluating each pickup slot.
+     *
+     * @param branchId the branch id
+     * @param items the items
+     * @return the operation result
+     */
     @Transactional(readOnly = true)
-    public List<ValidatedOrderItem> validatePickupCart(Long branchId, List<CreateOrderItemRequest> items) {
-        validateBranch(branchId);
-        return validateProducts(branchId, normalizeItems(items), true, null);
+    public List<ValidatedOrderItem> validatePickupCart(
+            Long branchId, List<CreateOrderItemRequest> items) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validatePickupCart(Long,List<CreateOrderItemRequest>)");
+        try {
+            validateBranch(branchId);
+            return validateProducts(branchId, normalizeItems(items), true, null);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validatePickupCart(Long,List<CreateOrderItemRequest>)");
+        }
     }
 
     // =========================================================
     // VALIDATE NEW ORDER
     // =========================================================
-
+    /**
+     * Validates order validation data and returns the {@code ValidatedOrderData} result.
+     *
+     * @param request the request supplied to this method
+     * @return the {@code ValidatedOrderData} result
+     */
     @Transactional(readOnly = true)
-    public ValidatedOrderData validate(
-            CreateOrderRequest request
-    ) {
-
-        log.debug(
-                "Validating order request: branchId={}, pickupSlotId={}, pickupType={}, itemCount={}",
-                request.branchId(),
-                request.pickupSlotId(),
-                request.pickupType(),
-                request.items().size()
-        );
-
-        Branch branch =
-                validateBranch(
-                        request.branchId()
-                );
-
-        PickupSlot pickupSlot =
-                validatePickupSlot(
-                        request.pickupSlotId(),
-                        branch.getId()
-                );
-        smartOrderingRules.validateWindow(pickupSlot);
-
-        /*
-         * New orders must validate that their requested
-         * pickup mode can still take another reservation.
-         */
-        validatePickupTypeForNewReservation(
-                request.pickupType(),
-                pickupSlot
-        );
-
-        Map<Long, RequestedOrderItem> normalizedItems =
-                normalizeItems(
-                        request.items()
-                );
-
-        List<ValidatedOrderItem> items =
-                validateProducts(
-                        branch.getId(),
-                        normalizedItems, true, pickupSlot.getSlotDate().atTime(pickupSlot.getStartTime())
-                );
-
-        log.debug(
-                "Order validation completed successfully: branchId={}, pickupSlotId={}, normalizedItemCount={}",
-                branch.getId(),
-                pickupSlot.getId(),
-                items.size()
-        );
-
-        return new ValidatedOrderData(
-                branch,
-                pickupSlot,
-                request.pickupType(),
-                items
-        );
+    public ValidatedOrderData validate(CreateOrderRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(OrderValidationService.class, "validate(CreateOrderRequest)");
+        try {
+            log.debug(
+                    "Validating order request: branchId={}, pickupSlotId={}, pickupType={},"
+                            + " itemCount={}",
+                    request.branchId(),
+                    request.pickupSlotId(),
+                    request.pickupType(),
+                    request.items().size());
+            Branch branch = validateBranch(request.branchId());
+            PickupSlot pickupSlot = validatePickupSlot(request.pickupSlotId(), branch.getId());
+            smartOrderingRules.validateWindow(pickupSlot);
+            /*
+             * New orders must validate that their requested
+             * pickup mode can still take another reservation.
+             */
+            validatePickupTypeForNewReservation(request.pickupType(), pickupSlot);
+            Map<Long, RequestedOrderItem> normalizedItems = normalizeItems(request.items());
+            List<ValidatedOrderItem> items =
+                    validateProducts(
+                            branch.getId(),
+                            normalizedItems,
+                            true,
+                            pickupSlot.getSlotDate().atTime(pickupSlot.getStartTime()));
+            log.debug(
+                    "Order validation completed successfully: branchId={}, pickupSlotId={},"
+                            + " normalizedItemCount={}",
+                    branch.getId(),
+                    pickupSlot.getId(),
+                    items.size());
+            return new ValidatedOrderData(branch, pickupSlot, request.pickupType(), items);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validate(CreateOrderRequest)");
+        }
     }
 
     // =========================================================
     // VALIDATE EXISTING RESERVED ORDER UPDATE
     // =========================================================
-
-    /*
-     * This path is deliberately different from validating
-     * a brand-new order.
+    /**
+     * Validates existing reservation update.
      *
-     * The order ALREADY owns one pickup reservation.
-     *
-     * Keeping the same slot and type does not require free
-     * capacity because this order already owns it. Selecting
-     * another slot or pickup type is validated exactly like a
-     * new reservation before OrderService transfers capacity.
-     *
-     * We still validate:
-     *
-     * - branch remains active
-     * - pickup slot remains active
-     * - pickup window has not passed
-     * - products remain available at that branch
-     * - current backend prices/taxes
+     * @param order the order
+     * @param requestedPickupSlotId the requested pickup slot id
+     * @param requestedPickupType the requested pickup type
+     * @param requestedItems the requested items
+     * @return the validate existing reservation update result
      */
     @Transactional(readOnly = true)
     public ValidatedOrderData validateExistingReservationUpdate(
             Order order,
             Long requestedPickupSlotId,
             PickupType requestedPickupType,
-            List<CreateOrderItemRequest> requestedItems
-    ) {
-
-        if (order == null) {
-
-            throw new IllegalArgumentException(
-                    "Order is required."
-            );
-        }
-
-        if (
-                requestedPickupSlotId == null
-        ) {
-
-            throw new IllegalArgumentException(
-                    "Pickup slot ID is required."
-            );
-        }
-
-        if (
-                requestedPickupType == null
-        ) {
-
-            throw new IllegalArgumentException(
-                    "Pickup type is required."
-            );
-        }
-
-        if (
-                requestedItems == null
-                        ||
-                        requestedItems.isEmpty()
-        ) {
-
-            throw new IllegalArgumentException(
-                    "At least one order item is required."
-            );
-        }
-
-        Branch branch =
-                order.getBranch();
-
-        PickupSlot existingPickupSlot =
-                order.getPickupSlot();
-
-        if (
-                branch == null
-                        ||
-                        existingPickupSlot == null
-        ) {
-
-            log.error(
-                    "Existing order is missing branch or pickup slot: orderId={}",
-                    order.getId()
-            );
-
-            throw new IllegalStateException(
-                    "Order pickup information is incomplete."
-            );
-        }
-
-        log.debug(
-                "Validating pending order update: orderId={}, orderNumber={}, branchId={}, existingPickupSlotId={}, requestedPickupSlotId={}, requestedPickupType={}, itemCount={}",
-                order.getId(),
-                order.getOrderNumber(),
-                branch.getId(),
-                existingPickupSlot.getId(),
-                requestedPickupSlotId,
-                requestedPickupType,
-                requestedItems.size()
-        );
-
-        /*
-         * Existing reservation must still belong
-         * to an active branch.
-         */
-        if (!branch.isActive()) {
-
-            log.warn(
-                    "Pending order update rejected because branch is inactive: orderId={}, branchId={}",
+            List<CreateOrderItemRequest> requestedItems) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateExistingReservationUpdate(Order,Long,PickupType,List<CreateOrderItemRequest>)");
+        try {
+            if (order == null) {
+                throw new IllegalArgumentException("Order is required.");
+            }
+            if (requestedPickupSlotId == null) {
+                throw new IllegalArgumentException("Pickup slot ID is required.");
+            }
+            if (requestedPickupType == null) {
+                throw new IllegalArgumentException("Pickup type is required.");
+            }
+            if (requestedItems == null || requestedItems.isEmpty()) {
+                throw new IllegalArgumentException("At least one order item is required.");
+            }
+            Branch branch = order.getBranch();
+            PickupSlot existingPickupSlot = order.getPickupSlot();
+            if (branch == null || existingPickupSlot == null) {
+                log.error(
+                        "Existing order is missing branch or pickup slot: orderId={}",
+                        order.getId());
+                throw new IllegalStateException("Order pickup information is incomplete.");
+            }
+            log.debug(
+                    "Validating pending order update: orderId={}, orderNumber={}, branchId={},"
+                            + " existingPickupSlotId={}, requestedPickupSlotId={},"
+                            + " requestedPickupType={}, itemCount={}",
                     order.getId(),
-                    branch.getId()
-            );
-
-            throw new IllegalStateException(
-                    "Selected branch is currently unavailable."
-            );
-        }
-
-        if (
-                order.getPickupType()
-                        ==
-                        PickupType.ADMIN_OVERRIDE
-        ) {
-
-            log.warn(
-                    "Customer pending-order update attempted on ADMIN_OVERRIDE order: orderId={}",
-                    order.getId()
-            );
-
-            throw new IllegalStateException(
-                    "This order cannot be changed through customer checkout."
-            );
-        }
-
-        boolean keepsExistingReservation =
-                existingPickupSlot
-                        .getId()
-                        .equals(
-                                requestedPickupSlotId
-                        )
-                        &&
-                        order.getPickupType()
-                                ==
-                                requestedPickupType;
-
-        PickupSlot requestedPickupSlot;
-
-        if (keepsExistingReservation) {
-
-            /*
-             * This order already owns this capacity, so a
-             * full slot remains valid for this order.
-             */
-            validateOwnedPickupReservation(
-                    order,
-                    branch,
-                    existingPickupSlot
-            );
-
-            requestedPickupSlot =
-                    existingPickupSlot;
-
-        } else {
-
-            requestedPickupSlot =
-                    validatePickupSlot(
-                            requestedPickupSlotId,
-                            branch.getId()
-                    );
-            smartOrderingRules.validateWindow(requestedPickupSlot);
-
-            validatePickupTypeForNewReservation(
+                    order.getOrderNumber(),
+                    branch.getId(),
+                    existingPickupSlot.getId(),
+                    requestedPickupSlotId,
                     requestedPickupType,
-                    requestedPickupSlot
-            );
+                    requestedItems.size());
+            /*
+             * Existing reservation must still belong
+             * to an active branch.
+             */
+            if (!branch.isActive()) {
+                log.warn(
+                        "Pending order update rejected because branch is inactive: orderId={},"
+                                + " branchId={}",
+                        order.getId(),
+                        branch.getId());
+                throw new IllegalStateException("Selected branch is currently unavailable.");
+            }
+            if (order.getPickupType() == PickupType.ADMIN_OVERRIDE) {
+                log.warn(
+                        "Customer pending-order update attempted on ADMIN_OVERRIDE order:"
+                                + " orderId={}",
+                        order.getId());
+                throw new IllegalStateException(
+                        "This order cannot be changed through customer checkout.");
+            }
+            boolean keepsExistingReservation =
+                    existingPickupSlot.getId().equals(requestedPickupSlotId)
+                            && order.getPickupType() == requestedPickupType;
+            PickupSlot requestedPickupSlot;
+            if (keepsExistingReservation) {
+                /*
+                 * This order already owns this capacity, so a
+                 * full slot remains valid for this order.
+                 */
+                validateOwnedPickupReservation(order, branch, existingPickupSlot);
+                requestedPickupSlot = existingPickupSlot;
+            } else {
+                requestedPickupSlot = validatePickupSlot(requestedPickupSlotId, branch.getId());
+                smartOrderingRules.validateWindow(requestedPickupSlot);
+                validatePickupTypeForNewReservation(requestedPickupType, requestedPickupSlot);
+            }
+            Map<Long, RequestedOrderItem> normalizedItems = normalizeItems(requestedItems);
+            List<ValidatedOrderItem> items =
+                    validateProducts(
+                            branch.getId(),
+                            normalizedItems,
+                            !(keepsExistingReservation
+                                    && order.getItems().size() == normalizedItems.size()
+                                    && order.getItems().stream()
+                                            .allMatch(
+                                                    item -> {
+                                                        var requested =
+                                                                normalizedItems.get(
+                                                                        item.getProduct().getId());
+                                                        return requested != null
+                                                                && (item.getSaleMode()
+                                                                                == ProductSaleMode
+                                                                                        .WEIGHT
+                                                                        ? java.util.Objects.equals(
+                                                                                        item
+                                                                                                .getWeightGrams(),
+                                                                                        requested
+                                                                                                .weightGrams())
+                                                                                && (requested
+                                                                                                        .quantity()
+                                                                                                == null
+                                                                                        || requested
+                                                                                                        .quantity()
+                                                                                                == 1)
+                                                                        : java.util.Objects.equals(
+                                                                                        item
+                                                                                                .getQuantity(),
+                                                                                        requested
+                                                                                                .quantity())
+                                                                                && requested
+                                                                                                .weightGrams()
+                                                                                        == null);
+                                                    })),
+                            requestedPickupSlot
+                                    .getSlotDate()
+                                    .atTime(requestedPickupSlot.getStartTime()));
+            log.debug(
+                    "Pending order update validation completed: orderId={}, normalizedItemCount={}",
+                    order.getId(),
+                    items.size());
+            return new ValidatedOrderData(branch, requestedPickupSlot, requestedPickupType, items);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateExistingReservationUpdate(Order,Long,PickupType,List<CreateOrderItemRequest>)");
         }
-
-        Map<Long, RequestedOrderItem> normalizedItems =
-                normalizeItems(
-                        requestedItems
-                );
-
-        List<ValidatedOrderItem> items =
-                validateProducts(
-                        branch.getId(),
-                        normalizedItems,
-                        !(keepsExistingReservation && order.getItems().size()==normalizedItems.size()
-                            && order.getItems().stream().allMatch(item -> {
-                                var requested=normalizedItems.get(item.getProduct().getId());
-                                return requested!=null && (item.getSaleMode()==ProductSaleMode.WEIGHT
-                                    ? java.util.Objects.equals(item.getWeightGrams(),requested.weightGrams()) && (requested.quantity()==null || requested.quantity()==1)
-                                    : java.util.Objects.equals(item.getQuantity(),requested.quantity()) && requested.weightGrams()==null);
-                            })), requestedPickupSlot.getSlotDate().atTime(requestedPickupSlot.getStartTime())
-                );
-
-        log.debug(
-                "Pending order update validation completed: orderId={}, normalizedItemCount={}",
-                order.getId(),
-                items.size()
-        );
-
-        return new ValidatedOrderData(
-                branch,
-                requestedPickupSlot,
-                requestedPickupType,
-                items
-        );
     }
 
     // =========================================================
     // VALIDATE CAPACITY ALREADY OWNED BY THIS ORDER
     // =========================================================
-
-    private void validateOwnedPickupReservation(
-            Order order,
-            Branch branch,
-            PickupSlot pickupSlot
-    ) {
-
-        if (!pickupSlot.isActive()) {
-
-            throw new IllegalStateException(
-                    "Your selected pickup slot is no longer available."
-            );
-        }
-
-        if (
-                !pickupSlot.getBranch()
-                        .getId()
-                        .equals(
-                                branch.getId()
-                        )
-        ) {
-
-            log.error(
-                    "Pending order has pickup slot branch mismatch: orderId={}, branchId={}, pickupSlotId={}, slotBranchId={}",
-                    order.getId(),
-                    branch.getId(),
-                    pickupSlot.getId(),
-                    pickupSlot.getBranch().getId()
-            );
-
-            throw new IllegalStateException(
-                    "Order pickup configuration is invalid."
-            );
-        }
-
-        pickupSlotValidationService
-                .validateNotPassed(
-                        pickupSlot
-                );
-
-        if (
-                order.getPickupType()
-                        ==
-                        PickupType.PRIORITY
-                        &&
-                        !pickupSlot.isPriorityEnabled()
-        ) {
-
-            throw new IllegalStateException(
-                    "Priority pickup is no longer available for this slot."
-            );
+    /**
+     * Validates owned pickup reservation.
+     *
+     * @param order the order
+     * @param branch the branch
+     * @param pickupSlot the pickup slot
+     */
+    private void validateOwnedPickupReservation(Order order, Branch branch, PickupSlot pickupSlot) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateOwnedPickupReservation(Order,Branch,PickupSlot)");
+        try {
+            if (!pickupSlot.isActive()) {
+                throw new IllegalStateException(
+                        "Your selected pickup slot is no longer available.");
+            }
+            if (!pickupSlot.getBranch().getId().equals(branch.getId())) {
+                log.error(
+                        "Pending order has pickup slot branch mismatch: orderId={}, branchId={},"
+                                + " pickupSlotId={}, slotBranchId={}",
+                        order.getId(),
+                        branch.getId(),
+                        pickupSlot.getId(),
+                        pickupSlot.getBranch().getId());
+                throw new IllegalStateException("Order pickup configuration is invalid.");
+            }
+            pickupSlotValidationService.validateNotPassed(pickupSlot);
+            if (order.getPickupType() == PickupType.PRIORITY && !pickupSlot.isPriorityEnabled()) {
+                throw new IllegalStateException(
+                        "Priority pickup is no longer available for this slot.");
+            }
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateOwnedPickupReservation(Order,Branch,PickupSlot)");
         }
     }
 
     // =========================================================
     // VALIDATE BRANCH
     // =========================================================
-
-    private Branch validateBranch(
-            Long branchId
-    ) {
-
-        Branch branch =
-                branchRepository
-                        .findById(
-                                branchId
-                        )
-                        .orElseThrow(() -> {
-
-                            log.warn(
-                                    "Order validation failed because branch does not exist: branchId={}",
-                                    branchId
-                            );
-
-                            return new IllegalArgumentException(
-                                    "Selected branch does not exist."
-                            );
-                        });
-
-        if (!branch.isActive()) {
-
-            log.warn(
-                    "Order validation failed because branch is inactive: branchId={}",
-                    branchId
-            );
-
-            throw new IllegalArgumentException(
-                    "Selected branch is currently unavailable."
-            );
+    /**
+     * Validates branch.
+     *
+     * @param branchId the branch id
+     * @return the validate branch result
+     */
+    private Branch validateBranch(Long branchId) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(OrderValidationService.class, "validateBranch(Long)");
+        try {
+            Branch branch =
+                    branchRepository
+                            .findById(branchId)
+                            .orElseThrow(
+                                    () -> {
+                                        log.warn(
+                                                "Order validation failed because branch does not"
+                                                        + " exist: branchId={}",
+                                                branchId);
+                                        return new IllegalArgumentException(
+                                                "Selected branch does not exist.");
+                                    });
+            if (!branch.isActive()) {
+                log.warn(
+                        "Order validation failed because branch is inactive: branchId={}",
+                        branchId);
+                throw new IllegalArgumentException("Selected branch is currently unavailable.");
+            }
+            return branch;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateBranch(Long)");
         }
-
-        return branch;
     }
 
     // =========================================================
     // VALIDATE PICKUP SLOT
     // =========================================================
-
-    private PickupSlot validatePickupSlot(
-            Long pickupSlotId,
-            Long branchId
-    ) {
-
-        PickupSlot slot =
-                pickupSlotRepository
-                        .findById(
-                                pickupSlotId
-                        )
-                        .orElseThrow(() -> {
-
-                            log.warn(
-                                    "Order validation failed because pickup slot does not exist: pickupSlotId={}",
-                                    pickupSlotId
-                            );
-
-                            return new IllegalArgumentException(
-                                    "Selected pickup slot does not exist."
-                            );
-                        });
-
-        if (
-                !slot.getBranch()
-                        .getId()
-                        .equals(
-                                branchId
-                        )
-        ) {
-
-            log.warn(
-                    "Pickup slot branch mismatch: pickupSlotId={}, slotBranchId={}, requestedBranchId={}",
-                    pickupSlotId,
-                    slot.getBranch().getId(),
-                    branchId
-            );
-
-            throw new IllegalArgumentException(
-                    "Selected pickup slot does not belong to the selected branch."
-            );
+    /**
+     * Validates pickup slot.
+     *
+     * @param pickupSlotId the pickup slot id
+     * @param branchId the branch id
+     * @return the validate pickup slot result
+     */
+    private PickupSlot validatePickupSlot(Long pickupSlotId, Long branchId) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(OrderValidationService.class, "validatePickupSlot(Long,Long)");
+        try {
+            PickupSlot slot =
+                    pickupSlotRepository
+                            .findById(pickupSlotId)
+                            .orElseThrow(
+                                    () -> {
+                                        log.warn(
+                                                "Order validation failed because pickup slot does"
+                                                        + " not exist: pickupSlotId={}",
+                                                pickupSlotId);
+                                        return new IllegalArgumentException(
+                                                "Selected pickup slot does not exist.");
+                                    });
+            if (!slot.getBranch().getId().equals(branchId)) {
+                log.warn(
+                        "Pickup slot branch mismatch: pickupSlotId={}, slotBranchId={},"
+                                + " requestedBranchId={}",
+                        pickupSlotId,
+                        slot.getBranch().getId(),
+                        branchId);
+                throw new IllegalArgumentException(
+                        "Selected pickup slot does not belong to the selected branch.");
+            }
+            if (!slot.isActive()) {
+                log.warn(
+                        "Order validation failed because pickup slot is inactive: pickupSlotId={}",
+                        pickupSlotId);
+                throw new IllegalArgumentException("Selected pickup slot is no longer available.");
+            }
+            pickupSlotValidationService.validateNotPassed(slot);
+            return slot;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validatePickupSlot(Long,Long)");
         }
-
-        if (!slot.isActive()) {
-
-            log.warn(
-                    "Order validation failed because pickup slot is inactive: pickupSlotId={}",
-                    pickupSlotId
-            );
-
-            throw new IllegalArgumentException(
-                    "Selected pickup slot is no longer available."
-            );
-        }
-
-        pickupSlotValidationService
-                .validateNotPassed(
-                        slot
-                );
-
-        return slot;
     }
 
     // =========================================================
     // VALIDATE NEW PICKUP RESERVATION
     // =========================================================
-
-    private void validatePickupTypeForNewReservation(
-            PickupType pickupType,
-            PickupSlot slot
-    ) {
-
-        if (
-                pickupType
-                        ==
-                        PickupType.ADMIN_OVERRIDE
-        ) {
-
-            log.warn(
-                    "ADMIN_OVERRIDE attempted through public order flow: pickupSlotId={}",
-                    slot.getId()
-            );
-
-            throw new IllegalArgumentException(
-                    "Admin override cannot be used for a customer order."
-            );
-        }
-
-        if (
-                pickupType
-                        ==
-                        PickupType.PRIORITY
-        ) {
-
-            if (!slot.isPriorityEnabled()) {
-
+    /**
+     * Validates pickup type for new reservation.
+     *
+     * @param pickupType the pickup type
+     * @param slot the slot
+     */
+    private void validatePickupTypeForNewReservation(PickupType pickupType, PickupSlot slot) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validatePickupTypeForNewReservation(PickupType,PickupSlot)");
+        try {
+            if (pickupType == PickupType.ADMIN_OVERRIDE) {
                 log.warn(
-                        "Priority pickup requested for slot without priority enabled: pickupSlotId={}",
-                        slot.getId()
-                );
-
+                        "ADMIN_OVERRIDE attempted through public order flow: pickupSlotId={}",
+                        slot.getId());
                 throw new IllegalArgumentException(
-                        "Priority pickup is not available for the selected slot."
-                );
+                        "Admin override cannot be used for a customer order.");
             }
-
-            if (
-                    slot.getPriorityBookedCount()
-                            >=
-                            slot.getPriorityCapacity()
-            ) {
-
-                log.warn(
-                        "Priority pickup capacity exhausted: pickupSlotId={}",
-                        slot.getId()
-                );
-
-                throw new IllegalArgumentException(
-                        "Priority pickup is no longer available for the selected slot."
-                );
+            if (pickupType == PickupType.PRIORITY) {
+                if (!slot.isPriorityEnabled()) {
+                    log.warn(
+                            "Priority pickup requested for slot without priority enabled:"
+                                    + " pickupSlotId={}",
+                            slot.getId());
+                    throw new IllegalArgumentException(
+                            "Priority pickup is not available for the selected slot.");
+                }
+                if (slot.getPriorityBookedCount() >= slot.getPriorityCapacity()) {
+                    log.warn("Priority pickup capacity exhausted: pickupSlotId={}", slot.getId());
+                    throw new IllegalArgumentException(
+                            "Priority pickup is no longer available for the selected slot.");
+                }
             }
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validatePickupTypeForNewReservation(PickupType,PickupSlot)");
         }
     }
 
     // =========================================================
     // NORMALIZE ITEMS
     // =========================================================
-
-    private Map<Long, RequestedOrderItem> normalizeItems(
-            List<CreateOrderItemRequest> items
-    ) {
-
-        Map<Long, RequestedOrderItem> normalized =
-                new LinkedHashMap<>();
-
-        for (
-                CreateOrderItemRequest item :
-                items
-        ) {
-
-            if (
-                    item.productId()
-                            ==
-                            null
-            ) {
-
-                throw new IllegalArgumentException(
-                        "Product ID is required."
-                );
+    /**
+     * Normalizes items.
+     *
+     * @param items the items
+     * @return the normalize items result
+     */
+    private Map<Long, RequestedOrderItem> normalizeItems(List<CreateOrderItemRequest> items) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "normalizeItems(List<CreateOrderItemRequest>)");
+        try {
+            Map<Long, RequestedOrderItem> normalized = new LinkedHashMap<>();
+            for (CreateOrderItemRequest item : items) {
+                if (item.productId() == null) {
+                    throw new IllegalArgumentException("Product ID is required.");
+                }
+                normalized.merge(
+                        item.productId(),
+                        new RequestedOrderItem(item.quantity(), item.weightGrams()),
+                        (existing, additional) -> {
+                            try {
+                                return new RequestedOrderItem(
+                                        addNullableExact(
+                                                existing.quantity(), additional.quantity()),
+                                        addNullableExact(
+                                                existing.weightGrams(), additional.weightGrams()));
+                            } catch (ArithmeticException exception) {
+                                log.warn(
+                                        "Order amount overflow while merging duplicate product:"
+                                                + " productId={}",
+                                        item.productId());
+                                throw new IllegalArgumentException(
+                                        "Requested product amount is too large.");
+                            }
+                        });
             }
-
-            normalized.merge(
-                    item.productId(),
-                    new RequestedOrderItem(
-                            item.quantity(),
-                            item.weightGrams()
-                    ),
-                    (
-                            existing,
-                            additional
-                    ) -> {
-
-                        try {
-
-                            return new RequestedOrderItem(
-                                    addNullableExact(
-                                            existing.quantity(),
-                                            additional.quantity()
-                                    ),
-                                    addNullableExact(
-                                            existing.weightGrams(),
-                                            additional.weightGrams()
-                                    )
-                            );
-
-                        } catch (
-                                ArithmeticException exception
-                        ) {
-
-                            log.warn(
-                                    "Order amount overflow while merging duplicate product: productId={}",
-                                    item.productId()
-                            );
-
-                            throw new IllegalArgumentException(
-                                    "Requested product amount is too large."
-                            );
-                        }
-                    }
-            );
+            return normalized;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "normalizeItems(List<CreateOrderItemRequest>)");
         }
-
-        return normalized;
     }
 
     // =========================================================
     // VALIDATE PRODUCTS
     // =========================================================
+    /**
+     * Validates products.
+     *
+     * @param branchId the branch id
+     * @param requestedItems the requested items
+     * @return the validate products result
+     */
+    private List<ValidatedOrderItem> validateProducts(
+            Long branchId, Map<Long, RequestedOrderItem> requestedItems) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateProducts(Long,Map<Long,RequestedOrderItem>)");
+        try {
+            return validateProducts(branchId, requestedItems, serviceWindows.snapshot(branchId));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateProducts(Long,Map<Long,RequestedOrderItem>)");
+        }
+    }
 
-    private List<ValidatedOrderItem> validateProducts(Long branchId,Map<Long,RequestedOrderItem> requestedItems) {
-        return validateProducts(branchId,requestedItems,serviceWindows.snapshot(branchId));
+    /**
+     * Validates products.
+     *
+     * @param branchId the branch id
+     * @param requestedItems the requested items
+     * @param enforceService the enforce service
+     * @param pickupAt the pickup at
+     * @return the validate products result
+     */
+    private List<ValidatedOrderItem> validateProducts(
+            Long branchId,
+            Map<Long, RequestedOrderItem> requestedItems,
+            boolean enforceService,
+            java.time.LocalDateTime pickupAt) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateProducts(Long,Map<Long,RequestedOrderItem>,boolean,java.time.LocalDateTime)");
+        try {
+            return validateProducts(
+                    branchId,
+                    requestedItems,
+                    enforceService
+                            ? serviceWindows.pickupSnapshot(
+                                    branchId, pickupAt, requestedItems.keySet())
+                            : new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(
+                                    false, Map.of()));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateProducts(Long,Map<Long,RequestedOrderItem>,boolean,java.time.LocalDateTime)");
+        }
     }
-    private List<ValidatedOrderItem> validateProducts(Long branchId, Map<Long,RequestedOrderItem> requestedItems,
-            boolean enforceService, java.time.LocalDateTime pickupAt) {
-        return validateProducts(branchId, requestedItems, enforceService ? serviceWindows.pickupSnapshot(branchId,pickupAt,requestedItems.keySet())
-                : new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(false,Map.of()));
-    }
-    private List<ValidatedOrderItem> validateProducts(Long branchId, Map<Long,RequestedOrderItem> requestedItems,
+
+    /**
+     * Validates products.
+     *
+     * @param branchId the branch id
+     * @param requestedItems the requested items
+     * @param serviceAvailability the service availability
+     * @return the validate products result
+     */
+    private List<ValidatedOrderItem> validateProducts(
+            Long branchId,
+            Map<Long, RequestedOrderItem> requestedItems,
             com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot serviceAvailability) {
-        Set<Long> productIds =
-                requestedItems.keySet();
-
-        List<BranchProduct> branchProducts =
-                branchProductRepository
-                        .findForOrder(
-                                branchId,
-                                productIds
-                        );
-
-        Map<Long, BranchProduct> branchProductMap =
-                branchProducts
-                        .stream()
-                        .collect(
-                                Collectors.toMap(
-                                        branchProduct ->
-                                                branchProduct
-                                                        .getProduct()
-                                                        .getId(),
-
-                                        Function.identity()
-                                )
-                        );
-
-        List<ValidatedOrderItem> validated =
-                new ArrayList<>();
-
-        for (
-                Map.Entry<Long, RequestedOrderItem> entry :
-                requestedItems.entrySet()
-        ) {
-
-            Long productId =
-                    entry.getKey();
-
-            BranchProduct branchProduct =
-                    branchProductMap.get(
-                            productId
-                    );
-
-            if (
-                    branchProduct == null
-            ) {
-
-                log.warn(
-                        "Product is not configured for selected branch: branchId={}, productId={}",
-                        branchId,
-                        productId
-                );
-
-                throw new IllegalArgumentException(
-                        "One or more selected products are not available at this branch."
-                );
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateProducts(Long,Map<Long,RequestedOrderItem>,com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot)");
+        try {
+            Set<Long> productIds = requestedItems.keySet();
+            List<BranchProduct> branchProducts =
+                    branchProductRepository.findForOrder(branchId, productIds);
+            Map<Long, BranchProduct> branchProductMap =
+                    branchProducts.stream()
+                            .collect(
+                                    Collectors.toMap(
+                                            branchProduct -> branchProduct.getProduct().getId(),
+                                            Function.identity()));
+            List<ValidatedOrderItem> validated = new ArrayList<>();
+            for (Map.Entry<Long, RequestedOrderItem> entry : requestedItems.entrySet()) {
+                Long productId = entry.getKey();
+                BranchProduct branchProduct = branchProductMap.get(productId);
+                if (branchProduct == null) {
+                    log.warn(
+                            "Product is not configured for selected branch: branchId={},"
+                                    + " productId={}",
+                            branchId,
+                            productId);
+                    throw new IllegalArgumentException(
+                            "One or more selected products are not available at this branch.");
+                }
+                Product product = branchProduct.getProduct();
+                RequestedOrderItem requestedItem = entry.getValue();
+                if (!product.isActive()) {
+                    log.warn(
+                            "Inactive product requested: branchId={}, productId={}",
+                            branchId,
+                            productId);
+                    throw new IllegalArgumentException(
+                            "One or more selected products are currently unavailable.");
+                }
+                serviceAvailability.requireAvailable(productId);
+                if (!branchProduct.isAvailable()) {
+                    log.warn(
+                            "Branch product marked unavailable: branchId={}, productId={}",
+                            branchId,
+                            productId);
+                    throw new IllegalArgumentException(
+                            "One or more selected products are currently unavailable at this"
+                                    + " branch.");
+                }
+                if (product.getBasePrice() == null) {
+                    log.error("Product has no base price configured: productId={}", productId);
+                    throw new IllegalStateException("Product pricing is not configured correctly.");
+                }
+                if (product.getTaxCategory() != null && !product.getTaxCategory().isActive()) {
+                    log.error(
+                            "Product is linked to inactive tax category: productId={},"
+                                    + " taxCategoryId={}",
+                            productId,
+                            product.getTaxCategory().getId());
+                    throw new IllegalStateException("Product tax configuration is not available.");
+                }
+                ProductSaleMode saleMode =
+                        product.getSaleMode() == null
+                                ? ProductSaleMode.UNIT
+                                : product.getSaleMode();
+                if (saleMode == ProductSaleMode.WEIGHT) {
+                    validateWeightRequest(product, requestedItem);
+                    validated.add(
+                            new ValidatedOrderItem(
+                                    product,
+                                    branchProduct,
+                                    saleMode,
+                                    1,
+                                    requestedItem.weightGrams()));
+                } else {
+                    validateUnitRequest(product, requestedItem);
+                    validated.add(
+                            new ValidatedOrderItem(
+                                    product,
+                                    branchProduct,
+                                    saleMode,
+                                    requestedItem.quantity(),
+                                    null));
+                }
             }
+            return validated;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateProducts(Long,Map<Long,RequestedOrderItem>,com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot)");
+        }
+    }
 
-            Product product =
-                    branchProduct.getProduct();
-
-            RequestedOrderItem requestedItem =
-                    entry.getValue();
-
-            if (!product.isActive()) {
-
-                log.warn(
-                        "Inactive product requested: branchId={}, productId={}",
-                        branchId,
-                        productId
-                );
-
+    /**
+     * Validates unit request.
+     *
+     * @param product the product
+     * @param request the request
+     */
+    private void validateUnitRequest(Product product, RequestedOrderItem request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateUnitRequest(Product,RequestedOrderItem)");
+        try {
+            if (request.quantity() == null || request.quantity() <= 0) {
                 throw new IllegalArgumentException(
-                        "One or more selected products are currently unavailable."
-                );
+                        product.getName() + " requires a quantity of at least 1.");
             }
-
-            serviceAvailability.requireAvailable(productId);
-
-            if (!branchProduct.isAvailable()) {
-
-                log.warn(
-                        "Branch product marked unavailable: branchId={}, productId={}",
-                        branchId,
-                        productId
-                );
-
+            if (request.weightGrams() != null) {
                 throw new IllegalArgumentException(
-                        "One or more selected products are currently unavailable at this branch."
-                );
+                        product.getName() + " is sold by quantity, not by weight.");
             }
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateUnitRequest(Product,RequestedOrderItem)");
+        }
+    }
 
-            if (
-                    product.getBasePrice()
-                            ==
-                            null
-            ) {
-
+    /**
+     * Validates weight request.
+     *
+     * @param product the product
+     * @param request the request
+     */
+    private void validateWeightRequest(Product product, RequestedOrderItem request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "validateWeightRequest(Product,RequestedOrderItem)");
+        try {
+            Integer minimumWeight = product.getMinimumWeightGrams();
+            Integer weightStep = product.getWeightStepGrams();
+            if (minimumWeight == null
+                    || minimumWeight < 250
+                    || weightStep == null
+                    || weightStep <= 0) {
                 log.error(
-                        "Product has no base price configured: productId={}",
-                        productId
-                );
-
-                throw new IllegalStateException(
-                        "Product pricing is not configured correctly."
-                );
+                        "Invalid weight configuration: productId={}, minimumWeightGrams={},"
+                                + " weightStepGrams={}",
+                        product.getId(),
+                        minimumWeight,
+                        weightStep);
+                throw new IllegalStateException("Product weight configuration is unavailable.");
             }
-
-            if (
-                    product.getTaxCategory()
-                            !=
-                            null
-                            &&
-                            !product.getTaxCategory()
-                                    .isActive()
-            ) {
-
-                log.error(
-                        "Product is linked to inactive tax category: productId={}, taxCategoryId={}",
-                        productId,
-                        product.getTaxCategory()
-                                .getId()
-                );
-
-                throw new IllegalStateException(
-                        "Product tax configuration is not available."
-                );
+            Integer requestedWeight = request.weightGrams();
+            if (requestedWeight == null) {
+                throw new IllegalArgumentException(
+                        "Please select a weight for " + product.getName() + ".");
             }
-
-            ProductSaleMode saleMode =
-                    product.getSaleMode() == null
-                            ? ProductSaleMode.UNIT
-                            : product.getSaleMode();
-
-            if (saleMode == ProductSaleMode.WEIGHT) {
-
-                validateWeightRequest(
-                        product,
-                        requestedItem
-                );
-
-                validated.add(
-                        new ValidatedOrderItem(
-                                product,
-                                branchProduct,
-                                saleMode,
-                                1,
-                                requestedItem.weightGrams()
-                        )
-                );
-
-            } else {
-
-                validateUnitRequest(
-                        product,
-                        requestedItem
-                );
-
-                validated.add(
-                        new ValidatedOrderItem(
-                                product,
-                                branchProduct,
-                                saleMode,
-                                requestedItem.quantity(),
-                                null
-                        )
-                );
+            if (requestedWeight < minimumWeight) {
+                throw new IllegalArgumentException(
+                        product.getName() + " has a minimum order of " + minimumWeight + " grams.");
             }
-        }
-
-        return validated;
-    }
-
-    private void validateUnitRequest(
-            Product product,
-            RequestedOrderItem request
-    ) {
-
-        if (
-                request.quantity() == null
-                        || request.quantity() <= 0
-        ) {
-            throw new IllegalArgumentException(
-                    product.getName() + " requires a quantity of at least 1."
-            );
-        }
-
-        if (request.weightGrams() != null) {
-            throw new IllegalArgumentException(
-                    product.getName() + " is sold by quantity, not by weight."
-            );
+            if ((requestedWeight - minimumWeight) % weightStep != 0) {
+                throw new IllegalArgumentException(
+                        product.getName()
+                                + " must be ordered in "
+                                + weightStep
+                                + " gram steps starting from "
+                                + minimumWeight
+                                + " grams.");
+            }
+            if (request.quantity() != null && request.quantity() != 1) {
+                throw new IllegalArgumentException(
+                        product.getName() + " is sold by weight, not by quantity.");
+            }
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "validateWeightRequest(Product,RequestedOrderItem)");
         }
     }
 
-    private void validateWeightRequest(
-            Product product,
-            RequestedOrderItem request
-    ) {
-
-        Integer minimumWeight =
-                product.getMinimumWeightGrams();
-
-        Integer weightStep =
-                product.getWeightStepGrams();
-
-        if (
-                minimumWeight == null
-                        || minimumWeight < 250
-                        || weightStep == null
-                        || weightStep <= 0
-        ) {
-            log.error(
-                    "Invalid weight configuration: productId={}, minimumWeightGrams={}, weightStepGrams={}",
-                    product.getId(),
-                    minimumWeight,
-                    weightStep
-            );
-
-            throw new IllegalStateException(
-                    "Product weight configuration is unavailable."
-            );
-        }
-
-        Integer requestedWeight =
-                request.weightGrams();
-
-        if (requestedWeight == null) {
-            throw new IllegalArgumentException(
-                    "Please select a weight for " + product.getName() + "."
-            );
-        }
-
-        if (requestedWeight < minimumWeight) {
-            throw new IllegalArgumentException(
-                    product.getName()
-                            + " has a minimum order of "
-                            + minimumWeight
-                            + " grams."
-            );
-        }
-
-        if ((requestedWeight - minimumWeight) % weightStep != 0) {
-            throw new IllegalArgumentException(
-                    product.getName()
-                            + " must be ordered in "
-                            + weightStep
-                            + " gram steps starting from "
-                            + minimumWeight
-                            + " grams."
-            );
-        }
-
-        if (request.quantity() != null && request.quantity() != 1) {
-            throw new IllegalArgumentException(
-                    product.getName() + " is sold by weight, not by quantity."
-            );
+    /**
+     * Adds nullable exact.
+     *
+     * @param first the first
+     * @param second the second
+     * @return the add nullable exact result
+     */
+    private Integer addNullableExact(Integer first, Integer second) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        OrderValidationService.class, "addNullableExact(Integer,Integer)");
+        try {
+            if (first == null) {
+                return second;
+            }
+            if (second == null) {
+                return first;
+            }
+            return Math.addExact(first, second);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    OrderValidationService.class,
+                    "addNullableExact(Integer,Integer)");
         }
     }
 
-    private Integer addNullableExact(
-            Integer first,
-            Integer second
-    ) {
-
-        if (first == null) {
-            return second;
-        }
-
-        if (second == null) {
-            return first;
-        }
-
-        return Math.addExact(first, second);
-    }
-
-    private record RequestedOrderItem(
-            Integer quantity,
-            Integer weightGrams
-    ) {
-    }
+    /**
+     * Immutable requested order item data contract.
+     *
+     * @param quantity the quantity
+     * @param weightGrams the weight grams
+     */
+    private record RequestedOrderItem(Integer quantity, Integer weightGrams) {}
 }

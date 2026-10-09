@@ -1,13 +1,17 @@
 package com.gokulsweets.restaurant.staff.approval;
 
 import com.gokulsweets.restaurant.branch.Branch;
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.staff.StaffUser;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+/** Persisted approval request state. */
 @Entity
 @Table(name = "approval_requests")
 @Getter
@@ -18,98 +22,69 @@ public class ApprovalRequest {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(
-            name = "request_number",
-            unique = true,
-            length = 30
-    )
+    @Column(name = "request_number", unique = true, length = 30)
     private String requestNumber;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "request_type",
-            nullable = false,
-            length = 30
-    )
+    @Column(name = "request_type", nullable = false, length = 30)
     private ApprovalRequestType requestType;
 
-    @ManyToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "staff_user_id",
-            nullable = false
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "staff_user_id", nullable = false)
     private StaffUser staffUser;
 
-    @ManyToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "branch_id",
-            nullable = false
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "branch_id", nullable = false)
     private Branch branch;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            nullable = false,
-            length = 30
-    )
+    @Column(nullable = false, length = 30)
     private ApprovalRequestStatus status;
 
-    @Column(
-            nullable = false,
-            length = 180
-    )
+    @Column(nullable = false, length = 180)
     private String title;
 
     @Column(length = 1000)
     private String summary;
 
-    @Column(
-            name = "workflow_version",
-            nullable = false
-    )
+    @Column(name = "workflow_version", nullable = false)
     private Integer workflowVersion = 1;
 
-    @Column(
-            name = "submitted_at",
-            nullable = false
-    )
+    @Column(name = "submitted_at", nullable = false)
     private LocalDateTime submittedAt;
 
     @Column(name = "resolved_at")
     private LocalDateTime resolvedAt;
 
-    @Column(
-            name = "created_at",
-            nullable = false
-    )
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(
-            name = "updated_at",
-            nullable = false
-    )
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-
-        LocalDateTime now =
-                LocalDateTime.now();
-
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(ApprovalRequest.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, ApprovalRequest.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-
-        updatedAt =
-                LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(ApprovalRequest.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, ApprovalRequest.class, "onUpdate()");
+        }
     }
 }
