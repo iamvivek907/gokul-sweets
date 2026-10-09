@@ -296,7 +296,20 @@ jobs:
       - name: Verify complete-preview deadline regressions
         run: python3 -B -m unittest discover -s backend/scripts -p 'test_*.py'
       - name: Build actual deployment image without cached Gradle or Docker layers
-        run: docker build --pull --no-cache --progress=plain --tag gokul-render-ci backend
+        run: |
+          build_log=$(mktemp)
+          trap 'rm -f "$build_log"' EXIT
+          for attempt in 1 2 3; do
+            if docker build --pull --no-cache --progress=plain --tag gokul-render-ci backend 2>&1 | tee "$build_log"; then
+              exit 0
+            fi
+            # Retry registry rate limits only; compiler, dependency and image errors fail immediately.
+            if ! grep -Eq 'failed to resolve source metadata.*(429 Too Many Requests|toomanyrequests)' "$build_log" || [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            echo "Registry rate limited the build; retrying attempt $((attempt + 1)) of 3."
+            sleep "$((attempt * 15))"
+          done
       - name: Start deployment image and verify database-backed health
         run: |
           jvm_args=()

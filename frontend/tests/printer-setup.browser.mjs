@@ -11,7 +11,7 @@ try {
    setTimeout(()=>controller.abort(new DOMException('Request deadline exceeded','TimeoutError')),milliseconds);
    return controller.signal;
   };});
-  let reads=0,release,started;
+  let reads=0,release,started,stalledRequest;
   const firstStarted=new Promise(resolve=>{started=resolve;});
   let gate=new Promise(resolve=>{release=resolve;});
   let state={configured:true,enabled:false,online:true,profile:{branchId:1,station:'KITCHEN',agentId:'shop',printerCode:'KITCHEN_MAIN',protocol:'ESC_POS_USB',target:'Test Queue',port:9100,baudRate:9600,paperWidthMm:80,autoCut:false},runtime:{status:'READY',devices:{usb:['Test Queue'],bluetooth:[]}}};
@@ -23,7 +23,7 @@ try {
    if(path==='/api/admin/auth/me')json={staffId:1,username:'owner',fullName:'Owner',roleName:'OWNER_ADMIN',branchIds:[1],permissions:['ORDER_VIEW','BRANCH_MANAGE','ORDER_START_PREPARATION']};
    else if(path==='/api/branches')json=[{id:1,name:'Test shop',code:'TEST',active:true}];
    else if(path==='/api/admin/printing/station') {
-    reads++;json=structuredClone(state);
+    reads++;stalledRequest=request;json=structuredClone(state);
     if(gate){started();await gate;}
    } else if(path.endsWith('/printing/station/mode')) {
     assert.equal(request.headers()['x-staff-csrf'],'test-csrf');
@@ -55,14 +55,22 @@ try {
   gate=new Promise(resolve=>{release=resolve;});
   await page.clock.fastForward(5000);await stalledStarted;
   const stalledReads=reads;
-  await page.clock.fastForward(30001);
+  const failedRequest=page.waitForEvent('requestfailed',{predicate:request=>request===stalledRequest});
+  await page.clock.fastForward(30001);await failedRequest;
   await page.getByText('Printer status request timed out. Retrying automatically.',{exact:true}).waitFor();
   assert.equal(reads,stalledReads,'A stuck request must be aborted before a new poll starts');
   // Abort left the old route pending; release it before starting a healthy read.
   const releaseStalled=release;gate=null;releaseStalled();
   state={...state,enabled:false};
   const recoveredReply=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/printing/station');
-  await page.clock.fastForward(5000);await recoveredReply;
+  // Process each timer tick and its network callbacks instead of jumping directly to
+  // one assumed interval boundary after the abort. A stuck guard still fails within two periods.
+  for(let tick=0;tick<10&&reads===stalledReads;tick++) {
+   await page.clock.runFor(1000);
+   await page.evaluate(()=>Promise.resolve());
+  }
+  assert.equal(reads,stalledReads+1,'Polling must recover within two intervals after abort');
+  await recoveredReply;
   await page.getByText('Paused',{exact:true}).waitFor();
   await page.waitForFunction(()=>!document.body.textContent.includes('Printer status request timed out. Retrying automatically.'));
   assert.equal(reads,stalledReads+1);
