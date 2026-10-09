@@ -46,7 +46,8 @@ class SmartOrderingRulesTest {
                 new CartAvailabilityController(
                         features,
                         service,
-                        mock(com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService.class));
+                        mock(com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService.class),
+                        new MenuPreviewReads(service, clock));
         var request =
                 new CartAvailabilityController.Request(
                         LocalDate.now(clock),
