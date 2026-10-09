@@ -28,6 +28,10 @@ import java.util.Map;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    private static final org.springframework.web.util.DisconnectedClientHelper disconnectedClients =
+            new org.springframework.web.util.DisconnectedClientHelper(
+                    GlobalExceptionHandler.class.getName() + ".disconnectedClients");
+
     /**
      * Handles upload size.
      *
@@ -424,6 +428,13 @@ public class GlobalExceptionHandler {
                         GlobalExceptionHandler.class,
                         "handleUnexpected(Exception,HttpServletRequest)");
         try {
+            // A closed response connection cannot receive another JSON error body. Restrict this
+            // path to response serialization failures; upstream/database errors remain failures.
+            if (exception
+                            instanceof
+                            org.springframework.http.converter.HttpMessageNotWritableException
+                    && disconnectedClients.checkAndLogClientDisconnectedException(exception))
+                return null;
             log.error(
                     "Unexpected request failure: method={}, path={}",
                     request.getMethod(),

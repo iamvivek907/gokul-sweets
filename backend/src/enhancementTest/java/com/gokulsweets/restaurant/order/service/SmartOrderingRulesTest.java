@@ -53,8 +53,10 @@ class SmartOrderingRulesTest {
                         1,
                         List.of(new CreateOrderItemRequest(1L, 1, null)),
                         null);
-        assertThat(controller.check(1L, request, false).getStatusCode().value()).isEqualTo(404);
-        assertThat(controller.check(1L, request, true).getStatusCode().value()).isEqualTo(404);
+        assertThat(controller.check(1L, request, false, true).getStatusCode().value())
+                .isEqualTo(404);
+        assertThat(controller.check(1L, request, true, true).getStatusCode().value())
+                .isEqualTo(404);
         verifyNoInteractions(service);
     }
 

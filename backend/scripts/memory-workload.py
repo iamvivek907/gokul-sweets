@@ -82,9 +82,17 @@ async def menu_preview(user, iteration):
     """Match the browser's full-menu, selected-date preview and sequential 100-item batches."""
     date = (TODAY + datetime.timedelta(days=1)).isoformat()
     for batch in MENU_BATCHES:
-        result = await http_json('/api/branches/10001/availability?menuPreview=true',
+        result = await http_json('/api/branches/10001/availability?menuPreview=true&compact=true',
                                  dict(startDate=date, days=1, items=batch, fulfilmentType='PICKUP'))
         dates = result.get('dates', [])
+        catalog = result.get('issueCatalog')
+        if catalog is None:
+            raise ValueError('Expected opt-in compact menu preview')
+        for day in dates:
+            for slot in day['slots']:
+                if any(not isinstance(index, int) or index < 0 or index >= len(catalog)
+                       for index in slot['issueIndexes']):
+                    raise ValueError('Invalid menu preview issue index')
         expected = {item['productId'] for item in batch}
         if len(dates) != 1 or dates[0]['date'] != date or {item['productId'] for item in dates[0].get('items', [])} != expected:
             raise ValueError('Full-menu preview must return every requested item for the selected date')

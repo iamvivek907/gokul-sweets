@@ -1,5 +1,10 @@
 /** Backfill cancellation APIs used by customer flows on older mobile browsers. */
 export function installAbortSignalCompatibility(Signal: typeof AbortSignal = AbortSignal): void {
+    if (typeof Signal.prototype.throwIfAborted !== "function") {
+        Object.defineProperty(Signal.prototype, "throwIfAborted", {configurable: true, writable: true, value: function(this: AbortSignal) {
+            if (this.aborted) throw this.reason ?? new DOMException("Request aborted", "AbortError");
+        }});
+    }
     if (typeof Signal.timeout !== "function") {
         Object.defineProperty(Signal, "timeout", {configurable: true, writable: true, value: (milliseconds: number) => {
             if (!Number.isFinite(milliseconds) || milliseconds < 0) throw new RangeError("Invalid timeout");

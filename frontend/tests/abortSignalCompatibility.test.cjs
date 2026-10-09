@@ -3,6 +3,7 @@ const code=ts.transpileModule(fs.readFileSync('lib/abortSignalCompatibility.ts',
 function fixture(){
  class LegacySignal extends AbortSignal {}
  Object.defineProperties(LegacySignal,{any:{value:undefined,configurable:true},timeout:{value:undefined,configurable:true}});
+ Object.defineProperty(LegacySignal.prototype,'throwIfAborted',{value:undefined,configurable:true});
  const timers=[],exports={};
  vm.runInNewContext(code,{exports,AbortSignal:LegacySignal,AbortController,DOMException,setTimeout:(callback,delay)=>timers.push({callback,delay})});
  return {Signal:LegacySignal,timers,install:exports.installAbortSignalCompatibility};
@@ -26,6 +27,13 @@ test('already aborted consumers fail immediately and timeout fallback retains de
  assert.equal(combined.aborted,true);assert.equal(combined.reason.name,'TimeoutError');
 });
 test('supported browsers retain native cancellation methods',()=>{
- const f=fixture(),any=AbortSignal.any,timeout=AbortSignal.timeout;
- f.install(AbortSignal);assert.equal(AbortSignal.any,any);assert.equal(AbortSignal.timeout,timeout);
+ const f=fixture(),any=AbortSignal.any,timeout=AbortSignal.timeout,throwIfAborted=AbortSignal.prototype.throwIfAborted;
+ f.install(AbortSignal);assert.equal(AbortSignal.any,any);assert.equal(AbortSignal.timeout,timeout);assert.equal(AbortSignal.prototype.throwIfAborted,throwIfAborted);
+});
+test('legacy abort checks allow live reads and preserve cancellation reasons',()=>{
+ const f=fixture(),signal=new AbortController().signal;
+ assert.doesNotThrow(()=>f.Signal.prototype.throwIfAborted.call(signal));
+ const controller=new AbortController(),reason=new DOMException('Account changed','AbortError');
+ controller.abort(reason);assert.throws(()=>f.Signal.prototype.throwIfAborted.call(controller.signal),error=>error===reason);
+ assert.throws(()=>f.Signal.prototype.throwIfAborted.call({aborted:true}),{name:'AbortError'});
 });
