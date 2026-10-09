@@ -26,6 +26,9 @@ try {
   const setup=page.getByRole('link',{name:'Set up printer',exact:true});await setup.waitFor();
   assert.equal(await setup.evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)');
   await page.getByText(/Open printer setup to configure.*Second shop/).waitFor();
+  assert.equal(await setup.getAttribute('href'),'/admin/printing/setup?branchId=2');
+  // Another Admin tab changes the shared preference while Queue still shows branch 2.
+  await page.evaluate(()=>localStorage.setItem('gokul-admin-branch:1','1'));
   await setup.click();
   const branch=page.locator('main select').first();await page.waitForFunction(()=>document.querySelector('main select')?.value==='2');
   const installer=page.getByRole('link',{name:'Download Windows installer',exact:true});await installer.waitFor();
@@ -36,10 +39,11 @@ try {
   await page.getByRole('link',{name:'Back to printer queue',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#printing-branch')?.value==='1');
   // A stale preference cannot select a branch removed from the staff member's access.
   await page.evaluate(()=>localStorage.setItem('gokul-admin-branch:1','2'));restricted=true;stationBranches.length=0;
-  await page.goto(`${base}/admin/printing/setup`);await page.waitForFunction(()=>document.querySelector('main select')?.value==='1');
+  await page.goto(`${base}/admin/printing/setup?branchId=2`);await page.waitForFunction(()=>document.querySelector('main select')?.value==='1');
   await page.waitForFunction(()=>document.body.textContent.includes('Not installed'));
   assert.equal(await branch.locator('option[value="2"]').count(),0);
   assert.ok(stationBranches.every(id=>id===1));
+  assert.equal(new URL(page.url()).searchParams.get('branchId'),'1','Denied branch is replaced with an allowed branch in the URL');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);await context.close();console.log(`Printer setup guidance, contrast, branch reload and access checks passed at ${width}px`);
  }
