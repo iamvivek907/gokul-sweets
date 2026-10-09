@@ -55,8 +55,6 @@ public class CartAvailabilityService {
 
     private final Clock inventoryClock;
 
-    private final com.gokulsweets.restaurant.menu.MenuServiceWindows serviceWindows;
-
     /**
      * Returns check information for cart availability.
      *
@@ -111,7 +109,8 @@ public class CartAvailabilityService {
                 throw new IllegalArgumentException(
                         "Choose a date within the advance ordering window.");
             }
-            List<ValidatedOrderItem> items = validation.validatePickupCart(branchId, requested);
+            var validated = validation.validatePickupCartWithWindows(branchId, requested);
+            List<ValidatedOrderItem> items = validated.items();
             List<Long> ids = items.stream().map(item -> item.branchProduct().getId()).toList();
             Map<Long, BranchInventoryPolicy> policies =
                     policyRepository.findByBranchProductIdIn(ids).stream()
@@ -154,12 +153,7 @@ public class CartAvailabilityService {
                                     branchId, startDate, lastDate)
                             .stream()
                             .collect(Collectors.groupingBy(PickupSlot::getSlotDate));
-            var serviceAt =
-                    serviceWindows.pickupEvaluator(
-                            branchId,
-                            items.stream()
-                                    .map(item -> item.product().getId())
-                                    .collect(Collectors.toSet()));
+            var serviceAt = validated.serviceAt();
             List<DateAvailability> dates = new ArrayList<>();
             for (LocalDate date = startDate; !date.isAfter(lastDate); date = date.plusDays(1)) {
                 List<SlotAvailability> slots = new ArrayList<>();
@@ -231,53 +225,7 @@ public class CartAvailabilityService {
                                     code,
                                     issues));
                 }
-                List<ItemAvailability> dateItems = new ArrayList<>();
-                var inWindow =
-                        slots.stream().filter(s -> !"PICKUP_WINDOW".equals(s.code())).toList();
-                var openSlots =
-                        inWindow.stream()
-                                .filter(
-                                        s ->
-                                                s.slot().remainingCapacity() > 0
-                                                        || (s.slot().priorityEnabled()
-                                                                && s.slot()
-                                                                                .priorityRemainingCapacity()
-                                                                        > 0))
-                                .toList();
-                for (ItemAvailability item : stock) {
-                    if (!item.available()) {
-                        dateItems.add(item);
-                        continue;
-                    }
-                    boolean fits =
-                            openSlots.stream()
-                                    .anyMatch(
-                                            s ->
-                                                    s.issues().stream()
-                                                            .noneMatch(
-                                                                    i ->
-                                                                            i.productId()
-                                                                                    .equals(
-                                                                                            item
-                                                                                                    .productId())));
-                    if (fits) dateItems.add(item);
-                    else
-                        dateItems.add(
-                                openSlots.stream()
-                                        .flatMap(s -> s.issues().stream())
-                                        .filter(i -> i.productId().equals(item.productId()))
-                                        .findFirst()
-                                        .orElse(
-                                                inWindow.isEmpty()
-                                                        ? item.unavailable(
-                                                                "NO_SLOTS",
-                                                                "No pickup times are open for this"
-                                                                    + " date. Choose another date.")
-                                                        : item.unavailable(
-                                                                "SLOT_FULL",
-                                                                "All pickup times are fully booked."
-                                                                    + " Choose another date.")));
-                }
+                List<ItemAvailability> dateItems = summarizeDateItems(stock, slots);
                 boolean available =
                         slots.stream().anyMatch(s -> s.normalAvailable() || s.priorityAvailable());
                 String dateReason =
@@ -339,6 +287,74 @@ public class CartAvailabilityService {
                     __gokulMethodStartedNanos,
                     CartAvailabilityService.class,
                     "check(Long,LocalDate,int,List<CreateOrderItemRequest>,boolean)");
+        }
+    }
+
+    /**
+     * Summarises dated item availability using one index of issues in slots with capacity. Stock
+     * failures and the first applicable slot reason retain their original precedence.
+     *
+     * @param stock authoritative dated stock decisions in request order
+     * @param slots current slot decisions in server order
+     * @return item decisions in the original request order
+     */
+    static List<ItemAvailability> summarizeDateItems(
+            List<ItemAvailability> stock, List<SlotAvailability> slots) {
+        long started =
+                MethodTiming.start(
+                        CartAvailabilityService.class,
+                        "summarizeDateItems(List<ItemAvailability>,List<SlotAvailability>)");
+        try {
+            List<ItemAvailability> dateItems = new ArrayList<>();
+            var inWindow = slots.stream().filter(s -> !"PICKUP_WINDOW".equals(s.code())).toList();
+            var openSlots =
+                    inWindow.stream()
+                            .filter(
+                                    s ->
+                                            s.slot().remainingCapacity() > 0
+                                                    || (s.slot().priorityEnabled()
+                                                            && s.slot().priorityRemainingCapacity()
+                                                                    > 0))
+                            .toList();
+            // Index each open slot once instead of scanning every issue for every product.
+            // Keep first-issue order identical to the original slot traversal.
+            Map<Long, Integer> blockedSlots = new HashMap<>();
+            Map<Long, ItemAvailability> firstIssues = new HashMap<>();
+            for (SlotAvailability openSlot : openSlots) {
+                Set<Long> seen = new HashSet<>();
+                for (ItemAvailability issue : openSlot.issues()) {
+                    firstIssues.putIfAbsent(issue.productId(), issue);
+                    if (seen.add(issue.productId()))
+                        blockedSlots.merge(issue.productId(), 1, Integer::sum);
+                }
+            }
+            for (ItemAvailability item : stock) {
+                if (!item.available()) {
+                    dateItems.add(item);
+                    continue;
+                }
+                boolean fits = blockedSlots.getOrDefault(item.productId(), 0) < openSlots.size();
+                if (fits) dateItems.add(item);
+                else
+                    dateItems.add(
+                            firstIssues.getOrDefault(
+                                    item.productId(),
+                                    inWindow.isEmpty()
+                                            ? item.unavailable(
+                                                    "NO_SLOTS",
+                                                    "No pickup times are open for this date. Choose"
+                                                            + " another date.")
+                                            : item.unavailable(
+                                                    "SLOT_FULL",
+                                                    "All pickup times are fully booked. Choose"
+                                                            + " another date.")));
+            }
+            return dateItems;
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    CartAvailabilityService.class,
+                    "summarizeDateItems(List<ItemAvailability>,List<SlotAvailability>)");
         }
     }
 

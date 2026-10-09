@@ -6,6 +6,9 @@ package com.gokulsweets.restaurant.menu;
  */
 public final class AppConstant {
 
+    /** Fixed stripes bound coordination memory while allowing unrelated branches to rebuild. */
+    public static final int MENU_CACHE_LOCK_STRIPES = 64;
+
     /** Creates a app constant instance. */
     private AppConstant() {}
 

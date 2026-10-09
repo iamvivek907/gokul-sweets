@@ -13,6 +13,8 @@ BASE = 'http://127.0.0.1:10000'
 with urllib.request.urlopen(BASE + '/api/menu?branchId=10001') as response:
     menu = json.load(response)
 ITEMS = [dict(productId=p['id'], quantity=1) for category in menu for p in category['products']][:5]
+MENU_ITEMS = [dict(productId=p['id'], quantity=1) for category in menu for p in category['products']]
+MENU_BATCHES = [MENU_ITEMS[offset:offset + 100] for offset in range(0, len(MENU_ITEMS), 100)]
 TODAY = datetime.datetime.now(ZoneInfo('Asia/Kolkata')).date()
 
 
@@ -76,6 +78,18 @@ async def discovery(user, iteration):
         raise ValueError('Expected lightweight dates without item inventory matrix')
 
 
+async def menu_preview(user, iteration):
+    """Match the browser's full-menu, selected-date preview and sequential 100-item batches."""
+    date = (TODAY + datetime.timedelta(days=1)).isoformat()
+    for batch in MENU_BATCHES:
+        result = await http_json('/api/branches/10001/availability?menuPreview=true',
+                                 dict(startDate=date, days=1, items=batch, fulfilmentType='PICKUP'))
+        dates = result.get('dates', [])
+        expected = {item['productId'] for item in batch}
+        if len(dates) != 1 or dates[0]['date'] != date or {item['productId'] for item in dates[0].get('items', [])} != expected:
+            raise ValueError('Full-menu preview must return every requested item for the selected date')
+
+
 async def stage(users, action, rounds, scenario):
     timings, errors = [], []
     active = peak = 0
@@ -116,6 +130,10 @@ async def main():
         failed |= await stage(users, request, 5, 'mixed-customer-staff')
     for users in (10, 100, 500, 1000):
         failed |= await stage(users, discovery, 1, 'lightweight-31-day-pickup-discovery')
+    # Each completed preview here is four sequential POSTs for the 379-item fixture.
+    # Report complete-preview latency; the earlier stages are individual HTTP request timings.
+    for users in (100, 500):
+        failed |= await stage(users, menu_preview, 1, 'full-menu-selected-date-preview')
     return 1 if failed else 0
 
 

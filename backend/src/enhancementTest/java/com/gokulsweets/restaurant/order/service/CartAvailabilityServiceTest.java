@@ -56,11 +56,15 @@ class CartAvailabilityServiceTest {
         var available = SmartOrderingRulesTest.slot(today.plusDays(1), LocalTime.of(13, 0));
         available.setId(3L);
         var request = List.of(new CreateOrderItemRequest(11L, null, 250));
-        when(validation.validatePickupCart(1L, request))
+        when(validation.validatePickupCartWithWindows(1L, request))
                 .thenReturn(
-                        List.of(
-                                new ValidatedOrderItem(
-                                        product, bp, ProductSaleMode.WEIGHT, 1, 250)));
+                        new com.gokulsweets.restaurant.order.service.model.ValidatedPickupCart(
+                                List.of(
+                                        new ValidatedOrderItem(
+                                                product, bp, ProductSaleMode.WEIGHT, 1, 250)),
+                                ignored ->
+                                        new com.gokulsweets.restaurant.menu.MenuServiceWindows
+                                                .Snapshot(false, java.util.Map.of())));
         when(policies.findByBranchProductIdIn(List.of(22L))).thenReturn(List.of(policy));
         when(allocations.findByBranchProductIdInAndServiceDateBetween(
                         List.of(22L), today, today.plusDays(1)))
@@ -68,12 +72,6 @@ class CartAvailabilityServiceTest {
         when(slots.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
                         1L, today, today.plusDays(1)))
                 .thenReturn(List.of(first, full, available));
-        var windows = mock(com.gokulsweets.restaurant.menu.MenuServiceWindows.class);
-        when(windows.pickupEvaluator(anyLong(), anySet()))
-                .thenReturn(
-                        at ->
-                                new com.gokulsweets.restaurant.menu.MenuServiceWindows.Snapshot(
-                                        false, java.util.Map.of()));
         var service =
                 new CartAvailabilityService(
                         features,
@@ -85,8 +83,7 @@ class CartAvailabilityServiceTest {
                         new InventoryAvailabilityService(),
                         slots,
                         settings,
-                        clock,
-                        windows);
+                        clock);
         var result = service.check(1L, today, 2, request);
         assertThat(result.fulfilmentType()).isEqualTo("PICKUP");
         assertThat(result.dates().get(0).available()).isFalse();
@@ -110,7 +107,7 @@ class CartAvailabilityServiceTest {
                 .isEqualTo("QUANTITY_TOO_LARGE");
         assertThat(result.dates().getFirst().items().getFirst().availableQuantity())
                 .isEqualByComparingTo("200");
-        verify(validation, atLeastOnce()).validatePickupCart(1L, request);
+        verify(validation, atLeastOnce()).validatePickupCartWithWindows(1L, request);
         verify(allocations, atLeastOnce())
                 .findByBranchProductIdInAndServiceDateBetween(any(), any(), any());
         verify(policies, atLeastOnce()).findByBranchProductIdIn(any());

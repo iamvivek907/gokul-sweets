@@ -110,10 +110,13 @@ public class OrderService {
                 MethodTiming.start(
                         OrderService.class, "createOrder(CreateOrderRequest,String,String)");
         try {
+            long identityStarted = System.nanoTime();
             verifiedOrderOwnership.requireCheckoutIdentity(request.customerPhone(), identityToken);
+            long identityFinished = System.nanoTime();
             String requestHash = orderIdempotencyService.createRequestHash(request);
             OrderIdempotencyService.ClaimResult claim =
                     orderIdempotencyService.claim(idempotencyKey, requestHash);
+            long claimFinished = System.nanoTime();
             /*
              * Retry of an already completed request.
              *
@@ -140,20 +143,27 @@ public class OrderService {
                     request.pickupSlotId(),
                     request.pickupType(),
                     request.items().size());
+            long validationStarted = System.nanoTime();
             ValidatedOrderData validatedOrder = orderValidationService.validate(request);
+            long validationFinished = System.nanoTime();
             // A read-only whole-cart preflight; guarded slot update and locked inventory
             // holds below are still the source of truth when another order races us.
             pickupCommitmentCheck.checkNewOrder(validatedOrder, request.items());
+            long commitmentFinished = System.nanoTime();
             OrderCalculationResult calculation = orderCalculationService.calculate(validatedOrder);
             // Verify the exact accepted server price before creating any slot or stock hold.
             checkoutQuoteService.accept(request, null, calculation, request.quoteToken());
+            long pricingFinished = System.nanoTime();
             reservePickupCapacity(validatedOrder);
+            long slotFinished = System.nanoTime();
             Order order = buildOrder(request, validatedOrder, calculation);
             addOrderItems(order, calculation);
             Order savedOrder = orderRepository.saveAndFlush(order);
+            long persistenceFinished = System.nanoTime();
             verifiedOrderOwnership.bindNewOrder(
                     savedOrder.getId(), request.customerPhone(), identityToken);
             loyalty.reserve(savedOrder, request.rewardCode());
+            long ownershipFinished = System.nanoTime();
             /*
              * Reserve the complete order inventory after the order
              * has received its database identity, but inside this
@@ -168,7 +178,26 @@ public class OrderService {
              * - every inventory hold and ledger entry
              */
             orderInventoryReservationService.synchronizePendingOrder(savedOrder, validatedOrder);
+            long inventoryFinished = System.nanoTime();
             orderIdempotencyService.linkOrder(idempotencyKey, savedOrder);
+            try {
+                log.info(
+                        "Order creation stages: identityMs={}, claimMs={}, validationMs={},"
+                                + " commitmentMs={}, pricingMs={}, slotMs={}, persistenceMs={},"
+                                + " ownershipAndRewardsMs={}, inventoryMs={}, linkMs={}",
+                        (identityFinished - identityStarted) / 1_000_000.0,
+                        (claimFinished - identityFinished) / 1_000_000.0,
+                        (validationFinished - validationStarted) / 1_000_000.0,
+                        (commitmentFinished - validationFinished) / 1_000_000.0,
+                        (pricingFinished - commitmentFinished) / 1_000_000.0,
+                        (slotFinished - pricingFinished) / 1_000_000.0,
+                        (persistenceFinished - slotFinished) / 1_000_000.0,
+                        (ownershipFinished - persistenceFinished) / 1_000_000.0,
+                        (inventoryFinished - ownershipFinished) / 1_000_000.0,
+                        (System.nanoTime() - inventoryFinished) / 1_000_000.0);
+            } catch (RuntimeException loggingFailure) {
+                // Additional diagnostics cannot change checkout success or transaction state.
+            }
             log.info(
                     "Order created successfully: orderId={}, orderNumber={}, branchId={},"
                         + " pickupSlotId={}, status={}, totalAmount={}, reservationExpiresAt={}",

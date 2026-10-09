@@ -3,7 +3,9 @@
 import CustomerNotificationLink from "./CustomerNotificationLink";
 import {useEffect, useState} from "react";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
-import {apiClient} from "@/services/apiClient";
+import {ApiError} from "@/services/apiClient";
+import {readCustomerInbox} from "@/services/customerInbox";
+import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import NotificationIcon from "@/components/customer/NotificationIcon";
 
 export default function CustomerNotificationBell() {
@@ -12,29 +14,42 @@ export default function CustomerNotificationBell() {
     useEffect(() => {
         if (!features?.notificationInbox) return;
         let active = true;
-        let busy = false;
-        const controller = new AbortController();
+        let paused = false;
+        let pending: AbortController | null = null;
         const refresh = async () => {
-            if (busy || document.visibilityState !== "visible" || !navigator.onLine) return;
-            busy = true;
+            if (!active || paused || pending || document.visibilityState !== "visible" || !navigator.onLine) return;
+            const controller = new AbortController();
+            pending = controller;
             try {
-                const me = await apiClient<{authenticated: boolean}>("/api/customer/identity/me", {credentials: "include", signal: controller.signal});
-                if (!me.authenticated) {if (active) setCount(null); return;}
-                const inbox = await apiClient<{unreadCount: number}>("/api/customer/identity/notifications", {credentials: "include", signal: controller.signal});
-                if (active) setCount(inbox.unreadCount);
-            } catch {if (active) setCount(null);}
-            finally {busy = false;}
+                const inbox = await readCustomerInbox(controller.signal);
+                if (active && pending === controller) setCount(inbox.unreadCount);
+            } catch (error) {
+                if (active && pending === controller) {
+                    setCount(null);
+                    if (error instanceof ApiError && [401, 403, 404].includes(error.status)) paused = true;
+                }
+            } finally {if (pending === controller) pending = null;}
         };
         void refresh();
         const timer = window.setInterval(() => void refresh(), 30000);
-        window.addEventListener("gokul-customer-identity-changed", refresh);
-        window.addEventListener("gokul-inbox-changed", refresh);
-        window.addEventListener("online", refresh);
-        document.addEventListener("visibilitychange", refresh);
-        return () => {active = false; controller.abort(); window.clearInterval(timer);
-            window.removeEventListener("gokul-customer-identity-changed", refresh);
-            window.removeEventListener("gokul-inbox-changed", refresh);
-            window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh);};
+        const identityChanged = () => {
+            pending?.abort(); pending = null; paused = false; setCount(null); void refresh();
+        };
+        const stopIdentity = subscribeCustomerIdentityChanges(identityChanged, {revalidateOnResume: false});
+        const inboxChanged = () => {pending?.abort(); pending = null; void refresh();};
+        window.addEventListener("gokul-inbox-changed", inboxChanged);
+        const resume = () => {if (document.visibilityState === "visible") {paused = false; void refresh();}};
+        const pageshow = (event: PageTransitionEvent) => {if (event.persisted) resume();};
+        window.addEventListener("focus", resume);
+        window.addEventListener("pageshow", pageshow);
+        window.addEventListener("online", resume);
+        document.addEventListener("visibilitychange", resume);
+        return () => {active = false; pending?.abort(); window.clearInterval(timer);
+            stopIdentity();
+            window.removeEventListener("gokul-inbox-changed", inboxChanged);
+            window.removeEventListener("focus", resume);
+            window.removeEventListener("pageshow", pageshow);
+            window.removeEventListener("online", resume); document.removeEventListener("visibilitychange", resume);};
     }, [features?.notificationInbox]);
     if (!features?.notificationInbox || count === null) return null;
     return <CustomerNotificationLink label={`Notifications, ${count} unread`}

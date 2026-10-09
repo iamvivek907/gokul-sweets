@@ -21,6 +21,12 @@ public class MenuCatalogService {
 
     private final Map<Long, Catalog> cache = new LinkedHashMap<>(16, .75f, true);
 
+    // Fixed stripes keep lock storage bounded; database work never holds the shared LRU lock.
+    private final Object[] branchLocks =
+            java.util.stream.IntStream.range(0, AppConstant.MENU_CACHE_LOCK_STRIPES)
+                    .mapToObj(ignored -> new Object())
+                    .toArray();
+
     /**
      * Immutable catalog data contract.
      *
@@ -91,19 +97,24 @@ public class MenuCatalogService {
             // Never publish uncommitted admin/import data into a shared process cache.
             if (!org.springframework.transaction.support.TransactionSynchronizationManager
                     .isCurrentTransactionReadOnly()) return build(branchId, revision());
-            synchronized (cache) {
+            synchronized (branchLocks[Math.floorMod(branchId, branchLocks.length)]) {
                 for (int attempt = 0; attempt < 3; attempt++) {
                     String revision = revision();
-                    var existing = cache.get(branchId);
+                    Catalog existing;
+                    synchronized (cache) {
+                        existing = cache.get(branchId);
+                    }
                     if (existing != null && existing.revision().equals(revision)) return existing;
                     var snapshot = build(branchId, revision);
                     // Do not publish a snapshot assembled across a committed catalog change.
                     if (!revision().equals(revision)) continue;
-                    cache.put(branchId, snapshot);
-                    while (cache.size() > 16
-                            || cache.values().stream().mapToLong(this::estimatedBytes).sum()
-                                    > 8 * 1024 * 1024)
-                        cache.remove(cache.keySet().iterator().next());
+                    synchronized (cache) {
+                        cache.put(branchId, snapshot);
+                        while (cache.size() > 16
+                                || cache.values().stream().mapToLong(this::estimatedBytes).sum()
+                                        > 8 * 1024 * 1024)
+                            cache.remove(cache.keySet().iterator().next());
+                    }
                     return snapshot;
                 }
             }
