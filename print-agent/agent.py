@@ -255,11 +255,16 @@ def process_job(api, db, cfg, job):
     try:
         data = match_printer(cfg, job)
     except (ValueError, KeyError, UnicodeError, TypeError):
-        api.post(f"jobs/{int(job['printJobId'])}/failed", {
-            "agentId": cfg["agent_id"], "claimToken": job["claimToken"],
-            "errorCode": "LOCAL_PROFILE_OR_TICKET_INVALID",
-            "errorMessage": "Check local printer profile and ASCII KOT text"})
-        raise ValueError("Job validation failed; agent stopped before sending printer data")
+        try:
+            api.post(f"jobs/{int(job['printJobId'])}/failed", {
+                "agentId": cfg["agent_id"], "claimToken": job["claimToken"],
+                "errorCode": "LOCAL_PROFILE_OR_TICKET_INVALID",
+                "errorMessage": "Check local printer profile and ASCII KOT text"})
+        finally:
+            # Validation must hold printing even when reporting the failure loses
+            # its response. No printer data was sent; never turn this into a
+            # recoverable connection-only error in the managed loop.
+            raise ValueError("Job validation failed; agent stopped before sending printer data")
     save_pending(db, cfg, job, "uncertain")
     deliver(cfg, data)
     save_pending(db, cfg, job, "sent")
@@ -381,6 +386,7 @@ def managed(cfg, path):
         db.execute("CREATE TABLE IF NOT EXISTS commands (id TEXT PRIMARY KEY, result TEXT NOT NULL)")
         completed_id, completed_result = None, None
         runtime_error = None
+        connection_error = None
         hardware = {"usb": [], "bluetooth": []}
         next_devices = next_heartbeat = 0
         while True:
@@ -393,15 +399,14 @@ def managed(cfg, path):
                     except Exception:
                         runtime_error = "Device discovery failed; check Windows drivers and pairing."
                     next_devices = time.monotonic() + 60
-                runtime = {"status": "NEEDS_ATTENTION" if pending else "ERROR" if runtime_error else "READY",
-                           "message": runtime_error, "devices": hardware,
+                runtime = {"status": "NEEDS_ATTENTION" if pending else "ERROR" if runtime_error or connection_error else "READY",
+                           "message": runtime_error or connection_error, "devices": hardware,
                            "pendingJobId": pending["job"]["printJobId"] if pending else None,
                            "pendingState": pending["state"] if pending else None}
                 state = api.post("control", dict(api.identity(), runtime=runtime,
                                  completedCommandId=completed_id, commandResult=completed_result))
                 completed_id, completed_result = None, None
-                if runtime_error and runtime_error.startswith("Backend connection"):
-                    runtime_error = None
+                connection_error = None
                 if time.monotonic() >= next_heartbeat:
                     api.post("heartbeat", api.identity())
                     next_heartbeat = time.monotonic() + 20
@@ -417,7 +422,8 @@ def managed(cfg, path):
                     completed_id = command["id"]
                     try:
                         completed_result = managed_command(api, db, cfg, command)
-                        runtime_error = None
+                        if completed_result.get("status") == "DONE":
+                            runtime_error = None
                     except Exception:
                         completed_result = {"status": "NEEDS_ATTENTION", "message": "Action failed. Inspect paper, connection and pending ticket before retrying."}
                         runtime_error = completed_result["message"]
@@ -428,7 +434,7 @@ def managed(cfg, path):
                         runtime_error = None
             except (error.URLError, TimeoutError):
                 # Durable pending/command receipts prevent resend after any connection failure.
-                runtime_error = "Backend connection interrupted; reconnecting. Pending tickets are held."
+                connection_error = "Backend connection interrupted; reconnecting. Pending tickets are held."
             except Exception:
                 runtime_error = "Printing needs attention. Check Admin setup, credentials and hardware."
             time.sleep(2)

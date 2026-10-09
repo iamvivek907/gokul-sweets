@@ -2,7 +2,7 @@
 
 ## One-time installation from Admin
 
-Deploy the backend (including Flyway V125) and frontend from this PR before installing the managed agent. The backend administrator sets a private random `PRINT_AGENT_API_KEY` in the backend environment. This is a shop agent credential, not a frontend environment variable. Give it only to the trusted person installing the shop station.
+Deploy the backend (including Flyway V125 and V126) and frontend from this PR before installing the managed agent. The backend administrator sets a private random `PRINT_AGENT_API_KEY` in the backend environment. This is a shop agent credential, not a frontend environment variable. Give it only to the trusted person installing the shop station.
 
 1. Use the **Windows 10/11 computer physically connected to the printer**, signed in as the account that will stay signed in during restaurant operations. Staff can subsequently use Admin from Android, another computer or this computer.
 2. For **USB**, install the manufacturer's Windows driver and confirm its local printer queue accepts RAW ESC/POS. For **Bluetooth**, pair a **Classic/SPP** printer in Windows and identify its outgoing COM port and manufacturer's baud rate. BLE-only, proprietary and GDI-only printers need another bridge.
@@ -36,11 +36,13 @@ The agent polls approximately every two seconds. The Admin panel refreshes every
 
 Physical transport is bounded to 30 seconds and isolated in a child process. The agent records an uncertain ticket before sending data and retains the journal if the transport or acknowledgement fails. It keeps reporting online, but claims no further KOTs while a pending ticket exists. **Do not delete the journal or blindly restart/retry to clear it.**
 
-Validation errors without a pending write also hold new claims. Pause, correct the connection settings or complete a successful test, then Start printing. Review the failed job in Printer Queue before retrying it.
+Validation errors without a pending write also hold new claims. Pause, correct the connection settings or complete a successful test, then Start printing. Review the failed job in Printer Queue before retrying it. A temporary backend disconnection does not clear this hold; an expired or uncertain test does not count as a successful test.
 
 Pause printing in Admin, inspect the paper and Windows spooler, then choose the appropriate recovery button. The checkbox means you checked this specific ticket. Tests are blocked while a KOT is unresolved. If the backend already committed a printed acknowledgement but its response was lost, the agent reconciles its authenticated, scoped `PRINTED` status without printing again. If another agent reclaimed the job or the claim changed, recovery remains blocked: your administrator must reconcile the queue and paper. A failed recovery request does not clear the local journal.
 
 Operator commands expire after 60 seconds if they have not begun, so an old test or recovery request is not executed unexpectedly after a long disconnection. A command already in progress finishes normally.
+
+If the backend accepts **Approve another attempt** but its reply is lost, inspect paper and approve recovery again. The backend recognizes the same agent/claim receipt without rescheduling the job or changing a newer claim; the agent clears its pending journal only after a successful acknowledgement.
 
 Test commands also have durable local receipts: a crash or lost response will not replay the same test automatically. A transport-accepted test is not sensor-confirmed paper output. Inspect paper before issuing a new test after an uncertain result.
 

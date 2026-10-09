@@ -1,6 +1,7 @@
 # Run once as the shop's Windows account. No secret is sent to the website or command line.
 param([switch]$VerifyPaths)
 $ErrorActionPreference = 'Stop'
+$profilePattern = '*.json'
 function Get-AgentPaths([string]$BranchStation) {
     $folder = Join-Path (Join-Path $env:LOCALAPPDATA 'GokulPrint') $BranchStation
     $pythonRoot = Join-Path (Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Programs') 'Python') 'Python313') 'python.exe'
@@ -12,6 +13,7 @@ if ($VerifyPaths) {
     $expectedFolder = [IO.Path]::Combine($env:LOCALAPPDATA, 'GokulPrint', '1-KITCHEN')
     $expectedPython = [IO.Path]::Combine([IO.Path]::Combine($env:LOCALAPPDATA, 'Programs', 'Python', 'Python313'), 'python.exe')
     if ($paths.Folder -ne $expectedFolder -or $paths.Python -ne $expectedPython -or $paths.Runtime -ne [IO.Path]::Combine($expectedFolder, '.venv', 'Scripts', 'python.exe') -or $paths.Background -ne [IO.Path]::Combine($expectedFolder, '.venv', 'Scripts', 'pythonw.exe')) { throw 'Installer path verification failed.' }
+    if ('config.local.json' -notlike $profilePattern -or 'config.local (1).json' -notlike $profilePattern -or 'config.local (2).json' -notlike $profilePattern -or 'profile.exe' -like $profilePattern) { throw 'Installer profile filter verification failed.' }
     Write-Host 'Installer runtime and startup paths verified.'
     exit 0
 }
@@ -20,7 +22,7 @@ Add-Type -AssemblyName System.Security
 try {
     $picker = New-Object System.Windows.Forms.OpenFileDialog
     $picker.Title = 'Select the printer profile downloaded from Admin setup'
-    $picker.Filter = 'Printer profile (config.local.json)|config.local.json'
+    $picker.Filter = "Printer profile (*.json)|$profilePattern"
     if ($picker.ShowDialog() -ne 'OK') { exit 0 }
     $profile = Get-Content -LiteralPath $picker.FileName -Raw | ConvertFrom-Json
     [long]$branchNumber = 0

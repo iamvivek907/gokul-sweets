@@ -69,6 +69,13 @@ public class PrintJob {
     @Column(name = "claimed_by_agent", length = 120)
     private String claimedByAgent;
 
+    // Receipt retained independently of the active claim for lost-response recovery.
+    @Column(name = "failed_claim_token", length = 100)
+    private String failedClaimToken;
+
+    @Column(name = "failed_claim_agent", length = 120)
+    private String failedClaimAgent;
+
     @Column(name = "claimed_at")
     private LocalDateTime claimedAt;
 

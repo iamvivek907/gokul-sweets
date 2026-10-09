@@ -401,6 +401,95 @@ class AgentTest(unittest.TestCase):
         self.assertEqual(sum(call.args[0] == "jobs/claim" for call in self.api.post.call_args_list), 1)
         self.assertEqual(reports[-1]["status"], "ERROR")
 
+    def test_lost_retry_ack_can_recover_without_sending_paper(self):
+        self.managed_db()
+        agent.save_pending(self.db, self.cfg, self.job, "uncertain")
+        # First response is lost after the server commits; the same claim's
+        # persisted receipt makes the second acknowledgement a successful no-op.
+        self.api.post.side_effect = [TimeoutError(), None]
+        command = {"id": "retry-1", "action": "RETRY", "jobId": 12}
+        with patch.object(agent, "deliver") as send:
+            with self.assertRaises(TimeoutError):
+                agent.managed_command(self.api, self.db, self.cfg, command)
+            self.assertIsNotNone(self.db.execute("SELECT * FROM pending").fetchone())
+            result = agent.managed_command(self.api, self.db, self.cfg, command | {"id": "retry-2"})
+            self.assertEqual(result["status"], "DONE")
+            self.assertIsNone(self.db.execute("SELECT * FROM pending").fetchone())
+            self.assertEqual(self.api.post.call_args_list[0], self.api.post.call_args_list[1])
+            send.assert_not_called()
+
+    def test_validation_hold_survives_disconnect_and_reconnect(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        reports = []
+        def post(path, body):
+            if path == "control":
+                reports.append(body["runtime"])
+                if len(reports) == 2:
+                    raise agent.error.URLError("temporary outage")
+                return {"profile": self.remote_profile(), "enabled": True, "command": {}}
+            return dict(self.job, copies=0) if path == "jobs/claim" else None
+        self.api.post.side_effect = post
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent.time, "sleep", side_effect=[None, None, None, KeyboardInterrupt]), patch.object(agent, "deliver") as send:
+                with self.assertRaises(KeyboardInterrupt):
+                    agent.managed(self.cfg, Path(directory) / "profile.json")
+                send.assert_not_called()
+        self.assertEqual(sum(call.args[0] == "jobs/claim" for call in self.api.post.call_args_list), 1)
+        self.assertEqual(reports[1]["message"], reports[-1]["message"])
+        self.assertEqual(reports[-1]["status"], "ERROR")
+
+    def test_validation_failure_ack_outage_also_holds_printing(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        def post(path, body):
+            if path == "control":
+                return {"profile": self.remote_profile(), "enabled": True, "command": {}}
+            if path.endswith("/failed"):
+                raise TimeoutError("Failure response lost")
+            return dict(self.job, copies=0) if path == "jobs/claim" else None
+        self.api.post.side_effect = post
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent.time, "sleep", side_effect=[None, KeyboardInterrupt]), patch.object(agent, "deliver") as send:
+                with self.assertRaises(KeyboardInterrupt):
+                    agent.managed(self.cfg, Path(directory) / "profile.json")
+                send.assert_not_called()
+        self.assertEqual(sum(call.args[0] == "jobs/claim" for call in self.api.post.call_args_list), 1)
+
+    def test_connection_failure_alone_recovers_without_operator_action(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        controls = 0
+        def post(path, body):
+            nonlocal controls
+            if path == "control":
+                controls += 1
+                if controls == 1:
+                    raise agent.error.URLError("temporary outage")
+                return {"profile": self.remote_profile(), "enabled": True, "command": {}}
+            return None
+        self.api.post.side_effect = post
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent.time, "sleep", side_effect=[None, KeyboardInterrupt]):
+                with self.assertRaises(KeyboardInterrupt):
+                    agent.managed(self.cfg, Path(directory) / "profile.json")
+        self.assertEqual(sum(call.args[0] == "jobs/claim" for call in self.api.post.call_args_list), 1)
+
+    def test_expired_test_does_not_clear_validation_hold(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        controls = 0
+        def post(path, body):
+            nonlocal controls
+            if path == "control":
+                controls += 1
+                command = {"id": "expired-test", "action": "TEST", "expiresAt": 0} if controls == 2 else {}
+                return {"profile": self.remote_profile(), "enabled": controls != 2, "command": command}
+            return dict(self.job, copies=0) if path == "jobs/claim" else None
+        self.api.post.side_effect = post
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent.time, "sleep", side_effect=[None, None, KeyboardInterrupt]), patch.object(agent, "deliver") as send:
+                with self.assertRaises(KeyboardInterrupt):
+                    agent.managed(self.cfg, Path(directory) / "profile.json")
+                send.assert_not_called()
+        self.assertEqual(sum(call.args[0] == "jobs/claim" for call in self.api.post.call_args_list), 1)
+
     @unittest.skipUnless(agent.sys.platform == "win32", "Windows DPAPI")
     def test_installer_secret_can_be_decrypted_only_through_windows_dpapi(self):
         import win32crypt
