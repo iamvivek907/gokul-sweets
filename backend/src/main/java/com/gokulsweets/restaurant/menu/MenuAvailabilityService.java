@@ -87,6 +87,24 @@ public class MenuAvailabilityService {
         try {
             // Menu flags are advisory. Never cache dated quantities, holds, or checkout acceptance.
             boolean publish = TransactionSynchronizationManager.isCurrentTransactionReadOnly();
+            if (publish) {
+                var observedCatalog = catalog.get(branchId);
+                Instant observedNow = inventoryClock.instant();
+                Cached observed;
+                synchronized (cache) {
+                    observed = cache.get(branchId);
+                }
+                if (observed != null
+                        && observed.value().revision().equals(observedCatalog.revision())
+                        && !observedNow.isBefore(observed.evaluatedAt())
+                        && observedNow.isBefore(observed.until())) {
+                    return new Availability(
+                            observed.value().revision(),
+                            observed.value().serviceWindowsEnabled(),
+                            observed.value().items(),
+                            observedNow);
+                }
+            }
             synchronized (branchLocks[Math.floorMod(branchId, branchLocks.length)]) {
                 for (int attempt = 0; attempt < 3; attempt++) {
                     var snapshot = catalog.get(branchId);

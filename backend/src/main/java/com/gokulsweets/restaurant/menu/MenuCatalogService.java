@@ -97,6 +97,13 @@ public class MenuCatalogService {
             // Never publish uncommitted admin/import data into a shared process cache.
             if (!org.springframework.transaction.support.TransactionSynchronizationManager
                     .isCurrentTransactionReadOnly()) return build(branchId, revision());
+            // Cached reads need no rebuild lock. Every request still checks the committed revision.
+            String observedRevision = revision();
+            Catalog observed;
+            synchronized (cache) {
+                observed = cache.get(branchId);
+            }
+            if (observed != null && observed.revision().equals(observedRevision)) return observed;
             synchronized (branchLocks[Math.floorMod(branchId, branchLocks.length)]) {
                 for (int attempt = 0; attempt < 3; attempt++) {
                     String revision = revision();
