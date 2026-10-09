@@ -10,13 +10,14 @@ const sweets=[product(1,'Rasgulla',1,'Sweets',15),{...product(2,'Gulab Jamun',1,
 const groups=[{key:'dahi',title:'Dahi',choices:dairy.map(p=>({productId:p.id,label:p.name.replace('Dahi ','')+' pack'}))}],slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false};
 const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,640,1024]){
- const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let blockRasgulla=false,delay=false;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let blockRasgulla=false,delay=false,releaseInitial;const initialGate=new Promise(resolve=>{releaseInitial=resolve;});const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/api/**',async route=>{const path=new URL(route.request().url()).pathname;let json=[];
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,smartAvailability:true,pickupAddOns:true,reviews:true,notificationInbox:true,today:date,futureOrderingDays:30};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/menu')json=[{id:1,name:'Sweets',products:sweets},{id:2,name:'Dairy',products:dairy},{id:3,name:'Snacks',products:snacks}];
+  else if(path==='/api/menu/catalog')json={revision:'1',categories:[{id:1,name:'Sweets',products:sweets},{id:2,name:'Dairy',products:dairy},{id:3,name:'Snacks',products:snacks}]};
+  else if(path==='/api/menu'){await initialGate;json=[{id:1,name:'Sweets',products:sweets},{id:2,name:'Dairy',products:dairy},{id:3,name:'Snacks',products:snacks}];}
   else if(path==='/api/menu/portion-groups')json={version:1,groups};
   else if(path==='/api/storefront/customer-identity')json={enabled:true};else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Vivek',phone:'+919876543210'};
   else if(path.endsWith('/availability')){if(delay)await new Promise(r=>setTimeout(r,1500));json={today:date,maximumDate:date,dates:[{date,available:true,items:products.map(p=>({productId:p.id,available:p.id!==6&&!(p.id===1&&blockRasgulla),code:p.id===6?'NO_INVENTORY':p.id===1&&blockRasgulla?'QUANTITY_TOO_LARGE':null})),slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};}
@@ -24,7 +25,10 @@ try{for(const width of [320,390,640,1024]){
   await route.fulfill({json,headers}).catch(()=>{});
  });
  await context.addInitScript(({branch,date,slot})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{branch,date,slot});
- await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('#gokul-product-1').waitFor();
+ await page.goto(`${base}/menu`);await page.locator('#gokul-product-1').waitFor();
+ assert.match(await page.locator('#gokul-product-1').innerText(),/Rasgulla/);
+ assert.equal(await page.locator('#gokul-product-1').getByRole('button',{name:'Add Rasgulla to cart',exact:true}).isDisabled(),true,'display-only catalog cannot enable ordering before live checks');
+ releaseInitial();await page.locator('#gokul-product-1').getByRole('button',{name:'Add Rasgulla to cart',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('#gokul-product-1 button[data-ordering-target="add"]')?.disabled);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  if(width>640){assert.equal(await page.locator('.menu-editorial-feature').count(),0);assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.getByRole('heading',{name:'Dahi 400 g',exact:true}).count(),1);assert.equal(await page.locator('.customer-bottom-navigation a').count(),5);assert.equal(await page.locator('.customer-bottom-navigation').getAttribute('data-reference-menu'),null);await context.close();console.log('Premium menu desktop preserved');continue;}
  await page.locator('.menu-editorial-feature').waitFor();assert.equal(await page.locator('.menu-category-tile').count(),2);assert.equal(await page.locator('.customer-notification-bell').isVisible(),true);assert.equal(await page.locator('.customer-account-link').isVisible(),true);
  const brand=await page.locator('.reference-wordmark').boundingBox();

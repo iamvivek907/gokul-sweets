@@ -1,4 +1,5 @@
 "use client";
+import {reportLoadingStage} from "@/lib/customerLoading";
 import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
 import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
@@ -90,6 +91,7 @@ interface ProductRatingState {
 
 export default function MenuScreen() {
     const translate = useTranslation();
+    const renderStarted = useRef<number | null>(null);
     const [appearanceState, setAppearanceState] = useState<{branchId:number|null;orders:Record<number,number>}>({branchId:null,orders:{}});
     const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
@@ -122,6 +124,14 @@ export default function MenuScreen() {
         useState<MenuCategory[]>(
             []
         );
+    useEffect(() => {
+        if (!categories.length || renderStarted.current === null) return;
+        const started = renderStarted.current;
+        renderStarted.current = null;
+        let paint = 0;
+        const frame = requestAnimationFrame(() => {paint = requestAnimationFrame(() => reportLoadingStage("MENU_RENDER", started));});
+        return () => {cancelAnimationFrame(frame); cancelAnimationFrame(paint);};
+    }, [categories]);
     useMenuServiceRefresh(branch?.id,categories,setCategories);
 
 
@@ -291,7 +301,14 @@ export default function MenuScreen() {
                     const result =
                         await getMenu(
                             selectedBranch.id,
-                            controller.signal
+                            controller.signal,
+                            catalog => {
+                                if (controller.signal.aborted) return;
+                                renderStarted.current = performance.now();
+                                setCategories(catalog);
+                                setLoadedBranchId(selectedBranch.id);
+                                setLoading(false);
+                            }
                         );
 
 
@@ -303,6 +320,7 @@ export default function MenuScreen() {
                     }
 
 
+                    renderStarted.current = performance.now();
                     setCategories(
                         result
                     );

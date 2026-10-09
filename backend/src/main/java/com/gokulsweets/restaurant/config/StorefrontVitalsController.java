@@ -18,7 +18,19 @@ import java.util.Set;
 @Slf4j
 public class StorefrontVitalsController {
 
-    private static final Set<String> METRICS = Set.of("TTFB", "FCP", "LCP", "CLS", "INP", "FID");
+    private static final Set<String> METRICS =
+            Set.of(
+                    "TTFB",
+                    "FCP",
+                    "LCP",
+                    "CLS",
+                    "INP",
+                    "FID",
+                    "MENU_NETWORK",
+                    "MENU_BODY",
+                    "MENU_PREVIEW",
+                    "MENU_RENDER",
+                    "MENU_IMAGE");
 
     private static final Set<String> RATINGS = Set.of("good", "needs-improvement", "poor");
 
@@ -39,8 +51,13 @@ public class StorefrontVitalsController {
         try {
             if (!features.isAccessibleOrderingV2()) return ResponseEntity.noContent().build();
             if (metric == null
+                    || metric.name() == null
+                    || metric.rating() == null
+                    || metric.page() == null
                     || !METRICS.contains(metric.name())
-                    || !RATINGS.contains(metric.rating())
+                    || !(metric.name().startsWith("MENU_")
+                            ? "measured".equals(metric.rating())
+                            : RATINGS.contains(metric.rating()))
                     || !PAGES.contains(metric.page())
                     || metric.value() < 0
                     || metric.value() > 120_000

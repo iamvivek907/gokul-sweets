@@ -2,6 +2,9 @@ package com.gokulsweets.restaurant.config;
 
 import com.gokulsweets.restaurant.observability.MethodTiming;
 
+import io.micrometer.core.instrument.MeterRegistry;
+
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -11,12 +14,16 @@ import org.springframework.stereotype.Component;
 import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.concurrent.TimeUnit;
 
 /** Internal aggregate measurements only; no public diagnostic endpoint. */
 @Component
 @Slf4j
+@RequiredArgsConstructor
 @ConditionalOnProperty(name = "gokul.memory.diagnostics-enabled", havingValue = "true")
 public class MemoryDiagnostics {
+
+    private final MeterRegistry metrics;
 
     /** Returns sample information for memory diagnostics. */
     @Scheduled(fixedDelayString = "${gokul.memory.diagnostics-delay-ms:30000}")
@@ -40,6 +47,47 @@ public class MemoryDiagnostics {
                     mib(buffers),
                     ManagementFactory.getThreadMXBean().getThreadCount(),
                     containerMiB());
+            for (var gc : ManagementFactory.getGarbageCollectorMXBeans()) {
+                log.info(
+                        "GC sample: collector={}, count={}, elapsedMs={}",
+                        gc.getName(),
+                        gc.getCollectionCount(),
+                        gc.getCollectionTime());
+            }
+            for (String name :
+                    new String[] {
+                        "hikaricp.connections.active",
+                        "hikaricp.connections.pending",
+                        "hikaricp.connections.max"
+                    }) {
+                metrics.find(name)
+                        .gauges()
+                        .forEach(
+                                gauge ->
+                                        log.info(
+                                                "Pool sample: metric={}, value={}",
+                                                name,
+                                                gauge.value()));
+            }
+            for (String name :
+                    new String[] {"http.server.requests", "hikaricp.connections.acquire"}) {
+                metrics.find(name)
+                        .timers()
+                        .forEach(
+                                timer -> {
+                                    var snapshot = timer.takeSnapshot();
+                                    for (var percentile : snapshot.percentileValues()) {
+                                        log.info(
+                                                "Latency sample: metric={}, tags={}, count={},"
+                                                        + " percentile={}, milliseconds={}",
+                                                name,
+                                                timer.getId().getTags(),
+                                                snapshot.count(),
+                                                percentile.percentile(),
+                                                percentile.value(TimeUnit.MILLISECONDS));
+                                    }
+                                });
+            }
         } finally {
             MethodTiming.finish(__gokulMethodStartedNanos, MemoryDiagnostics.class, "sample()");
         }

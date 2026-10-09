@@ -130,13 +130,12 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
 
     async function changeOrderPage(index:number) {
         if(paging)return;
-        if(pages[index]){setPageIndex(index);setOrders(pages[index].orders);requestAnimationFrame(()=>document.getElementById("account-orders")?.scrollIntoView({block:"start"}));return;}
         const before=pages[pageIndex]?.nextBefore;if(index!==pageIndex+1||!before)return;
         const controller=new AbortController();pageRequest.current=controller;setPaging(true);setMessage("");
         try{const next=await getVerifiedOrderPage(before,AbortSignal.any([controller.signal,AbortSignal.timeout(8000)]));
             if(controller.signal.aborted)return;
-            setPages(current=>[...current,next]);setOrders(next.orders);setPageIndex(index);requestAnimationFrame(()=>document.getElementById("account-orders")?.scrollIntoView({block:"start"}));
-        }catch(error){if(!controller.signal.aborted){if(error instanceof ApiError&&[401,403].includes(error.status)){setOrders([]);setPages([]);setStatus("error");}else setMessage("The next page could not load. Your current orders are saved. Try Next again.");}}
+            setPages(current=>[...current,next]);setOrders(current=>[...current,...next.orders.filter(order=>!current.some(existing=>existing.orderNumber===order.orderNumber))]);setPageIndex(index);
+        }catch(error){if(!controller.signal.aborted){if(error instanceof ApiError&&[401,403].includes(error.status)){setOrders([]);setPages([]);setStatus("error");}else setMessage("The next page could not load. Your current orders are saved. Try Load more again.");}}
         finally{if(!controller.signal.aborted)setPaging(false);}
     }
 
@@ -271,7 +270,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 </div>}
                 </div>
             </dialog>
-            <nav className="profile-history-pagination" aria-label="Order history pages"><button type="button" disabled={paging||pageIndex===0} onClick={()=>void changeOrderPage(pageIndex-1)}>Previous</button><span aria-live="polite">Page {pageIndex+1}</span><button type="button" disabled={paging||!pages[pageIndex]?.nextBefore} onClick={()=>void changeOrderPage(pageIndex+1)}>{paging?"Loading…":"Next"}</button></nav>
+            <nav className="profile-history-pagination" aria-label="Order history pages"><span aria-live="polite">{orders.length} orders loaded</span>{pages[pageIndex]?.nextBefore && <button type="button" disabled={paging} onClick={()=>void changeOrderPage(pageIndex+1)}><T text={paging?"Loading…":"Load more"}/></button>}</nav>
         </>}</section>}
         {activeSection === "preferences" && <section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]"><T text="Your preferences" /></h2>
             <p className="mt-1 text-sm text-[#756763]"><T text="Dietary notes are for your reference; check ingredients with the branch for each order." /></p>

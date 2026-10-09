@@ -1,4 +1,5 @@
 import "@/lib/abortSignalCompatibility";
+import {reportLoadingStage} from "@/lib/customerLoading";
 import {API_BASE_URL} from "@/lib/constants";
 import {retryAfterDelayMs} from "@/lib/paymentPolling";
 
@@ -59,6 +60,8 @@ export async function apiClient<T>(
         requestHeaders.set("Content-Type", "application/json");
     }
 
+    const measured = path.startsWith("/api/menu") && typeof performance !== "undefined";
+    const started = measured ? performance.now() : 0;
     let response: Response;
 
     try {
@@ -88,6 +91,7 @@ export async function apiClient<T>(
         );
     }
 
+    if (measured) reportLoadingStage("MENU_NETWORK", started);
     if (!response.ok) {
         let body: ApiErrorBody = {};
 
@@ -112,5 +116,8 @@ export async function apiClient<T>(
         return undefined as T;
     }
 
-    return response.json() as Promise<T>;
+    const bodyStarted = measured ? performance.now() : 0;
+    const result = await response.json() as T;
+    if (measured) reportLoadingStage("MENU_BODY", bodyStarted);
+    return result;
 }

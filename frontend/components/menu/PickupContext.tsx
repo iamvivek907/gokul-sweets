@@ -1,4 +1,5 @@
 "use client";
+import {reportLoadingStage} from "@/lib/customerLoading";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import {T,useTranslation} from "@/lib/language";
@@ -54,10 +55,12 @@ export function useDateAvailability(products?: MenuProduct[]) {
         if (!features?.smartAvailability || !branch || !requestDate || !validDate || !JSON.parse(itemsJson).length) return;
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
+            const started = performance.now();
             void (menuPreview ? checkMenuAvailability : checkCartAvailability)(branch.id, requestDate, 1, JSON.parse(itemsJson),
                 AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]),menuPreview)
                 .then(data => {
                     if (controller.signal.aborted) return;
+                    if (menuPreview) reportLoadingStage("MENU_PREVIEW", started);
                     setResult({key, scope, data});
 
                 })
