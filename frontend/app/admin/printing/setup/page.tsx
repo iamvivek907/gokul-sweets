@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {useEffect, useRef, useState, type FormEvent} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 import {ADMIN_API_BASE_URL} from "@/lib/constants";
 import {printStationRequest, PrintStationRequestError, type PrinterProfile, type PrintStation} from "@/services/printStationApi";
 
@@ -17,6 +18,12 @@ function readPendingActions(): Record<string, string> {
     if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
     return Object.fromEntries(Object.entries(saved).filter(([scope, id]) =>
         /^\d+:[A-Z_]+$/.test(scope) && typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)));
+}
+function rememberSetupBranch(branchId: number | null) {
+    const url = new URL(window.location.href);
+    if (branchId === null) url.searchParams.delete("branchId");
+    else url.searchParams.set("branchId", String(branchId));
+    window.history.replaceState(null, "", url);
 }
 function exportProfile(profile: PrinterProfile, origin: string) {
     const url = new URL(origin);
@@ -83,7 +90,12 @@ export default function PrinterSetupPage() {
             if (controller.signal.aborted) return;
             const valid = readPendingActions();
             pendingActionsRef.current = valid; setPendingActions(valid);
-            setBranches(allowed); setBranchId(allowed[0]?.id ?? null);
+            // The branch explicitly opened from Queue wins over another tab's preference.
+            const requested = new URLSearchParams(window.location.search).get("branchId");
+            const requestedId = requested && /^[1-9]\d*$/.test(requested) ? Number(requested) : null;
+            const selected = preferredAdminBranchId(staff.staffId, allowed, requestedId);
+            setBranches(allowed); setBranchId(selected);
+            rememberSetupBranch(selected);
         }).catch(error => {if (error.name !== "AbortError") setMessage(error.message);});
         return () => controller.abort();
     }, [staff]);
@@ -190,7 +202,7 @@ export default function PrinterSetupPage() {
         <h1 className="text-3xl font-bold">Printer setup</h1>
         <p>Install once on the shop&apos;s Windows computer. After installation, manage printing here from desktop or Android. Keep that Windows account signed in and the computer awake.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-            <label>Branch<select className={field} value={branchId ?? ""} disabled={busy} onChange={event => {currentScope.current = `${event.target.value}:${station}`; ++revision.current; setState(null); setCheckedPaper(false); setMessage(""); setBranchId(Number(event.target.value));}}><option value="" disabled>Select a branch</option>{branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name} (ID {branch.id})</option>)}</select></label>
+            <label>Branch<select className={field} value={branchId ?? ""} disabled={busy} onChange={event => {currentScope.current = `${event.target.value}:${station}`; ++revision.current; setState(null); setCheckedPaper(false); setMessage(""); setBranchId(Number(event.target.value)); rememberSetupBranch(Number(event.target.value)); if (staff) rememberAdminBranchId(staff.staffId, Number(event.target.value));}}><option value="" disabled>Select a branch</option>{branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name} (ID {branch.id})</option>)}</select></label>
             <label>Station<select className={field} value={station} disabled={busy} onChange={event => {currentScope.current = `${branchId}:${event.target.value}`; ++revision.current; setState(null); setCheckedPaper(false); setMessage(""); setStation(event.target.value);}}>{stations.map(value => <option key={value}>{value}</option>)}</select></label>
         </div>
         <section aria-labelledby="station-controls" className="space-y-3 rounded-xl border border-stone-200 bg-stone-50 p-5">
@@ -223,7 +235,7 @@ export default function PrinterSetupPage() {
                 <li>Open a paid DEV order and choose Prepare / KOT or Start preparation. Check the ticket and Printer Queue. Customer checkout alone does not start preparation.</li>
             </ol>
             <p>Windows starts the agent in the background after the installing account signs in. No daily PowerShell commands are needed. Closing this webpage does not stop printing. Hardware pairing, paper changes and fixing a disconnected computer still happen at the shop.</p>
-            <a href="/downloads/gokul-print-agent.zip" download className="inline-block rounded bg-stone-800 px-4 py-3 font-semibold text-white">Download Windows installer</a>
+            <a href="/downloads/gokul-print-agent.zip" download style={{color: "#fff"}} className="inline-block rounded bg-stone-800 px-4 py-3 font-semibold text-white">Download Windows installer</a>
             <label className="block">Backend HTTPS address (this environment)<input className={field} type="url" value={backend} readOnly /></label>
             <button className={button} disabled={!state?.profile || busy} onClick={() => {
                 try {if (state?.profile) exportProfile(state.profile, backend);}

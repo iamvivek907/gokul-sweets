@@ -1132,10 +1132,10 @@ export default function AdminPrintingPage() {
                             Monitor automatic KOT printing, failures and retries.
                         </p>
 
-                        <Link href="/admin/printing/setup" className="mt-3 inline-block font-semibold text-[#9b6411] underline">
-                            Set up a USB or Bluetooth printer
+                        <Link href={selectedBranchId === null ? "/admin/printing/setup" : `/admin/printing/setup?branchId=${selectedBranchId}`} style={{color: "#fff"}} className="mt-3 inline-block rounded-lg bg-[#7a1625] px-4 py-3 font-semibold">
+                            Set up printer
                         </Link>
-                        {selectedBranchId !== null && <p className="mt-1 text-sm text-[#756763]">Selected branch ID for setup: {selectedBranchId}</p>}
+                        <p className="mt-2 text-sm text-[#756763]">Open printer setup to configure a USB or Bluetooth printer, download the one-time Windows installer and manage printing for {branches.find(branch => branch.id === selectedBranchId)?.name ?? "your selected branch"}.</p>
 
                     </div>
 

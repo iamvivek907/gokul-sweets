@@ -251,7 +251,7 @@ try {
   await test.click();await aStarted;
   await page.getByRole('link',{name:'Back to printer queue',exact:true}).click();
   await page.waitForURL('**/admin/printing');
-  await page.getByRole('link',{name:'Set up a USB or Bluetooth printer',exact:true}).click();
+  await page.getByRole('link',{name:'Set up printer',exact:true}).click();
   await page.getByText(oldReply==='accepted'?'Server status refreshed. Check the paper and action result before requesting another printer action.':'The previous action was cancelled before acceptance. It will not run later. Check the paper before requesting another print.',{exact:true}).waitFor();
   await test.click();await bStarted;
   const savedB=JSON.stringify({'1:KITCHEN':ids[1]});

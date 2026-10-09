@@ -6,7 +6,7 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
 const product=(id,name,categoryId,categoryName,available=true)=>({id,name,categoryId,categoryName,price:50,available,saleMode:'UNIT',imageUrl:'/arrival-mithai.webp'});
 const sweets=Array.from({length:112},(_,i)=>product(i+1,i===0?'Rasgulla':`Sweet ${i+1}`,1,'Sweets'));
-const food=[product(113,'Unavailable meal',2,'Food')],dairy=[product(114,'Dahi small',3,'Dairy'),product(115,'Dahi large',3,'Dairy')];
+const snacks=[product(113,'Unavailable meal',2,'Snacks')],dairy=[product(114,'Dahi small',3,'Dairy'),product(115,'Dahi large',3,'Dairy')];
 const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false,priorityRemainingCapacity:0};
 const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,640]){
@@ -18,7 +18,8 @@ try{for(const width of [320,390,640]){
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,smartAvailability:true,today:date,futureOrderingDays:30};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/menu')json=[{id:1,name:'Sweets',products:sweets},{id:2,name:'Food',products:food},{id:3,name:'Dairy',products:dairy.map(p=>({...p,available:mode!=='catalogue'}))}];
+  else if(path==='/api/menu')json=[{id:1,name:'Sweets',products:sweets},{id:2,name:'Snacks',products:snacks},{id:3,name:'Dairy',products:dairy.map(p=>({...p,available:mode!=='catalogue'}))}];
+  else if(path==='/api/reviews/product-summaries')json=route.request().postDataJSON().productIds.filter(id=>id===1||id===113).map(productId=>({productId,averageRating:4.4,ratingCount:5}));
   else if(path==='/api/menu/portion-groups')json={groups:[{key:'dahi',title:'Dahi',choices:dairy.map(p=>({productId:p.id,label:p.name.replace('Dahi ', '')}))}]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/availability')){
@@ -35,7 +36,19 @@ try{for(const width of [320,390,640]){
  const load=async()=>{await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('#gokul-product-113').waitFor();};
  await load();
  await page.waitForFunction(()=>document.querySelector('#gokul-product-113 button[aria-label="Add Unavailable meal to cart"]')?.disabled===true);
- assert.deepEqual([...new Set(requests.flatMap(items=>items.map(p=>p.productId)))].sort((a,b)=>a-b),Array.from({length:115},(_,i)=>i+1),'full catalogue checked, including Food after 112 sweets');
+ assert.deepEqual([...new Set(requests.flatMap(items=>items.map(p=>p.productId)))].sort((a,b)=>a-b),Array.from({length:115},(_,i)=>i+1),'full catalogue checked, including Snacks after 112 sweets');
+ // Rated sweet and snack rows keep their own badge below their own price.
+ for(const id of [1,113]){
+  const card=page.locator(`#gokul-product-${id}`);await card.locator('.product-rating-summary').waitFor();
+  const geometry=await card.evaluate(node=>{
+   const rect=selector=>{const r=node.querySelector(selector).getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right};};
+   return {rating:rect('.product-rating-summary'),price:rect('.product-card-purchase'),copy:rect('.product-card-copy'),position:getComputedStyle(node.querySelector('.product-card-rating')).position};
+  });
+  assert.equal(geometry.position,'static',`item ${id} rating stays in the text flow at ${width}px`);
+  assert.ok(geometry.rating.top>=geometry.price.bottom-1,`item ${id} rating sits below its price at ${width}px`);
+  assert.ok(geometry.rating.left>=geometry.copy.left-1&&geometry.rating.right<=geometry.copy.right+1,`item ${id} rating stays in its own text column`);
+ }
+ assert.equal(await page.locator('#gokul-product-2 .product-rating-summary').count(),0,'unrated products never inherit a neighbour rating');
  const search=page.locator('.menu-search input');await search.fill('Rasgulla');await page.locator('#gokul-product-1').waitFor();assert.equal(await page.getByText('No matching items',{exact:true}).count(),0);
  await search.fill('Dahi');const group=page.locator('.mobile-portion-card');await group.waitFor();await group.getByRole('button',{name:'Choose options for Dahi',exact:true}).waitFor();assert.equal(await group.getByRole('button',{name:'Choose options for Dahi',exact:true}).isDisabled(),true);assert.doesNotMatch(await group.innerText(),/sizes? available/);
  // A single orderable variant keeps the group enabled, and only that size can be added.
