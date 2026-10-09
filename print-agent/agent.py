@@ -378,14 +378,36 @@ def managed_command(api, db, cfg, command):
     return result
 
 
+def profile_signature(cfg):
+    # Store only the validated identity/connection, never arbitrary local keys.
+    keys = ("api_url", "branch_id", "agent_id", "station", "printer_code", "protocol",
+            "target", "port", "baud_rate", "paper_width_mm", "auto_cut")
+    return json.dumps({key: cfg[key] for key in keys}, sort_keys=True)
+
+
 def managed(cfg, path):
     api = Api(cfg)
     with exclusive_profile(path), contextlib.closing(sqlite3.connect(str(path) + ".sqlite3")) as db:
         db.execute("PRAGMA synchronous=FULL")
         db.execute("CREATE TABLE IF NOT EXISTS pending (id INTEGER PRIMARY KEY CHECK(id=1), payload TEXT NOT NULL)")
         db.execute("CREATE TABLE IF NOT EXISTS commands (id TEXT PRIMARY KEY, result TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS holds (id INTEGER PRIMARY KEY CHECK(id=1), message TEXT NOT NULL, profile TEXT NOT NULL)")
+        row = db.execute("SELECT message, profile FROM holds WHERE id=1").fetchone()
+        runtime_error, held_profile = row if row else (None, None)
+
+        def set_error(message):
+            nonlocal runtime_error, held_profile
+            # Preserve the original failing profile when a later error changes
+            # the message. A restart loads the bootstrap, not the remote profile.
+            profile = (held_profile or profile_signature(cfg)) if message else None
+            with db:
+                if message:
+                    db.execute("INSERT OR REPLACE INTO holds VALUES (1,?,?)", (message, profile))
+                else:
+                    db.execute("DELETE FROM holds WHERE id=1")
+            runtime_error, held_profile = message, profile
+
         completed_id, completed_result = None, None
-        runtime_error = None
         connection_error = None
         hardware = {"usb": [], "bluetooth": []}
         next_devices = next_heartbeat = 0
@@ -397,7 +419,7 @@ def managed(cfg, path):
                     try:
                         hardware = devices_snapshot()
                     except Exception:
-                        runtime_error = "Device discovery failed; check Windows drivers and pairing."
+                        set_error("Device discovery failed; check Windows drivers and pairing.")
                     next_devices = time.monotonic() + 60
                 runtime = {"status": "NEEDS_ATTENTION" if pending else "ERROR" if runtime_error or connection_error else "READY",
                            "message": runtime_error or connection_error, "devices": hardware,
@@ -411,8 +433,8 @@ def managed(cfg, path):
                     api.post("heartbeat", api.identity())
                     next_heartbeat = time.monotonic() + 20
                 updated = managed_profile(cfg, state["profile"])
-                if updated != cfg:
-                    runtime_error = None
+                if runtime_error and held_profile != profile_signature(updated):
+                    set_error(None)
                 cfg = updated
                 api.cfg = cfg
                 command = state.get("command")
@@ -423,20 +445,19 @@ def managed(cfg, path):
                     try:
                         completed_result = managed_command(api, db, cfg, command)
                         if completed_result.get("status") == "DONE":
-                            runtime_error = None
+                            set_error(None)
                     except Exception:
                         completed_result = {"status": "NEEDS_ATTENTION", "message": "Action failed. Inspect paper, connection and pending ticket before retrying."}
-                        runtime_error = completed_result["message"]
+                        set_error(completed_result["message"])
                 elif state.get("enabled") and not pending and not runtime_error:
                     job = api.post("jobs/claim", api.identity())
                     if job:
                         process_job(api, db, cfg, job)
-                        runtime_error = None
             except (error.URLError, TimeoutError):
                 # Durable pending/command receipts prevent resend after any connection failure.
                 connection_error = "Backend connection interrupted; reconnecting. Pending tickets are held."
             except Exception:
-                runtime_error = "Printing needs attention. Check Admin setup, credentials and hardware."
+                set_error("Printing needs attention. Check Admin setup, credentials and hardware.")
             time.sleep(2)
 
 

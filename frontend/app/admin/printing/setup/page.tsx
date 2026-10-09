@@ -56,7 +56,10 @@ export default function PrinterSetupPage() {
         const controller = new AbortController();
         const scope = `${branchId}:${station}`;
         currentScope.current = scope;
+        let refreshing = false;
         async function refresh() {
+            if (refreshing || busyRef.current || controller.signal.aborted) return;
+            refreshing = true;
             const version = ++revision.current;
             try {
                 const result = await printStationRequest(authorization!, branchId!, station, "", undefined, controller.signal);
@@ -74,6 +77,8 @@ export default function PrinterSetupPage() {
                 }
             } catch (error) {
                 if (!controller.signal.aborted && version === revision.current) setMessage(error instanceof Error ? error.message : "Unable to load station.");
+            } finally {
+                refreshing = false;
             }
         }
         void refresh();

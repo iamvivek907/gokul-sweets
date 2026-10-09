@@ -490,6 +490,84 @@ class AgentTest(unittest.TestCase):
                 send.assert_not_called()
         self.assertEqual(sum(call.args[0] == "jobs/claim" for call in self.api.post.call_args_list), 1)
 
+    def test_validation_hold_survives_restart_with_bootstrap_and_remote_profiles(self):
+        for remote_target in (self.cfg["target"], "Remotely selected queue"):
+            with self.subTest(target=remote_target), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "profile.json"
+                api = Mock(cfg=dict(self.cfg))
+                api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+                reports = []
+                def post(endpoint, body):
+                    if endpoint == "control":
+                        reports.append(body["runtime"])
+                        return {"profile": self.remote_profile() | {"target": remote_target}, "enabled": True, "command": {}}
+                    return dict(self.job, copies=0) if endpoint == "jobs/claim" else None
+                api.post.side_effect = post
+                with patch.object(agent, "Api", return_value=api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent, "deliver") as send:
+                    for _ in range(2):
+                        with patch.object(agent.time, "sleep", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+                            agent.managed(dict(self.cfg), path)
+                    send.assert_not_called()
+                self.assertEqual(sum(call.args[0] == "jobs/claim" for call in api.post.call_args_list), 1)
+                self.assertEqual(reports[-1]["status"], "ERROR")
+                with contextlib.closing(sqlite3.connect(str(path) + ".sqlite3")) as db:
+                    row = db.execute("SELECT message,profile FROM holds").fetchone()
+                    self.assertIsNotNone(row)
+                    self.assertEqual(json.loads(row[1])["target"], remote_target)
+
+    def test_changed_admin_profile_clears_saved_hold_after_restart(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        profile = self.remote_profile()
+        claims = []
+        def post(endpoint, body):
+            if endpoint == "control":
+                return {"profile": profile, "enabled": True, "command": {}}
+            if endpoint == "jobs/claim":
+                claims.append(1)
+                return dict(self.job, copies=0) if len(claims) == 1 else None
+            return None
+        self.api.post.side_effect = post
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}):
+                with patch.object(agent.time, "sleep", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+                    agent.managed(dict(self.cfg), path)
+                profile = profile | {"target": "Corrected queue"}
+                with patch.object(agent.time, "sleep", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+                    agent.managed(dict(self.cfg), path)
+            with contextlib.closing(sqlite3.connect(str(path) + ".sqlite3")) as db:
+                self.assertIsNone(db.execute("SELECT * FROM holds").fetchone())
+        self.assertEqual(len(claims), 2)
+
+    def test_successful_test_clears_saved_hold_across_restart(self):
+        self.api.identity.return_value = {"branchId": 1, "agentId": "shop", "station": "KITCHEN"}
+        command = {}
+        claims = []
+        def post(endpoint, body):
+            if endpoint == "control":
+                return {"profile": self.remote_profile(), "enabled": not command, "command": command}
+            if endpoint == "jobs/claim":
+                claims.append(1)
+                return dict(self.job, copies=0) if len(claims) == 1 else None
+            return None
+        self.api.post.side_effect = post
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "profile.json"
+            with patch.object(agent, "Api", return_value=self.api), patch.object(agent, "devices_snapshot", return_value={}), patch.object(agent, "deliver") as send:
+                for action in ({}, {"id": "successful-test", "action": "TEST"}, {}):
+                    command = action
+                    with patch.object(agent.time, "sleep", side_effect=KeyboardInterrupt), self.assertRaises(KeyboardInterrupt):
+                        agent.managed(dict(self.cfg), path)
+                send.assert_called_once()
+            with contextlib.closing(sqlite3.connect(str(path) + ".sqlite3")) as db:
+                self.assertIsNone(db.execute("SELECT * FROM holds").fetchone())
+        self.assertEqual(len(claims), 2)
+
+    def test_hold_profile_signature_excludes_unrecognized_local_fields(self):
+        signature = agent.profile_signature(self.cfg | {"local_secret": "must-not-be-saved"})
+        self.assertNotIn("must-not-be-saved", signature)
+        self.assertEqual(json.loads(signature)["target"], self.cfg["target"])
+
     @unittest.skipUnless(agent.sys.platform == "win32", "Windows DPAPI")
     def test_installer_secret_can_be_decrypted_only_through_windows_dpapi(self):
         import win32crypt
