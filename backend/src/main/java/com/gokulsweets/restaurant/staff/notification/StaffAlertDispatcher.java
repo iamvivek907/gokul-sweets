@@ -203,7 +203,10 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
      * <p>Reads {@code orders}, {@code staff_alert_deliveries}, {@code staff_order_alerts}, {@code
      * staff_push_subscriptions}.
      *
-     * <p>Writes {@code OF}, {@code staff_alert_deliveries}.
+     * <p>Locks one due staff delivery row with {@code FOR UPDATE OF d SKIP LOCKED} before claiming
+     * it.
+     *
+     * <p>Writes {@code staff_alert_deliveries}.
      *
      * @return the {@code Task} result
      */

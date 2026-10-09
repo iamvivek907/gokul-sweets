@@ -212,7 +212,10 @@ ON CONFLICT (environment, subject_id) DO UPDATE SET sound_enabled = EXCLUDED.sou
      *
      * <p>Reads {@code customer_push_subscriptions}, {@code verified_customer_sessions}.
      *
-     * <p>Writes {@code OF}, {@code customer_push_subscriptions}.
+     * <p>Locks the matching subscription row before checking ownership and updating the endpoint
+     * subscription.
+     *
+     * <p>Writes {@code customer_push_subscriptions}.
      *
      * @param environment the environment supplied to this method
      * @param subject the subject supplied to this method

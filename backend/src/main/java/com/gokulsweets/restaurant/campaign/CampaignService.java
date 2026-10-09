@@ -449,7 +449,8 @@ public class CampaignService {
                         public void afterCompletion(int status) {
                             final long __gokulMethodStartedNanos =
                                     MethodTiming.start(
-                                            CampaignService.class, "afterCompletion(int)");
+                                            CampaignService.class,
+                                            "upload(Long,MultipartFile,boolean,UUID)/anonymous[1]/afterCompletion(int)");
                             try {
                                 if (status != STATUS_COMMITTED) cleanup(media.url());
                                 else if (!features.isControlledCampaignPublishing()
@@ -458,7 +459,7 @@ public class CampaignService {
                                 MethodTiming.finish(
                                         __gokulMethodStartedNanos,
                                         CampaignService.class,
-                                        "afterCompletion(int)");
+                                        "upload(Long,MultipartFile,boolean,UUID)/anonymous[1]/afterCompletion(int)");
                             }
                         }
                     });
@@ -543,7 +544,9 @@ public class CampaignService {
                         @Override
                         public void afterCommit() {
                             final long __gokulMethodStartedNanos =
-                                    MethodTiming.start(CampaignService.class, "afterCommit()");
+                                    MethodTiming.start(
+                                            CampaignService.class,
+                                            "removeMedia(Long,boolean)/anonymous[2]/afterCommit()");
                             try {
                                 if (!features.isControlledCampaignPublishing()
                                         && campaign.getPublishedRevision() == null) cleanup(oldUrl);
@@ -551,7 +554,7 @@ public class CampaignService {
                                 MethodTiming.finish(
                                         __gokulMethodStartedNanos,
                                         CampaignService.class,
-                                        "afterCommit()");
+                                        "removeMedia(Long,boolean)/anonymous[2]/afterCommit()");
                             }
                         }
                     });
@@ -646,7 +649,8 @@ public class CampaignService {
                         public void afterCompletion(int status) {
                             final long __gokulMethodStartedNanos =
                                     MethodTiming.start(
-                                            CampaignService.class, "afterCompletion(int)");
+                                            CampaignService.class,
+                                            "uploadMobile(Long,MultipartFile,UUID)/anonymous[3]/afterCompletion(int)");
                             try {
                                 if (status != STATUS_COMMITTED) cleanup(media.url());
                                 else // Keep previous versions available for publication rollback.
@@ -656,7 +660,7 @@ public class CampaignService {
                                 MethodTiming.finish(
                                         __gokulMethodStartedNanos,
                                         CampaignService.class,
-                                        "afterCompletion(int)");
+                                        "uploadMobile(Long,MultipartFile,UUID)/anonymous[3]/afterCompletion(int)");
                             }
                         }
                     });
@@ -725,14 +729,16 @@ public class CampaignService {
                             @Override
                             public void afterCommit() {
                                 final long __gokulMethodStartedNanos =
-                                        MethodTiming.start(CampaignService.class, "afterCommit()");
+                                        MethodTiming.start(
+                                                CampaignService.class,
+                                                "removeMobile(Long)/anonymous[4]/afterCommit()");
                                 try {
                                     cleanup(oldUrl);
                                 } finally {
                                     MethodTiming.finish(
                                             __gokulMethodStartedNanos,
                                             CampaignService.class,
-                                            "afterCommit()");
+                                            "removeMobile(Long)/anonymous[4]/afterCommit()");
                                 }
                             }
                         });

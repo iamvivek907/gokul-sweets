@@ -486,7 +486,10 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
 
     /**
      * Claims the environment's cleanup lease, deletes only eligible notification batches
-     * transactionally and reconciles the persisted outcome after uncertain failures.
+     * transactionally and reconciles the persisted outcome after uncertain failures. Lease-change
+     * errors inside deletion are caught and reconciled. A confirmed failed run returns its view for
+     * scheduled execution or raises an HTTP error for manual execution; an unconfirmed result
+     * raises an HTTP error.
      *
      * <p>Reads {@code data_cleanup_settings}.
      *
@@ -495,8 +498,6 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
      * @param actor the actor supplied to this method
      * @param expectedRevision the expected revision supplied to this method
      * @return the {@code View} result
-     * @throws IllegalStateException when the method rejects the request with {@code Cleanup lease
-     *     changed.}
      * @throws ResponseStatusException when the method rejects the request with {@code A cleanup is
      *     already running. Refresh for its result.}; {@code Cleanup failed; no records were
      *     deleted. Refresh for details.}; {@code Cleanup result could not be confirmed. Refresh the

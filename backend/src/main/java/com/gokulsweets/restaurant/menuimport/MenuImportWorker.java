@@ -53,11 +53,12 @@ public class MenuImportWorker {
      *
      * <p>Reads {@code menu_import_jobs}.
      *
-     * <p>Writes {@code SKIP}, {@code menu_import_jobs}.
+     * <p>Claims one queued or expired import under {@code FOR UPDATE SKIP LOCKED}, avoiding jobs
+     * locked by another worker.
      *
-     * @throws org.springframework.security.access.AccessDeniedException when the method rejects the
-     *     request with {@code Import requester is disabled.}; {@code Import requester no longer has
-     *     branch menu access.}
+     * <p>Writes {@code menu_import_jobs}. Requester authorization and import failures are caught,
+     * logged, and the worker attempts to mark the claimed job failed. The previous security context
+     * is restored afterward.
      */
     @Scheduled(
             fixedDelayString = "${gokul.jobs.poll-ms:2000}",

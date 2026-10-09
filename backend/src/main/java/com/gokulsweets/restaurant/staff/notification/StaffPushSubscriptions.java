@@ -48,7 +48,10 @@ public class StaffPushSubscriptions {
      *
      * <p>Reads {@code staff_push_subscriptions}, {@code staff_sessions}, {@code staff_users}.
      *
-     * <p>Writes {@code OF}, {@code staff_push_subscriptions}.
+     * <p>Locks the active staff row and matching subscription row before registering or replacing
+     * the endpoint.
+     *
+     * <p>Writes {@code staff_push_subscriptions}.
      *
      * <p>Delegates to {@code StaffSessionService.hash(...)}.
      *

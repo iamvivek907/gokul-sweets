@@ -10,7 +10,8 @@ Run `cd backend && ./gradlew formatJava` before committing Java changes. `./grad
 runs `checkJavaFormat` and `checkMethodTimingCoverage` alongside the existing regression suites.
 The coverage check rejects placeholder method descriptions, requires JavaDoc for types/methods,
 and validates timing labels against the actual declaring-type path and parameter signature.
-Verifier regressions cover copied labels, overloads, generics, varargs and anonymous callbacks.
+Verifier regressions cover copied labels, overloads, generics, varargs, distinct anonymous
+callbacks, enum overrides and SQL locking keywords incorrectly listed as write targets.
 It requires a matching start/finally-finish
 wrapper for every explicit concrete business method; the diagnostics package is excluded
 from instrumentation to prevent logging recursion. The pinned Google Java Format
@@ -43,6 +44,11 @@ Defaults:
 | `GOKUL_METHOD_TIMING_ENABLED` | `true` | Enable elapsed-time diagnostics after application configuration initializes. |
 | `GOKUL_METHOD_TIMING_SLOW_THRESHOLD_MS` | `1000` | Emit WARN when a method reaches this inclusive elapsed duration. |
 | `GOKUL_METHOD_TIMING_LOG_LEVEL` | `INFO` | Slow-method WARN events remain visible; per-method completion events are suppressed. |
+
+Anonymous callback labels include the enclosing method or field and a lexical index, for
+example `removeMedia(Long,boolean)/anonymous[2]/afterCommit()`. This distinguishes separate
+callbacks even when they implement the same interface method. Enum-constant overrides include
+the constant name. Callback indexes follow source order and can change when code is edited.
 
 Set the log level to `DEBUG` for every measured completion; `TRACE` also records entry.
 Use these levels during investigation, then restore `INFO` to avoid excessive output.

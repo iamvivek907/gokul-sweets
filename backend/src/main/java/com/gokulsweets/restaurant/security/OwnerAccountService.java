@@ -479,7 +479,8 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
      *
      * <p>Reads {@code roles}, {@code staff_users}.
      *
-     * <p>Writes {@code OF}.
+     * <p>Locks the selected {@code staff_users} row with {@code FOR UPDATE OF u}; this query does
+     * not modify it.
      *
      * @param id the id supplied to this method
      * @return the {@code Map<String, Object>} result

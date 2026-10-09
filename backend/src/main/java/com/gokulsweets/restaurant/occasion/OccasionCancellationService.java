@@ -34,8 +34,10 @@ public class OccasionCancellationService {
      *
      * <p>Reads {@code occasion_enquiries}, {@code occasion_production_allocations}, {@code orders}.
      *
-     * <p>Writes {@code OF}, {@code occasion_cancellation_reviews}, {@code occasion_enquiries},
-     * {@code occasion_enquiry_events}, {@code occasion_payment_attempts}, {@code
+     * <p>Locks the associated order, enquiry and production-allocation rows before cancellation.
+     *
+     * <p>Writes {@code occasion_cancellation_reviews}, {@code occasion_enquiries}, {@code
+     * occasion_enquiry_events}, {@code occasion_payment_attempts}, {@code
      * occasion_production_allocations}, {@code orders}.
      *
      * @param environment the environment supplied to this method

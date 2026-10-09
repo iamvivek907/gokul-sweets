@@ -302,7 +302,8 @@ INSERT INTO branch_experience_audit(branch_id, actor_staff_id, action,
                         public void afterCompletion(int status) {
                             final long __gokulMethodStartedNanos =
                                     MethodTiming.start(
-                                            BranchExperienceService.class, "afterCompletion(int)");
+                                            BranchExperienceService.class,
+                                            "upload(long,MultipartFile,boolean,long)/anonymous[1]/afterCompletion(int)");
                             try {
                                 if (status != STATUS_COMMITTED)
                                     storage.deleteCampaignMedia(media.url());
@@ -310,7 +311,7 @@ INSERT INTO branch_experience_audit(branch_id, actor_staff_id, action,
                                 MethodTiming.finish(
                                         __gokulMethodStartedNanos,
                                         BranchExperienceService.class,
-                                        "afterCompletion(int)");
+                                        "upload(long,MultipartFile,boolean,long)/anonymous[1]/afterCompletion(int)");
                             }
                         }
                     });

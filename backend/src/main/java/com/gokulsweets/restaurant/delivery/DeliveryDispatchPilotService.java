@@ -261,7 +261,9 @@ ON CONFLICT (rider_id, window_id) DO UPDATE SET available = EXCLUDED.available
      * <p>Reads {@code delivery_capacity_windows}, {@code delivery_pilot_assignments}, {@code
      * delivery_pilot_riders}, {@code delivery_rider_availability}, {@code orders}.
      *
-     * <p>Writes {@code OF}, {@code delivery_pilot_assignments}.
+     * <p>Locks the selected order, capacity window and rider rows before assigning the delivery.
+     *
+     * <p>Writes {@code delivery_pilot_assignments}.
      *
      * @param branchId the branch id supplied to this method
      * @param orderId the order id supplied to this method

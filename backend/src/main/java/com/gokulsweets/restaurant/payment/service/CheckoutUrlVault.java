@@ -53,12 +53,11 @@ public class CheckoutUrlVault {
     }
 
     /**
-     * Seals checkout url vault data and returns the {@code String} result.
+     * Encrypts a valid HTTPS checkout URL as a versioned AES-GCM payload, returning null for a null
+     * URL. URL validation and encryption failures are wrapped in IllegalStateException.
      *
      * @param url the url supplied to this method
      * @return the {@code String} result
-     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
-     *     checkout URL.}
      * @throws IllegalStateException when the method rejects the request with {@code Could not
      *     securely persist payment checkout.}
      */
@@ -97,7 +96,8 @@ public class CheckoutUrlVault {
     }
 
     /**
-     * Opens checkout url vault data and returns the {@code String} result.
+     * Authenticates and decrypts a versioned AES-GCM checkout payload, returning null for a null
+     * payload. Malformed or unauthenticated payloads are wrapped in IllegalStateException.
      *
      * @param encoded the encoded supplied to this method
      * @return the {@code String} result

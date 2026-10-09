@@ -167,7 +167,9 @@ WHERE s.id = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
      * <p>Reads {@code customer_notification_events}, {@code customer_push_deliveries}, {@code
      * customer_push_subscriptions}.
      *
-     * <p>Writes {@code OF}, {@code customer_push_deliveries}.
+     * <p>Locks one due delivery row with {@code FOR UPDATE OF d SKIP LOCKED} before claiming it.
+     *
+     * <p>Writes {@code customer_push_deliveries}.
      *
      * @param environment the environment supplied to this method
      * @return the {@code Task} result

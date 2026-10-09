@@ -73,7 +73,8 @@ public class ProductService {
                                 public void afterCommit() {
                                     final long __gokulMethodStartedNanos =
                                             MethodTiming.start(
-                                                    ProductService.class, "afterCommit()");
+                                                    ProductService.class,
+                                                    "deleteAfterCommit(String)/anonymous[1]/afterCommit()");
                                     try {
                                         try {
                                             r2StorageService.deleteProductImage(url);
@@ -85,7 +86,7 @@ public class ProductService {
                                         MethodTiming.finish(
                                                 __gokulMethodStartedNanos,
                                                 ProductService.class,
-                                                "afterCommit()");
+                                                "deleteAfterCommit(String)/anonymous[1]/afterCommit()");
                                     }
                                 }
                             });
@@ -225,7 +226,8 @@ public class ProductService {
                                 public void afterCompletion(int status) {
                                     final long __gokulMethodStartedNanos =
                                             MethodTiming.start(
-                                                    ProductService.class, "afterCompletion(int)");
+                                                    ProductService.class,
+                                                    "uploadImage(Long,MultipartFile)/anonymous[2]/afterCompletion(int)");
                                     try {
                                         if (status != STATUS_COMMITTED) {
                                             try {
@@ -241,7 +243,7 @@ public class ProductService {
                                         MethodTiming.finish(
                                                 __gokulMethodStartedNanos,
                                                 ProductService.class,
-                                                "afterCompletion(int)");
+                                                "uploadImage(Long,MultipartFile)/anonymous[2]/afterCompletion(int)");
                                     }
                                 }
                             });

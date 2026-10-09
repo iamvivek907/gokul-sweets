@@ -433,7 +433,9 @@ public class BrandService {
                         @Override
                         public void afterCompletion(int status) {
                             final long __gokulMethodStartedNanos =
-                                    MethodTiming.start(BrandService.class, "afterCompletion(int)");
+                                    MethodTiming.start(
+                                            BrandService.class,
+                                            "upload(long,MultipartFile)/anonymous[1]/afterCompletion(int)");
                             try {
                                 if (status != STATUS_COMMITTED)
                                     storage.deleteCampaignMedia(media.url());
@@ -441,7 +443,7 @@ public class BrandService {
                                 MethodTiming.finish(
                                         __gokulMethodStartedNanos,
                                         BrandService.class,
-                                        "afterCompletion(int)");
+                                        "upload(long,MultipartFile)/anonymous[1]/afterCompletion(int)");
                             }
                         }
                     });

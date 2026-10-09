@@ -29,7 +29,9 @@ public class OccasionProductionReadinessService {
      *
      * <p>Reads {@code occasion_enquiries}, {@code occasion_production_allocations}, {@code orders}.
      *
-     * <p>Writes {@code OF}, {@code occasion_production_allocations}, {@code
+     * <p>Locks the associated order and matching production allocation before recording readiness.
+     *
+     * <p>Writes {@code occasion_production_allocations}, {@code
      * occasion_production_readiness_events}.
      *
      * @param environment the environment supplied to this method
