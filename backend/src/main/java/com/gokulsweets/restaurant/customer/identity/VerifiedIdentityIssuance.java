@@ -29,13 +29,14 @@ public class VerifiedIdentityIssuance {
     private final VerifiedCustomerSessionStore sessions;
 
     /**
-     * Issues the operation.
+     * Issues verified identity issuance data and returns the {@code
+     * VerifiedCustomerSessionStore.IssuedSession} result.
      *
-     * @param environment the environment
-     * @param accessToken the access token
-     * @param verifiedPhone the verified phone
-     * @param now the now
-     * @return the issue result
+     * @param environment the environment supplied to this method
+     * @param accessToken the access token supplied to this method
+     * @param verifiedPhone the verified phone supplied to this method
+     * @param now the now supplied to this method
+     * @return the value of {@code issue(environment, accessToken, verifiedPhone, null, now)}
      */
     @Transactional
     public VerifiedCustomerSessionStore.IssuedSession issue(
@@ -55,14 +56,21 @@ public class VerifiedIdentityIssuance {
     }
 
     /**
-     * Issues the operation.
+     * Issues verified identity issuance data and returns the {@code
+     * VerifiedCustomerSessionStore.IssuedSession} result.
      *
-     * @param environment the environment
-     * @param accessToken the access token
-     * @param verifiedPhone the verified phone
-     * @param previousSessionToken the previous session token
-     * @param now the now
-     * @return the issue result
+     * <p>Writes {@code verified_identity_proof_claims}.
+     *
+     * @param environment the environment supplied to this method
+     * @param accessToken the access token supplied to this method
+     * @param verifiedPhone the verified phone supplied to this method
+     * @param previousSessionToken the previous session token supplied to this method
+     * @param now the now supplied to this method
+     * @return the value of {@code sessions.issue(environment, subject, now)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code A
+     *     provider-verified mobile is required}; {@code Invalid identity proof}
+     * @throws IllegalStateException when the method rejects the request with {@code Identity proof
+     *     already used}; {@code Identity proof hashing unavailable}
      */
     @Transactional
     public VerifiedCustomerSessionStore.IssuedSession issue(

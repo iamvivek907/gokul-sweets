@@ -46,12 +46,12 @@ public class DeliveryStockCheck {
     private final Clock inventoryClock;
 
     /**
-     * Checks the operation.
+     * Returns check information for delivery stock check.
      *
-     * @param branchId the branch id
-     * @param date the date
-     * @param requested the requested
-     * @return the check result
+     * @param branchId the branch id supplied to this method
+     * @param date the date supplied to this method
+     * @param requested the requested supplied to this method
+     * @return the value of {@code check(branchId, date, requested, null)}
      */
     @Transactional(readOnly = true)
     public Check check(long branchId, LocalDate date, List<CreateOrderItemRequest> requested) {
@@ -100,13 +100,13 @@ public class DeliveryStockCheck {
     }
 
     /**
-     * Checks the operation.
+     * Returns check information for delivery stock check.
      *
-     * @param branchId the branch id
-     * @param date the date
-     * @param requested the requested
-     * @param startsAt the starts at
-     * @return the check result
+     * @param branchId the branch id supplied to this method
+     * @param date the date supplied to this method
+     * @param requested the requested supplied to this method
+     * @param startsAt the starts at supplied to this method
+     * @return the {@code Check} result
      */
     private Check check(
             long branchId,

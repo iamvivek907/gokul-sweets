@@ -32,10 +32,12 @@ public class AdminAuthController {
     private final EnhancementProperties flags;
 
     /**
-     * Mes the operation.
+     * Handles {@code GET /api/admin/auth/me} for admin auth.
      *
-     * @param request the request
-     * @return the me result
+     * <p>Delegates to {@code StaffSessionService.cookie(...)}.
+     *
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<AdminAuthResponse>} result
      */
     @GetMapping("/me")
     public ResponseEntity<AdminAuthResponse> me(HttpServletRequest request) {
@@ -56,11 +58,13 @@ public class AdminAuthController {
     }
 
     /**
-     * Logins the operation.
+     * Handles {@code POST /api/admin/auth/login} for admin auth.
      *
-     * @param input the input
-     * @param request the request
-     * @return the login result
+     * <p>Delegates to {@code StaffSessionService.cookie(...)}.
+     *
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<?>} result
      */
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Login input, HttpServletRequest request) {
@@ -89,10 +93,12 @@ public class AdminAuthController {
     }
 
     /**
-     * Setups the operation.
+     * Handles {@code POST /api/admin/auth/mfa/setup} for admin auth.
      *
-     * @param input the input
-     * @return the setup result
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param input the input supplied to this method
+     * @return the {@code ResponseEntity<StaffMfaService.Setup>} result
      */
     @PostMapping("/mfa/setup")
     public ResponseEntity<StaffMfaService.Setup> setup(@RequestBody EnrollmentRequest input) {
@@ -113,11 +119,13 @@ public class AdminAuthController {
     }
 
     /**
-     * Confirms the operation.
+     * Handles {@code POST /api/admin/auth/mfa/confirm} for admin auth.
      *
-     * @param input the input
-     * @param request the request
-     * @return the confirm result
+     * <p>Delegates to {@code StaffSessionService.cookie(...)}.
+     *
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<?>} result
      */
     @PostMapping("/mfa/confirm")
     public ResponseEntity<?> confirm(@RequestBody Confirmation input, HttpServletRequest request) {
@@ -139,10 +147,12 @@ public class AdminAuthController {
     }
 
     /**
-     * Logouts the operation.
+     * Handles {@code POST /api/admin/auth/logout} for admin auth.
      *
-     * @param request the request
-     * @return the logout result
+     * <p>Delegates to {@code StaffSessionService.cookie(...)}.
+     *
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<Void>} result
      */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
@@ -195,11 +205,12 @@ public class AdminAuthController {
     }
 
     /**
-     * Cookies the operation.
+     * Builds a secure, HTTP-only, SameSite=Lax staff-session cookie scoped to /api/admin with the
+     * supplied lifetime.
      *
-     * @param value the value
-     * @param age the age
-     * @return the cookie result
+     * @param value the value supplied to this method
+     * @param age the age supplied to this method
+     * @return the {@code ResponseCookie} result
      */
     static ResponseCookie cookie(String value, Duration age) {
         final long __gokulMethodStartedNanos =

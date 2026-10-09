@@ -45,9 +45,9 @@ public class ReverseAddressLookup {
             String addressLine, String locality, String postalCode, String attribution) {}
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the {@code boolean} result
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -60,12 +60,18 @@ public class ReverseAddressLookup {
     }
 
     /**
-     * Suggests the operation.
+     * Suggests reverse address lookup data and returns the {@code Suggestion} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param value the value
-     * @return the suggest result
+     * <p>Writes {@code customer_location_lookup_limits}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param value the value supplied to this method
+     * @return the value of {@code parse(body)}
+     * @throws ResponseStatusException when the method rejects the request with {@code Choose valid
+     *     coordinates.}; {@code Location address suggestions are not configured. Enter your address
+     *     manually.}; {@code Please wait a minute before requesting another location suggestion.};
+     *     {@code We could not suggest an address. Enter it manually or try again later.}
      */
     public Suggestion suggest(String environment, UUID subject, Coordinates value) {
         final long __gokulMethodStartedNanos =
@@ -137,10 +143,12 @@ WHERE customer_location_lookup_limits.last_requested_at<CURRENT_TIMESTAMP-INTERV
     }
 
     /**
-     * Parses the operation.
+     * Parses reverse address lookup data and returns the {@code Suggestion} result.
      *
-     * @param body the body
-     * @return the parse result
+     * @param body the body supplied to this method
+     * @return the {@code Suggestion} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code No suitable
+     *     Indian address suggestion.}
      */
     static Suggestion parse(String body) {
         final long __gokulMethodStartedNanos =
@@ -180,11 +188,11 @@ WHERE customer_location_lookup_limits.last_requested_at<CURRENT_TIMESTAMP-INTERV
     }
 
     /**
-     * Limits the operation.
+     * Returns limit information for reverse address lookup.
      *
-     * @param value the value
-     * @param length the length
-     * @return the limit result
+     * @param value the value supplied to this method
+     * @param length the length supplied to this method
+     * @return the value of {@code value.length() > length ? value.substring(0, length) : value}
      */
     private static String limit(String value, int length) {
         final long __gokulMethodStartedNanos =

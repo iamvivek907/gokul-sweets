@@ -21,11 +21,11 @@ public interface OrderIdempotencyRepository extends JpaRepository<OrderIdempoten
     Optional<OrderIdempotency> findByIdempotencyKey(String idempotencyKey);
 
     /**
-     * Claims the operation.
+     * Claims order idempotency data and returns the {@code int} result.
      *
-     * @param idempotencyKey the idempotency key
-     * @param requestHash the request hash
-     * @return the claim result
+     * @param idempotencyKey the idempotency key supplied to this method
+     * @param requestHash the request hash supplied to this method
+     * @return the {@code int} result
      */
     @Modifying
     @Query(

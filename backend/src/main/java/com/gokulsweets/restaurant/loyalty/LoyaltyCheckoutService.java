@@ -42,10 +42,10 @@ public class LoyaltyCheckoutService {
             AppliedRebateResponse offer) {}
 
     /**
-     * Reads the operation.
+     * Returns read information for loyalty checkout.
      *
-     * @param number the number
-     * @return the read result
+     * @param number the number supplied to this method
+     * @return the {@code Checkout} result
      */
     @Transactional
     public Checkout read(String number) {
@@ -66,12 +66,14 @@ public class LoyaltyCheckoutService {
     }
 
     /**
-     * Selects the operation.
+     * Returns select information for loyalty checkout.
      *
-     * @param number the number
-     * @param code the code
-     * @param policyVersion the policy version
-     * @return the select result
+     * @param number the number supplied to this method
+     * @param code the code supplied to this method
+     * @param policyVersion the policy version supplied to this method
+     * @return the {@code Checkout} result
+     * @throws IllegalStateException when the method rejects the request with {@code Rewards are
+     *     currently unavailable.}; {@code Rewards cannot change after payment starts.}
      */
     @Transactional
     public Checkout select(String number, String code, String policyVersion) {

@@ -21,13 +21,14 @@ public class AdminPrintJobController {
     private final AdminPrintJobService printJobService;
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/print-jobs} for admin print job.
      *
-     * @param branchId the branch id
-     * @param status the status
-     * @param page the page
-     * @param size the size
-     * @return the list result
+     * @param branchId the branch id supplied to this method
+     * @param status the status supplied to this method
+     * @param page the page supplied to this method
+     * @param size the size supplied to this method
+     * @return the value of {@code ResponseEntity.ok(printJobService.getJobs(branchId, status, page,
+     *     size))}
      */
     @GetMapping
     public ResponseEntity<AdminPrintJobPageResponse> list(
@@ -49,10 +50,10 @@ public class AdminPrintJobController {
     }
 
     /**
-     * Countses the operation.
+     * Handles {@code GET /api/admin/print-jobs/counts} for admin print job.
      *
-     * @param branchId the branch id
-     * @return the counts result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code ResponseEntity.ok(printJobService.getCounts(branchId))}
      */
     @GetMapping("/counts")
     public ResponseEntity<AdminPrintJobCountsResponse> counts(@RequestParam Long branchId) {
@@ -67,10 +68,12 @@ public class AdminPrintJobController {
     }
 
     /**
-     * Retry the operation.
+     * Handles {@code POST /api/admin/print-jobs/{printJobId}/retry} for admin print job.
      *
-     * @param printJobId the print job id
-     * @return the retry result
+     * <p>Delegates to {@code printJobService.retry(...)}.
+     *
+     * @param printJobId the print job id supplied to this method
+     * @return the value of {@code ResponseEntity.ok(printJobService.retry(printJobId))}
      */
     @PostMapping("/{printJobId}/retry")
     public ResponseEntity<AdminPrintJobResponse> retry(@PathVariable Long printJobId) {

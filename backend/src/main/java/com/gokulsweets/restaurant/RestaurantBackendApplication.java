@@ -14,9 +14,9 @@ import java.util.TimeZone;
 public class RestaurantBackendApplication {
 
     /**
-     * Mains the operation.
+     * Starts restaurant backend application data.
      *
-     * @param args the args
+     * @param args the args supplied to this method
      */
     public static void main(String[] args) {
         final long __gokulMethodStartedNanos =

@@ -37,11 +37,13 @@ public class RazorpayWebhookService {
     private final PaymentStatusService paymentStatusService;
 
     /**
-     * Processes the operation.
+     * Processes razorpay webhook data.
      *
-     * @param rawBody the raw body
-     * @param signature the signature
-     * @param providerEventId the provider event id
+     * <p>Delegates to {@code eventRepository.claim(...)}.
+     *
+     * @param rawBody the raw body supplied to this method
+     * @param signature the signature supplied to this method
+     * @param providerEventId the provider event id supplied to this method
      */
     @Transactional
     public void process(byte[] rawBody, String signature, String providerEventId) {
@@ -252,10 +254,12 @@ public class RazorpayWebhookService {
     }
 
     /**
-     * Parses the operation.
+     * Parses razorpay webhook data and returns the {@code JsonNode} result.
      *
-     * @param rawBody the raw body
-     * @return the parse result
+     * @param rawBody the raw body supplied to this method
+     * @return the value of {@code objectMapper.readTree(rawBody)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Razorpay
+     *     webhook payload is invalid.}
      */
     private JsonNode parse(byte[] rawBody) {
         final long __gokulMethodStartedNanos =
@@ -319,10 +323,12 @@ public class RazorpayWebhookService {
     }
 
     /**
-     * Sha256s the operation.
+     * Returns the SHA-256 digest of the supplied value as hexadecimal text.
      *
-     * @param value the value
-     * @return the sha256 result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalStateException when the method rejects the request with {@code SHA-256 is
+     *     unavailable.}
      */
     private String sha256(byte[] value) {
         final long __gokulMethodStartedNanos =

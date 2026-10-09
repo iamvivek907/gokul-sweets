@@ -38,15 +38,23 @@ public class OccasionOrderFinalizer {
     private final com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts staffAlerts;
 
     /**
-     * Creates the operation.
+     * Creates occasion order finalizer data and returns the {@code String} result.
      *
-     * @param enquiryId the enquiry id
-     * @param environment the environment
-     * @param subject the subject
-     * @param branchId the branch id
-     * @param pickupSlotId the pickup slot id
-     * @param gross the gross
-     * @return the create result
+     * <p>Reads {@code occasion_enquiries}, {@code occasion_payment_attempts}, {@code
+     * occasion_quote_lines}, {@code orders}, {@code payments}.
+     *
+     * <p>Writes {@code occasion_enquiries}, {@code order_items}, {@code orders}, {@code payments},
+     * {@code verified_order_ownership}.
+     *
+     * @param enquiryId the enquiry id supplied to this method
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param pickupSlotId the pickup slot id supplied to this method
+     * @param gross the gross supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalStateException when the method rejects the request with {@code Approved item
+     *     prices do not match the verified occasion payment.}
      */
     public String create(
             UUID enquiryId,

@@ -15,10 +15,10 @@ public class AdminBranchOperationsController {
     private final BranchOperations operations;
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/operational} for admin branch operations.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code operations.get(branchId)}
      */
     @GetMapping
     public BranchOperations.Status get(@PathVariable long branchId) {
@@ -33,11 +33,11 @@ public class AdminBranchOperationsController {
     }
 
     /**
-     * Updates the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/operational} for admin branch operations.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the set result
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code operations.set(branchId, input)}
      */
     @PutMapping
     public BranchOperations.Status set(

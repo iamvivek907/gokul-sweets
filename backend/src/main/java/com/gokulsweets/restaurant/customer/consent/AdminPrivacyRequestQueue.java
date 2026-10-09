@@ -32,10 +32,16 @@ public class AdminPrivacyRequestQueue {
     private final StaffAuthorizationService staff;
 
     /**
-     * Views the operation.
+     * Returns view information for admin privacy request queue.
      *
-     * @param page the page
-     * @return the view result
+     * <p>Authorization checks include {@code PermissionName.PRIVACY_REQUEST_VIEW}.
+     *
+     * <p>Reads {@code customer_privacy_requests}.
+     *
+     * <p>Writes {@code customer_privacy_queue_access_audit}.
+     *
+     * @param page the page supplied to this method
+     * @return the value of {@code entries}
      */
     @Transactional
     public List<Entry> view(int page) {
@@ -75,11 +81,17 @@ public class AdminPrivacyRequestQueue {
     }
 
     /**
-     * Triages the operation.
+     * Triages admin privacy request queue data and returns the {@code Entry} result.
      *
-     * @param requestId the request id
-     * @param state the state
-     * @return the triage result
+     * <p>Authorization checks include {@code PermissionName.PRIVACY_REQUEST_VIEW}.
+     *
+     * <p>Reads {@code customer_privacy_requests}.
+     *
+     * <p>Writes {@code customer_privacy_requests}, {@code customer_privacy_triage_events}.
+     *
+     * @param requestId the request id supplied to this method
+     * @param state the state supplied to this method
+     * @return the {@code Entry} result
      */
     @Transactional
     public Entry triage(long requestId, PrivacyReviewState state) {
@@ -133,9 +145,9 @@ VALUES (?, ?, ?, ?)
     }
 
     /**
-     * Environments the operation.
+     * Returns environment information for admin privacy request queue.
      *
-     * @return the environment result
+     * @return the {@code ConsentEnvironment} result
      */
     private ConsentEnvironment environment() {
         final long __gokulMethodStartedNanos =
@@ -153,11 +165,11 @@ VALUES (?, ?, ?, ?)
     }
 
     /**
-     * Entry the operation.
+     * Returns entry information for admin privacy request queue.
      *
-     * @param rs the rs
-     * @return the entry result
-     * @throws java.sql.SQLException if the operation cannot complete
+     * @param rs the rs supplied to this method
+     * @return the {@code Entry} result
+     * @throws java.sql.SQLException if the underlying operation fails
      */
     private static Entry entry(java.sql.ResultSet rs) throws java.sql.SQLException {
         final long __gokulMethodStartedNanos =

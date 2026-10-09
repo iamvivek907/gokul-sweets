@@ -309,10 +309,12 @@ public class OccasionCatalogue {
     }
 
     /**
-     * Imageses the operation.
+     * Returns images information for occasion catalogue.
      *
-     * @param json the json
-     * @return the images result
+     * @param json the json supplied to this method
+     * @return the {@code List<String>} result
+     * @throws IllegalStateException when the method rejects the request with {@code Invalid
+     *     packaging gallery}
      */
     private List<String> images(String json) {
         final long __gokulMethodStartedNanos =
@@ -331,10 +333,13 @@ public class OccasionCatalogue {
     }
 
     /**
-     * Jsons the operation.
+     * Serializes gallery URLs as JSON, substituting an empty list for a null list and rejecting
+     * serialization failures.
      *
-     * @param urls the urls
-     * @return the json result
+     * @param urls the urls supplied to this method
+     * @return the value of {@code mapper.writeValueAsString(urls == null ? List.of() : urls)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     gallery}
      */
     private String json(List<String> urls) {
         final long __gokulMethodStartedNanos =
@@ -352,9 +357,11 @@ public class OccasionCatalogue {
     }
 
     /**
-     * Photos the operation.
+     * Returns photo information for occasion catalogue.
      *
-     * @param url the url
+     * @param url the url supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Use an HTTPS
+     *     photo.}
      */
     private void photo(String url) {
         final long __gokulMethodStartedNanos =
@@ -450,7 +457,7 @@ public class OccasionCatalogue {
         }
     }
 
-    /** Enableds the operation. */
+    /** Rejects access when the feature is disabled. */
     void enabled() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(OccasionCatalogue.class, "enabled()");
@@ -463,11 +470,16 @@ public class OccasionCatalogue {
     }
 
     /**
-     * Catalogues the operation.
+     * Returns catalogue information for occasion catalogue.
      *
-     * @param branchId the branch id
-     * @param admin the admin
-     * @return the catalogue result
+     * <p>Reads {@code branch_products}, {@code branches}, {@code categories}, {@code
+     * occasion_branding}, {@code occasion_packaging}, {@code products}, {@code tax_categories}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param admin the admin supplied to this method
+     * @return the {@code Catalogue} result
+     * @throws ResponseStatusException when the method rejects the request with {@code This branch
+     *     is currently not operational.}
      */
     @Transactional(readOnly = true)
     public Catalogue catalogue(long branchId, boolean admin) {

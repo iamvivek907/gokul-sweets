@@ -832,10 +832,10 @@ public class PaymentStatusService {
     // TRUNCATE FAILURE REASON
     // =========================================================
     /**
-     * Truncates the operation.
+     * Truncates payment status data and returns the {@code String} result.
      *
-     * @param value the value
-     * @return the truncate result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
      */
     private String truncate(String value) {
         final long __gokulMethodStartedNanos =

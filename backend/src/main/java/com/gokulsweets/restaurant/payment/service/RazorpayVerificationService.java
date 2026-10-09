@@ -29,11 +29,16 @@ public class RazorpayVerificationService {
     private final RazorpayClient razorpayClient;
 
     /**
-     * Verify the operation.
+     * Verifies razorpay verification data and returns the {@code PaymentResponse} result.
      *
-     * @param paymentId the payment id
-     * @param request the request
-     * @return the verify result
+     * <p>Delegates to {@code paymentStatusService.markPaid(...)}, {@code
+     * paymentStatusService.markFailed(...)}, {@code checkoutService.responseFor(...)}.
+     *
+     * @param paymentId the payment id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code checkoutService.responseFor(payment.getId())}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Razorpay
+     *     order reference does not match this payment.}
      */
     public PaymentResponse verify(Long paymentId, RazorpayPaymentVerificationRequest request) {
         final long __gokulMethodStartedNanos =

@@ -121,11 +121,14 @@ public class AdminApprovalController {
     }
 
     /**
-     * Approves the operation.
+     * Handles {@code POST /api/admin/approvals/{approvalRequestId}/approve} for admin approval.
      *
-     * @param approvalRequestId the approval request id
-     * @param request the request
-     * @return the approve result
+     * <p>Delegates to {@code adminApprovalService.approve(...)}.
+     *
+     * @param approvalRequestId the approval request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(adminApprovalService.approve(approvalRequestId,
+     *     request))}
      */
     @PostMapping("/{approvalRequestId}/approve")
     @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
@@ -146,11 +149,14 @@ public class AdminApprovalController {
     }
 
     /**
-     * Rejects the operation.
+     * Handles {@code POST /api/admin/approvals/{approvalRequestId}/reject} for admin approval.
      *
-     * @param approvalRequestId the approval request id
-     * @param request the request
-     * @return the reject result
+     * <p>Delegates to {@code adminApprovalService.reject(...)}.
+     *
+     * @param approvalRequestId the approval request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(adminApprovalService.reject(approvalRequestId,
+     *     request))}
      */
     @PostMapping("/{approvalRequestId}/reject")
     @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")

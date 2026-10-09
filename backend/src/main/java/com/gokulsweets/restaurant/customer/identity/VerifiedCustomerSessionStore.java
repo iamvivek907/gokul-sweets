@@ -33,12 +33,14 @@ public class VerifiedCustomerSessionStore {
     private final SecureRandom random = new SecureRandom();
 
     /**
-     * Issues the operation.
+     * Issues verified customer session store data and returns the {@code IssuedSession} result.
      *
-     * @param environment the environment
-     * @param verifiedSubjectId the verified subject id
-     * @param now the now
-     * @return the issue result
+     * <p>Writes {@code verified_customer_sessions}.
+     *
+     * @param environment the environment supplied to this method
+     * @param verifiedSubjectId the verified subject id supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code IssuedSession} result
      */
     @Transactional
     public IssuedSession issue(
@@ -74,12 +76,14 @@ public class VerifiedCustomerSessionStore {
     }
 
     /**
-     * Subjects the operation.
+     * Returns subject information for verified customer session store.
      *
-     * @param environment the environment
-     * @param token the token
-     * @param now the now
-     * @return the subject result
+     * <p>Reads {@code verified_customer_sessions}.
+     *
+     * @param environment the environment supplied to this method
+     * @param token the token supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code Optional<UUID>} result
      */
     @Transactional(readOnly = true)
     public Optional<UUID> subject(ConsentEnvironment environment, String token, Instant now) {
@@ -108,11 +112,13 @@ WHERE environment = ? AND token_digest = ? AND expires_at > ? AND revoked_at IS 
     }
 
     /**
-     * Revokes the operation.
+     * Revokes verified customer session store data.
      *
-     * @param environment the environment
-     * @param token the token
-     * @param now the now
+     * <p>Writes {@code verified_customer_sessions}.
+     *
+     * @param environment the environment supplied to this method
+     * @param token the token supplied to this method
+     * @param now the now supplied to this method
      */
     @Transactional
     public void revoke(ConsentEnvironment environment, String token, Instant now) {
@@ -140,10 +146,12 @@ WHERE environment = ? AND token_digest = ? AND expires_at > ? AND revoked_at IS 
     }
 
     /**
-     * Digests the operation.
+     * Returns the SHA-256 digest of the supplied value as bytes.
      *
-     * @param token the token
-     * @return the digest result
+     * @param token the token supplied to this method
+     * @return the {@code byte[]} result
+     * @throws IllegalStateException when the method rejects the request with {@code Session hashing
+     *     unavailable}
      */
     static byte[] digest(String token) {
         final long __gokulMethodStartedNanos =

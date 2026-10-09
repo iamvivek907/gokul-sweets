@@ -277,12 +277,12 @@ public class PhonePeClient {
             String originalMerchantOrderId) {}
 
     /**
-     * Refunds the operation.
+     * Refunds phone pe data and returns the {@code RefundResponse} result.
      *
-     * @param reference the reference
-     * @param orderId the order id
-     * @param amount the amount
-     * @return the refund result
+     * @param reference the reference supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param amount the amount supplied to this method
+     * @return the {@code RefundResponse} result
      */
     public RefundResponse refund(String reference, String orderId, BigDecimal amount) {
         final long __gokulMethodStartedNanos =

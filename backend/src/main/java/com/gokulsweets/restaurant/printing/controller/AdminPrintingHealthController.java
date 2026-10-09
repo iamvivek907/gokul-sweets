@@ -20,11 +20,12 @@ public class AdminPrintingHealthController {
     private final AdminPrintingHealthService printingHealthService;
 
     /**
-     * Healths the operation.
+     * Handles {@code GET /api/admin/printing/health} for admin printing health.
      *
-     * @param branchId the branch id
-     * @param station the station
-     * @return the health result
+     * @param branchId the branch id supplied to this method
+     * @param station the station supplied to this method
+     * @return the value of {@code ResponseEntity.ok(printingHealthService.getHealth(branchId,
+     *     station))}
      */
     @GetMapping("/health")
     @PreAuthorize("hasAuthority('ORDER_VIEW')")

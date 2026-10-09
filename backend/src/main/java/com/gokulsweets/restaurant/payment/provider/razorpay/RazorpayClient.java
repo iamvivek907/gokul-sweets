@@ -247,12 +247,12 @@ public class RazorpayClient {
     }
 
     /**
-     * Sends the operation.
+     * Sends razorpay data and returns the {@code JsonNode} result.
      *
-     * @param method the method
-     * @param path the path
-     * @param body the body
-     * @return the send result
+     * @param method the method supplied to this method
+     * @param path the path supplied to this method
+     * @param body the body supplied to this method
+     * @return the value of {@code send(method, path, body, null)}
      */
     private JsonNode send(String method, String path, JsonNode body) {
         final long __gokulMethodStartedNanos =
@@ -268,13 +268,16 @@ public class RazorpayClient {
     }
 
     /**
-     * Sends the operation.
+     * Sends razorpay data and returns the {@code JsonNode} result.
      *
-     * @param method the method
-     * @param path the path
-     * @param body the body
-     * @param refundIdempotency the refund idempotency
-     * @return the send result
+     * @param method the method supplied to this method
+     * @param path the path supplied to this method
+     * @param body the body supplied to this method
+     * @param refundIdempotency the refund idempotency supplied to this method
+     * @return the value of {@code objectMapper.readTree(response.body())}
+     * @throws PaymentGatewayException when the method rejects the request with {@code
+     *     RAZORPAY_CONNECTION_FAILED}; {@code RAZORPAY_REQUEST_INTERRUPTED}; {@code
+     *     RAZORPAY_REQUEST_REJECTED}
      */
     private JsonNode send(String method, String path, JsonNode body, String refundIdempotency) {
         final long __gokulMethodStartedNanos =

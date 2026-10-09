@@ -134,11 +134,14 @@ public class StaffLeaveController {
     }
 
     /**
-     * Resubmits the operation.
+     * Handles {@code POST /api/admin/me/leave-requests/{leaveRequestId}/resubmit} for staff leave.
      *
-     * @param leaveRequestId the leave request id
-     * @param request the request
-     * @return the resubmit result
+     * <p>Delegates to {@code staffLeaveService.resubmit(...)}.
+     *
+     * @param leaveRequestId the leave request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(staffLeaveService.resubmit(leaveRequestId,
+     *     request.comment()))}
      */
     @PostMapping("/{leaveRequestId}/resubmit")
     public ResponseEntity<LeaveRequestResponse> resubmit(
@@ -156,11 +159,14 @@ public class StaffLeaveController {
     }
 
     /**
-     * Cancels the operation.
+     * Handles {@code POST /api/admin/me/leave-requests/{leaveRequestId}/cancel} for staff leave.
      *
-     * @param leaveRequestId the leave request id
-     * @param request the request
-     * @return the cancel result
+     * <p>Delegates to {@code staffLeaveService.cancel(...)}.
+     *
+     * @param leaveRequestId the leave request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(staffLeaveService.cancel(leaveRequestId,
+     *     request.comment()))}
      */
     @PostMapping("/{leaveRequestId}/cancel")
     public ResponseEntity<LeaveRequestResponse> cancel(

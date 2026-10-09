@@ -640,13 +640,13 @@ VALUES (?, ?, ?, 'BALANCE', 'PENDING', ?, ?, ?)
     }
 
     /**
-     * Statuses the operation.
+     * Returns status information for occasion commitment.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param enquiryId the enquiry id
-     * @param attemptId the attempt id
-     * @return the status result
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param enquiryId the enquiry id supplied to this method
+     * @param attemptId the attempt id supplied to this method
+     * @return the {@code Checkout} result
      */
     public Checkout status(
             ConsentEnvironment environment, UUID subject, UUID enquiryId, UUID attemptId) {
@@ -689,12 +689,14 @@ VALUES (?, ?, ?, 'BALANCE', 'PENDING', ?, ?, ?)
     }
 
     /**
-     * Latests the operation.
+     * Returns latest information for occasion commitment.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param enquiryId the enquiry id
-     * @return the latest result
+     * <p>Reads {@code occasion_payment_attempts}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param enquiryId the enquiry id supplied to this method
+     * @return the {@code Checkout} result
      */
     public Checkout latest(ConsentEnvironment environment, UUID subject, UUID enquiryId) {
         final long __gokulMethodStartedNanos =
@@ -827,10 +829,10 @@ UPDATE occasion_payment_attempts SET provider_order_id = ?, provider_checkout_ur
     }
 
     /**
-     * Paids the operation.
+     * Returns paid information for occasion commitment.
      *
-     * @param merchantOrderId the merchant order id
-     * @param providerTransactionId the provider transaction id
+     * @param merchantOrderId the merchant order id supplied to this method
+     * @param providerTransactionId the provider transaction id supplied to this method
      */
     private void paid(String merchantOrderId, String providerTransactionId) {
         final long __gokulMethodStartedNanos =
@@ -853,9 +855,9 @@ UPDATE occasion_payment_attempts SET provider_order_id = ?, provider_checkout_ur
     }
 
     /**
-     * Faileds the operation.
+     * Returns failed information for occasion commitment.
      *
-     * @param merchantOrderId the merchant order id
+     * @param merchantOrderId the merchant order id supplied to this method
      */
     private void failed(String merchantOrderId) {
         final long __gokulMethodStartedNanos =
@@ -869,11 +871,18 @@ UPDATE occasion_payment_attempts SET provider_order_id = ?, provider_checkout_ur
     }
 
     /**
-     * Settles the operation.
+     * Settles occasion commitment data.
      *
-     * @param merchantOrderId the merchant order id
-     * @param providerTransactionId the provider transaction id
-     * @param success the success
+     * <p>Reads {@code occasion_payment_attempts}.
+     *
+     * <p>Writes {@code occasion_enquiries}, {@code occasion_payment_attempts}, {@code
+     * occasion_production_allocations}.
+     *
+     * @param merchantOrderId the merchant order id supplied to this method
+     * @param providerTransactionId the provider transaction id supplied to this method
+     * @param success the success supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Unknown
+     *     occasion payment.}
      */
     private void settle(String merchantOrderId, String providerTransactionId, boolean success) {
         final long __gokulMethodStartedNanos =
@@ -1046,9 +1055,11 @@ UPDATE occasion_payment_attempts SET status = 'PAID', provider_transaction_id = 
     }
 
     /**
-     * Expires the operation.
+     * Expires occasion commitment data.
      *
-     * @param enquiryId the enquiry id
+     * <p>Writes {@code occasion_payment_attempts}.
+     *
+     * @param enquiryId the enquiry id supplied to this method
      */
     public void expire(UUID enquiryId) {
         final long __gokulMethodStartedNanos =
@@ -1111,10 +1122,12 @@ ORDER BY e.hold_expires_at LIMIT 100
     }
 
     /**
-     * Releases the operation.
+     * Releases occasion commitment data.
      *
-     * @param enquiry the enquiry
-     * @param reason the reason
+     * <p>Writes {@code occasion_enquiries}, {@code occasion_production_allocations}.
+     *
+     * @param enquiry the enquiry supplied to this method
+     * @param reason the reason supplied to this method
      */
     private void release(Enquiry enquiry, String reason) {
         final long __gokulMethodStartedNanos =
@@ -1358,10 +1371,10 @@ ORDER BY e.hold_expires_at LIMIT 100
     }
 
     /**
-     * Responses the operation.
+     * Returns response information for occasion commitment.
      *
-     * @param attempt the attempt
-     * @return the response result
+     * @param attempt the attempt supplied to this method
+     * @return the {@code Checkout} result
      */
     private Checkout response(Attempt attempt) {
         final long __gokulMethodStartedNanos =
@@ -1419,10 +1432,10 @@ ORDER BY e.hold_expires_at LIMIT 100
     }
 
     /**
-     * Conflicts the operation.
+     * Creates an HTTP CONFLICT exception using the supplied rejection reason.
      *
-     * @param reason the reason
-     * @return the conflict result
+     * @param reason the reason supplied to this method
+     * @return the {@code ResponseStatusException} result
      */
     private static ResponseStatusException conflict(String reason) {
         final long __gokulMethodStartedNanos =
@@ -1436,13 +1449,15 @@ ORDER BY e.hold_expires_at LIMIT 100
     }
 
     /**
-     * Events the operation.
+     * Returns event information for occasion commitment.
      *
-     * @param id the id
-     * @param actor the actor
-     * @param before the before
-     * @param after the after
-     * @param detail the detail
+     * <p>Writes {@code occasion_enquiry_events}.
+     *
+     * @param id the id supplied to this method
+     * @param actor the actor supplied to this method
+     * @param before the before supplied to this method
+     * @param after the after supplied to this method
+     * @param detail the detail supplied to this method
      */
     private void event(UUID id, String actor, String before, String after, String detail) {
         final long __gokulMethodStartedNanos =

@@ -21,12 +21,14 @@ public class RazorpayWebhookController {
     private final RazorpayWebhookService webhookService;
 
     /**
-     * Receives the operation.
+     * Handles {@code POST /api/payments/webhooks/razorpay} for razorpay webhook.
      *
-     * @param rawBody the raw body
-     * @param signature the signature
-     * @param eventId the event id
-     * @return the receive result
+     * <p>Delegates to {@code webhookService.process(...)}.
+     *
+     * @param rawBody the raw body supplied to this method
+     * @param signature the signature supplied to this method
+     * @param eventId the event id supplied to this method
+     * @return the value of {@code ResponseEntity.ok().build()}
      */
     @PostMapping
     public ResponseEntity<Void> receive(

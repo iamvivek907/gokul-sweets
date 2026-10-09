@@ -64,9 +64,11 @@ public class StaffAlertsController {
             boolean emailTestRouting) {}
 
     /**
-     * Staffs the operation.
+     * Returns staff information for staff alerts.
      *
-     * @return the staff result
+     * <p>Authorization checks include {@code PermissionName.ORDER_VIEW}.
+     *
+     * @return the value of {@code authorization.getCurrentStaff().getId()}
      */
     private long staff() {
         final long __gokulMethodStartedNanos =
@@ -79,7 +81,7 @@ public class StaffAlertsController {
         }
     }
 
-    /** Enableds the operation. */
+    /** Rejects access when the feature is disabled. */
     private void enabled() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(StaffAlertsController.class, "enabled()");
@@ -92,11 +94,13 @@ public class StaffAlertsController {
     }
 
     /**
-     * Settingses the operation.
+     * Handles {@code GET /api/admin/notifications/settings} for staff alerts.
      *
-     * @param deviceId the device id
-     * @param request the request
-     * @return the settings result
+     * <p>Delegates to {@code StaffSessionService.cookie(...)}.
+     *
+     * @param deviceId the device id supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<Settings>} result
      */
     @GetMapping("/settings")
     public ResponseEntity<Settings> settings(
@@ -134,12 +138,14 @@ public class StaffAlertsController {
     }
 
     /**
-     * Pages the operation.
+     * Handles {@code GET /api/admin/notifications} for staff alerts.
      *
-     * @param before the before
-     * @param unreadOnly the unread only
-     * @param search the search
-     * @return the page result
+     * @param before the before supplied to this method
+     * @param unreadOnly the unread only supplied to this method
+     * @param search the search supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(alerts.page(staffId,
+     *     before, unreadOnly, search))}
      */
     @GetMapping
     public ResponseEntity<StaffOrderAlerts.Page> page(
@@ -163,10 +169,11 @@ public class StaffAlertsController {
     }
 
     /**
-     * Reads the operation.
+     * Handles {@code PUT /api/admin/notifications/{id}/read} for staff alerts.
      *
-     * @param id the id
-     * @return the read result
+     * @param id the id supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build()}
      */
     @PutMapping("/{id}/read")
     public ResponseEntity<Void> read(@PathVariable long id) {
@@ -212,11 +219,15 @@ public class StaffAlertsController {
     }
 
     /**
-     * Subscribes the operation.
+     * Handles {@code POST /api/admin/notifications/push-subscriptions} for staff alerts.
      *
-     * @param input the input
-     * @param request the request
-     * @return the subscribe result
+     * <p>Delegates to {@code StaffSessionService.cookie(...)}.
+     *
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(subscriptions.subscribe(staffId,
+     *     StaffSessionService.cookie(request), input))}
      */
     @PostMapping("/push-subscriptions")
     public ResponseEntity<StaffPushSubscriptions.Result> subscribe(
@@ -242,10 +253,11 @@ public class StaffAlertsController {
     }
 
     /**
-     * Revokes the operation.
+     * Handles {@code DELETE /api/admin/notifications/push-subscriptions/{id}} for staff alerts.
      *
-     * @param id the id
-     * @return the revoke result
+     * @param id the id supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build()}
      */
     @DeleteMapping("/push-subscriptions/{id}")
     public ResponseEntity<Void> revoke(@PathVariable UUID id) {

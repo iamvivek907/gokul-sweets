@@ -90,11 +90,11 @@ public class MenuService {
     }
 
     /**
-     * Retimes the operation.
+     * Changes pickup timing for menu data and returns the {@code MenuServiceWindows.Status} result.
      *
-     * @param status the status
-     * @param observedAt the observed at
-     * @return the retime result
+     * @param status the status supplied to this method
+     * @param observedAt the observed at supplied to this method
+     * @return the {@code MenuServiceWindows.Status} result
      */
     private MenuServiceWindows.Status retime(
             MenuServiceWindows.Status status, java.time.Instant observedAt) {

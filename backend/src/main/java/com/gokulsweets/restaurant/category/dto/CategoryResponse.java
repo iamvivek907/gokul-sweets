@@ -16,10 +16,10 @@ public record CategoryResponse(
         Long id, String name, String description, Integer displayOrder, boolean active) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code CategoryResponse} representation.
      *
-     * @param category the category
-     * @return the from result
+     * @param category the category supplied to this method
+     * @return the {@code CategoryResponse} result
      */
     public static CategoryResponse from(Category category) {
         final long __gokulMethodStartedNanos =

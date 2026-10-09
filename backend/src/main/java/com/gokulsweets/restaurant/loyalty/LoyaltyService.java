@@ -138,9 +138,9 @@ public class LoyaltyService {
     private record Owner(String environment, UUID subject) {}
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the value of {@code features.rewardsReady()}
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -284,9 +284,9 @@ public class LoyaltyService {
     }
 
     /**
-     * Nows the operation.
+     * Returns now information for loyalty.
      *
-     * @return the now result
+     * @return the value of {@code inventoryClock.instant()}
      */
     private Instant now() {
         final long __gokulMethodStartedNanos = MethodTiming.start(LoyaltyService.class, "now()");
@@ -298,10 +298,10 @@ public class LoyaltyService {
     }
 
     /**
-     * Timestamps the operation.
+     * Returns timestamp information for loyalty.
      *
-     * @param value the value
-     * @return the timestamp result
+     * @param value the value supplied to this method
+     * @return the value of {@code value == null ? null : Timestamp.from(value)}
      */
     private Timestamp timestamp(Instant value) {
         final long __gokulMethodStartedNanos =
@@ -315,10 +315,10 @@ public class LoyaltyService {
     }
 
     /**
-     * Invalids the operation.
+     * Creates an HTTP CONFLICT exception using the supplied rejection reason.
      *
-     * @param message the message
-     * @return the invalid result
+     * @param message the message supplied to this method
+     * @return the {@code ResponseStatusException} result
      */
     private ResponseStatusException invalid(String message) {
         final long __gokulMethodStartedNanos =
@@ -331,10 +331,14 @@ public class LoyaltyService {
     }
 
     /**
-     * Locks the operation.
+     * Returns lock information for loyalty.
      *
-     * @param environment the environment
-     * @param subject the subject
+     * <p>Reads {@code loyalty_accounts}.
+     *
+     * <p>Writes {@code loyalty_accounts}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
      */
     private void lock(String environment, UUID subject) {
         final long __gokulMethodStartedNanos =
@@ -358,11 +362,13 @@ public class LoyaltyService {
     }
 
     /**
-     * Lotses the operation.
+     * Returns lots information for loyalty.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @return the lots result
+     * <p>Reads {@code loyalty_accounts}, {@code loyalty_ledger}, {@code loyalty_lots}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @return the {@code List<Lot>} result
      */
     private List<Lot> lots(String environment, UUID subject) {
         final long __gokulMethodStartedNanos =
@@ -413,17 +419,18 @@ WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at N
     }
 
     /**
-     * Appends the operation.
+     * Appends loyalty data and returns the {@code long} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param key the key
-     * @param kind the kind
-     * @param coins the coins
-     * @param orderId the order id
-     * @param reason the reason
-     * @param expiry the expiry
-     * @return the append result
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param key the key supplied to this method
+     * @param kind the kind supplied to this method
+     * @param coins the coins supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param reason the reason supplied to this method
+     * @param expiry the expiry supplied to this method
+     * @return the value of {@code append(environment, subject, key, kind, coins, orderId, reason,
+     *     expiry, null)}
      */
     private long append(
             String environment,
@@ -449,18 +456,19 @@ WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at N
     }
 
     /**
-     * Appends the operation.
+     * Appends loyalty data and returns the {@code long} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param key the key
-     * @param kind the kind
-     * @param coins the coins
-     * @param orderId the order id
-     * @param reason the reason
-     * @param expiry the expiry
-     * @param origin the origin
-     * @return the append result
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param key the key supplied to this method
+     * @param kind the kind supplied to this method
+     * @param coins the coins supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param reason the reason supplied to this method
+     * @param expiry the expiry supplied to this method
+     * @param origin the origin supplied to this method
+     * @return the value of {@code append(environment, subject, key, kind, coins, orderId, reason,
+     *     expiry, origin, rules.getExpiryDays())}
      */
     private long append(
             String environment,
@@ -497,19 +505,23 @@ WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at N
     }
 
     /**
-     * Appends the operation.
+     * Appends loyalty data and returns the {@code long} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param key the key
-     * @param kind the kind
-     * @param coins the coins
-     * @param orderId the order id
-     * @param reason the reason
-     * @param expiry the expiry
-     * @param origin the origin
-     * @param expiryDays the expiry days
-     * @return the append result
+     * <p>Reads {@code loyalty_ledger}.
+     *
+     * <p>Writes {@code loyalty_ledger}, {@code loyalty_lots}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param key the key supplied to this method
+     * @param kind the kind supplied to this method
+     * @param coins the coins supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param reason the reason supplied to this method
+     * @param expiry the expiry supplied to this method
+     * @param origin the origin supplied to this method
+     * @param expiryDays the expiry days supplied to this method
+     * @return the {@code long} result
      */
     private long append(
             String environment,
@@ -569,10 +581,12 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
     }
 
     /**
-     * Expires the operation.
+     * Expires loyalty data.
      *
-     * @param environment the environment
-     * @param subject the subject
+     * <p>Writes {@code loyalty_lots}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
      */
     private void expire(String environment, UUID subject) {
         final long __gokulMethodStartedNanos =
@@ -599,12 +613,14 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
     }
 
     /**
-     * Existses the operation.
+     * Returns exists information for loyalty.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param key the key
-     * @return the exists result
+     * <p>Reads {@code loyalty_ledger}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param key the key supplied to this method
+     * @return the {@code boolean} result
      */
     private boolean exists(String environment, UUID subject, String key) {
         final long __gokulMethodStartedNanos =
@@ -684,10 +700,10 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
     }
 
     /**
-     * Caps the operation.
+     * Returns cap information for loyalty.
      *
-     * @param subtotal the subtotal
-     * @return the cap result
+     * @param subtotal the subtotal supplied to this method
+     * @return the {@code BigDecimal} result
      */
     public BigDecimal cap(BigDecimal subtotal) {
         final long __gokulMethodStartedNanos =
@@ -702,11 +718,13 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
     }
 
     /**
-     * Catalogues the operation.
+     * Returns catalogue information for loyalty.
      *
-     * @param balance the balance
-     * @param subtotal the subtotal
-     * @return the catalogue result
+     * <p>Reads {@code loyalty_rewards}.
+     *
+     * @param balance the balance supplied to this method
+     * @param subtotal the subtotal supplied to this method
+     * @return the {@code List<Reward>} result
      */
     private List<Reward> catalogue(int balance, BigDecimal subtotal) {
         final long __gokulMethodStartedNanos =
@@ -748,12 +766,15 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
     }
 
     /**
-     * Wallets the operation.
+     * Returns wallet information for loyalty.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param subtotal the subtotal
-     * @return the wallet result
+     * <p>Reads {@code loyalty_ledger}, {@code loyalty_qualifying_orders}, {@code orders}, {@code
+     * payments}, {@code verified_order_ownership}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param subtotal the subtotal supplied to this method
+     * @return the {@code Wallet} result
      */
     @Transactional
     public Wallet wallet(String environment, UUID subject, BigDecimal subtotal) {
@@ -846,13 +867,13 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     }
 
     /**
-     * Previews the operation.
+     * Previews loyalty data and returns the {@code Reward} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param subtotal the subtotal
-     * @param code the code
-     * @return the preview result
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param subtotal the subtotal supplied to this method
+     * @param code the code supplied to this method
+     * @return the {@code Reward} result
      */
     @Transactional
     public Reward preview(String environment, UUID subject, BigDecimal subtotal, String code) {
@@ -878,10 +899,12 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     }
 
     /**
-     * Owners the operation.
+     * Returns owner information for loyalty.
      *
-     * @param orderId the order id
-     * @return the owner result
+     * <p>Reads {@code verified_order_ownership}.
+     *
+     * @param orderId the order id supplied to this method
+     * @return the {@code Owner} result
      */
     private Owner owner(long orderId) {
         final long __gokulMethodStartedNanos =
@@ -1072,11 +1095,15 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     }
 
     /**
-     * Releases the operation.
+     * Releases loyalty data.
      *
-     * @param owner the owner
-     * @param orderId the order id
-     * @param generation the generation
+     * <p>Reads {@code loyalty_hold_lots}, {@code loyalty_ledger}.
+     *
+     * <p>Writes {@code loyalty_holds}.
+     *
+     * @param owner the owner supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param generation the generation supplied to this method
      */
     private void release(Owner owner, long orderId, int generation) {
         final long __gokulMethodStartedNanos =
@@ -1120,9 +1147,11 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     }
 
     /**
-     * Removes the operation.
+     * Removes loyalty data.
      *
-     * @param order the order
+     * <p>Reads {@code loyalty_holds}.
+     *
+     * @param order the order supplied to this method
      */
     @Transactional
     public void remove(Order order) {
@@ -1263,13 +1292,21 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
     public record Adjusted(long ledgerId, int oldBalance, int newBalance) {}
 
     /**
-     * Adjusts the operation.
+     * Adjusts loyalty data and returns the {@code Adjusted} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param request the request
-     * @param staffId the staff id
-     * @return the adjust result
+     * <p>Reads {@code loyalty_adjustment_audit}, {@code loyalty_ledger}, {@code
+     * verified_customer_subjects}.
+     *
+     * <p>Writes {@code loyalty_adjustment_audit}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param request the request supplied to this method
+     * @param staffId the staff id supplied to this method
+     * @return the {@code Adjusted} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code An
+     *     adjustment needs a unique key, a bounded coin amount and a clear reason (8–300
+     *     characters).}; {@code Verified customer subject does not exist in this environment.}
      */
     @Transactional
     public Adjusted adjust(String environment, UUID subject, Adjustment request, long staffId) {

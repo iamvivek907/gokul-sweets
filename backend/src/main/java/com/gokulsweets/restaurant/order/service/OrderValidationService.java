@@ -103,10 +103,10 @@ public class OrderValidationService {
     // VALIDATE NEW ORDER
     // =========================================================
     /**
-     * Validates the operation.
+     * Validates order validation data and returns the {@code ValidatedOrderData} result.
      *
-     * @param request the request
-     * @return the validate result
+     * @param request the request supplied to this method
+     * @return the {@code ValidatedOrderData} result
      */
     @Transactional(readOnly = true)
     public ValidatedOrderData validate(CreateOrderRequest request) {

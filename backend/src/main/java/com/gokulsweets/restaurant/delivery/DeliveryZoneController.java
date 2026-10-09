@@ -25,10 +25,12 @@ public class DeliveryZoneController {
     private final DeliveryZoneService service;
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/delivery-zones} for delivery zone.
      *
-     * @param branchId the branch id
-     * @return the list result
+     * <p>Delegates to {@code service.enabled(...)}, {@code service.list(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code ResponseEntity<List<DeliveryZoneService.Zone>>} result
      */
     @GetMapping("/api/admin/branches/{branchId}/delivery-zones")
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
@@ -45,11 +47,13 @@ public class DeliveryZoneController {
     }
 
     /**
-     * Configures the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/delivery-zones} for delivery zone.
      *
-     * @param branchId the branch id
-     * @param request the request
-     * @return the configure result
+     * <p>Delegates to {@code service.enabled(...)}, {@code service.configure(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<DeliveryZoneService.Zone>} result
      */
     @PutMapping("/api/admin/branches/{branchId}/delivery-zones")
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
@@ -72,11 +76,13 @@ public class DeliveryZoneController {
     }
 
     /**
-     * Coverages the operation.
+     * Handles {@code GET /api/storefront/delivery/coverage} for delivery zone.
      *
-     * @param locality the locality
-     * @param postalCode the postal code
-     * @return the coverage result
+     * <p>Delegates to {@code service.enabled(...)}, {@code service.coverage(...)}.
+     *
+     * @param locality the locality supplied to this method
+     * @param postalCode the postal code supplied to this method
+     * @return the {@code ResponseEntity<DeliveryZoneService.Coverage>} result
      */
     @GetMapping("/api/storefront/delivery/coverage")
     public ResponseEntity<DeliveryZoneService.Coverage> coverage(

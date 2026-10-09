@@ -17,9 +17,11 @@ public class TaxCollectionSettings {
     private final JdbcTemplate jdbc;
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * <p>Reads {@code tax_collection_settings}.
+     *
+     * @return the {@code boolean} result
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -53,11 +55,15 @@ public class TaxCollectionSettings {
     }
 
     /**
-     * Saves the operation.
+     * Persists tax collection settings data and returns the {@code boolean} result.
      *
-     * @param enabled the enabled
-     * @param staffId the staff id
-     * @return the save result
+     * <p>Reads {@code tax_collection_settings}.
+     *
+     * <p>Writes {@code tax_collection_audit}, {@code tax_collection_settings}.
+     *
+     * @param enabled the enabled supplied to this method
+     * @param staffId the staff id supplied to this method
+     * @return the value of {@code enabled}
      */
     @Transactional
     public boolean save(boolean enabled, long staffId) {

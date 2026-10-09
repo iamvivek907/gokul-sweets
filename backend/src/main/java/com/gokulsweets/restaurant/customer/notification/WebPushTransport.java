@@ -44,9 +44,9 @@ public class WebPushTransport {
     }
 
     /**
-     * Configureds the operation.
+     * Returns configured information for web push transport.
      *
-     * @return the configured result
+     * @return the {@code boolean} result
      */
     public boolean configured() {
         final long __gokulMethodStartedNanos =
@@ -130,17 +130,18 @@ public class WebPushTransport {
     }
 
     /**
-     * Sends the operation.
+     * Sends web push transport data and returns the {@code int} result.
      *
-     * @param endpoint the endpoint
-     * @param publicKey the public key
-     * @param auth the auth
-     * @param eventId the event id
-     * @param title the title
-     * @param body the body
-     * @param url the url
-     * @return the send result
-     * @throws Exception if the operation cannot complete
+     * @param endpoint the endpoint supplied to this method
+     * @param publicKey the public key supplied to this method
+     * @param auth the auth supplied to this method
+     * @param eventId the event id supplied to this method
+     * @param title the title supplied to this method
+     * @param body the body supplied to this method
+     * @param url the url supplied to this method
+     * @return the value of {@code transmit(endpoint, publicKey, auth, String.valueOf(eventId),
+     *     title, body, url)}
+     * @throws Exception if the underlying operation fails
      */
     public int send(
             String endpoint,
@@ -202,17 +203,21 @@ public class WebPushTransport {
     }
 
     /**
-     * Transmits the operation.
+     * Transmits web push transport data and returns the {@code int} result.
      *
-     * @param endpoint the endpoint
-     * @param publicKey the public key
-     * @param auth the auth
-     * @param eventId the event id
-     * @param title the title
-     * @param body the body
-     * @param url the url
-     * @return the transmit result
-     * @throws Exception if the operation cannot complete
+     * <p>Delegates to {@code client.send(...)}.
+     *
+     * @param endpoint the endpoint supplied to this method
+     * @param publicKey the public key supplied to this method
+     * @param auth the auth supplied to this method
+     * @param eventId the event id supplied to this method
+     * @param title the title supplied to this method
+     * @param body the body supplied to this method
+     * @param url the url supplied to this method
+     * @return the value of {@code
+     *     client.send(request.POST(HttpRequest.BodyPublishers.ofByteArray(encrypted.getBody())).build(),
+     *     HttpResponse.BodyHandlers.discarding()).statusCode()}
+     * @throws Exception if the underlying operation fails
      */
     private int transmit(
             String endpoint,
@@ -248,14 +253,15 @@ public class WebPushTransport {
     }
 
     /**
-     * Prepares the operation.
+     * Prepares web push transport data and returns the {@code nl.martijndwars.webpush.HttpRequest}
+     * result.
      *
-     * @param endpoint the endpoint
-     * @param publicKey the public key
-     * @param auth the auth
-     * @param eventId the event id
-     * @return the prepare result
-     * @throws Exception if the operation cannot complete
+     * @param endpoint the endpoint supplied to this method
+     * @param publicKey the public key supplied to this method
+     * @param auth the auth supplied to this method
+     * @param eventId the event id supplied to this method
+     * @return the {@code nl.martijndwars.webpush.HttpRequest} result
+     * @throws Exception if the underlying operation fails
      */
     nl.martijndwars.webpush.HttpRequest prepare(
             String endpoint, String publicKey, String auth, long eventId) throws Exception {
@@ -279,17 +285,19 @@ public class WebPushTransport {
     }
 
     /**
-     * Prepares the operation.
+     * Prepares web push transport data and returns the {@code nl.martijndwars.webpush.HttpRequest}
+     * result.
      *
-     * @param endpoint the endpoint
-     * @param publicKey the public key
-     * @param auth the auth
-     * @param eventId the event id
-     * @param title the title
-     * @param body the body
-     * @param url the url
-     * @return the prepare result
-     * @throws Exception if the operation cannot complete
+     * @param endpoint the endpoint supplied to this method
+     * @param publicKey the public key supplied to this method
+     * @param auth the auth supplied to this method
+     * @param eventId the event id supplied to this method
+     * @param title the title supplied to this method
+     * @param body the body supplied to this method
+     * @param url the url supplied to this method
+     * @return the value of {@code prepare(endpoint, publicKey, auth, String.valueOf(eventId),
+     *     title, body, url)}
+     * @throws Exception if the underlying operation fails
      */
     nl.martijndwars.webpush.HttpRequest prepare(
             String endpoint,
@@ -315,17 +323,22 @@ public class WebPushTransport {
     }
 
     /**
-     * Prepares the operation.
+     * Prepares web push transport data and returns the {@code nl.martijndwars.webpush.HttpRequest}
+     * result.
      *
-     * @param endpoint the endpoint
-     * @param publicKey the public key
-     * @param auth the auth
-     * @param eventId the event id
-     * @param title the title
-     * @param body the body
-     * @param url the url
-     * @return the prepare result
-     * @throws Exception if the operation cannot complete
+     * <p>Delegates to {@code service.encrypted(...)}.
+     *
+     * @param endpoint the endpoint supplied to this method
+     * @param publicKey the public key supplied to this method
+     * @param auth the auth supplied to this method
+     * @param eventId the event id supplied to this method
+     * @param title the title supplied to this method
+     * @param body the body supplied to this method
+     * @param url the url supplied to this method
+     * @return the value of {@code service.encrypted(notification)}
+     * @throws IllegalStateException when the method rejects the request with {@code Push delivery
+     *     unavailable}
+     * @throws Exception if the underlying operation fails
      */
     private nl.martijndwars.webpush.HttpRequest prepare(
             String endpoint,
@@ -396,11 +409,11 @@ public class WebPushTransport {
         }
 
         /**
-         * Encrypteds the operation.
+         * Returns encrypted information for request builder.
          *
-         * @param notification the notification
-         * @return the encrypted result
-         * @throws Exception if the operation cannot complete
+         * @param notification the notification supplied to this method
+         * @return the value of {@code prepareRequest(notification, Encoding.AES128GCM)}
+         * @throws Exception if the underlying operation fails
          */
         nl.martijndwars.webpush.HttpRequest encrypted(Notification notification) throws Exception {
             final long __gokulMethodStartedNanos =

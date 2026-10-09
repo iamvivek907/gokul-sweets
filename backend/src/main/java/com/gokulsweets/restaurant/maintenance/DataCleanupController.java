@@ -21,9 +21,11 @@ public class DataCleanupController {
     private final DataCleanupService cleanup;
 
     /**
-     * Owners the operation.
+     * Requires the current staff account to have the owner role and returns its identifier.
      *
-     * @return the owner result
+     * @return the value of {@code actor.getId()}
+     * @throws AccessDeniedException when the method rejects the request with {@code Only the owner
+     *     may configure or run data cleanup.}
      */
     private long owner() {
         final long __gokulMethodStartedNanos =
@@ -40,9 +42,10 @@ public class DataCleanupController {
     }
 
     /**
-     * Views the operation.
+     * Handles {@code GET /api/admin/data-cleanup} for data cleanup.
      *
-     * @return the view result
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(cleanup.view())}
      */
     @GetMapping
     public ResponseEntity<DataCleanupService.View> view() {
@@ -57,10 +60,10 @@ public class DataCleanupController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/data-cleanup} for data cleanup.
      *
-     * @param config the config
-     * @return the save result
+     * @param config the config supplied to this method
+     * @return the value of {@code cleanup.save(config, owner())}
      */
     @PutMapping
     public DataCleanupService.View save(@RequestBody DataCleanupService.Config config) {
@@ -77,9 +80,9 @@ public class DataCleanupController {
     }
 
     /**
-     * Previews the operation.
+     * Handles {@code POST /api/admin/data-cleanup/preview} for data cleanup.
      *
-     * @return the preview result
+     * @return the value of {@code cleanup.preview()}
      */
     @PostMapping("/preview")
     public DataCleanupService.Preview preview() {
@@ -102,10 +105,10 @@ public class DataCleanupController {
     public record RunInput(long revision) {}
 
     /**
-     * Runs the operation.
+     * Handles {@code POST /api/admin/data-cleanup/run} for data cleanup.
      *
-     * @param input the input
-     * @return the run result
+     * @param input the input supplied to this method
+     * @return the value of {@code cleanup.run(owner(), input.revision())}
      */
     @PostMapping("/run")
     public DataCleanupService.View run(@RequestBody RunInput input) {

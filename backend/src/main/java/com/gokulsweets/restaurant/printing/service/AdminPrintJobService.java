@@ -117,10 +117,20 @@ public class AdminPrintJobService {
      * =========================================================
      */
     /**
-     * Retry the operation.
+     * Retries admin print job data and returns the {@code AdminPrintJobResponse} result.
      *
-     * @param printJobId the print job id
-     * @return the retry result
+     * <p>Authorization checks include {@code PermissionName.ORDER_START_PREPARATION}.
+     *
+     * <p>Delegates to {@code printJobRepository.findForRetry(...)}, {@code
+     * staffAuthorizationService.requirePermission(...)}, {@code
+     * staffAuthorizationService.requireBranchAccess(...)}, {@code
+     * printJobRepository.saveAndFlush(...)}.
+     *
+     * @param printJobId the print job id supplied to this method
+     * @return the value of {@code toResponse(saved)}
+     * @throws ResponseStatusException when the method rejects the request with {@code A printed job
+     *     cannot be retried as the same print job.}; {@code The print job is currently claimed by a
+     *     print agent.}
      */
     @Transactional
     public AdminPrintJobResponse retry(Long printJobId) {

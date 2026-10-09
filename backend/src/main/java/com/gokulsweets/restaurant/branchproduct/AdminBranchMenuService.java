@@ -156,9 +156,14 @@ public class AdminBranchMenuService {
      * =========================================================
      */
     /**
-     * Authorizes the operation.
+     * Checks authorization for admin branch menu data.
      *
-     * @param branchId the branch id
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code staffAuthorizationService.requirePermission(...)}, {@code
+     * staffAuthorizationService.requireBranchAccess(...)}.
+     *
+     * @param branchId the branch id supplied to this method
      */
     private void authorize(Long branchId) {
         final long __gokulMethodStartedNanos =

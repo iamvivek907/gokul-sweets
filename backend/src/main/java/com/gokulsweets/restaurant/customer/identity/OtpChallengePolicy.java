@@ -43,11 +43,13 @@ public final class OtpChallengePolicy {
     }
 
     /**
-     * Issues the operation.
+     * Issues otp challenge policy data and returns the {@code Issued} result.
      *
-     * @param normalizedPhone the normalized phone
-     * @param now the now
-     * @return the issue result
+     * @param normalizedPhone the normalized phone supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code Issued} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code A normalized
+     *     Indian mobile is required}
      */
     public Issued issue(String normalizedPhone, Instant now) {
         final long __gokulMethodStartedNanos =
@@ -76,13 +78,13 @@ public final class OtpChallengePolicy {
     }
 
     /**
-     * Verify the operation.
+     * Verifies otp challenge policy data and returns the {@code Outcome} result.
      *
-     * @param challenge the challenge
-     * @param phone the phone
-     * @param code the code
-     * @param now the now
-     * @return the verify result
+     * @param challenge the challenge supplied to this method
+     * @param phone the phone supplied to this method
+     * @param code the code supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code Outcome} result
      */
     public Outcome verify(Challenge challenge, String phone, String code, Instant now) {
         final long __gokulMethodStartedNanos =
@@ -145,12 +147,14 @@ public final class OtpChallengePolicy {
     }
 
     /**
-     * Digests the operation.
+     * Returns digest information for otp challenge policy.
      *
-     * @param phone the phone
-     * @param nonce the nonce
-     * @param code the code
-     * @return the digest result
+     * @param phone the phone supplied to this method
+     * @param nonce the nonce supplied to this method
+     * @param code the code supplied to this method
+     * @return the value of {@code mac.doFinal(code.getBytes(StandardCharsets.US_ASCII))}
+     * @throws IllegalStateException when the method rejects the request with {@code OTP
+     *     verification is unavailable}
      */
     private byte[] digest(String phone, byte[] nonce, String code) {
         final long __gokulMethodStartedNanos =
@@ -200,9 +204,9 @@ public final class OtpChallengePolicy {
         }
 
         /**
-         * Digests the operation.
+         * Returns digest information for challenge.
          *
-         * @return the digest result
+         * @return the value of {@code digest.clone()}
          */
         @Override
         public byte[] digest() {

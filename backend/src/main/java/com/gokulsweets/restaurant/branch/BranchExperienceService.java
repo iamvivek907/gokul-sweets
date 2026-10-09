@@ -86,11 +86,13 @@ public class BranchExperienceService {
     public record Copy(String altText, String description) {}
 
     /**
-     * Rows the operation.
+     * Returns row information for branch experience.
      *
-     * @param branchId the branch id
-     * @param lock the lock
-     * @return the row result
+     * <p>Writes {@code branch_experience}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param lock the lock supplied to this method
+     * @return the {@code Snapshot} result
      */
     private Snapshot row(long branchId, boolean lock) {
         final long __gokulMethodStartedNanos =
@@ -127,9 +129,14 @@ SELECT branch_id, draft_image_url, draft_mobile_url, draft_alt_text, draft_descr
     }
 
     /**
-     * Checks the operation.
+     * Returns check information for branch experience.
      *
-     * @param branchId the branch id
+     * <p>Authorization checks include {@code PermissionName.BRANCH_MANAGE}, {@code
+     * PermissionName.MENU_MANAGE}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Branch not
+     *     found.}
      */
     private void check(long branchId) {
         final long __gokulMethodStartedNanos =
@@ -147,10 +154,12 @@ SELECT branch_id, draft_image_url, draft_mobile_url, draft_alt_text, draft_descr
     }
 
     /**
-     * Versions the operation.
+     * Returns version information for branch experience.
      *
-     * @param current the current
-     * @param expected the expected
+     * @param current the current supplied to this method
+     * @param expected the expected supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Branch
+     *     content changed. Reload before saving.}
      */
     private void version(Snapshot current, long expected) {
         final long __gokulMethodStartedNanos =
@@ -168,11 +177,13 @@ SELECT branch_id, draft_image_url, draft_mobile_url, draft_alt_text, draft_descr
     }
 
     /**
-     * Audits the operation.
+     * Records an audit entry for branch experience data.
      *
-     * @param before the before
-     * @param after the after
-     * @param action the action
+     * <p>Writes {@code branch_experience_audit}.
+     *
+     * @param before the before supplied to this method
+     * @param after the after supplied to this method
+     * @param action the action supplied to this method
      */
     private void audit(Snapshot before, Snapshot after, String action) {
         final long __gokulMethodStartedNanos =
@@ -200,10 +211,10 @@ INSERT INTO branch_experience_audit(branch_id, actor_staff_id, action,
     }
 
     /**
-     * Returns the operation.
+     * Returns get information for branch experience.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code row(branchId, false)}
      */
     @Transactional
     public Snapshot get(long branchId) {
@@ -259,13 +270,15 @@ INSERT INTO branch_experience_audit(branch_id, actor_staff_id, action,
     }
 
     /**
-     * Uploads the operation.
+     * Uploads branch experience data and returns the {@code Snapshot} result.
      *
-     * @param branchId the branch id
-     * @param file the file
-     * @param mobile the mobile
-     * @param expected the expected
-     * @return the upload result
+     * <p>Delegates to {@code storage.uploadCampaignMedia(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param file the file supplied to this method
+     * @param mobile the mobile supplied to this method
+     * @param expected the expected supplied to this method
+     * @return the value of {@code after}
      */
     @Transactional
     public Snapshot upload(long branchId, MultipartFile file, boolean mobile, long expected) {
@@ -319,11 +332,15 @@ INSERT INTO branch_experience_audit(branch_id, actor_staff_id, action,
     }
 
     /**
-     * Publishes the operation.
+     * Publishes branch experience data and returns the {@code Snapshot} result.
      *
-     * @param branchId the branch id
-     * @param expected the expected
-     * @return the publish result
+     * <p>Writes {@code branch_experience}, {@code branch_experience_publications}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param expected the expected supplied to this method
+     * @return the value of {@code after}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Upload a
+     *     branch cover and add alt text before publishing.}
      */
     @Transactional
     public Snapshot publish(long branchId, long expected) {
@@ -370,12 +387,18 @@ INSERT INTO branch_experience_publications(branch_id, revision, image_url, mobil
     }
 
     /**
-     * Restores the operation.
+     * Restores branch experience data and returns the {@code Snapshot} result.
      *
-     * @param branchId the branch id
-     * @param revision the revision
-     * @param expected the expected
-     * @return the restore result
+     * <p>Reads {@code branch_experience_publications}.
+     *
+     * <p>Writes {@code branch_experience}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param revision the revision supplied to this method
+     * @param expected the expected supplied to this method
+     * @return the value of {@code publish(branchId, expected + 1)}
+     * @throws ResponseStatusException when the method rejects the request with {@code Publication
+     *     not found.}
      */
     @Transactional
     public Snapshot restore(long branchId, long revision, long expected) {
@@ -424,10 +447,12 @@ UPDATE branch_experience SET draft_image_url=?, draft_mobile_url=?, draft_alt_te
     }
 
     /**
-     * History the operation.
+     * Returns history information for branch experience.
      *
-     * @param branchId the branch id
-     * @return the history result
+     * <p>Reads {@code branch_experience_publications}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code List<Publication>} result
      */
     @Transactional(readOnly = true)
     public List<Publication> history(long branchId) {
@@ -456,10 +481,12 @@ UPDATE branch_experience SET draft_image_url=?, draft_mobile_url=?, draft_alt_te
     }
 
     /**
-     * Publisheds the operation.
+     * Returns published information for branch experience.
      *
-     * @param branchId the branch id
-     * @return the published result
+     * <p>Reads {@code branch_experience}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Publication} result
      */
     @Transactional(readOnly = true)
     public Publication published(long branchId) {

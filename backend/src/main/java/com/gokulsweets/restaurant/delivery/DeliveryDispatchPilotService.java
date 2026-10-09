@@ -81,10 +81,13 @@ public class DeliveryDispatchPilotService {
     public record Assignment(long orderId, long riderId, long windowId, String state) {}
 
     /**
-     * Boards the operation.
+     * Returns board information for delivery dispatch pilot.
      *
-     * @param branchId the branch id
-     * @return the board result
+     * <p>Reads {@code delivery_capacity_windows}, {@code delivery_pilot_assignments}, {@code
+     * orders}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code List<BoardRow>} result
      */
     @Transactional(readOnly = true)
     public List<BoardRow> board(long branchId) {
@@ -127,10 +130,12 @@ ORDER BY w.service_date, w.starts_at, o.id
     }
 
     /**
-     * Riderses the operation.
+     * Returns riders information for delivery dispatch pilot.
      *
-     * @param branchId the branch id
-     * @return the riders result
+     * <p>Reads {@code delivery_pilot_riders}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code List<Rider>} result
      */
     @Transactional(readOnly = true)
     public List<Rider> riders(long branchId) {
@@ -181,12 +186,21 @@ ORDER BY w.service_date, w.starts_at, o.id
     }
 
     /**
-     * Availability the operation.
+     * Returns availability information for delivery dispatch pilot.
      *
-     * @param branchId the branch id
-     * @param riderId the rider id
-     * @param windowId the window id
-     * @param available the available
+     * <p>Reads {@code delivery_capacity_windows}, {@code delivery_pilot_assignments}, {@code
+     * delivery_pilot_riders}, {@code delivery_zones}.
+     *
+     * <p>Writes {@code delivery_rider_availability}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param riderId the rider id supplied to this method
+     * @param windowId the window id supplied to this method
+     * @param available the available supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Rider or
+     *     branch window is unavailable.}
+     * @throws IllegalStateException when the method rejects the request with {@code Resolve this
+     *     rider's active delivery before removing availability.}
      */
     @Transactional
     public void availability(long branchId, long riderId, long windowId, boolean available) {
@@ -242,12 +256,21 @@ ON CONFLICT (rider_id, window_id) DO UPDATE SET available = EXCLUDED.available
     }
 
     /**
-     * Assigns the operation.
+     * Assigns delivery dispatch pilot data and returns the {@code Assignment} result.
      *
-     * @param branchId the branch id
-     * @param orderId the order id
-     * @param riderId the rider id
-     * @return the assign result
+     * <p>Reads {@code delivery_capacity_windows}, {@code delivery_pilot_assignments}, {@code
+     * delivery_pilot_riders}, {@code delivery_rider_availability}, {@code orders}.
+     *
+     * <p>Writes {@code OF}, {@code delivery_pilot_assignments}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param riderId the rider id supplied to this method
+     * @return the {@code Assignment} result
+     * @throws IllegalStateException when the method rejects the request with {@code Branch rider
+     *     capacity is full.}; {@code Order already has a rider; resolve the assignment first.};
+     *     {@code Order is not ready for rider assignment.}; {@code Rider is unavailable for this
+     *     window.}
      */
     @Transactional
     public Assignment assign(long branchId, long orderId, long riderId) {
@@ -377,13 +400,21 @@ SELECT count(*) FROM delivery_pilot_assignments WHERE order_id = ? AND state = '
     }
 
     /**
-     * Exceptions the operation.
+     * Returns exception information for delivery dispatch pilot.
      *
-     * @param branchId the branch id
-     * @param orderId the order id
-     * @param reason the reason
-     * @param detail the detail
-     * @param contacted the contacted
+     * <p>Reads {@code orders}.
+     *
+     * <p>Writes {@code delivery_dispatch_exceptions}, {@code delivery_pilot_assignments}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param reason the reason supplied to this method
+     * @param detail the detail supplied to this method
+     * @param contacted the contacted supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     reason and explain the issue.}
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery
+     *     exception is unavailable for this order.}
      */
     @Transactional
     public void exception(
@@ -441,12 +472,20 @@ SELECT count(*) FROM delivery_pilot_assignments WHERE order_id = ? AND state = '
     }
 
     /**
-     * Completes the operation.
+     * Completes delivery dispatch pilot data.
      *
-     * @param branchId the branch id
-     * @param orderId the order id
-     * @param actualJourneyCost the actual journey cost
-     * @param outcome the outcome
+     * <p>Reads {@code orders}.
+     *
+     * <p>Writes {@code delivery_pilot_assignments}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param actualJourneyCost the actual journey cost supplied to this method
+     * @param outcome the outcome supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Actual
+     *     journey cost and outcome are required.}
+     * @throws IllegalStateException when the method rejects the request with {@code Only a
+     *     delivered trip can record an outcome.}
      */
     @Transactional
     public void complete(

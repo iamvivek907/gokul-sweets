@@ -137,11 +137,11 @@ public class RebateApplicationService {
     }
 
     /**
-     * Apply the operation.
+     * Applies rebate application data and returns the {@code AppliedRebateResponse} result.
      *
-     * @param orderNumber the order number
-     * @param request the request
-     * @return the apply result
+     * @param orderNumber the order number supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code applySnapshot(orderNumber, request, true)}
      */
     @Transactional
     public AppliedRebateResponse apply(String orderNumber, ApplyRebateRequest request) {
@@ -239,10 +239,13 @@ public class RebateApplicationService {
     // REMOVE
     // =========================================================
     /**
-     * Removes the operation.
+     * Removes rebate application data and returns the {@code AppliedRebateResponse} result.
      *
-     * @param orderNumber the order number
-     * @return the remove result
+     * <p>Delegates to {@code orderRepository.findForUpdate(...)}, {@code
+     * orderRepository.save(...)}.
+     *
+     * @param orderNumber the order number supplied to this method
+     * @return the {@code AppliedRebateResponse} result
      */
     @Transactional
     public AppliedRebateResponse remove(String orderNumber) {

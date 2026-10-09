@@ -58,9 +58,9 @@ public class TaxCollectionController {
     }
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/tax-collection} for tax collection.
      *
-     * @return the get result
+     * @return the {@code Setting} result
      */
     @GetMapping
     public Setting get() {
@@ -75,10 +75,10 @@ public class TaxCollectionController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/tax-collection} for tax collection.
      *
-     * @param input the input
-     * @return the save result
+     * @param input the input supplied to this method
+     * @return the {@code Setting} result
      */
     @PutMapping
     public Setting save(@Valid @RequestBody Input input) {

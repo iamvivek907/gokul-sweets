@@ -21,16 +21,18 @@ public class InventoryLedgerService {
     private final InventoryStockTransactionRepository transactionRepository;
 
     /**
-     * Records the operation.
+     * Records inventory ledger data.
      *
-     * @param allocation the allocation
-     * @param reservation the reservation
-     * @param type the type
-     * @param quantityDelta the quantity delta
-     * @param orderNumber the order number
-     * @param referenceKey the reference key
-     * @param reason the reason
-     * @param performedBy the performed by
+     * <p>Delegates to {@code transactionRepository.save(...)}.
+     *
+     * @param allocation the allocation supplied to this method
+     * @param reservation the reservation supplied to this method
+     * @param type the type supplied to this method
+     * @param quantityDelta the quantity delta supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @param referenceKey the reference key supplied to this method
+     * @param reason the reason supplied to this method
+     * @param performedBy the performed by supplied to this method
      */
     public void record(
             InventoryDailyAllocation allocation,

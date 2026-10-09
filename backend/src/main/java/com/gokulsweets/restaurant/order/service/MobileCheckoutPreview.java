@@ -55,11 +55,13 @@ public class MobileCheckoutPreview {
             AvailableRebateResponse selectedOffer) {}
 
     /**
-     * Previews the operation.
+     * Previews mobile checkout preview data and returns the {@code Preview} result.
      *
-     * @param request the request
-     * @param token the token
-     * @return the preview result
+     * @param request the request supplied to this method
+     * @param token the token supplied to this method
+     * @return the {@code Preview} result
+     * @throws IllegalStateException when the method rejects the request with {@code Rewards are
+     *     currently unavailable.}
      */
     @Transactional
     public Preview preview(CreateOrderRequest request, String token) {

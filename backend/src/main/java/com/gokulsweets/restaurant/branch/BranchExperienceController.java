@@ -21,10 +21,10 @@ public class BranchExperienceController {
     private final BranchExperienceService experience;
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/experience} for branch experience.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code experience.get(branchId)}
      */
     @GetMapping
     public BranchExperienceService.Snapshot get(@PathVariable long branchId) {
@@ -39,12 +39,12 @@ public class BranchExperienceController {
     }
 
     /**
-     * Drafts the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/experience} for branch experience.
      *
-     * @param branchId the branch id
-     * @param version the version
-     * @param copy the copy
-     * @return the draft result
+     * @param branchId the branch id supplied to this method
+     * @param version the version supplied to this method
+     * @param copy the copy supplied to this method
+     * @return the value of {@code experience.saveCopy(branchId, copy, version)}
      */
     @PutMapping
     public BranchExperienceService.Snapshot draft(
@@ -66,13 +66,13 @@ public class BranchExperienceController {
     }
 
     /**
-     * Uploads the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/experience/media} for branch experience.
      *
-     * @param branchId the branch id
-     * @param version the version
-     * @param mobile the mobile
-     * @param file the file
-     * @return the upload result
+     * @param branchId the branch id supplied to this method
+     * @param version the version supplied to this method
+     * @param mobile the mobile supplied to this method
+     * @param file the file supplied to this method
+     * @return the value of {@code experience.upload(branchId, file, mobile, version)}
      */
     @PostMapping(value = "/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public BranchExperienceService.Snapshot upload(
@@ -95,11 +95,11 @@ public class BranchExperienceController {
     }
 
     /**
-     * Publishes the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/experience/publish} for branch experience.
      *
-     * @param branchId the branch id
-     * @param version the version
-     * @return the publish result
+     * @param branchId the branch id supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code experience.publish(branchId, version)}
      */
     @PostMapping("/publish")
     public BranchExperienceService.Snapshot publish(
@@ -117,10 +117,11 @@ public class BranchExperienceController {
     }
 
     /**
-     * History the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/experience/publications} for branch
+     * experience.
      *
-     * @param branchId the branch id
-     * @return the history result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code experience.history(branchId)}
      */
     @GetMapping("/publications")
     public List<BranchExperienceService.Publication> history(@PathVariable long branchId) {
@@ -135,12 +136,14 @@ public class BranchExperienceController {
     }
 
     /**
-     * Restores the operation.
+     * Handles {@code POST
+     * /api/admin/branches/{branchId}/experience/publications/{revision}/restore} for branch
+     * experience.
      *
-     * @param branchId the branch id
-     * @param revision the revision
-     * @param version the version
-     * @return the restore result
+     * @param branchId the branch id supplied to this method
+     * @param revision the revision supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code experience.restore(branchId, revision, version)}
      */
     @PostMapping("/publications/{revision}/restore")
     public BranchExperienceService.Snapshot restore(

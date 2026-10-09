@@ -68,11 +68,15 @@ public class CustomerAccountHub {
             String label, String addressLine, String locality, String postalCode) {}
 
     /**
-     * Snapshots the operation.
+     * Returns snapshot information for customer account hub.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @return the snapshot result
+     * <p>Reads {@code orders}, {@code payments}, {@code verified_customer_account}, {@code
+     * verified_customer_addresses}, {@code verified_customer_favourites}, {@code
+     * verified_order_ownership}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @return the {@code Snapshot} result
      */
     @Transactional(readOnly = true)
     public Snapshot snapshot(String environment, UUID subject) {
@@ -383,11 +387,11 @@ DELETE FROM verified_customer_addresses WHERE id = ? AND environment = ? AND sub
     }
 
     /**
-     * Valids the operation.
+     * Returns valid information for customer account hub.
      *
-     * @param text the text
-     * @param max the max
-     * @return the valid result
+     * @param text the text supplied to this method
+     * @param max the max supplied to this method
+     * @return the value of {@code text != null && !text.isBlank() && text.trim().length() <= max}
      */
     private boolean valid(String text, int max) {
         final long __gokulMethodStartedNanos =

@@ -87,10 +87,10 @@ public class PickupLifecycleScheduler {
     }
 
     /**
-     * Processes the operation.
+     * Processes pickup lifecycle data.
      *
-     * @param orderNumbers the order numbers
-     * @param expiryStage the expiry stage
+     * @param orderNumbers the order numbers supplied to this method
+     * @param expiryStage the expiry stage supplied to this method
      */
     private void process(List<String> orderNumbers, boolean expiryStage) {
         final long __gokulMethodStartedNanos =

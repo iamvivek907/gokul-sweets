@@ -57,10 +57,11 @@ public class StaffMfaService {
     }
 
     /**
-     * Requireds the operation.
+     * Returns whether MFA is mandatory for an owner or an account with staff-management,
+     * payroll-management or refund-creation permission.
      *
-     * @param staff the staff
-     * @return the required result
+     * @param staff the staff account with its loaded role and permissions
+     * @return true when MFA is mandatory; false otherwise
      */
     public boolean required(StaffUser staff) {
         final long __gokulMethodStartedNanos =
@@ -82,10 +83,13 @@ public class StaffMfaService {
     }
 
     /**
-     * Enrolleds the operation.
+     * Returns whether the staff account has a persisted MFA secret; an unfinished enrollment
+     * challenge does not count as enrollment.
      *
-     * @param staffId the staff id
-     * @return the enrolled result
+     * <p>Reads {@code staff_mfa}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @return true when a persisted MFA secret exists for the account
      */
     public boolean enrolled(long staffId) {
         final long __gokulMethodStartedNanos =
@@ -110,11 +114,18 @@ public class StaffMfaService {
     public record Setup(String secret, String uri) {}
 
     /**
-     * Setups the operation.
+     * Locks an unexpired enrollment challenge and creates or reuses its encrypted secret, returning
+     * the authenticator secret and enrollment URI.
      *
-     * @param staffId the staff id
-     * @param enrollmentHash the enrollment hash
-     * @return the setup result
+     * <p>Reads {@code staff_mfa_enrollments}.
+     *
+     * <p>Writes {@code staff_mfa_enrollments}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param enrollmentHash the enrollment hash supplied to this method
+     * @return the {@code Setup} result
+     * @throws IllegalStateException when the method rejects the request with {@code Enrollment
+     *     expired or already complete.}
      */
     @Transactional
     public Setup setup(long staffId, String enrollmentHash) {
@@ -155,12 +166,23 @@ public class StaffMfaService {
     }
 
     /**
-     * Confirms the operation.
+     * Completes an unexpired MFA enrollment after validating an authenticator code, consumes the
+     * challenge and returns eight newly issued recovery codes.
      *
-     * @param staffId the staff id
-     * @param enrollmentHash the enrollment hash
-     * @param code the code
-     * @return the confirm result
+     * <p>Reads {@code staff_mfa_enrollments}.
+     *
+     * <p>Writes {@code staff_mfa}, {@code staff_mfa_enrollments}, {@code staff_mfa_recovery}.
+     *
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param enrollmentHash the enrollment hash supplied to this method
+     * @param code the code supplied to this method
+     * @return the value of {@code recovery}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     authenticator code.}
+     * @throws IllegalStateException when the method rejects the request with {@code Enrollment
+     *     expired or already complete.}
      */
     @Transactional
     public List<String> confirm(long staffId, String enrollmentHash, String code) {
@@ -208,11 +230,18 @@ public class StaffMfaService {
     }
 
     /**
-     * Verify the operation.
+     * Accepts a fresh authenticator counter or consumes one unused recovery code; returns false for
+     * malformed, missing or replayed credentials.
      *
-     * @param staffId the staff id
-     * @param code the code
-     * @return the verify result
+     * <p>Reads {@code staff_mfa}.
+     *
+     * <p>Writes {@code staff_mfa}, {@code staff_mfa_recovery}.
+     *
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param code the code supplied to this method
+     * @return the {@code boolean} result
      */
     @Transactional
     public boolean verify(long staffId, String code) {
@@ -248,9 +277,11 @@ public class StaffMfaService {
     }
 
     /**
-     * Key the operation.
+     * Decodes the configured Base64 key and requires exactly 32 bytes for AES encryption.
      *
-     * @return the key result
+     * @return the {@code SecretKeySpec} result
+     * @throws IllegalStateException when the method rejects the request with {@code
+     *     STAFF_MFA_ENCRYPTION_KEY must be a base64 encoded 32-byte key.}
      */
     private SecretKeySpec key() {
         final long __gokulMethodStartedNanos = MethodTiming.start(StaffMfaService.class, "key()");
@@ -269,10 +300,15 @@ public class StaffMfaService {
     }
 
     /**
-     * Encrypts the operation.
+     * Encrypts an MFA secret with AES-GCM and a random 12-byte nonce, returning the Base64-encoded
+     * nonce and ciphertext.
      *
-     * @param secret the secret
-     * @return the encrypt result
+     * @param secret the secret supplied to this method
+     * @return the value of {@code
+     *     Base64.getEncoder().encodeToString(ByteBuffer.allocate(nonce.length +
+     *     encrypted.length).put(nonce).put(encrypted).array())}
+     * @throws IllegalStateException when the method rejects the request with {@code MFA encryption
+     *     failed.}
      */
     private String encrypt(byte[] secret) {
         final long __gokulMethodStartedNanos =
@@ -299,10 +335,13 @@ public class StaffMfaService {
     }
 
     /**
-     * Decrypts the operation.
+     * Decodes the stored nonce and ciphertext, authenticates them with AES-GCM and returns the
+     * original MFA secret bytes.
      *
-     * @param encoded the encoded
-     * @return the decrypt result
+     * @param encoded the encoded supplied to this method
+     * @return the value of {@code cipher.doFinal(encrypted)}
+     * @throws IllegalStateException when the method rejects the request with {@code MFA secret
+     *     cannot be decrypted.}
      */
     private byte[] decrypt(String encoded) {
         final long __gokulMethodStartedNanos =
@@ -347,10 +386,10 @@ public class StaffMfaService {
     }
 
     /**
-     * Base32s the operation.
+     * Encodes secret bytes as unpadded Base32 for authenticator enrollment.
      *
-     * @param data the data
-     * @return the base32 result
+     * @param data the data supplied to this method
+     * @return the value of {@code value.toString()}
      */
     private static String base32(byte[] data) {
         final long __gokulMethodStartedNanos =
@@ -374,11 +413,14 @@ public class StaffMfaService {
     }
 
     /**
-     * Counters the operation.
+     * Returns the matching 30-second TOTP counter within the previous, current or next window, or
+     * minus one when no six-digit code matches.
      *
-     * @param secret the secret
-     * @param code the code
-     * @return the counter result
+     * @param secret the secret supplied to this method
+     * @param code the code supplied to this method
+     * @return the {@code long} result
+     * @throws IllegalStateException when the method rejects the request with {@code MFA check
+     *     failed.}
      */
     private long counter(byte[] secret, String code) {
         final long __gokulMethodStartedNanos =

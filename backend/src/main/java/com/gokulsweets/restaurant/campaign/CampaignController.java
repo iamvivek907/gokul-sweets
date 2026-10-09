@@ -28,10 +28,13 @@ public class CampaignController {
     private final StaffAuthorizationService authorization;
 
     /**
-     * Actives the operation.
+     * Handles {@code GET /api/storefront/campaigns} for campaign.
      *
-     * @param branchId the branch id
-     * @return the active result
+     * <p>Delegates to {@code service.active(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code features.isHomepageCampaigns() ? service.active(branchId) :
+     *     List.of()}
      */
     @GetMapping("/api/storefront/campaigns")
     public List<HomepageCampaign> active(@RequestParam(required = false) Long branchId) {
@@ -46,10 +49,14 @@ public class CampaignController {
     }
 
     /**
-     * History the operation.
+     * Handles {@code GET /api/admin/homepage-campaigns/{id}/publications} for campaign.
      *
-     * @param id the id
-     * @return the history result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code service.history(...)}.
+     *
+     * @param id the id supplied to this method
+     * @return the value of {@code service.history(id)}
      */
     @GetMapping("/api/admin/homepage-campaigns/{id}/publications")
     public List<CampaignPublication> history(@PathVariable Long id) {
@@ -65,12 +72,17 @@ public class CampaignController {
     }
 
     /**
-     * Restores the operation.
+     * Handles {@code POST /api/admin/homepage-campaigns/{id}/publications/{revision}/restore} for
+     * campaign.
      *
-     * @param id the id
-     * @param revision the revision
-     * @param expectedVersion the expected version
-     * @return the restore result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code service.rollback(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param revision the revision supplied to this method
+     * @param expectedVersion the expected version supplied to this method
+     * @return the value of {@code service.rollback(id, revision, expectedVersion)}
      */
     @PostMapping("/api/admin/homepage-campaigns/{id}/publications/{revision}/restore")
     public HomepageCampaign restore(
@@ -89,9 +101,13 @@ public class CampaignController {
     }
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/homepage-campaigns} for campaign.
      *
-     * @return the list result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code repository.findAllByOrderByDisplayOrderAscIdAsc(...)}.
+     *
+     * @return the value of {@code repository.findAllByOrderByDisplayOrderAscIdAsc()}
      */
     @GetMapping("/api/admin/homepage-campaigns")
     public List<HomepageCampaign> list() {
@@ -106,11 +122,15 @@ public class CampaignController {
     }
 
     /**
-     * Creates the operation.
+     * Handles {@code POST /api/admin/homepage-campaigns} for campaign.
      *
-     * @param request the request
-     * @param requestId the request id
-     * @return the create result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code service.create(...)}.
+     *
+     * @param request the request supplied to this method
+     * @param requestId the request id supplied to this method
+     * @return the value of {@code service.create(request, requestId)}
      */
     @PostMapping("/api/admin/homepage-campaigns")
     public HomepageCampaign create(
@@ -131,12 +151,16 @@ public class CampaignController {
     }
 
     /**
-     * Updates the operation.
+     * Handles {@code PUT /api/admin/homepage-campaigns/{id}} for campaign.
      *
-     * @param id the id
-     * @param request the request
-     * @param expectedVersion the expected version
-     * @return the update result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code service.save(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param request the request supplied to this method
+     * @param expectedVersion the expected version supplied to this method
+     * @return the value of {@code service.save(id, request, expectedVersion)}
      */
     @PutMapping("/api/admin/homepage-campaigns/{id}")
     public HomepageCampaign update(
@@ -157,14 +181,18 @@ public class CampaignController {
     }
 
     /**
-     * Uploads the operation.
+     * Handles {@code POST /api/admin/homepage-campaigns/{id}/media} for campaign.
      *
-     * @param id the id
-     * @param file the file
-     * @param fallback the fallback
-     * @param requestId the request id
-     * @param expectedVersion the expected version
-     * @return the upload result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code service.upload(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param file the file supplied to this method
+     * @param fallback the fallback supplied to this method
+     * @param requestId the request id supplied to this method
+     * @param expectedVersion the expected version supplied to this method
+     * @return the value of {@code service.upload(id, file, fallback, requestId, expectedVersion)}
      */
     @PostMapping(
             value = "/api/admin/homepage-campaigns/{id}/media",
@@ -245,12 +273,16 @@ public class CampaignController {
     }
 
     /**
-     * Removes the operation.
+     * Handles {@code DELETE /api/admin/homepage-campaigns/{id}/media} for campaign.
      *
-     * @param id the id
-     * @param fallback the fallback
-     * @param expectedVersion the expected version
-     * @return the remove result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code service.removeMedia(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param fallback the fallback supplied to this method
+     * @param expectedVersion the expected version supplied to this method
+     * @return the value of {@code service.removeMedia(id, fallback, expectedVersion)}
      */
     @DeleteMapping("/api/admin/homepage-campaigns/{id}/media")
     public HomepageCampaign remove(

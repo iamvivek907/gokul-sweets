@@ -68,9 +68,13 @@ public class OrderDemandService {
     private static final String LINES = AppConstant.ORDER_DEMAND_SERVICE_LINES;
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for order demand data.
      *
-     * @param branchId the branch id
+     * @param branchId the branch id supplied to this method
+     * @throws AccessDeniedException when the method rejects the request with {@code Demand and
+     *     exports are available to admin and manager only.}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     branch.}
      */
     private void authorize(long branchId) {
         final long __gokulMethodStartedNanos =
@@ -91,10 +95,12 @@ public class OrderDemandService {
     }
 
     /**
-     * Ranges the operation.
+     * Returns range information for order demand.
      *
-     * @param from the from
-     * @param to the to
+     * @param from the from supplied to this method
+     * @param to the to supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     date range of at most 31 days.}
      */
     private void range(LocalDate from, LocalDate to) {
         final long __gokulMethodStartedNanos =
@@ -114,12 +120,12 @@ public class OrderDemandService {
     }
 
     /**
-     * Reads the operation.
+     * Returns read information for order demand.
      *
-     * @param branchId the branch id
-     * @param from the from
-     * @param to the to
-     * @return the read result
+     * @param branchId the branch id supplied to this method
+     * @param from the from supplied to this method
+     * @param to the to supplied to this method
+     * @return the {@code List<Demand>} result
      */
     private List<Demand> read(long branchId, LocalDate from, LocalDate to) {
         final long __gokulMethodStartedNanos =
@@ -163,12 +169,12 @@ public class OrderDemandService {
     }
 
     /**
-     * Returns the operation.
+     * Returns get information for order demand.
      *
-     * @param branchId the branch id
-     * @param from the from
-     * @param to the to
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @param from the from supplied to this method
+     * @param to the to supplied to this method
+     * @return the value of {@code read(branchId, from, to)}
      */
     @PreAuthorize("hasAuthority('REPORT_VIEW')")
     @Transactional(
@@ -190,12 +196,14 @@ public class OrderDemandService {
     }
 
     /**
-     * Exports the operation.
+     * Exports order demand data and returns the {@code byte[]} result.
      *
-     * @param branchId the branch id
-     * @param from the from
-     * @param to the to
-     * @return the export result
+     * @param branchId the branch id supplied to this method
+     * @param from the from supplied to this method
+     * @param to the to supplied to this method
+     * @return the {@code byte[]} result
+     * @throws IllegalStateException when the method rejects the request with {@code Could not
+     *     create the demand export. Try again.}
      */
     @PreAuthorize("hasAuthority('REPORT_VIEW')")
     @Transactional(
@@ -312,11 +320,11 @@ public class OrderDemandService {
     }
 
     /**
-     * Writes the operation.
+     * Writes order demand data.
      *
-     * @param sheet the sheet
-     * @param number the number
-     * @param values the values
+     * @param sheet the sheet supplied to this method
+     * @param number the number supplied to this method
+     * @param values the values supplied to this method
      */
     private void write(org.apache.poi.ss.usermodel.Sheet sheet, int number, List<?> values) {
         final long __gokulMethodStartedNanos =
@@ -340,10 +348,12 @@ public class OrderDemandService {
     }
 
     /**
-     * Policieses the operation.
+     * Returns policies information for order demand.
      *
-     * @param branchId the branch id
-     * @return the policies result
+     * <p>Reads {@code branch_products}, {@code products}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code List<Policy>} result
      */
     @PreAuthorize("hasAuthority('MENU_MANAGE')")
     @Transactional(readOnly = true)
@@ -365,11 +375,15 @@ public class OrderDemandService {
     }
 
     /**
-     * Policy the operation.
+     * Returns policy information for order demand.
      *
-     * @param branchId the branch id
-     * @param productId the product id
-     * @param allowed the allowed
+     * <p>Writes {@code branch_products}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param productId the product id supplied to this method
+     * @param allowed the allowed supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Product is
+     *     not in this branch.}
      */
     @PreAuthorize("hasAuthority('MENU_MANAGE')")
     @Transactional

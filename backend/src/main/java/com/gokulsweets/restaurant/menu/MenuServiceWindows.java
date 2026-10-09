@@ -123,10 +123,10 @@ public class MenuServiceWindows {
     public record Snapshot(boolean enabled, Map<Long, Status> products) {
 
         /**
-         * Statuses the operation.
+         * Returns status information for snapshot.
          *
-         * @param productId the product id
-         * @return the status result
+         * @param productId the product id supplied to this method
+         * @return the value of {@code products.get(productId)}
          */
         public Status status(long productId) {
             final long __gokulMethodStartedNanos =
@@ -163,10 +163,10 @@ public class MenuServiceWindows {
     }
 
     /**
-     * Settingses the operation.
+     * Requires menu-management and branch access before returning the branch service-window policy.
      *
-     * @param branchId the branch id
-     * @return the settings result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code readSettings(branchId)}
      */
     @Transactional(readOnly = true)
     public Settings settings(long branchId) {
@@ -182,9 +182,15 @@ public class MenuServiceWindows {
     }
 
     /**
-     * Authorizes the operation.
+     * Requires menu-management permission, branch access and an existing branch.
      *
-     * @param branchId the branch id
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Reads {@code branches}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Branch not
+     *     found.}
      */
     private void authorize(long branchId) {
         final long __gokulMethodStartedNanos =
@@ -204,11 +210,12 @@ public class MenuServiceWindows {
     }
 
     /**
-     * Hourses the operation.
+     * Returns the branch item's configured service hours after checking menu-management and branch
+     * access.
      *
-     * @param branchId the branch id
-     * @param branchProductId the branch product id
-     * @return the hours result
+     * @param branchId the branch id supplied to this method
+     * @param branchProductId the branch product id supplied to this method
+     * @return the value of {@code readHours(branchId, branchProductId)}
      */
     @Transactional(readOnly = true)
     public ItemHours hours(long branchId, long branchProductId) {
@@ -393,11 +400,22 @@ public class MenuServiceWindows {
     }
 
     /**
-     * Saves the operation.
+     * Replaces a branch's item rules under the branch lock, rejecting stale revisions, invalid
+     * schedules and cyclic ingredient dependencies.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the save result
+     * <p>Reads {@code branch_products}, {@code branches}.
+     *
+     * <p>Writes {@code menu_service_items}, {@code menu_service_policies}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code readSettings(branchId)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose valid
+     *     menu rules.}; {@code Ingredient dependencies must not form a loop.}; {@code Use at most
+     *     ten linked ingredient items.}; {@code Use unique branch items, valid days and different
+     *     opening/closing times.}
+     * @throws ResponseStatusException when the method rejects the request with {@code Menu timing
+     *     changed. Reload before saving.}
      */
     @Transactional
     public Settings save(long branchId, Settings input) {
@@ -479,10 +497,10 @@ public class MenuServiceWindows {
     }
 
     /**
-     * Snapshots the operation.
+     * Evaluates the branch's service-window rules at the current business time in Asia/Kolkata.
      *
-     * @param branchId the branch id
-     * @return the snapshot result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Snapshot} result
      */
     public Snapshot snapshot(long branchId) {
         final long __gokulMethodStartedNanos =
@@ -642,14 +660,15 @@ public class MenuServiceWindows {
     }
 
     /**
-     * Evaluates the operation.
+     * Evaluates item availability, service hours and ingredient dependencies, returning the reason
+     * and next relevant change time.
      *
-     * @param id the id
-     * @param products the products
-     * @param rules the rules
-     * @param now the now
-     * @param visited the visited
-     * @return the evaluate result
+     * @param id the id supplied to this method
+     * @param products the products supplied to this method
+     * @param rules the rules supplied to this method
+     * @param now the now supplied to this method
+     * @param visited the visited supplied to this method
+     * @return the {@code Status} result
      */
     private Status evaluate(
             long id,

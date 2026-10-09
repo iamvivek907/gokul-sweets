@@ -20,11 +20,11 @@ public class OrderCorrectionController {
     private final VerifiedOrderAccess access;
 
     /**
-     * Previews the operation.
+     * Handles {@code GET /api/customer/identity/orders/{number}/correction} for order correction.
      *
-     * @param number the number
-     * @param request the request
-     * @return the preview result
+     * @param number the number supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code result(corrections.preview(number, false))}
      */
     @GetMapping("/api/customer/identity/orders/{number}/correction")
     public ResponseEntity<OrderCorrectionService.Summary> preview(
@@ -44,12 +44,12 @@ public class OrderCorrectionController {
     }
 
     /**
-     * Cancels the operation.
+     * Handles {@code POST /api/customer/identity/orders/{number}/cancel} for order correction.
      *
-     * @param number the number
-     * @param input the input
-     * @param request the request
-     * @return the cancel result
+     * @param number the number supplied to this method
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code result(corrections.cancel(number, input, false))}
      */
     @PostMapping("/api/customer/identity/orders/{number}/cancel")
     public ResponseEntity<OrderCorrectionService.Summary> cancel(
@@ -117,11 +117,11 @@ public class OrderCorrectionController {
     }
 
     /**
-     * Transfers the operation.
+     * Handles {@code POST /api/admin/orders/{number}/transfer} for order correction.
      *
-     * @param number the number
-     * @param input the input
-     * @return the transfer result
+     * @param number the number supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code result(corrections.transfer(number, input))}
      */
     @PostMapping("/api/admin/orders/{number}/transfer")
     public ResponseEntity<OrderCorrectionService.Summary> transfer(
@@ -141,11 +141,11 @@ public class OrderCorrectionController {
     }
 
     /**
-     * Reschedules the operation.
+     * Handles {@code POST /api/admin/orders/{number}/reschedule} for order correction.
      *
-     * @param number the number
-     * @param input the input
-     * @return the reschedule result
+     * @param number the number supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code result(corrections.reschedule(number, input))}
      */
     @PostMapping("/api/admin/orders/{number}/reschedule")
     public ResponseEntity<OrderCorrectionService.Summary> reschedule(
@@ -165,10 +165,11 @@ public class OrderCorrectionController {
     }
 
     /**
-     * Results the operation.
+     * Returns result information for order correction.
      *
-     * @param value the value
-     * @return the result result
+     * @param value the value supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(value)}
      */
     private ResponseEntity<OrderCorrectionService.Summary> result(
             OrderCorrectionService.Summary value) {

@@ -33,9 +33,9 @@ public class OrderNumberGenerator {
     }
 
     /**
-     * Generates the operation.
+     * Generates order number generator data and returns the {@code String} result.
      *
-     * @return the generate result
+     * @return the {@code String} result
      */
     public String generate() {
         final long __gokulMethodStartedNanos =

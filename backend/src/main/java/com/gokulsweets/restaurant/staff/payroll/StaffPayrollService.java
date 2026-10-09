@@ -300,11 +300,13 @@ public class StaffPayrollService {
     }
 
     /**
-     * Resubmits the operation.
+     * Resubmits staff payroll data and returns the {@code PaymentRequestResponse} result.
      *
-     * @param paymentRequestId the payment request id
-     * @param request the request
-     * @return the resubmit result
+     * <p>Delegates to {@code approvalWorkflowService.resubmit(...)}.
+     *
+     * @param paymentRequestId the payment request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code toPaymentResponse(payment)}
      */
     @Transactional
     public PaymentRequestResponse resubmit(Long paymentRequestId, PayrollActionRequest request) {
@@ -326,11 +328,13 @@ public class StaffPayrollService {
     }
 
     /**
-     * Cancels the operation.
+     * Cancels staff payroll data and returns the {@code PaymentRequestResponse} result.
      *
-     * @param paymentRequestId the payment request id
-     * @param request the request
-     * @return the cancel result
+     * <p>Delegates to {@code approvalWorkflowService.cancelOwnRequest(...)}.
+     *
+     * @param paymentRequestId the payment request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code toPaymentResponse(payment)}
      */
     @Transactional
     public PaymentRequestResponse cancel(Long paymentRequestId, PayrollActionRequest request) {
@@ -429,10 +433,12 @@ public class StaffPayrollService {
     }
 
     /**
-     * Money the operation.
+     * Rounds the monetary amount to two decimal places using half-up rounding. A null amount is
+     * treated as zero.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code (value == null ? BigDecimal.ZERO : value).setScale(2,
+     *     RoundingMode.HALF_UP)}
      */
     private BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =

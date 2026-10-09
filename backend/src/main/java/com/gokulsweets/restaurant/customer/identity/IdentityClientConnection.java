@@ -22,10 +22,13 @@ public class IdentityClientConnection {
     private final Environment settings;
 
     /**
-     * Resolves the operation.
+     * Returns resolve information for identity client connection.
      *
-     * @param request the request
-     * @return the resolve result
+     * @param request the request supplied to this method
+     * @return the {@code Connection} result
+     * @throws IllegalStateException when the method rejects the request with {@code Client address
+     *     unavailable}; {@code Too many forwarded hops}; {@code Trusted proxy forwarding is
+     *     unavailable}
      */
     public Connection resolve(HttpServletRequest request) {
         final long __gokulMethodStartedNanos =
@@ -150,10 +153,12 @@ public class IdentityClientConnection {
     private record Range(byte[] network, int bits) {
 
         /**
-         * Parses the operation.
+         * Parses range data and returns the {@code Range} result.
          *
-         * @param raw the raw
-         * @return the parse result
+         * @param raw the raw supplied to this method
+         * @return the {@code Range} result
+         * @throws IllegalStateException when the method rejects the request with {@code Invalid
+         *     trusted proxy range}
          */
         static Range parse(String raw) {
             final long __gokulMethodStartedNanos =
@@ -182,10 +187,10 @@ public class IdentityClientConnection {
         }
 
         /**
-         * Includeses the operation.
+         * Returns includes information for range.
          *
-         * @param address the address
-         * @return the includes result
+         * @param address the address supplied to this method
+         * @return the {@code boolean} result
          */
         boolean includes(InetAddress address) {
             final long __gokulMethodStartedNanos =

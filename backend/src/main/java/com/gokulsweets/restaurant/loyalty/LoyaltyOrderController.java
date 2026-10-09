@@ -21,11 +21,12 @@ public class LoyaltyOrderController {
     private final LoyaltyCheckoutService checkout;
 
     /**
-     * Reads the operation.
+     * Handles {@code GET /api/orders/{orderNumber}/rewards} for loyalty order.
      *
-     * @param orderNumber the order number
-     * @param request the request
-     * @return the read result
+     * @param orderNumber the order number supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(checkout.read(orderNumber))}
      */
     @GetMapping
     public ResponseEntity<LoyaltyCheckoutService.Checkout> read(
@@ -46,12 +47,14 @@ public class LoyaltyOrderController {
     }
 
     /**
-     * Selects the operation.
+     * Handles {@code PUT /api/orders/{orderNumber}/rewards} for loyalty order.
      *
-     * @param orderNumber the order number
-     * @param selection the selection
-     * @param request the request
-     * @return the select result
+     * @param orderNumber the order number supplied to this method
+     * @param selection the selection supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(checkout.select(orderNumber,
+     *     selection.rewardCode(), selection.policyVersion()))}
      */
     @PutMapping
     public ResponseEntity<LoyaltyCheckoutService.Checkout> select(

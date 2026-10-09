@@ -632,15 +632,15 @@ public class RebateEligibilityService {
     // RESPONSE
     // =========================================================
     /**
-     * Responses the operation.
+     * Returns response information for rebate eligibility.
      *
-     * @param rebate the rebate
-     * @param eligibleAmount the eligible amount
-     * @param rebateAmount the rebate amount
-     * @param nextMinimum the next minimum
-     * @param nextRebate the next rebate
-     * @param amountNeeded the amount needed
-     * @return the response result
+     * @param rebate the rebate supplied to this method
+     * @param eligibleAmount the eligible amount supplied to this method
+     * @param rebateAmount the rebate amount supplied to this method
+     * @param nextMinimum the next minimum supplied to this method
+     * @param nextRebate the next rebate supplied to this method
+     * @param amountNeeded the amount needed supplied to this method
+     * @return the {@code AvailableRebateResponse} result
      */
     private AvailableRebateResponse response(
             Rebate rebate,
@@ -801,10 +801,10 @@ public class RebateEligibilityService {
     // HELPERS
     // =========================================================
     /**
-     * Money the operation.
+     * Rounds the monetary amount to two decimal places using half-up rounding.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code value.setScale(2, RoundingMode.HALF_UP)}
      */
     private BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =

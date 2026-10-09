@@ -21,12 +21,18 @@ public class CustomerPrivacyRequests {
     private final JdbcTemplate jdbc;
 
     /**
-     * Submits the operation.
+     * Submits customer privacy requests data and returns the {@code Request} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param kind the kind
-     * @return the submit result
+     * <p>Reads {@code customer_privacy_requests}.
+     *
+     * <p>Writes {@code customer_privacy_requests}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param kind the kind supplied to this method
+     * @return the {@code Request} result
+     * @throws IllegalStateException when the method rejects the request with {@code Privacy request
+     *     was not recorded}
      */
     @Transactional
     public Request submit(ConsentEnvironment environment, UUID subject, PrivacyRequestKind kind) {

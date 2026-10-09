@@ -29,10 +29,10 @@ public record AdminAuthResponse(
         Set<Long> branchIds) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code AdminAuthResponse} representation.
      *
-     * @param staffUser the staff user
-     * @return the from result
+     * @param staffUser the staff user supplied to this method
+     * @return the {@code AdminAuthResponse} result
      */
     public static AdminAuthResponse from(StaffUser staffUser) {
         final long __gokulMethodStartedNanos =

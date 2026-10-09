@@ -33,11 +33,13 @@ public class AdminInventoryAutomationController {
             runItems;
 
     /**
-     * Explains the operation.
+     * Handles {@code GET
+     * /api/admin/inventory/branches/{branchId}/automation/runs/{runId}/explanation} for admin
+     * inventory automation.
      *
-     * @param branchId the branch id
-     * @param runId the run id
-     * @return the explain result
+     * @param branchId the branch id supplied to this method
+     * @param runId the run id supplied to this method
+     * @return the value of {@code runItems.explain(branchId, runId)}
      */
     @GetMapping("/runs/{runId}/explanation")
     public java.util.List<AutomationRunExplanation> explain(
@@ -106,12 +108,17 @@ public class AdminInventoryAutomationController {
     }
 
     /**
-     * Generates the operation.
+     * Handles {@code POST /api/admin/inventory/branches/{branchId}/automation/generate} for admin
+     * inventory automation.
      *
-     * @param branchId the branch id
-     * @param request the request
-     * @param authentication the authentication
-     * @return the generate result
+     * <p>Delegates to {@code generationService.generate(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param request the request supplied to this method
+     * @param authentication the authentication supplied to this method
+     * @return the value of {@code ResponseEntity.ok(generationService.generate(branchId,
+     *     request.fromDate(), request.throughDate(), InventoryAutomationTrigger.MANUAL,
+     *     authentication.getName()))}
      */
     @PostMapping("/generate")
     public ResponseEntity<AutomationRunResponse> generate(
@@ -140,10 +147,15 @@ public class AdminInventoryAutomationController {
     }
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for admin inventory automation data.
      *
-     * @param branchId the branch id
-     * @param permission the permission
+     * <p>Authorization checks include {@code permission}.
+     *
+     * <p>Delegates to {@code authorizationService.requirePermission(...)}, {@code
+     * authorizationService.requireBranchAccess(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param permission the permission supplied to this method
      */
     private void authorize(Long branchId, PermissionName permission) {
         final long __gokulMethodStartedNanos =

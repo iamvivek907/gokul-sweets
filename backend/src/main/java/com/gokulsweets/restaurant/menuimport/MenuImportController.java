@@ -17,11 +17,11 @@ public class MenuImportController {
     private final MenuImportJobs jobs;
 
     /**
-     * Jobs the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/menu/import/jobs/{jobId}} for menu import.
      *
-     * @param branchId the branch id
-     * @param jobId the job id
-     * @return the job result
+     * @param branchId the branch id supplied to this method
+     * @param jobId the job id supplied to this method
+     * @return the value of {@code jobs.get(branchId, jobId)}
      */
     @GetMapping("/import/jobs/{jobId}")
     public MenuImportJobs.Job job(@PathVariable long branchId, @PathVariable java.util.UUID jobId) {
@@ -38,11 +38,12 @@ public class MenuImportController {
     }
 
     /**
-     * Submissions the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/menu/import/submissions/{submissionId}} for
+     * menu import.
      *
-     * @param branchId the branch id
-     * @param submissionId the submission id
-     * @return the submission result
+     * @param branchId the branch id supplied to this method
+     * @param submissionId the submission id supplied to this method
+     * @return the value of {@code jobs.getSubmission(branchId, submissionId)}
      */
     @GetMapping("/import/submissions/{submissionId}")
     public MenuImportJobs.Job submission(

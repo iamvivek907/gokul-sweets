@@ -42,10 +42,10 @@ public record InventoryPolicyResponse(
         Integer shelfLifeMinutes) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code InventoryPolicyResponse} representation.
      *
-     * @param policy the policy
-     * @return the from result
+     * @param policy the policy supplied to this method
+     * @return the {@code InventoryPolicyResponse} result
      */
     public static InventoryPolicyResponse from(BranchInventoryPolicy policy) {
         final long __gokulMethodStartedNanos =

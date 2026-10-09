@@ -448,12 +448,21 @@ public class OccasionEnquiryService {
             long readinessRevision) {}
 
     /**
-     * Submits the operation.
+     * Submits occasion enquiry data and returns the {@code Summary} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param input the input
-     * @return the submit result
+     * <p>Reads {@code branches}, {@code occasion_enquiries}.
+     *
+     * <p>Writes {@code occasion_enquiries}, {@code occasion_enquiry_items}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Summary} result
+     * @throws ResponseStatusException when the method rejects the request with {@code A delivery
+     *     request needs an address; pickup does not.}; {@code Additional kg requires a
+     *     weight-priced item.}; {@code Branch is unavailable.}; {@code Check the sweet's lead time
+     *     and quantity unit.}; {@code Choose a future date within one year.}; {@code Choose
+     *     distinct products and valid quantities.}; {@code Use one packing plan per request.}
      */
     @Transactional
     public Summary submit(ConsentEnvironment environment, UUID subject, Request input) {
@@ -702,12 +711,14 @@ ORDER BY e.created_at DESC,e.id DESC LIMIT 100
     }
 
     /**
-     * Returns the operation.
+     * Returns get information for occasion enquiry.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param id the id
-     * @return the get result
+     * <p>Reads {@code occasion_enquiries}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param id the id supplied to this method
+     * @return the {@code Summary} result
      */
     @Transactional(readOnly = true)
     public Summary get(ConsentEnvironment environment, UUID subject, UUID id) {
@@ -807,14 +818,32 @@ SELECT * FROM occasion_enquiries WHERE environment = ? AND branch_id = ? ORDER B
     }
 
     /**
-     * Quotes the operation.
+     * Returns quote information for occasion enquiry.
      *
-     * @param environment the environment
-     * @param branchId the branch id
-     * @param id the id
-     * @param staff the staff
-     * @param quote the quote
-     * @return the quote result
+     * <p>Reads {@code branch_products}, {@code occasion_enquiries}, {@code occasion_enquiry_items},
+     * {@code products}, {@code tax_categories}, {@code tax_collection_settings}.
+     *
+     * <p>Writes {@code occasion_enquiries}, {@code occasion_enquiry_items}, {@code
+     * occasion_production_allocations}, {@code occasion_quote_lines}.
+     *
+     * @param environment the environment supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param staff the staff supplied to this method
+     * @param quote the quote supplied to this method
+     * @return the value of {@code staffGet(environment, branchId, id)}
+     * @throws ResponseStatusException when the method rejects the request with {@code A product has
+     *     no active tax category. Configure it before quoting.}; {@code Approve a whole-gram
+     *     production quantity for piece-based weight sweets before quoting. Unit sweets must retain
+     *     the requested piece count.}; {@code Balance must be due before the event date in India.};
+     *     {@code Choose a positive deposit and a balance deadline after the quote expires.}; {@code
+     *     Dedicated bulk production must be enabled before approving this occasion request.};
+     *     {@code Enter a kitchen-ready time on the fulfilment date in IST after reviewing
+     *     procurement and existing commitments.}; {@code Item prices must add up to the quote
+     *     amount.}; {@code Only an open request can be quoted.}; {@code Price every requested
+     *     product exactly once.}; {@code Quote amount or expiry is invalid.}; {@code Review
+     *     physical box fit, branding and lead time; approve the packaging total included in item
+     *     prices.}; {@code This quote expired; ask for a new enquiry.}
      */
     @Transactional
     public Summary quote(
@@ -1089,14 +1118,18 @@ FROM occasion_enquiry_items WHERE enquiry_id = ?
     }
 
     /**
-     * Declines the operation.
+     * Declines occasion enquiry data and returns the {@code Summary} result.
      *
-     * @param environment the environment
-     * @param branchId the branch id
-     * @param id the id
-     * @param staff the staff
-     * @param reason the reason
-     * @return the decline result
+     * <p>Writes {@code occasion_enquiries}, {@code occasion_production_allocations}.
+     *
+     * @param environment the environment supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param staff the staff supplied to this method
+     * @param reason the reason supplied to this method
+     * @return the value of {@code staffGet(environment, branchId, id)}
+     * @throws ResponseStatusException when the method rejects the request with {@code Explain why
+     *     this request cannot be fulfilled.}; {@code This request is no longer open.}
      */
     @Transactional
     public Summary decline(
@@ -1169,12 +1202,14 @@ FROM occasion_enquiry_items WHERE enquiry_id = ?
     }
 
     /**
-     * Expireds the operation.
+     * Returns expired information for occasion enquiry.
      *
-     * @param environment the environment
-     * @param branchId the branch id
-     * @param id the id
-     * @return the expired result
+     * <p>Reads {@code occasion_enquiries}.
+     *
+     * @param environment the environment supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @return the {@code boolean} result
      */
     private boolean expired(ConsentEnvironment environment, long branchId, UUID id) {
         final long __gokulMethodStartedNanos =
@@ -1229,13 +1264,15 @@ FROM occasion_enquiry_items WHERE enquiry_id = ?
     }
 
     /**
-     * Events the operation.
+     * Returns event information for occasion enquiry.
      *
-     * @param id the id
-     * @param actor the actor
-     * @param before the before
-     * @param after the after
-     * @param detail the detail
+     * <p>Writes {@code occasion_enquiry_events}.
+     *
+     * @param id the id supplied to this method
+     * @param actor the actor supplied to this method
+     * @param before the before supplied to this method
+     * @param after the after supplied to this method
+     * @param detail the detail supplied to this method
      */
     private void event(UUID id, String actor, String before, String after, String detail) {
         final long __gokulMethodStartedNanos =
@@ -1342,11 +1379,15 @@ FROM occasion_enquiry_items WHERE enquiry_id = ?
     }
 
     /**
-     * Maps the operation.
+     * Maps the supplied data into a {@code Summary} representation.
      *
-     * @param rs the rs
-     * @return the map result
-     * @throws java.sql.SQLException if the operation cannot complete
+     * <p>Reads {@code branch_products}, {@code occasion_cancellation_reviews}, {@code
+     * occasion_enquiries}, {@code occasion_enquiry_items}, {@code occasion_production_allocations},
+     * {@code occasion_quote_lines}, {@code orders}, {@code products}.
+     *
+     * @param rs the rs supplied to this method
+     * @return the {@code Summary} result
+     * @throws java.sql.SQLException if the underlying operation fails
      */
     private Summary map(java.sql.ResultSet rs) throws java.sql.SQLException {
         final long __gokulMethodStartedNanos =

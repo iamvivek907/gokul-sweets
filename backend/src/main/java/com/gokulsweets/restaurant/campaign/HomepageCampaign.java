@@ -113,7 +113,9 @@ public class HomepageCampaign {
 
     @JsonIgnore private UUID fallbackRequestId;
 
-    /** Creates the operation. */
+    /**
+     * Initializes creation and update timestamps together before the campaign is first persisted.
+     */
     @PrePersist
     void create() {
         final long __gokulMethodStartedNanos =
@@ -126,7 +128,7 @@ public class HomepageCampaign {
         }
     }
 
-    /** Updates the operation. */
+    /** Refreshes the campaign update timestamp before an existing row is updated. */
     @PreUpdate
     void update() {
         final long __gokulMethodStartedNanos =

@@ -377,13 +377,16 @@ public class OccasionQuoteCalculator {
             BigDecimal supplementalGrams) {}
 
     /**
-     * Previews the operation.
+     * Previews occasion quote calculator data and returns the {@code Calculation} result.
      *
-     * @param env the env
-     * @param branchId the branch id
-     * @param id the id
-     * @param input the input
-     * @return the preview result
+     * <p>Reads {@code branch_products}, {@code occasion_enquiries}, {@code occasion_enquiry_items},
+     * {@code products}, {@code tax_categories}.
+     *
+     * @param env the env supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Calculation} result
      */
     @Transactional(readOnly = true)
     public Calculation preview(ConsentEnvironment env, long branchId, UUID id, Input input) {
@@ -662,14 +665,21 @@ WHERE i.enquiry_id=? ORDER BY p.id
     }
 
     /**
-     * Approves the operation.
+     * Approves occasion quote calculator data and returns the {@code
+     * OccasionEnquiryService.Summary} result.
      *
-     * @param env the env
-     * @param branchId the branch id
-     * @param id the id
-     * @param staff the staff
-     * @param input the input
-     * @return the approve result
+     * <p>Reads {@code occasion_enquiries}.
+     *
+     * <p>Writes {@code occasion_enquiries}, {@code occasion_enquiry_events}.
+     *
+     * @param env the env supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param staff the staff supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code OccasionEnquiryService.Summary} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Rates or
+     *     quantities changed. Calculate and review the quote again before sending.}
      */
     @Transactional
     public OccasionEnquiryService.Summary approve(
@@ -790,10 +800,11 @@ UPDATE occasion_enquiries SET estimated=?,original_estimate=?,quote_calculation=
     }
 
     /**
-     * Percents the operation.
+     * Treats a missing rebate as zero and otherwise requires a percentage from zero through 99 with
+     * at most two decimal places.
      *
-     * @param value the value
-     * @return the percent result
+     * @param value the value supplied to this method
+     * @return the {@code BigDecimal} result
      */
     static BigDecimal percent(BigDecimal value) {
         final long __gokulMethodStartedNanos =
@@ -814,12 +825,13 @@ UPDATE occasion_enquiries SET estimated=?,original_estimate=?,quote_calculation=
     }
 
     /**
-     * Discounteds the operation.
+     * Returns discounted information for occasion quote calculator.
      *
-     * @param original the original
-     * @param item the item
-     * @param bulk the bulk
-     * @return the discounted result
+     * @param original the original supplied to this method
+     * @param item the item supplied to this method
+     * @param bulk the bulk supplied to this method
+     * @return the value of {@code
+     *     afterItem.subtract(money(afterItem.multiply(percent(bulk)).movePointLeft(2)))}
      */
     static BigDecimal discounted(BigDecimal original, BigDecimal item, BigDecimal bulk) {
         final long __gokulMethodStartedNanos =
@@ -839,10 +851,10 @@ UPDATE occasion_enquiries SET estimated=?,original_estimate=?,quote_calculation=
     }
 
     /**
-     * Money the operation.
+     * Rounds the monetary amount to two decimal places using half-up rounding.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code value.setScale(2, RoundingMode.HALF_UP)}
      */
     static BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =
@@ -856,9 +868,9 @@ UPDATE occasion_enquiries SET estimated=?,original_estimate=?,quote_calculation=
     }
 
     /**
-     * Invalids the operation.
+     * Rejects the request with an HTTP BAD_REQUEST response.
      *
-     * @param message the message
+     * @param message the message supplied to this method
      */
     private static void invalid(String message) {
         final long __gokulMethodStartedNanos =

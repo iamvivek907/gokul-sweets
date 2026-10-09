@@ -15,11 +15,13 @@ public class AdminMenuServiceWindowsController {
     private final MenuServiceWindows windows;
 
     /**
-     * Hourses the operation.
+     * Handles {@code GET
+     * /api/admin/branches/{branchId}/menu-service-windows/{branchProductId}/hours} for admin menu
+     * service windows.
      *
-     * @param branchId the branch id
-     * @param branchProductId the branch product id
-     * @return the hours result
+     * @param branchId the branch id supplied to this method
+     * @param branchProductId the branch product id supplied to this method
+     * @return the value of {@code windows.hours(branchId, branchProductId)}
      */
     @GetMapping("/{branchProductId}/hours")
     public MenuServiceWindows.ItemHours hours(
@@ -37,12 +39,14 @@ public class AdminMenuServiceWindowsController {
     }
 
     /**
-     * Hourses the operation.
+     * Handles {@code PUT
+     * /api/admin/branches/{branchId}/menu-service-windows/{branchProductId}/hours} for admin menu
+     * service windows.
      *
-     * @param branchId the branch id
-     * @param branchProductId the branch product id
-     * @param input the input
-     * @return the hours result
+     * @param branchId the branch id supplied to this method
+     * @param branchProductId the branch product id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code windows.saveHours(branchId, branchProductId, input)}
      */
     @PutMapping("/{branchProductId}/hours")
     public MenuServiceWindows.ItemHours hours(
@@ -64,10 +68,11 @@ public class AdminMenuServiceWindowsController {
     }
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/menu-service-windows} for admin menu
+     * service windows.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code windows.settings(branchId)}
      */
     @GetMapping
     public MenuServiceWindows.Settings get(@PathVariable long branchId) {
@@ -84,11 +89,12 @@ public class AdminMenuServiceWindowsController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/menu-service-windows} for admin menu
+     * service windows.
      *
-     * @param branchId the branch id
-     * @param settings the settings
-     * @return the save result
+     * @param branchId the branch id supplied to this method
+     * @param settings the settings supplied to this method
+     * @return the value of {@code windows.save(branchId, settings)}
      */
     @PutMapping
     public MenuServiceWindows.Settings save(

@@ -19,11 +19,12 @@ public class DeliveryBoundaryController {
     private final DeliveryBoundaryService boundaries;
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/delivery-zones/{zoneId}/boundary} for
+     * delivery boundary.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @return the {@code ResponseEntity<DeliveryBoundaryService.Boundary>} result
      */
     @GetMapping
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
@@ -41,12 +42,13 @@ public class DeliveryBoundaryController {
     }
 
     /**
-     * Configures the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/delivery-zones/{zoneId}/boundary} for
+     * delivery boundary.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @param input the input
-     * @return the configure result
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code ResponseEntity<DeliveryBoundaryService.Boundary>} result
      */
     @PutMapping
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")

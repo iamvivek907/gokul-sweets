@@ -13,11 +13,12 @@ public interface InventoryAutomationRunItemRepository
         extends JpaRepository<InventoryAutomationRunItem, Long> {
 
     /**
-     * Explains the operation.
+     * Explains inventory automation run item data and returns the {@code
+     * List<AutomationRunExplanation>} result.
      *
-     * @param branchId the branch id
-     * @param runId the run id
-     * @return the explain result
+     * @param branchId the branch id supplied to this method
+     * @param runId the run id supplied to this method
+     * @return the {@code List<AutomationRunExplanation>} result
      */
     @Query(
             """

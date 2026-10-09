@@ -160,14 +160,18 @@ public class IdentityExchangeRateLimiter {
     }
 
     /**
-     * Checks the operation.
+     * Returns check information for identity exchange rate limiter.
      *
-     * @param environment the environment
-     * @param scope the scope
-     * @param value the value
-     * @param now the now
-     * @param window the window
-     * @param maximum the maximum
+     * <p>Writes {@code identity_exchange_limits}.
+     *
+     * @param environment the environment supplied to this method
+     * @param scope the scope supplied to this method
+     * @param value the value supplied to this method
+     * @param now the now supplied to this method
+     * @param window the window supplied to this method
+     * @param maximum the maximum supplied to this method
+     * @throws IllegalStateException when the method rejects the request with {@code Identity
+     *     exchange rate limit is unavailable}
      */
     private void check(
             ConsentEnvironment environment,
@@ -220,12 +224,14 @@ RETURNING attempts
     }
 
     /**
-     * Digests the operation.
+     * Returns digest information for identity exchange rate limiter.
      *
-     * @param key the key
-     * @param scope the scope
-     * @param value the value
-     * @return the digest result
+     * @param key the key supplied to this method
+     * @param scope the scope supplied to this method
+     * @param value the value supplied to this method
+     * @return the value of {@code mac.doFinal(value.getBytes(StandardCharsets.UTF_8))}
+     * @throws IllegalStateException when the method rejects the request with {@code Identity rate
+     *     limit hashing unavailable}
      */
     private static byte[] digest(String key, String scope, String value) {
         final long __gokulMethodStartedNanos =

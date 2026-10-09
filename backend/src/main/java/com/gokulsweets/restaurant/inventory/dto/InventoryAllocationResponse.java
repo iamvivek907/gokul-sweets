@@ -63,11 +63,11 @@ public record InventoryAllocationResponse(
         String note) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code InventoryAllocationResponse} representation.
      *
-     * @param allocation the allocation
-     * @param availability the availability
-     * @return the from result
+     * @param allocation the allocation supplied to this method
+     * @param availability the availability supplied to this method
+     * @return the {@code InventoryAllocationResponse} result
      */
     public static InventoryAllocationResponse from(
             InventoryDailyAllocation allocation, InventoryAvailability availability) {

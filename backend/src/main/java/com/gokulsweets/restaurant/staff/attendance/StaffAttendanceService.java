@@ -314,11 +314,13 @@ public class StaffAttendanceService {
     }
 
     /**
-     * Resubmits the operation.
+     * Resubmits staff attendance data and returns the {@code AttendanceResponse} result.
      *
-     * @param attendanceId the attendance id
-     * @param request the request
-     * @return the resubmit result
+     * <p>Delegates to {@code approvalWorkflowService.resubmit(...)}.
+     *
+     * @param attendanceId the attendance id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code toResponse(attendance)}
      */
     @Transactional
     public AttendanceResponse resubmit(Long attendanceId, AttendanceActionRequest request) {
@@ -340,11 +342,13 @@ public class StaffAttendanceService {
     }
 
     /**
-     * Cancels the operation.
+     * Cancels staff attendance data and returns the {@code AttendanceResponse} result.
      *
-     * @param attendanceId the attendance id
-     * @param request the request
-     * @return the cancel result
+     * <p>Delegates to {@code approvalWorkflowService.cancelOwnRequest(...)}.
+     *
+     * @param attendanceId the attendance id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code toResponse(attendance)}
      */
     @Transactional
     public AttendanceResponse cancel(Long attendanceId, AttendanceActionRequest request) {

@@ -155,11 +155,15 @@ public class StaffPayrollController {
     }
 
     /**
-     * Resubmits the operation.
+     * Handles {@code POST /api/admin/me/payroll/payment-requests/{paymentRequestId}/resubmit} for
+     * staff payroll.
      *
-     * @param paymentRequestId the payment request id
-     * @param request the request
-     * @return the resubmit result
+     * <p>Delegates to {@code staffPayrollService.resubmit(...)}.
+     *
+     * @param paymentRequestId the payment request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(staffPayrollService.resubmit(paymentRequestId,
+     *     request))}
      */
     @PostMapping("/payment-requests/{paymentRequestId}/resubmit")
     public ResponseEntity<PaymentRequestResponse> resubmit(
@@ -178,11 +182,15 @@ public class StaffPayrollController {
     }
 
     /**
-     * Cancels the operation.
+     * Handles {@code POST /api/admin/me/payroll/payment-requests/{paymentRequestId}/cancel} for
+     * staff payroll.
      *
-     * @param paymentRequestId the payment request id
-     * @param request the request
-     * @return the cancel result
+     * <p>Delegates to {@code staffPayrollService.cancel(...)}.
+     *
+     * @param paymentRequestId the payment request id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(staffPayrollService.cancel(paymentRequestId,
+     *     request))}
      */
     @PostMapping("/payment-requests/{paymentRequestId}/cancel")
     public ResponseEntity<PaymentRequestResponse> cancel(

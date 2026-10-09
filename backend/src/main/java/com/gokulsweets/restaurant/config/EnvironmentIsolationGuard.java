@@ -25,7 +25,7 @@ public class EnvironmentIsolationGuard {
 
     private final PhonePeProperties phonePe;
 
-    /** Checks the operation. */
+    /** Returns check information for environment isolation guard. */
     @PostConstruct
     void check() {
         final long __gokulMethodStartedNanos =
@@ -110,9 +110,9 @@ public class EnvironmentIsolationGuard {
             String webhookKeyId) {}
 
     /**
-     * Validates the operation.
+     * Validates environment isolation guard data.
      *
-     * @param s the s
+     * @param s the s supplied to this method
      */
     static void validate(Settings s) {
         final long __gokulMethodStartedNanos =
@@ -165,12 +165,13 @@ public class EnvironmentIsolationGuard {
     }
 
     /**
-     * Origins the operation.
+     * Validates an HTTPS URL or origin and returns its scheme and authority, rejecting credentials,
+     * query strings and fragments.
      *
-     * @param raw the raw
-     * @param name the name
-     * @param requireOrigin the require origin
-     * @return the origin result
+     * @param raw the raw supplied to this method
+     * @param name the name supplied to this method
+     * @param requireOrigin the require origin supplied to this method
+     * @return the {@code String} result
      */
     private static String origin(String raw, String name, boolean requireOrigin) {
         final long __gokulMethodStartedNanos =
@@ -205,10 +206,10 @@ public class EnvironmentIsolationGuard {
     }
 
     /**
-     * Invalids the operation.
+     * Builds an environment-isolation configuration error with the supplied reason.
      *
-     * @param reason the reason
-     * @return the invalid result
+     * @param reason the reason supplied to this method
+     * @return the {@code IllegalStateException} result
      */
     private static IllegalStateException invalid(String reason) {
         final long __gokulMethodStartedNanos =

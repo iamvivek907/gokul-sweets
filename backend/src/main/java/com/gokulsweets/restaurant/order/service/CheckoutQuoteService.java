@@ -95,11 +95,13 @@ public class CheckoutQuoteService {
             String paymentFeeTaxRate) {}
 
     /**
-     * Previews the operation.
+     * Previews checkout quote data and returns the {@code Quote} result.
      *
-     * @param request the request
-     * @param pendingOrderNumber the pending order number
-     * @return the preview result
+     * @param request the request supplied to this method
+     * @param pendingOrderNumber the pending order number supplied to this method
+     * @return the {@code Quote} result
+     * @throws IllegalStateException when the method rejects the request with {@code Checkout quotes
+     *     are not enabled.}; {@code The branch changed. Review your checkout again.}
      */
     @Transactional(readOnly = true)
     public Quote preview(CreateOrderRequest request, String pendingOrderNumber) {
@@ -169,12 +171,15 @@ public class CheckoutQuoteService {
     }
 
     /**
-     * Accepts the operation.
+     * Accepts checkout quote data.
      *
-     * @param request the request
-     * @param orderNumber the order number
-     * @param amounts the amounts
-     * @param token the token
+     * @param request the request supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @param amounts the amounts supplied to this method
+     * @param token the token supplied to this method
+     * @throws IllegalStateException when the method rejects the request with {@code Review the
+     *     current price before continuing.}; {@code This price quote expired. Review the current
+     *     price again.}; {@code Your price or pickup details changed. Review the updated quote.}
      */
     public void accept(
             CreateOrderRequest request,
@@ -247,13 +252,13 @@ public class CheckoutQuoteService {
     }
 
     /**
-     * Payloads the operation.
+     * Returns payload information for checkout quote.
      *
-     * @param request the request
-     * @param orderNumber the order number
-     * @param amounts the amounts
-     * @param lockPolicy the lock policy
-     * @return the payload result
+     * @param request the request supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @param amounts the amounts supplied to this method
+     * @param lockPolicy the lock policy supplied to this method
+     * @return the {@code String} result
      */
     private String payload(
             CreateOrderRequest request,
@@ -341,10 +346,13 @@ public class CheckoutQuoteService {
     }
 
     /**
-     * Signs the operation.
+     * Returns sign information for checkout quote.
      *
-     * @param message the message
-     * @return the sign result
+     * @param message the message supplied to this method
+     * @return the value of {@code
+     *     Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(message.getBytes(StandardCharsets.UTF_8)))}
+     * @throws IllegalStateException when the method rejects the request with {@code Checkout quote
+     *     signing failed.}; {@code Checkout quote signing key must contain at least 32 characters.}
      */
     private String sign(String message) {
         final long __gokulMethodStartedNanos =

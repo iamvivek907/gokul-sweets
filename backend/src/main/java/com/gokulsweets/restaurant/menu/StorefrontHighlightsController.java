@@ -46,10 +46,10 @@ public class StorefrontHighlightsController {
     private final Map<CacheKey, CacheEntry> highlightsCache = new LinkedHashMap<>(16, 0.75f, true);
 
     /**
-     * Highlightses the operation.
+     * Handles {@code GET /api/branches/{branchId}/storefront-highlights} for storefront highlights.
      *
-     * @param branchId the branch id
-     * @return the highlights result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Highlights} result
      */
     @GetMapping("/api/branches/{branchId}/storefront-highlights")
     public Highlights highlights(@PathVariable Long branchId) {

@@ -35,10 +35,10 @@ public class StaffAlertEmail {
                     .build();
 
     /**
-     * Addresses the operation.
+     * Returns address information for staff alert email.
      *
-     * @param value the value
-     * @return the address result
+     * @param value the value supplied to this method
+     * @return the {@code boolean} result
      */
     static boolean address(String value) {
         final long __gokulMethodStartedNanos =
@@ -55,9 +55,9 @@ public class StaffAlertEmail {
     }
 
     /**
-     * Configureds the operation.
+     * Returns configured information for staff alert email.
      *
-     * @return the configured result
+     * @return the {@code boolean} result
      */
     public boolean configured() {
         final long __gokulMethodStartedNanos =
@@ -77,10 +77,10 @@ public class StaffAlertEmail {
     }
 
     /**
-     * Recipients the operation.
+     * Returns recipient information for staff alert email.
      *
-     * @param staffId the staff id
-     * @return the recipient result
+     * @param staffId the staff id supplied to this method
+     * @return the {@code String} result
      */
     public String recipient(long staffId) {
         final long __gokulMethodStartedNanos =
@@ -133,14 +133,16 @@ public class StaffAlertEmail {
     }
 
     /**
-     * Prepares the operation.
+     * Prepares staff alert email data and returns the {@code HttpRequest} result.
      *
-     * @param staffId the staff id
-     * @param title the title
-     * @param message the message
-     * @param orderNumber the order number
-     * @param eventId the event id
-     * @return the prepare result
+     * @param staffId the staff id supplied to this method
+     * @param title the title supplied to this method
+     * @param message the message supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @param eventId the event id supplied to this method
+     * @return the {@code HttpRequest} result
+     * @throws IllegalStateException when the method rejects the request with {@code Staff email
+     *     unavailable}; {@code Unknown staff alert environment}
      */
     HttpRequest prepare(
             long staffId, String title, String message, String orderNumber, long eventId) {
@@ -197,15 +199,18 @@ public class StaffAlertEmail {
     }
 
     /**
-     * Sends the operation.
+     * Sends staff alert email data and returns the {@code int} result.
      *
-     * @param staffId the staff id
-     * @param title the title
-     * @param message the message
-     * @param orderNumber the order number
-     * @param eventId the event id
-     * @return the send result
-     * @throws Exception if the operation cannot complete
+     * <p>Delegates to {@code client.send(...)}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param title the title supplied to this method
+     * @param message the message supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @param eventId the event id supplied to this method
+     * @return the value of {@code client.send(prepare(staffId, title, message, orderNumber,
+     *     eventId), HttpResponse.BodyHandlers.discarding()).statusCode()}
+     * @throws Exception if the underlying operation fails
      */
     public int send(long staffId, String title, String message, String orderNumber, long eventId)
             throws Exception {

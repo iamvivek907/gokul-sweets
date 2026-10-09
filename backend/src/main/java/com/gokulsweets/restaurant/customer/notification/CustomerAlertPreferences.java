@@ -84,9 +84,9 @@ public class CustomerAlertPreferences {
     public record SubscriptionResult(UUID id) {}
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the value of {@code features.isNotificationAlerts() && inbox.enabled()}
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -100,11 +100,13 @@ public class CustomerAlertPreferences {
     }
 
     /**
-     * Settingses the operation.
+     * Returns settings information for customer alert preferences.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @return the settings result
+     * <p>Reads {@code customer_notification_preferences}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @return the {@code Settings} result
      */
     @Transactional(readOnly = true)
     public Settings settings(String environment, UUID subject) {
@@ -150,12 +152,16 @@ FROM customer_notification_preferences WHERE environment = ? AND subject_id = ?
     }
 
     /**
-     * Saves the operation.
+     * Persists customer alert preferences data and returns the {@code Settings} result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param input the input
-     * @return the save result
+     * <p>Writes {@code customer_notification_preferences}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code settings(environment, subject)}
+     * @throws ResponseStatusException when the method rejects the request with {@code Choose
+     *     distinct quiet-hours start and end times (IST).}
      */
     @Transactional
     public Settings save(String environment, UUID subject, Input input) {
@@ -201,13 +207,22 @@ ON CONFLICT (environment, subject_id) DO UPDATE SET sound_enabled = EXCLUDED.sou
     }
 
     /**
-     * Subscribes the operation.
+     * Subscribes to customer alert preferences data and returns the {@code SubscriptionResult}
+     * result.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param token the token
-     * @param input the input
-     * @return the subscribe result
+     * <p>Reads {@code customer_push_subscriptions}, {@code verified_customer_sessions}.
+     *
+     * <p>Writes {@code OF}, {@code customer_push_subscriptions}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param token the token supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code SubscriptionResult} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Invalid
+     *     browser subscription.}; {@code Maximum five browsers per account.}; {@code Push is not
+     *     configured. Your inbox remains available.}; {@code This browser is registered to another
+     *     account. Disable its old subscription first.}
      */
     @Transactional
     public SubscriptionResult subscribe(
@@ -321,11 +336,13 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
     }
 
     /**
-     * Unsubscribes the operation.
+     * Unsubscribes from customer alert preferences data.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param id the id
+     * <p>Writes {@code customer_push_subscriptions}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param id the id supplied to this method
      */
     @Transactional
     public void unsubscribe(String environment, UUID subject, UUID id) {
@@ -374,10 +391,12 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
     }
 
     /**
-     * Digests the operation.
+     * Hashes the UTF-8 value with SHA-256, treating null as an empty byte sequence.
      *
-     * @param value the value
-     * @return the digest result
+     * @param value the value supplied to this method
+     * @return the {@code byte[]} result
+     * @throws IllegalStateException when the method rejects the request with {@code Hash
+     *     unavailable}
      */
     static byte[] digest(String value) {
         final long __gokulMethodStartedNanos =
@@ -399,13 +418,13 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
     }
 
     /**
-     * Quiets the operation.
+     * Returns quiet information for customer alert preferences.
      *
-     * @param enabled the enabled
-     * @param start the start
-     * @param end the end
-     * @param now the now
-     * @return the quiet result
+     * @param enabled the enabled supplied to this method
+     * @param start the start supplied to this method
+     * @param end the end supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code boolean} result
      */
     public static boolean quiet(boolean enabled, int start, int end, Instant now) {
         final long __gokulMethodStartedNanos =

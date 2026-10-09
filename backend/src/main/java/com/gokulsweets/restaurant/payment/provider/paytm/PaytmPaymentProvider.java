@@ -127,10 +127,13 @@ public class PaytmPaymentProvider implements PaymentProvider {
     }
 
     /**
-     * Refunds the operation.
+     * Refunds paytm payment provider data and returns the {@code RefundResult} result.
      *
-     * @param payment the payment
-     * @return the refund result
+     * @param payment the payment supplied to this method
+     * @return the value of {@code mapRefund(payment,
+     *     paytmClient.initiateRefund(requireProviderOrderId(payment),
+     *     payment.getProviderPaymentId(), payment.getRefundReferenceId(),
+     *     payment.requestedRefundAmount()), true)}
      */
     @Override
     public RefundResult refund(Payment payment) {

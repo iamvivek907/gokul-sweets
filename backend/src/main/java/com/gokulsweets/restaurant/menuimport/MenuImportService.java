@@ -52,11 +52,11 @@ public class MenuImportService {
     private final StaffAuthorizationService staffAuthorizationService;
 
     /**
-     * Validates the operation.
+     * Validates menu import data and returns the {@code MenuImportValidationResponse} result.
      *
-     * @param branchId the branch id
-     * @param file the file
-     * @return the validate result
+     * @param branchId the branch id supplied to this method
+     * @param file the file supplied to this method
+     * @return the {@code MenuImportValidationResponse} result
      */
     @Transactional(readOnly = true)
     public MenuImportValidationResponse validate(Long branchId, MultipartFile file) {
@@ -230,10 +230,15 @@ public class MenuImportService {
     }
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for menu import data and returns the {@code StaffUser} result.
      *
-     * @param branchId the branch id
-     * @return the authorize result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code staffAuthorizationService.requirePermission(...)}, {@code
+     * staffAuthorizationService.requireBranchAccess(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code staffAuthorizationService.getCurrentStaff()}
      */
     private StaffUser authorize(Long branchId) {
         final long __gokulMethodStartedNanos =
@@ -862,12 +867,12 @@ public class MenuImportService {
     }
 
     /**
-     * Errors the operation.
+     * Returns error information for menu import.
      *
-     * @param row the row
-     * @param column the column
-     * @param message the message
-     * @return the error result
+     * @param row the row supplied to this method
+     * @param column the column supplied to this method
+     * @param message the message supplied to this method
+     * @return the {@code MenuImportErrorResponse} result
      */
     private MenuImportErrorResponse error(MenuImportRow row, String column, String message) {
         final long __gokulMethodStartedNanos =

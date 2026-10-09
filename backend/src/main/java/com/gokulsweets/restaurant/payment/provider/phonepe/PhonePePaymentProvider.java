@@ -149,10 +149,12 @@ public class PhonePePaymentProvider implements PaymentProvider {
     }
 
     /**
-     * Refunds the operation.
+     * Refunds phone pe payment provider data and returns the {@code RefundResult} result.
      *
-     * @param payment the payment
-     * @return the refund result
+     * <p>Delegates to {@code client.refundStatus(...)}, {@code client.refund(...)}.
+     *
+     * @param payment the payment supplied to this method
+     * @return the {@code RefundResult} result
      */
     @Override
     public RefundResult refund(Payment payment) {

@@ -112,10 +112,13 @@ public class MenuWorkspaceService {
             List<Option> branchCategories) {}
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for menu workspace data.
      *
-     * @param branch the branch
-     * @param inventory the inventory
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}, {@code
+     * PermissionName.INVENTORY_VIEW}.
+     *
+     * @param branch the branch supplied to this method
+     * @param inventory the inventory supplied to this method
      */
     private void authorize(long branch, boolean inventory) {
         final long __gokulMethodStartedNanos =
@@ -133,10 +136,14 @@ public class MenuWorkspaceService {
     }
 
     /**
-     * Shareds the operation.
+     * Returns shared information for menu workspace.
      *
-     * @param branch the branch
-     * @param product the product
+     * <p>Reads {@code branch_products}.
+     *
+     * @param branch the branch supplied to this method
+     * @param product the product supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Product not
+     *     assigned to this branch.}
      */
     private void shared(long branch, long product) {
         final long __gokulMethodStartedNanos =
@@ -162,16 +169,21 @@ public class MenuWorkspaceService {
     private static final String BALANCE = AppConstant.MENU_WORKSPACE_SERVICE_BALANCE;
 
     /**
-     * Lists the operation.
+     * Returns list information for menu workspace.
      *
-     * @param branch the branch
-     * @param date the date
-     * @param search the search
-     * @param category the category
-     * @param filter the filter
-     * @param page the page
-     * @param size the size
-     * @return the list result
+     * <p>Reads {@code branch_products}, {@code categories}, {@code products}, {@code
+     * tax_categories}.
+     *
+     * @param branch the branch supplied to this method
+     * @param date the date supplied to this method
+     * @param search the search supplied to this method
+     * @param category the category supplied to this method
+     * @param filter the filter supplied to this method
+     * @param page the page supplied to this method
+     * @param size the size supplied to this method
+     * @return the {@code Page} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Search is
+     *     too long.}; {@code Unknown filter.}; {@code Use a page size between 1 and 50.}
      */
     @Transactional(readOnly = true)
     public Page list(
@@ -322,11 +334,13 @@ public class MenuWorkspaceService {
     }
 
     /**
-     * Products the operation.
+     * Returns product information for menu workspace.
      *
-     * @param id the id
-     * @param lock the lock
-     * @return the product result
+     * @param id the id supplied to this method
+     * @param lock the lock supplied to this method
+     * @return the value of {@code rows.getFirst()}
+     * @throws ResponseStatusException when the method rejects the request with {@code Product not
+     *     found.}
      */
     private Map<String, Object> product(long id, boolean lock) {
         final long __gokulMethodStartedNanos =
@@ -345,13 +359,15 @@ public class MenuWorkspaceService {
     }
 
     /**
-     * Audits the operation.
+     * Records an audit entry for menu workspace data.
      *
-     * @param branch the branch
-     * @param product the product
-     * @param action the action
-     * @param before the before
-     * @param after the after
+     * <p>Writes {@code menu_workspace_audit}.
+     *
+     * @param branch the branch supplied to this method
+     * @param product the product supplied to this method
+     * @param action the action supplied to this method
+     * @param before the before supplied to this method
+     * @param after the after supplied to this method
      */
     private void audit(long branch, Long product, String action, Object before, Object after) {
         final long __gokulMethodStartedNanos =
@@ -377,9 +393,14 @@ public class MenuWorkspaceService {
     }
 
     /**
-     * Validates the operation.
+     * Validates menu workspace data.
      *
-     * @param d the d
+     * <p>Reads {@code categories}, {@code tax_categories}.
+     *
+     * @param d the d supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose an
+     *     active category.}; {@code Choose an active tax category.}; {@code Weight products need
+     *     minimum and step quantities.}
      */
     private void validate(Details d) {
         final long __gokulMethodStartedNanos =
@@ -460,12 +481,18 @@ public class MenuWorkspaceService {
     }
 
     /**
-     * Creates the operation.
+     * Creates menu workspace data and returns the {@code long} result.
      *
-     * @param branch the branch
-     * @param d the d
-     * @param branches the branches
-     * @return the create result
+     * <p>Reads {@code branches}.
+     *
+     * <p>Writes {@code branch_products}, {@code products}.
+     *
+     * @param branch the branch supplied to this method
+     * @param d the d supplied to this method
+     * @param branches the branches supplied to this method
+     * @return the value of {@code id}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Assign the
+     *     selected branch and up to 50 permitted branches.}; {@code Branch not active.}
      */
     @Transactional
     public long create(long branch, Details d, List<Long> branches) {
@@ -652,14 +679,14 @@ public class MenuWorkspaceService {
     }
 
     /**
-     * Images the operation.
+     * Returns image information for menu workspace.
      *
-     * @param branch the branch
-     * @param id the id
-     * @param version the version
-     * @param image the image
-     * @param remove the remove
-     * @return the image result
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @param version the version supplied to this method
+     * @param image the image supplied to this method
+     * @param remove the remove supplied to this method
+     * @return the value of {@code saved.imageUrl()}
      */
     @Transactional
     public String image(long branch, long id, long version, MultipartFile image, boolean remove) {
@@ -721,7 +748,13 @@ public class MenuWorkspaceService {
         }
     }
 
-    /** Conflicts the operation. */
+    /**
+     * Rejects the request with an HTTP CONFLICT response.
+     *
+     * @throws ResponseStatusException when the method rejects the request with {@code This item
+     *     changed since you opened it. Close and reload the item before saving; your entries have
+     *     been retained.}
+     */
     private void conflict() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(MenuWorkspaceService.class, "conflict()");
@@ -755,12 +788,19 @@ public class MenuWorkspaceService {
             @jakarta.validation.Valid AdminReadinessUpdateRequest readiness) {}
 
     /**
-     * Stocks the operation.
+     * Returns stock information for menu workspace.
      *
-     * @param branch the branch
-     * @param product the product
-     * @param date the date
-     * @param edit the edit
+     * <p>Authorization checks include {@code PermissionName.INVENTORY_MANAGE}.
+     *
+     * <p>Reads {@code branch_inventory_policies}, {@code branch_products}, {@code
+     * inventory_daily_allocations}.
+     *
+     * @param branch the branch supplied to this method
+     * @param product the product supplied to this method
+     * @param date the date supplied to this method
+     * @param edit the edit supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Product not
+     *     in branch.}
      */
     @Transactional
     public void stock(long branch, long product, LocalDate date, StockEdit edit) {

@@ -44,12 +44,21 @@ public class StaffPushSubscriptions {
     public record Result(UUID id) {}
 
     /**
-     * Subscribes the operation.
+     * Subscribes to staff push subscriptions data and returns the {@code Result} result.
      *
-     * @param staffId the staff id
-     * @param cookie the cookie
-     * @param input the input
-     * @return the subscribe result
+     * <p>Reads {@code staff_push_subscriptions}, {@code staff_sessions}, {@code staff_users}.
+     *
+     * <p>Writes {@code OF}, {@code staff_push_subscriptions}.
+     *
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param cookie the cookie supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Result} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Maximum five
+     *     live staff browsers.}; {@code Push is not configured; use the preparation queue.}; {@code
+     *     This browser belongs to another staff session. Disable its old registration first.}
      */
     @Transactional
     public Result subscribe(long staffId, String cookie, Input input) {
@@ -149,10 +158,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Revokes the operation.
+     * Revokes staff push subscriptions data.
      *
-     * @param staffId the staff id
-     * @param id the id
+     * <p>Writes {@code staff_push_subscriptions}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param id the id supplied to this method
      */
     @Transactional
     public void revoke(long staffId, UUID id) {
@@ -174,12 +185,16 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Lives the operation.
+     * Returns live information for staff push subscriptions.
      *
-     * @param staffId the staff id
-     * @param id the id
-     * @param cookie the cookie
-     * @return the live result
+     * <p>Reads {@code staff_push_subscriptions}, {@code staff_sessions}, {@code staff_users}.
+     *
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param id the id supplied to this method
+     * @param cookie the cookie supplied to this method
+     * @return the {@code boolean} result
      */
     public boolean live(long staffId, UUID id, String cookie) {
         final long __gokulMethodStartedNanos =

@@ -56,11 +56,11 @@ public class CustomerInventoryAvailabilityService {
     private final Clock inventoryClock;
 
     /**
-     * Checks the operation.
+     * Returns check information for customer inventory availability.
      *
-     * @param branchId the branch id
-     * @param request the request
-     * @return the check result
+     * @param branchId the branch id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code check(branchId, request, true)}
      */
     @Transactional(readOnly = true)
     public CustomerInventoryCheckResponse check(
@@ -104,12 +104,20 @@ public class CustomerInventoryAvailabilityService {
     }
 
     /**
-     * Checks the operation.
+     * Returns check information for customer inventory availability.
      *
-     * @param branchId the branch id
-     * @param request the request
-     * @param suggestDate the suggest date
-     * @return the check result
+     * <p>Delegates to {@code branchProductRepository.findForOrder(...)}, {@code
+     * policyRepository.findByBranchProductIdIn(...)}, {@code
+     * allocationRepository.findByBranchProductIdInAndServiceDate(...)}, {@code
+     * allocationRepository.findByBranchProductIdInAndServiceDateBetween(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param request the request supplied to this method
+     * @param suggestDate the suggest date supplied to this method
+     * @return the {@code CustomerInventoryCheckResponse} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code One or more
+     *     selected products are not sold by this branch.}; {@code Pickup date cannot be in the
+     *     past.}
      */
     private CustomerInventoryCheckResponse check(
             Long branchId, CustomerInventoryCheckRequest request, boolean suggestDate) {
@@ -388,13 +396,13 @@ public class CustomerInventoryAvailabilityService {
     }
 
     /**
-     * Unavailables the operation.
+     * Returns unavailable information for customer inventory availability.
      *
-     * @param branchProduct the branch product
-     * @param policy the policy
-     * @param requestedQuantity the requested quantity
-     * @param reason the reason
-     * @return the unavailable result
+     * @param branchProduct the branch product supplied to this method
+     * @param policy the policy supplied to this method
+     * @param requestedQuantity the requested quantity supplied to this method
+     * @param reason the reason supplied to this method
+     * @return the {@code CustomerInventoryCheckResponse.Item} result
      */
     private CustomerInventoryCheckResponse.Item unavailable(
             BranchProduct branchProduct,

@@ -58,13 +58,13 @@ public class CartAvailabilityService {
     private final com.gokulsweets.restaurant.menu.MenuServiceWindows serviceWindows;
 
     /**
-     * Checks the operation.
+     * Returns check information for cart availability.
      *
-     * @param branchId the branch id
-     * @param startDate the start date
-     * @param days the days
-     * @param requested the requested
-     * @return the check result
+     * @param branchId the branch id supplied to this method
+     * @param startDate the start date supplied to this method
+     * @param days the days supplied to this method
+     * @param requested the requested supplied to this method
+     * @return the value of {@code check(branchId, startDate, days, requested, false)}
      */
     @Transactional(readOnly = true)
     public Availability check(
@@ -501,11 +501,11 @@ public class CartAvailabilityService {
             LocalDateTime expectedReadyAt) {
 
         /**
-         * Unavailables the operation.
+         * Returns unavailable information for item availability.
          *
-         * @param code the code
-         * @param reason the reason
-         * @return the unavailable result
+         * @param code the code supplied to this method
+         * @param reason the reason supplied to this method
+         * @return the {@code ItemAvailability} result
          */
         ItemAvailability unavailable(String code, String reason) {
             final long __gokulMethodStartedNanos =

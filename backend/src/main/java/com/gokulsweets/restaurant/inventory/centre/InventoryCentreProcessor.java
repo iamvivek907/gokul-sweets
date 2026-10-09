@@ -35,10 +35,28 @@ public class InventoryCentreProcessor {
     private final Clock inventoryClock;
 
     /**
-     * Apply the operation.
+     * Applies inventory centre processor data.
      *
-     * @param branch the branch
-     * @param work the work
+     * <p>Reads {@code branch_inventory_policies}, {@code branch_products}, {@code branches}, {@code
+     * mobile_menu_config}, {@code products}.
+     *
+     * <p>Writes {@code menu_service_items}, {@code menu_service_policies}, {@code
+     * menu_workspace_audit}, {@code mobile_menu_config}.
+     *
+     * @param branch the branch supplied to this method
+     * @param work the work supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code A date is
+     *     paused or closed; review it individually before reopening.}; {@code Branch item changed.
+     *     Reload before retrying.}; {@code Confirm the physically prepared quantity for today.};
+     *     {@code Existing inventory units differ. Use the individual editor; bulk jobs cannot
+     *     convert stock units.}; {@code Grouping changed. Reload the plan before retrying.}; {@code
+     *     Inventory policy changed. Reload before retrying.}; {@code Item is no longer assigned to
+     *     this branch.}; {@code Item selling unit changed. Reload before retrying.}; {@code Item
+     *     service hours changed. Reload before retrying.}; {@code Job crossed into a past service
+     *     date. Review dates and submit a fresh plan.}; {@code Policy differs from this plan.
+     *     Enable Apply selling method or use the individual editor.}; {@code Prepared stock exceeds
+     *     the online allocation.}; {@code The job crossed midnight in IST. Review dates and verify
+     *     stock in a fresh plan.}
      */
     @Transactional
     public void apply(long branch, Work work) {

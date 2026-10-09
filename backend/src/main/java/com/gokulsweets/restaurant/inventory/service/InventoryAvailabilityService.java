@@ -23,11 +23,11 @@ public class InventoryAvailabilityService {
             EnumSet.of(InventoryAllocationStatus.APPROVED, InventoryAllocationStatus.READY);
 
     /**
-     * Calculates the operation.
+     * Calculates inventory availability data and returns the {@code InventoryAvailability} result.
      *
-     * @param allocation the allocation
-     * @param policy the policy
-     * @return the calculate result
+     * @param allocation the allocation supplied to this method
+     * @param policy the policy supplied to this method
+     * @return the {@code InventoryAvailability} result
      */
     public InventoryAvailability calculate(
             InventoryDailyAllocation allocation, BranchInventoryPolicy policy) {

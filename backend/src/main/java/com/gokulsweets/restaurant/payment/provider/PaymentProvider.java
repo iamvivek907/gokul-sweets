@@ -33,10 +33,10 @@ public interface PaymentProvider {
     PaymentVerificationResult verifyPayment(Payment payment);
 
     /**
-     * Refunds the operation.
+     * Refunds payment provider data and returns the {@code RefundResult} result.
      *
-     * @param payment the payment
-     * @return the refund result
+     * @param payment the payment supplied to this method
+     * @return the {@code RefundResult} result
      */
     RefundResult refund(Payment payment);
 

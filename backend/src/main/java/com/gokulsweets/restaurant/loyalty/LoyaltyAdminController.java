@@ -33,9 +33,11 @@ public class LoyaltyAdminController {
     private final ObjectMapper mapper;
 
     /**
-     * Owners the operation.
+     * Returns owner information for loyalty admin.
      *
-     * @return the owner result
+     * @return the value of {@code user.getId()}
+     * @throws AccessDeniedException when the method rejects the request with {@code Only the owner
+     *     may change funded loyalty benefits.}
      */
     private long owner() {
         final long __gokulMethodStartedNanos =
@@ -81,9 +83,14 @@ public class LoyaltyAdminController {
     public record Exclusions(List<Long> productIds, List<String> rebateCodes, String reason) {}
 
     /**
-     * Reports the operation.
+     * Handles {@code GET /api/admin/loyalty} for loyalty admin.
      *
-     * @return the report result
+     * <p>Reads {@code loyalty_accounts}, {@code loyalty_adjustment_audit}, {@code
+     * loyalty_excluded_products}, {@code loyalty_excluded_rebates}, {@code loyalty_holds}, {@code
+     * loyalty_ledger}, {@code loyalty_rewards}, {@code orders}, {@code verified_order_ownership}.
+     *
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(output)}
      */
     @GetMapping
     public ResponseEntity<Map<String, Object>> report() {
@@ -175,9 +182,15 @@ public class LoyaltyAdminController {
     }
 
     /**
-     * Rewards the operation.
+     * Handles {@code PUT /api/admin/loyalty/rewards} for loyalty admin.
      *
-     * @param input the input
+     * <p>Reads {@code loyalty_rewards}.
+     *
+     * <p>Writes {@code loyalty_rewards}.
+     *
+     * @param input the input supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code A funded
+     *     reward needs valid amounts and must stay within the normal 3% coin-cost budget.}
      */
     @PutMapping("/rewards")
     @Transactional
@@ -230,9 +243,15 @@ public class LoyaltyAdminController {
     }
 
     /**
-     * Exclusionses the operation.
+     * Handles {@code PUT /api/admin/loyalty/exclusions} for loyalty admin.
      *
-     * @param input the input
+     * <p>Reads {@code loyalty_excluded_products}, {@code loyalty_excluded_rebates}.
+     *
+     * <p>Writes {@code loyalty_excluded_products}, {@code loyalty_excluded_rebates}.
+     *
+     * @param input the input supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     excluded products or promotion codes.}
      */
     @PutMapping("/exclusions")
     @Transactional
@@ -273,12 +292,13 @@ public class LoyaltyAdminController {
     }
 
     /**
-     * Adjusts the operation.
+     * Handles {@code POST /api/admin/loyalty/accounts/{environment}/{subject}/adjustments} for
+     * loyalty admin.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param input the input
-     * @return the adjust result
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code loyalty.adjust(environment, subject, input, owner())}
      */
     @PostMapping("/accounts/{environment}/{subject}/adjustments")
     public LoyaltyService.Adjusted adjust(
@@ -300,11 +320,14 @@ public class LoyaltyAdminController {
     }
 
     /**
-     * Ledgers the operation.
+     * Handles {@code GET /api/admin/loyalty/accounts/{environment}/{subject}/ledger} for loyalty
+     * admin.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @return the ledger result
+     * <p>Reads {@code loyalty_ledger}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @return the {@code ResponseEntity<List<Map<String, Object>>>} result
      */
     @GetMapping("/accounts/{environment}/{subject}/ledger")
     public ResponseEntity<List<Map<String, Object>>> ledger(
@@ -328,9 +351,11 @@ public class LoyaltyAdminController {
     }
 
     /**
-     * Reasons the operation.
+     * Returns reason information for loyalty admin.
      *
-     * @param reason the reason
+     * @param reason the reason supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code A clear
+     *     audit reason (8–300 characters) is required.}
      */
     private void reason(String reason) {
         final long __gokulMethodStartedNanos =
@@ -346,14 +371,18 @@ public class LoyaltyAdminController {
     }
 
     /**
-     * Audits the operation.
+     * Records an audit entry for loyalty admin data.
      *
-     * @param actor the actor
-     * @param kind the kind
-     * @param target the target
-     * @param reason the reason
-     * @param before the before
-     * @param after the after
+     * <p>Writes {@code loyalty_admin_audit}.
+     *
+     * @param actor the actor supplied to this method
+     * @param kind the kind supplied to this method
+     * @param target the target supplied to this method
+     * @param reason the reason supplied to this method
+     * @param before the before supplied to this method
+     * @param after the after supplied to this method
+     * @throws IllegalStateException when the method rejects the request with {@code Loyalty audit
+     *     could not be written}
      */
     private void audit(
             long actor, String kind, String target, String reason, Object before, Object after) {

@@ -56,10 +56,12 @@ public class PaymentProviderRegistry {
     }
 
     /**
-     * Requires the operation.
+     * Requires payment provider registry data and returns the {@code PaymentProvider} result.
      *
-     * @param requestedProvider the requested provider
-     * @return the require result
+     * @param requestedProvider the requested provider supplied to this method
+     * @return the value of {@code provider}
+     * @throws IllegalStateException when the method rejects the request with {@code The selected
+     *     payment provider is unavailable.}
      */
     public PaymentProvider require(PaymentProviderType requestedProvider) {
         final long __gokulMethodStartedNanos =

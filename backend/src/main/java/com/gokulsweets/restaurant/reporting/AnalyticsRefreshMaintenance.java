@@ -20,7 +20,11 @@ public class AnalyticsRefreshMaintenance {
 
     private final AnalyticsRefreshService service;
 
-    /** Refreshes the operation. */
+    /**
+     * Refreshes analytics refresh maintenance data.
+     *
+     * <p>Delegates to {@code service.refreshChangedOrders(...)}.
+     */
     @Scheduled(
             fixedDelayString = "${gokul.reporting.refresh-delay-ms:60000}",
             initialDelayString = "${gokul.reporting.initial-delay-ms:10000}")

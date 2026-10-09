@@ -237,7 +237,13 @@ public class InventoryCentreWorker {
         }
     }
 
-    /** Cleanups the operation. */
+    /**
+     * Cleans up inventory centre data.
+     *
+     * <p>Reads {@code inventory_centre_jobs}, {@code inventory_centre_tasks}.
+     *
+     * <p>Writes {@code inventory_centre_tasks}.
+     */
     @Scheduled(fixedDelayString = "${inventory.centre.cleanup-ms:3600000}")
     public void cleanup() {
         final long __gokulMethodStartedNanos =

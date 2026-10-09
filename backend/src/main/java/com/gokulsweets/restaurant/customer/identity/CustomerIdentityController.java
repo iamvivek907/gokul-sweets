@@ -124,11 +124,13 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Exchanges the operation.
+     * Handles {@code POST /api/customer/identity/exchange} for customer identity.
      *
-     * @param payload the payload
-     * @param request the request
-     * @return the exchange result
+     * @param payload the payload supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<Map<String, Object>>} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Identity
+     *     proof required}
      */
     @PostMapping(value = "/exchange", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> exchange(
@@ -182,10 +184,10 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Mes the operation.
+     * Handles {@code GET /api/customer/identity/me} for customer identity.
      *
-     * @param request the request
-     * @return the me result
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<Map<String, Object>>} result
      */
     @GetMapping("/me")
     public ResponseEntity<Map<String, Object>> me(HttpServletRequest request) {
@@ -274,10 +276,12 @@ public class CustomerIdentityController {
     public record NameRequest(String name) {}
 
     /**
-     * Orderses the operation.
+     * Handles {@code GET /api/customer/identity/orders} for customer identity.
      *
-     * @param request the request
-     * @return the orders result
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(orders.getCustomerOrderHistory(ownership.orderNumbers(environment.name(),
+     *     subject)))}
      */
     @GetMapping("/orders")
     public ResponseEntity<List<CustomerOrderSummaryResponse>> orders(HttpServletRequest request) {
@@ -356,11 +360,12 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Orders the operation.
+     * Handles {@code GET /api/customer/identity/orders/{orderNumber}} for customer identity.
      *
-     * @param orderNumber the order number
-     * @param request the request
-     * @return the order result
+     * @param orderNumber the order number supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(orders.getCustomerOrder(orderNumber))}
      */
     @GetMapping("/orders/{orderNumber}")
     public ResponseEntity<CustomerOrderResponse> order(
@@ -440,10 +445,12 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Accounts the operation.
+     * Handles {@code GET /api/customer/identity/account} for customer identity.
      *
-     * @param request the request
-     * @return the account result
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(accountHub.snapshot(environment.name(),
+     *     requiredSubject(request, environment)))}
      */
     @GetMapping("/account")
     public ResponseEntity<CustomerAccountHub.Snapshot> account(HttpServletRequest request) {
@@ -465,11 +472,12 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Preferenceses the operation.
+     * Handles {@code PUT /api/customer/identity/account/preferences} for customer identity.
      *
-     * @param preferences the preferences
-     * @param request the request
-     * @return the preferences result
+     * @param preferences the preferences supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build()}
      */
     @PutMapping("/account/preferences")
     public ResponseEntity<Void> preferences(
@@ -493,11 +501,13 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Favourites the operation.
+     * Handles {@code PUT /api/customer/identity/account/favourites/{productId}} for customer
+     * identity.
      *
-     * @param productId the product id
-     * @param request the request
-     * @return the favourite result
+     * @param productId the product id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build()}
      */
     @PutMapping("/account/favourites/{productId}")
     public ResponseEntity<Void> favourite(
@@ -643,10 +653,12 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Rewardses the operation.
+     * Handles {@code GET /api/customer/identity/rewards} for customer identity.
      *
-     * @param request the request
-     * @return the rewards result
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(loyalty.wallet(environment.name(),
+     *     requiredSubject(request, environment), null))}
      */
     @GetMapping("/rewards")
     public ResponseEntity<com.gokulsweets.restaurant.loyalty.LoyaltyService.Wallet> rewards(
@@ -692,10 +704,11 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Consentses the operation.
+     * Handles {@code GET /api/customer/identity/consents} for customer identity.
      *
-     * @param request the request
-     * @return the consents result
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(decisions)}
      */
     @GetMapping("/consents")
     public ResponseEntity<Map<ConsentPurpose, ConsentDecision>> consents(
@@ -834,13 +847,15 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Notificationses the operation.
+     * Handles {@code GET /api/customer/identity/notifications} for customer identity.
      *
-     * @param before the before
-     * @param unreadOnly the unread only
-     * @param search the search
-     * @param request the request
-     * @return the notifications result
+     * @param before the before supplied to this method
+     * @param unreadOnly the unread only supplied to this method
+     * @param search the search supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(notifications.page(environment.name(),
+     *     requiredSubject(request, environment), before, unreadOnly, search))}
      */
     @GetMapping("/notifications")
     public ResponseEntity<
@@ -1273,10 +1288,12 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Logouts the operation.
+     * Handles {@code POST /api/customer/identity/logout} for customer identity.
      *
-     * @param request the request
-     * @return the logout result
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.noContent().cacheControl(CacheControl.noStore()).header(HttpHeaders.SET_COOKIE,
+     *     expired.toString()).build()}
      */
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request) {
@@ -1367,10 +1384,11 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Cookies the operation.
+     * Returns the requested cookie value, or null when it is absent; the single-argument overload
+     * reads the identity cookie.
      *
-     * @param request the request
-     * @return the cookie result
+     * @param request the request supplied to this method
+     * @return the value of {@code cookie(request, COOKIE)}
      */
     private static String cookie(HttpServletRequest request) {
         final long __gokulMethodStartedNanos =
@@ -1386,11 +1404,12 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Cookies the operation.
+     * Returns the requested cookie value, or null when it is absent; the single-argument overload
+     * reads the identity cookie.
      *
-     * @param request the request
-     * @param name the name
-     * @return the cookie result
+     * @param request the request supplied to this method
+     * @param name the name supplied to this method
+     * @return the {@code String} result
      */
     private static String cookie(HttpServletRequest request, String name) {
         final long __gokulMethodStartedNanos =
@@ -1419,9 +1438,10 @@ public class CustomerIdentityController {
     public record ExchangeRequest(String accessToken) {}
 
     /**
-     * Limiteds the operation.
+     * Returns limited information for customer identity.
      *
-     * @return the limited result
+     * @return the value of {@code
+     *     ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).cacheControl(CacheControl.noStore()).build()}
      */
     @ExceptionHandler(IdentityExchangeRateLimiter.Limited.class)
     public ResponseEntity<Void> limited() {
@@ -1438,9 +1458,10 @@ public class CustomerIdentityController {
     }
 
     /**
-     * Unavailables the operation.
+     * Returns unavailable information for customer identity.
      *
-     * @return the unavailable result
+     * @return the value of {@code
+     *     ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).cacheControl(CacheControl.noStore()).build()}
      */
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Void> unavailable() {

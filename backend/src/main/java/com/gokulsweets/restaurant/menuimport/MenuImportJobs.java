@@ -31,9 +31,9 @@ public class MenuImportJobs {
     private boolean enabled;
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the value of {@code enabled}
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -57,10 +57,12 @@ public class MenuImportJobs {
     public record Job(UUID id, String operation, String status, String result, String error) {}
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for menu import jobs data and returns the {@code long} result.
      *
-     * @param branchId the branch id
-     * @return the authorize result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code authorization.getCurrentStaff().getId()}
      */
     private long authorize(long branchId) {
         final long __gokulMethodStartedNanos =
@@ -75,12 +77,12 @@ public class MenuImportJobs {
     }
 
     /**
-     * Enqueues the operation.
+     * Enqueues menu import jobs data and returns the {@code Job} result.
      *
-     * @param branchId the branch id
-     * @param file the file
-     * @param operation the operation
-     * @return the enqueue result
+     * @param branchId the branch id supplied to this method
+     * @param file the file supplied to this method
+     * @param operation the operation supplied to this method
+     * @return the value of {@code enqueue(branchId, file, operation, null)}
      */
     @Transactional
     public Job enqueue(long branchId, MultipartFile file, String operation) {
@@ -97,13 +99,24 @@ public class MenuImportJobs {
     }
 
     /**
-     * Enqueues the operation.
+     * Enqueues menu import jobs data and returns the {@code Job} result.
      *
-     * @param branchId the branch id
-     * @param file the file
-     * @param operation the operation
-     * @param submissionId the submission id
-     * @return the enqueue result
+     * <p>Reads {@code branches}, {@code menu_import_jobs}, {@code menu_import_submissions}.
+     *
+     * <p>Writes {@code menu_import_jobs}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param file the file supplied to this method
+     * @param operation the operation supplied to this method
+     * @param submissionId the submission id supplied to this method
+     * @return the {@code Job} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Branch not
+     *     found.}; {@code Choose an Excel file of at most 2 MB.}; {@code Invalid menu operation.};
+     *     {@code Unable to read the upload.}
+     * @throws ResponseStatusException when the method rejects the request with {@code A menu job is
+     *     already running for this branch. Wait for it to finish.}; {@code The import queue is
+     *     full. Please try later.}; {@code This upload identifier belongs to a different
+     *     submission.}
      */
     @Transactional
     public Job enqueue(long branchId, MultipartFile file, String operation, UUID submissionId) {
@@ -268,11 +281,13 @@ public class MenuImportJobs {
     }
 
     /**
-     * Returns the operation.
+     * Returns get information for menu import jobs.
      *
-     * @param branchId the branch id
-     * @param id the id
-     * @return the get result
+     * <p>Reads {@code menu_import_jobs}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @return the {@code Job} result
      */
     @Transactional(readOnly = true)
     public Job get(long branchId, UUID id) {
@@ -299,11 +314,11 @@ public class MenuImportJobs {
     }
 
     /**
-     * Jobs the operation.
+     * Returns job information for menu import jobs.
      *
-     * @param r the r
-     * @return the job result
-     * @throws java.sql.SQLException if the operation cannot complete
+     * @param r the r supplied to this method
+     * @return the {@code Job} result
+     * @throws java.sql.SQLException if the underlying operation fails
      */
     static Job job(java.sql.ResultSet r) throws java.sql.SQLException {
         final long __gokulMethodStartedNanos =

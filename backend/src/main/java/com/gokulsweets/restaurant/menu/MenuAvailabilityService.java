@@ -67,10 +67,12 @@ public class MenuAvailabilityService {
     private record Cached(Instant evaluatedAt, Instant until, Availability value) {}
 
     /**
-     * Returns the operation.
+     * Returns get information for menu availability.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Availability} result
+     * @throws org.springframework.web.server.ResponseStatusException when the method rejects the
+     *     request with {@code Menu is updating. Please try again.}
      */
     @Transactional(readOnly = true)
     public Availability get(long branchId) {

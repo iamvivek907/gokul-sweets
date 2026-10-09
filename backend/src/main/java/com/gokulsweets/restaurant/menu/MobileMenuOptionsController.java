@@ -18,10 +18,11 @@ public class MobileMenuOptionsController {
     private final MobileMenuOptionsService options;
 
     /**
-     * Reads the operation.
+     * Handles {@code GET /api/menu/portion-groups} for mobile menu options.
      *
-     * @param branchId the branch id
-     * @return the read result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(options.publicRead(branchId))}
      */
     @GetMapping("/api/menu/portion-groups")
     public ResponseEntity<MobileMenuOptionsService.Snapshot> read(@RequestParam long branchId) {
@@ -58,11 +59,12 @@ public class MobileMenuOptionsController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/menu/portion-groups} for mobile menu
+     * options.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the save result
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code options.save(branchId, input)}
      */
     @PutMapping("/api/admin/branches/{branchId}/menu/portion-groups")
     public MobileMenuOptionsService.Snapshot save(
@@ -82,12 +84,13 @@ public class MobileMenuOptionsController {
     }
 
     /**
-     * Pages the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/menu/workspace/groups} for mobile menu
+     * options.
      *
-     * @param branchId the branch id
-     * @param search the search
-     * @param page the page
-     * @return the page result
+     * @param branchId the branch id supplied to this method
+     * @param search the search supplied to this method
+     * @param page the page supplied to this method
+     * @return the value of {@code options.page(branchId, search, page)}
      */
     @GetMapping("/api/admin/branches/{branchId}/menu/workspace/groups")
     public MobileMenuOptionsService.GroupPage page(
@@ -117,11 +120,12 @@ public class MobileMenuOptionsController {
             @jakarta.validation.constraints.NotNull @Valid MobileMenuOptionsService.Group group) {}
 
     /**
-     * Ones the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/menu/workspace/groups} for mobile menu
+     * options.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the one result
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code java.util.Map<String, Long>} result
      */
     @PutMapping("/api/admin/branches/{branchId}/menu/workspace/groups")
     public java.util.Map<String, Long> one(
@@ -138,11 +142,14 @@ public class MobileMenuOptionsController {
     }
 
     /**
-     * Removes the operation.
+     * Handles {@code DELETE /api/admin/branches/{branchId}/menu/workspace/groups/{key}} for mobile
+     * menu options.
      *
-     * @param branchId the branch id
-     * @param key the key
-     * @param version the version
+     * @param branchId the branch id supplied to this method
+     * @param key the key supplied to this method
+     * @param version the version supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     group key.}
      */
     @DeleteMapping("/api/admin/branches/{branchId}/menu/workspace/groups/{key}")
     public void remove(

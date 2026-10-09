@@ -44,10 +44,10 @@ public record AdminBranchProductResponse(
         Integer displayOrder) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code AdminBranchProductResponse} representation.
      *
-     * @param branchProduct the branch product
-     * @return the from result
+     * @param branchProduct the branch product supplied to this method
+     * @return the {@code AdminBranchProductResponse} result
      */
     public static AdminBranchProductResponse from(BranchProduct branchProduct) {
         final long __gokulMethodStartedNanos =

@@ -324,13 +324,13 @@ public class ProductIntelligenceService {
     }
 
     /**
-     * Classify the operation.
+     * Classifies product intelligence data and returns the {@code Classification} result.
      *
-     * @param row the row
-     * @param penetration the penetration
-     * @param consistency the consistency
-     * @param growth the growth
-     * @return the classify result
+     * @param row the row supplied to this method
+     * @param penetration the penetration supplied to this method
+     * @param consistency the consistency supplied to this method
+     * @param growth the growth supplied to this method
+     * @return the {@code Classification} result
      */
     private Classification classify(
             ProductRow row, BigDecimal penetration, BigDecimal consistency, BigDecimal growth) {
@@ -384,11 +384,11 @@ public class ProductIntelligenceService {
     }
 
     /**
-     * Percents the operation.
+     * Returns percent information for product intelligence.
      *
-     * @param numerator the numerator
-     * @param denominator the denominator
-     * @return the percent result
+     * @param numerator the numerator supplied to this method
+     * @param denominator the denominator supplied to this method
+     * @return the {@code BigDecimal} result
      */
     private BigDecimal percent(BigDecimal numerator, BigDecimal denominator) {
         final long __gokulMethodStartedNanos =

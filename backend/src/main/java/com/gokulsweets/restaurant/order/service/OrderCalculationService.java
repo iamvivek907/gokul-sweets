@@ -72,10 +72,10 @@ public class OrderCalculationService {
     private static final BigDecimal ONE_THOUSAND = new BigDecimal("1000");
 
     /**
-     * Calculates the operation.
+     * Calculates order calculation data and returns the {@code OrderCalculationResult} result.
      *
-     * @param validatedOrder the validated order
-     * @return the calculate result
+     * @param validatedOrder the validated order supplied to this method
+     * @return the {@code OrderCalculationResult} result
      */
     public OrderCalculationResult calculate(ValidatedOrderData validatedOrder) {
         final long __gokulMethodStartedNanos =
@@ -475,10 +475,10 @@ public class OrderCalculationService {
     }
 
     /**
-     * Money the operation.
+     * Returns money information for order calculation.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code value.setScale(MONEY_SCALE, ROUNDING_MODE)}
      */
     private BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =

@@ -87,6 +87,7 @@ public final class BehaviorPreservationCheck {
                             || !end.getArgument(0).toString().equals(marker.getNameAsString())
                             || (!start.getArgument(0).equals(end.getArgument(1))
                                     || !start.getArgument(1).equals(end.getArgument(2)))
+                            || !MethodTimingCoverageCheck.matchesDeclaration(method, start)
                             || !wrapped.getCatchClauses().isEmpty()
                             || !wrapped.getResources().isEmpty()
                             || wrapped.getFinallyBlock().orElseThrow().getStatements().size()

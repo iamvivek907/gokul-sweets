@@ -123,10 +123,10 @@ public class OrderCorrectionService {
             UUID requestKey, long targetBranchId, long targetSlotId, String reason) {}
 
     /**
-     * Lockeds the operation.
+     * Returns locked information for order correction.
      *
-     * @param number the number
-     * @return the locked result
+     * @param number the number supplied to this method
+     * @return the {@code Order} result
      */
     private Order locked(String number) {
         final long __gokulMethodStartedNanos =
@@ -141,11 +141,11 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Previews the operation.
+     * Previews order correction data and returns the {@code Summary} result.
      *
-     * @param number the number
-     * @param manager the manager
-     * @return the preview result
+     * @param number the number supplied to this method
+     * @param manager the manager supplied to this method
+     * @return the value of {@code summary(order, manager)}
      */
     @Transactional(readOnly = true)
     public Summary preview(String number, boolean manager) {
@@ -166,10 +166,13 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for order correction data.
      *
-     * @param order the order
-     * @param changing the changing
+     * <p>Authorization checks include {@code changing ? PermissionName.ORDER_CANCEL :
+     * PermissionName.ORDER_VIEW}, {@code PermissionName.REFUND_CREATE}.
+     *
+     * @param order the order supplied to this method
+     * @param changing the changing supplied to this method
      */
     private void authorize(Order order, boolean changing) {
         final long __gokulMethodStartedNanos =
@@ -188,10 +191,11 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Retaineds the operation.
+     * Returns retained information for order correction.
      *
-     * @param order the order
-     * @return the retained result
+     * @param order the order supplied to this method
+     * @return the value of {@code
+     *     money(order.getPriorityCharge()).add(money(order.getDeliveryFee())).add(money(order.getConvenienceFee())).add(money(order.getPaymentFee()))}
      */
     private BigDecimal retained(Order order) {
         final long __gokulMethodStartedNanos =
@@ -208,10 +212,11 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Money the operation.
+     * Returns money information for order correction.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code value == null ? BigDecimal.ZERO : value.setScale(2,
+     *     java.math.RoundingMode.HALF_UP)}
      */
     private static BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =
@@ -227,10 +232,12 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Captureds the operation.
+     * Returns captured information for order correction.
      *
-     * @param order the order
-     * @return the captured result
+     * @param order the order supplied to this method
+     * @return the value of {@code
+     *     payments.findByOrderIdOrderByCreatedAtDesc(order.getId()).stream().filter(p ->
+     *     p.getPaymentStatus() == PaymentStatus.PAID).toList()}
      */
     private List<Payment> captured(Order order) {
         final long __gokulMethodStartedNanos =
@@ -246,11 +253,11 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Summary the operation.
+     * Returns summary information for order correction.
      *
-     * @param order the order
-     * @param manager the manager
-     * @return the summary result
+     * @param order the order supplied to this method
+     * @param manager the manager supplied to this method
+     * @return the {@code Summary} result
      */
     private Summary summary(Order order, boolean manager) {
         final long __gokulMethodStartedNanos =
@@ -318,12 +325,16 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Cancels the operation.
+     * Cancels order correction data and returns the {@code Summary} result.
      *
-     * @param number the number
-     * @param input the input
-     * @param manager the manager
-     * @return the cancel result
+     * <p>Reads {@code order_corrections}, {@code payments}.
+     *
+     * <p>Writes {@code order_corrections}.
+     *
+     * @param number the number supplied to this method
+     * @param input the input supplied to this method
+     * @param manager the manager supplied to this method
+     * @return the {@code Summary} result
      */
     @Transactional
     public Summary cancel(String number, Cancellation input, boolean manager) {
@@ -432,9 +443,9 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Releases the operation.
+     * Releases order correction data.
      *
-     * @param order the order
+     * @param order the order supplied to this method
      */
     private void release(Order order) {
         final long __gokulMethodStartedNanos =
@@ -457,10 +468,12 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Validates the operation.
+     * Validates order correction data.
      *
-     * @param key the key
-     * @param reason the reason
+     * @param key the key supplied to this method
+     * @param reason the reason supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Choose a
+     *     reason and a request key.}
      */
     private void validate(UUID key, String reason) {
         final long __gokulMethodStartedNanos =
@@ -478,10 +491,10 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Conflicts the operation.
+     * Creates an HTTP CONFLICT exception using the supplied rejection reason.
      *
-     * @param text the text
-     * @return the conflict result
+     * @param text the text supplied to this method
+     * @return the {@code ResponseStatusException} result
      */
     private ResponseStatusException conflict(String text) {
         final long __gokulMethodStartedNanos =
@@ -504,11 +517,15 @@ public class OrderCorrectionService {
     public record Reschedule(UUID requestKey, long targetSlotId, String reason) {}
 
     /**
-     * Reschedules the operation.
+     * Reschedules order correction data and returns the {@code Summary} result.
      *
-     * @param number the number
-     * @param input the input
-     * @return the reschedule result
+     * @param number the number supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Summary} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     pickup slot and reason.}
+     * @throws org.springframework.security.access.AccessDeniedException when the method rejects the
+     *     request with {@code Only admin or manager can change pickup timing.}
      */
     @Transactional
     public Summary reschedule(String number, Reschedule input) {
@@ -539,11 +556,11 @@ public class OrderCorrectionService {
     }
 
     /**
-     * Transfers the operation.
+     * Transfers order correction data and returns the {@code Summary} result.
      *
-     * @param number the number
-     * @param input the input
-     * @return the transfer result
+     * @param number the number supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code movePickup(number, input, false)}
      */
     @Transactional
     public Summary transfer(String number, Transfer input) {

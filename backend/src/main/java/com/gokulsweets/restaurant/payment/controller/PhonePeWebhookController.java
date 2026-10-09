@@ -17,12 +17,14 @@ public class PhonePeWebhookController {
     private final PhonePeCallbackService callbackService;
 
     /**
-     * Receives the operation.
+     * Handles {@code POST /api/payments/webhooks/phonepe} for phone pe webhook.
      *
-     * @param rawBody the raw body
-     * @param checksumKeyId the checksum key id
-     * @param checksumSignature the checksum signature
-     * @return the receive result
+     * <p>Delegates to {@code callbackService.process(...)}.
+     *
+     * @param rawBody the raw body supplied to this method
+     * @param checksumKeyId the checksum key id supplied to this method
+     * @param checksumSignature the checksum signature supplied to this method
+     * @return the value of {@code ResponseEntity.ok().build()}
      */
     @PostMapping
     public ResponseEntity<Void> receive(

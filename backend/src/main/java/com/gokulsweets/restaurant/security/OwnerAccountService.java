@@ -91,9 +91,9 @@ public class OwnerAccountService {
     public record Account(String username, boolean hasRecoveryKey) {}
 
     /**
-     * Secures the operation.
+     * Returns whether secure staff sessions are enabled in a recognized DEV or PROD environment.
      *
-     * @return the secure result
+     * @return the {@code boolean} result
      */
     private boolean secure() {
         final long __gokulMethodStartedNanos =
@@ -110,9 +110,10 @@ public class OwnerAccountService {
     }
 
     /**
-     * Enableds the operation.
+     * Returns whether secure owner setup is enabled and its configured setup-key hash is a
+     * 64-character lowercase hexadecimal value.
      *
-     * @return the enabled result
+     * @return the {@code boolean} result
      */
     private boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -141,9 +142,10 @@ public class OwnerAccountService {
     }
 
     /**
-     * Statuses the operation.
+     * Returns whether one-time owner setup is enabled and still open, checking closure under the
+     * singleton setup-row lock.
      *
-     * @return the status result
+     * @return the {@code Status} result
      */
     public Status status() {
         final long __gokulMethodStartedNanos =
@@ -161,9 +163,14 @@ public class OwnerAccountService {
     }
 
     /**
-     * Closeds the operation.
+     * Locks the setup latch and permanently closes it if setup already completed or any owner
+     * account already exists.
      *
-     * @return the closed result
+     * <p>Reads {@code roles}, {@code staff_owner_setup}, {@code staff_users}.
+     *
+     * <p>Writes {@code staff_owner_setup}.
+     *
+     * @return the {@code boolean} result
      */
     private boolean closed() {
         final long __gokulMethodStartedNanos =
@@ -235,13 +242,23 @@ ON CONFLICT(username) DO UPDATE SET failures=CASE WHEN staff_login_limits.update
     }
 
     /**
-     * Setups the operation.
+     * Verifies the operator-held setup key and creates the first owner atomically, permanently
+     * closing setup and returning a new recovery key.
      *
-     * @param key the key
-     * @param username the username
-     * @param password the password
-     * @param fullName the full name
-     * @return the setup result
+     * <p>Reads {@code roles}.
+     *
+     * <p>Writes {@code staff_owner_setup}, {@code staff_users}.
+     *
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param key the key supplied to this method
+     * @param username the username supplied to this method
+     * @param password the password supplied to this method
+     * @param fullName the full name supplied to this method
+     * @return the {@code Created} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Enter an
+     *     owner name of up to 150 characters.}; {@code Owner setup is already completed. Use admin
+     *     login.}
      */
     public Created setup(String key, String username, String password, String fullName) {
         final long __gokulMethodStartedNanos =
@@ -297,12 +314,19 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Recovers the operation.
+     * Consumes a matching owner recovery key, changes username and password, revokes sessions and
+     * enrollment challenges, and returns a replacement key without changing MFA or roles.
      *
-     * @param key the key
-     * @param username the username
-     * @param password the password
-     * @return the recover result
+     * <p>Reads {@code staff_owner_recovery}.
+     *
+     * <p>Writes {@code staff_users}.
+     *
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param key the key supplied to this method
+     * @param username the username supplied to this method
+     * @param password the password supplied to this method
+     * @return the {@code Created} result
      */
     public Created recover(String key, String username, String password) {
         final long __gokulMethodStartedNanos =
@@ -355,10 +379,13 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Accounts the operation.
+     * Returns the active owner's username and whether a recovery-key hash is stored, under the
+     * owner account lock.
      *
-     * @param id the id
-     * @return the account result
+     * <p>Reads {@code staff_owner_recovery}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code Account} result
      */
     public Account account(long id) {
         final long __gokulMethodStartedNanos =
@@ -410,12 +437,15 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Renames the operation.
+     * Requires the owner's password and MFA, changes to an unused normalized username and revokes
+     * existing sessions and enrollment challenges.
      *
-     * @param id the id
-     * @param name the name
-     * @param password the password
-     * @param code the code
+     * <p>Writes {@code staff_users}.
+     *
+     * @param id the id supplied to this method
+     * @param name the name supplied to this method
+     * @param password the password supplied to this method
+     * @param code the code supplied to this method
      */
     public void rename(long id, String name, String password, String code) {
         final long __gokulMethodStartedNanos =
@@ -444,10 +474,15 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Owners the operation.
+     * Requires secure account handling and locks an active owner row, rejecting inactive, missing
+     * or non-owner accounts.
      *
-     * @param id the id
-     * @return the owner result
+     * <p>Reads {@code roles}, {@code staff_users}.
+     *
+     * <p>Writes {@code OF}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code Map<String, Object>} result
      */
     private Map<String, Object> owner(long id) {
         final long __gokulMethodStartedNanos =
@@ -472,11 +507,12 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Reauthenticates the operation.
+     * Requires an active owner, a matching password and a valid fresh MFA or recovery code before a
+     * sensitive account change.
      *
-     * @param id the id
-     * @param password the password
-     * @param code the code
+     * @param id the id supplied to this method
+     * @param password the password supplied to this method
+     * @param code the code supplied to this method
      */
     private void reauthenticate(long id, String password, String code) {
         final long __gokulMethodStartedNanos =
@@ -496,10 +532,15 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Rotates the operation.
+     * Replaces the owner's stored recovery-key hash and returns a fresh random key; only the hash
+     * is persisted.
      *
-     * @param id the id
-     * @return the rotate result
+     * <p>Writes {@code staff_owner_recovery}.
+     *
+     * <p>Delegates to {@code StaffSessionService.hash(...)}.
+     *
+     * @param id the id supplied to this method
+     * @return the value of {@code key}
      */
     private String rotate(long id) {
         final long __gokulMethodStartedNanos =
@@ -522,9 +563,12 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Invalidates the operation.
+     * Revokes all active sessions and deletes unfinished MFA enrollment challenges for the staff
+     * account.
      *
-     * @param id the id
+     * <p>Writes {@code staff_mfa_enrollments}, {@code staff_sessions}.
+     *
+     * @param id the id supplied to this method
      */
     private void invalidate(long id) {
         final long __gokulMethodStartedNanos =
@@ -542,10 +586,12 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Audits the operation.
+     * Persists the account identifier and authentication event name in the staff audit table.
      *
-     * @param id the id
-     * @param event the event
+     * <p>Writes {@code staff_auth_audit}.
+     *
+     * @param id the id supplied to this method
+     * @param event the event supplied to this method
      */
     private void audit(long id, String event) {
         final long __gokulMethodStartedNanos =
@@ -559,10 +605,15 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Uniques the operation.
+     * Rejects a username already used by another staff account, comparing normalized usernames
+     * case-insensitively.
      *
-     * @param name the name
-     * @param id the id
+     * <p>Reads {@code staff_users}.
+     *
+     * @param name the name supplied to this method
+     * @param id the id supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code That username
+     *     is already in use.}
      */
     private void unique(String name, long id) {
         final long __gokulMethodStartedNanos =
@@ -584,10 +635,13 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Usernames the operation.
+     * Requires a supported username of 2–100 characters, then trims and lowercases it with the root
+     * locale.
      *
-     * @param name the name
-     * @return the username result
+     * @param name the name supplied to this method
+     * @return the value of {@code name.trim().toLowerCase(Locale.ROOT)}
+     * @throws ResponseStatusException when the method rejects the request with {@code Use 2–100
+     *     letters, numbers, dots, underscores, @ or hyphens for the username.}
      */
     private static String username(String name) {
         final long __gokulMethodStartedNanos =
@@ -606,9 +660,12 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Passwords the operation.
+     * Requires at least twelve password characters and at most 72 UTF-8 bytes for the configured
+     * password hashing policy.
      *
-     * @param password the password
+     * @param password the password supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Use at least
+     *     12 characters and a shorter password if it exceeds the supported length.}
      */
     private static void password(String password) {
         final long __gokulMethodStartedNanos =
@@ -627,7 +684,13 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
         }
     }
 
-    /** Denieds the operation. */
+    /**
+     * Raises a generic forbidden response that does not reveal which account verification check
+     * failed.
+     *
+     * @throws ResponseStatusException when the method rejects the request with {@code Account
+     *     verification failed.}
+     */
     private static void denied() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(OwnerAccountService.class, "denied()");
@@ -638,7 +701,10 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
         }
     }
 
-    /** Deadlineses the operation. */
+    /**
+     * Applies transaction-local ten-second statement and two-second lock timeouts to owner account
+     * writes.
+     */
     private void deadlines() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(OwnerAccountService.class, "deadlines()");
@@ -652,11 +718,14 @@ SELECT ?,?,?,id,TRUE,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM roles WHERE name='
     }
 
     /**
-     * Writes the operation.
+     * Runs the supplied account mutation transactionally with local database timeouts and maps
+     * integrity conflicts to a refresh-and-retry response.
      *
-     * @param <T> the generic t type
-     * @param action the action
-     * @return the write result
+     * @param <T> the T type
+     * @param action the action supplied to this method
+     * @return the {@code T} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Account
+     *     details changed. Refresh and try again.}
      */
     private <T> T write(java.util.function.Supplier<T> action) {
         final long __gokulMethodStartedNanos =

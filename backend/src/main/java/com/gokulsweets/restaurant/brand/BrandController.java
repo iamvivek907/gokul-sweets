@@ -34,9 +34,11 @@ public class BrandController {
     }
 
     /**
-     * Admins the operation.
+     * Handles {@code GET /api/admin/about} for brand.
      *
-     * @return the admin result
+     * <p>Delegates to {@code service.adminContent(...)}.
+     *
+     * @return the value of {@code service.adminContent()}
      */
     @GetMapping("/api/admin/about")
     public BrandService.Content admin() {
@@ -49,11 +51,13 @@ public class BrandController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/about} for brand.
      *
-     * @param copy the copy
-     * @param version the version
-     * @return the save result
+     * <p>Delegates to {@code service.save(...)}.
+     *
+     * @param copy the copy supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code service.save(copy, version)}
      */
     @PutMapping("/api/admin/about")
     public BrandService.Story save(
@@ -71,11 +75,13 @@ public class BrandController {
     }
 
     /**
-     * Photos the operation.
+     * Handles {@code POST /api/admin/about/photo} for brand.
      *
-     * @param file the file
-     * @param version the version
-     * @return the photo result
+     * <p>Delegates to {@code service.storyPhoto(...)}.
+     *
+     * @param file the file supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code service.storyPhoto(file, version)}
      */
     @PostMapping("/api/admin/about/photo")
     public BrandService.Story photo(
@@ -109,10 +115,12 @@ public class BrandController {
     }
 
     /**
-     * Creates the operation.
+     * Handles {@code POST /api/admin/about/people} for brand.
      *
-     * @param person the person
-     * @return the create result
+     * <p>Delegates to {@code service.create(...)}.
+     *
+     * @param person the person supplied to this method
+     * @return the value of {@code service.create(person)}
      */
     @PostMapping("/api/admin/about/people")
     public BrandService.Person create(@Valid @RequestBody BrandService.PersonInput person) {

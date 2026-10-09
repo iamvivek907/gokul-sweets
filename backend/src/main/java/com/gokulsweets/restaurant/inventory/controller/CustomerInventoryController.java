@@ -25,11 +25,13 @@ public class CustomerInventoryController {
     private final CustomerInventoryAvailabilityService availabilityService;
 
     /**
-     * Checks the operation.
+     * Handles {@code POST /api/branches/{branchId}/inventory/check} for customer inventory.
      *
-     * @param branchId the branch id
-     * @param request the request
-     * @return the check result
+     * <p>Delegates to {@code availabilityService.check(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(availabilityService.check(branchId, request))}
      */
     @PostMapping("/check")
     public ResponseEntity<CustomerInventoryCheckResponse> check(

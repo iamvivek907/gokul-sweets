@@ -36,7 +36,7 @@ public class CustomerPushDispatcher {
 
     private final Clock inventoryClock;
 
-    /** Scheduleds the operation. */
+    /** Returns scheduled information for customer push dispatcher. */
     @Scheduled(fixedDelay = 30000, initialDelay = 30000)
     public void scheduled() {
         final long __gokulMethodStartedNanos =
@@ -162,10 +162,15 @@ WHERE s.id = ? AND s.revoked_at IS NULL AND v.revoked_at IS NULL
     }
 
     /**
-     * Claims the operation.
+     * Claims customer push dispatcher data and returns the {@code Task} result.
      *
-     * @param environment the environment
-     * @return the claim result
+     * <p>Reads {@code customer_notification_events}, {@code customer_push_deliveries}, {@code
+     * customer_push_subscriptions}.
+     *
+     * <p>Writes {@code OF}, {@code customer_push_deliveries}.
+     *
+     * @param environment the environment supplied to this method
+     * @return the {@code Task} result
      */
     private Task claim(String environment) {
         final long __gokulMethodStartedNanos =
@@ -218,11 +223,13 @@ ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
     }
 
     /**
-     * Finishes the operation.
+     * Finishes customer push dispatcher data.
      *
-     * @param task the task
-     * @param state the state
-     * @param code the code
+     * <p>Writes {@code customer_push_deliveries}.
+     *
+     * @param task the task supplied to this method
+     * @param state the state supplied to this method
+     * @param code the code supplied to this method
      */
     private void finish(Task task, String state, Integer code) {
         final long __gokulMethodStartedNanos =
@@ -248,10 +255,12 @@ UPDATE customer_push_deliveries SET state = ?, last_http_status = ?,
     }
 
     /**
-     * Retry the operation.
+     * Retries customer push dispatcher data.
      *
-     * @param task the task
-     * @param code the code
+     * <p>Writes {@code customer_push_deliveries}.
+     *
+     * @param task the task supplied to this method
+     * @param code the code supplied to this method
      */
     private void retry(Task task, Integer code) {
         final long __gokulMethodStartedNanos =
@@ -277,11 +286,11 @@ WHERE id = ? AND state = 'SENDING' AND lease_token = ?
     }
 
     /**
-     * Destinations the operation.
+     * Returns destination information for customer push dispatcher.
      *
-     * @param type the type
-     * @param id the id
-     * @return the destination result
+     * @param type the type supplied to this method
+     * @param id the id supplied to this method
+     * @return the {@code String} result
      */
     private static String destination(String type, String id) {
         final long __gokulMethodStartedNanos =

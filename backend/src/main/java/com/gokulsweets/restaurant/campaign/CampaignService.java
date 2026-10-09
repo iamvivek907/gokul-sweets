@@ -41,11 +41,17 @@ public class CampaignService {
     private final CampaignPublicationRepository publications;
 
     /**
-     * Creates the operation.
+     * Creates a campaign draft; when an idempotency key is supplied, reuses the matching draft and
+     * rejects reuse with different request fields.
      *
-     * @param request the request
-     * @param requestId the request id
-     * @return the create result
+     * <p>Delegates to {@code repository.createDraft(...)}, {@code
+     * repository.findByCreationRequestId(...)}.
+     *
+     * @param request the request supplied to this method
+     * @param requestId the request id supplied to this method
+     * @return the {@code HomepageCampaign} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code This draft
+     *     request was already used with different fields. Reopen the saved draft before editing.}
      */
     @Transactional
     public HomepageCampaign create(CampaignRequest request, UUID requestId) {
@@ -101,10 +107,14 @@ public class CampaignService {
     }
 
     /**
-     * Actives the operation.
+     * Returns currently visible campaigns, using published revisions when controlled publishing is
+     * enabled.
      *
-     * @param branchId the branch id
-     * @return the active result
+     * <p>Delegates to {@code repository.findAllByOrderByDisplayOrderAscIdAsc(...)}, {@code
+     * repository.findByActiveTrueOrderByDisplayOrderAscIdAsc(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code List<HomepageCampaign>} result
      */
     @Transactional(readOnly = true)
     public List<HomepageCampaign> active(Long branchId) {
@@ -136,9 +146,10 @@ public class CampaignService {
     }
 
     /**
-     * Actives the operation.
+     * Returns currently visible campaigns, using published revisions when controlled publishing is
+     * enabled.
      *
-     * @return the active result
+     * @return the value of {@code active(null)}
      */
     public List<HomepageCampaign> active() {
         final long __gokulMethodStartedNanos =
@@ -151,11 +162,16 @@ public class CampaignService {
     }
 
     /**
-     * Saves the operation.
+     * Validates and persists campaign fields, checking expected revisions when applicable and
+     * publishing a snapshot when controlled activation requires one.
      *
-     * @param id the id
-     * @param request the request
-     * @return the save result
+     * <p>Delegates to {@code repository.saveAndFlush(...)}, {@code repository.save(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code HomepageCampaign} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Add image
+     *     description before publishing.}
      */
     @Transactional
     public HomepageCampaign save(Long id, CampaignRequest request) {
@@ -206,12 +222,13 @@ public class CampaignService {
     }
 
     /**
-     * Saves the operation.
+     * Validates and persists campaign fields, checking expected revisions when applicable and
+     * publishing a snapshot when controlled activation requires one.
      *
-     * @param id the id
-     * @param request the request
-     * @param expectedVersion the expected version
-     * @return the save result
+     * @param id the id supplied to this method
+     * @param request the request supplied to this method
+     * @param expectedVersion the expected version supplied to this method
+     * @return the value of {@code save(id, request)}
      */
     @Transactional
     public HomepageCampaign save(Long id, CampaignRequest request, Long expectedVersion) {
@@ -251,10 +268,15 @@ public class CampaignService {
     }
 
     /**
-     * History the operation.
+     * Returns a campaign's publication revisions newest first, rejecting disabled controlled
+     * publishing or an unknown campaign.
      *
-     * @param id the id
-     * @return the history result
+     * <p>Delegates to {@code repository.existsById(...)}.
+     *
+     * @param id the id supplied to this method
+     * @return the value of {@code publications.findByCampaignIdOrderByIdDesc(id)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Campaign not
+     *     found.}; {@code Controlled publishing is disabled.}
      */
     @Transactional(readOnly = true)
     public List<CampaignPublication> history(Long id) {
@@ -272,11 +294,16 @@ public class CampaignService {
     }
 
     /**
-     * Rollbacks the operation.
+     * Restores the campaign's published-revision pointer to a revision belonging to that campaign,
+     * checking an expected version when supplied.
      *
-     * @param id the id
-     * @param revision the revision
-     * @return the rollback result
+     * <p>Delegates to {@code repository.saveAndFlush(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param revision the revision supplied to this method
+     * @return the value of {@code repository.saveAndFlush(campaign)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Controlled
+     *     publishing is disabled.}; {@code Revision belongs to another campaign.}
      */
     @Transactional
     public HomepageCampaign rollback(Long id, Long revision) {
@@ -301,12 +328,13 @@ public class CampaignService {
     }
 
     /**
-     * Rollbacks the operation.
+     * Restores the campaign's published-revision pointer to a revision belonging to that campaign,
+     * checking an expected version when supplied.
      *
-     * @param id the id
-     * @param revision the revision
-     * @param expectedVersion the expected version
-     * @return the rollback result
+     * @param id the id supplied to this method
+     * @param revision the revision supplied to this method
+     * @param expectedVersion the expected version supplied to this method
+     * @return the value of {@code rollback(id, revision)}
      */
     @Transactional
     public HomepageCampaign rollback(Long id, Long revision, Long expectedVersion) {
@@ -322,12 +350,13 @@ public class CampaignService {
     }
 
     /**
-     * Uploads the operation.
+     * Stores campaign media and updates the draft, preserving idempotency checks and coordinating
+     * object cleanup with the transaction outcome.
      *
-     * @param id the id
-     * @param file the file
-     * @param fallback the fallback
-     * @return the upload result
+     * @param id the id supplied to this method
+     * @param file the file supplied to this method
+     * @param fallback the fallback supplied to this method
+     * @return the value of {@code upload(id, file, fallback, null)}
      */
     @Transactional
     public HomepageCampaign upload(Long id, MultipartFile file, boolean fallback) {
@@ -344,13 +373,24 @@ public class CampaignService {
     }
 
     /**
-     * Uploads the operation.
+     * Stores campaign media and updates the draft, preserving idempotency checks and coordinating
+     * object cleanup with the transaction outcome.
      *
-     * @param id the id
-     * @param file the file
-     * @param fallback the fallback
-     * @param requestId the request id
-     * @return the upload result
+     * <p>Delegates to {@code repository.mediaRequestHash(...)}, {@code
+     * storage.uploadCampaignMedia(...)}, {@code repository.recordMediaRequest(...)}, {@code
+     * repository.saveAndFlush(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param file the file supplied to this method
+     * @param fallback the fallback supplied to this method
+     * @param requestId the request id supplied to this method
+     * @return the {@code HomepageCampaign} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose an
+     *     image up to 5 MB or video up to 50 MB.}; {@code This upload has since been replaced or
+     *     removed. Reload the campaign before changing media.}; {@code This upload request was
+     *     already used for a different file.}
+     * @throws IllegalStateException when the method rejects the request with {@code Unable to read
+     *     campaign media.}
      */
     @Transactional
     public HomepageCampaign upload(Long id, MultipartFile file, boolean fallback, UUID requestId) {
@@ -445,14 +485,15 @@ public class CampaignService {
     }
 
     /**
-     * Uploads the operation.
+     * Stores campaign media and updates the draft, preserving idempotency checks and coordinating
+     * object cleanup with the transaction outcome.
      *
-     * @param id the id
-     * @param file the file
-     * @param fallback the fallback
-     * @param requestId the request id
-     * @param expectedVersion the expected version
-     * @return the upload result
+     * @param id the id supplied to this method
+     * @param file the file supplied to this method
+     * @param fallback the fallback supplied to this method
+     * @param requestId the request id supplied to this method
+     * @param expectedVersion the expected version supplied to this method
+     * @return the value of {@code upload(id, file, fallback, requestId)}
      */
     @Transactional
     public HomepageCampaign upload(
@@ -724,9 +765,12 @@ public class CampaignService {
     }
 
     /**
-     * Cleanups the operation.
+     * Attempts to delete campaign media from storage; logs deletion failures for later cleanup
+     * rather than propagating them.
      *
-     * @param url the url
+     * <p>Delegates to {@code storage.deleteCampaignMedia(...)}.
+     *
+     * @param url the url supplied to this method
      */
     private void cleanup(String url) {
         final long __gokulMethodStartedNanos =
@@ -748,10 +792,12 @@ public class CampaignService {
     }
 
     /**
-     * Requires the operation.
+     * Loads the campaign under the repository's update lock or rejects an unknown identifier.
      *
-     * @param id the id
-     * @return the require result
+     * <p>Delegates to {@code repository.findForUpdate(...)}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code HomepageCampaign} result
      */
     private HomepageCampaign require(Long id) {
         final long __gokulMethodStartedNanos =
@@ -766,10 +812,10 @@ public class CampaignService {
     }
 
     /**
-     * Animateds the operation.
+     * Returns whether campaign media is a GIF or has a video content type.
      *
-     * @param campaign the campaign
-     * @return the animated result
+     * @param campaign the campaign supplied to this method
+     * @return the {@code boolean} result
      */
     static boolean animated(HomepageCampaign campaign) {
         final long __gokulMethodStartedNanos =
@@ -809,10 +855,12 @@ public class CampaignService {
     }
 
     /**
-     * Hashes the operation.
+     * Returns the SHA-256 digest of the supplied value as hexadecimal text.
      *
-     * @param value the value
-     * @return the hash result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalStateException when the method rejects the request with {@code SHA-256
+     *     unavailable.}
      */
     private static String hash(byte[] value) {
         final long __gokulMethodStartedNanos =

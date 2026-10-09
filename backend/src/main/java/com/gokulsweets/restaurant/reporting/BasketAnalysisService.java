@@ -359,12 +359,12 @@ public class BasketAnalysisService {
     }
 
     /**
-     * Classify the operation.
+     * Classifies basket analysis data and returns the {@code BasketPairStrength} result.
      *
-     * @param pairOrders the pair orders
-     * @param support the support
-     * @param lift the lift
-     * @return the classify result
+     * @param pairOrders the pair orders supplied to this method
+     * @param support the support supplied to this method
+     * @param lift the lift supplied to this method
+     * @return the {@code BasketPairStrength} result
      */
     private BasketPairStrength classify(long pairOrders, BigDecimal support, BigDecimal lift) {
         final long __gokulMethodStartedNanos =
@@ -392,15 +392,15 @@ public class BasketAnalysisService {
     }
 
     /**
-     * Explanations the operation.
+     * Returns explanation information for basket analysis.
      *
-     * @param row the row
-     * @param support the support
-     * @param confidenceAToB the confidence ato b
-     * @param confidenceBToA the confidence bto a
-     * @param lift the lift
-     * @param strength the strength
-     * @return the explanation result
+     * @param row the row supplied to this method
+     * @param support the support supplied to this method
+     * @param confidenceAToB the confidence a to b supplied to this method
+     * @param confidenceBToA the confidence b to a supplied to this method
+     * @param lift the lift supplied to this method
+     * @param strength the strength supplied to this method
+     * @return the {@code String} result
      */
     private String explanation(
             PairRow row,
@@ -447,11 +447,11 @@ public class BasketAnalysisService {
     }
 
     /**
-     * Percents the operation.
+     * Returns percent information for basket analysis.
      *
-     * @param numerator the numerator
-     * @param denominator the denominator
-     * @return the percent result
+     * @param numerator the numerator supplied to this method
+     * @param denominator the denominator supplied to this method
+     * @return the {@code BigDecimal} result
      */
     private BigDecimal percent(long numerator, long denominator) {
         final long __gokulMethodStartedNanos =
@@ -467,11 +467,11 @@ public class BasketAnalysisService {
     }
 
     /**
-     * Ratios the operation.
+     * Returns ratio information for basket analysis.
      *
-     * @param numerator the numerator
-     * @param denominator the denominator
-     * @return the ratio result
+     * @param numerator the numerator supplied to this method
+     * @param denominator the denominator supplied to this method
+     * @return the {@code BigDecimal} result
      */
     private BigDecimal ratio(long numerator, long denominator) {
         final long __gokulMethodStartedNanos =

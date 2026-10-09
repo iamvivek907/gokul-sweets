@@ -22,10 +22,10 @@ public class OccasionCatalogueController {
     private final com.gokulsweets.restaurant.storage.R2StorageService storage;
 
     /**
-     * Customers the operation.
+     * Handles {@code GET /api/branches/{branchId}/occasion-catalogue} for occasion catalogue.
      *
-     * @param branchId the branch id
-     * @return the customer result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code catalogue.catalogue(branchId, false)}
      */
     @GetMapping("/api/branches/{branchId}/occasion-catalogue")
     public OccasionCatalogue.Catalogue customer(@PathVariable long branchId) {
@@ -40,10 +40,10 @@ public class OccasionCatalogueController {
     }
 
     /**
-     * Admins the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/occasion-catalogue} for occasion catalogue.
      *
-     * @param branchId the branch id
-     * @return the admin result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code catalogue.catalogue(branchId, true)}
      */
     @GetMapping("/api/admin/branches/{branchId}/occasion-catalogue")
     @PreAuthorize("hasAuthority('MENU_MANAGE')")
@@ -60,11 +60,12 @@ public class OccasionCatalogueController {
     }
 
     /**
-     * Sweets the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/occasion-catalogue/sweets/{productId}} for
+     * occasion catalogue.
      *
-     * @param branchId the branch id
-     * @param productId the product id
-     * @param input the input
+     * @param branchId the branch id supplied to this method
+     * @param productId the product id supplied to this method
+     * @param input the input supplied to this method
      */
     @PutMapping("/api/admin/branches/{branchId}/occasion-catalogue/sweets/{productId}")
     @PreAuthorize("hasAuthority('MENU_MANAGE')")
@@ -88,11 +89,12 @@ public class OccasionCatalogueController {
     }
 
     /**
-     * Boxs the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/occasion-catalogue/boxes} for occasion
+     * catalogue.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the box result
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code catalogue.saveBox(branchId, input)}
      */
     @PostMapping("/api/admin/branches/{branchId}/occasion-catalogue/boxes")
     @PreAuthorize("hasAuthority('MENU_MANAGE')")
@@ -113,10 +115,11 @@ public class OccasionCatalogueController {
     }
 
     /**
-     * Brandings the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/occasion-catalogue/branding} for occasion
+     * catalogue.
      *
-     * @param branchId the branch id
-     * @param input the input
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
      */
     @PutMapping("/api/admin/branches/{branchId}/occasion-catalogue/branding")
     @PreAuthorize("hasAuthority('MENU_MANAGE')")
@@ -138,11 +141,14 @@ public class OccasionCatalogueController {
     }
 
     /**
-     * Photos the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/occasion-catalogue/photos} for occasion
+     * catalogue.
      *
-     * @param branchId the branch id
-     * @param image the image
-     * @return the photo result
+     * <p>Delegates to {@code storage.uploadCampaignMedia(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param image the image supplied to this method
+     * @return the {@code java.util.Map<String, String>} result
      */
     @PostMapping(
             value = "/api/admin/branches/{branchId}/occasion-catalogue/photos",

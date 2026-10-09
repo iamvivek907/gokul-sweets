@@ -17,10 +17,12 @@ public class BranchOfferingsController {
     private final BranchOfferingsService service;
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/offerings} for branch offerings.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * <p>Delegates to {@code service.admin(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code service.admin(branchId)}
      */
     @GetMapping
     public BranchOfferingsService.Snapshot get(@PathVariable long branchId) {
@@ -35,12 +37,14 @@ public class BranchOfferingsController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/offerings} for branch offerings.
      *
-     * @param branchId the branch id
-     * @param version the version
-     * @param input the input
-     * @return the save result
+     * <p>Delegates to {@code service.save(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param version the version supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code service.save(branchId, input, version)}
      */
     @PutMapping
     public BranchOfferingsService.Snapshot save(
@@ -62,11 +66,13 @@ public class BranchOfferingsController {
     }
 
     /**
-     * Publishes the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/offerings/publish} for branch offerings.
      *
-     * @param branchId the branch id
-     * @param version the version
-     * @return the publish result
+     * <p>Delegates to {@code service.publish(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code service.publish(branchId, version)}
      */
     @PostMapping("/publish")
     public BranchOfferingsService.Snapshot publish(

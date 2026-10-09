@@ -21,10 +21,15 @@ public class DeliveryOrderWindowLookup {
     private final JdbcTemplate jdbc;
 
     /**
-     * Requires the operation.
+     * Loads the persisted window for a delivery order in its branch, rejecting missing or
+     * inconsistent delivery-window references.
      *
-     * @param order the order
-     * @return the require result
+     * <p>Reads {@code delivery_capacity_windows}, {@code delivery_zones}.
+     *
+     * @param order the order supplied to this method
+     * @return the {@code Window} result
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery order
+     *     window is unavailable.}
      */
     @Transactional(readOnly = true)
     public Window require(Order order) {

@@ -15,10 +15,10 @@ public class BranchDiscoveryController {
     private final BranchDiscoveryService discovery;
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/branches/{branchId}/discovery} for branch discovery.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code discovery.get(branchId)}
      */
     @GetMapping
     public BranchDiscoveryService.Discovery get(@PathVariable long branchId) {

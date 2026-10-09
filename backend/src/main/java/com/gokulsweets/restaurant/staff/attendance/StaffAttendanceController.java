@@ -158,11 +158,14 @@ public class StaffAttendanceController {
     }
 
     /**
-     * Resubmits the operation.
+     * Handles {@code POST /api/admin/me/attendance/{attendanceId}/resubmit} for staff attendance.
      *
-     * @param attendanceId the attendance id
-     * @param request the request
-     * @return the resubmit result
+     * <p>Delegates to {@code staffAttendanceService.resubmit(...)}.
+     *
+     * @param attendanceId the attendance id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(staffAttendanceService.resubmit(attendanceId,
+     *     request))}
      */
     @PostMapping("/{attendanceId}/resubmit")
     public ResponseEntity<AttendanceResponse> resubmit(
@@ -181,11 +184,14 @@ public class StaffAttendanceController {
     }
 
     /**
-     * Cancels the operation.
+     * Handles {@code POST /api/admin/me/attendance/{attendanceId}/cancel} for staff attendance.
      *
-     * @param attendanceId the attendance id
-     * @param request the request
-     * @return the cancel result
+     * <p>Delegates to {@code staffAttendanceService.cancel(...)}.
+     *
+     * @param attendanceId the attendance id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(staffAttendanceService.cancel(attendanceId,
+     *     request))}
      */
     @PostMapping("/{attendanceId}/cancel")
     public ResponseEntity<AttendanceResponse> cancel(

@@ -46,10 +46,10 @@ public record AdminBranchResponse(
         LocalDateTime updatedAt) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code AdminBranchResponse} representation.
      *
-     * @param branch the branch
-     * @return the from result
+     * @param branch the branch supplied to this method
+     * @return the {@code AdminBranchResponse} result
      */
     public static AdminBranchResponse from(Branch branch) {
         final long __gokulMethodStartedNanos =

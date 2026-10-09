@@ -25,10 +25,10 @@ public class TrustedCheckoutIdentity {
     private final Environment settings;
 
     /**
-     * Tokens the operation.
+     * Returns token information for trusted checkout identity.
      *
-     * @param request the request
-     * @return the token result
+     * @param request the request supplied to this method
+     * @return the {@code String} result
      */
     public String token(HttpServletRequest request) {
         final long __gokulMethodStartedNanos =

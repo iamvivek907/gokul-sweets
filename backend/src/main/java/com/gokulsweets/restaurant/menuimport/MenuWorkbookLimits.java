@@ -31,10 +31,12 @@ final class MenuWorkbookLimits {
             AppConstant.MENU_WORKBOOK_LIMITS_MAX_EXPANDED_BYTES;
 
     /**
-     * Validates the operation.
+     * Validates menu workbook limits data.
      *
-     * @param input the input
-     * @throws IOException if the operation cannot complete
+     * @param input the input supplied to this method
+     * @throws XMLStreamException when the method rejects the request with {@code External XML
+     *     references are not supported.}
+     * @throws IOException if the underlying operation fails
      */
     static void validate(InputStream input) throws IOException {
         final long __gokulMethodStartedNanos =
@@ -210,9 +212,9 @@ final class MenuWorkbookLimits {
     }
 
     /**
-     * Rejects the operation.
+     * Rejects menu workbook limits data.
      *
-     * @param message the message
+     * @param message the message supplied to this method
      */
     private static void reject(String message) {
         final long __gokulMethodStartedNanos =
@@ -258,9 +260,9 @@ final class MenuWorkbookLimits {
         }
 
         /**
-         * Counts the operation.
+         * Returns count information for bounded part.
          *
-         * @param amount the amount
+         * @param amount the amount supplied to this method
          */
         private void count(int amount) {
             final long __gokulMethodStartedNanos =
@@ -280,10 +282,10 @@ final class MenuWorkbookLimits {
         }
 
         /**
-         * Reads the operation.
+         * Returns read information for bounded part.
          *
-         * @return the read result
-         * @throws IOException if the operation cannot complete
+         * @return the value of {@code value}
+         * @throws IOException if the underlying operation fails
          */
         @Override
         public int read() throws IOException {
@@ -300,13 +302,13 @@ final class MenuWorkbookLimits {
         }
 
         /**
-         * Reads the operation.
+         * Returns read information for bounded part.
          *
-         * @param bytes the bytes
-         * @param offset the offset
-         * @param length the length
-         * @return the read result
-         * @throws IOException if the operation cannot complete
+         * @param bytes the bytes supplied to this method
+         * @param offset the offset supplied to this method
+         * @param length the length supplied to this method
+         * @return the value of {@code count}
+         * @throws IOException if the underlying operation fails
          */
         @Override
         public int read(byte[] bytes, int offset, int length) throws IOException {
@@ -325,7 +327,7 @@ final class MenuWorkbookLimits {
             }
         }
 
-        /** Closes the operation. */
+        /** Closes bounded part data. */
         @Override
         public void close() {
             final long __gokulMethodStartedNanos =

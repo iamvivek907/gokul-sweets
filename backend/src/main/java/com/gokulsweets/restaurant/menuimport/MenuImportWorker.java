@@ -48,7 +48,17 @@ public class MenuImportWorker {
      */
     record Claim(UUID id, UUID token) {}
 
-    /** Processes the operation. */
+    /**
+     * Processes menu import data.
+     *
+     * <p>Reads {@code menu_import_jobs}.
+     *
+     * <p>Writes {@code SKIP}, {@code menu_import_jobs}.
+     *
+     * @throws org.springframework.security.access.AccessDeniedException when the method rejects the
+     *     request with {@code Import requester is disabled.}; {@code Import requester no longer has
+     *     branch menu access.}
+     */
     @Scheduled(
             fixedDelayString = "${gokul.jobs.poll-ms:2000}",
             initialDelayString = "${gokul.jobs.poll-ms:2000}")

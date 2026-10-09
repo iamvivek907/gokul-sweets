@@ -30,11 +30,13 @@ public class IdentityDeviceRegistry {
     private final SecureRandom random = new SecureRandom();
 
     /**
-     * Issues the operation.
+     * Issues identity device registry data and returns the {@code String} result.
      *
-     * @param environment the environment
-     * @param now the now
-     * @return the issue result
+     * <p>Writes {@code identity_devices}.
+     *
+     * @param environment the environment supplied to this method
+     * @param now the now supplied to this method
+     * @return the value of {@code token}
      */
     public String issue(ConsentEnvironment environment, Instant now) {
         final long __gokulMethodStartedNanos =
@@ -62,12 +64,14 @@ public class IdentityDeviceRegistry {
     }
 
     /**
-     * Recognizeds the operation.
+     * Returns recognized information for identity device registry.
      *
-     * @param environment the environment
-     * @param token the token
-     * @param now the now
-     * @return the recognized result
+     * <p>Reads {@code identity_devices}.
+     *
+     * @param environment the environment supplied to this method
+     * @param token the token supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code boolean} result
      */
     public boolean recognized(ConsentEnvironment environment, String token, Instant now) {
         final long __gokulMethodStartedNanos =

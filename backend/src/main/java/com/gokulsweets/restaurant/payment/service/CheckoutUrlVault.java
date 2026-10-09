@@ -30,9 +30,11 @@ public class CheckoutUrlVault {
     }
 
     /**
-     * Key the operation.
+     * Returns key information for checkout url vault.
      *
-     * @return the key result
+     * @return the {@code SecretKeySpec} result
+     * @throws IllegalStateException when the method rejects the request with {@code Configure a
+     *     base64 32-byte payment checkout encryption key.}
      */
     private SecretKeySpec key() {
         final long __gokulMethodStartedNanos = MethodTiming.start(CheckoutUrlVault.class, "key()");
@@ -51,10 +53,14 @@ public class CheckoutUrlVault {
     }
 
     /**
-     * Seals the operation.
+     * Seals checkout url vault data and returns the {@code String} result.
      *
-     * @param url the url
-     * @return the seal result
+     * @param url the url supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     checkout URL.}
+     * @throws IllegalStateException when the method rejects the request with {@code Could not
+     *     securely persist payment checkout.}
      */
     public String seal(String url) {
         final long __gokulMethodStartedNanos =
@@ -91,10 +97,12 @@ public class CheckoutUrlVault {
     }
 
     /**
-     * Opens the operation.
+     * Opens checkout url vault data and returns the {@code String} result.
      *
-     * @param encoded the encoded
-     * @return the open result
+     * @param encoded the encoded supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalStateException when the method rejects the request with {@code Payment
+     *     checkout could not be recovered. Check provider status before continuing.}
      */
     public String open(String encoded) {
         final long __gokulMethodStartedNanos =

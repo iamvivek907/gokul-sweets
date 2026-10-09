@@ -337,12 +337,14 @@ WHERE own.order_id=? AND own.environment=? AND s.token_digest=?
     }
 
     /**
-     * Ownses the operation.
+     * Returns owns information for verified order ownership.
      *
-     * @param environment the environment
-     * @param subjectId the subject id
-     * @param orderNumber the order number
-     * @return the owns result
+     * <p>Reads {@code orders}, {@code verified_order_ownership}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subjectId the subject id supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @return the {@code boolean} result
      */
     public boolean owns(String environment, UUID subjectId, String orderNumber) {
         final long __gokulMethodStartedNanos =

@@ -20,9 +20,9 @@ public class OwnerAccountController {
     private final StaffAuthorizationService authorization;
 
     /**
-     * Statuses the operation.
+     * Handles {@code GET /api/admin/auth/owner-setup} for owner account.
      *
-     * @return the status result
+     * @return the value of {@code response(accounts.status())}
      */
     @GetMapping("/api/admin/auth/owner-setup")
     public ResponseEntity<OwnerAccountService.Status> status() {
@@ -37,11 +37,12 @@ public class OwnerAccountController {
     }
 
     /**
-     * Setups the operation.
+     * Handles {@code POST /api/admin/auth/owner-setup} for owner account.
      *
-     * @param input the input
-     * @param request the request
-     * @return the setup result
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code response(accounts.setup(input.setupKey(), input.username(),
+     *     input.password(), input.fullName()))}
      */
     @PostMapping("/api/admin/auth/owner-setup")
     public ResponseEntity<OwnerAccountService.Created> setup(
@@ -65,11 +66,12 @@ public class OwnerAccountController {
     }
 
     /**
-     * Recovers the operation.
+     * Handles {@code POST /api/admin/auth/owner-recovery} for owner account.
      *
-     * @param input the input
-     * @param request the request
-     * @return the recover result
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code response(accounts.recover(input.recoveryKey(), input.username(),
+     *     input.password()))}
      */
     @PostMapping("/api/admin/auth/owner-recovery")
     public ResponseEntity<OwnerAccountService.Created> recover(
@@ -90,9 +92,10 @@ public class OwnerAccountController {
     }
 
     /**
-     * Accounts the operation.
+     * Handles {@code GET /api/admin/account-security} for owner account.
      *
-     * @return the account result
+     * @return the value of {@code
+     *     response(accounts.account(authorization.getCurrentStaff().getId()))}
      */
     @GetMapping("/api/admin/account-security")
     public ResponseEntity<OwnerAccountService.Account> account() {
@@ -107,11 +110,12 @@ public class OwnerAccountController {
     }
 
     /**
-     * Key the operation.
+     * Handles {@code POST /api/admin/account-security/recovery-key} for owner account.
      *
-     * @param input the input
-     * @param request the request
-     * @return the key result
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code response(accounts.recoveryKey(id, input.password(),
+     *     input.code()))}
      */
     @PostMapping("/api/admin/account-security/recovery-key")
     public ResponseEntity<OwnerAccountService.Created> key(
@@ -132,11 +136,12 @@ public class OwnerAccountController {
     }
 
     /**
-     * Usernames the operation.
+     * Handles {@code POST /api/admin/account-security/username} for owner account.
      *
-     * @param input the input
-     * @param request the request
-     * @return the username result
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build()}
      */
     @PostMapping("/api/admin/account-security/username")
     public ResponseEntity<Void> username(@RequestBody Rename input, HttpServletRequest request) {
@@ -157,11 +162,13 @@ public class OwnerAccountController {
     }
 
     /**
-     * Responses the operation.
+     * Wraps the response in HTTP 200 with no-store caching so credential and account responses are
+     * not cached.
      *
-     * @param <T> the generic t type
-     * @param body the body
-     * @return the response result
+     * @param <T> the T type
+     * @param body the body supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body)}
      */
     private static <T> ResponseEntity<T> response(T body) {
         final long __gokulMethodStartedNanos =

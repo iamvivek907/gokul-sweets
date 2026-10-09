@@ -20,12 +20,12 @@ public class OrderDemandController {
     private final OrderDemandService demand;
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/orders/planning/demand} for order demand.
      *
-     * @param branchId the branch id
-     * @param from the from
-     * @param to the to
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @param from the from supplied to this method
+     * @param to the to supplied to this method
+     * @return the value of {@code demand.get(branchId, from, to)}
      */
     @GetMapping("/demand")
     public List<OrderDemandService.Demand> get(
@@ -43,12 +43,12 @@ public class OrderDemandController {
     }
 
     /**
-     * Exports the operation.
+     * Handles {@code GET /api/admin/orders/planning/demand/export} for order demand.
      *
-     * @param branchId the branch id
-     * @param from the from
-     * @param to the to
-     * @return the export result
+     * @param branchId the branch id supplied to this method
+     * @param from the from supplied to this method
+     * @param to the to supplied to this method
+     * @return the {@code ResponseEntity<byte[]>} result
      */
     @GetMapping("/demand/export")
     public ResponseEntity<byte[]> export(
@@ -80,10 +80,10 @@ public class OrderDemandController {
     }
 
     /**
-     * Policieses the operation.
+     * Handles {@code GET /api/admin/orders/planning/products} for order demand.
      *
-     * @param branchId the branch id
-     * @return the policies result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code demand.policies(branchId)}
      */
     @GetMapping("/products")
     public List<OrderDemandService.Policy> policies(@RequestParam long branchId) {
@@ -105,12 +105,12 @@ public class OrderDemandController {
     public record PolicyRequest(boolean earlyPreparationAllowed) {}
 
     /**
-     * Policy the operation.
+     * Handles {@code PUT /api/admin/orders/planning/products/{productId}} for order demand.
      *
-     * @param productId the product id
-     * @param branchId the branch id
-     * @param input the input
-     * @return the policy result
+     * @param productId the product id supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code ResponseEntity.noContent().build()}
      */
     @PutMapping("/products/{productId}")
     public ResponseEntity<Void> policy(

@@ -126,9 +126,11 @@ public class MenuAppearanceController {
     public record Snapshot(long version, Config draft, Config live, String publishedAt) {}
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for menu appearance data.
      *
-     * @param branch the branch
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * @param branch the branch supplied to this method
      */
     private void authorize(long branch) {
         final long __gokulMethodStartedNanos =
@@ -143,9 +145,9 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Empty the operation.
+     * Returns a menu-appearance configuration with no category or product overrides.
      *
-     * @return the empty result
+     * @return the {@code Config} result
      */
     private Config empty() {
         final long __gokulMethodStartedNanos =
@@ -159,10 +161,12 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Decodes the operation.
+     * Decodes menu appearance data and returns the {@code Config} result.
      *
-     * @param value the value
-     * @return the decode result
+     * @param value the value supplied to this method
+     * @return the value of {@code mapper.readValue(String.valueOf(value), Config.class)}
+     * @throws IllegalStateException when the method rejects the request with {@code Unable to read
+     *     menu appearance.}
      */
     private Config decode(Object value) {
         final long __gokulMethodStartedNanos =
@@ -180,10 +184,12 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Encodes the operation.
+     * Encodes menu appearance data and returns the {@code String} result.
      *
-     * @param config the config
-     * @return the encode result
+     * @param config the config supplied to this method
+     * @return the value of {@code mapper.writeValueAsString(config)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid menu
+     *     appearance.}
      */
     private String encode(Config config) {
         final long __gokulMethodStartedNanos =
@@ -201,10 +207,12 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Reads the operation.
+     * Returns read information for menu appearance.
      *
-     * @param branch the branch
-     * @return the read result
+     * <p>Reads {@code branch_menu_appearance}.
+     *
+     * @param branch the branch supplied to this method
+     * @return the {@code Snapshot} result
      */
     private Snapshot read(long branch) {
         final long __gokulMethodStartedNanos =
@@ -227,10 +235,11 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Admins the operation.
+     * Handles {@code GET /api/admin/branches/{branch}/menu/workspace/appearance} for menu
+     * appearance.
      *
-     * @param branch the branch
-     * @return the admin result
+     * @param branch the branch supplied to this method
+     * @return the value of {@code read(branch)}
      */
     @GetMapping("/api/admin/branches/{branch}/menu/workspace/appearance")
     @Transactional(readOnly = true)
@@ -247,10 +256,14 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Lives the operation.
+     * Handles {@code GET /api/menu/appearance} for menu appearance.
      *
-     * @param branchId the branch id
-     * @return the live result
+     * <p>Reads {@code branches}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Config} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Branch
+     *     unavailable.}
      */
     @GetMapping("/api/menu/appearance")
     @Transactional(readOnly = true)
@@ -285,9 +298,11 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Manageds the operation.
+     * Returns managed information for menu appearance.
      *
-     * @param url the url
+     * <p>Delegates to {@code storage.validateManagedCampaignUrl(...)}.
+     *
+     * @param url the url supplied to this method
      */
     private void managed(String url) {
         final long __gokulMethodStartedNanos =
@@ -302,11 +317,22 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/branches/{branch}/menu/workspace/appearance} for menu
+     * appearance.
      *
-     * @param branch the branch
-     * @param input the input
-     * @return the save result
+     * <p>Reads {@code branch_menu_appearance}.
+     *
+     * <p>Writes {@code branch_menu_appearance}, {@code menu_workspace_audit}.
+     *
+     * @param branch the branch supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code read(branch)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     destination category for the button.}; {@code Duplicate banner key.}; {@code Duplicate
+     *     category.}; {@code End must follow start.}; {@code Video banners need a static poster for
+     *     reduced motion.}
+     * @throws ResponseStatusException when the method rejects the request with {@code Appearance
+     *     changed. Reload before saving; draft retained.}
      */
     @PutMapping("/api/admin/branches/{branch}/menu/workspace/appearance")
     @Transactional
@@ -380,10 +406,14 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Category the operation.
+     * Returns category information for menu appearance.
      *
-     * @param branch the branch
-     * @param id the id
+     * <p>Reads {@code branch_products}, {@code products}.
+     *
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     category in this branch menu.}
      */
     private void category(long branch, long id) {
         final long __gokulMethodStartedNanos =
@@ -406,12 +436,17 @@ public class MenuAppearanceController {
     }
 
     /**
-     * Medias the operation.
+     * Handles {@code POST /api/admin/branches/{branch}/menu/workspace/appearance/media} for menu
+     * appearance.
      *
-     * @param branch the branch
-     * @param file the file
-     * @param poster the poster
-     * @return the media result
+     * <p>Delegates to {@code storage.uploadCampaignMedia(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param file the file supplied to this method
+     * @param poster the poster supplied to this method
+     * @return the value of {@code storage.uploadCampaignMedia(branch, file, poster)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     JPEG, PNG, WebP, MP4 or WebM file.}
      */
     @PostMapping(
             value = "/api/admin/branches/{branch}/menu/workspace/appearance/media",

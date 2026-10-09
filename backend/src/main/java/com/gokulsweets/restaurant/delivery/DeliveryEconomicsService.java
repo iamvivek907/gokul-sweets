@@ -96,10 +96,15 @@ public class DeliveryEconomicsService {
             String alternative) {}
 
     /**
-     * Assesses the operation.
+     * Assesses delivery economics data and returns the {@code Assessment} result.
      *
-     * @param price the price
-     * @return the assess result
+     * @param price the price supplied to this method
+     * @return the {@code Assessment} result
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery cost
+     *     inputs are stale; choose pickup instead.}; {@code Delivery cost policy is invalid.};
+     *     {@code Delivery cost validity date is missing; choose pickup instead.}; {@code Delivery
+     *     cost version is missing; choose pickup instead.}; {@code Delivery costs are not
+     *     configured.}
      */
     public Assessment assess(OrderCalculationResult price) {
         final long __gokulMethodStartedNanos =
@@ -191,10 +196,10 @@ public class DeliveryEconomicsService {
     }
 
     /**
-     * Money the operation.
+     * Rounds the monetary amount to two decimal places using half-up rounding.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code value.setScale(2, RoundingMode.HALF_UP)}
      */
     private static BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =

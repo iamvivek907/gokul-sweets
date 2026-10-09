@@ -49,10 +49,17 @@ public class RebateManagementService {
     // CREATE
     // =========================================================
     /**
-     * Creates the operation.
+     * Creates rebate management data and returns the {@code RebateResponse} result.
      *
-     * @param request the request
-     * @return the create result
+     * <p>Authorization checks include {@code PermissionName.REBATE_MANAGE}.
+     *
+     * <p>Delegates to {@code staffAuthorizationService.requirePermission(...)}, {@code
+     * rebateRepository.existsByCodeIgnoreCase(...)}, {@code rebateRepository.save(...)}.
+     *
+     * @param request the request supplied to this method
+     * @return the value of {@code toResponse(saved, savedSlabs, savedCustomers)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Rebate code
+     *     already exists.}
      */
     @Transactional
     public RebateResponse create(CreateRebateRequest request) {
@@ -167,11 +174,19 @@ public class RebateManagementService {
     // UPDATE
     // =========================================================
     /**
-     * Updates the operation.
+     * Updates rebate management data and returns the {@code RebateResponse} result.
      *
-     * @param rebateId the rebate id
-     * @param request the request
-     * @return the update result
+     * <p>Authorization checks include {@code PermissionName.REBATE_MANAGE}.
+     *
+     * <p>Delegates to {@code staffAuthorizationService.requirePermission(...)}, {@code
+     * rebateRepository.existsByCodeIgnoreCaseAndIdNot(...)}, {@code rebateRepository.save(...)},
+     * {@code rebateSlabRepository.deleteByRebateId(...)}.
+     *
+     * @param rebateId the rebate id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code buildResponse(rebate)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Rebate code
+     *     already exists.}
      */
     @Transactional
     public RebateResponse update(Long rebateId, UpdateRebateRequest request) {
@@ -252,10 +267,10 @@ public class RebateManagementService {
     // ACTIVATE / DEACTIVATE
     // =========================================================
     /**
-     * Activates the operation.
+     * Activates rebate management data and returns the {@code RebateResponse} result.
      *
-     * @param rebateId the rebate id
-     * @return the activate result
+     * @param rebateId the rebate id supplied to this method
+     * @return the value of {@code changeActiveStatus(rebateId, true)}
      */
     @Transactional
     public RebateResponse activate(Long rebateId) {
@@ -270,10 +285,10 @@ public class RebateManagementService {
     }
 
     /**
-     * Deactivates the operation.
+     * Deactivates rebate management data and returns the {@code RebateResponse} result.
      *
-     * @param rebateId the rebate id
-     * @return the deactivate result
+     * @param rebateId the rebate id supplied to this method
+     * @return the value of {@code changeActiveStatus(rebateId, false)}
      */
     @Transactional
     public RebateResponse deactivate(Long rebateId) {
@@ -1105,10 +1120,10 @@ public class RebateManagementService {
     // NORMALIZATION
     // =========================================================
     /**
-     * Money the operation.
+     * Rounds the monetary amount to two decimal places using half-up rounding.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code value.setScale(2, RoundingMode.HALF_UP)}
      */
     private BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =

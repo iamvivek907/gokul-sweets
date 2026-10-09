@@ -154,10 +154,13 @@ public class InventoryCentreJobs {
     }
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for inventory centre jobs data.
      *
-     * @param branch the branch
-     * @param manage the manage
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}, {@code manage ?
+     * PermissionName.INVENTORY_MANAGE : PermissionName.INVENTORY_VIEW}.
+     *
+     * @param branch the branch supplied to this method
+     * @param manage the manage supplied to this method
      */
     public void authorize(long branch, boolean manage) {
         final long __gokulMethodStartedNanos =
@@ -176,11 +179,30 @@ public class InventoryCentreJobs {
     }
 
     /**
-     * Submits the operation.
+     * Submits inventory centre jobs data and returns the {@code Map<String, Object>} result.
      *
-     * @param branch the branch
-     * @param input the input
-     * @return the submit result
+     * <p>Reads {@code inventory_centre_jobs}, {@code mobile_menu_config}.
+     *
+     * <p>Writes {@code inventory_centre_jobs}, {@code inventory_centre_tasks}.
+     *
+     * @param branch the branch supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Map<String, Object>} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose
+     *     current/future dates, at most 60 days and 10,000 item-date allocations per job.}; {@code
+     *     Daily capacity does not confirm prepared stock.}; {@code Enter allocation quantities for
+     *     inventory changes.}; {@code Enter different opening and closing times in IST.}; {@code
+     *     Future stock cannot be confirmed physically ready.}; {@code Hours-only plans do not
+     *     confirm stock.}; {@code Select each product once.}; {@code Select inventory or
+     *     service-hour changes.}; {@code Some items do not belong to this branch.}
+     * @throws IllegalStateException when the method rejects the request with {@code Unable to
+     *     serialize inventory request.}
+     * @throws ResponseStatusException when the method rejects the request with {@code An allocation
+     *     changed. Reload before submitting.}; {@code An item policy or branch entry changed.
+     *     Reload before submitting.}; {@code An item selling unit changed. Reload before
+     *     submitting.}; {@code Submission identifier is already used for a different plan.}; {@code
+     *     This branch already has an active inventory job.}; {@code Three inventory jobs are
+     *     active. Wait for completion before submitting another.}
      */
     @Transactional
     public Map<String, Object> submit(long branch, Submit input) {
@@ -399,10 +421,12 @@ public class InventoryCentreJobs {
     }
 
     /**
-     * Timings the operation.
+     * Returns timing information for inventory centre jobs.
      *
-     * @param bp the bp
-     * @return the timing result
+     * <p>Reads {@code menu_service_items}.
+     *
+     * @param bp the bp supplied to this method
+     * @return the value of {@code rows.isEmpty() ? null : rows.getFirst()}
      */
     public Timing timing(long bp) {
         final long __gokulMethodStartedNanos =
@@ -427,11 +451,15 @@ public class InventoryCentreJobs {
     }
 
     /**
-     * Summary the operation.
+     * Returns summary information for inventory centre jobs.
      *
-     * @param branch the branch
-     * @param job the job
-     * @return the summary result
+     * <p>Reads {@code inventory_centre_jobs}.
+     *
+     * @param branch the branch supplied to this method
+     * @param job the job supplied to this method
+     * @return the value of {@code rows.getFirst()}
+     * @throws ResponseStatusException when the method rejects the request with {@code Inventory job
+     *     not found.}
      */
     @Transactional(readOnly = true)
     public Map<String, Object> summary(long branch, UUID job) {
@@ -455,10 +483,12 @@ public class InventoryCentreJobs {
     }
 
     /**
-     * Recents the operation.
+     * Returns recent information for inventory centre jobs.
      *
-     * @param branch the branch
-     * @return the recent result
+     * <p>Reads {@code inventory_centre_jobs}.
+     *
+     * @param branch the branch supplied to this method
+     * @return the {@code List<Map<String, Object>>} result
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> recent(long branch) {
@@ -478,12 +508,16 @@ public class InventoryCentreJobs {
     }
 
     /**
-     * Resultses the operation.
+     * Returns results information for inventory centre jobs.
      *
-     * @param branch the branch
-     * @param job the job
-     * @param page the page
-     * @return the results result
+     * <p>Reads {@code inventory_centre_tasks}, {@code products}.
+     *
+     * @param branch the branch supplied to this method
+     * @param job the job supplied to this method
+     * @param page the page supplied to this method
+     * @return the {@code List<Map<String, Object>>} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     result page.}
      */
     @Transactional(readOnly = true)
     public List<Map<String, Object>> results(long branch, UUID job, int page) {

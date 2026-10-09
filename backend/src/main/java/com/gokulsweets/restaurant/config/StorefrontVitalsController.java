@@ -27,10 +27,10 @@ public class StorefrontVitalsController {
     private final EnhancementProperties features;
 
     /**
-     * Receives the operation.
+     * Handles {@code POST /api/storefront/vitals} for storefront vitals.
      *
-     * @param metric the metric
-     * @return the receive result
+     * @param metric the metric supplied to this method
+     * @return the {@code ResponseEntity<Void>} result
      */
     @PostMapping("/api/storefront/vitals")
     public ResponseEntity<Void> receive(@RequestBody Vital metric) {

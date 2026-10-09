@@ -22,7 +22,12 @@ public class LoyaltyReconciler {
 
     private final LoyaltyService loyalty;
 
-    /** Reconciles the operation. */
+    /**
+     * Reconciles loyalty reconciler data.
+     *
+     * <p>Reads {@code loyalty_accounts}, {@code loyalty_holds}, {@code loyalty_ledger}, {@code
+     * loyalty_lots}, {@code orders}, {@code payments}, {@code verified_order_ownership}.
+     */
     @Scheduled(fixedDelayString = "${gokul.loyalty.reconcile-delay-ms:15000}")
     public void reconcile() {
         final long __gokulMethodStartedNanos =

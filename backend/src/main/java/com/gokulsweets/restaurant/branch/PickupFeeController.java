@@ -46,10 +46,12 @@ public class PickupFeeController {
             boolean taxReviewed) {}
 
     /**
-     * Branches the operation.
+     * Returns branch information for pickup fee.
      *
-     * @param id the id
-     * @return the branch result
+     * <p>Authorization checks include {@code PermissionName.BRANCH_MANAGE}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code Branch} result
      */
     private Branch branch(long id) {
         final long __gokulMethodStartedNanos =
@@ -66,10 +68,10 @@ public class PickupFeeController {
     }
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/pickup-fee} for pickup fee.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Fee} result
      */
     @GetMapping
     public Fee get(@PathVariable long branchId) {
@@ -84,11 +86,15 @@ public class PickupFeeController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/pickup-fee} for pickup fee.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the save result
+     * <p>Authorization checks include {@code PermissionName.BRANCH_MANAGE}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Fee} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Confirm the
+     *     fee tax treatment before enabling it.}
      */
     @PutMapping
     @org.springframework.transaction.annotation.Transactional

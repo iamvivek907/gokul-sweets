@@ -136,7 +136,13 @@ public record CampaignRequest(
                 null);
     }
 
-    /** Validates the operation. */
+    /**
+     * Validates campaign data.
+     *
+     * @throws IllegalArgumentException when the method rejects the request with {@code Campaign end
+     *     must be after its start.}; {@code Provide both a button label and a destination, or
+     *     neither.}
+     */
     public void validate() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(CampaignRequest.class, "validate()");

@@ -22,12 +22,12 @@ public class OptionalProcessingGate {
     private final Environment settings;
 
     /**
-     * Allowses the operation.
+     * Returns allows information for optional processing gate.
      *
-     * @param environment the environment
-     * @param verifiedSubjectId the verified subject id
-     * @param purpose the purpose
-     * @return the allows result
+     * @param environment the environment supplied to this method
+     * @param verifiedSubjectId the verified subject id supplied to this method
+     * @param purpose the purpose supplied to this method
+     * @return the {@code boolean} result
      */
     public boolean allows(
             ConsentEnvironment environment, UUID verifiedSubjectId, ConsentPurpose purpose) {

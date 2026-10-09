@@ -13,10 +13,10 @@ public final class PaymentFeePricing {
     private PaymentFeePricing() {}
 
     /**
-     * Zeros the operation.
+     * Returns zero information for payment fee pricing.
      *
-     * @param value the value
-     * @return the zero result
+     * @param value the value supplied to this method
+     * @return the value of {@code value == null ? BigDecimal.ZERO : value}
      */
     private static BigDecimal zero(BigDecimal value) {
         final long __gokulMethodStartedNanos =
@@ -30,11 +30,11 @@ public final class PaymentFeePricing {
     }
 
     /**
-     * Fees the operation.
+     * Returns fee information for payment fee pricing.
      *
-     * @param base the base
-     * @param rate the rate
-     * @return the fee result
+     * @param base the base supplied to this method
+     * @param rate the rate supplied to this method
+     * @return the {@code BigDecimal} result
      */
     public static BigDecimal fee(BigDecimal base, BigDecimal rate) {
         final long __gokulMethodStartedNanos =
@@ -52,11 +52,11 @@ public final class PaymentFeePricing {
     }
 
     /**
-     * Taxs the operation.
+     * Returns tax information for payment fee pricing.
      *
-     * @param fee the fee
-     * @param rate the rate
-     * @return the tax result
+     * @param fee the fee supplied to this method
+     * @param rate the rate supplied to this method
+     * @return the {@code BigDecimal} result
      */
     public static BigDecimal tax(BigDecimal fee, BigDecimal rate) {
         final long __gokulMethodStartedNanos =
@@ -98,9 +98,9 @@ public final class PaymentFeePricing {
     }
 
     /**
-     * Reprices the operation.
+     * Returns reprice information for payment fee pricing.
      *
-     * @param order the order
+     * @param order the order supplied to this method
      */
     public static void reprice(Order order) {
         final long __gokulMethodStartedNanos =

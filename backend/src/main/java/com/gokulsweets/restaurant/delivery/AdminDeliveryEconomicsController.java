@@ -28,10 +28,13 @@ public class AdminDeliveryEconomicsController {
     private final com.gokulsweets.restaurant.security.StaffAuthorizationService authorization;
 
     /**
-     * Details the operation.
+     * Handles {@code GET /api/admin/orders/{orderId}/delivery-economics} for admin delivery
+     * economics.
      *
-     * @param orderId the order id
-     * @return the detail result
+     * <p>Reads {@code delivery_economics_snapshots}, {@code orders}, {@code payments}.
+     *
+     * @param orderId the order id supplied to this method
+     * @return the {@code ResponseEntity<Map<String, Object>>} result
      */
     @GetMapping("/api/admin/orders/{orderId}/delivery-economics")
     @PreAuthorize("hasAuthority('REPORT_VIEW')")

@@ -117,12 +117,12 @@ public class PickupAddOnService {
     }
 
     /**
-     * Fitses the operation.
+     * Returns fits information for pickup add on.
      *
-     * @param branch the branch
-     * @param request the request
-     * @param order the order
-     * @return the fits result
+     * @param branch the branch supplied to this method
+     * @param request the request supplied to this method
+     * @param order the order supplied to this method
+     * @return the {@code boolean} result
      */
     private boolean fits(long branch, CustomerInventoryCheckRequest request, Order order) {
         final long __gokulMethodStartedNanos =
@@ -156,12 +156,12 @@ public class PickupAddOnService {
     }
 
     /**
-     * Checks the operation.
+     * Returns check information for pickup add on.
      *
-     * @param branch the branch
-     * @param request the request
-     * @param number the number
-     * @return the check result
+     * @param branch the branch supplied to this method
+     * @param request the request supplied to this method
+     * @param number the number supplied to this method
+     * @return the {@code Availability} result
      */
     @Transactional(readOnly = true)
     public Availability check(long branch, CustomerInventoryCheckRequest request, String number) {
@@ -180,12 +180,12 @@ public class PickupAddOnService {
     }
 
     /**
-     * Recommends the operation.
+     * Recommends pickup add on data and returns the {@code List<Suggestion>} result.
      *
-     * @param branch the branch
-     * @param request the request
-     * @param number the number
-     * @return the recommend result
+     * @param branch the branch supplied to this method
+     * @param request the request supplied to this method
+     * @param number the number supplied to this method
+     * @return the value of {@code recommend(branch, request, number, null, null)}
      */
     @Transactional(readOnly = true)
     public List<Suggestion> recommend(
@@ -205,14 +205,15 @@ public class PickupAddOnService {
     }
 
     /**
-     * Recommends the operation.
+     * Recommends pickup add on data and returns the {@code List<Suggestion>} result.
      *
-     * @param branch the branch
-     * @param request the request
-     * @param number the number
-     * @param pickupSlotId the pickup slot id
-     * @param pickupType the pickup type
-     * @return the recommend result
+     * @param branch the branch supplied to this method
+     * @param request the request supplied to this method
+     * @param number the number supplied to this method
+     * @param pickupSlotId the pickup slot id supplied to this method
+     * @param pickupType the pickup type supplied to this method
+     * @return the value of {@code recommend(branch, request, number, pickupSlotId, pickupType,
+     *     false)}
      */
     @Transactional(readOnly = true)
     public List<Suggestion> recommend(
@@ -236,15 +237,23 @@ public class PickupAddOnService {
     }
 
     /**
-     * Recommends the operation.
+     * Recommends pickup add on data and returns the {@code List<Suggestion>} result.
      *
-     * @param branch the branch
-     * @param request the request
-     * @param number the number
-     * @param pickupSlotId the pickup slot id
-     * @param pickupType the pickup type
-     * @param browse the browse
-     * @return the recommend result
+     * <p>Reads {@code analytics_product_daily}, {@code products}, {@code tax_categories}, {@code
+     * tax_collection_settings}.
+     *
+     * @param branch the branch supplied to this method
+     * @param request the request supplied to this method
+     * @param number the number supplied to this method
+     * @param pickupSlotId the pickup slot id supplied to this method
+     * @param pickupType the pickup type supplied to this method
+     * @param browse the browse supplied to this method
+     * @return the {@code List<Suggestion>} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     valid quantity.}; {@code Choose a valid weight.}; {@code Choose an available pickup date
+     *     in India.}; {@code Choose between one and thirty cart items.}; {@code Choose both pickup
+     *     slot and type.}; {@code Choose distinct products available at this branch.}; {@code
+     *     Review the reserved pickup slot.}; {@code Slot availability is not enabled.}
      */
     @Transactional(readOnly = true)
     public List<Suggestion> recommend(

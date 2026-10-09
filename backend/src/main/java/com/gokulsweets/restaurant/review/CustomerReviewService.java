@@ -68,11 +68,17 @@ public class CustomerReviewService {
     }
 
     /**
-     * Upserts the operation.
+     * Inserts or updates customer review data and returns the {@code CustomerReviewResponse}
+     * result.
      *
-     * @param orderNumber the order number
-     * @param request the request
-     * @return the upsert result
+     * <p>Delegates to {@code reviewRepository.findByOrderId(...)}, {@code
+     * reviewRepository.save(...)}.
+     *
+     * @param orderNumber the order number supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code CustomerReviewResponse} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Each product
+     *     can be rated only once.}; {@code Only products from this order can be rated.}
      */
     @Transactional
     public CustomerReviewResponse upsert(String orderNumber, UpsertReviewRequest request) {

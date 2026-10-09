@@ -157,9 +157,9 @@ public class StaffOrderAlerts {
     }
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the {@code boolean} result
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -178,9 +178,9 @@ public class StaffOrderAlerts {
     }
 
     /**
-     * Scopes the operation.
+     * Returns scope information for staff order alerts.
      *
-     * @return the scope result
+     * @return the {@code String} result
      */
     public String scope() {
         final long __gokulMethodStartedNanos =
@@ -193,9 +193,10 @@ public class StaffOrderAlerts {
     }
 
     /**
-     * Nows the operation.
+     * Returns now information for staff order alerts.
      *
-     * @return the now result
+     * @return the value of {@code LocalDateTime.ofInstant(inventoryClock.instant(),
+     *     ApplicationClock.BUSINESS_ZONE)}
      */
     public LocalDateTime now() {
         final long __gokulMethodStartedNanos = MethodTiming.start(StaffOrderAlerts.class, "now()");
@@ -459,14 +460,18 @@ ON CONFLICT(environment,event_key) DO NOTHING
     }
 
     /**
-     * Records the operation.
+     * Records staff order alerts data.
      *
-     * @param order the order
-     * @param kind the kind
-     * @param permission the permission
-     * @param scheduled the scheduled
-     * @param title the title
-     * @param message the message
+     * <p>Reads {@code order_corrections}.
+     *
+     * <p>Writes {@code staff_order_alerts}.
+     *
+     * @param order the order supplied to this method
+     * @param kind the kind supplied to this method
+     * @param permission the permission supplied to this method
+     * @param scheduled the scheduled supplied to this method
+     * @param title the title supplied to this method
+     * @param message the message supplied to this method
      */
     private void record(
             Order order,
@@ -550,10 +555,10 @@ ON CONFLICT(environment, event_key) DO NOTHING
     }
 
     /**
-     * Schedules the operation.
+     * Returns schedule information for staff order alerts.
      *
-     * @param order the order
-     * @return the schedule result
+     * @param order the order supplied to this method
+     * @return the value of {@code preparation.evaluate(view, now())}
      */
     private PreparationEligibility schedule(Order order) {
         final long __gokulMethodStartedNanos =
@@ -575,10 +580,10 @@ ON CONFLICT(environment, event_key) DO NOTHING
     }
 
     /**
-     * Actionables the operation.
+     * Returns actionable information for staff order alerts.
      *
-     * @param event the event
-     * @return the actionable result
+     * @param event the event supplied to this method
+     * @return the {@code boolean} result
      */
     @Transactional(readOnly = true)
     public boolean actionable(Event event) {
@@ -647,11 +652,11 @@ ON CONFLICT(environment, event_key) DO NOTHING
     }
 
     /**
-     * Events the operation.
+     * Returns event information for staff order alerts.
      *
-     * @param rs the rs
-     * @return the event result
-     * @throws java.sql.SQLException if the operation cannot complete
+     * @param rs the rs supplied to this method
+     * @return the {@code Event} result
+     * @throws java.sql.SQLException if the underlying operation fails
      */
     public static Event event(java.sql.ResultSet rs) throws java.sql.SQLException {
         final long __gokulMethodStartedNanos =
@@ -686,11 +691,11 @@ ON CONFLICT(environment, event_key) DO NOTHING
     }
 
     /**
-     * Pages the operation.
+     * Returns page information for staff order alerts.
      *
-     * @param staffId the staff id
-     * @param before the before
-     * @return the page result
+     * @param staffId the staff id supplied to this method
+     * @param before the before supplied to this method
+     * @return the {@code Page} result
      */
     @Transactional(
             readOnly = true,
@@ -707,13 +712,13 @@ ON CONFLICT(environment, event_key) DO NOTHING
     }
 
     /**
-     * Pages the operation.
+     * Returns page information for staff order alerts.
      *
-     * @param staffId the staff id
-     * @param before the before
-     * @param unreadOnly the unread only
-     * @param search the search
-     * @return the page result
+     * @param staffId the staff id supplied to this method
+     * @param before the before supplied to this method
+     * @param unreadOnly the unread only supplied to this method
+     * @param search the search supplied to this method
+     * @return the {@code Page} result
      */
     @Transactional(
             readOnly = true,
@@ -857,11 +862,11 @@ WHERE e.environment = ? AND e.id < ? AND (NOT ? OR r.read_at IS NULL)
     }
 
     /**
-     * Eligibles the operation.
+     * Returns eligible information for staff order alerts.
      *
-     * @param eventId the event id
-     * @param staffId the staff id
-     * @return the eligible result
+     * @param eventId the event id supplied to this method
+     * @param staffId the staff id supplied to this method
+     * @return the {@code boolean} result
      */
     public boolean eligible(long eventId, long staffId) {
         final long __gokulMethodStartedNanos =

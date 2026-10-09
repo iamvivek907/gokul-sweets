@@ -38,11 +38,13 @@ public class CareerController {
     }
 
     /**
-     * Apply the operation.
+     * Handles {@code POST /api/storefront/careers/applications} for career.
      *
-     * @param input the input
-     * @param request the request
-     * @return the apply result
+     * <p>Delegates to {@code service.apply(...)}.
+     *
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code service.apply(input, request.getRemoteAddr())}
      */
     @PostMapping("/api/storefront/careers/applications")
     public CareerService.Receipt apply(
@@ -62,10 +64,12 @@ public class CareerController {
     }
 
     /**
-     * Jobses the operation.
+     * Handles {@code GET /api/admin/careers/jobs} for career.
      *
-     * @param branchId the branch id
-     * @return the jobs result
+     * <p>Delegates to {@code service.jobs(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code service.jobs(branchId)}
      */
     @GetMapping("/api/admin/careers/jobs")
     public List<CareerService.Job> jobs(@RequestParam(required = false) Long branchId) {
@@ -79,10 +83,12 @@ public class CareerController {
     }
 
     /**
-     * Creates the operation.
+     * Handles {@code POST /api/admin/careers/jobs} for career.
      *
-     * @param input the input
-     * @return the create result
+     * <p>Delegates to {@code service.create(...)}.
+     *
+     * @param input the input supplied to this method
+     * @return the value of {@code service.create(input)}
      */
     @PostMapping("/api/admin/careers/jobs")
     public CareerService.Job create(@Valid @RequestBody CareerService.JobInput input) {
@@ -99,12 +105,14 @@ public class CareerController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/careers/jobs/{id}} for career.
      *
-     * @param id the id
-     * @param input the input
-     * @param version the version
-     * @return the save result
+     * <p>Delegates to {@code service.save(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code service.save(id, input, version)}
      */
     @PutMapping("/api/admin/careers/jobs/{id}")
     public CareerService.Job save(
@@ -125,17 +133,20 @@ public class CareerController {
     }
 
     /**
-     * Applicantses the operation.
+     * Handles {@code GET /api/admin/careers/applications} for career.
      *
-     * @param branchId the branch id
-     * @param jobId the job id
-     * @param status the status
-     * @param search the search
-     * @param minExperience the min experience
-     * @param maxExperience the max experience
-     * @param page the page
-     * @param size the size
-     * @return the applicants result
+     * <p>Delegates to {@code service.applicants(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param jobId the job id supplied to this method
+     * @param status the status supplied to this method
+     * @param search the search supplied to this method
+     * @param minExperience the min experience supplied to this method
+     * @param maxExperience the max experience supplied to this method
+     * @param page the page supplied to this method
+     * @param size the size supplied to this method
+     * @return the value of {@code service.applicants(branchId, jobId, status, search,
+     *     minExperience, maxExperience, page, size)}
      */
     @GetMapping("/api/admin/careers/applications")
     public CareerService.Page applicants(
@@ -163,10 +174,12 @@ public class CareerController {
     }
 
     /**
-     * Details the operation.
+     * Handles {@code GET /api/admin/careers/applications/{id}} for career.
      *
-     * @param id the id
-     * @return the detail result
+     * <p>Delegates to {@code service.detail(...)}.
+     *
+     * @param id the id supplied to this method
+     * @return the value of {@code service.detail(id)}
      */
     @GetMapping("/api/admin/careers/applications/{id}")
     public CareerService.Applicant detail(@PathVariable UUID id) {
@@ -180,12 +193,14 @@ public class CareerController {
     }
 
     /**
-     * Updates the operation.
+     * Handles {@code PUT /api/admin/careers/applications/{id}} for career.
      *
-     * @param id the id
-     * @param input the input
-     * @param version the version
-     * @return the update result
+     * <p>Delegates to {@code service.update(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code service.update(id, input, version)}
      */
     @PutMapping("/api/admin/careers/applications/{id}")
     public CareerService.Applicant update(

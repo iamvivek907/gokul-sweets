@@ -87,12 +87,12 @@ public class OccasionProductionWorkspace {
     public record Approval(String token) {}
 
     /**
-     * Weeks the operation.
+     * Returns week information for occasion production workspace.
      *
-     * @param env the env
-     * @param branch the branch
-     * @param from the from
-     * @return the week result
+     * @param env the env supplied to this method
+     * @param branch the branch supplied to this method
+     * @param from the from supplied to this method
+     * @return the {@code Week} result
      */
     @Transactional(
             readOnly = true,
@@ -142,12 +142,14 @@ public class OccasionProductionWorkspace {
     public record Month(LocalDate today, YearMonth month, List<CalendarDay> days) {}
 
     /**
-     * Months the operation.
+     * Returns month information for occasion production workspace.
      *
-     * @param env the env
-     * @param branch the branch
-     * @param month the month
-     * @return the month result
+     * <p>Reads {@code occasion_enquiries}.
+     *
+     * @param env the env supplied to this method
+     * @param branch the branch supplied to this method
+     * @param month the month supplied to this method
+     * @return the {@code Month} result
      */
     @Transactional(readOnly = true)
     public Month month(ConsentEnvironment env, long branch, YearMonth month) {
@@ -196,12 +198,15 @@ GROUP BY service_date
     }
 
     /**
-     * Day the operation.
+     * Returns day information for occasion production workspace.
      *
-     * @param env the env
-     * @param branch the branch
-     * @param date the date
-     * @return the day result
+     * <p>Reads {@code occasion_enquiries}, {@code occasion_enquiry_items}, {@code
+     * occasion_production_allocations}, {@code orders}, {@code products}.
+     *
+     * @param env the env supplied to this method
+     * @param branch the branch supplied to this method
+     * @param date the date supplied to this method
+     * @return the {@code Day} result
      */
     private Day day(ConsentEnvironment env, long branch, LocalDate date) {
         final long __gokulMethodStartedNanos =
@@ -268,13 +273,15 @@ GROUP BY p.id,p.name ORDER BY p.name
     }
 
     /**
-     * Pendings the operation.
+     * Returns pending information for occasion production workspace.
      *
-     * @param env the env
-     * @param branch the branch
-     * @param date the date
-     * @param product the product
-     * @return the pending result
+     * <p>Reads {@code occasion_enquiries}, {@code occasion_production_allocations}, {@code orders}.
+     *
+     * @param env the env supplied to this method
+     * @param branch the branch supplied to this method
+     * @param date the date supplied to this method
+     * @param product the product supplied to this method
+     * @return the {@code List<Map<String, Object>>} result
      */
     private List<Map<String, Object>> pending(
             ConsentEnvironment env, long branch, LocalDate date, long product) {
@@ -304,13 +311,13 @@ WHERE e.environment=? AND e.branch_id=? AND e.service_date=? AND a.product_id=?
     }
 
     /**
-     * Tokens the operation.
+     * Returns token information for occasion production workspace.
      *
-     * @param env the env
-     * @param branch the branch
-     * @param date the date
-     * @param product the product
-     * @return the token result
+     * @param env the env supplied to this method
+     * @param branch the branch supplied to this method
+     * @param date the date supplied to this method
+     * @param product the product supplied to this method
+     * @return the {@code String} result
      */
     private String token(ConsentEnvironment env, long branch, LocalDate date, long product) {
         final long __gokulMethodStartedNanos =
@@ -342,15 +349,21 @@ WHERE e.environment=? AND e.branch_id=? AND e.service_date=? AND a.product_id=?
     }
 
     /**
-     * Approves the operation.
+     * Approves occasion production workspace data and returns the {@code int} result.
      *
-     * @param env the env
-     * @param branch the branch
-     * @param date the date
-     * @param product the product
-     * @param token the token
-     * @param actor the actor
-     * @return the approve result
+     * <p>Reads {@code occasion_enquiries}.
+     *
+     * <p>Writes {@code occasion_enquiry_events}, {@code occasion_production_allocations}.
+     *
+     * @param env the env supplied to this method
+     * @param branch the branch supplied to this method
+     * @param date the date supplied to this method
+     * @param product the product supplied to this method
+     * @param token the token supplied to this method
+     * @param actor the actor supplied to this method
+     * @return the {@code int} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Production
+     *     commitments changed. Refresh and review the new totals.}
      */
     @Transactional
     public int approve(
@@ -432,9 +445,9 @@ WHERE e.environment=? AND e.branch_id=? AND e.service_date=? AND a.product_id=?
     }
 
     /**
-     * Invalids the operation.
+     * Rejects the request with an HTTP BAD_REQUEST response.
      *
-     * @param message the message
+     * @param message the message supplied to this method
      */
     private static void invalid(String message) {
         final long __gokulMethodStartedNanos =

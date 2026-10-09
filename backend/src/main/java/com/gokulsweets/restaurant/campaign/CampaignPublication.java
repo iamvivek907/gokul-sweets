@@ -79,11 +79,11 @@ public class CampaignPublication {
     private Instant publishedAt;
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code CampaignPublication} representation.
      *
-     * @param source the source
-     * @param now the now
-     * @return the from result
+     * @param source the source supplied to this method
+     * @param now the now supplied to this method
+     * @return the value of {@code copy}
      */
     static CampaignPublication from(HomepageCampaign source, Instant now) {
         final long __gokulMethodStartedNanos =

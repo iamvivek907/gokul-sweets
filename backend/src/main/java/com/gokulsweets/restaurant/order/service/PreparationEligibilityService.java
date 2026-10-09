@@ -33,10 +33,10 @@ public class PreparationEligibilityService {
      * =========================================================
      */
     /**
-     * Evaluates the operation.
+     * Evaluates preparation eligibility data and returns the {@code PreparationEligibility} result.
      *
-     * @param order the order
-     * @return the evaluate result
+     * @param order the order supplied to this method
+     * @return the value of {@code evaluate(order, ApplicationClock.legacyTimestampNow())}
      */
     public PreparationEligibility evaluate(Order order) {
         final long __gokulMethodStartedNanos =
@@ -60,11 +60,21 @@ public class PreparationEligibilityService {
      * deterministic and easy to unit test.
      */
     /**
-     * Evaluates the operation.
+     * Evaluates preparation eligibility data and returns the {@code PreparationEligibility} result.
      *
-     * @param order the order
-     * @param now the now
-     * @return the evaluate result
+     * <p>Reads {@code branch_products}, {@code delivery_capacity_windows}, {@code delivery_zones},
+     * {@code order_items}.
+     *
+     * @param order the order supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code PreparationEligibility} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Current time
+     *     is required.}; {@code Order is required.}
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery
+     *     preparation lead minutes cannot be negative.}; {@code Delivery window is unavailable for
+     *     the confirmed order.}; {@code Pickup slot date is unavailable.}; {@code Pickup slot is
+     *     unavailable for the confirmed order.}; {@code Pickup slot start time is unavailable.};
+     *     {@code Pickup type is unavailable for the confirmed order.}
      */
     public PreparationEligibility evaluate(Order order, LocalDateTime now) {
         final long __gokulMethodStartedNanos =
@@ -156,12 +166,12 @@ FROM order_items i LEFT JOIN branch_products bp
     }
 
     /**
-     * Eligibility the operation.
+     * Returns eligibility information for preparation eligibility.
      *
-     * @param pickupAt the pickup at
-     * @param leadMinutes the lead minutes
-     * @param now the now
-     * @return the eligibility result
+     * @param pickupAt the pickup at supplied to this method
+     * @param leadMinutes the lead minutes supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code PreparationEligibility} result
      */
     private PreparationEligibility eligibility(
             LocalDateTime pickupAt, int leadMinutes, LocalDateTime now) {

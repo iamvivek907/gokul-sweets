@@ -144,10 +144,12 @@ public class RazorpayPaymentProvider implements PaymentProvider {
     }
 
     /**
-     * Refunds the operation.
+     * Refunds razorpay payment provider data and returns the {@code RefundResult} result.
      *
-     * @param payment the payment
-     * @return the refund result
+     * <p>Delegates to {@code client.createRefund(...)}.
+     *
+     * @param payment the payment supplied to this method
+     * @return the value of {@code mapRefund(payment, refund)}
      */
     @Override
     public RefundResult refund(Payment payment) {

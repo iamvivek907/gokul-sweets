@@ -29,9 +29,13 @@ public class AdminTaxCategoryController {
     private final StaffAuthorizationService authorization;
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/tax-categories} for admin tax category.
      *
-     * @return the list result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code repository.findAll(...)}.
+     *
+     * @return the {@code List<TaxCategoryResponse>} result
      */
     @GetMapping
     public List<TaxCategoryResponse> list() {
@@ -49,10 +53,12 @@ public class AdminTaxCategoryController {
     }
 
     /**
-     * Creates the operation.
+     * Handles {@code POST /api/admin/tax-categories} for admin tax category.
      *
-     * @param request the request
-     * @return the create result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * @param request the request supplied to this method
+     * @return the {@code TaxCategoryResponse} result
      */
     @PostMapping
     @Transactional
@@ -71,11 +77,13 @@ public class AdminTaxCategoryController {
     }
 
     /**
-     * Updates the operation.
+     * Handles {@code PUT /api/admin/tax-categories/{id}} for admin tax category.
      *
-     * @param id the id
-     * @param request the request
-     * @return the update result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * @param id the id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code save(require(id), request)}
      */
     @PutMapping("/{id}")
     @Transactional
@@ -95,11 +103,15 @@ public class AdminTaxCategoryController {
     }
 
     /**
-     * Actives the operation.
+     * Handles {@code PATCH /api/admin/tax-categories/{id}/active} for admin tax category.
      *
-     * @param id the id
-     * @param request the request
-     * @return the active result
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * <p>Delegates to {@code repository.save(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code TaxCategoryResponse.from(repository.save(category))}
      */
     @PatchMapping("/{id}/active")
     @Transactional
@@ -123,10 +135,12 @@ public class AdminTaxCategoryController {
     }
 
     /**
-     * Requires the operation.
+     * Requires admin tax category data and returns the {@code TaxCategory} result.
      *
-     * @param id the id
-     * @return the require result
+     * <p>Delegates to {@code repository.findById(...)}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code TaxCategory} result
      */
     private TaxCategory require(Long id) {
         final long __gokulMethodStartedNanos =
@@ -142,11 +156,15 @@ public class AdminTaxCategoryController {
     }
 
     /**
-     * Saves the operation.
+     * Persists admin tax category data and returns the {@code TaxCategoryResponse} result.
      *
-     * @param category the category
-     * @param request the request
-     * @return the save result
+     * <p>Delegates to {@code repository.findByCode(...)}, {@code repository.save(...)}.
+     *
+     * @param category the category supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code TaxCategoryResponse.from(repository.save(category))}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Combined
+     *     CGST and SGST cannot exceed 100%.}; {@code Tax code already exists.}
      */
     private TaxCategoryResponse save(TaxCategory category, TaxRequest request) {
         final long __gokulMethodStartedNanos =

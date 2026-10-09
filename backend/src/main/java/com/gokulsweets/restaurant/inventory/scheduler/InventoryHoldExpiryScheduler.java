@@ -71,10 +71,10 @@ public class InventoryHoldExpiryScheduler {
     }
 
     /**
-     * Masks the operation.
+     * Returns mask information for inventory hold expiry.
      *
-     * @param value the value
-     * @return the mask result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
      */
     private String mask(String value) {
         final long __gokulMethodStartedNanos =

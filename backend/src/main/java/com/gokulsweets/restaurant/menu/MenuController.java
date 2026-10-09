@@ -58,11 +58,12 @@ public class MenuController {
     }
 
     /**
-     * Catalogs the operation.
+     * Handles {@code GET /api/menu/catalog} for menu.
      *
-     * @param branchId the branch id
-     * @param request the request
-     * @return the catalog result
+     * @param branchId the branch id supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code org.springframework.http.ResponseEntity<MenuCatalogService.Catalog>}
+     *     result
      */
     @GetMapping("/catalog")
     public org.springframework.http.ResponseEntity<MenuCatalogService.Catalog> catalog(
@@ -93,10 +94,11 @@ public class MenuController {
     }
 
     /**
-     * Availability the operation.
+     * Handles {@code GET /api/menu/availability} for menu.
      *
-     * @param branchId the branch id
-     * @return the availability result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code
+     *     org.springframework.http.ResponseEntity.ok().cacheControl(org.springframework.http.CacheControl.noStore()).body(availability.get(branchId))}
      */
     @GetMapping("/availability")
     public org.springframework.http.ResponseEntity<MenuAvailabilityService.Availability>

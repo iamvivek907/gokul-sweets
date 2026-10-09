@@ -18,10 +18,10 @@ public class KitchenPlanningController {
     private final KitchenPlanningService planning;
 
     /**
-     * Alertses the operation.
+     * Handles {@code GET /api/admin/orders/planning/alerts} for kitchen planning.
      *
-     * @param branchId the branch id
-     * @return the alerts result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code planning.alerts(branchId)}
      */
     @GetMapping("/alerts")
     public KitchenPlanningService.AlertCounts alerts(@RequestParam long branchId) {
@@ -36,14 +36,14 @@ public class KitchenPlanningController {
     }
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/orders/planning} for kitchen planning.
      *
-     * @param branchId the branch id
-     * @param filter the filter
-     * @param date the date
-     * @param start the start
-     * @param page the page
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @param filter the filter supplied to this method
+     * @param date the date supplied to this method
+     * @param start the start supplied to this method
+     * @param page the page supplied to this method
+     * @return the value of {@code planning.get(branchId, filter, date, start, page)}
      */
     @GetMapping
     public KitchenPlanningService.Plan get(

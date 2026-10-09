@@ -164,10 +164,15 @@ public class AdminProductionController {
     }
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for admin production data.
      *
-     * @param branchId the branch id
-     * @param permission the permission
+     * <p>Authorization checks include {@code permission}.
+     *
+     * <p>Delegates to {@code authorizationService.requirePermission(...)}, {@code
+     * authorizationService.requireBranchAccess(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param permission the permission supplied to this method
      */
     private void authorize(Long branchId, PermissionName permission) {
         final long __gokulMethodStartedNanos =

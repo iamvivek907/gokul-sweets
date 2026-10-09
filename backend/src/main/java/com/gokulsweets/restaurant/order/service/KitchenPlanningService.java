@@ -156,14 +156,16 @@ public class KitchenPlanningService {
     private static final String BASE = AppConstant.KITCHEN_PLANNING_SERVICE_BASE;
 
     /**
-     * Returns the operation.
+     * Returns get information for kitchen planning.
      *
-     * @param branchId the branch id
-     * @param filter the filter
-     * @param date the date
-     * @param start the start
-     * @param page the page
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @param filter the filter supplied to this method
+     * @param date the date supplied to this method
+     * @param start the start supplied to this method
+     * @param page the page supplied to this method
+     * @return the {@code Plan} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     branch, date and valid page.}
      */
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
     @Transactional(
@@ -341,10 +343,12 @@ FROM planned
     }
 
     /**
-     * Alertses the operation.
+     * Returns alerts information for kitchen planning.
      *
-     * @param branchId the branch id
-     * @return the alerts result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code AlertCounts} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose a
+     *     valid branch.}
      */
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
     @Transactional(readOnly = true)

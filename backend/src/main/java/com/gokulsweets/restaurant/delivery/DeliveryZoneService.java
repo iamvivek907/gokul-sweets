@@ -30,9 +30,10 @@ public class DeliveryZoneService {
     private final BranchRepository branches;
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the value of {@code flags.isDeliveryZones() && flags.isDeliveryLocalityCheck() &&
+     *     flags.isCustomerConsentControls() && flags.isCustomerOtpIdentity()}
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -48,11 +49,18 @@ public class DeliveryZoneService {
     }
 
     /**
-     * Configures the operation.
+     * Configures delivery zone data and returns the {@code Zone} result.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the configure result
+     * <p>Writes {@code delivery_zone_products}, {@code delivery_zones}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Zone} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Closing time
+     *     must follow opening time.}; {@code Duplicate product IDs.}; {@code Products must be
+     *     active on this branch menu.}; {@code Unknown branch.}
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery
+     *     configuration is disabled.}
      */
     @Transactional
     public Zone configure(long branchId, Configuration input) {
@@ -131,10 +139,16 @@ RETURNING id
     }
 
     /**
-     * Lists the operation.
+     * Returns list information for delivery zone.
      *
-     * @param branchId the branch id
-     * @return the list result
+     * <p>Reads {@code delivery_zone_products}, {@code delivery_zones}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the {@code List<Zone>} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Unknown
+     *     branch.}
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery
+     *     configuration is disabled.}
      */
     @Transactional(readOnly = true)
     public List<Zone> list(long branchId) {
@@ -171,11 +185,16 @@ RETURNING id
     }
 
     /**
-     * Coverages the operation.
+     * Returns coverage information for delivery zone.
      *
-     * @param locality the locality
-     * @param postalCode the postal code
-     * @return the coverage result
+     * <p>Reads {@code branch_products}, {@code branches}, {@code categories}, {@code
+     * delivery_zone_products}, {@code delivery_zones}, {@code products}.
+     *
+     * @param locality the locality supplied to this method
+     * @param postalCode the postal code supplied to this method
+     * @return the {@code Coverage} result
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery
+     *     coverage is disabled.}
      */
     @Transactional(readOnly = true)
     public Coverage coverage(String locality, String postalCode) {
@@ -217,10 +236,11 @@ ORDER BY b.name
     }
 
     /**
-     * Canonicals the operation.
+     * Trims locality text, collapses whitespace and lowercases it with the root locale for
+     * comparison.
      *
-     * @param locality the locality
-     * @return the canonical result
+     * @param locality the locality supplied to this method
+     * @return the {@code String} result
      */
     static String canonical(String locality) {
         final long __gokulMethodStartedNanos =
@@ -234,11 +254,11 @@ ORDER BY b.name
     }
 
     /**
-     * Concats the operation.
+     * Returns concat information for delivery zone.
      *
-     * @param branchId the branch id
-     * @param ids the ids
-     * @return the concat result
+     * @param branchId the branch id supplied to this method
+     * @param ids the ids supplied to this method
+     * @return the value of {@code params}
      */
     private static Object[] concat(long branchId, List<Long> ids) {
         final long __gokulMethodStartedNanos =

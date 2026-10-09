@@ -42,10 +42,10 @@ public record PickupSlotResponse(
         BigDecimal priorityCharge) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code PickupSlotResponse} representation.
      *
-     * @param slot the slot
-     * @return the from result
+     * @param slot the slot supplied to this method
+     * @return the {@code PickupSlotResponse} result
      */
     public static PickupSlotResponse from(PickupSlot slot) {
         final long __gokulMethodStartedNanos =

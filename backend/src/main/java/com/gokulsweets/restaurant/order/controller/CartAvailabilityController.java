@@ -28,12 +28,12 @@ public class CartAvailabilityController {
     private final com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService discovery;
 
     /**
-     * Discovers the operation.
+     * Handles {@code GET /api/branches/{branchId}/pickup-discovery} for cart availability.
      *
-     * @param branchId the branch id
-     * @param startDate the start date
-     * @param days the days
-     * @return the discover result
+     * @param branchId the branch id supplied to this method
+     * @param startDate the start date supplied to this method
+     * @param days the days supplied to this method
+     * @return the {@code ResponseEntity<CartAvailabilityService.Availability>} result
      */
     @GetMapping("/api/branches/{branchId}/pickup-discovery")
     public ResponseEntity<CartAvailabilityService.Availability> discover(
@@ -57,12 +57,14 @@ public class CartAvailabilityController {
     }
 
     /**
-     * Checks the operation.
+     * Handles {@code POST /api/branches/{branchId}/availability} for cart availability.
      *
-     * @param branchId the branch id
-     * @param request the request
-     * @param menuPreview the menu preview
-     * @return the check result
+     * <p>Delegates to {@code service.check(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param request the request supplied to this method
+     * @param menuPreview the menu preview supplied to this method
+     * @return the {@code ResponseEntity<CartAvailabilityService.Availability>} result
      */
     @PostMapping("/api/branches/{branchId}/availability")
     public ResponseEntity<CartAvailabilityService.Availability> check(

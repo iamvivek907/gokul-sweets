@@ -24,11 +24,11 @@ public class PickupAddOnController {
     private final VerifiedOrderAccess access;
 
     /**
-     * Owneds the operation.
+     * Returns owned information for pickup add on.
      *
-     * @param number the number
-     * @param request the request
-     * @return the owned result
+     * @param number the number supplied to this method
+     * @param request the request supplied to this method
+     * @return the {@code String} result
      */
     private String owned(String number, HttpServletRequest request) {
         final long __gokulMethodStartedNanos =
@@ -47,16 +47,19 @@ public class PickupAddOnController {
     }
 
     /**
-     * Recommends the operation.
+     * Handles {@code POST /api/menu/pickup-addons} for pickup add on.
      *
-     * @param browse the browse
-     * @param branchId the branch id
-     * @param pickupSlotId the pickup slot id
-     * @param pickupType the pickup type
-     * @param orderNumber the order number
-     * @param body the body
-     * @param request the request
-     * @return the recommend result
+     * <p>Delegates to {@code service.recommend(...)}.
+     *
+     * @param browse the browse supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param pickupSlotId the pickup slot id supplied to this method
+     * @param pickupType the pickup type supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @param body the body supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code service.recommend(branchId, body, owned(orderNumber, request),
+     *     pickupSlotId, pickupType, browse)}
      */
     @PostMapping
     public List<PickupAddOnService.Suggestion> recommend(
@@ -84,13 +87,15 @@ public class PickupAddOnController {
     }
 
     /**
-     * Checks the operation.
+     * Handles {@code POST /api/menu/pickup-addons/check} for pickup add on.
      *
-     * @param branchId the branch id
-     * @param orderNumber the order number
-     * @param body the body
-     * @param request the request
-     * @return the check result
+     * <p>Delegates to {@code service.check(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param orderNumber the order number supplied to this method
+     * @param body the body supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code service.check(branchId, body, owned(orderNumber, request))}
      */
     @PostMapping("/check")
     public PickupAddOnService.Availability check(

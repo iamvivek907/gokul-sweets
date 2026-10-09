@@ -26,10 +26,12 @@ public class RebateManagementController {
     private final RebateManagementService rebateManagementService;
 
     /**
-     * Creates the operation.
+     * Handles {@code POST /api/admin/rebates} for rebate management.
      *
-     * @param request the request
-     * @return the create result
+     * <p>Delegates to {@code rebateManagementService.create(...)}.
+     *
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.status(HttpStatus.CREATED).body(response)}
      */
     @PostMapping
     public ResponseEntity<RebateResponse> create(@Valid @RequestBody CreateRebateRequest request) {
@@ -90,11 +92,14 @@ public class RebateManagementController {
     }
 
     /**
-     * Updates the operation.
+     * Handles {@code PUT /api/admin/rebates/{rebateId}} for rebate management.
      *
-     * @param rebateId the rebate id
-     * @param request the request
-     * @return the update result
+     * <p>Delegates to {@code rebateManagementService.update(...)}.
+     *
+     * @param rebateId the rebate id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(rebateManagementService.update(rebateId,
+     *     request))}
      */
     @PutMapping("/{rebateId}")
     public ResponseEntity<RebateResponse> update(
@@ -113,10 +118,12 @@ public class RebateManagementController {
     }
 
     /**
-     * Activates the operation.
+     * Handles {@code PATCH /api/admin/rebates/{rebateId}/activate} for rebate management.
      *
-     * @param rebateId the rebate id
-     * @return the activate result
+     * <p>Delegates to {@code rebateManagementService.activate(...)}.
+     *
+     * @param rebateId the rebate id supplied to this method
+     * @return the value of {@code ResponseEntity.ok(rebateManagementService.activate(rebateId))}
      */
     @PatchMapping("/{rebateId}/activate")
     public ResponseEntity<RebateResponse> activate(@PathVariable Long rebateId) {
@@ -131,10 +138,12 @@ public class RebateManagementController {
     }
 
     /**
-     * Deactivates the operation.
+     * Handles {@code PATCH /api/admin/rebates/{rebateId}/deactivate} for rebate management.
      *
-     * @param rebateId the rebate id
-     * @return the deactivate result
+     * <p>Delegates to {@code rebateManagementService.deactivate(...)}.
+     *
+     * @param rebateId the rebate id supplied to this method
+     * @return the value of {@code ResponseEntity.ok(rebateManagementService.deactivate(rebateId))}
      */
     @PatchMapping("/{rebateId}/deactivate")
     public ResponseEntity<RebateResponse> deactivate(@PathVariable Long rebateId) {

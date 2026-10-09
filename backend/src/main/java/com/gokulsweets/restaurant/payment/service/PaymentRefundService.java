@@ -74,10 +74,14 @@ public class PaymentRefundService {
     }
 
     /**
-     * Reconciles the operation.
+     * Reconciles payment refund data and returns the {@code boolean} result.
      *
-     * @param paymentId the payment id
-     * @return the reconcile result
+     * <p>Delegates to {@code paymentRepository.claimRefundCheck(...)}, {@code
+     * paymentRepository.findByIdWithOrder(...)}, {@code
+     * paymentRepository.recordRefundSubmissionAttempt(...)}, {@code provider.refund(...)}.
+     *
+     * @param paymentId the payment id supplied to this method
+     * @return the {@code boolean} result
      */
     private boolean reconcile(Long paymentId) {
         final long __gokulMethodStartedNanos =
@@ -167,9 +171,9 @@ public class PaymentRefundService {
     }
 
     /**
-     * Nows the operation.
+     * Returns now information for payment refund.
      *
-     * @return the now result
+     * @return the value of {@code LocalDateTime.now(BUSINESS_ZONE)}
      */
     private static LocalDateTime now() {
         final long __gokulMethodStartedNanos =
@@ -182,11 +186,15 @@ public class PaymentRefundService {
     }
 
     /**
-     * Apply the operation.
+     * Applies payment refund data.
      *
-     * @param paymentId the payment id
-     * @param result the result
-     * @param initiation the initiation
+     * <p>Delegates to {@code paymentStatusService.markRefundInitiated(...)}, {@code
+     * paymentStatusService.markRefundStillPending(...)}, {@code
+     * paymentStatusService.markRefunded(...)}, {@code paymentStatusService.markRefundFailed(...)}.
+     *
+     * @param paymentId the payment id supplied to this method
+     * @param result the result supplied to this method
+     * @param initiation the initiation supplied to this method
      */
     private void apply(Long paymentId, RefundResult result, boolean initiation) {
         final long __gokulMethodStartedNanos =

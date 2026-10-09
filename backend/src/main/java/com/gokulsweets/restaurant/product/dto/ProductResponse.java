@@ -34,10 +34,11 @@ public record ProductResponse(
         boolean vegetarian) {
 
     /**
-     * Froms the operation.
+     * Maps a product and its category, optional tax category, image and vegetarian flag into the
+     * public product response.
      *
-     * @param product the product
-     * @return the from result
+     * @param product the product supplied to this method
+     * @return the {@code ProductResponse} result
      */
     public static ProductResponse from(Product product) {
         final long __gokulMethodStartedNanos =

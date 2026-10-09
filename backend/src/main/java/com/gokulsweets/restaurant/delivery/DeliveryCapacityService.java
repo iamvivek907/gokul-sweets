@@ -41,9 +41,9 @@ public class DeliveryCapacityService {
     private final DeliveryBoundaryService boundaries;
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the value of {@code flags.isDeliveryCapacity() && zones.enabled()}
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -57,12 +57,20 @@ public class DeliveryCapacityService {
     }
 
     /**
-     * Configures the operation.
+     * Configures delivery capacity data and returns the {@code Window} result.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @param input the input
-     * @return the configure result
+     * <p>Reads {@code delivery_zones}.
+     *
+     * <p>Writes {@code delivery_capacity_windows}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Window} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Capacity
+     *     cannot be lower than existing reservations.}; {@code Rider capacity must be between 1 and
+     *     1000.}; {@code Select a date within the next 30 IST business days.}; {@code Window must
+     *     fit inside zone operating hours.}
      */
     @Transactional
     public Window configure(long branchId, long zoneId, WindowConfiguration input) {
@@ -138,11 +146,13 @@ RETURNING id, reserved_count
     }
 
     /**
-     * Lists the operation.
+     * Returns list information for delivery capacity.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @return the list result
+     * <p>Reads {@code delivery_capacity_windows}, {@code delivery_zones}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @return the {@code List<Window>} result
      */
     @Transactional(readOnly = true)
     public List<Window> list(long branchId, long zoneId) {
@@ -178,10 +188,15 @@ RETURNING id, reserved_count
     }
 
     /**
-     * Quotes the operation.
+     * Returns quote information for delivery capacity.
      *
-     * @param request the request
-     * @return the quote result
+     * <p>Reads {@code branches}, {@code delivery_capacity_windows}, {@code delivery_pilot_riders},
+     * {@code delivery_rider_availability}, {@code delivery_zones}.
+     *
+     * <p>Delegates to {@code DeliveryZoneService.canonical(...)}.
+     *
+     * @param request the request supplied to this method
+     * @return the {@code Quote} result
      */
     @Transactional(readOnly = true)
     public Quote quote(QuoteRequest request) {
@@ -344,10 +359,10 @@ WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
     }
 
     /**
-     * Unavailables the operation.
+     * Returns unavailable information for delivery capacity.
      *
-     * @param notice the notice
-     * @return the unavailable result
+     * @param notice the notice supplied to this method
+     * @return the {@code Quote} result
      */
     private static Quote unavailable(String notice) {
         final long __gokulMethodStartedNanos =
@@ -363,12 +378,12 @@ WHERE a.window_id = ? AND a.available AND r.active AND r.branch_id = ?
     }
 
     /**
-     * Paramses the operation.
+     * Returns params information for delivery capacity.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @param productIds the product ids
-     * @return the params result
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @param productIds the product ids supplied to this method
+     * @return the value of {@code values}
      */
     private static Object[] params(long branchId, long zoneId, List<Long> productIds) {
         final long __gokulMethodStartedNanos =

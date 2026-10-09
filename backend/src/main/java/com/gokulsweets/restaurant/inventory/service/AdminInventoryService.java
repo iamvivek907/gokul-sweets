@@ -697,10 +697,10 @@ VALUES (?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Normalizes the operation.
+     * Normalizes admin inventory data and returns the {@code String} result.
      *
-     * @param value the value
-     * @return the normalize result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
      */
     private String normalize(String value) {
         final long __gokulMethodStartedNanos =

@@ -61,12 +61,17 @@ public class DeliveryOrderCreationService {
     private final Clock inventoryClock;
 
     /**
-     * Creates the operation.
+     * Creates delivery order creation data and returns the {@code Created} result.
      *
-     * @param request the request
-     * @param idempotencyKey the idempotency key
-     * @param identityToken the identity token
-     * @return the create result
+     * <p>Writes {@code delivery_economics_snapshots}.
+     *
+     * @param request the request supplied to this method
+     * @param idempotencyKey the idempotency key supplied to this method
+     * @param identityToken the identity token supplied to this method
+     * @return the {@code Created} result
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery order
+     *     creation is disabled.}; {@code The selected delivery window is no longer available.};
+     *     {@code This idempotency key belongs to a pickup order.}
      */
     @Transactional
     public Created create(CreateRequest request, String idempotencyKey, String identityToken) {
@@ -170,9 +175,11 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Validates the operation.
+     * Validates delivery order creation data.
      *
-     * @param request the request
+     * @param request the request supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code Complete
+     *     delivery order details are required.}
      */
     static void validate(CreateRequest request) {
         final long __gokulMethodStartedNanos =
@@ -221,10 +228,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Fingerprints the operation.
+     * Returns fingerprint information for delivery order creation.
      *
-     * @param request the request
-     * @return the fingerprint result
+     * @param request the request supplied to this method
+     * @return the value of {@code digest(canonical.toString())}
      */
     private static String fingerprint(CreateRequest request) {
         final long __gokulMethodStartedNanos =
@@ -263,10 +270,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Appends the operation.
+     * Appends delivery order creation data.
      *
-     * @param value the value
-     * @param part the part
+     * @param value the value supplied to this method
+     * @param part the part supplied to this method
      */
     private static void append(StringBuilder value, String part) {
         final long __gokulMethodStartedNanos =
@@ -283,10 +290,12 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Digests the operation.
+     * Returns the SHA-256 digest of the supplied value as hexadecimal text.
      *
-     * @param value the value
-     * @return the digest result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalStateException when the method rejects the request with {@code SHA-256 is
+     *     unavailable.}
      */
     private static String digest(String value) {
         final long __gokulMethodStartedNanos =
@@ -309,10 +318,10 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     }
 
     /**
-     * Responses the operation.
+     * Returns response information for delivery order creation.
      *
-     * @param order the order
-     * @return the response result
+     * @param order the order supplied to this method
+     * @return the {@code Created} result
      */
     private static Created response(Order order) {
         final long __gokulMethodStartedNanos =

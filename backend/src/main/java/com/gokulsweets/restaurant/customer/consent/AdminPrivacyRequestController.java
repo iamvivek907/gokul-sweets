@@ -26,10 +26,11 @@ public class AdminPrivacyRequestController {
     private final AdminPrivacyRequestQueue queue;
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/privacy-requests} for admin privacy request.
      *
-     * @param page the page
-     * @return the list result
+     * @param page the page supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(queue.view(page))}
      */
     @GetMapping
     @PreAuthorize("hasAuthority('PRIVACY_REQUEST_VIEW')")
@@ -46,11 +47,14 @@ public class AdminPrivacyRequestController {
     }
 
     /**
-     * Triages the operation.
+     * Handles {@code PATCH /api/admin/privacy-requests/{requestId}/triage} for admin privacy
+     * request.
      *
-     * @param requestId the request id
-     * @param choice the choice
-     * @return the triage result
+     * @param requestId the request id supplied to this method
+     * @param choice the choice supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(queue.triage(requestId,
+     *     choice == null ? null : choice.state()))}
      */
     @PatchMapping("/{requestId}/triage")
     @PreAuthorize("hasAuthority('PRIVACY_REQUEST_VIEW')")

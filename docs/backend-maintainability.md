@@ -8,13 +8,19 @@ formats source files, and extracts named compile-time constants without changing
 
 Run `cd backend && ./gradlew formatJava` before committing Java changes. `./gradlew check`
 runs `checkJavaFormat` and `checkMethodTimingCoverage` alongside the existing regression suites.
-The coverage check requires JavaDoc for types/methods and a matching start/finally-finish
+The coverage check rejects placeholder method descriptions, requires JavaDoc for types/methods,
+and validates timing labels against the actual declaring-type path and parameter signature.
+Verifier regressions cover copied labels, overloads, generics, varargs and anonymous callbacks.
+It requires a matching start/finally-finish
 wrapper for every explicit concrete business method; the diagnostics package is excluded
 from instrumentation to prevent logging recursion. The pinned Google Java Format
 AOSP style uses four-space indentation, separates declarations, and wraps long expressions.
 It applies to maintained main, test and enhancement Java sources and verification tooling.
 
-Existing JavaDoc is retained. Previously undocumented types and explicitly declared methods
+Existing meaningful JavaDoc is retained. Placeholder descriptions have been replaced with
+endpoint contracts, authorization checks, database effects, return expressions and rejection
+reasons grounded in each method. Security and cleanup methods document their MFA/replay,
+revision, lease and retention rules explicitly. Previously undocumented types and explicitly declared methods
 have summaries and parameter/return/declared-exception tags. Record components, exposed enum
 values and explicit constructors are documented too. Standard Javadoc does not expand Lombok
 and reports missing synthetic/default-constructor comments; a published API documentation

@@ -24,16 +24,18 @@ public class MenuWorkspaceController {
     private final MenuWorkspaceService service;
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/branches/{branch}/menu/workspace} for menu workspace.
      *
-     * @param branch the branch
-     * @param date the date
-     * @param search the search
-     * @param category the category
-     * @param filter the filter
-     * @param page the page
-     * @param size the size
-     * @return the list result
+     * <p>Delegates to {@code service.list(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param date the date supplied to this method
+     * @param search the search supplied to this method
+     * @param category the category supplied to this method
+     * @param filter the filter supplied to this method
+     * @param page the page supplied to this method
+     * @param size the size supplied to this method
+     * @return the value of {@code service.list(branch, date, search, category, filter, page, size)}
      */
     @GetMapping
     public MenuWorkspaceService.Page list(
@@ -69,11 +71,13 @@ public class MenuWorkspaceController {
             @NotNull @Size(min = 1, max = 50) List<@Positive Long> branchIds) {}
 
     /**
-     * Creates the operation.
+     * Handles {@code POST /api/admin/branches/{branch}/menu/workspace} for menu workspace.
      *
-     * @param branch the branch
-     * @param input the input
-     * @return the create result
+     * <p>Delegates to {@code service.create(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code Map<String, Long>} result
      */
     @PostMapping
     public Map<String, Long> create(@PathVariable long branch, @Valid @RequestBody Create input) {
@@ -90,11 +94,14 @@ public class MenuWorkspaceController {
     }
 
     /**
-     * Detailses the operation.
+     * Handles {@code PUT /api/admin/branches/{branch}/menu/workspace/{id}/details} for menu
+     * workspace.
      *
-     * @param branch the branch
-     * @param id the id
-     * @param input the input
+     * <p>Delegates to {@code service.editDetails(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
      */
     @PutMapping("/{id}/details")
     public void details(
@@ -142,11 +149,14 @@ public class MenuWorkspaceController {
     }
 
     /**
-     * Dietary the operation.
+     * Handles {@code PATCH /api/admin/branches/{branch}/menu/workspace/{id}/dietary} for menu
+     * workspace.
      *
-     * @param branch the branch
-     * @param id the id
-     * @param input the input
+     * <p>Delegates to {@code service.editDietary(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
      */
     @PatchMapping("/{id}/dietary")
     public void dietary(
@@ -190,13 +200,16 @@ public class MenuWorkspaceController {
     }
 
     /**
-     * Images the operation.
+     * Handles {@code POST /api/admin/branches/{branch}/menu/workspace/{id}/image} for menu
+     * workspace.
      *
-     * @param branch the branch
-     * @param id the id
-     * @param version the version
-     * @param image the image
-     * @return the image result
+     * <p>Delegates to {@code service.image(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @param version the version supplied to this method
+     * @param image the image supplied to this method
+     * @return the {@code Map<String, String>} result
      */
     @PostMapping(value = "/{id}/image", consumes = "multipart/form-data")
     public Map<String, String> image(
@@ -218,11 +231,14 @@ public class MenuWorkspaceController {
     }
 
     /**
-     * Removes the operation.
+     * Handles {@code DELETE /api/admin/branches/{branch}/menu/workspace/{id}/image} for menu
+     * workspace.
      *
-     * @param branch the branch
-     * @param id the id
-     * @param version the version
+     * <p>Delegates to {@code service.image(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @param version the version supplied to this method
      */
     @DeleteMapping("/{id}/image")
     public void remove(
@@ -240,12 +256,15 @@ public class MenuWorkspaceController {
     }
 
     /**
-     * Stocks the operation.
+     * Handles {@code PUT /api/admin/branches/{branch}/menu/workspace/{id}/stock/{date}} for menu
+     * workspace.
      *
-     * @param branch the branch
-     * @param id the id
-     * @param date the date
-     * @param input the input
+     * <p>Delegates to {@code service.stock(...)}.
+     *
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @param date the date supplied to this method
+     * @param input the input supplied to this method
      */
     @PutMapping("/{id}/stock/{date}")
     public void stock(

@@ -46,9 +46,9 @@ public class ApplicationClock {
     }
 
     /**
-     * Zones the operation.
+     * Returns zone information for application clock.
      *
-     * @return the zone result
+     * @return the value of {@code BUSINESS_ZONE}
      */
     public ZoneId zone() {
         final long __gokulMethodStartedNanos = MethodTiming.start(ApplicationClock.class, "zone()");
@@ -60,9 +60,9 @@ public class ApplicationClock {
     }
 
     /**
-     * Nows the operation.
+     * Returns the current local date and time in the business timezone.
      *
-     * @return the now result
+     * @return the value of {@code LocalDateTime.now(BUSINESS_ZONE)}
      */
     public LocalDateTime now() {
         final long __gokulMethodStartedNanos = MethodTiming.start(ApplicationClock.class, "now()");
@@ -74,9 +74,9 @@ public class ApplicationClock {
     }
 
     /**
-     * Today the operation.
+     * Returns today information for application clock.
      *
-     * @return the today result
+     * @return the value of {@code LocalDate.now(BUSINESS_ZONE)}
      */
     public LocalDate today() {
         final long __gokulMethodStartedNanos =

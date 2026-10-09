@@ -19,11 +19,11 @@ public class InventoryCentreController {
     private final InventoryCentreJobs jobs;
 
     /**
-     * Submits the operation.
+     * Handles {@code POST /api/admin/inventory/branches/{branch}/centre/jobs} for inventory centre.
      *
-     * @param branch the branch
-     * @param input the input
-     * @return the submit result
+     * @param branch the branch supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code jobs.submit(branch, input)}
      */
     @PostMapping("/jobs")
     public Map<String, Object> submit(
@@ -42,10 +42,10 @@ public class InventoryCentreController {
     }
 
     /**
-     * Recents the operation.
+     * Handles {@code GET /api/admin/inventory/branches/{branch}/centre/jobs} for inventory centre.
      *
-     * @param branch the branch
-     * @return the recent result
+     * @param branch the branch supplied to this method
+     * @return the value of {@code jobs.recent(branch)}
      */
     @GetMapping("/jobs")
     public List<Map<String, Object>> recent(@PathVariable long branch) {
@@ -60,11 +60,12 @@ public class InventoryCentreController {
     }
 
     /**
-     * Statuses the operation.
+     * Handles {@code GET /api/admin/inventory/branches/{branch}/centre/jobs/{id}} for inventory
+     * centre.
      *
-     * @param branch the branch
-     * @param id the id
-     * @return the status result
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @return the value of {@code jobs.summary(branch, id)}
      */
     @GetMapping("/jobs/{id}")
     public Map<String, Object> status(@PathVariable long branch, @PathVariable UUID id) {
@@ -81,12 +82,13 @@ public class InventoryCentreController {
     }
 
     /**
-     * Resultses the operation.
+     * Handles {@code GET /api/admin/inventory/branches/{branch}/centre/jobs/{id}/results} for
+     * inventory centre.
      *
-     * @param branch the branch
-     * @param id the id
-     * @param page the page
-     * @return the results result
+     * @param branch the branch supplied to this method
+     * @param id the id supplied to this method
+     * @param page the page supplied to this method
+     * @return the value of {@code jobs.results(branch, id, page)}
      */
     @GetMapping("/jobs/{id}/results")
     public List<Map<String, Object>> results(

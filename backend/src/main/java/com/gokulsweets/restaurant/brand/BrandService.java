@@ -117,9 +117,11 @@ public class BrandService {
     public record Content(Story story, List<Person> people) {}
 
     /**
-     * Story the operation.
+     * Returns story information for brand.
      *
-     * @return the story result
+     * <p>Reads {@code brand_story}.
+     *
+     * @return the {@code Story} result
      */
     private Story story() {
         final long __gokulMethodStartedNanos = MethodTiming.start(BrandService.class, "story()");
@@ -141,10 +143,10 @@ public class BrandService {
     }
 
     /**
-     * Peoples the operation.
+     * Returns people information for brand.
      *
-     * @param published the published
-     * @return the people result
+     * @param published the published supplied to this method
+     * @return the {@code List<Person>} result
      */
     private List<Person> people(boolean published) {
         final long __gokulMethodStartedNanos =
@@ -170,7 +172,11 @@ public class BrandService {
         }
     }
 
-    /** Checks the operation. */
+    /**
+     * Returns check information for brand.
+     *
+     * <p>Authorization checks include {@code PermissionName.ABOUT_MANAGE}.
+     */
     private void check() {
         final long __gokulMethodStartedNanos = MethodTiming.start(BrandService.class, "check()");
         try {
@@ -181,9 +187,11 @@ public class BrandService {
     }
 
     /**
-     * Changeds the operation.
+     * Returns changed information for brand.
      *
-     * @param rows the rows
+     * @param rows the rows supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Content
+     *     changed. Reload before saving.}
      */
     private void changed(int rows) {
         final long __gokulMethodStartedNanos =
@@ -198,10 +206,12 @@ public class BrandService {
     }
 
     /**
-     * Audits the operation.
+     * Records an audit entry for brand data.
      *
-     * @param action the action
-     * @param id the id
+     * <p>Writes {@code brand_career_audit}.
+     *
+     * @param action the action supplied to this method
+     * @param id the id supplied to this method
      */
     private void audit(String action, long id) {
         final long __gokulMethodStartedNanos =
@@ -253,11 +263,13 @@ public class BrandService {
     }
 
     /**
-     * Saves the operation.
+     * Persists brand data and returns the {@code Story} result.
      *
-     * @param copy the copy
-     * @param version the version
-     * @return the save result
+     * <p>Writes {@code brand_story}.
+     *
+     * @param copy the copy supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code story()}
      */
     @Transactional
     public Story save(Copy copy, long version) {
@@ -284,10 +296,12 @@ public class BrandService {
     }
 
     /**
-     * Creates the operation.
+     * Creates brand data and returns the {@code Person} result.
      *
-     * @param input the input
-     * @return the create result
+     * <p>Writes {@code brand_people}.
+     *
+     * @param input the input supplied to this method
+     * @return the value of {@code person(id)}
      */
     @Transactional
     public Person create(PersonInput input) {
@@ -316,10 +330,10 @@ public class BrandService {
     }
 
     /**
-     * Persons the operation.
+     * Returns person information for brand.
      *
-     * @param id the id
-     * @return the person result
+     * @param id the id supplied to this method
+     * @return the {@code Person} result
      */
     private Person person(long id) {
         final long __gokulMethodStartedNanos =
@@ -395,11 +409,13 @@ public class BrandService {
     }
 
     /**
-     * Uploads the operation.
+     * Uploads brand data and returns the {@code String} result.
      *
-     * @param id the id
-     * @param file the file
-     * @return the upload result
+     * <p>Delegates to {@code storage.uploadCampaignMedia(...)}.
+     *
+     * @param id the id supplied to this method
+     * @param file the file supplied to this method
+     * @return the value of {@code media.url()}
      */
     private String upload(long id, MultipartFile file) {
         final long __gokulMethodStartedNanos_ =

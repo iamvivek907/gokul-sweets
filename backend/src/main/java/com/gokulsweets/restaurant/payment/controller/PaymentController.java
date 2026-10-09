@@ -36,9 +36,9 @@ public class PaymentController {
     private final VerifiedOrderAccess orderAccess;
 
     /**
-     * Providerses the operation.
+     * Handles {@code GET /api/payments/providers} for payment.
      *
-     * @return the providers result
+     * @return the {@code ResponseEntity<PaymentProviderConfigurationResponse>} result
      */
     @GetMapping("/providers")
     public ResponseEntity<PaymentProviderConfigurationResponse> providers() {

@@ -28,10 +28,10 @@ public class BranchService {
     private final EnhancementProperties features;
 
     /**
-     * Responses the operation.
+     * Returns response information for branch.
      *
-     * @param branch the branch
-     * @return the response result
+     * @param branch the branch supplied to this method
+     * @return the {@code BranchResponse} result
      */
     private BranchResponse response(Branch branch) {
         final long __gokulMethodStartedNanos =

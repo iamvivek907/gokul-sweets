@@ -365,9 +365,9 @@ UPDATE occasion_enquiries SET quoted_amount=?,packing_finalized_at=?,packing_rev
     }
 
     /**
-     * Invalids the operation.
+     * Rejects the request with an HTTP BAD_REQUEST response.
      *
-     * @param message the message
+     * @param message the message supplied to this method
      */
     private static void invalid(String message) {
         final long __gokulMethodStartedNanos =
@@ -381,9 +381,9 @@ UPDATE occasion_enquiries SET quoted_amount=?,packing_finalized_at=?,packing_rev
     }
 
     /**
-     * Conflicts the operation.
+     * Rejects the request with an HTTP CONFLICT response.
      *
-     * @param message the message
+     * @param message the message supplied to this method
      */
     private static void conflict(String message) {
         final long __gokulMethodStartedNanos =

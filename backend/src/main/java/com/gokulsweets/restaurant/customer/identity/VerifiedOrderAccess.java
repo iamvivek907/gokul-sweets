@@ -227,9 +227,9 @@ SELECT EXISTS (SELECT 1 FROM verified_order_ownership own
     }
 
     /**
-     * Actives the operation.
+     * Returns active information for verified order access.
      *
-     * @return the active result
+     * @return the {@code boolean} result
      */
     private boolean active() {
         final long __gokulMethodStartedNanos =

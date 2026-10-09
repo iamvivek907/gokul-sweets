@@ -28,12 +28,12 @@ public class DeliveryOrderController {
     private final TrustedCheckoutIdentity identity;
 
     /**
-     * Creates the operation.
+     * Handles {@code POST /api/storefront/delivery/orders} for delivery order.
      *
-     * @param idempotencyKey the idempotency key
-     * @param request the request
-     * @param servletRequest the servlet request
-     * @return the create result
+     * @param idempotencyKey the idempotency key supplied to this method
+     * @param request the request supplied to this method
+     * @param servletRequest the servlet request supplied to this method
+     * @return the {@code ResponseEntity<DeliveryOrderCreationService.Created>} result
      */
     @PostMapping("/api/storefront/delivery/orders")
     public ResponseEntity<DeliveryOrderCreationService.Created> create(

@@ -33,11 +33,15 @@ public class DeliveryOrderPreparationService {
     private final DeliveryEconomicsService economics;
 
     /**
-     * Prepares the operation.
+     * Prepares delivery order preparation data and returns the {@code Prepared} result.
      *
-     * @param request the request
-     * @param windowId the window id
-     * @return the prepare result
+     * @param request the request supplied to this method
+     * @param windowId the window id supplied to this method
+     * @return the {@code Prepared} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Review the
+     *     items in your delivery cart.}; {@code Select a valid delivery date, cart and window.}
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery order
+     *     preparation is disabled.}
      */
     @Transactional(readOnly = true)
     public Prepared prepare(DeliveryCapacityService.QuoteRequest request, long windowId) {

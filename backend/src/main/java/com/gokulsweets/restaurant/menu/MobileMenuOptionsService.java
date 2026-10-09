@@ -67,9 +67,12 @@ public class MobileMenuOptionsService {
     public record Snapshot(long version, List<Group> groups) {}
 
     /**
-     * Authorizes the operation.
+     * Requires menu-management permission and branch access before editing mobile menu option
+     * groups.
      *
-     * @param id the id
+     * <p>Authorization checks include {@code PermissionName.MENU_MANAGE}.
+     *
+     * @param id the id supplied to this method
      */
     private void authorize(long id) {
         final long __gokulMethodStartedNanos =
@@ -133,10 +136,12 @@ public class MobileMenuOptionsService {
     }
 
     /**
-     * Reads the operation.
+     * Loads the branch's mobile option-group snapshot; callers perform access checks when required.
      *
-     * @param id the id
-     * @return the read result
+     * <p>Reads {@code mobile_menu_choices}, {@code mobile_menu_config}, {@code mobile_menu_groups}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code Snapshot} result
      */
     private Snapshot read(long id) {
         final long __gokulMethodStartedNanos =
@@ -182,11 +187,23 @@ public class MobileMenuOptionsService {
     }
 
     /**
-     * Saves the operation.
+     * Validates and replaces mobile menu option groups using the supplied version, returning the
+     * saved snapshot.
      *
-     * @param id the id
-     * @param input the input
-     * @return the save result
+     * <p>Reads {@code branch_products}, {@code mobile_menu_config}, {@code products}.
+     *
+     * <p>Writes {@code mobile_menu_choices}, {@code mobile_menu_config}, {@code
+     * mobile_menu_groups}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code read(id)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code A product or
+     *     portion label is repeated.}; {@code Choose a piece-based item from this branch menu for
+     *     every portion.}; {@code Each portion group needs a unique key.}; {@code Portions must
+     *     belong to the same category.}
+     * @throws ResponseStatusException when the method rejects the request with {@code Branch not
+     *     found.}; {@code Portion options changed. Reload before saving.}
      */
     @Transactional
     public Snapshot save(long id, Input input) {
@@ -339,12 +356,17 @@ public class MobileMenuOptionsService {
             long version, List<Group> groups, long total, int page, int totalPages) {}
 
     /**
-     * Pages the operation.
+     * Returns a bounded page of matching mobile option groups within one repeatable-read snapshot
+     * after checking administrative access.
      *
-     * @param branch the branch
-     * @param search the search
-     * @param page the page
-     * @return the page result
+     * <p>Reads {@code mobile_menu_choices}, {@code mobile_menu_config}, {@code mobile_menu_groups}.
+     *
+     * @param branch the branch supplied to this method
+     * @param search the search supplied to this method
+     * @param page the page supplied to this method
+     * @return the {@code GroupPage} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     group search.}
      */
     @Transactional(
             readOnly = true,

@@ -232,11 +232,17 @@ public class OrderIdempotencyService {
     }
 
     /**
-     * Claims the operation.
+     * Claims order idempotency data and returns the {@code ClaimResult} result.
      *
-     * @param idempotencyKey the idempotency key
-     * @param requestHash the request hash
-     * @return the claim result
+     * <p>Delegates to {@code orderIdempotencyRepository.claim(...)}, {@code
+     * orderIdempotencyRepository.findByIdempotencyKey(...)}.
+     *
+     * @param idempotencyKey the idempotency key supplied to this method
+     * @param requestHash the request hash supplied to this method
+     * @return the {@code ClaimResult} result
+     * @throws IllegalStateException when the method rejects the request with {@code This
+     *     idempotency key was already used for a different order request.}; {@code This order
+     *     request is already being processed.}
      */
     public ClaimResult claim(String idempotencyKey, String requestHash) {
         final long __gokulMethodStartedNanos =
@@ -344,10 +350,10 @@ public class OrderIdempotencyService {
     }
 
     /**
-     * Normalizes the operation.
+     * Normalizes order idempotency data and returns the {@code String} result.
      *
-     * @param value the value
-     * @return the normalize result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
      */
     private String normalize(String value) {
         final long __gokulMethodStartedNanos =
@@ -361,10 +367,12 @@ public class OrderIdempotencyService {
     }
 
     /**
-     * Sha256s the operation.
+     * Returns the SHA-256 digest of the supplied value as hexadecimal text.
      *
-     * @param value the value
-     * @return the sha256 result
+     * @param value the value supplied to this method
+     * @return the value of {@code toHex(hash)}
+     * @throws IllegalStateException when the method rejects the request with {@code SHA-256 is
+     *     unavailable.}
      */
     private String sha256(String value) {
         final long __gokulMethodStartedNanos =
@@ -432,10 +440,10 @@ public class OrderIdempotencyService {
         private Integer weightGrams;
 
         /**
-         * Adds the operation.
+         * Adds item totals data.
          *
-         * @param itemQuantity the item quantity
-         * @param itemWeightGrams the item weight grams
+         * @param itemQuantity the item quantity supplied to this method
+         * @param itemWeightGrams the item weight grams supplied to this method
          */
         private void add(Integer itemQuantity, Integer itemWeightGrams) {
             final long __gokulMethodStartedNanos =

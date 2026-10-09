@@ -78,9 +78,11 @@ public class PickupSlotController {
     }
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for pickup slot data.
      *
-     * @param branchId the branch id
+     * <p>Authorization checks include {@code PermissionName.BRANCH_MANAGE}.
+     *
+     * @param branchId the branch id supplied to this method
      */
     private void authorize(Long branchId) {
         final long __gokulMethodStartedNanos =

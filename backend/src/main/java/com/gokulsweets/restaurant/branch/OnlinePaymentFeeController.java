@@ -50,9 +50,11 @@ public class OnlinePaymentFeeController {
             boolean reviewed) {}
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for online payment fee data.
      *
-     * @param id the id
+     * <p>Authorization checks include {@code PermissionName.BRANCH_MANAGE}.
+     *
+     * @param id the id supplied to this method
      */
     private void authorize(long id) {
         final long __gokulMethodStartedNanos =
@@ -67,10 +69,10 @@ public class OnlinePaymentFeeController {
     }
 
     /**
-     * Fees the operation.
+     * Returns fee information for online payment fee.
      *
-     * @param b the b
-     * @return the fee result
+     * @param b the b supplied to this method
+     * @return the {@code Fee} result
      */
     private Fee fee(Branch b) {
         final long __gokulMethodStartedNanos =
@@ -87,10 +89,10 @@ public class OnlinePaymentFeeController {
     }
 
     /**
-     * Returns the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/payment-fee} for online payment fee.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Fee} result
      */
     @GetMapping
     public Fee get(@PathVariable long branchId) {
@@ -108,11 +110,13 @@ public class OnlinePaymentFeeController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/payment-fee} for online payment fee.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the save result
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code fee(b)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Review
+     *     provider terms and fee tax treatment before enabling the charge.}
      */
     @PutMapping
     @Transactional

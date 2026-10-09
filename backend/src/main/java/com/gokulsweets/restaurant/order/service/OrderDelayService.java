@@ -42,11 +42,19 @@ public class OrderDelayService {
             notifications;
 
     /**
-     * Reports the operation.
+     * Returns report information for order delay.
      *
-     * @param orderNumber the order number
-     * @param request the request
-     * @return the report result
+     * <p>Authorization checks include {@code PermissionName.ORDER_MARK_READY}.
+     *
+     * @param orderNumber the order number supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code queries.getOrder(orderNumber)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Provide a
+     *     revised ready time and a reason of 10 to 300 characters.}; {@code The revised ready time
+     *     must be after the booked pickup start and within 24 hours from now (IST).}
+     * @throws IllegalStateException when the method rejects the request with {@code Delay reporting
+     *     is not enabled.}; {@code Delivery readiness updates require a revised rider window.};
+     *     {@code Only confirmed or preparing orders can report a revised ready time.}
      */
     @Transactional
     public AdminOrderDetailResponse report(String orderNumber, UpdateOrderDelayRequest request) {

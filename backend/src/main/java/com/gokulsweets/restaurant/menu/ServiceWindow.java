@@ -14,10 +14,10 @@ import java.time.*;
 public record ServiceWindow(LocalTime startsAt, LocalTime endsAt, int weekdays) {
 
     /**
-     * Containses the operation.
+     * Returns contains information for service window.
      *
-     * @param now the now
-     * @return the contains result
+     * @param now the now supplied to this method
+     * @return the {@code boolean} result
      */
     public boolean contains(ZonedDateTime now) {
         final long __gokulMethodStartedNanos =

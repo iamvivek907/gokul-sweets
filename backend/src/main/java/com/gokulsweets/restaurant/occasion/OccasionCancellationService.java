@@ -30,13 +30,21 @@ public class OccasionCancellationService {
     private final PickupSlotReservationService slots;
 
     /**
-     * Cancels the operation.
+     * Cancels occasion cancellation data.
      *
-     * @param environment the environment
-     * @param branch the branch
-     * @param enquiry the enquiry
-     * @param actor the actor
-     * @param reason the reason
+     * <p>Reads {@code occasion_enquiries}, {@code occasion_production_allocations}, {@code orders}.
+     *
+     * <p>Writes {@code OF}, {@code occasion_cancellation_reviews}, {@code occasion_enquiries},
+     * {@code occasion_enquiry_events}, {@code occasion_payment_attempts}, {@code
+     * occasion_production_allocations}, {@code orders}.
+     *
+     * @param environment the environment supplied to this method
+     * @param branch the branch supplied to this method
+     * @param enquiry the enquiry supplied to this method
+     * @param actor the actor supplied to this method
+     * @param reason the reason supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Explain the
+     *     cancellation for customer and finance review.}
      */
     @Transactional
     public void cancel(
@@ -161,10 +169,10 @@ VALUES (?, ?, ?, 'CANCELLED', ?)
     }
 
     /**
-     * Conflicts the operation.
+     * Creates an HTTP CONFLICT exception using the supplied rejection reason.
      *
-     * @param message the message
-     * @return the conflict result
+     * @param message the message supplied to this method
+     * @return the {@code ResponseStatusException} result
      */
     private static ResponseStatusException conflict(String message) {
         final long __gokulMethodStartedNanos =

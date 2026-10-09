@@ -167,10 +167,12 @@ public class AdminPayrollOpeningBalanceService {
     }
 
     /**
-     * Money the operation.
+     * Rounds the monetary amount to two decimal places using half-up rounding. A null amount is
+     * treated as zero.
      *
-     * @param value the value
-     * @return the money result
+     * @param value the value supplied to this method
+     * @return the value of {@code (value == null ? BigDecimal.ZERO : value).setScale(2,
+     *     RoundingMode.HALF_UP)}
      */
     private BigDecimal money(BigDecimal value) {
         final long __gokulMethodStartedNanos =

@@ -20,9 +20,9 @@ public class StorefrontFeaturesController {
     private final Clock inventoryClock;
 
     /**
-     * Featureses the operation.
+     * Handles {@code GET /api/storefront/features} for storefront features.
      *
-     * @return the features result
+     * @return the {@code Features} result
      */
     @GetMapping("/api/storefront/features")
     public Features features() {

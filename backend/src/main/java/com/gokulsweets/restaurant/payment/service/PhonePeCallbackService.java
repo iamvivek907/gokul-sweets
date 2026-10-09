@@ -36,11 +36,16 @@ public class PhonePeCallbackService {
     private final OccasionCommitmentService occasionCommitments;
 
     /**
-     * Processes the operation.
+     * Processes phone pe callback data.
      *
-     * @param rawBody the raw body
-     * @param checksumKeyId the checksum key id
-     * @param checksumSignature the checksum signature
+     * <p>Delegates to {@code paymentRepository.findByProviderAndProviderOrderId(...)}, {@code
+     * paymentStatusService.markPaid(...)}, {@code paymentStatusService.markFailed(...)}.
+     *
+     * @param rawBody the raw body supplied to this method
+     * @param checksumKeyId the checksum key id supplied to this method
+     * @param checksumSignature the checksum signature supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code PhonePe
+     *     webhook payload is missing.}
      */
     public void process(byte[] rawBody, String checksumKeyId, String checksumSignature) {
         final long __gokulMethodStartedNanos =
@@ -230,10 +235,12 @@ public class PhonePeCallbackService {
     }
 
     /**
-     * Parses the operation.
+     * Parses phone pe callback data and returns the {@code JsonNode} result.
      *
-     * @param rawBody the raw body
-     * @return the parse result
+     * @param rawBody the raw body supplied to this method
+     * @return the value of {@code objectMapper.readTree(rawBody)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code PhonePe
+     *     webhook payload is invalid.}
      */
     private JsonNode parse(byte[] rawBody) {
         final long __gokulMethodStartedNanos =

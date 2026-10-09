@@ -68,14 +68,25 @@ public class InventoryAutomationGenerationService {
     private final com.gokulsweets.restaurant.config.EnhancementProperties features;
 
     /**
-     * Generates the operation.
+     * Generates inventory automation generation data and returns the {@code AutomationRunResponse}
+     * result.
      *
-     * @param branchId the branch id
-     * @param fromDate the from date
-     * @param throughDate the through date
-     * @param trigger the trigger
-     * @param actor the actor
-     * @return the generate result
+     * <p>Delegates to {@code
+     * ruleRepository.findByBranchProduct_Branch_IdOrderByBranchProduct_Product_NameAsc(...)},
+     * {@code policyRepository.findByBranchProductIdIn(...)}, {@code
+     * windowRepository.findByAutomationRuleIdInAndActiveTrue(...)}, {@code
+     * allocationRepository.findByBranchProduct_Branch_IdAndServiceDateBetweenOrderByServiceDateAsc(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param fromDate the from date supplied to this method
+     * @param throughDate the through date supplied to this method
+     * @param trigger the trigger supplied to this method
+     * @param actor the actor supplied to this method
+     * @return the value of {@code InventoryAutomationMapper.toRunResponse(saved)}
+     * @throws InventoryConflictException when the method rejects the request with {@code
+     *     BRANCH_INACTIVE}
+     * @throws InventoryNotFoundException when the method rejects the request with {@code
+     *     BRANCH_NOT_FOUND}
      */
     @Transactional
     public AutomationRunResponse generate(
@@ -675,11 +686,11 @@ public class InventoryAutomationGenerationService {
     }
 
     /**
-     * Caps the operation.
+     * Returns cap information for inventory automation generation.
      *
-     * @param value the value
-     * @param maximum the maximum
-     * @return the cap result
+     * @param value the value supplied to this method
+     * @param maximum the maximum supplied to this method
+     * @return the value of {@code maximum == null ? safe : safe.min(maximum)}
      */
     private BigDecimal cap(BigDecimal value, BigDecimal maximum) {
         final long __gokulMethodStartedNanos =
@@ -697,11 +708,12 @@ public class InventoryAutomationGenerationService {
     }
 
     /**
-     * Normalizes the operation.
+     * Normalizes inventory automation generation data and returns the {@code BigDecimal} result.
      *
-     * @param value the value
-     * @param unit the unit
-     * @return the normalize result
+     * @param value the value supplied to this method
+     * @param unit the unit supplied to this method
+     * @return the value of {@code unit == InventoryUnit.PIECE ? value.setScale(0,
+     *     RoundingMode.CEILING).setScale(3) : value.setScale(3, RoundingMode.HALF_UP)}
      */
     private BigDecimal normalize(BigDecimal value, InventoryUnit unit) {
         final long __gokulMethodStartedNanos =

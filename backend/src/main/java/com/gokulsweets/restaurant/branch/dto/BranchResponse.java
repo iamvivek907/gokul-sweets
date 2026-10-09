@@ -53,15 +53,15 @@ public record BranchResponse(
         boolean operational) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code BranchResponse} representation.
      *
-     * @param branch the branch
-     * @param coverImageUrl the cover image url
-     * @param mobileCoverImageUrl the mobile cover image url
-     * @param coverAltText the cover alt text
-     * @param description the description
-     * @param pickupAvailable the pickup available
-     * @return the from result
+     * @param branch the branch supplied to this method
+     * @param coverImageUrl the cover image url supplied to this method
+     * @param mobileCoverImageUrl the mobile cover image url supplied to this method
+     * @param coverAltText the cover alt text supplied to this method
+     * @param description the description supplied to this method
+     * @param pickupAvailable the pickup available supplied to this method
+     * @return the {@code BranchResponse} result
      */
     public static BranchResponse from(
             Branch branch,

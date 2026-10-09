@@ -36,13 +36,22 @@ public class DeliveryRiderHoldService {
     private final Clock inventoryClock;
 
     /**
-     * Holds the operation.
+     * Holds delivery rider hold data and returns the {@code boolean} result.
      *
-     * @param holdKey the hold key
-     * @param fingerprint the fingerprint
-     * @param request the request
-     * @param windowId the window id
-     * @return the hold result
+     * <p>Reads {@code delivery_capacity_windows}, {@code delivery_rider_holds}, {@code
+     * delivery_zones}.
+     *
+     * <p>Writes {@code delivery_capacity_windows}, {@code delivery_rider_holds}.
+     *
+     * @param holdKey the hold key supplied to this method
+     * @param fingerprint the fingerprint supplied to this method
+     * @param request the request supplied to this method
+     * @param windowId the window id supplied to this method
+     * @return the {@code boolean} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     rider hold request.}
+     * @throws IllegalStateException when the method rejects the request with {@code Rider holds are
+     *     disabled.}
      */
     @Transactional
     public boolean hold(
@@ -228,12 +237,18 @@ ORDER BY expires_at LIMIT ?
     }
 
     /**
-     * Transitions the operation.
+     * Changes the state of delivery rider hold data and returns the {@code boolean} result.
      *
-     * @param key the key
-     * @param target the target
-     * @param expiryOnly the expiry only
-     * @return the transition result
+     * <p>Reads {@code delivery_capacity_windows}, {@code delivery_rider_holds}.
+     *
+     * <p>Writes {@code delivery_capacity_windows}, {@code delivery_rider_holds}.
+     *
+     * @param key the key supplied to this method
+     * @param target the target supplied to this method
+     * @param expiryOnly the expiry only supplied to this method
+     * @return the {@code boolean} result
+     * @throws IllegalStateException when the method rejects the request with {@code Rider capacity
+     *     accounting is inconsistent.}
      */
     private boolean transition(String key, String target, boolean expiryOnly) {
         final long __gokulMethodStartedNanos =

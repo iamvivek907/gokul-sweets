@@ -25,15 +25,22 @@ public class OccasionProductionReadinessService {
     private final EnhancementProperties features;
 
     /**
-     * Records the operation.
+     * Records occasion production readiness data.
      *
-     * @param environment the environment
-     * @param branchId the branch id
-     * @param enquiry the enquiry
-     * @param productId the product id
-     * @param quantity the quantity
-     * @param revision the revision
-     * @param actor the actor
+     * <p>Reads {@code occasion_enquiries}, {@code occasion_production_allocations}, {@code orders}.
+     *
+     * <p>Writes {@code OF}, {@code occasion_production_allocations}, {@code
+     * occasion_production_readiness_events}.
+     *
+     * @param environment the environment supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @param enquiry the enquiry supplied to this method
+     * @param productId the product id supplied to this method
+     * @param quantity the quantity supplied to this method
+     * @param revision the revision supplied to this method
+     * @param actor the actor supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Enter a valid
+     *     actual ready quantity.}; {@code Ready quantity must fit the approved quantity and unit.}
      */
     @Transactional
     public void record(
@@ -159,10 +166,10 @@ FOR UPDATE OF p
     }
 
     /**
-     * Conflicts the operation.
+     * Creates an HTTP CONFLICT exception using the supplied rejection reason.
      *
-     * @param message the message
-     * @return the conflict result
+     * @param message the message supplied to this method
+     * @return the {@code ResponseStatusException} result
      */
     private static ResponseStatusException conflict(String message) {
         final long __gokulMethodStartedNanos =

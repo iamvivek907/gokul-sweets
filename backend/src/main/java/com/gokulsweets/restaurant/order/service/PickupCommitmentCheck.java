@@ -83,11 +83,11 @@ public class PickupCommitmentCheck {
     }
 
     /**
-     * Conflicts the operation.
+     * Returns conflict information for pickup commitment check.
      *
-     * @param reason the reason
-     * @param date the date
-     * @return the conflict result
+     * @param reason the reason supplied to this method
+     * @param date the date supplied to this method
+     * @return the {@code InventoryConflictException} result
      */
     private static InventoryConflictException conflict(String reason, String date) {
         final long __gokulMethodStartedNanos =

@@ -19,10 +19,11 @@ final class StartupDiagnostics {
     private StartupDiagnostics() {}
 
     /**
-     * Configures the operation.
+     * When enabled, buffers startup steps and logs readiness plus the twenty slowest recorded steps
+     * after the application becomes ready.
      *
-     * @param application the application
-     * @param enabled the enabled
+     * @param application the application supplied to this method
+     * @param enabled the enabled supplied to this method
      */
     static void configure(SpringApplication application, boolean enabled) {
         final long __gokulMethodStartedNanos =
@@ -65,10 +66,12 @@ final class StartupDiagnostics {
     }
 
     /**
-     * Slowests the operation.
+     * Returns at most twenty startup events ordered by descending elapsed duration; nested event
+     * durations can overlap.
      *
-     * @param events the events
-     * @return the slowest result
+     * @param events the events supplied to this method
+     * @return the value of {@code
+     *     events.stream().sorted(Comparator.comparing(TimelineEvent::getDuration).reversed()).limit(20).toList()}
      */
     static List<TimelineEvent> slowest(List<TimelineEvent> events) {
         final long __gokulMethodStartedNanos =

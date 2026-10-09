@@ -153,3 +153,13 @@ tasks.register('checkMethodTimingCoverage', JavaExec) {
     args = [file('src/main/java').absolutePath]
 }
 tasks.named('check') { dependsOn tasks.named('checkMethodTimingCoverage') }
+
+// Test the verifier itself: paired but copied labels must not pass future source checks.
+tasks.register('testMethodTimingCoverage', JavaExec) {
+    group = 'verification'
+    dependsOn tasks.named('compileMaintenanceVerification')
+    classpath = files(layout.buildDirectory.dir('maintenance-verification')) + configurations.maintenanceVerification
+    mainClass = 'MethodTimingCoverageCheckTest'
+    maxHeapSize = '256m'
+}
+tasks.named('check') { dependsOn tasks.named('testMethodTimingCoverage') }

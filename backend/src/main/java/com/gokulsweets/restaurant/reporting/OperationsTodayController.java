@@ -25,10 +25,12 @@ public class OperationsTodayController {
     private final Clock clock;
 
     /**
-     * Today the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/dashboard/today} for operations today.
      *
-     * @param branchId the branch id
-     * @return the today result
+     * <p>Reads {@code delivery_capacity_windows}, {@code orders}, {@code pickup_slots}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code result}
      */
     @GetMapping("/api/admin/branches/{branchId}/dashboard/today")
     @PreAuthorize("hasAuthority('ORDER_VIEW')")

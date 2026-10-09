@@ -154,10 +154,12 @@ public class DeliveryAcceptedQuoteService {
     }
 
     /**
-     * Previews the operation.
+     * Previews delivery accepted quote data and returns the {@code Quote} result.
      *
-     * @param request the request
-     * @return the preview result
+     * <p>Delegates to {@code DeliveryOrderCreationService.validate(...)}.
+     *
+     * @param request the request supplied to this method
+     * @return the {@code Quote} result
      */
     @Transactional(readOnly = true)
     public Quote preview(DeliveryOrderCreationService.CreateRequest request) {
@@ -217,11 +219,15 @@ public class DeliveryAcceptedQuoteService {
     }
 
     /**
-     * Accepts the operation.
+     * Accepts delivery accepted quote data.
      *
-     * @param request the request
-     * @param price the price
-     * @param economics the economics
+     * @param request the request supplied to this method
+     * @param price the price supplied to this method
+     * @param economics the economics supplied to this method
+     * @throws IllegalStateException when the method rejects the request with {@code Review the
+     *     current delivery price before continuing.}; {@code This delivery price expired. Review
+     *     the current price again.}; {@code Your delivery details or price changed. Review the
+     *     updated quote.}
      */
     public void accept(
             DeliveryOrderCreationService.CreateRequest request,
@@ -275,12 +281,12 @@ public class DeliveryAcceptedQuoteService {
     }
 
     /**
-     * Payloads the operation.
+     * Returns payload information for delivery accepted quote.
      *
-     * @param request the request
-     * @param price the price
-     * @param economics the economics
-     * @return the payload result
+     * @param request the request supplied to this method
+     * @param price the price supplied to this method
+     * @param economics the economics supplied to this method
+     * @return the value of {@code value.toString()}
      */
     private static String payload(
             DeliveryOrderCreationService.CreateRequest request,
@@ -344,10 +350,10 @@ public class DeliveryAcceptedQuoteService {
     }
 
     /**
-     * Appends the operation.
+     * Appends delivery accepted quote data.
      *
-     * @param value the value
-     * @param part the part
+     * @param value the value supplied to this method
+     * @param part the part supplied to this method
      */
     private static void append(StringBuilder value, String part) {
         final long __gokulMethodStartedNanos =
@@ -364,10 +370,13 @@ public class DeliveryAcceptedQuoteService {
     }
 
     /**
-     * Signs the operation.
+     * Returns sign information for delivery accepted quote.
      *
-     * @param message the message
-     * @return the sign result
+     * @param message the message supplied to this method
+     * @return the value of {@code
+     *     Base64.getUrlEncoder().withoutPadding().encodeToString(mac.doFinal(message.getBytes(StandardCharsets.UTF_8)))}
+     * @throws IllegalStateException when the method rejects the request with {@code Checkout quote
+     *     signing key must contain at least 32 characters.}; {@code Delivery quote signing failed.}
      */
     private String sign(String message) {
         final long __gokulMethodStartedNanos =

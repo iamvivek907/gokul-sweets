@@ -21,10 +21,12 @@ public class AdminDeliveryDispatchController {
     private final DeliveryDispatchPilotService pilot;
 
     /**
-     * Boards the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/delivery-dispatch} for admin delivery
+     * dispatch.
      *
-     * @param branchId the branch id
-     * @return the board result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code
+     *     ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(pilot.board(branchId))}
      */
     @GetMapping
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
@@ -45,10 +47,11 @@ public class AdminDeliveryDispatchController {
     }
 
     /**
-     * Riderses the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/delivery-dispatch/riders} for admin
+     * delivery dispatch.
      *
-     * @param branchId the branch id
-     * @return the riders result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code pilot.riders(branchId)}
      */
     @GetMapping("/riders")
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
@@ -66,11 +69,12 @@ public class AdminDeliveryDispatchController {
     }
 
     /**
-     * Riders the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/delivery-dispatch/riders} for admin
+     * delivery dispatch.
      *
-     * @param branchId the branch id
-     * @param input the input
-     * @return the rider result
+     * @param branchId the branch id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code pilot.addRider(branchId, input.name())}
      */
     @PostMapping("/riders")
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
@@ -90,12 +94,14 @@ public class AdminDeliveryDispatchController {
     }
 
     /**
-     * Availability the operation.
+     * Handles {@code PUT
+     * /api/admin/branches/{branchId}/delivery-dispatch/riders/{riderId}/windows/{windowId}} for
+     * admin delivery dispatch.
      *
-     * @param branchId the branch id
-     * @param riderId the rider id
-     * @param windowId the window id
-     * @param input the input
+     * @param branchId the branch id supplied to this method
+     * @param riderId the rider id supplied to this method
+     * @param windowId the window id supplied to this method
+     * @param input the input supplied to this method
      */
     @PutMapping("/riders/{riderId}/windows/{windowId}")
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
@@ -119,12 +125,13 @@ public class AdminDeliveryDispatchController {
     }
 
     /**
-     * Assigns the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/delivery-dispatch/orders/{orderId}/assign}
+     * for admin delivery dispatch.
      *
-     * @param branchId the branch id
-     * @param orderId the order id
-     * @param input the input
-     * @return the assign result
+     * @param branchId the branch id supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code pilot.assign(branchId, orderId, input.riderId())}
      */
     @PostMapping("/orders/{orderId}/assign")
     @PreAuthorize("hasAuthority('ORDER_DISPATCH_DELIVERY')")
@@ -147,11 +154,13 @@ public class AdminDeliveryDispatchController {
     }
 
     /**
-     * Exceptions the operation.
+     * Handles {@code POST
+     * /api/admin/branches/{branchId}/delivery-dispatch/orders/{orderId}/exception} for admin
+     * delivery dispatch.
      *
-     * @param branchId the branch id
-     * @param orderId the order id
-     * @param input the input
+     * @param branchId the branch id supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param input the input supplied to this method
      */
     @PostMapping("/orders/{orderId}/exception")
     @PreAuthorize("hasAuthority('ORDER_DISPATCH_DELIVERY')")
@@ -175,11 +184,13 @@ public class AdminDeliveryDispatchController {
     }
 
     /**
-     * Completes the operation.
+     * Handles {@code POST
+     * /api/admin/branches/{branchId}/delivery-dispatch/orders/{orderId}/outcome} for admin delivery
+     * dispatch.
      *
-     * @param branchId the branch id
-     * @param orderId the order id
-     * @param input the input
+     * @param branchId the branch id supplied to this method
+     * @param orderId the order id supplied to this method
+     * @param input the input supplied to this method
      */
     @PostMapping("/orders/{orderId}/outcome")
     @PreAuthorize("hasAuthority('ORDER_CONFIRM_DELIVERY')")

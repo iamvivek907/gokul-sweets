@@ -11,10 +11,12 @@ public class KotNumberGenerator {
     private static final String PREFIX = AppConstant.KOT_NUMBER_GENERATOR_PREFIX;
 
     /**
-     * Generates the operation.
+     * Generates kot number generator data and returns the {@code String} result.
      *
-     * @param orderId the order id
-     * @return the generate result
+     * @param orderId the order id supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Order ID is
+     *     required to generate a KOT number.}; {@code Order ID must be positive.}
      */
     public String generate(Long orderId) {
         final long __gokulMethodStartedNanos =

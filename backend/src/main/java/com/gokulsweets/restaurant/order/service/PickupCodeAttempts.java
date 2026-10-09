@@ -23,11 +23,15 @@ public class PickupCodeAttempts {
     private final JdbcTemplate jdbc;
 
     /**
-     * Checks the operation.
+     * Returns check information for pickup code attempts.
      *
-     * @param orderId the order id
-     * @param submitted the submitted
-     * @return the check result
+     * <p>Reads {@code order_pickup_codes}.
+     *
+     * <p>Writes {@code order_pickup_codes}.
+     *
+     * @param orderId the order id supplied to this method
+     * @param submitted the submitted supplied to this method
+     * @return the {@code String} result
      */
     @Transactional(propagation = Propagation.REQUIRED)
     public String check(long orderId, String submitted) {

@@ -27,9 +27,11 @@ public class BranchOperations {
     public record Status(boolean operational) {}
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for branch operations data.
      *
-     * @param id the id
+     * <p>Authorization checks include {@code PermissionName.BRANCH_MANAGE}.
+     *
+     * @param id the id supplied to this method
      */
     private void authorize(long id) {
         final long __gokulMethodStartedNanos =
@@ -44,10 +46,10 @@ public class BranchOperations {
     }
 
     /**
-     * Returns the operation.
+     * Returns get information for branch operations.
      *
-     * @param id the id
-     * @return the get result
+     * @param id the id supplied to this method
+     * @return the value of {@code status(id)}
      */
     @Transactional(readOnly = true)
     public Status get(long id) {
@@ -62,11 +64,17 @@ public class BranchOperations {
     }
 
     /**
-     * Updates the operation.
+     * Sets branch operations data and returns the {@code Status} result.
      *
-     * @param id the id
-     * @param input the input
-     * @return the set result
+     * <p>Reads {@code branches}.
+     *
+     * <p>Writes {@code branches}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code status(id)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose an
+     *     operational status.}
      */
     @Transactional
     public Status set(long id, Status input) {
@@ -88,10 +96,12 @@ public class BranchOperations {
     }
 
     /**
-     * Statuses the operation.
+     * Returns status information for branch operations.
      *
-     * @param id the id
-     * @return the status result
+     * <p>Reads {@code branches}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code Status} result
      */
     private Status status(long id) {
         final long __gokulMethodStartedNanos =

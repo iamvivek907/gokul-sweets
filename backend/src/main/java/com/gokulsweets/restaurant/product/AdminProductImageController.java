@@ -18,11 +18,11 @@ public class AdminProductImageController {
     private final ProductService products;
 
     /**
-     * Uploads the operation.
+     * Handles {@code POST /api/admin/products/{id}/image} for admin product image.
      *
-     * @param id the id
-     * @param image the image
-     * @return the upload result
+     * @param id the id supplied to this method
+     * @param image the image supplied to this method
+     * @return the value of {@code products.uploadImage(id, image)}
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ProductResponse upload(@PathVariable Long id, @RequestParam MultipartFile image) {
@@ -39,10 +39,10 @@ public class AdminProductImageController {
     }
 
     /**
-     * Removes the operation.
+     * Handles {@code DELETE /api/admin/products/{id}/image} for admin product image.
      *
-     * @param id the id
-     * @return the remove result
+     * @param id the id supplied to this method
+     * @return the value of {@code products.removeImage(id)}
      */
     @DeleteMapping
     public ProductResponse remove(@PathVariable Long id) {

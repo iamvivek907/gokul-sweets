@@ -19,12 +19,14 @@ public class ConsentLedger {
     private final JdbcTemplate jdbc;
 
     /**
-     * Currents the operation.
+     * Returns current information for consent ledger.
      *
-     * @param environment the environment
-     * @param verifiedSubjectId the verified subject id
-     * @param purpose the purpose
-     * @return the current result
+     * <p>Reads {@code customer_consent_events}.
+     *
+     * @param environment the environment supplied to this method
+     * @param verifiedSubjectId the verified subject id supplied to this method
+     * @param purpose the purpose supplied to this method
+     * @return the {@code ConsentDecision} result
      */
     @Transactional(readOnly = true)
     public ConsentDecision current(
@@ -61,14 +63,18 @@ public class ConsentLedger {
     }
 
     /**
-     * Records the operation.
+     * Records consent ledger data and returns the {@code ConsentDecision} result.
      *
-     * @param environment the environment
-     * @param verifiedSubjectId the verified subject id
-     * @param purpose the purpose
-     * @param policyVersion the policy version
-     * @param granted the granted
-     * @return the record result
+     * <p>Writes {@code customer_consent_events}.
+     *
+     * @param environment the environment supplied to this method
+     * @param verifiedSubjectId the verified subject id supplied to this method
+     * @param purpose the purpose supplied to this method
+     * @param policyVersion the policy version supplied to this method
+     * @param granted the granted supplied to this method
+     * @return the {@code ConsentDecision} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code A valid
+     *     consent policy version is required}
      */
     @Transactional
     public ConsentDecision record(

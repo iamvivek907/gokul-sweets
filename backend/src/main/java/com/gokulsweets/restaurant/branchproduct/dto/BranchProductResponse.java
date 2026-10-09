@@ -32,10 +32,10 @@ public record BranchProductResponse(
         Integer displayOrder) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code BranchProductResponse} representation.
      *
-     * @param branchProduct the branch product
-     * @return the from result
+     * @param branchProduct the branch product supplied to this method
+     * @return the {@code BranchProductResponse} result
      */
     public static BranchProductResponse from(BranchProduct branchProduct) {
         final long __gokulMethodStartedNanos =

@@ -184,12 +184,19 @@ public class ApprovalWorkflowService {
      * then call this method.
      */
     /**
-     * Resubmits the operation.
+     * Resubmits approval workflow data and returns the {@code ApprovalRequest} result.
      *
-     * @param approvalRequestId the approval request id
-     * @param requestingStaff the requesting staff
-     * @param comment the comment
-     * @return the resubmit result
+     * <p>Delegates to {@code approvalRequestRepository.findByIdForUpdate(...)}, {@code
+     * approvalRequestRepository.save(...)}.
+     *
+     * @param approvalRequestId the approval request id supplied to this method
+     * @param requestingStaff the requesting staff supplied to this method
+     * @param comment the comment supplied to this method
+     * @return the value of {@code saved}
+     * @throws IllegalArgumentException when the method rejects the request with {@code You can only
+     *     resubmit your own request.}
+     * @throws IllegalStateException when the method rejects the request with {@code Only a
+     *     sent-back request can be resubmitted.}
      */
     @Transactional
     public ApprovalRequest resubmit(

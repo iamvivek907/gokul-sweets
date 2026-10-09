@@ -178,21 +178,21 @@ public class PreparationQueueQueriesImpl implements PreparationQueueQueries {
     }
 
     /**
-     * Parameterses the operation.
+     * Returns parameters information for preparation queue queries impl.
      *
-     * @param branchId the branch id
-     * @param status the status
-     * @param normal the normal
-     * @param normalDate the normal date
-     * @param normalTime the normal time
-     * @param priority the priority
-     * @param priorityDate the priority date
-     * @param priorityTime the priority time
-     * @param override the override
-     * @param overrideDate the override date
-     * @param overrideTime the override time
-     * @param earlyDate the early date
-     * @return the parameters result
+     * @param branchId the branch id supplied to this method
+     * @param status the status supplied to this method
+     * @param normal the normal supplied to this method
+     * @param normalDate the normal date supplied to this method
+     * @param normalTime the normal time supplied to this method
+     * @param priority the priority supplied to this method
+     * @param priorityDate the priority date supplied to this method
+     * @param priorityTime the priority time supplied to this method
+     * @param override the override supplied to this method
+     * @param overrideDate the override date supplied to this method
+     * @param overrideTime the override time supplied to this method
+     * @param earlyDate the early date supplied to this method
+     * @return the {@code List<Object>} result
      */
     private List<Object> parameters(
             Long branchId,

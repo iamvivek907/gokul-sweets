@@ -66,10 +66,13 @@ public class PrintAgentService {
      * =========================================================
      */
     /**
-     * Heartbeats the operation.
+     * Updates the heartbeat for print agent data and returns the {@code
+     * PrintAgentHeartbeatResponse} result.
      *
-     * @param request the request
-     * @return the heartbeat result
+     * <p>Delegates to {@code printAgentHeartbeatRepository.upsertHeartbeat(...)}.
+     *
+     * @param request the request supplied to this method
+     * @return the {@code PrintAgentHeartbeatResponse} result
      */
     @Transactional
     public PrintAgentHeartbeatResponse heartbeat(PrintAgentHeartbeatRequest request) {

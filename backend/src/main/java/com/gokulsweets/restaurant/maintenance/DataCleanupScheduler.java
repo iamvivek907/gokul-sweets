@@ -18,7 +18,10 @@ public class DataCleanupScheduler {
 
     private final DataCleanupService cleanup;
 
-    /** Polls the operation. */
+    /**
+     * Attempts scheduled cleanup and logs failures so a failed poll does not prevent later
+     * scheduled attempts.
+     */
     @Scheduled(fixedDelay = 60000, initialDelay = 60000)
     public void poll() {
         final long __gokulMethodStartedNanos =

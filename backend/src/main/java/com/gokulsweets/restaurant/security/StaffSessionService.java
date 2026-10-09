@@ -89,14 +89,26 @@ public class StaffSessionService {
     public record Verified(long staffId, String username, String csrfHash, Instant createdAt) {}
 
     /**
-     * Logins the operation.
+     * Authenticates staff credentials under the login-attempt limit, checks MFA and
+     * credential-version races, and returns a session or enrollment challenge.
      *
-     * @param username the username
-     * @param password the password
-     * @param code the code
-     * @param ip the ip
-     * @param previousCookie the previous cookie
-     * @return the login result
+     * <p>Reads {@code staff_login_limits}.
+     *
+     * <p>Writes {@code staff_login_limits}, {@code staff_mfa_enrollments}.
+     *
+     * @param username the username supplied to this method
+     * @param password the password supplied to this method
+     * @param code the code supplied to this method
+     * @param ip the ip supplied to this method
+     * @param previousCookie the previous cookie supplied to this method
+     * @return the {@code SignIn} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     authenticator code.}; {@code Invalid sign-in details.}; {@code Invalid staff credentials
+     *     or authenticator code.}
+     * @throws IllegalStateException when the method rejects the request with {@code Secure staff
+     *     sessions are disabled.}; {@code Staff account is inactive.}
+     * @throws org.springframework.web.server.ResponseStatusException when the method rejects the
+     *     request with {@code Too many sign-in attempts. Try again later.}
      */
     public SignIn login(
             String username, String password, String code, String ip, String previousCookie) {
@@ -216,10 +228,15 @@ ON CONFLICT (username) DO UPDATE SET
     }
 
     /**
-     * Enrollments the operation.
+     * Returns an unexpired enrollment challenge only while its staff account is active and still
+     * has the credential version captured at challenge creation.
      *
-     * @param token the token
-     * @return the enrollment result
+     * <p>Reads {@code staff_mfa_enrollments}, {@code staff_users}.
+     *
+     * @param token the token supplied to this method
+     * @return the {@code Enrollment} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Enrollment
+     *     expired.}
      */
     @Transactional(readOnly = true)
     public Enrollment enrollment(String token) {
@@ -247,10 +264,13 @@ WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=
     }
 
     /**
-     * Issues the operation.
+     * Stores hashes of a fresh session token and its derived CSRF token, capturing credential
+     * version and expiry; returns the raw tokens to the sign-in caller.
      *
-     * @param user the user
-     * @return the issue result
+     * <p>Writes {@code staff_sessions}.
+     *
+     * @param user the user supplied to this method
+     * @return the {@code SignIn} result
      */
     @Transactional
     public SignIn issue(StaffUser user) {
@@ -353,10 +373,13 @@ WHERE e.token_hash = ? AND e.expires_at > ? AND u.active AND e.staff_updated_at=
     }
 
     /**
-     * Verify the operation.
+     * Returns the active staff session identity or null, rejecting malformed, revoked, expired or
+     * credential-stale tokens and over-age admin sessions.
      *
-     * @param token the token
-     * @return the verify result
+     * <p>Reads {@code roles}, {@code staff_sessions}, {@code staff_users}.
+     *
+     * @param token the token supplied to this method
+     * @return the {@code Verified} result
      */
     @Transactional(readOnly = true)
     public Verified verify(String token) {
@@ -393,9 +416,12 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
     }
 
     /**
-     * Revokes the operation.
+     * Revokes the matching session when the supplied token has the supported format; missing or
+     * malformed tokens are ignored.
      *
-     * @param token the token
+     * <p>Writes {@code staff_sessions}.
+     *
+     * @param token the token supplied to this method
      */
     @Transactional
     public void revoke(String token) {
@@ -440,10 +466,10 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
     }
 
     /**
-     * Csrfs the operation.
+     * Returns the derived CSRF token only for a currently valid staff session, or null otherwise.
      *
-     * @param token the token
-     * @return the csrf result
+     * @param token the token supplied to this method
+     * @return the value of {@code verify(token) == null ? null : derivedCsrf(token)}
      */
     public String csrf(String token) {
         final long __gokulMethodStartedNanos =
@@ -504,10 +530,12 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
     }
 
     /**
-     * Audits the operation.
+     * Persists the staff identifier and authentication event in the audit table.
      *
-     * @param staffId the staff id
-     * @param event the event
+     * <p>Writes {@code staff_auth_audit}.
+     *
+     * @param staffId the staff id supplied to this method
+     * @param event the event supplied to this method
      */
     private void audit(Long staffId, String event) {
         final long __gokulMethodStartedNanos =
@@ -540,10 +568,12 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
     }
 
     /**
-     * Hashes the operation.
+     * Returns the SHA-256 digest of the supplied value as hexadecimal text.
      *
-     * @param value the value
-     * @return the hash result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
+     * @throws IllegalStateException when the method rejects the request with {@code SHA-256
+     *     unavailable.}
      */
     public static String hash(String value) {
         final long __gokulMethodStartedNanos =
@@ -564,10 +594,11 @@ WHERE s.token_hash = ? AND s.revoked_at IS NULL AND s.expires_at > ?
     }
 
     /**
-     * Cookies the operation.
+     * Returns the staff-session cookie value, or null when the request does not contain that
+     * cookie.
      *
-     * @param request the request
-     * @return the cookie result
+     * @param request the request supplied to this method
+     * @return the {@code String} result
      */
     public static String cookie(HttpServletRequest request) {
         final long __gokulMethodStartedNanos =

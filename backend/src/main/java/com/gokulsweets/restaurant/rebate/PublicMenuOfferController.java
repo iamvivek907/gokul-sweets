@@ -20,10 +20,11 @@ public class PublicMenuOfferController {
     private final EnhancementProperties flags;
 
     /**
-     * Offerses the operation.
+     * Handles {@code GET /api/menu/offers} for public menu offer.
      *
-     * @param branchId the branch id
-     * @return the offers result
+     * @param branchId the branch id supplied to this method
+     * @return the value of {@code flags.isPickupAddOns() ? eligibility.publicOffers(branchId) :
+     *     List.of()}
      */
     @GetMapping
     public List<RebateEligibilityService.PublicOffer> offers(@RequestParam long branchId) {

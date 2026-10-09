@@ -175,12 +175,12 @@ public class CareerService {
             @NotNull @Size(max = 3000) String staffNotes) {}
 
     /**
-     * Jobs the operation.
+     * Returns job information for career.
      *
-     * @param r the r
-     * @param n the n
-     * @return the job result
-     * @throws SQLException if the operation cannot complete
+     * @param r the r supplied to this method
+     * @param n the n supplied to this method
+     * @return the {@code Job} result
+     * @throws SQLException if the underlying operation fails
      */
     private Job job(ResultSet r, int n) throws SQLException {
         final long __gokulMethodStartedNanos =
@@ -203,12 +203,12 @@ public class CareerService {
     }
 
     /**
-     * Applicants the operation.
+     * Returns applicant information for career.
      *
-     * @param r the r
-     * @param n the n
-     * @return the applicant result
-     * @throws SQLException if the operation cannot complete
+     * @param r the r supplied to this method
+     * @param n the n supplied to this method
+     * @return the {@code Applicant} result
+     * @throws SQLException if the underlying operation fails
      */
     private Applicant applicant(ResultSet r, int n) throws SQLException {
         final long __gokulMethodStartedNanos =
@@ -240,7 +240,11 @@ public class CareerService {
 
     private static final String APPLICANTS = AppConstant.CAREER_SERVICE_APPLICANTS;
 
-    /** Checks the operation. */
+    /**
+     * Returns check information for career.
+     *
+     * <p>Authorization checks include {@code PermissionName.CAREERS_MANAGE}.
+     */
     private void check() {
         final long __gokulMethodStartedNanos = MethodTiming.start(CareerService.class, "check()");
         try {
@@ -251,10 +255,12 @@ public class CareerService {
     }
 
     /**
-     * Audits the operation.
+     * Records an audit entry for career data.
      *
-     * @param action the action
-     * @param id the id
+     * <p>Writes {@code brand_career_audit}.
+     *
+     * @param action the action supplied to this method
+     * @param id the id supplied to this method
      */
     private void audit(String action, String id) {
         final long __gokulMethodStartedNanos =
@@ -272,12 +278,12 @@ public class CareerService {
     }
 
     /**
-     * Visibles the operation.
+     * Returns visible information for career.
      *
-     * @param alias the alias
-     * @param params the params
-     * @param requested the requested
-     * @return the visible result
+     * @param alias the alias supplied to this method
+     * @param params the params supplied to this method
+     * @param requested the requested supplied to this method
+     * @return the {@code String} result
      */
     private String visible(String alias, List<Object> params, Long requested) {
         final long __gokulMethodStartedNanos =
@@ -331,10 +337,10 @@ public class CareerService {
     }
 
     /**
-     * Jobses the operation.
+     * Returns jobs information for career.
      *
-     * @param branch the branch
-     * @return the jobs result
+     * @param branch the branch supplied to this method
+     * @return the {@code List<Job>} result
      */
     @Transactional(readOnly = true)
     public List<Job> jobs(Long branch) {
@@ -356,10 +362,12 @@ public class CareerService {
     }
 
     /**
-     * Creates the operation.
+     * Creates career data and returns the {@code Job} result.
      *
-     * @param input the input
-     * @return the create result
+     * <p>Writes {@code career_jobs}.
+     *
+     * @param input the input supplied to this method
+     * @return the value of {@code jobById(id)}
      */
     @Transactional
     public Job create(JobInput input) {
@@ -409,12 +417,18 @@ public class CareerService {
     }
 
     /**
-     * Saves the operation.
+     * Persists career data and returns the {@code Job} result.
      *
-     * @param id the id
-     * @param input the input
-     * @param version the version
-     * @return the save result
+     * <p>Writes {@code career_jobs}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @param version the version supplied to this method
+     * @return the value of {@code jobById(id)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Create a new
+     *     role for a different branch so existing applications stay correctly linked.}
+     * @throws ResponseStatusException when the method rejects the request with {@code Job changed.
+     *     Reload before saving.}
      */
     @Transactional
     public Job save(long id, JobInput input, long version) {
@@ -477,11 +491,22 @@ public class CareerService {
     }
 
     /**
-     * Apply the operation.
+     * Applies career data and returns the {@code Receipt} result.
      *
-     * @param input the input
-     * @param client the client
-     * @return the apply result
+     * <p>Reads {@code branches}, {@code career_applications}, {@code career_jobs}.
+     *
+     * <p>Writes {@code career_application_throttle}, {@code career_applications}.
+     *
+     * @param input the input supplied to this method
+     * @param client the client supplied to this method
+     * @return the {@code Receipt} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose an
+     *     active branch.}
+     * @throws ResponseStatusException when the method rejects the request with {@code An
+     *     application for this role and contact is already under review. No duplicate application
+     *     was created.}; {@code This role is closed. Choose another opening or send general
+     *     interest.}; {@code This submission reference was already used. Start a new application.};
+     *     {@code Too many applications from this connection. Please try later.}
      */
     @Transactional
     public Receipt apply(ApplicationInput input, String client) {
@@ -585,10 +610,10 @@ ON CONFLICT(client_key) DO UPDATE SET requests=CASE WHEN career_application_thro
     }
 
     /**
-     * Receipts the operation.
+     * Returns receipt information for career.
      *
-     * @param id the id
-     * @return the receipt result
+     * @param id the id supplied to this method
+     * @return the {@code Receipt} result
      */
     private Receipt receipt(UUID id) {
         final long __gokulMethodStartedNanos =
@@ -604,17 +629,19 @@ ON CONFLICT(client_key) DO UPDATE SET requests=CASE WHEN career_application_thro
     }
 
     /**
-     * Applicantses the operation.
+     * Returns applicants information for career.
      *
-     * @param branch the branch
-     * @param job the job
-     * @param status the status
-     * @param search the search
-     * @param minimum the minimum
-     * @param maximum the maximum
-     * @param page the page
-     * @param size the size
-     * @return the applicants result
+     * @param branch the branch supplied to this method
+     * @param job the job supplied to this method
+     * @param status the status supplied to this method
+     * @param search the search supplied to this method
+     * @param minimum the minimum supplied to this method
+     * @param maximum the maximum supplied to this method
+     * @param page the page supplied to this method
+     * @param size the size supplied to this method
+     * @return the {@code Page} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Choose valid
+     *     applicant filters.}; {@code Unknown application status.}
      */
     @Transactional
     public Page applicants(
@@ -700,10 +727,10 @@ ON CONFLICT(client_key) DO UPDATE SET requests=CASE WHEN career_application_thro
     }
 
     /**
-     * Details the operation.
+     * Returns detail information for career.
      *
-     * @param id the id
-     * @return the detail result
+     * @param id the id supplied to this method
+     * @return the value of {@code applicant}
      */
     @Transactional
     public Applicant detail(UUID id) {
@@ -728,12 +755,16 @@ ON CONFLICT(client_key) DO UPDATE SET requests=CASE WHEN career_application_thro
     }
 
     /**
-     * Updates the operation.
+     * Updates career data and returns the {@code Applicant} result.
      *
-     * @param id the id
-     * @param input the input
-     * @param version the version
-     * @return the update result
+     * <p>Writes {@code career_applications}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @param version the version supplied to this method
+     * @return the {@code Applicant} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Application
+     *     changed. Reload before saving.}
      */
     @Transactional
     public Applicant update(UUID id, Update input, long version) {

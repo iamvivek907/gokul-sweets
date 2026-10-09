@@ -406,12 +406,12 @@ public class AdminInventoryWorkspaceService {
     }
 
     /**
-     * Attentions the operation.
+     * Returns attention information for admin inventory workspace.
      *
-     * @param policy the policy
-     * @param allocation the allocation
-     * @param response the response
-     * @return the attention result
+     * @param policy the policy supplied to this method
+     * @param allocation the allocation supplied to this method
+     * @param response the response supplied to this method
+     * @return the {@code Attention} result
      */
     private Attention attention(
             BranchInventoryPolicy policy,
@@ -462,10 +462,10 @@ public class AdminInventoryWorkspaceService {
     }
 
     /**
-     * Summary the operation.
+     * Returns summary information for admin inventory workspace.
      *
-     * @param items the items
-     * @return the summary result
+     * @param items the items supplied to this method
+     * @return the {@code InventoryCatalogueSummaryResponse} result
      */
     private InventoryCatalogueSummaryResponse summary(List<InventoryCatalogueItemResponse> items) {
         final long __gokulMethodStartedNanos =
@@ -643,10 +643,10 @@ public class AdminInventoryWorkspaceService {
     }
 
     /**
-     * Normalizes the operation.
+     * Normalizes admin inventory workspace data and returns the {@code String} result.
      *
-     * @param value the value
-     * @return the normalize result
+     * @param value the value supplied to this method
+     * @return the {@code String} result
      */
     private String normalize(String value) {
         final long __gokulMethodStartedNanos =

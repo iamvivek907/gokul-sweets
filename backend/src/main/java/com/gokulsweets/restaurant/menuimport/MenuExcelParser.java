@@ -71,10 +71,13 @@ public class MenuExcelParser {
     }
 
     /**
-     * Parses the operation.
+     * Parses menu excel parser data and returns the {@code List<MenuImportRow>} result.
      *
-     * @param file the file
-     * @return the parse result
+     * @param file the file supplied to this method
+     * @return the value of {@code rows}
+     * @throws MenuImportValidationException when the method rejects the request with {@code Menu
+     *     upload supports at most 500 data rows.}; {@code Menu_Upload sheet is missing its header
+     *     row.}; {@code Unable to read the uploaded Excel file.}
      */
     public List<MenuImportRow> parse(MultipartFile file) {
         final long __gokulMethodStartedNanos =
@@ -226,12 +229,12 @@ public class MenuExcelParser {
     }
 
     /**
-     * Texts the operation.
+     * Returns text information for menu excel parser.
      *
-     * @param row the row
-     * @param columns the columns
-     * @param column the column
-     * @return the text result
+     * @param row the row supplied to this method
+     * @param columns the columns supplied to this method
+     * @param column the column supplied to this method
+     * @return the {@code String} result
      */
     private String text(Row row, Map<String, Integer> columns, String column) {
         final long __gokulMethodStartedNanos =
@@ -275,13 +278,14 @@ public class MenuExcelParser {
     }
 
     /**
-     * Integers the operation.
+     * Parses an Excel cell as an exact integer, rejecting fractional or malformed values with the
+     * row and column context.
      *
-     * @param row the row
-     * @param columns the columns
-     * @param column the column
-     * @param excelRow the excel row
-     * @return the integer result
+     * @param row the row supplied to this method
+     * @param columns the columns supplied to this method
+     * @param column the column supplied to this method
+     * @param excelRow the excel row supplied to this method
+     * @return the value of {@code decimal.intValueExact()}
      */
     private int integer(Row row, Map<String, Integer> columns, String column, int excelRow) {
         final long __gokulMethodStartedNanos =
@@ -366,14 +370,15 @@ public class MenuExcelParser {
     }
 
     /**
-     * Decimals the operation.
+     * Parses a comma-separated decimal cell, allowing a missing value only when the caller marks
+     * the column nullable.
      *
-     * @param row the row
-     * @param columns the columns
-     * @param column the column
-     * @param excelRow the excel row
-     * @param nullable the nullable
-     * @return the decimal result
+     * @param row the row supplied to this method
+     * @param columns the columns supplied to this method
+     * @param column the column supplied to this method
+     * @param excelRow the excel row supplied to this method
+     * @param nullable the nullable supplied to this method
+     * @return the {@code BigDecimal} result
      */
     private BigDecimal decimal(
             Row row, Map<String, Integer> columns, String column, int excelRow, boolean nullable) {
@@ -403,13 +408,14 @@ public class MenuExcelParser {
     }
 
     /**
-     * Bools the operation.
+     * Parses true/yes/1 or false/no/0 case-insensitively, rejecting any other cell value with row
+     * and column context.
      *
-     * @param row the row
-     * @param columns the columns
-     * @param column the column
-     * @param excelRow the excel row
-     * @return the bool result
+     * @param row the row supplied to this method
+     * @param columns the columns supplied to this method
+     * @param column the column supplied to this method
+     * @param excelRow the excel row supplied to this method
+     * @return the {@code boolean} result
      */
     private boolean bool(Row row, Map<String, Integer> columns, String column, int excelRow) {
         final long __gokulMethodStartedNanos =

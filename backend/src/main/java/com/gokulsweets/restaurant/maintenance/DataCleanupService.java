@@ -77,9 +77,11 @@ public class DataCleanupService {
     }
 
     /**
-     * Scopes the operation.
+     * Returns scope information for data cleanup.
      *
-     * @return the scope result
+     * @return the value of {@code scope}
+     * @throws IllegalStateException when the method rejects the request with {@code Cleanup
+     *     requires a valid deployment environment.}
      */
     private String scope() {
         final long __gokulMethodStartedNanos =
@@ -161,9 +163,12 @@ public class DataCleanupService {
     private record Claim(UUID token, int retention) {}
 
     /**
-     * Views the operation.
+     * Returns environment-scoped cleanup settings, the last run outcome and whether its lease is
+     * still active.
      *
-     * @return the view result
+     * <p>Reads {@code data_cleanup_settings}.
+     *
+     * @return the {@code View} result
      */
     public View view() {
         final long __gokulMethodStartedNanos =
@@ -205,10 +210,10 @@ public class DataCleanupService {
     }
 
     /**
-     * Instants the operation.
+     * Returns instant information for data cleanup.
      *
-     * @param value the value
-     * @return the instant result
+     * @param value the value supplied to this method
+     * @return the value of {@code value == null ? null : value.toInstant()}
      */
     private static Instant instant(Timestamp value) {
         final long __gokulMethodStartedNanos =
@@ -222,11 +227,17 @@ public class DataCleanupService {
     }
 
     /**
-     * Saves the operation.
+     * Updates environment-scoped cleanup settings using an expected revision and validates the IST
+     * daily time and retention interval.
      *
-     * @param input the input
-     * @param actor the actor
-     * @return the save result
+     * <p>Writes {@code data_cleanup_settings}.
+     *
+     * @param input the input supplied to this method
+     * @param actor the actor supplied to this method
+     * @return the value of {@code view()}
+     * @throws ResponseStatusException when the method rejects the request with {@code Retention
+     *     must be between 30 and 3650 days.}; {@code Settings changed. Refresh before saving.};
+     *     {@code Use a valid daily time (HH:mm) in IST.}
      */
     public View save(Config input, long actor) {
         final long __gokulMethodStartedNanos =
@@ -267,10 +278,11 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
     }
 
     /**
-     * Parameterses the operation.
+     * Builds environment and retention-cutoff parameters using the injected clock and business
+     * timezone.
      *
-     * @param retention the retention
-     * @return the parameters result
+     * @param retention the retention supplied to this method
+     * @return the {@code Map<String, Object>} result
      */
     private Map<String, Object> parameters(int retention) {
         final long __gokulMethodStartedNanos =
@@ -294,9 +306,10 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
     }
 
     /**
-     * Previews the operation.
+     * Counts the bounded next batch of eligible notification events and their dependent
+     * delivery/read rows without deleting them.
      *
-     * @return the preview result
+     * @return the {@code Preview} result
      */
     public Preview preview() {
         final long __gokulMethodStartedNanos =
@@ -330,11 +343,12 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
     }
 
     /**
-     * Childrens the operation.
+     * Counts dependent event rows for the supplied identifiers, returning zero for an empty
+     * identifier list.
      *
-     * @param table the table
-     * @param ids the ids
-     * @return the children result
+     * @param table the table supplied to this method
+     * @param ids the ids supplied to this method
+     * @return the {@code long} result
      */
     private long children(String table, List<Long> ids) {
         final long __gokulMethodStartedNanos =
@@ -354,12 +368,13 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
     }
 
     /**
-     * Candidateses the operation.
+     * Selects an oldest-first bounded batch of eligible event identifiers, optionally locking
+     * candidates while skipping locked rows.
      *
-     * @param predicate the predicate
-     * @param params the params
-     * @param lock the lock
-     * @return the candidates result
+     * @param predicate the predicate supplied to this method
+     * @param params the params supplied to this method
+     * @param lock the lock supplied to this method
+     * @return the {@code List<Long>} result
      */
     private List<Long> candidates(String predicate, Map<String, Object> params, boolean lock) {
         final long __gokulMethodStartedNanos =
@@ -383,10 +398,11 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
     }
 
     /**
-     * States the operation.
+     * Loads environment-scoped cleanup configuration and lease state, optionally locking the
+     * settings row; returns null when no row is available.
      *
-     * @param lock the lock
-     * @return the state result
+     * @param lock the lock supplied to this method
+     * @return the value of {@code rows.isEmpty() ? null : rows.getFirst()}
      */
     private State state(boolean lock) {
         final long __gokulMethodStartedNanos =
@@ -417,14 +433,15 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
     }
 
     /**
-     * Dues the operation.
+     * Returns whether cleanup is enabled, its IST run time has arrived and today's run has not
+     * completed or its running lease has expired.
      *
-     * @param config the config
-     * @param lastDate the last date
-     * @param status the status
-     * @param leaseUntil the lease until
-     * @param now the now
-     * @return the due result
+     * @param config the config supplied to this method
+     * @param lastDate the last date supplied to this method
+     * @param status the status supplied to this method
+     * @param leaseUntil the lease until supplied to this method
+     * @param now the now supplied to this method
+     * @return the {@code boolean} result
      */
     static boolean due(
             Config config, LocalDate lastDate, String status, Instant leaseUntil, Instant now) {
@@ -468,11 +485,22 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
     }
 
     /**
-     * Runs the operation.
+     * Claims the environment's cleanup lease, deletes only eligible notification batches
+     * transactionally and reconciles the persisted outcome after uncertain failures.
      *
-     * @param actor the actor
-     * @param expectedRevision the expected revision
-     * @return the run result
+     * <p>Reads {@code data_cleanup_settings}.
+     *
+     * <p>Writes {@code data_cleanup_settings}.
+     *
+     * @param actor the actor supplied to this method
+     * @param expectedRevision the expected revision supplied to this method
+     * @return the {@code View} result
+     * @throws IllegalStateException when the method rejects the request with {@code Cleanup lease
+     *     changed.}
+     * @throws ResponseStatusException when the method rejects the request with {@code A cleanup is
+     *     already running. Refresh for its result.}; {@code Cleanup failed; no records were
+     *     deleted. Refresh for details.}; {@code Cleanup result could not be confirmed. Refresh the
+     *     last run before trying again.}; {@code Settings changed. Refresh and preview again.}
      */
     public View run(Long actor, Long expectedRevision) {
         final long __gokulMethodStartedNanos =
@@ -648,12 +676,13 @@ UPDATE data_cleanup_settings SET last_status='FAILED',last_finished_at=?,
     }
 
     /**
-     * Deletes the operation.
+     * Deletes only rows matching the supplied identifier list from the internal table and column,
+     * returning zero when the list is empty.
      *
-     * @param table the table
-     * @param column the column
-     * @param ids the ids
-     * @return the delete result
+     * @param table the table supplied to this method
+     * @param column the column supplied to this method
+     * @param ids the ids supplied to this method
+     * @return the {@code long} result
      */
     private long delete(String table, String column, List<Long> ids) {
         final long __gokulMethodStartedNanos =
@@ -672,7 +701,9 @@ UPDATE data_cleanup_settings SET last_status='FAILED',last_finished_at=?,
         }
     }
 
-    /** Deadlineses the operation. */
+    /**
+     * Applies transaction-local ten-second statement and two-second lock timeouts to cleanup work.
+     */
     private void deadlines() {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(DataCleanupService.class, "deadlines()");

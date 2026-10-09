@@ -18,7 +18,7 @@ import java.nio.file.Path;
 @ConditionalOnProperty(name = "gokul.memory.diagnostics-enabled", havingValue = "true")
 public class MemoryDiagnostics {
 
-    /** Samples the operation. */
+    /** Returns sample information for memory diagnostics. */
     @Scheduled(fixedDelayString = "${gokul.memory.diagnostics-delay-ms:30000}")
     public void sample() {
         final long __gokulMethodStartedNanos =
@@ -46,10 +46,10 @@ public class MemoryDiagnostics {
     }
 
     /**
-     * Mibs the operation.
+     * Returns mib information for memory diagnostics.
      *
-     * @param bytes the bytes
-     * @return the mib result
+     * @param bytes the bytes supplied to this method
+     * @return the value of {@code bytes / (1024 * 1024)}
      */
     private static long mib(long bytes) {
         final long __gokulMethodStartedNanos =

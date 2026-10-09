@@ -102,10 +102,11 @@ public class BranchDiscoveryService {
     }
 
     /**
-     * Rounds the operation.
+     * Returns round information for branch discovery.
      *
-     * @param value the value
-     * @return the round result
+     * @param value the value supplied to this method
+     * @return the value of {@code BigDecimal.valueOf(value).setScale(1,
+     *     RoundingMode.HALF_UP).doubleValue()}
      */
     private static double round(double value) {
         final long __gokulMethodStartedNanos =
@@ -119,10 +120,15 @@ public class BranchDiscoveryService {
     }
 
     /**
-     * Returns the operation.
+     * Returns get information for branch discovery.
      *
-     * @param id the id
-     * @return the get result
+     * <p>Reads {@code branch_products}, {@code orders}, {@code products}, {@code review_items},
+     * {@code reviews}.
+     *
+     * @param id the id supplied to this method
+     * @return the {@code Discovery} result
+     * @throws ResponseStatusException when the method rejects the request with {@code Branch not
+     *     found.}
      */
     @Transactional(readOnly = true)
     public Discovery get(long id) {

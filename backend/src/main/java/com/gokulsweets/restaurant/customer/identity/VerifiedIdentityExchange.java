@@ -24,14 +24,15 @@ public class VerifiedIdentityExchange {
     private final IdentityExchangeRateLimiter rateLimiter;
 
     /**
-     * Exchanges the operation.
+     * Returns exchange information for verified identity exchange.
      *
-     * @param environment the environment
-     * @param sourceAddress the source address
-     * @param deviceToken the device token
-     * @param accessToken the access token
-     * @param now the now
-     * @return the exchange result
+     * @param environment the environment supplied to this method
+     * @param sourceAddress the source address supplied to this method
+     * @param deviceToken the device token supplied to this method
+     * @param accessToken the access token supplied to this method
+     * @param now the now supplied to this method
+     * @return the value of {@code exchange(environment, sourceAddress, deviceToken, accessToken,
+     *     null, now)}
      */
     public VerifiedCustomerSessionStore.IssuedSession exchange(
             ConsentEnvironment environment,
@@ -54,15 +55,16 @@ public class VerifiedIdentityExchange {
     }
 
     /**
-     * Exchanges the operation.
+     * Returns exchange information for verified identity exchange.
      *
-     * @param environment the environment
-     * @param sourceAddress the source address
-     * @param deviceToken the device token
-     * @param accessToken the access token
-     * @param previousSessionToken the previous session token
-     * @param now the now
-     * @return the exchange result
+     * @param environment the environment supplied to this method
+     * @param sourceAddress the source address supplied to this method
+     * @param deviceToken the device token supplied to this method
+     * @param accessToken the access token supplied to this method
+     * @param previousSessionToken the previous session token supplied to this method
+     * @param now the now supplied to this method
+     * @return the value of {@code issuance.issue(environment, accessToken, verifiedPhone,
+     *     previousSessionToken, now)}
      */
     public VerifiedCustomerSessionStore.IssuedSession exchange(
             ConsentEnvironment environment,

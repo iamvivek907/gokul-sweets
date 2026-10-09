@@ -35,10 +35,10 @@ public record BranchPickupSettingsResponse(
         BigDecimal defaultPriorityCharge) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code BranchPickupSettingsResponse} representation.
      *
-     * @param settings the settings
-     * @return the from result
+     * @param settings the settings supplied to this method
+     * @return the {@code BranchPickupSettingsResponse} result
      */
     public static BranchPickupSettingsResponse from(BranchPickupSettings settings) {
         final long __gokulMethodStartedNanos =

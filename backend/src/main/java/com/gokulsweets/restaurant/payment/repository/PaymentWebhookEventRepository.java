@@ -23,13 +23,13 @@ public interface PaymentWebhookEventRepository extends JpaRepository<PaymentWebh
             PaymentProviderType provider, String providerEventId);
 
     /**
-     * Claims the operation.
+     * Claims payment webhook event data and returns the {@code int} result.
      *
-     * @param provider the provider
-     * @param providerEventId the provider event id
-     * @param eventType the event type
-     * @param payloadSha256 the payload sha256
-     * @return the claim result
+     * @param provider the provider supplied to this method
+     * @param providerEventId the provider event id supplied to this method
+     * @param eventType the event type supplied to this method
+     * @param payloadSha256 the payload sha256 supplied to this method
+     * @return the {@code int} result
      */
     @Modifying(flushAutomatically = true)
     @Query(

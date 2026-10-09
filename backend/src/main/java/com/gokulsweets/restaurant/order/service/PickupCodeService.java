@@ -111,9 +111,11 @@ public class PickupCodeService {
     }
 
     /**
-     * Issues the operation.
+     * Issues pickup code data.
      *
-     * @param id the id
+     * <p>Writes {@code order_pickup_codes}.
+     *
+     * @param id the id supplied to this method
      */
     private void issue(long id) {
         final long __gokulMethodStartedNanos =

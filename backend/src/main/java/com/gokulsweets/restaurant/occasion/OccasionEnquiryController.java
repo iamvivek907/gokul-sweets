@@ -52,11 +52,13 @@ public class OccasionEnquiryController {
     private final StaffAuthorizationService staff;
 
     /**
-     * Submits the operation.
+     * Handles {@code POST /api/occasion-enquiries} for occasion enquiry.
      *
-     * @param input the input
-     * @param request the request
-     * @return the submit result
+     * <p>Delegates to {@code service.submit(...)}.
+     *
+     * @param input the input supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code service.submit(environment(), subject(request), input)}
      */
     @PostMapping("/api/occasion-enquiries")
     public OccasionEnquiryService.Summary submit(
@@ -76,11 +78,13 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Mines the operation.
+     * Handles {@code GET /api/occasion-enquiries} for occasion enquiry.
      *
-     * @param request the request
-     * @param before the before
-     * @return the mine result
+     * <p>Delegates to {@code service.customerList(...)}.
+     *
+     * @param request the request supplied to this method
+     * @param before the before supplied to this method
+     * @return the value of {@code service.customerList(environment(), subject(request), before)}
      */
     @GetMapping("/api/occasion-enquiries")
     public List<OccasionEnquiryService.Summary> mine(
@@ -99,11 +103,11 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Mines the operation.
+     * Handles {@code GET /api/occasion-enquiries/{id}} for occasion enquiry.
      *
-     * @param id the id
-     * @param request the request
-     * @return the mine result
+     * @param id the id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code service.get(environment(), subject(request), id)}
      */
     @GetMapping("/api/occasion-enquiries/{id}")
     public OccasionEnquiryService.Summary mine(@PathVariable UUID id, HttpServletRequest request) {
@@ -129,12 +133,13 @@ public class OccasionEnquiryController {
     public record DepositChoice(long pickupSlotId, boolean estimateAccepted) {}
 
     /**
-     * Deposits the operation.
+     * Handles {@code POST /api/occasion-enquiries/{id}/deposit} for occasion enquiry.
      *
-     * @param id the id
-     * @param choice the choice
-     * @param request the request
-     * @return the deposit result
+     * @param id the id supplied to this method
+     * @param choice the choice supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code commitments.beginDeposit(environment(), subject(request), id,
+     *     choice.pickupSlotId(), choice.estimateAccepted())}
      */
     @PostMapping("/api/occasion-enquiries/{id}/deposit")
     public OccasionCommitmentService.Checkout deposit(
@@ -159,11 +164,11 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Balances the operation.
+     * Handles {@code POST /api/occasion-enquiries/{id}/balance} for occasion enquiry.
      *
-     * @param id the id
-     * @param request the request
-     * @return the balance result
+     * @param id the id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code commitments.beginBalance(environment(), subject(request), id)}
      */
     @PostMapping("/api/occasion-enquiries/{id}/balance")
     public OccasionCommitmentService.Checkout balance(
@@ -182,12 +187,13 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Payments the operation.
+     * Handles {@code GET /api/occasion-enquiries/{id}/payments/{attemptId}} for occasion enquiry.
      *
-     * @param id the id
-     * @param attemptId the attempt id
-     * @param request the request
-     * @return the payment result
+     * @param id the id supplied to this method
+     * @param attemptId the attempt id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code commitments.status(environment(), subject(request), id,
+     *     attemptId)}
      */
     @GetMapping("/api/occasion-enquiries/{id}/payments/{attemptId}")
     public OccasionCommitmentService.Checkout payment(
@@ -260,11 +266,12 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Plannings the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/occasion-enquiries/planning} for occasion
+     * enquiry.
      *
-     * @param branchId the branch id
-     * @param from the from
-     * @return the planning result
+     * @param branchId the branch id supplied to this method
+     * @param from the from supplied to this method
+     * @return the value of {@code workspace.week(environment(), branchId, from)}
      */
     @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/planning")
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
@@ -285,11 +292,12 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Calendars the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/occasion-enquiries/calendar} for occasion
+     * enquiry.
      *
-     * @param branchId the branch id
-     * @param month the month
-     * @return the calendar result
+     * @param branchId the branch id supplied to this method
+     * @param month the month supplied to this method
+     * @return the value of {@code workspace.month(environment(), branchId, month)}
      */
     @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/calendar")
     @PreAuthorize("hasAuthority('ORDER_VIEW')")
@@ -377,12 +385,16 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Quotes the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/occasion-enquiries/{id}/quote} for
+     * occasion enquiry.
      *
-     * @param branchId the branch id
-     * @param id the id
-     * @param quote the quote
-     * @return the quote result
+     * <p>Delegates to {@code service.quote(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param quote the quote supplied to this method
+     * @return the value of {@code service.quote(environment(), branchId, id,
+     *     staff.getCurrentStaff().getUsername(), quote)}
      */
     @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/quote")
     @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
@@ -407,12 +419,13 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Previews the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/occasion-enquiries/{id}/quote-preview} for
+     * occasion enquiry.
      *
-     * @param branchId the branch id
-     * @param id the id
-     * @param input the input
-     * @return the preview result
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code calculator.preview(environment(), branchId, id, input)}
      */
     @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/quote-preview")
     @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
@@ -496,12 +509,16 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Declines the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/occasion-enquiries/{id}/decline} for
+     * occasion enquiry.
      *
-     * @param branchId the branch id
-     * @param id the id
-     * @param input the input
-     * @return the decline result
+     * <p>Delegates to {@code service.decline(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code service.decline(environment(), branchId, id,
+     *     staff.getCurrentStaff().getUsername(), input.reason())}
      */
     @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/decline")
     @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
@@ -534,13 +551,17 @@ public class OccasionEnquiryController {
     public record ReadyQuantity(java.math.BigDecimal quantity, long revision) {}
 
     /**
-     * Readinesses the operation.
+     * Handles {@code POST
+     * /api/admin/branches/{branchId}/occasion-enquiries/{id}/production/{productId}/readiness} for
+     * occasion enquiry.
      *
-     * @param branchId the branch id
-     * @param id the id
-     * @param productId the product id
-     * @param input the input
-     * @return the readiness result
+     * <p>Delegates to {@code service.staffGet(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param productId the product id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code service.staffGet(environment(), branchId, id)}
      */
     @PostMapping(
             "/api/admin/branches/{branchId}/occasion-enquiries/{id}/production/{productId}/readiness")
@@ -573,12 +594,15 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Cancels the operation.
+     * Handles {@code POST /api/admin/branches/{branchId}/occasion-enquiries/{id}/cancel} for
+     * occasion enquiry.
      *
-     * @param branchId the branch id
-     * @param id the id
-     * @param input the input
-     * @return the cancel result
+     * <p>Delegates to {@code service.staffGet(...)}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code service.staffGet(environment(), branchId, id)}
      */
     @PostMapping("/api/admin/branches/{branchId}/occasion-enquiries/{id}/cancel")
     @PreAuthorize("hasAuthority('APPROVAL_MANAGE')")
@@ -611,10 +635,10 @@ public class OccasionEnquiryController {
     public record Decline(String reason) {}
 
     /**
-     * Subjects the operation.
+     * Returns subject information for occasion enquiry.
      *
-     * @param request the request
-     * @return the subject result
+     * @param request the request supplied to this method
+     * @return the {@code UUID} result
      */
     private UUID subject(HttpServletRequest request) {
         final long __gokulMethodStartedNanos =
@@ -634,9 +658,9 @@ public class OccasionEnquiryController {
     }
 
     /**
-     * Environments the operation.
+     * Returns environment information for occasion enquiry.
      *
-     * @return the environment result
+     * @return the {@code ConsentEnvironment} result
      */
     private ConsentEnvironment environment() {
         final long __gokulMethodStartedNanos =

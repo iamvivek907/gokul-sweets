@@ -232,11 +232,13 @@ public class StaffLeaveService {
     }
 
     /**
-     * Resubmits the operation.
+     * Resubmits staff leave data and returns the {@code LeaveRequestResponse} result.
      *
-     * @param leaveRequestId the leave request id
-     * @param comment the comment
-     * @return the resubmit result
+     * <p>Delegates to {@code approvalWorkflowService.resubmit(...)}.
+     *
+     * @param leaveRequestId the leave request id supplied to this method
+     * @param comment the comment supplied to this method
+     * @return the value of {@code toResponse(leaveRequest)}
      */
     @Transactional
     public LeaveRequestResponse resubmit(Long leaveRequestId, String comment) {
@@ -255,11 +257,13 @@ public class StaffLeaveService {
     }
 
     /**
-     * Cancels the operation.
+     * Cancels staff leave data and returns the {@code LeaveRequestResponse} result.
      *
-     * @param leaveRequestId the leave request id
-     * @param comment the comment
-     * @return the cancel result
+     * <p>Delegates to {@code approvalWorkflowService.cancelOwnRequest(...)}.
+     *
+     * @param leaveRequestId the leave request id supplied to this method
+     * @param comment the comment supplied to this method
+     * @return the value of {@code toResponse(leaveRequest)}
      */
     @Transactional
     public LeaveRequestResponse cancel(Long leaveRequestId, String comment) {

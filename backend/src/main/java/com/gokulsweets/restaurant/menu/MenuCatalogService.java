@@ -30,9 +30,11 @@ public class MenuCatalogService {
     public record Catalog(String revision, List<MenuCategoryResponse> categories) {}
 
     /**
-     * Revisions the operation.
+     * Reads the database catalog-revision token used to validate cached branch catalogs.
      *
-     * @return the revision result
+     * <p>Reads {@code menu_catalog_revision}.
+     *
+     * @return the {@code String} result
      */
     public String revision() {
         final long __gokulMethodStartedNanos =
@@ -72,10 +74,13 @@ public class MenuCatalogService {
     }
 
     /**
-     * Returns the operation.
+     * Returns a branch catalog for a stable revision, rebuilding stale entries and bypassing the
+     * shared cache outside read-only transactions.
      *
-     * @param branchId the branch id
-     * @return the get result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code Catalog} result
+     * @throws org.springframework.web.server.ResponseStatusException when the method rejects the
+     *     request with {@code Menu is updating. Please try again.}
      */
     @Transactional(readOnly = true)
     public Catalog get(long branchId) {
@@ -150,10 +155,10 @@ public class MenuCatalogService {
     }
 
     /**
-     * Lengths the operation.
+     * Returns zero for a null string or its character count otherwise.
      *
-     * @param value the value
-     * @return the length result
+     * @param value the value supplied to this method
+     * @return the value of {@code value == null ? 0 : value.length()}
      */
     private int length(String value) {
         final long __gokulMethodStartedNanos =
@@ -167,11 +172,14 @@ public class MenuCatalogService {
     }
 
     /**
-     * Builds the operation.
+     * Loads a branch catalog snapshot from database rows and associates it with the supplied
+     * revision token.
      *
-     * @param branchId the branch id
-     * @param revision the revision
-     * @return the build result
+     * <p>Reads {@code branch_products}, {@code categories}, {@code products}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param revision the revision supplied to this method
+     * @return the {@code Catalog} result
      */
     private Catalog build(long branchId, String revision) {
         final long __gokulMethodStartedNanos =

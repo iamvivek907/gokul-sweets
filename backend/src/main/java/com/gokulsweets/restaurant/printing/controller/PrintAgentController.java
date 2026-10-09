@@ -35,11 +35,14 @@ public class PrintAgentController {
      * =========================================================
      */
     /**
-     * Heartbeats the operation.
+     * Handles {@code POST /api/print-agent/heartbeat} for print agent.
      *
-     * @param apiKey the api key
-     * @param request the request
-     * @return the heartbeat result
+     * <p>Delegates to {@code authenticationService.authenticate(...)}, {@code
+     * printAgentService.heartbeat(...)}.
+     *
+     * @param apiKey the api key supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.ok(printAgentService.heartbeat(request))}
      */
     @PostMapping("/heartbeat")
     public ResponseEntity<PrintAgentHeartbeatResponse> heartbeat(
@@ -65,11 +68,16 @@ public class PrintAgentController {
      * =========================================================
      */
     /**
-     * Claims the operation.
+     * Handles {@code POST /api/print-agent/jobs/claim} for print agent.
      *
-     * @param apiKey the api key
-     * @param request the request
-     * @return the claim result
+     * <p>Delegates to {@code authenticationService.authenticate(...)}, {@code
+     * printAgentService.claimNext(...)}.
+     *
+     * @param apiKey the api key supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code
+     *     printAgentService.claimNext(request).map(ResponseEntity::ok).orElseGet(() ->
+     *     ResponseEntity.noContent().build())}
      */
     @PostMapping("/jobs/claim")
     public ResponseEntity<PrintAgentClaimResponse> claim(
@@ -98,12 +106,15 @@ public class PrintAgentController {
      * =========================================================
      */
     /**
-     * Printeds the operation.
+     * Handles {@code POST /api/print-agent/jobs/{printJobId}/printed} for print agent.
      *
-     * @param apiKey the api key
-     * @param printJobId the print job id
-     * @param request the request
-     * @return the printed result
+     * <p>Delegates to {@code authenticationService.authenticate(...)}, {@code
+     * printAgentService.markPrinted(...)}.
+     *
+     * @param apiKey the api key supplied to this method
+     * @param printJobId the print job id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.noContent().build()}
      */
     @PostMapping("/jobs/{printJobId}/printed")
     public ResponseEntity<Void> printed(
@@ -132,12 +143,15 @@ public class PrintAgentController {
      * =========================================================
      */
     /**
-     * Faileds the operation.
+     * Handles {@code POST /api/print-agent/jobs/{printJobId}/failed} for print agent.
      *
-     * @param apiKey the api key
-     * @param printJobId the print job id
-     * @param request the request
-     * @return the failed result
+     * <p>Delegates to {@code authenticationService.authenticate(...)}, {@code
+     * printAgentService.markFailed(...)}.
+     *
+     * @param apiKey the api key supplied to this method
+     * @param printJobId the print job id supplied to this method
+     * @param request the request supplied to this method
+     * @return the value of {@code ResponseEntity.noContent().build()}
      */
     @PostMapping("/jobs/{printJobId}/failed")
     public ResponseEntity<Void> failed(

@@ -33,9 +33,10 @@ public class DeliveryBoundaryService {
     private final ObjectMapper mapper;
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the value of {@code flags.isDeliveryAddressBoundaries() && flags.isDeliveryCapacity()
+     *     && zones.enabled()}
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -51,12 +52,18 @@ public class DeliveryBoundaryService {
     }
 
     /**
-     * Configures the operation.
+     * Configures delivery boundary data and returns the {@code Boundary} result.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @param input the input
-     * @return the configure result
+     * <p>Reads {@code delivery_zones}.
+     *
+     * <p>Writes {@code delivery_zone_boundaries}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @param input the input supplied to this method
+     * @return the value of {@code input}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Invalid
+     *     delivery boundary.}
      */
     @Transactional
     public Boundary configure(long branchId, long zoneId, Boundary input) {
@@ -103,11 +110,15 @@ ON CONFLICT (zone_id) DO UPDATE SET vertices = EXCLUDED.vertices,
     }
 
     /**
-     * Returns the operation.
+     * Returns get information for delivery boundary.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @return the get result
+     * <p>Reads {@code delivery_zone_boundaries}, {@code delivery_zones}.
+     *
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @return the value of {@code rows.getFirst()}
+     * @throws ResponseStatusException when the method rejects the request with {@code Boundary not
+     *     configured.}
      */
     @Transactional(readOnly = true)
     public Boundary get(long branchId, long zoneId) {
@@ -134,12 +145,14 @@ JOIN delivery_zones z ON z.id = b.zone_id WHERE z.id = ? AND z.branch_id = ?
     }
 
     /**
-     * Containses the operation.
+     * Returns contains information for delivery boundary.
      *
-     * @param zoneId the zone id
-     * @param latitude the latitude
-     * @param longitude the longitude
-     * @return the contains result
+     * <p>Reads {@code delivery_zone_boundaries}.
+     *
+     * @param zoneId the zone id supplied to this method
+     * @param latitude the latitude supplied to this method
+     * @param longitude the longitude supplied to this method
+     * @return the {@code boolean} result
      */
     @Transactional(readOnly = true)
     public boolean contains(long zoneId, Double latitude, Double longitude) {
@@ -168,11 +181,13 @@ SELECT vertices::text FROM delivery_zone_boundaries WHERE zone_id = ? AND review
     }
 
     /**
-     * Decodes the operation.
+     * Decodes delivery boundary data and returns the {@code Boundary} result.
      *
-     * @param json the json
-     * @param reviewed the reviewed
-     * @return the decode result
+     * @param json the json supplied to this method
+     * @param reviewed the reviewed supplied to this method
+     * @return the {@code Boundary} result
+     * @throws IllegalStateException when the method rejects the request with {@code Invalid stored
+     *     delivery boundary.}
      */
     private Boundary decode(String json, boolean reviewed) {
         final long __gokulMethodStartedNanos =
@@ -206,11 +221,12 @@ SELECT vertices::text FROM delivery_zone_boundaries WHERE zone_id = ? AND review
     }
 
     /**
-     * Valids the operation.
+     * Returns valid information for delivery boundary.
      *
-     * @param lat the lat
-     * @param lon the lon
-     * @return the valid result
+     * @param lat the lat supplied to this method
+     * @param lon the lon supplied to this method
+     * @return the value of {@code Double.isFinite(lat) && Double.isFinite(lon) && lat >= -90 && lat
+     *     <= 90 && lon >= -180 && lon <= 180}
      */
     private static boolean valid(double lat, double lon) {
         final long __gokulMethodStartedNanos =
@@ -231,9 +247,13 @@ SELECT vertices::text FROM delivery_zone_boundaries WHERE zone_id = ? AND review
     }
 
     /**
-     * Validates the operation.
+     * Validates delivery boundary data.
      *
-     * @param points the points
+     * @param points the points supplied to this method
+     * @throws IllegalArgumentException when the method rejects the request with {@code A boundary
+     *     needs 3 to 100 vertices.}; {@code Adjacent boundary vertices must differ.}; {@code
+     *     Boundary area is too small or self-crossing.}; {@code Boundary edges cannot cross.};
+     *     {@code Invalid boundary coordinate.}
      */
     static void validate(List<Point> points) {
         final long __gokulMethodStartedNanos =
@@ -273,12 +293,13 @@ SELECT vertices::text FROM delivery_zone_boundaries WHERE zone_id = ? AND review
     }
 
     /**
-     * Crosses the operation.
+     * Returns cross information for delivery boundary.
      *
-     * @param a the a
-     * @param b the b
-     * @param c the c
-     * @return the cross result
+     * @param a the a supplied to this method
+     * @param b the b supplied to this method
+     * @param c the c supplied to this method
+     * @return the value of {@code (b.longitude() - a.longitude()) * (c.latitude() - a.latitude()) -
+     *     (b.latitude() - a.latitude()) * (c.longitude() - a.longitude())}
      */
     private static double cross(Point a, Point b, Point c) {
         final long __gokulMethodStartedNanos =
@@ -320,13 +341,14 @@ SELECT vertices::text FROM delivery_zone_boundaries WHERE zone_id = ? AND review
     }
 
     /**
-     * Intersectses the operation.
+     * Returns intersects information for delivery boundary.
      *
-     * @param a the a
-     * @param b the b
-     * @param c the c
-     * @param d the d
-     * @return the intersects result
+     * @param a the a supplied to this method
+     * @param b the b supplied to this method
+     * @param c the c supplied to this method
+     * @param d the d supplied to this method
+     * @return the value of {@code (x * y < 0 && z * w < 0) || onEdge(a, b, c) || onEdge(a, b, d) ||
+     *     onEdge(c, d, a) || onEdge(c, d, b)}
      */
     private static boolean intersects(Point a, Point b, Point c, Point d) {
         final long __gokulMethodStartedNanos =
@@ -348,11 +370,11 @@ SELECT vertices::text FROM delivery_zone_boundaries WHERE zone_id = ? AND review
     }
 
     /**
-     * Insides the operation.
+     * Returns inside information for delivery boundary.
      *
-     * @param polygon the polygon
-     * @param point the point
-     * @return the inside result
+     * @param polygon the polygon supplied to this method
+     * @param point the point supplied to this method
+     * @return the {@code boolean} result
      */
     static boolean inside(List<Point> polygon, Point point) {
         final long __gokulMethodStartedNanos =

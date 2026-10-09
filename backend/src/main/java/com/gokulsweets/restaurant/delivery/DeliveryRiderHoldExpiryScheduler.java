@@ -17,7 +17,7 @@ public class DeliveryRiderHoldExpiryScheduler {
 
     private final DeliveryRiderHoldService holds;
 
-    /** Expires the operation. */
+    /** Expires delivery rider hold expiry data. */
     @Scheduled(fixedDelayString = "${delivery.rider-holds.expiry-check-milliseconds:60000}")
     public void expire() {
         final long __gokulMethodStartedNanos =

@@ -104,9 +104,9 @@ public class CustomerNotificationInbox {
     public record PreferenceInput(Boolean offerInboxEnabled) {}
 
     /**
-     * Enableds the operation.
+     * Returns whether the configured prerequisites for this feature are enabled.
      *
-     * @return the enabled result
+     * @return the {@code boolean} result
      */
     public boolean enabled() {
         final long __gokulMethodStartedNanos =
@@ -128,9 +128,9 @@ public class CustomerNotificationInbox {
     }
 
     /**
-     * Environments the operation.
+     * Returns environment information for customer notification inbox.
      *
-     * @return the environment result
+     * @return the {@code String} result
      */
     private String environment() {
         final long __gokulMethodStartedNanos =
@@ -182,12 +182,16 @@ ON CONFLICT (environment, subject_id, event_key) DO NOTHING
     }
 
     /**
-     * Corrections the operation.
+     * Returns correction information for customer notification inbox.
      *
-     * @param orderId the order id
-     * @param requestKey the request key
-     * @param title the title
-     * @param message the message
+     * <p>Reads {@code orders}, {@code verified_order_ownership}.
+     *
+     * <p>Writes {@code customer_notification_events}.
+     *
+     * @param orderId the order id supplied to this method
+     * @param requestKey the request key supplied to this method
+     * @param title the title supplied to this method
+     * @param message the message supplied to this method
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public void correction(Long orderId, UUID requestKey, String title, String message) {
@@ -414,12 +418,12 @@ ON CONFLICT (environment, subject_id, event_key) DO NOTHING
     }
 
     /**
-     * Pages the operation.
+     * Returns page information for customer notification inbox.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param before the before
-     * @return the page result
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param before the before supplied to this method
+     * @return the {@code Page} result
      */
     @Transactional(
             readOnly = true,
@@ -438,14 +442,16 @@ ON CONFLICT (environment, subject_id, event_key) DO NOTHING
     }
 
     /**
-     * Pages the operation.
+     * Returns page information for customer notification inbox.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @param before the before
-     * @param unreadOnly the unread only
-     * @param search the search
-     * @return the page result
+     * <p>Reads {@code customer_notification_events}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @param before the before supplied to this method
+     * @param unreadOnly the unread only supplied to this method
+     * @param search the search supplied to this method
+     * @return the {@code Page} result
      */
     @Transactional(
             readOnly = true,
@@ -642,11 +648,13 @@ WHERE e.environment=? AND e.subject_id=?
     }
 
     /**
-     * Preferenceses the operation.
+     * Returns preferences information for customer notification inbox.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @return the preferences result
+     * <p>Reads {@code customer_notification_preferences}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @return the {@code Preferences} result
      */
     @Transactional(readOnly = true)
     public Preferences preferences(String environment, UUID subject) {

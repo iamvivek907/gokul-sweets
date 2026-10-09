@@ -36,11 +36,21 @@ public class DemandForecastService {
     private final StaffAuthorizationService staffAuthorizationService;
 
     /**
-     * Forecasts the operation.
+     * Returns forecast information for demand forecast.
      *
-     * @param targetDate the target date
-     * @param branchId the branch id
-     * @return the forecast result
+     * <p>Authorization checks include {@code PermissionName.REPORT_VIEW}.
+     *
+     * <p>Reads {@code analytics_product_daily}, {@code apd}, {@code branches}, {@code categories},
+     * {@code products}.
+     *
+     * <p>Delegates to {@code staffAuthorizationService.requirePermission(...)}.
+     *
+     * @param targetDate the target date supplied to this method
+     * @param branchId the branch id supplied to this method
+     * @return the {@code DemandForecastResponse} result
+     * @throws IllegalArgumentException when the method rejects the request with {@code Active
+     *     branch does not exist.}; {@code Branch is required.}; {@code Demand forecast target date
+     *     cannot be in the past.}; {@code Target date is required.}
      */
     @Transactional(readOnly = true)
     public DemandForecastResponse forecast(LocalDate targetDate, Long branchId) {
@@ -293,11 +303,11 @@ public class DemandForecastService {
     }
 
     /**
-     * Confidences the operation.
+     * Returns confidence information for demand forecast.
      *
-     * @param weeksWithSales the weeks with sales
-     * @param coefficientOfVariation the coefficient of variation
-     * @return the confidence result
+     * @param weeksWithSales the weeks with sales supplied to this method
+     * @param coefficientOfVariation the coefficient of variation supplied to this method
+     * @return the {@code DemandForecastConfidence} result
      */
     private DemandForecastConfidence confidence(
             int weeksWithSales, BigDecimal coefficientOfVariation) {
@@ -322,14 +332,14 @@ public class DemandForecastService {
     }
 
     /**
-     * Explanations the operation.
+     * Returns explanation information for demand forecast.
      *
-     * @param recentAverage the recent average
-     * @param previousAverage the previous average
-     * @param trendPercent the trend percent
-     * @param weeksWithSales the weeks with sales
-     * @param confidence the confidence
-     * @return the explanation result
+     * @param recentAverage the recent average supplied to this method
+     * @param previousAverage the previous average supplied to this method
+     * @param trendPercent the trend percent supplied to this method
+     * @param weeksWithSales the weeks with sales supplied to this method
+     * @param confidence the confidence supplied to this method
+     * @return the {@code String} result
      */
     private String explanation(
             BigDecimal recentAverage,
@@ -365,10 +375,10 @@ public class DemandForecastService {
     }
 
     /**
-     * Averages the operation.
+     * Returns average information for demand forecast.
      *
-     * @param values the values
-     * @return the average result
+     * @param values the values supplied to this method
+     * @return the {@code BigDecimal} result
      */
     private BigDecimal average(List<Long> values) {
         final long __gokulMethodStartedNanos =

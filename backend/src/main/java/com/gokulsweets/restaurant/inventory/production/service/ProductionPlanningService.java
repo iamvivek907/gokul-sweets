@@ -381,14 +381,14 @@ public class ProductionPlanningService {
     }
 
     /**
-     * Priority the operation.
+     * Returns priority information for production planning.
      *
-     * @param allocation the allocation
-     * @param minimum the minimum
-     * @param suggested the suggested
-     * @param serviceDate the service date
-     * @param rawOnHand the raw on hand
-     * @return the priority result
+     * @param allocation the allocation supplied to this method
+     * @param minimum the minimum supplied to this method
+     * @param suggested the suggested supplied to this method
+     * @param serviceDate the service date supplied to this method
+     * @param rawOnHand the raw on hand supplied to this method
+     * @return the {@code String} result
      */
     private String priority(
             InventoryDailyAllocation allocation,
@@ -418,10 +418,10 @@ public class ProductionPlanningService {
     }
 
     /**
-     * Summary the operation.
+     * Returns summary information for production planning.
      *
-     * @param items the items
-     * @return the summary result
+     * @param items the items supplied to this method
+     * @return the {@code ProductionPlanSummaryResponse} result
      */
     private ProductionPlanSummaryResponse summary(List<ProductionPlanItemResponse> items) {
         final long __gokulMethodStartedNanos =
@@ -446,11 +446,12 @@ public class ProductionPlanningService {
     }
 
     /**
-     * Counts the operation.
+     * Returns count information for production planning.
      *
-     * @param items the items
-     * @param priority the priority
-     * @return the count result
+     * @param items the items supplied to this method
+     * @param priority the priority supplied to this method
+     * @return the value of {@code items.stream().filter(item ->
+     *     priority.equals(item.priority())).count()}
      */
     private long count(List<ProductionPlanItemResponse> items, String priority) {
         final long __gokulMethodStartedNanos =
@@ -672,10 +673,10 @@ public class ProductionPlanningService {
     }
 
     /**
-     * Normalizes the operation.
+     * Normalizes production planning data and returns the {@code String} result.
      *
-     * @param value the value
-     * @return the normalize result
+     * @param value the value supplied to this method
+     * @return the value of {@code value == null || value.isBlank() ? null : value.trim()}
      */
     private String normalize(String value) {
         final long __gokulMethodStartedNanos =

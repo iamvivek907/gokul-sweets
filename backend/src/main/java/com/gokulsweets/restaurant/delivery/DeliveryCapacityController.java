@@ -20,11 +20,12 @@ public class DeliveryCapacityController {
     private final DeliveryCapacityService capacity;
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/branches/{branchId}/delivery-zones/{zoneId}/windows} for
+     * delivery capacity.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @return the list result
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @return the {@code ResponseEntity<List<DeliveryCapacityService.Window>>} result
      */
     @GetMapping("/api/admin/branches/{branchId}/delivery-zones/{zoneId}/windows")
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
@@ -42,12 +43,13 @@ public class DeliveryCapacityController {
     }
 
     /**
-     * Configures the operation.
+     * Handles {@code PUT /api/admin/branches/{branchId}/delivery-zones/{zoneId}/windows} for
+     * delivery capacity.
      *
-     * @param branchId the branch id
-     * @param zoneId the zone id
-     * @param input the input
-     * @return the configure result
+     * @param branchId the branch id supplied to this method
+     * @param zoneId the zone id supplied to this method
+     * @param input the input supplied to this method
+     * @return the {@code ResponseEntity<DeliveryCapacityService.Window>} result
      */
     @PutMapping("/api/admin/branches/{branchId}/delivery-zones/{zoneId}/windows")
     @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
@@ -71,10 +73,10 @@ public class DeliveryCapacityController {
     }
 
     /**
-     * Quotes the operation.
+     * Handles {@code POST /api/storefront/delivery/quote} for delivery capacity.
      *
-     * @param request the request
-     * @return the quote result
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<DeliveryCapacityService.Quote>} result
      */
     @PostMapping("/api/storefront/delivery/quote")
     public ResponseEntity<DeliveryCapacityService.Quote> quote(

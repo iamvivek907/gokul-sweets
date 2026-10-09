@@ -2,11 +2,13 @@ import com.github.javaparser.ParserConfiguration;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.ClassExpr;
 import com.github.javaparser.ast.expr.MethodCallExpr;
 import com.github.javaparser.ast.stmt.TryStmt;
 
 import java.nio.file.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /** Enforces documentation and explicit method timing for future maintained backend Java sources. */
 public final class MethodTimingCoverageCheck {
@@ -33,6 +35,11 @@ public final class MethodTimingCoverageCheck {
             for (var method : cu.findAll(MethodDeclaration.class)) {
                 String key = path + "#" + method.getNameAsString();
                 if (method.getJavadocComment().isEmpty()) failures.add(key + ": missing JavaDoc");
+                else if (method.getJavadocComment()
+                        .orElseThrow()
+                        .getContent()
+                        .contains("the operation."))
+                    failures.add(key + ": replace placeholder JavaDoc with a method contract");
                 if (method.getBody().isEmpty() || diagnostics) continue;
                 methods++;
                 var body = method.getBody().orElseThrow();
@@ -64,6 +71,7 @@ public final class MethodTimingCoverageCheck {
                             || !finish.getArgument(0).toString().equals(variable.getNameAsString())
                             || !start.getArgument(0).equals(finish.getArgument(1))
                             || !start.getArgument(1).equals(finish.getArgument(2))
+                            || !matchesDeclaration(method, start)
                             || wrapped.getFinallyBlock().orElseThrow().getStatements().size()
                                     != 1) {
                         failures.add(key + ": inconsistent timing metadata or cleanup");
@@ -78,6 +86,40 @@ public final class MethodTimingCoverageCheck {
                 "Documentation and timing coverage passed for "
                         + methods
                         + " explicit business methods.");
+    }
+
+    /**
+     * Validates labels against the nearest named type and the source parameter signature.
+     * Anonymous-class callbacks retain the enclosing named type, matching existing instrumentation.
+     */
+    static boolean matchesDeclaration(MethodDeclaration method, MethodCallExpr start) {
+        var owners = new ArrayList<String>();
+        for (var node = method.getParentNode();
+                node.isPresent();
+                node = node.orElseThrow().getParentNode()) {
+            if (node.orElseThrow() instanceof TypeDeclaration<?> type)
+                owners.add(type.getNameAsString());
+        }
+        Collections.reverse(owners);
+        String owner = String.join(".", owners);
+        String signature =
+                method.getNameAsString()
+                        + "("
+                        + method.getParameters().stream()
+                                .map(
+                                        parameter ->
+                                                parameter
+                                                                .getType()
+                                                                .toString()
+                                                                .replaceAll("\\s+", "")
+                                                        + (parameter.isVarArgs() ? "..." : ""))
+                                .collect(Collectors.joining(","))
+                        + ")";
+        return start.getArguments().size() == 2
+                && start.getArgument(0) instanceof ClassExpr classLabel
+                && classLabel.getType().toString().equals(owner)
+                && start.getArgument(1).isStringLiteralExpr()
+                && start.getArgument(1).asStringLiteralExpr().asString().equals(signature);
     }
 
     private static boolean isTimingCall(MethodCallExpr call, String name, int arguments) {

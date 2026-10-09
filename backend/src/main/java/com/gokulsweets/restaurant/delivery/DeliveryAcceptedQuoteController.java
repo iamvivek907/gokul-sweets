@@ -21,10 +21,10 @@ public class DeliveryAcceptedQuoteController {
     private final DeliveryAcceptedQuoteService quotes;
 
     /**
-     * Previews the operation.
+     * Handles {@code POST /api/storefront/delivery/accepted-quote} for delivery accepted quote.
      *
-     * @param request the request
-     * @return the preview result
+     * @param request the request supplied to this method
+     * @return the {@code ResponseEntity<DeliveryAcceptedQuoteService.Quote>} result
      */
     @PostMapping("/api/storefront/delivery/accepted-quote")
     public ResponseEntity<DeliveryAcceptedQuoteService.Quote> preview(

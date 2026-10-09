@@ -19,11 +19,13 @@ public class CustomerVisitPolicy {
     private final JdbcTemplate jdbc;
 
     /**
-     * Completeds the operation.
+     * Returns completed information for customer visit policy.
      *
-     * @param environment the environment
-     * @param subject the subject
-     * @return the completed result
+     * <p>Reads {@code orders}, {@code payments}, {@code verified_order_ownership}.
+     *
+     * @param environment the environment supplied to this method
+     * @param subject the subject supplied to this method
+     * @return the {@code long} result
      */
     public long completed(String environment, UUID subject) {
         final long __gokulMethodStartedNanos =

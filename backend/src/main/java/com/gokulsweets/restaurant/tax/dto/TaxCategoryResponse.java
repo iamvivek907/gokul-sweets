@@ -28,10 +28,10 @@ public record TaxCategoryResponse(
         boolean active) {
 
     /**
-     * Froms the operation.
+     * Maps the supplied data into a {@code TaxCategoryResponse} representation.
      *
-     * @param taxCategory the tax category
-     * @return the from result
+     * @param taxCategory the tax category supplied to this method
+     * @return the {@code TaxCategoryResponse} result
      */
     public static TaxCategoryResponse from(TaxCategory taxCategory) {
         final long __gokulMethodStartedNanos =

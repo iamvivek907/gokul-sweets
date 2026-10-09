@@ -55,9 +55,13 @@ public class BranchOfferingsService {
     public record Snapshot(long version, List<Offering> draft, List<Offering> published) {}
 
     /**
-     * Authorizes the operation.
+     * Checks authorization for branch offerings data.
      *
-     * @param id the id
+     * <p>Authorization checks include {@code PermissionName.BRANCH_MANAGE}.
+     *
+     * @param id the id supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Branch not
+     *     found.}
      */
     private void authorize(long id) {
         final long __gokulMethodStartedNanos =
@@ -74,11 +78,13 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Lists the operation.
+     * Returns list information for branch offerings.
      *
-     * @param id the id
-     * @param scope the scope
-     * @return the list result
+     * <p>Reads {@code branch_offerings}.
+     *
+     * @param id the id supplied to this method
+     * @param scope the scope supplied to this method
+     * @return the {@code List<Offering>} result
      */
     private List<Offering> list(long id, String scope) {
         final long __gokulMethodStartedNanos =
@@ -97,11 +103,13 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Versions the operation.
+     * Returns version information for branch offerings.
      *
-     * @param id the id
-     * @param lock the lock
-     * @return the version result
+     * <p>Writes {@code branch_offering_settings}.
+     *
+     * @param id the id supplied to this method
+     * @param lock the lock supplied to this method
+     * @return the {@code long} result
      */
     private long version(long id, boolean lock) {
         final long __gokulMethodStartedNanos =
@@ -125,10 +133,10 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Snapshots the operation.
+     * Returns snapshot information for branch offerings.
      *
-     * @param id the id
-     * @return the snapshot result
+     * @param id the id supplied to this method
+     * @return the {@code Snapshot} result
      */
     private Snapshot snapshot(long id) {
         final long __gokulMethodStartedNanos =
@@ -142,10 +150,12 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Expecteds the operation.
+     * Returns expected information for branch offerings.
      *
-     * @param id the id
-     * @param expected the expected
+     * @param id the id supplied to this method
+     * @param expected the expected supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Branch
+     *     offerings changed. Reload before saving.}
      */
     private void expected(long id, long expected) {
         final long __gokulMethodStartedNanos =
@@ -161,11 +171,13 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Replaces the operation.
+     * Replaces branch offerings data.
      *
-     * @param id the id
-     * @param scope the scope
-     * @param items the items
+     * <p>Writes {@code branch_offerings}.
+     *
+     * @param id the id supplied to this method
+     * @param scope the scope supplied to this method
+     * @param items the items supplied to this method
      */
     private void replace(long id, String scope, List<Offering> items) {
         final long __gokulMethodStartedNanos =
@@ -193,10 +205,10 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Admins the operation.
+     * Returns admin information for branch offerings.
      *
-     * @param id the id
-     * @return the admin result
+     * @param id the id supplied to this method
+     * @return the value of {@code snapshot(id)}
      */
     @Transactional
     public Snapshot admin(long id) {
@@ -212,12 +224,16 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Saves the operation.
+     * Persists branch offerings data and returns the {@code Snapshot} result.
      *
-     * @param id the id
-     * @param input the input
-     * @param expected the expected
-     * @return the save result
+     * <p>Writes {@code branch_offering_settings}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @param expected the expected supplied to this method
+     * @return the value of {@code snapshot(id)}
+     * @throws IllegalArgumentException when the method rejects the request with {@code Add up to
+     *     twelve offerings with a title and description.}
      */
     @Transactional
     public Snapshot save(long id, Input input, long expected) {
@@ -255,11 +271,13 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Publishes the operation.
+     * Publishes branch offerings data and returns the {@code Snapshot} result.
      *
-     * @param id the id
-     * @param expected the expected
-     * @return the publish result
+     * <p>Writes {@code branch_offering_settings}.
+     *
+     * @param id the id supplied to this method
+     * @param expected the expected supplied to this method
+     * @return the value of {@code snapshot(id)}
      */
     @Transactional
     public Snapshot publish(long id, long expected) {
@@ -281,10 +299,10 @@ public class BranchOfferingsService {
     }
 
     /**
-     * Publisheds the operation.
+     * Returns published information for branch offerings.
      *
-     * @param id the id
-     * @return the published result
+     * @param id the id supplied to this method
+     * @return the {@code List<Offering>} result
      */
     @Transactional(readOnly = true)
     public List<Offering> published(long id) {

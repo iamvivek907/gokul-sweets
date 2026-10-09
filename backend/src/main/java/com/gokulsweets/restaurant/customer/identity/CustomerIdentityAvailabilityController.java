@@ -23,9 +23,9 @@ public class CustomerIdentityAvailabilityController {
     private final Environment settings;
 
     /**
-     * Availability the operation.
+     * Handles {@code GET /api/storefront/customer-identity} for customer identity availability.
      *
-     * @return the availability result
+     * @return the {@code ResponseEntity<Map<String, Boolean>>} result
      */
     @GetMapping("/api/storefront/customer-identity")
     public ResponseEntity<Map<String, Boolean>> availability() {

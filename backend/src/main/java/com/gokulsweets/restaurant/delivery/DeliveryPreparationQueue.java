@@ -32,12 +32,12 @@ public class DeliveryPreparationQueue {
     private final PreparationWindowProperties preparation;
 
     /**
-     * Eligibles the operation.
+     * Returns eligible information for delivery preparation queue.
      *
-     * @param branchId the branch id
-     * @param now the now
-     * @param limit the limit
-     * @return the eligible result
+     * @param branchId the branch id supplied to this method
+     * @param now the now supplied to this method
+     * @param limit the limit supplied to this method
+     * @return the {@code List<Order>} result
      */
     public List<Order> eligible(Long branchId, LocalDateTime now, int limit) {
         final long __gokulMethodStartedNanos =
@@ -73,10 +73,10 @@ public class DeliveryPreparationQueue {
     }
 
     /**
-     * Confirmeds the operation.
+     * Returns confirmed information for delivery preparation queue.
      *
-     * @param branchId the branch id
-     * @return the confirmed result
+     * @param branchId the branch id supplied to this method
+     * @return the {@code long} result
      */
     public long confirmed(Long branchId) {
         final long __gokulMethodStartedNanos =
@@ -143,10 +143,12 @@ public class DeliveryPreparationQueue {
     }
 
     /**
-     * Cutoffs the operation.
+     * Returns cutoff information for delivery preparation queue.
      *
-     * @param now the now
-     * @return the cutoff result
+     * @param now the now supplied to this method
+     * @return the value of {@code now.plusMinutes(preparation.getDeliveryLeadMinutes())}
+     * @throws IllegalStateException when the method rejects the request with {@code Delivery
+     *     preparation lead minutes cannot be negative.}
      */
     private LocalDateTime cutoff(LocalDateTime now) {
         final long __gokulMethodStartedNanos =

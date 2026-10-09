@@ -33,9 +33,13 @@ public class RebateVisitRuleController {
     public record Input(int minimumCompletedOrders, String reason) {}
 
     /**
-     * Lists the operation.
+     * Handles {@code GET /api/admin/rebates/visit-rules} for rebate visit rule.
      *
-     * @return the list result
+     * <p>Authorization checks include {@code PermissionName.REBATE_VIEW}.
+     *
+     * <p>Reads {@code rebate_visit_rules}, {@code rebates}.
+     *
+     * @return the {@code ResponseEntity<List<Map<String, Object>>>} result
      */
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> list() {
@@ -68,10 +72,10 @@ public class RebateVisitRuleController {
     }
 
     /**
-     * Visibles the operation.
+     * Returns visible information for rebate visit rule.
      *
-     * @param id the id
-     * @return the visible result
+     * @param id the id supplied to this method
+     * @return the {@code boolean} result
      */
     private boolean visible(long id) {
         final long __gokulMethodStartedNanos =
@@ -90,10 +94,20 @@ public class RebateVisitRuleController {
     }
 
     /**
-     * Saves the operation.
+     * Handles {@code PUT /api/admin/rebates/visit-rules/{id}} for rebate visit rule.
      *
-     * @param id the id
-     * @param input the input
+     * <p>Authorization checks include {@code PermissionName.REBATE_MANAGE}.
+     *
+     * <p>Reads {@code rebates}.
+     *
+     * <p>Writes {@code rebate_visit_rule_audit}, {@code rebate_visit_rules}.
+     *
+     * @param id the id supplied to this method
+     * @param input the input supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Enter a
+     *     non-negative completed-visit minimum and an audit reason.}
+     * @throws org.springframework.security.access.AccessDeniedException when the method rejects the
+     *     request with {@code Only an administrator can change offers across branches.}
      */
     @PutMapping("/{id}")
     @Transactional

@@ -222,11 +222,12 @@ public class AdminApprovalService {
     }
 
     /**
-     * Approves the operation.
+     * Approves admin approval data and returns the {@code ApprovalRequestResponse} result.
      *
-     * @param approvalRequestId the approval request id
-     * @param actionRequest the action request
-     * @return the approve result
+     * @param approvalRequestId the approval request id supplied to this method
+     * @param actionRequest the action request supplied to this method
+     * @return the value of {@code transitionPending(approvalRequestId,
+     *     ApprovalRequestStatus.APPROVED, ApprovalRequestAction.APPROVED, actionRequest.comment())}
      */
     @Transactional
     public ApprovalRequestResponse approve(
@@ -249,11 +250,12 @@ public class AdminApprovalService {
     }
 
     /**
-     * Rejects the operation.
+     * Rejects admin approval data and returns the {@code ApprovalRequestResponse} result.
      *
-     * @param approvalRequestId the approval request id
-     * @param actionRequest the action request
-     * @return the reject result
+     * @param approvalRequestId the approval request id supplied to this method
+     * @param actionRequest the action request supplied to this method
+     * @return the value of {@code transitionPending(approvalRequestId,
+     *     ApprovalRequestStatus.REJECTED, ApprovalRequestAction.REJECTED, comment)}
      */
     @Transactional
     public ApprovalRequestResponse reject(

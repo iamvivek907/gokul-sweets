@@ -18,9 +18,12 @@ public class PrintAgentAuthenticationService {
     private String configuredApiKey;
 
     /**
-     * Authenticates the operation.
+     * Authenticates print agent authentication data.
      *
-     * @param providedApiKey the provided api key
+     * @param providedApiKey the provided api key supplied to this method
+     * @throws ResponseStatusException when the method rejects the request with {@code Invalid print
+     *     agent API key.}; {@code Print agent API key is required.}; {@code Print agent
+     *     authentication is not configured.}
      */
     public void authenticate(String providedApiKey) {
         final long __gokulMethodStartedNanos =

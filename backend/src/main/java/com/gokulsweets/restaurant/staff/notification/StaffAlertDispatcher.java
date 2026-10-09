@@ -33,7 +33,7 @@ public class StaffAlertDispatcher {
 
     private final TransactionTemplate transactions;
 
-    /** Scheduleds the operation. */
+    /** Returns scheduled information for staff alert dispatcher. */
     @Scheduled(fixedDelay = 30000, initialDelay = 30000)
     public void scheduled() {
         final long __gokulMethodStartedNanos =
@@ -198,9 +198,14 @@ JOIN staff_users u ON u.id = s.staff_id WHERE s.id = ? AND s.staff_id = ? AND s.
     }
 
     /**
-     * Claims the operation.
+     * Claims staff alert dispatcher data and returns the {@code Task} result.
      *
-     * @return the claim result
+     * <p>Reads {@code orders}, {@code staff_alert_deliveries}, {@code staff_order_alerts}, {@code
+     * staff_push_subscriptions}.
+     *
+     * <p>Writes {@code OF}, {@code staff_alert_deliveries}.
+     *
+     * @return the {@code Task} result
      */
     private Task claim() {
         final long __gokulMethodStartedNanos =
@@ -245,11 +250,13 @@ ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
     }
 
     /**
-     * Finishes the operation.
+     * Finishes staff alert dispatcher data.
      *
-     * @param task the task
-     * @param state the state
-     * @param code the code
+     * <p>Writes {@code staff_alert_deliveries}.
+     *
+     * @param task the task supplied to this method
+     * @param state the state supplied to this method
+     * @param code the code supplied to this method
      */
     private void finish(Task task, String state, Integer code) {
         final long __gokulMethodStartedNanos =
@@ -274,10 +281,12 @@ UPDATE staff_alert_deliveries SET state = ?, last_http_status = ?, accepted_at =
     }
 
     /**
-     * Retry the operation.
+     * Retries staff alert dispatcher data.
      *
-     * @param task the task
-     * @param code the code
+     * <p>Writes {@code staff_alert_deliveries}.
+     *
+     * @param task the task supplied to this method
+     * @param code the code supplied to this method
      */
     private void retry(Task task, Integer code) {
         final long __gokulMethodStartedNanos =
