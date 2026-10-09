@@ -209,4 +209,54 @@ try {
   assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-printer-pending-actions')),'{}');
   await context.close();console.log(`Late commit cancellation and reload reconciliation passed at ${width}px`);
  }
+ for(const width of [390,1280]) for(const oldReply of ['accepted','rejected']) {
+  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+  let posts=0,releaseA,releaseB,startedA,startedB,finishedA,finishedB,ids=[],reconciledIds=[],cancelledB=false;
+  const gateA=new Promise(r=>releaseA=r),gateB=new Promise(r=>releaseB=r);
+  const aStarted=new Promise(r=>startedA=r),bStarted=new Promise(r=>startedB=r);
+  const aFinished=new Promise(r=>finishedA=r),bFinished=new Promise(r=>finishedB=r);
+  const state={configured:true,enabled:false,online:true,profile:{branchId:1,station:'KITCHEN',agentId:'shop',printerCode:'KITCHEN_MAIN',protocol:'ESC_POS_USB',target:'Test Queue',port:9100,baudRate:9600,paperWidthMm:80,autoCut:false},runtime:{status:'READY',devices:{usb:['Test Queue'],bluetooth:[]}},command:{}};
+  await context.route('**/api/**',async route=>{
+   const req=route.request(),url=new URL(req.url()),path=url.pathname;
+   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,x-staff-csrf','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Expose-Headers':'X-Staff-CSRF','X-Staff-CSRF':'test-csrf'};
+   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
+   let json=[],status=200,finished;
+   if(path==='/api/admin/auth/me')json={staffId:1,username:'owner',fullName:'Owner',roleName:'OWNER_ADMIN',branchIds:[1],permissions:['ORDER_VIEW','BRANCH_MANAGE','ORDER_START_PREPARATION']};
+   else if(path==='/api/branches')json=[{id:1,name:'Test shop',code:'TEST',active:true}];
+   else if(path.endsWith('/station/reconcile')){
+    const id=url.searchParams.get('requestId');reconciledIds.push(id);
+    if(id===ids[1])cancelledB=true;
+    json={...state,actionReceipt:{requestId:id,outcome:id===ids[0]&&oldReply==='accepted'?'ACCEPTED':'CANCELLED'}};
+   } else if(path==='/api/admin/printing/station')json=state;
+   else if(path.endsWith('/station/command')){
+    posts++;const id=url.searchParams.get('requestId');ids.push(id);
+    if(posts===1){startedA();await gateA;finished=finishedA;status=oldReply==='rejected'?409:200;json=status===409?{message:'Original action rejected.'}:{...state,actionReceipt:{requestId:id,outcome:'ACCEPTED'}};}
+    else {startedB();await gateB;assert.equal(cancelledB,true,'The delayed second action must be cancelled by reload reconciliation');finished=finishedB;json={...state,actionReceipt:{requestId:id,outcome:'CANCELLED'}};}
+   } else if(path.includes('counts'))json={queued:0,claimed:0,failed:0,printed:0,permanentlyFailed:0};
+   else if(path.includes('print-jobs'))json={jobs:[],totalElements:0,totalPages:0,page:0,size:20};
+   else if(path.includes('/printing/health'))json={branchId:1,station:'KITCHEN',agent:{status:'ONLINE'},printer:{status:'READY'},queue:{queued:0,claimed:0,failed:0,permanentlyFailed:0},activity:{}};
+   try{await route.fulfill({status,json,headers});}catch(error){if(!req.failure())throw error;}finally{finished?.();}
+  });
+  await page.goto(base+'/admin/printing/setup');
+  const test=page.getByRole('button',{name:'Print test ticket',exact:true});
+  await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(b=>b.textContent==='Print test ticket'&&!b.disabled));
+  await test.click();await aStarted;
+  await page.getByRole('link',{name:'Back to printer queue',exact:true}).click();
+  await page.waitForURL('**/admin/printing');
+  await page.getByRole('link',{name:'Set up a USB or Bluetooth printer',exact:true}).click();
+  await page.getByText(oldReply==='accepted'?'Server status refreshed. Check the paper and action result before requesting another printer action.':'The previous action was cancelled before acceptance. It will not run later. Check the paper before requesting another print.',{exact:true}).waitFor();
+  await test.click();await bStarted;
+  const savedB=JSON.stringify({'1:KITCHEN':ids[1]});
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-printer-pending-actions')),savedB);
+  releaseA();await aFinished;
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('gokul-printer-pending-actions')),savedB,'A reply to the unmounted page must not erase the newer request');
+  await page.reload();
+  await page.getByText('The previous action was cancelled before acceptance. It will not run later. Check the paper before requesting another print.',{exact:true}).waitFor();
+  assert.deepEqual(reconciledIds,ids,'Reload must reconcile B using its preserved ID');
+  assert.equal(await test.isEnabled(),true);
+  releaseB();await bFinished;
+  assert.equal(posts,2,'Neither uncertain request is automatically resent');
+  await context.close();console.log(`Printer navigation and delayed ${oldReply} reply preserves newer action at ${width}px`);
+ }
 } finally {await browser.close();}

@@ -12,6 +12,12 @@ const STATUS_TIMEOUT_MESSAGE = "Printer status request timed out. Retrying autom
 const ACTION_CANCELLED_MESSAGE = "The previous action was cancelled before acceptance. It will not run later. Check the paper before requesting another print.";
 const PENDING_ACTIONS_KEY = "gokul-printer-pending-actions";
 const stations = ["KITCHEN", "SWEETS", "BEVERAGE", "FAST_FOOD", "BILLING"];
+function readPendingActions(): Record<string, string> {
+    const saved: unknown = JSON.parse(sessionStorage.getItem(PENDING_ACTIONS_KEY) ?? "{}");
+    if (!saved || typeof saved !== "object" || Array.isArray(saved)) return {};
+    return Object.fromEntries(Object.entries(saved).filter(([scope, id]) =>
+        /^\d+:[A-Z_]+$/.test(scope) && typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)));
+}
 function exportProfile(profile: PrinterProfile, origin: string) {
     const url = new URL(origin);
     if (url.protocol !== "https:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash)
@@ -44,12 +50,27 @@ export default function PrinterSetupPage() {
     const observedPending = useRef<number | undefined>(undefined);
     const currentScope = useRef("");
 
-    function rememberAction(scope: string, requestId?: string) {
-        const next = {...pendingActionsRef.current};
-        if (requestId) next[scope] = requestId; else delete next[scope];
-        // Persist before dispatch: a reload must reconcile the same request, never invent a retry.
+    const pageLifecycle = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        const controller = new AbortController();
+        pageLifecycle.current = controller;
+        return () => controller.abort();
+    }, []);
+
+    function rememberAction(scope: string, requestId: string, completed = false) {
+        // Read current storage: a remounted page may already own a newer request.
+        const next = readPendingActions();
+        if (completed) {
+            if (next[scope] !== requestId) return false;
+            delete next[scope];
+        } else {
+            if (next[scope] && next[scope] !== requestId) throw new Error("Another printer action is awaiting confirmation.");
+            next[scope] = requestId;
+        }
         sessionStorage.setItem(PENDING_ACTIONS_KEY, JSON.stringify(next));
         pendingActionsRef.current = next; setPendingActions(next);
+        return true;
     }
 
     useEffect(() => {
@@ -59,12 +80,9 @@ export default function PrinterSetupPage() {
             if (!response.ok) throw new Error("Unable to load branches.");
             const all = await response.json() as {id: number; name: string; active: boolean}[];
             const allowed = all.filter(branch => branch.active && (staff.roleName === "OWNER_ADMIN" || staff.branchIds.includes(branch.id)));
-            const saved: unknown = JSON.parse(sessionStorage.getItem(PENDING_ACTIONS_KEY) ?? "{}");
-            if (saved && typeof saved === "object" && !Array.isArray(saved)) {
-                const valid = Object.fromEntries(Object.entries(saved).filter(([scope, id]) =>
-                    /^\d+:[A-Z_]+$/.test(scope) && typeof id === "string" && /^[0-9a-f-]{36}$/i.test(id)));
-                pendingActionsRef.current = valid; setPendingActions(valid);
-            }
+            if (controller.signal.aborted) return;
+            const valid = readPendingActions();
+            pendingActionsRef.current = valid; setPendingActions(valid);
             setBranches(allowed); setBranchId(allowed[0]?.id ?? null);
         }).catch(error => {if (error.name !== "AbortError") setMessage(error.message);});
         return () => controller.abort();
@@ -85,11 +103,11 @@ export default function PrinterSetupPage() {
                 const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(30000)]);
                 const requestId = pendingActionsRef.current[scope];
                 const result = await printStationRequest(authorization!, branchId!, station, requestId ? "/reconcile" : "", requestId ? {} : undefined, signal, requestId);
-                if (version === revision.current && scope === currentScope.current) {
+                if (!controller.signal.aborted && version === revision.current && scope === currentScope.current) {
                     setState(result);
                     if (requestId && result.actionReceipt?.requestId === requestId &&
                         ["ACCEPTED", "CANCELLED"].includes(result.actionReceipt.outcome)) {
-                        rememberAction(scope);
+                        rememberAction(scope, requestId, true);
                         setCheckedPaper(false);
                         setMessage(result.actionReceipt.outcome === "CANCELLED" ? ACTION_CANCELLED_MESSAGE : ACTION_RECONCILED_MESSAGE);
                     } else {
@@ -120,29 +138,32 @@ export default function PrinterSetupPage() {
     async function mutate(operation: string, body: object) {
         if (!authorization || branchId === null) return;
         const scope = currentScope.current;
+        const lifecycle = pageLifecycle.current;
+        if (!lifecycle || lifecycle.signal.aborted) return;
         if (busyRef.current || pendingActionsRef.current[scope]) return;
         const requestId = crypto.randomUUID();
         ++revision.current; busyRef.current = true; setBusy(true); setMessage("");
         try {
             rememberAction(scope, requestId);
-            const result = await printStationRequest(authorization, branchId, station, operation, body, AbortSignal.timeout(30000), requestId);
+            const result = await printStationRequest(authorization, branchId, station, operation, body, AbortSignal.any([lifecycle.signal, AbortSignal.timeout(30000)]), requestId);
+            if (lifecycle.signal.aborted) return;
             if (result.actionReceipt?.requestId !== requestId || !["ACCEPTED", "CANCELLED"].includes(result.actionReceipt.outcome)) throw new Error("Missing printer action acknowledgement.");
-            rememberAction(scope);
-            if (scope === currentScope.current) {
+            rememberAction(scope, requestId, true);
+            if (!lifecycle.signal.aborted && scope === currentScope.current) {
                 setState(result); setCheckedPaper(false);
                 setMessage(result.actionReceipt.outcome === "CANCELLED" ? ACTION_CANCELLED_MESSAGE : operation === "/profile" ? "Printer saved and paused. Install the agent or test the updated device, then Start printing." : "Request saved. Wait for the station to report the result.");
             }
         } catch (error) {
-            if (scope === currentScope.current) {
+            if (!lifecycle.signal.aborted && scope === currentScope.current) {
                 setCheckedPaper(false);
                 if (error instanceof PrintStationRequestError && error.status < 500 && error.status !== 408 && error.status !== 499) {
-                    rememberAction(scope);
+                    rememberAction(scope, requestId, true);
                     setMessage(error.message);
                 } else {
                     setMessage(`${ACTION_UNCONFIRMED_MESSAGE} ${error instanceof Error ? error.message : "Printer action failed."}`);
                 }
             }
-        } finally {busyRef.current = false; setBusy(false);}
+        } finally {if (!lifecycle.signal.aborted) {busyRef.current = false; setBusy(false);}}
     }
 
     function save(event: FormEvent<HTMLFormElement>) {
