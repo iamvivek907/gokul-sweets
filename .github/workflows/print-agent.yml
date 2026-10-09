@@ -1,0 +1,46 @@
+name: Verify local print agent
+
+on:
+  pull_request:
+    branches: [dev, main]
+    paths: ['print-agent/**', '.github/workflows/print-agent.yml']
+  push:
+    branches: [dev, main]
+    paths: ['print-agent/**', '.github/workflows/print-agent.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  print-agent:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.12', '3.13']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -r print-agent/requirements.txt
+      - run: python -B -m unittest discover -s print-agent -p 'test_*.py' -v
+      - run: python print-agent/agent.py --config print-agent/config.example.json validate
+      - run: python print-agent/agent.py --config print-agent/config.example.json preview
+      - name: Parse Windows installer and verify startup task configuration
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path 'print-agent/install.ps1'), [ref]$null, [ref]$errors) | Out-Null
+          if ($errors.Count) { throw ($errors | Out-String) }
+          & ./print-agent/install.ps1 -VerifyPaths
+          if ($LASTEXITCODE -ne 0) { throw 'Installer path check failed.' }
+          $principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
+          $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+          if ($settings.ExecutionTimeLimit -ne 'PT0S' -or $principal.LogonType -ne 'Interactive') { throw 'Invalid task configuration' }
+      - name: Validate downloadable package
+        run: |
+          node print-agent/package.cjs
+          python -c "import zipfile; z=zipfile.ZipFile('frontend/public/downloads/gokul-print-agent.zip'); assert z.testzip() is None; assert set(z.namelist()) == {'agent.py','background.py','install.cmd','install.ps1','requirements.txt'}"

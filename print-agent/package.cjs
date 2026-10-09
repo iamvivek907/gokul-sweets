@@ -1,0 +1,37 @@
+// Deterministic, uncompressed ZIP using only Node built-ins; never includes local profiles/keys.
+const fs = require('node:fs');
+const path = require('node:path');
+function crc32(data) {
+    let crc = 0xffffffff;
+    for (const byte of data) {
+        crc ^= byte;
+        for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+}
+const entries = ['agent.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd'];
+let offset = 0;
+const files = [], directory = [];
+for (const file of entries) {
+    const name = Buffer.from(file);
+    const data = fs.readFileSync(path.join(__dirname, file));
+    const header = Buffer.alloc(30);
+    header.writeUInt32LE(0x04034b50, 0); header.writeUInt16LE(20, 4);
+    header.writeUInt16LE(0x21, 12); // 1980-01-01
+    header.writeUInt32LE(crc32(data), 14); header.writeUInt32LE(data.length, 18);
+    header.writeUInt32LE(data.length, 22); header.writeUInt16LE(name.length, 26);
+    files.push(header, name, data);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(0x21, 14); central.writeUInt32LE(crc32(data), 16);
+    central.writeUInt32LE(data.length, 20); central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(name.length, 28); central.writeUInt32LE(offset, 42);
+    directory.push(central, name); offset += header.length + name.length + data.length;
+}
+const central = Buffer.concat(directory), end = Buffer.alloc(22);
+end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10);
+end.writeUInt32LE(central.length, 12); end.writeUInt32LE(offset, 16);
+const destination = path.join(__dirname, '../frontend/public/downloads/gokul-print-agent.zip');
+fs.mkdirSync(path.dirname(destination), {recursive: true});
+fs.writeFileSync(destination, Buffer.concat([...files, central, end]));
+console.log('Packaged Windows print agent (' + entries.length + ' non-secret files).');

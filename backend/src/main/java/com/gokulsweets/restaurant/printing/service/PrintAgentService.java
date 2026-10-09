@@ -12,6 +12,7 @@ import com.gokulsweets.restaurant.printing.dto.PrintAgentClaimResponse;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentFailedRequest;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentHeartbeatRequest;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentHeartbeatResponse;
+import com.gokulsweets.restaurant.printing.dto.PrintAgentJobStatusResponse;
 import com.gokulsweets.restaurant.printing.dto.PrintAgentPrintedRequest;
 import com.gokulsweets.restaurant.printing.entity.PrintJob;
 import com.gokulsweets.restaurant.printing.entity.PrinterDevice;
@@ -59,6 +60,44 @@ public class PrintAgentService {
     private final KotRepository kotRepository;
 
     private final DeliveryOrderWindowLookup deliveryWindows;
+
+    private final PrintStationControlService stationControl;
+
+    /**
+     * Reads job status for acknowledgement recovery without changing claims or retry state.
+     *
+     * @param printJobId the job being reconciled
+     * @param request the agent's branch and station identity
+     * @return the current status of a job in the requested branch and station
+     * @throws ResponseStatusException if the job is missing or belongs to another branch or station
+     */
+    @Transactional(readOnly = true)
+    public PrintAgentJobStatusResponse getJobStatus(
+            Long printJobId, PrintAgentClaimRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        PrintAgentService.class, "getJobStatus(Long,PrintAgentClaimRequest)");
+        try {
+            PrintJob job =
+                    printJobRepository
+                            .findById(printJobId)
+                            .filter(
+                                    value ->
+                                            request.branchId().equals(value.getBranch().getId())
+                                                    && request.station() == value.getStation())
+                            .orElseThrow(
+                                    () ->
+                                            new ResponseStatusException(
+                                                    HttpStatus.NOT_FOUND, "Print job not found."));
+            return new PrintAgentJobStatusResponse(
+                    job.getId(), request.branchId(), job.getStation(), job.getStatus());
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    PrintAgentService.class,
+                    "getJobStatus(Long,PrintAgentClaimRequest)");
+        }
+    }
 
     /*
      * =========================================================
@@ -118,6 +157,9 @@ public class PrintAgentService {
                 MethodTiming.start(PrintAgentService.class, "claimNext(PrintAgentClaimRequest)");
         try {
             String agentId = normalizeAgentId(request.agentId());
+            if (!stationControl.allowsClaim(request.branchId(), request.station(), agentId)) {
+                return Optional.empty();
+            }
             /*
              * A physical printer must currently be configured before
              * the agent can claim work.
@@ -205,7 +247,8 @@ public class PrintAgentService {
                 MethodTiming.start(
                         PrintAgentService.class, "markPrinted(Long,PrintAgentPrintedRequest)");
         try {
-            PrintJob printJob = getClaimedJob(printJobId, request.agentId(), request.claimToken());
+            PrintJob printJob =
+                    getClaimedJob(printJobId, request.agentId(), request.claimToken(), false);
             LocalDateTime now = LocalDateTime.now();
             printJob.setStatus(PrintJobStatus.PRINTED);
             printJob.setPrintedAt(now);
@@ -248,7 +291,12 @@ public class PrintAgentService {
                 MethodTiming.start(
                         PrintAgentService.class, "markFailed(Long,PrintAgentFailedRequest)");
         try {
-            PrintJob printJob = getClaimedJob(printJobId, request.agentId(), request.claimToken());
+            PrintJob printJob =
+                    getClaimedJob(printJobId, request.agentId(), request.claimToken(), true);
+            if (request.claimToken().trim().equals(printJob.getFailedClaimToken())
+                    && normalizeAgentId(request.agentId()).equals(printJob.getFailedClaimAgent())) {
+                return; // A committed acknowledgement must not reschedule or alter a newer claim.
+            }
             LocalDateTime now = LocalDateTime.now();
             int attemptCount = printJob.getAttemptCount() == null ? 0 : printJob.getAttemptCount();
             int maxAttempts = printJob.getMaxAttempts() == null ? 1 : printJob.getMaxAttempts();
@@ -256,6 +304,8 @@ public class PrintAgentService {
             printJob.setFailedAt(now);
             printJob.setLastErrorCode(normalizeErrorCode(request.errorCode()));
             printJob.setLastErrorMessage(normalizeNullableText(request.errorMessage()));
+            printJob.setFailedClaimToken(printJob.getClaimToken());
+            printJob.setFailedClaimAgent(printJob.getClaimedByAgent());
             clearClaim(printJob);
             if (attemptCount < maxAttempts) {
                 long retrySeconds = calculateRetryDelaySeconds(attemptCount);
@@ -434,25 +484,34 @@ public class PrintAgentService {
      * @param printJobId the print job id
      * @param agentId the agent id
      * @param claimToken the claim token
+     * @param allowFailedReceipt whether to accept the saved failure receipt
      * @return the get claimed job result
      */
-    private PrintJob getClaimedJob(Long printJobId, String agentId, String claimToken) {
+    private PrintJob getClaimedJob(
+            Long printJobId, String agentId, String claimToken, boolean allowFailedReceipt) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(PrintAgentService.class, "getClaimedJob(Long,String,String)");
+                MethodTiming.start(
+                        PrintAgentService.class, "getClaimedJob(Long,String,String,boolean)");
         try {
             PrintJob printJob =
                     printJobRepository
-                            .findById(printJobId)
+                            .findForAcknowledgement(printJobId)
                             .orElseThrow(
                                     () ->
                                             new ResponseStatusException(
                                                     HttpStatus.NOT_FOUND,
                                                     "Print job does not exist."));
+            String normalizedAgentId = normalizeAgentId(agentId);
+            if (allowFailedReceipt
+                    && claimToken != null
+                    && claimToken.trim().equals(printJob.getFailedClaimToken())
+                    && normalizedAgentId.equals(printJob.getFailedClaimAgent())) {
+                return printJob;
+            }
             if (printJob.getStatus() != PrintJobStatus.CLAIMED) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT, "The print job is no longer claimed.");
             }
-            String normalizedAgentId = normalizeAgentId(agentId);
             if (printJob.getClaimedByAgent() == null
                     || !printJob.getClaimedByAgent().equals(normalizedAgentId)) {
                 throw new ResponseStatusException(
@@ -469,7 +528,7 @@ public class PrintAgentService {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     PrintAgentService.class,
-                    "getClaimedJob(Long,String,String)");
+                    "getClaimedJob(Long,String,String,boolean)");
         }
     }
 
