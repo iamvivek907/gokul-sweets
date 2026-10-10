@@ -283,3 +283,5 @@ The enabled phone menu keeps pickup controls and search beneath the measured sha
 ## October 10 compact pickup header correction
 
 On the enabled phone menu, the full pickup card, search, category tiles and filters remain in normal document flow. After the pickup card leaves view, its date/time and search action replace the contents of the shared header at the same height. The original card stays in flow; separated enter/exit thresholds avoid oscillation. Returning to the top restores the brand/actions. Compact pickup opens the same authoritative picker; search returns to the existing input. Invalid/expired pickup is clearly labelled; scrolling immediately clears attention. Desktop and flag-OFF keep the shared header unchanged.
+
+Compact header polish: keep both header layers mounted, with short opacity/4px motion transitions in both directions and fixed header geometry. Hidden controls are inert immediately; reduced motion switches without animation. Availability-error retry repeats the menu check instead of opening discovery. The picker restores focus to its opening control without moving the menu.

@@ -9,12 +9,13 @@ import type {PickupSelection} from "@/types/pickup";
 const dateLabel=(date:string,locale:"en"|"hi",today:string)=>{const named=new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"Asia/Kolkata"}).format(new Date(`${date}T12:00:00+05:30`));const tomorrow=indiaToday(new Date(Date.parse(`${today}T12:00:00+05:30`)+86400000));return `${date===today?`${translate("Today",locale)} · `:date===tomorrow?`${translate("Tomorrow",locale)} · `:""}${named}`;};
 const money=(amount:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(amount);
 
-export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,initialDate,restoreScroll,today=indiaToday()}:{
- restoreScroll?:{left:number;top:number};today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
+export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,initialDate,restoreScroll,restoreFocus,today=indiaToday()}:{
+ restoreFocus?:HTMLElement|null;restoreScroll?:{left:number;top:number};today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
  onClose:()=>void;onConfirm:(selection:PickupSelection)=>Promise<boolean>;
 }){
  const locale=useLanguage();
  const initialScroll=useRef(restoreScroll);
+ const initialFocus=useRef(restoreFocus);
  const dialog=useRef<HTMLDialogElement>(null);
  const [date,setDate]=useState(()=>{
   const preferred=chosen?.date??initialDate;
@@ -27,7 +28,24 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
  const day=dates.find(day=>day.date===date);
  const times=options.filter(option=>option.date===date);
  const selected=times.find(option=>option.slot.id===selection?.slot.id&&option.pickupType===selection.pickupType);
- useEffect(()=>{mounted.current=true;const surface=dialog.current;if(!surface)return;const previousFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;const pageUrl=location.href;const scroll=initialScroll.current??{left:window.scrollX,top:window.scrollY};const lock=document.documentElement;const previous=lock.style.overflow;lock.style.overflow="hidden";surface.showModal();window.scrollTo({...scroll,behavior:"instant"});return()=>{mounted.current=false;surface.close();lock.style.overflow=previous;if(location.href===pageUrl){window.scrollTo({...scroll,behavior:"instant"});previousFocus?.focus({preventScroll:true});}};},[]);
+ useEffect(()=>{
+  mounted.current=true;
+  const surface=dialog.current;if(!surface)return;
+  // Capture the actual opener before its asynchronous load disables it and loses focus.
+  const previousFocus=initialFocus.current??(document.activeElement instanceof HTMLElement?document.activeElement:null);
+  const pageUrl=location.href;
+  const scroll=initialScroll.current??{left:window.scrollX,top:window.scrollY};
+  const lock=document.documentElement,previous=lock.style.overflow;
+  lock.style.overflow="hidden";surface.showModal();window.scrollTo({...scroll,behavior:"instant"});
+  return()=>{
+   mounted.current=false;surface.close();lock.style.overflow=previous;
+   if(location.href!==pageUrl)return;
+   window.scrollTo({...scroll,behavior:"instant"});
+   const openerAvailable=previousFocus?.isConnected&&!previousFocus.closest("[inert]")&&getComputedStyle(previousFocus).visibility!=="hidden";
+   const target=openerAvailable?previousFocus:document.querySelector<HTMLElement>(".mobile-menu-pickup > button");
+   target?.focus({preventScroll:true});
+  };
+ },[]);
  return <dialog ref={dialog} className="mobile-pickup-dialog" aria-labelledby="mobile-pickup-title" onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))onClose();}} onCancel={event=>{event.preventDefault();onClose();}}>
   <div className="mobile-pickup-dialog-header"><h2 id="mobile-pickup-title"><T text="Choose pickup date & time" /></h2><button type="button" onClick={onClose} aria-label="Close pickup selector"><T text="Close" /> <span aria-hidden="true">×</span></button></div>
   <div className="mobile-pickup-dialog-body">
