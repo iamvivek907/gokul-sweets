@@ -43,6 +43,7 @@ export default function Header() {
         >
 
             <div
+                data-header-content
                 className="
                     mx-auto
                     flex
@@ -114,7 +115,7 @@ export default function Header() {
                 </div>
 
             </div>
-
+            {pathname === "/menu" && futuristic && features?.contextualStorefrontV2 === true && <aside id="gokul-menu-header-slot" />}
 
         </header>
     );

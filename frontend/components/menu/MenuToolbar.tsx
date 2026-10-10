@@ -5,9 +5,9 @@ export function measureMenuToolbar(toolbar:HTMLElement){
  const header=toolbar.closest('.app-container')?.querySelector('.customer-site-header');
  const height=header?.getBoundingClientRect().height??0;
  toolbar.style.setProperty('--menu-header-height',`${height}px`);
- toolbar.parentElement?.style.setProperty('--menu-scroll-offset',`${Math.ceil(height+toolbar.getBoundingClientRect().height+12)}px`);
+ toolbar.parentElement?.style.setProperty('--menu-scroll-offset',`${Math.ceil(height+12)}px`);
 }
-/** The sticky phone toolbar follows the shared header's measured height. */
+/** Browsing tools stay in the page; only the shared compact pickup header remains visible. */
 export default function MenuToolbar({enabled,children}:{enabled:boolean;children:ReactNode}){
  const ref=useRef<HTMLDivElement>(null);const [attention,setAttention]=useState(false);
  useEffect(()=>{
