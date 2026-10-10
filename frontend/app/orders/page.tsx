@@ -1,4 +1,5 @@
 "use client";
+import OrderRewardGuidance from "@/components/customer/OrderRewardGuidance";
 import BrandLoading from "@/components/common/BrandLoading";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import CustomerIcon from "@/components/customer/CustomerIcon";
@@ -355,6 +356,7 @@ export default function OrdersPage() {
                     )}
                 </div>
 
+                <OrderRewardGuidance/>
                 {history.length > MAX_HISTORY_ORDERS && (
                     <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                         Checking your latest {MAX_HISTORY_ORDERS} orders for this branch.

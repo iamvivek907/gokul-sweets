@@ -56,7 +56,8 @@
     "tests/mobile-account-corrections.browser.mjs",
     "tests/mobile-orders.browser.mjs",
     "tests/profile-reorder.browser.mjs",
-    "tests/pwa-install.browser.mjs"
+    "tests/pwa-install.browser.mjs",
+    "tests/badge-experience.browser.mjs"
   ],
   "staff-bulk": [
     "tests/product-dietary.browser.mjs",
@@ -74,6 +75,7 @@
     "tests/data-cleanup.browser.mjs",
     "tests/owner-account.browser.mjs",
     "tests/printer-setup.browser.mjs",
-    "tests/printer-setup-navigation.browser.mjs"
+    "tests/printer-setup-navigation.browser.mjs",
+    "tests/badge-admin.browser.mjs"
   ]
 }

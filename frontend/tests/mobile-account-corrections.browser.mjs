@@ -21,6 +21,8 @@ try{
    else if(path==='/api/customer/identity/start'){otp++;return route.fulfill({status:204});}
    else if(path==='/api/customer/identity/me/name'){name=req.postDataJSON().name;return route.fulfill({status:204});}
    else if(path==='/api/customer/identity/orders/page')json={orders:[],nextBefore:null};
+   else if(path==='/api/customer/identity/badges')json={badges:[{id:1,code:'REGULAR',name:'Regular',description:'Five completed paid orders',requiredOrders:5,minimumSubtotal:0,bonusPercent:0,appearance:'GOLD',active:true,version:1,qualifyingOrders:5,earned:true}],current:{name:'Regular',appearance:'GOLD'}};
+   else if(path==='/api/customer/identity/badges/celebration')json=null;
    else if(path==='/api/customer/identity/account')json={paidOrders:8,completedOrders:5,favouriteProductIds:[],addresses,preferences:{dietaryNotes:null,preferredBranchId:null}};
    else if(path==='/api/customer/identity/account/location'){if(req.method()==='POST'){location++;json={addressLine:'Station Road, Tamkuhi',locality:'Tamkuhi Road',postalCode:'274407',attribution:'Google Maps'};}else json={enabled:true};}
    else if(path==='/api/customer/identity/account/addresses'){saved++;json={id:1,...req.postDataJSON()};addresses=[json];}
@@ -40,7 +42,7 @@ try{
    return route.fulfill({json});
   });
   await page.goto(`${base}/profile`);await page.locator('.account-hub').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  assert.equal(await page.locator('.account-tier-mark').isVisible(),compact);
+  assert.equal(await page.locator('h1 .account-tier-mark').isVisible(),compact);
   if(compact){
    await page.getByRole('link',{name:'View rewards',exact:true}).click();await page.waitForURL('**/profile/rewards');await page.locator('.reward-wallet-card').getByText('600',{exact:false}).waitFor();assert.match(await page.locator('.reward-savings-list').innerText(),/Minimum ₹750/);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/rewards-new-${width}.png`,fullPage:true});}

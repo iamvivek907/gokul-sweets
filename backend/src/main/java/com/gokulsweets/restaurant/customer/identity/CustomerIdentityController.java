@@ -75,6 +75,7 @@ public class CustomerIdentityController {
     private final CustomerPrivacyRequests privacyRequests;
 
     private final CustomerAccountHub accountHub;
+    private final com.gokulsweets.restaurant.badges.CustomerBadgeService badges;
 
     private final ReverseAddressLookup addressLookup;
 
@@ -649,6 +650,80 @@ public class CustomerIdentityController {
                     __gokulMethodStartedNanos,
                     CustomerIdentityController.class,
                     "deleteAddress(long,HttpServletRequest)");
+        }
+    }
+
+    /** Returns configured badge progress for the current verified account. */
+    @GetMapping("/badges")
+    public ResponseEntity<com.gokulsweets.restaurant.badges.CustomerBadgeService.Snapshot> badges(
+            HttpServletRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(CustomerIdentityController.class, "badges(HttpServletRequest)");
+        try {
+            var environment = accountEnvironment();
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(
+                            badges.snapshot(
+                                    environment.name(), requiredSubject(request, environment)));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    CustomerIdentityController.class,
+                    "badges(HttpServletRequest)");
+        }
+    }
+
+    /** Claims a new badge presentation after trusted-origin and verified-account checks. */
+    @PostMapping("/badges/celebration")
+    public ResponseEntity<com.gokulsweets.restaurant.badges.CustomerBadgeService.Celebration>
+            claimBadge(HttpServletRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        CustomerIdentityController.class, "claimBadge(HttpServletRequest)");
+        try {
+            requireTrustedMutation(request);
+            var environment = accountEnvironment();
+            var celebration =
+                    badges.claim(environment.name(), requiredSubject(request, environment));
+            return celebration == null
+                    ? ResponseEntity.noContent().cacheControl(CacheControl.noStore()).build()
+                    : ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(celebration);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    CustomerIdentityController.class,
+                    "claimBadge(HttpServletRequest)");
+        }
+    }
+
+    /** Immutable customer badge data and configured benefit contract. */
+    public record BadgeAcknowledgement(java.util.UUID claimId) {}
+
+    /** Acknowledges a displayed achievement for its verified owner and matching claim. */
+    @PostMapping("/badges/{awardId}/acknowledge")
+    public ResponseEntity<Void> acknowledgeBadge(
+            @PathVariable long awardId,
+            @RequestBody BadgeAcknowledgement value,
+            HttpServletRequest request) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        CustomerIdentityController.class,
+                        "acknowledgeBadge(long,BadgeAcknowledgement,HttpServletRequest)");
+        try {
+            requireTrustedMutation(request);
+            var environment = accountEnvironment();
+            badges.acknowledge(
+                    environment.name(),
+                    requiredSubject(request, environment),
+                    awardId,
+                    value.claimId());
+            return ResponseEntity.noContent().build();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    CustomerIdentityController.class,
+                    "acknowledgeBadge(long,BadgeAcknowledgement,HttpServletRequest)");
         }
     }
 

@@ -64,6 +64,12 @@ public class Order {
     @Column(nullable = false)
     private boolean loyaltyTestOrder;
 
+    @Column(nullable = false, precision = 5, scale = 2)
+    private BigDecimal loyaltyBadgeBonusPercent = BigDecimal.ZERO;
+
+    @Column(length = 80)
+    private String loyaltyBadgeName;
+
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal loyaltyEligibleSubtotal = BigDecimal.ZERO;
 

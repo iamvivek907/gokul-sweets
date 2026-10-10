@@ -1,4 +1,6 @@
 "use client";
+import BadgeCelebration from "@/components/customer/BadgeCelebration";
+import "@/components/customer/badges.css";
 import "@/lib/paymentNavigation";
 
 import {usePathname} from "next/navigation";
@@ -86,6 +88,7 @@ export default function AppShell({
             {futuristic&&<MobileEdgeBack />}
             <Header />
             <CustomerAlertRuntime />
+            <BadgeCelebration />
 
             <BranchOperationalGuard>
             {showConnectionNotice && <ConnectionNotice />}

@@ -3,10 +3,10 @@ name: Verify local print agent
 on:
   pull_request:
     branches: [dev, main]
-    paths: ['print-agent/**', '.github/workflows/print-agent.yml']
+    paths: ['print-agent/**', '.github/workflows/print-agent.yml', 'frontend/lib/generatedPrintInstaller.ts', 'frontend/app/downloads/**']
   push:
     branches: [dev, main]
-    paths: ['print-agent/**', '.github/workflows/print-agent.yml']
+    paths: ['print-agent/**', '.github/workflows/print-agent.yml', 'frontend/lib/generatedPrintInstaller.ts', 'frontend/app/downloads/**']
 
 permissions:
   contents: read
@@ -43,4 +43,7 @@ jobs:
       - name: Validate downloadable package
         run: |
           node print-agent/package.cjs
-          python -c "import zipfile; z=zipfile.ZipFile('frontend/public/downloads/gokul-print-agent.zip'); assert z.testzip() is None; assert set(z.namelist()) == {'agent.py','background.py','install.cmd','install.ps1','requirements.txt'}"
+          python -c "import zipfile; z=zipfile.ZipFile('print-agent/dist/gokul-print-agent.zip'); assert z.testzip() is None; assert set(z.namelist()) == {'agent.py','background.py','install.cmd','install.ps1','requirements.txt'}"
+
+      - name: Verify committed download matches installer sources
+        run: git diff --exit-code -- frontend/lib/generatedPrintInstaller.ts

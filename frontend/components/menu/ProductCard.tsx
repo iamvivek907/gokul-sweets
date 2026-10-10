@@ -109,6 +109,7 @@ export default function ProductCard({
 
     return (
         <article
+            onPointerDownCapture={event=>{if(unavailableForPickup&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
             className={`
                 gokul-product-card group
                 ${refined ? "gokul-menu-product-card" : ""}

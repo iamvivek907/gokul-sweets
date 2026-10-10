@@ -23,15 +23,15 @@ try{
   const exposure=page.getByText('Active reward reservations:',{exact:false});await exposure.waitFor();
   assert.match(await exposure.innerText(),/₹75.00/);assert.match(await exposure.innerText(),/additional to the available coin liability/);
   assert.match(await page.getByRole('heading',{name:'Outstanding coin liability'}).locator('..').innerText(),/₹25.00/);
-  await page.getByRole('combobox').selectOption(`DEV/${subject}`);
+  await page.getByRole('combobox').filter({has:page.locator(`option[value="DEV/${subject}"]`)}).selectOption(`DEV/${subject}`);
   await page.getByRole('spinbutton',{name:'Coin adjustment'}).fill('100');await page.getByRole('textbox',{name:'Audit reason for changes'}).fill('Customer service credit');
   await page.getByRole('button',{name:'Record adjustment'}).click();await page.locator('main p[role="alert"]').waitFor();
   assert.equal(balance,100);await page.getByRole('button',{name:'Record adjustment'}).click();
-  await page.waitForFunction(()=>document.querySelector('textarea')?.value==='');assert.equal(balance,100);assert.equal(keys[0],keys[1]);
+  await page.waitForFunction(()=>document.querySelector('textarea[maxlength="300"]:not(#badge-settings textarea)')?.value==='');assert.equal(balance,100);assert.equal(keys[0],keys[1]);
   await page.getByRole('textbox',{name:'Audit reason for changes'}).fill('Another approved credit');await page.getByRole('button',{name:'Record adjustment'}).click();
-  await page.waitForFunction(()=>document.querySelector('textarea')?.value==='');assert.equal(balance,200);assert.notEqual(keys[2],keys[1]);
+  await page.waitForFunction(()=>document.querySelector('textarea[maxlength="300"]:not(#badge-settings textarea)')?.value==='');assert.equal(balance,200);assert.notEqual(keys[2],keys[1]);
   lost=true;await page.getByRole('textbox',{name:'Audit reason for changes'}).fill('Credit to revise amount');await page.getByRole('button',{name:'Record adjustment'}).click();await page.locator('main p[role="alert"]').waitFor();
-  await page.getByRole('spinbutton',{name:'Coin adjustment'}).fill('50');await page.getByRole('button',{name:'Record adjustment'}).click();await page.waitForFunction(()=>document.querySelector('textarea')?.value==='');
+  await page.getByRole('spinbutton',{name:'Coin adjustment'}).fill('50');await page.getByRole('button',{name:'Record adjustment'}).click();await page.waitForFunction(()=>document.querySelector('textarea[maxlength="300"]:not(#badge-settings textarea)')?.value==='');
   assert.notEqual(keys[3],keys[4]);assert.equal(balance,350);
   console.log(`Loyalty admin liability passed at ${width}px`);await context.close();
  }

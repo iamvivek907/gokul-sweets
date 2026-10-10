@@ -37,6 +37,8 @@ class CustomerIdentityControllerTest {
     private final IdentityDeviceRegistry devices = mock(IdentityDeviceRegistry.class);
     private final ConsentLedger consents = mock(ConsentLedger.class);
     private final CustomerPrivacyRequests privacyRequests = mock(CustomerPrivacyRequests.class);
+    private final com.gokulsweets.restaurant.badges.CustomerBadgeService badges =
+            mock(com.gokulsweets.restaurant.badges.CustomerBadgeService.class);
     private final CustomerAccountHub accountHub = mock(CustomerAccountHub.class);
     private final com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox
             notifications =
@@ -69,9 +71,39 @@ class CustomerIdentityControllerTest {
                     consents,
                     privacyRequests,
                     accountHub,
+                    badges,
                     mock(ReverseAddressLookup.class),
                     notifications,
                     alerts);
+
+    @Test
+    void badgeEndpointsRequireVerifiedSubjectAndTrustedMutationsAndReturnEmptyClaimAs204() {
+        features.setCustomerOtpIdentity(true);
+        features.setCustomerAccountHub(true);
+        var request = request();
+        request.setCookies(new Cookie("__Host-gokul-customer", "session-token"));
+        var subject = UUID.randomUUID();
+        when(sessions.subject(eq(ConsentEnvironment.DEV), eq("session-token"), any()))
+                .thenReturn(Optional.of(subject));
+        assertThat(controller.claimBadge(request).getStatusCode().value()).isEqualTo(204);
+        verify(badges).claim("DEV", subject);
+        controller.badges(request);
+        verify(badges).snapshot("DEV", subject);
+        var other = request();
+        other.setCookies(new Cookie("__Host-gokul-customer", "session-token"));
+        other.removeHeader(HttpHeaders.ORIGIN);
+        other.addHeader(HttpHeaders.ORIGIN, "https://untrusted.example");
+        assertThatThrownBy(() -> controller.claimBadge(other))
+                .isInstanceOf(ResponseStatusException.class);
+        var claim = UUID.randomUUID();
+        controller.acknowledgeBadge(
+                4L, new CustomerIdentityController.BadgeAcknowledgement(claim), request);
+        verify(badges).acknowledge("DEV", subject, 4L, claim);
+        var revoked = request();
+        revoked.setCookies(new Cookie("__Host-gokul-customer", "revoked"));
+        assertThatThrownBy(() -> controller.badges(revoked))
+                .isInstanceOf(ResponseStatusException.class);
+    }
 
     @Test
     void alertsRequireTrustedCurrentSessionAndCanAlwaysRevokeOwnedSubscription() {

@@ -1,7 +1,6 @@
-/** Recognition for completed visits; never a phone/identity verification claim. */
-export default function AccountTierMark({orders}:{orders:number}){
- if(orders<1)return null;
- const tier=orders>=20?"gold":orders>=5?"blue":"grey";
- const label=orders>=20?"Gokul favourite":orders>=5?"Regular":"First visit";
- return <span className={`account-tier-mark tier-${tier}`} role="img" aria-label={`${label} · earned Gokul recognition`} title={`${label} · earned Gokul recognition`}><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="m12 1 3 2 3.5.5.5 3.5 2 3-2 3-.5 3.5-3.5.5-3 2-3-2-3.5-.5-.5-3.5-2-3 2-3 .5-3.5 3.5-.5z"/><path d="m7 12 3 3 7-7" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>;
+import type {Badge} from '@/services/badgeApi';
+/** Recognition for a configured badge, separate from identity or payment verification. */
+export default function AccountTierMark({badge,large=false}:{badge:Pick<Badge,'name'|'appearance'>|null;large?:boolean}){
+ if(!badge)return null;
+ return <span className={`badge-medallion${large?'':' account-tier-mark'} badge-${badge.appearance.toLowerCase()}${large?' badge-large':''}`} role="img" aria-label={`${badge.name} · earned Gokul recognition`} title={`${badge.name} · earned Gokul recognition`}><svg width={large?64:24} height={large?64:24} viewBox="0 0 24 24" aria-hidden="true"><path d="m6.5 12 3.5 3.5 7.5-7.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/></svg></span>;
 }

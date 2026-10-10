@@ -31,6 +31,8 @@ public class LoyaltyService {
 
     private final Clock inventoryClock;
 
+    private final com.gokulsweets.restaurant.badges.CustomerBadgeService badges;
+
     /**
      * Immutable reward data contract.
      *
@@ -71,7 +73,9 @@ public class LoyaltyService {
             String orderNumber,
             Long customerOrderNumber,
             Instant createdAt,
-            Instant expiresAt) {}
+            Instant expiresAt,
+            int badgeBonusCoins,
+            String badgeName) {}
 
     /**
      * Immutable wallet data contract.
@@ -237,6 +241,11 @@ public class LoyaltyService {
                             + jdbc.queryForList(
                                             "SELECT code FROM loyalty_excluded_rebates ORDER BY"
                                                     + " code")
+                                    .toString()
+                            + jdbc.queryForList(
+                                            "SELECT"
+                                                + " id,version,required_orders,minimum_subtotal,bonus_percent,active"
+                                                + " FROM customer_badges ORDER BY id")
                                     .toString()
                             + "|"
                             + rules.getRupeesPerCoin()
@@ -539,6 +548,46 @@ WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at N
                         LoyaltyService.class,
                         "append(String,UUID,String,String,int,Long,String,Instant,Long,int)");
         try {
+            return append(
+                    environment,
+                    subject,
+                    key,
+                    kind,
+                    coins,
+                    orderId,
+                    reason,
+                    expiry,
+                    origin,
+                    expiryDays,
+                    0,
+                    null);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    LoyaltyService.class,
+                    "append(String,UUID,String,String,int,Long,String,Instant,Long,int)");
+        }
+    }
+
+    /** Inserts a new immutable ledger event and its badge breakdown with idempotent credit lots. */
+    private long append(
+            String environment,
+            UUID subject,
+            String key,
+            String kind,
+            int coins,
+            Long orderId,
+            String reason,
+            Instant expiry,
+            Long origin,
+            int expiryDays,
+            int badgeBonusCoins,
+            String badgeName) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        LoyaltyService.class,
+                        "append(String,UUID,String,String,int,Long,String,Instant,Long,int,int,String)");
+        try {
             int days =
                     origin == null
                             ? expiryDays
@@ -549,8 +598,8 @@ WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at N
             var ids =
                     jdbc.query(
                             """
-INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,order_id,reason,expires_at,created_at,source_credit_id,expiry_days)
-VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO NOTHING RETURNING id
+INSERT INTO loyalty_ledger(environment,subject_id,event_key,kind,coins,order_id,reason,expires_at,created_at,source_credit_id,expiry_days,badge_bonus_coins,badge_name)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO NOTHING RETURNING id
 """,
                             (rs, row) -> rs.getLong(1),
                             environment,
@@ -563,7 +612,9 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
                             timestamp(expiry),
                             timestamp(now()),
                             origin,
-                            days);
+                            days,
+                            badgeBonusCoins,
+                            badgeName);
             if (ids.isEmpty()) return 0;
             long id = ids.getFirst();
             if (coins > 0)
@@ -576,7 +627,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     LoyaltyService.class,
-                    "append(String,UUID,String,String,int,Long,String,Instant,Long,int)");
+                    "append(String,UUID,String,String,int,Long,String,Instant,Long,int,int,String)");
         }
     }
 
@@ -788,7 +839,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key) DO 
             var history =
                     jdbc.query(
                             """
-SELECT l.id,l.kind,l.coins,l.reason,o.order_number,l.created_at,l.expires_at,o.customer_order_number FROM loyalty_ledger l
+SELECT l.id,l.kind,l.coins,l.reason,o.order_number,l.created_at,l.expires_at,o.customer_order_number,l.badge_bonus_coins,l.badge_name FROM loyalty_ledger l
 LEFT JOIN orders o ON o.id=l.order_id WHERE l.environment=? AND l.subject_id=? ORDER BY l.id DESC LIMIT 100
 """,
                             (rs, row) ->
@@ -802,7 +853,9 @@ LEFT JOIN orders o ON o.id=l.order_id WHERE l.environment=? AND l.subject_id=? O
                                             rs.getTimestamp(6).toInstant(),
                                             rs.getTimestamp(7) == null
                                                     ? null
-                                                    : rs.getTimestamp(7).toInstant()),
+                                                    : rs.getTimestamp(7).toInstant(),
+                                            rs.getInt(9),
+                                            rs.getString(10)),
                             environment,
                             subject);
             int completed =
@@ -821,7 +874,7 @@ LEFT JOIN orders o ON o.id=l.order_id WHERE l.environment=? AND l.subject_id=? O
             var pendingOrders =
                     jdbc.queryForList(
                             """
-SELECT o.subtotal,o.loyalty_discount,o.rebate_discount_amount,o.loyalty_eligible_subtotal,o.loyalty_test_order,o.rebate_code,o.loyalty_earning_rupees_per_coin,o.loyalty_qualifying_minimum
+SELECT o.subtotal,o.loyalty_discount,o.rebate_discount_amount,o.loyalty_eligible_subtotal,o.loyalty_test_order,o.rebate_code,o.loyalty_earning_rupees_per_coin,o.loyalty_badge_bonus_percent,o.loyalty_badge_name,o.loyalty_qualifying_minimum
 FROM orders o JOIN verified_order_ownership own ON own.order_id=o.id
 WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
  AND o.order_status NOT IN ('PICKED_UP','DELIVERED','CANCELLED','PAYMENT_FAILED')
@@ -943,13 +996,17 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
                 if (code != null && !code.isBlank()) throw invalid("Sign in to use earned coins.");
                 return;
             }
+            lockPolicyForRead();
             if (!order.isLoyaltyEnrolled()) {
+                lock(owner.environment(), owner.subject());
+                var benefit = badges.benefit(owner.environment(), owner.subject());
+                order.setLoyaltyBadgeBonusPercent(benefit.percent());
+                order.setLoyaltyBadgeName(benefit.name());
                 order.setLoyaltyEarningRupeesPerCoin(rules.getRupeesPerCoin());
                 order.setLoyaltyQualifyingMinimum(rules.getQualifyingSubtotal());
                 order.setLoyaltyWelcomeCoins(rules.getWelcomeCoins());
                 order.setLoyaltyExpiryDays(rules.getExpiryDays());
             }
-            lockPolicyForRead();
             order.setLoyaltyEnrolled(true);
             order.setLoyaltyEligibleSubtotal(eligibleSubtotal(order));
             if (code == null || code.isBlank()) return;
@@ -1391,9 +1448,23 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
      *
      * @param eligible the eligible
      * @param minimum the minimum
-     * @param coins the coins
+     * @param baseCoins normal coins after existing earning exclusions
+     * @param badgeBonusCoins the snapshotted tier bonus
      */
-    private record Earning(BigDecimal eligible, BigDecimal minimum, int coins) {}
+    private record Earning(
+            BigDecimal eligible, BigDecimal minimum, int baseCoins, int badgeBonusCoins) {
+        /** Returns the total of base earned coins and the snapshotted badge bonus. */
+        int coins() {
+            final long __gokulMethodStartedNanos =
+                    MethodTiming.start(LoyaltyService.Earning.class, "coins()");
+            try {
+                return Math.addExact(baseCoins, badgeBonusCoins);
+            } finally {
+                MethodTiming.finish(
+                        __gokulMethodStartedNanos, LoyaltyService.Earning.class, "coins()");
+            }
+        }
+    }
 
     /**
      * Excludeds promotions.
@@ -1448,7 +1519,10 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
                             : eligible.divideToIntegralValue(
                                             (BigDecimal) row.get("loyalty_earning_rupees_per_coin"))
                                     .intValueExact();
-            return new Earning(eligible, minimum, coins);
+            int bonus =
+                    com.gokulsweets.restaurant.badges.CustomerBadgeService.bonus(
+                            coins, (BigDecimal) row.get("loyalty_badge_bonus_percent"));
+            return new Earning(eligible, minimum, coins, bonus);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -1476,7 +1550,7 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
             var rows =
                     jdbc.queryForList(
                             """
-SELECT o.order_status,o.subtotal,o.loyalty_discount,o.rebate_discount_amount,o.loyalty_enrolled,o.loyalty_eligible_subtotal,o.loyalty_test_order,o.rebate_code,o.loyalty_earning_rupees_per_coin,o.loyalty_qualifying_minimum,o.loyalty_welcome_coins,o.loyalty_expiry_days,
+SELECT o.order_status,o.subtotal,o.loyalty_discount,o.rebate_discount_amount,o.loyalty_enrolled,o.loyalty_eligible_subtotal,o.loyalty_test_order,o.rebate_code,o.loyalty_earning_rupees_per_coin,o.loyalty_badge_bonus_percent,o.loyalty_badge_name,o.loyalty_qualifying_minimum,o.loyalty_welcome_coins,o.loyalty_expiry_days,
  EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='PAID') AS paid,
  EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='REFUNDED') AS refunded
 FROM orders o WHERE o.id=?
@@ -1591,17 +1665,29 @@ FROM orders o WHERE o.id=?
                         owner.environment(),
                         owner.subject());
             }
-            append(
-                    owner.environment(),
-                    owner.subject(),
-                    "earned:" + orderId,
-                    "EARNED",
-                    earned,
-                    orderId,
-                    "Paid completed order: eligible product spend ₹" + eligible,
-                    now().plus(Duration.ofDays(expiryDays)),
-                    null,
-                    expiryDays);
+            long earningId =
+                    append(
+                            owner.environment(),
+                            owner.subject(),
+                            "earned:" + orderId,
+                            "EARNED",
+                            earned,
+                            orderId,
+                            "Paid completed order: eligible product spend ₹"
+                                    + eligible
+                                    + (earning.badgeBonusCoins() > 0
+                                            ? "; "
+                                                    + earning.badgeBonusCoins()
+                                                    + " "
+                                                    + row.get("loyalty_badge_name")
+                                                    + " bonus coins"
+                                            : ""),
+                            now().plus(Duration.ofDays(expiryDays)),
+                            null,
+                            expiryDays,
+                            earning.badgeBonusCoins(),
+                            (String) row.get("loyalty_badge_name"));
+            if (earningId > 0) badges.snapshot(owner.environment(), owner.subject());
             if (welcome > 0
                     && eligible.compareTo(minimum) >= 0
                     && !exists(owner.environment(), owner.subject(), "welcome"))

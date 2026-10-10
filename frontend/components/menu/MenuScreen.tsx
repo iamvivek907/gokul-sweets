@@ -1,4 +1,5 @@
 "use client";
+import MenuToolbar from "./MenuToolbar";
 import {reportLoadingStage} from "@/lib/customerLoading";
 import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
@@ -1285,6 +1286,7 @@ export default function MenuScreen() {
                 </header>
 
 
+                <MenuToolbar enabled={phoneMenu}>
                 {mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
 
                 <div
@@ -1338,6 +1340,7 @@ export default function MenuScreen() {
                         )}
 
                 </div>
+                </MenuToolbar>
 
 
                 {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}

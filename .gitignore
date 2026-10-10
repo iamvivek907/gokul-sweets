@@ -64,3 +64,5 @@ print-agent/__pycache__/
 # Generated non-secret Windows print agent download
 frontend/public/downloads/gokul-print-agent.zip
 print-agent/key.dpapi
+
+print-agent/dist/

@@ -31,9 +31,10 @@ export default function MobileEdgeBack(){
    }
   };
   const cancel=()=>{reset();origin=null;};
+  document.addEventListener("scroll",cancel,{passive:true,capture:true});window.addEventListener("blur",cancel);document.addEventListener("visibilitychange",cancel);
   document.addEventListener("touchstart",start,{passive:true});document.addEventListener("touchmove",move,{passive:false});
   document.addEventListener("touchend",end);document.addEventListener("touchcancel",cancel);
-  return()=>{reset();document.removeEventListener("touchstart",start);document.removeEventListener("touchmove",move);document.removeEventListener("touchend",end);document.removeEventListener("touchcancel",cancel);};
+  return()=>{reset();document.removeEventListener("scroll",cancel,true);window.removeEventListener("blur",cancel);document.removeEventListener("visibilitychange",cancel);document.removeEventListener("touchstart",start);document.removeEventListener("touchmove",move);document.removeEventListener("touchend",end);document.removeEventListener("touchcancel",cancel);};
  },[pathname]);
  return null;
 }
