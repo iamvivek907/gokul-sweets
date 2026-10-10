@@ -1,5 +1,5 @@
 "use client";
-import MenuToolbar from "./MenuToolbar";
+import MenuToolbar,{measureMenuToolbar} from "./MenuToolbar";
 import {reportLoadingStage} from "@/lib/customerLoading";
 import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
@@ -796,6 +796,8 @@ export default function MenuScreen() {
             if(!section)return;
             completedBrowseScroll.current=browseScroll;
             const disclosure=section.querySelector("details");if(disclosure)disclosure.open=true;
+            const toolbar=document.querySelector<HTMLElement>(".mobile-menu-sticky-tools");
+            if(phoneMenu&&toolbar)measureMenuToolbar(toolbar);
             section.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});
         });
         return()=>cancelAnimationFrame(frame);

@@ -47,7 +47,8 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
  const before={menu:menuReads,pickup:pickupReads};const timings=[];
  for(let i=0;i<12;i++){
   const started=Date.now();await button.click();
-  await page.waitForFunction(()=>{const n=document.getElementById('menu-category-10');return n.getBoundingClientRect().top<200&&document.body.style.position!== 'fixed';});
+  await page.waitForFunction(()=>{const n=document.getElementById('menu-category-10');const tools=document.querySelector('.mobile-menu-sticky-tools');const top=n.getBoundingClientRect().top,bottom=tools.getBoundingClientRect().bottom;return top>=bottom-1&&top<=bottom+24&&document.body.style.position!=='fixed';});
+  assert.equal(await page.locator('#menu-category-10 .gokul-menu-category-heading h3').evaluate(n=>{const r=n.getBoundingClientRect();return n.contains(document.elementFromPoint(r.x+r.width/2,r.y+r.height/2));}),true,'category heading remains visible below the sticky tools');
   timings.push(Date.now()-started);assert.equal(await page.locator('.gokul-menu-category-section').count(),1);
  }
  assert.equal(menuReads,before.menu,'collection switches never refetch the catalog');
@@ -55,8 +56,8 @@ try{for(const [width,enabled,constrained] of [[320,true,false],[390,true,false],
  assert.deepEqual(errors,[],'large-menu repeated taps produce no page errors');
  await page.getByLabel('Find a favourite',{exact:true}).fill('Item 1-1');
  await button.click();
- await page.waitForFunction(()=>document.getElementById('menu-category-10')?.getBoundingClientRect().top<200);
+ await page.waitForFunction(()=>{const top=document.getElementById('menu-category-10')?.getBoundingClientRect().top,bottom=document.querySelector('.mobile-menu-sticky-tools').getBoundingClientRect().bottom;return top>=bottom-1&&top<=bottom+24;});
  assert.equal(await page.getByLabel('Find a favourite',{exact:true}).inputValue(),'','jump clears a search that would hide the category');
  await page.getByRole('button',{name:'All',exact:true}).click();await page.locator('#gokul-menu-items').scrollIntoViewIfNeeded();
- releaseHistory();releaseRatings();releaseAvailability();releasePreview();await context.close();
+ releaseHistory();releaseRatings();releaseAvailability();releasePreview();await context.close();console.log(`Measured category jumps and repeated filters passed at ${width}px`);
 }}finally{await browser.close();}

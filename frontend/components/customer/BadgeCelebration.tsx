@@ -21,7 +21,7 @@ export default function BadgeCelebration(){
   const schedule=(delay=500)=>{if(active&&Date.now()+delay<deadline)timer=setTimeout(attempt,delay);};
   const attempt=async()=>{
    if(!active||Date.now()>=deadline)return;
-   if(document.visibilityState!=='visible'||document.querySelector('dialog[open],[aria-modal=true]')){schedule();return;}
+   if(document.visibilityState!=='visible'||document.querySelector('dialog[open],[aria-modal=true],:popover-open')){schedule();return;}
    try{
     if(!verified){
      const remaining=30000-(Date.now()-lastAttempt);
@@ -31,7 +31,7 @@ export default function BadgeCelebration(){
      if(!active||!session.authenticated)return;
      verified=true;
     }
-    if(document.visibilityState!=='visible'||document.querySelector('dialog[open],[aria-modal=true]')){schedule();return;}
+    if(document.visibilityState!=='visible'||document.querySelector('dialog[open],[aria-modal=true],:popover-open')){schedule();return;}
     const next=await claimBadge(AbortSignal.any([c.signal,AbortSignal.timeout(8000)]));
     // Keep a leased award if another dialog opens while the request is in flight.
     if(active&&next)setAward(next);
@@ -46,7 +46,7 @@ export default function BadgeCelebration(){
   let timer:ReturnType<typeof setTimeout>;
   const present=()=>{
    if(Date.now()>=deadline)return;
-   if(document.visibilityState!=='visible'||document.querySelector('dialog[open],[aria-modal=true]')){
+   if(document.visibilityState!=='visible'||document.querySelector('dialog[open],[aria-modal=true],:popover-open')){
     if(Date.now()+500<deadline)timer=setTimeout(present,500);
     return;
    }

@@ -6,7 +6,7 @@ const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailab
 const badge={id:1,code:'REGULAR',name:'Gokul regular',description:'Thank you for coming back',requiredOrders:2,minimumSubtotal:500,bonusPercent:25,appearance:'GOLD',active:true,version:1,qualifyingOrders:2,earned:true};
 try{for(const width of [320,390,640,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
- let shown=false,claims=0,acks=0,orders=0,walletDelay=false,rewardsEnabled=true;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let shown=false,claims=0,acks=0,orders=0,walletDelay=false,rewardsEnabled=true,walletFailures=0;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');},branch);
  await context.route('**/api/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname;const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,x-staff-csrf','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Expose-Headers':'X-Staff-CSRF','X-Staff-CSRF':'test-csrf'};
@@ -16,11 +16,12 @@ try{for(const width of [320,390,640,1280]){
   else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Vivek',phone:'+919876543210'};
   else if(path==='/api/customer/identity/account')json={completedOrders:2,paidOrders:2,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
   else if(path==='/api/customer/identity/badges')json={badges:[badge,{...badge,id:2,code:'FAVOURITE',name:'Favourite',requiredOrders:5,qualifyingOrders:2,earned:false,bonusPercent:40}],current:badge};
-  else if(path==='/api/customer/identity/badges/celebration'){claims++;if(width===390&&!shown)await page.evaluate(()=>{const d=document.createElement('dialog');d.id='claim-race-dialog';document.body.append(d);d.showModal();});json=shown?null:{awardId:1,claimId:'claim-1',...badge};}
+  else if(path==='/api/customer/identity/badges/celebration'){claims++;if(width===390&&!shown)await page.evaluate(()=>{const d=document.createElement('dialog');d.id='claim-race-dialog';document.body.append(d);d.showModal();});if(width===640&&!shown)await page.evaluate(()=>document.querySelector('[popover]').showPopover());json=shown?null:{awardId:1,claimId:'claim-1',...badge};}
   else if(path==='/api/customer/identity/badges/1/acknowledge'){shown=true;acks++;return route.fulfill({status:204,headers});}
   else if(path==='/api/customer/identity/orders/page')json={orders:[],nextBefore:null};
   else if(path==='/api/customer/identity/orders')json=[];
   else if(path==='/api/customer/identity/rewards'){
+   if(walletFailures>0){walletFailures--;return route.fulfill({status:503,json:{message:'Temporary outage'},headers});}
    if(walletDelay)await new Promise(r=>setTimeout(r,2500));
    json={policyVersion:'1',balance:30,debt:0,pendingCoins:0,completedOrders:2,rewards:[{code:'SAVE',name:'Sweet saving',coins:30,discount:50,minimumSubtotal:149,eligible:true}],history:[{id:1,kind:'EARNED',coins:30,badgeBonusCoins:5,badgeName:'Gokul regular',reason:'Order completed',createdAt:new Date().toISOString()}],maximumRedemptionPercent:10,terms:'Fees are excluded'};
   }
@@ -37,16 +38,21 @@ try{for(const width of [320,390,640,1280]){
  assert.equal(await page.locator('.configured-badge.is-locked').getByRole('img',{name:/earned Gokul recognition/}).count(),0);
  await page.evaluate(()=>{const d=document.createElement('dialog');d.id='onboarding-dialog';document.body.append(d);d.showModal();});
  await page.waitForTimeout(3000);assert.equal(claims,0,'no claim while another dialog is open');
- await page.evaluate(()=>document.getElementById('onboarding-dialog').remove());
+ await page.evaluate(width=>{document.getElementById('onboarding-dialog').remove();if(width===1280)document.querySelector('[popover]').showPopover();},width);
+ if(width===1280){await page.waitForTimeout(1500);assert.equal(claims,0,'branch selection postpones badge claims');assert.equal(await page.locator(':popover-open').count(),1,'branch picker remains open');await page.evaluate(()=>document.querySelector(':popover-open').hidePopover());}
+ if(width===640){await page.locator(':popover-open').waitFor({state:'attached'});await page.waitForTimeout(700);assert.equal(acks,0,'a badge claimed during branch selection is not acknowledged prematurely');assert.equal(await page.locator('.badge-celebration[open]').count(),0);await page.evaluate(()=>document.querySelector(':popover-open').hidePopover());}
  if(width===390){await page.locator('#claim-race-dialog[open]').waitFor({state:'attached'});await page.waitForTimeout(700);assert.equal(acks,0,'a claimed award is not acknowledged behind another dialog');await page.evaluate(()=>document.getElementById('claim-race-dialog').remove());}
  await page.getByRole('dialog',{name:'You’ve earned Gokul regular',exact:true}).waitFor();assert.match(await page.locator('.badge-celebration').innerText(),/\+25% bonus/);
  assert.ok(acks>=1);const medal=page.locator('.badge-celebration .badge-medallion');const r=await medal.boundingBox();assert.ok(Math.abs(r.width-r.height)<1);assert.ok(r.width>=80);
  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.badge-celebration').evaluate(n=>getComputedStyle(n).animationName),'none');
  await page.locator('.badge-celebration').getByRole('button',{name:'Continue',exact:true}).click();await page.reload();await page.locator('.configured-badge').first().waitFor();await page.waitForTimeout(3000);assert.equal(await page.locator('.badge-celebration[open]').count(),0,'acknowledged achievement never replays on document refresh');
- walletDelay=true;const start=Date.now();await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();assert.ok(Date.now()-start<2200,'order content does not await optional rewards');await page.locator('.order-reward-guidance').waitFor();
+ walletDelay=true;walletFailures=1;const start=Date.now();await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();assert.ok(Date.now()-start<2200,'order content does not await optional rewards');await page.locator('.order-reward-guidance').waitFor();
  await page.getByText('No orders yet',{exact:true}).waitFor();
  await page.waitForTimeout(500); // Let the existing responsive Orders shell settle before measuring the optional wallet.
+ await page.getByRole('heading',{name:'Coins unavailable',exact:true}).waitFor();
+ assert.equal(await page.locator('.order-reward-guidance').getByRole('button',{name:'Retry loading coins',exact:true}).isEnabled(),true);
  const before=(await page.getByText('No orders yet',{exact:true}).boundingBox()).y;
+ await page.getByRole('button',{name:'Retry loading coins',exact:true}).click();
  await page.getByRole('heading',{name:'30 coins available',exact:true}).waitFor();
  const after=(await page.getByText('No orders yet',{exact:true}).boundingBox()).y;
  assert.ok(Math.abs(after-before)<1,`late wallet moved order history ${after-before}px`);

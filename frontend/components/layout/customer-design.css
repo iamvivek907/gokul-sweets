@@ -337,3 +337,9 @@
  .future-storefront[data-customer-design=reference] .pickup-attention-message{position:absolute;top:100%;left:0;right:0;background:#fff5db;box-shadow:0 4px 8px #80581712;font-size:12px;font-weight:650;color:#805817;padding:5px 8px}
  .future-storefront .pickup-attention-action{font-size:11px;color:#8f1838;background:transparent;border:0;text-decoration:underline;padding:4px 8px;min-height:44px}
 }
+
+@media(max-width:640px){
+ .future-storefront[data-premium-menu=true] .gokul-menu-category-section,
+ .future-storefront[data-premium-menu=true] #gokul-menu-items{scroll-margin-top:var(--menu-scroll-offset,120px)}
+ .future-storefront[data-premium-menu=true] .gokul-menu-product-card button{scroll-margin-top:var(--menu-scroll-offset,120px);scroll-margin-bottom:180px}
+}
