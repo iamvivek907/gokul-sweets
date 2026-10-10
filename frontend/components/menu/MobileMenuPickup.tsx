@@ -12,7 +12,7 @@ import {cartPickupOptions,menuPickupOptions} from "@/lib/menuPickupOptions";
 import {T,useLanguage,translate} from "@/lib/language";
 import type {MenuProduct} from "@/types/menu";
 import type {PickupSelection} from "@/types/pickup";
-const Dialog=dynamic(()=>import("@/components/checkout/MobilePickupDialog"));
+const Dialog=dynamic(()=>import("@/components/checkout/MobilePickupDialog"),{loading:()=> <span className="sr-only" role="status"><T text="Checking times…"/></span>});
 export default function MobileMenuPickup({compactHeader=false,branchId,products,today,days,selection,date,expired,selectionUnavailable=false,noPickupMessage,availabilityError,onRetry,automatic=false,findingSoonest=false,onChoosingChange}:{compactHeader?:boolean;branchId:number;products:MenuProduct[];today:string;days:number;selection:PickupSelection|null;date?:string|null;expired:boolean;selectionUnavailable?:boolean;noPickupMessage?:string|null;availabilityError?:string|null;onRetry?:()=>void;automatic?:boolean;findingSoonest?:boolean;onChoosingChange?:(value:boolean)=>void}){
  const locale=useLanguage();
  const pickupRef=useRef<HTMLElement>(null);
@@ -52,14 +52,13 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
  const [cartIds,setCartIds]=useState<number[]>([]);
  const controller=useRef<AbortController|null>(null);
  const [pickerTrigger,setPickerTrigger]=useState<HTMLElement|null>(null);
- const [pickerScroll,setPickerScroll]=useState<{left:number;top:number}|undefined>(undefined);
  useEffect(()=>{
   let active=true;
   queueMicrotask(()=>{if(active){setBusy(false);setOpen(false);setData(null);setError("");onChoosingChange?.(false);}});
   return()=>{active=false;controller.current?.abort();};
  },[branchId,request,onChoosingChange]);
  async function choose(trigger:HTMLElement){
-  if(busy)return;
+  if(busy||open)return;
   setPickerTrigger(trigger);
   onChoosingChange?.(true);setBusy(true);setError("");const c=new AbortController();controller.current=c;
   try{
@@ -71,8 +70,6 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
    const signal=AbortSignal.any([c.signal,AbortSignal.timeout(15000)]);
    const value=items.length?await checkCartAvailability(branchId,today,days+1,items,signal):await discoverPickupDates(branchId,today,days+1,signal);
    if(!c.signal.aborted&&branchSnapshot===getStoredBranchSnapshot()&&cartSnapshot===getCartSnapshot()){
-    // Customers may keep browsing while the request runs; preserve where they are now.
-    setPickerScroll({left:window.scrollX,top:window.scrollY});
     setCartIds(items.map(item=>item.productId));setData(value);setOpen(true);
    }else onChoosingChange?.(false);
   }
@@ -88,13 +85,13 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
  const compactLabel=expired||selectionUnavailable||!selection?(findingSoonest?translate('Finding soonest pickup…',locale):translate('Choose pickup date & time',locale)):`${namedDate}`;
  const compactError=error||availabilityError;
  const compactTime=selection&&!expired&&!selectionUnavailable?`${timeLabel(selection.slot.startTime)}–${timeLabel(selection.slot.endTime)} IST`:translate('Your cart is saved',locale);
- return <>{headerHost&&createPortal(<div className="menu-compact-header" aria-label="Menu pickup header" aria-hidden={!compact} inert={!compact}><button className="menu-compact-pickup" data-ordering-target={compact?"pickup":undefined} type="button" disabled={busy} onClick={event=>{if(availabilityError&&!error){onRetry?.();return;}void choose(event.currentTarget);}} aria-label={`${compactLabel} · ${busy?translate('Checking times…',locale):compactError?translate('Pickup times unavailable. Tap to retry.',locale):compactTime}`}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><span><strong>{compactLabel}</strong><small role={compactError?"alert":undefined}>{busy?<T text="Checking times…"/>:compactError?<T text="Pickup times unavailable. Tap to retry."/>:compactTime}</small></span><span aria-hidden="true">⌄</span></button><button className="menu-compact-search" type="button" aria-label="Search the menu" onClick={searchMenu}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg></button></div>,headerHost)}<section ref={pickupRef} className="mobile-menu-pickup" aria-label="Menu pickup time"><svg className="reference-pickup-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><div><span><T text={automatic?"Soonest pickup":"PICKUP TIME"}/></span><strong>{selection?`${namedDate} · ${timeLabel(selection.slot.startTime)}–${timeLabel(selection.slot.endTime)} IST`:findingSoonest?<T text="Finding soonest pickup…"/>:displayDate?`${namedDate} · ${translate("Time not selected",locale)}`:<T text="Choose pickup date & time"/> }</strong></div><button data-ordering-target="pickup" type="button" disabled={busy} onClick={event=>void choose(event.currentTarget)}><T text={busy?"Checking times…":selection?"Change time":"Choose time"}/></button>
+ return <>{headerHost&&createPortal(<div className="menu-compact-header" aria-label="Menu pickup header" aria-hidden={!compact} inert={!compact}><button className="menu-compact-pickup" data-ordering-target={compact?"pickup":undefined} type="button" disabled={busy||open} onClick={event=>{if(availabilityError&&!error){onRetry?.();return;}void choose(event.currentTarget);}} aria-label={`${compactLabel} · ${busy?translate('Checking times…',locale):compactError?translate('Pickup times unavailable. Tap to retry.',locale):compactTime}`}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><span><strong>{compactLabel}</strong><small role={compactError?"alert":undefined}>{busy?<T text="Checking times…"/>:compactError?<T text="Pickup times unavailable. Tap to retry."/>:compactTime}</small></span><span aria-hidden="true">⌄</span></button><button className="menu-compact-search" type="button" aria-label="Search the menu" onClick={searchMenu}><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg></button></div>,headerHost)}<section ref={pickupRef} className="mobile-menu-pickup" aria-label="Menu pickup time"><svg className="reference-pickup-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 2v6m8-6v6M4 10h16"/></svg><div><span><T text={automatic?"Soonest pickup":"PICKUP TIME"}/></span><strong>{selection?`${namedDate} · ${timeLabel(selection.slot.startTime)}–${timeLabel(selection.slot.endTime)} IST`:findingSoonest?<T text="Finding soonest pickup…"/>:displayDate?`${namedDate} · ${translate("Time not selected",locale)}`:<T text="Choose pickup date & time"/> }</strong></div><button data-ordering-target="pickup" type="button" disabled={busy||open} onClick={event=>void choose(event.currentTarget)}><T text={busy?"Checking times…":selection?"Change time":"Choose time"}/></button>
  {expired&&<p className="menu-pickup-conflict" role="status"><T text="Your previous pickup has passed. Choose a new time; your cart is saved."/></p>}
  {selectionUnavailable&&<p className="menu-pickup-conflict" role="status"><T text="Your saved pickup time no longer fits your cart. Adjust items or choose another time. Your cart is saved."/></p>}
  {noPickupMessage&&<p className="menu-pickup-conflict" role="status"><T text={noPickupMessage}/></p>}
  {availabilityError&&<p role="alert"><T text={availabilityError}/> <button type="button" onClick={onRetry}><T text="Retry availability"/></button></p>}
  {error&&<p role="alert">{error}</p>}
- {open&&data&&<Dialog restoreScroll={pickerScroll} restoreFocus={pickerTrigger} advisory today={today} dates={data.dates} options={cartIds.length?cartPickupOptions(data):menuPickupOptions(data,ids)} chosen={selection} initialDate={date??today} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);onChoosingChange?.(false);}} onConfirm={async value=>{
+ {open&&data&&<Dialog restoreFocus={pickerTrigger} advisory today={today} dates={data.dates} options={cartIds.length?cartPickupOptions(data):menuPickupOptions(data,ids)} chosen={selection} initialDate={date??today} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);onChoosingChange?.(false);}} onConfirm={async value=>{
   const branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot(),cartSnapshot=getCartSnapshot();
   const cart=parseCart(cartSnapshot);
   if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");

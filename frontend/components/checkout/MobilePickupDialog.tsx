@@ -9,12 +9,11 @@ import type {PickupSelection} from "@/types/pickup";
 const dateLabel=(date:string,locale:"en"|"hi",today:string)=>{const named=new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"Asia/Kolkata"}).format(new Date(`${date}T12:00:00+05:30`));const tomorrow=indiaToday(new Date(Date.parse(`${today}T12:00:00+05:30`)+86400000));return `${date===today?`${translate("Today",locale)} · `:date===tomorrow?`${translate("Tomorrow",locale)} · `:""}${named}`;};
 const money=(amount:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(amount);
 
-export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,initialDate,restoreScroll,restoreFocus,today=indiaToday()}:{
- restoreFocus?:HTMLElement|null;restoreScroll?:{left:number;top:number};today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
+export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,initialDate,restoreFocus,today=indiaToday()}:{
+ restoreFocus?:HTMLElement|null;today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
  onClose:()=>void;onConfirm:(selection:PickupSelection)=>Promise<boolean>;
 }){
  const locale=useLanguage();
- const initialScroll=useRef(restoreScroll);
  const initialFocus=useRef(restoreFocus);
  const dialog=useRef<HTMLDialogElement>(null);
  const [date,setDate]=useState(()=>{
@@ -34,7 +33,8 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
   // Capture the actual opener before its asynchronous load disables it and loses focus.
   const previousFocus=initialFocus.current??(document.activeElement instanceof HTMLElement?document.activeElement:null);
   const pageUrl=location.href;
-  const scroll=initialScroll.current??{left:window.scrollX,top:window.scrollY};
+  // The local loading boundary keeps the menu in flow until the dialog is ready.
+  const scroll={left:window.scrollX,top:window.scrollY};
   const lock=document.documentElement,previous=lock.style.overflow;
   lock.style.overflow="hidden";surface.showModal();window.scrollTo({...scroll,behavior:"instant"});
   return()=>{

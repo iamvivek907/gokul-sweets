@@ -7,14 +7,17 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
 const products=Array.from({length:30},(_,i)=>({id:i+1,name:i===0?'Rasgulla':`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:15,available:true,saleMode:'UNIT',imageUrl:'/arrival-mithai.webp'}));
 const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false};
+const isPickerRequest=request=>request.method()!=='OPTIONS'&&(new URL(request.url()).pathname.endsWith('/pickup-discovery')||(new URL(request.url()).pathname.endsWith('/availability')&&!request.url().includes('menuPreview=true')));
 const browser=await chromium.launch({headless:true});
-try{for(const [width,enabled,expired=false,reduced=true] of [[320,true],[390,true],[640,true],[1280,true],[390,false],[390,true,true],[390,true,false,false]]){
- const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:reduced?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let discoveryFails=false,previewFails=false,previewReads=0,discoveryGate=null;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+try{for(const [width,enabled,expired=false,reduced=true,cold=false] of [[320,true],[390,true],[640,true],[1280,true],[390,false],[390,true,true],[390,true,false,false],[390,true,false,false,true]]){
+ const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:reduced?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let discoveryFails=false,previewFails=false,previewReads=0,pickerGate=null;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let releaseChunk,notifyChunk;const chunkGate=new Promise(resolve=>{releaseChunk=resolve;}),chunkRequested=new Promise(resolve=>{notifyChunk=resolve;});
+ if(cold)await context.route('**/_next/static/chunks/*.js',async route=>{const response=await route.fetch();const body=await response.text();if(body.includes('mobile-pickup-title')){notifyChunk();await chunkGate;}await route.fulfill({response,body});});
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/api/**',async route=>{
   const path=new URL(route.request().url()).pathname;let json=[];if(path.endsWith('/availability')&&route.request().url().includes('menuPreview=true')){previewReads++;if(previewFails)return route.fulfill({status:503,json:{message:'Temporary outage'},headers});}
   if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
-  if(path.endsWith('/pickup-discovery')&&discoveryGate)await discoveryGate;
+  if(isPickerRequest(route.request())&&pickerGate)await pickerGate;
   if(path.endsWith('/pickup-discovery')&&discoveryFails)return route.fulfill({status:503,json:{message:'Temporary outage'},headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:enabled,checkoutExperienceV2:enabled,contextualStorefrontV2:true,smartAvailability:true,today:date,futureOrderingDays:30};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
@@ -45,18 +48,22 @@ try{for(const [width,enabled,expired=false,reduced=true] of [[320,true],[390,tru
   previewFails=true;await page.evaluate(()=>window.dispatchEvent(new Event('online')));await page.locator('.menu-compact-pickup [role=alert]').waitFor();
   const before=previewReads;previewFails=false;const retryResponse=page.waitForResponse(response=>response.url().includes('/availability?menuPreview=true'));await page.locator('.menu-compact-pickup').click();await retryResponse;await page.waitForFunction(()=>!document.querySelector('.menu-compact-pickup [role=alert]'));assert.ok(previewReads>before,'retry repeats authoritative menu availability');assert.equal(await page.locator('.mobile-pickup-dialog').count(),0,'availability retry does not open an unrelated picker');
  }
- const scroll=await page.evaluate(()=>scrollY);
+ let scroll=await page.evaluate(()=>scrollY);
  const saved=await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot'));
- await page.locator('.menu-compact-pickup').click();const picker=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});await picker.waitFor();await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),saved,'cancelling compact pickup preserves selection');
+ // Measure after retry text removal and browser scroll anchoring, while the request is held.
+ let releaseInitial;pickerGate=new Promise(resolve=>{releaseInitial=resolve;});const initialRequest=page.waitForRequest(isPickerRequest);
+ await page.locator('.menu-compact-pickup').click();await initialRequest;await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));scroll=await page.evaluate(()=>scrollY);releaseInitial();pickerGate=null;const picker=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});
+ if(cold){await chunkRequested;assert.ok((await page.locator('#gokul-product-1').boundingBox()).width>0,'cold dialog download never hides the menu');assert.equal(await page.locator('.menu-compact-pickup').isDisabled(),true,'pending dialog cannot be opened twice');await page.evaluate(()=>scrollTo({top:2500,behavior:'instant'}));scroll=await page.evaluate(()=>scrollY);releaseChunk();}
+ await picker.waitFor();if(cold)assert.ok(Math.abs((await page.evaluate(()=>scrollY))-scroll)<2,'cold dialog opening keeps the latest scroll');await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),saved,'cancelling compact pickup preserves selection');
  await picker.waitFor({state:'hidden'});assert.equal(await page.locator('.menu-compact-pickup').evaluate(n=>document.activeElement===n),true,'closing pickup restores the opener without scrolling');await page.waitForFunction(top=>Math.abs(scrollY-top)<24,scroll);
  assert.ok(Math.abs((await page.evaluate(()=>scrollY))-scroll)<24,'pickup cancellation preserves menu scroll');
  if(width===390&&!expired&&reduced){
-  let releaseDiscovery;discoveryGate=new Promise(resolve=>{releaseDiscovery=resolve;});
-  const requested=page.waitForRequest(request=>new URL(request.url()).pathname.endsWith('/pickup-discovery')&&request.method()==='GET');
+  let releaseDiscovery;pickerGate=new Promise(resolve=>{releaseDiscovery=resolve;});
+  const requested=page.waitForRequest(isPickerRequest);
   await page.locator('.menu-compact-pickup').click();await requested;
   await page.evaluate(()=>scrollTo({top:2500,behavior:'instant'}));const latestScroll=await page.evaluate(()=>scrollY);
   assert.ok(latestScroll>scroll+500,'customer continues browsing while pickup times load');
-  releaseDiscovery();discoveryGate=null;await picker.waitFor();
+  releaseDiscovery();pickerGate=null;await picker.waitFor();
   assert.ok(Math.abs((await page.evaluate(()=>scrollY))-latestScroll)<2,'opening a delayed picker keeps the latest browsing position');
   await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();await picker.waitFor({state:'hidden'});
   assert.ok(Math.abs((await page.evaluate(()=>scrollY))-latestScroll)<2,'closing a delayed picker keeps the latest browsing position');
