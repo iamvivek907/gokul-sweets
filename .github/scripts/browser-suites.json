@@ -29,6 +29,7 @@
     "tests/menu-discovery.browser.mjs",
     "tests/menu-pickup-guidance.browser.mjs",
     "tests/menu-review-regressions.browser.mjs",
+    "tests/menu-compact-header.browser.mjs",
     "tests/menu-layout-recovery.browser.mjs",
     "tests/premium-menu.browser.mjs",
     "tests/mobile-ordering-polish.browser.mjs",

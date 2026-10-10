@@ -1289,7 +1289,7 @@ export default function MenuScreen() {
 
 
                 <MenuToolbar enabled={phoneMenu}>
-                {mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
+                {mobileFeatures?.smartAvailability&&<MobileMenuPickup compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
 
                 <div
                     className="gokul-menu-tools
