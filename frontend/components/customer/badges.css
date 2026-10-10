@@ -23,10 +23,16 @@
 .future-storefront .badge-celebration .badge-benefit{margin:22px 0 12px}
 .future-storefront .badge-celebration small{display:block;line-height:1.5;color:#706b67}
 .future-storefront .badge-celebration button{display:block;width:100%;min-height:48px;margin-top:24px;border:0;border-radius:14px;background:#8f1838!important;color:#fff!important;font-weight:700}
-.future-storefront .order-reward-guidance{margin:18px 0;padding:18px;border:1px solid #d6e7db;border-radius:18px;background:#f1faf5;color:#22513a}
+.future-storefront .order-reward-guidance{margin:18px 0;padding:0 16px;border:1px solid #d6e7db;border-radius:18px;background:#f1faf5;color:#22513a}
 .future-storefront .order-reward-guidance h2{font-size:17px;font-weight:700}.future-storefront .order-reward-guidance p{font-size:13px;line-height:1.6;margin-top:6px}.future-storefront .order-reward-guidance a{display:inline-block;margin-top:10px;font-weight:650;text-decoration:underline}
 @keyframes badge-arrival{from{opacity:0;transform:translateY(14px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes badge-shine{50%{opacity:.5;transform:translateY(-3px)}}
 @media(prefers-reduced-motion:reduce){.future-storefront .badge-celebration[open],.future-storefront .badge-celebration-stars{animation:none}}
 
 @media(min-width:641px){.future-storefront h1>.account-tier-mark{display:none}}
+
+.future-storefront .order-reward-summary{height:56px;display:flex;align-items:center;gap:12px}
+.future-storefront .order-reward-summary h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:15px;margin:0}
+.future-storefront .order-reward-summary button{flex:none;min-height:44px;padding:0 8px;background:transparent;color:#22513a;border:0;font-weight:650}
+.future-storefront .order-reward-summary button:disabled{opacity:.5}
+.future-storefront .order-reward-details{padding-bottom:16px}
