@@ -61,6 +61,7 @@ try{for(const [width,enabled,expired=false,reduced=true,cold=false,classic=false
  await picker.waitFor({state:'hidden'});assert.equal(await page.locator('.menu-compact-pickup').evaluate(n=>document.activeElement===n),true,'closing pickup restores the opener without scrolling');await page.waitForFunction(top=>Math.abs(scrollY-top)<24,scroll);
  assert.ok(Math.abs((await page.evaluate(()=>scrollY))-scroll)<24,'pickup cancellation preserves menu scroll');
  if(width===390&&!expired&&reduced){
+  const pickupHeight=await page.locator('.mobile-menu-pickup').evaluate(n=>n.getBoundingClientRect().height);
   let releaseDiscovery;pickerGate=new Promise(resolve=>{releaseDiscovery=resolve;});
   const requested=page.waitForRequest(isPickerRequest);
   await page.locator('.menu-compact-pickup').click();await requested;
@@ -69,9 +70,11 @@ try{for(const [width,enabled,expired=false,reduced=true,cold=false,classic=false
   await page.evaluate(()=>scrollTo({top:2500,behavior:'instant'}));
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const latestScroll=await page.evaluate(()=>scrollY);
+  assert.equal(await page.locator('.mobile-menu-pickup').evaluate(n=>n.getBoundingClientRect().height),pickupHeight,'loading pickup times preserves the card height');
   assert.ok(latestScroll>scroll+500,'customer continues browsing while pickup times load');
   releaseDiscovery();pickerGate=null;await picker.waitFor();
   const openedScroll=await page.evaluate(()=>scrollY);
+  assert.equal(await page.locator('.mobile-menu-pickup').evaluate(n=>n.getBoundingClientRect().height),pickupHeight,'loaded pickup times preserve the card height');
   assert.ok(Math.abs(openedScroll-latestScroll)<2,`opening a delayed picker keeps the latest browsing position (${latestScroll} → ${openedScroll})`);
   await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();await picker.waitFor({state:'hidden'});
   assert.ok(Math.abs((await page.evaluate(()=>scrollY))-latestScroll)<2,'closing a delayed picker keeps the latest browsing position');
