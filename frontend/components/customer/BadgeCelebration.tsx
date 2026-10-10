@@ -10,6 +10,7 @@ let lastAttempt=0;
 /** Optional recognition runs after launch and never gates menu, OTP, checkout or order recovery. */
 export default function BadgeCelebration(){
  const path=usePathname(),features=useStorefrontFeatures(),dialog=useRef<HTMLDialogElement>(null);
+ const presented=useRef<Award|null>(null);
  const [award,setAward]=useState<Award|null>(null),[revision,setRevision]=useState(0);
  const allowed=features?.customerAccountHub===true&&!/^\/(checkout|orders|cart|admin|staff)(\/|$)/.test(path);
  useEffect(()=>subscribeCustomerIdentityChanges(()=>{lastAttempt=0;setAward(null);setRevision(v=>v+1);},{revalidateOnResume:true}),[]);
@@ -42,6 +43,8 @@ export default function BadgeCelebration(){
  },[allowed,path,revision]);
  useEffect(()=>{
   if(!allowed||!award){dialog.current?.close();return;}
+  // An effect restart must not present an award already shown in this session.
+  if(presented.current===award)return;
   const surface=dialog.current,deadline=Date.now()+90000;
   let timer:ReturnType<typeof setTimeout>;
   const present=()=>{
@@ -52,7 +55,8 @@ export default function BadgeCelebration(){
    }
    if(!surface)return;
    surface.showModal();
-   // Acknowledge only after presentation; the server owns replay prevention.
+   presented.current=award;
+   // Acknowledge only after presentation; the server owns durable replay prevention.
    void acknowledgeBadge(award).catch(()=>{});
   };
   present();
