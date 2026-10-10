@@ -13,7 +13,7 @@
 .future-storefront[data-customer-route] .notification-filters{padding:12px;background:#f5f6fa;border-radius:14px}
 .future-storefront[data-customer-route] .notification-toolbar>div button{border-color:#e7e9ed;background:#fff;color:#454b55;padding:6px 12px}
 @media(max-width:640px){
- .future-storefront[data-customer-route][data-edge-back] .page-content{translate:var(--customer-edge-offset,0px) 0;box-shadow:-10px 0 24px #20242b0a}
+ .future-storefront[data-customer-route][data-edge-back] .mobile-page-back{outline:2px solid #980c31;outline-offset:3px}
  .future-storefront[data-customer-route]:has(.mobile-checkout,.mobile-order-detail,.mobile-orders-list)>.page-content{padding-bottom:0!important}
  .future-storefront[data-customer-route]:has(.mobile-checkout)>.customer-site-footer{display:none}
  .future-storefront[data-customer-route] .mobile-checkout{background:#f4f5fa;padding-bottom:125px}

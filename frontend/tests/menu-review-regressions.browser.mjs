@@ -37,6 +37,15 @@ try{for(const width of [320,390,640]){
  await load();
  await page.waitForFunction(()=>document.querySelector('#gokul-product-113 button[aria-label="Add Unavailable meal to cart"]')?.disabled===true);
  assert.deepEqual([...new Set(requests.flatMap(items=>items.map(p=>p.productId)))].sort((a,b)=>a-b),Array.from({length:115},(_,i)=>i+1),'full catalogue checked, including Snacks after 112 sweets');
+ // Both controls stay below the measured header; blocked Add never changes the cart.
+ await page.evaluate(()=>window.scrollTo({top:350,behavior:'instant'}));
+ const toolbar=page.locator('.mobile-menu-sticky-tools');
+ const geometry=await toolbar.evaluate(n=>({top:n.getBoundingClientRect().top,header:document.querySelector('.customer-site-header').getBoundingClientRect().bottom}));
+ assert.ok(Math.abs(geometry.top-geometry.header)<3,`sticky toolbar follows the header at ${width}px: ${JSON.stringify(geometry)}`);
+ const blocked=page.locator('#gokul-product-113'),change=blocked.getByRole('button',{name:'Change pickup date',exact:true});await change.scrollIntoViewIfNeeded();await page.waitForTimeout(150);await change.click();
+ await page.waitForFunction(()=>document.querySelector('.mobile-menu-sticky-tools')?.getAttribute('data-pickup-attention')==='true');
+ await page.evaluate(()=>window.scrollBy(0,10));await page.waitForFunction(()=>!document.querySelector('.mobile-menu-sticky-tools[data-pickup-attention]'));
+ assert.equal(await blocked.getByRole('button',{name:'Add Unavailable meal to cart',exact:true}).isDisabled(),true);
  // Rated sweet and snack rows keep their own badge below their own price.
  for(const id of [1,113]){
   const card=page.locator(`#gokul-product-${id}`);await card.locator('.product-rating-summary').waitFor();

@@ -1,4 +1,5 @@
 "use client";
+import MenuToolbar,{measureMenuToolbar} from "./MenuToolbar";
 import {reportLoadingStage} from "@/lib/customerLoading";
 import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
@@ -795,6 +796,8 @@ export default function MenuScreen() {
             if(!section)return;
             completedBrowseScroll.current=browseScroll;
             const disclosure=section.querySelector("details");if(disclosure)disclosure.open=true;
+            const toolbar=document.querySelector<HTMLElement>(".mobile-menu-sticky-tools");
+            if(phoneMenu&&toolbar)measureMenuToolbar(toolbar);
             section.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});
         });
         return()=>cancelAnimationFrame(frame);
@@ -1285,6 +1288,7 @@ export default function MenuScreen() {
                 </header>
 
 
+                <MenuToolbar enabled={phoneMenu}>
                 {mobileFeatures?.smartAvailability&&<MobileMenuPickup key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
 
                 <div
@@ -1338,6 +1342,7 @@ export default function MenuScreen() {
                         )}
 
                 </div>
+                </MenuToolbar>
 
 
                 {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}

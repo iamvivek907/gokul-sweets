@@ -24,7 +24,7 @@ import {getMenu} from "@/services/menuApi";
 import {getVerifiedOrderPage, type VerifiedOrderPage} from "@/services/orderApi";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
-import {accountMilestones, currentMilestone} from "@/lib/accountMilestones";
+import BadgeCards, {useBadges} from "./BadgeCards";
 import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import type {CustomerOrderSummaryResponse, CustomerOrderResponse} from "@/types/order";
 import type {MenuProduct} from "@/types/menu";
@@ -43,6 +43,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     const modern=features?.futuristicStorefrontV2===true||features?.checkoutExperienceV2===true;
     const compact=phone===true&&(features?.futuristicStorefrontV2===true||features?.checkoutExperienceV2===true);
     const enabled = features?.customerAccountHub === true;
+    const badgeState=useBadges(session?.phone,enabled&&session?.authenticated===true);
     const {branch} = useSelectedBranch();
     const router = useRouter();
     const [account, setAccount] = useState<Account | null>(null);
@@ -171,7 +172,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
         } catch {setMessage("Could not sign out. Please try again."); setBusy(false); return false;}
     }
 
-    const earned = currentMilestone(account.completedOrders??0);
+    const earned = badgeState.value?.current??null;
     const displayName = session.name?.trim() || (compact?"Your Gokul account":"Gokul guest");
     const initials = displayName.split(/\s+/).slice(0, 2).map(part => part[0]?.toUpperCase()).join("");
     const maskedPhone = session.phone ? `+91 •••••• ${session.phone.replace(/\D/g, "").slice(-4)}` : "Phone verified";
@@ -185,15 +186,15 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 <div className="flex min-w-0 items-center gap-4 sm:gap-6">
                     <div className="account-avatar" aria-hidden="true">{initials}</div>
                     <div className="min-w-0"><p className="account-cover-kicker"><T text="Your Gokul profile" /></p>
-                        <h1 className="mt-1 truncate text-2xl font-bold sm:text-4xl">{displayName}<AccountTierMark orders={account.completedOrders??0}/></h1>
+                        <h1 className="mt-1 truncate text-2xl font-bold sm:text-4xl">{displayName}<AccountTierMark badge={earned}/></h1>
                         <p className="mt-2 text-sm">{maskedPhone}</p>
                         <button type="button" onClick={() => {setNameDraft(session.name ?? ""); setEditingDetails(true); showSection("details");}}
                             className="mt-4 rounded-full border border-[#f6dcae] px-4 py-2 text-sm font-semibold text-[#fff9ed] hover:bg-white/15"><T text="Edit details" /></button></div>
                 </div>
-                <div className="account-earned" aria-label={earned ? `Earned badge: ${earned.title}` : "No badge earned yet"}>
-                    <span className="account-earned-symbol" aria-hidden="true">{earned ? "✓" : "○"}</span>
+                <div className="account-earned" aria-label={earned ? `Earned badge: ${earned.name}` : "No badge earned yet"}>
+                    <AccountTierMark badge={earned}/>
                     <div><span className="account-earned-label">{earned ? "Earned badge" : "Your first badge"}</span>
-                        <strong>{earned?.title ?? "One order away"}</strong></div>
+                        <strong>{earned?.name ?? "Your journey starts here"}</strong></div>
                 </div>
             </div>
         </header>
@@ -211,22 +212,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 {!compact&&<Link href="/profile/privacy"><T text="Privacy and data" /></Link>}
             </nav>
             <div id="account-content" className="account-panels min-w-0 scroll-mt-28 space-y-6" aria-live="polite">
-                {activeSection === "badges" && <section id="account-milestones" className="account-milestones rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
-                    <div className="flex flex-wrap items-end justify-between gap-4">
-                        <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#c88a20]">Gokul journey</p>
-                            <h2 className="mt-2 text-2xl font-bold text-[#241715]"><T text="Your badges" /></h2>
-                            <p className="mt-2 text-sm text-[#756763]"><T text="Earned from completed paid orders on your account." /></p></div>
-                        <div className="account-order-count"><strong>{account.completedOrders??0}</strong><span><T text="completed visits"/></span></div>
-                    </div>
-                    <div className="mt-6 grid gap-3 sm:grid-cols-3">{accountMilestones.map(milestone => {
-                        const unlocked = (account.completedOrders??0) >= milestone.orders;
-                        return <div key={milestone.orders} className={`account-badge ${unlocked ? "is-earned" : "is-locked"}`}>
-                            <span className="account-badge-icon" aria-label={unlocked ? "Unlocked" : "Locked"}>{unlocked ? "✓" : "○"}</span>
-                            <strong>{milestone.title}</strong><span>{milestone.description}</span>
-                        </div>;
-                    })}</div>
-                    <p className="mt-4 text-xs text-[#756763]"><T text="Badges recognise visits. They are not points or discounts." /></p>
-                </section>}
+                {activeSection === "badges" && <BadgeCards state={badgeState}/>}
         {activeSection === "orders" && <section id="account-orders" className="profile-history rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
             {features?.occasionEnquiries && <nav className="mobile-profile-order-types" aria-label="Order history types"><button type="button" aria-pressed={orderType==="pickup"} onClick={()=>setOrderType("pickup")}><T text="Pickup orders" /></button><button type="button" aria-pressed={orderType==="bulk"} onClick={()=>setOrderType("bulk")}><T text="Bulk order requests" /></button></nav>}
             {orderType==="bulk"&&features?.occasionEnquiries?<Suspense fallback={<BrandLoading compact label="Loading your requests…" />}><OccasionRequests key={session.phone} embeddedSession={session}/></Suspense>:<><div className="profile-history-heading flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]"><T text="Your orders" /></h2>

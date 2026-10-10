@@ -158,7 +158,7 @@ export default function ProductGrid({
                             />
                             {unavailable && (
                                 <p role="status" className="menu-availability-note">
-                                    <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>
+                                    <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>{!pickupChecking&&pickup?.available===false&&<button type="button" className="pickup-attention-action" onClick={()=>window.dispatchEvent(new Event("gokul-pickup-attention"))}><T text="Change pickup date"/></button>}
                                 </p>
                             )}
                         </div>{pairing&&product.id===pairingSeed&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>

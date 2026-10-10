@@ -50,7 +50,7 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
  assert.equal(await breakfastSection.getByRole('button',{name:'Add Aloo Paratha to cart'}).isEnabled(),true);
  assert.equal(await page.getByRole('button',{name:'Add Veg Chowmein to cart'}).isDisabled(),true);
- await page.getByText('Available for pickup from 11 AM.',{exact:true}).waitFor();
+ await page.locator('.menu-availability-note').filter({hasText:'Available for pickup from 11 AM.'}).waitFor();
  const first=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));assert.equal(first.slot.id,8);assert.equal(first.date,today);assert.equal(first.pickupType,'NORMAL');
  await mkdir(screenshots,{recursive:true});await page.screenshot({path:`${screenshots}/pickup-breakfast-${width}.png`,fullPage:true});
  await page.reload();await pickup.getByText(/Today, .* · 8:00/).waitFor();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))),first);

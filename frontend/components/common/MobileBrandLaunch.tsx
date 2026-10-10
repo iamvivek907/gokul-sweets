@@ -1,5 +1,5 @@
 "use client";
-import {useEffect, useRef} from "react";
+import {useEffect, useRef, useSyncExternalStore} from "react";
 import {usePathname, useRouter} from "next/navigation";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {constrainedPhoneConnection} from "@/lib/mobileConnection";
@@ -8,8 +8,13 @@ import {T} from "@/lib/language";
 import ReferenceWordmark from "@/components/layout/ReferenceWordmark";
 import "./MobileBrandLaunch.css";
 
+const subscribeHydration=()=>()=>{};
+const hydratedSnapshot=()=>true;
+const serverSnapshot=()=>false;
+
 /** One short entrance per document/app resume; route changes never restart it. */
 export default function MobileBrandLaunch() {
+    const hydrated=useSyncExternalStore(subscribeHydration,hydratedSnapshot,serverSnapshot);
     const dialog = useRef<HTMLDialogElement>(null);
     const pathname = usePathname();
     const entryPath = useRef(pathname);
@@ -48,10 +53,10 @@ export default function MobileBrandLaunch() {
         const cover = branch.mobileCoverImageUrl || branch.coverImageUrl;
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
-    return <dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
+    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"><ReferenceWordmark className="brand-loading-wordmark"/><p>Fresh for your moments</p></div>}<dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
         <div className="gokul-mobile-launch-copy">
             <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>
             <p><T text="Fresh for your moments" /></p>
         </div>
-    </dialog>;
+    </dialog></>;
 }

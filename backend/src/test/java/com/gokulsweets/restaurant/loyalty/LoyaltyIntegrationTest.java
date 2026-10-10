@@ -55,6 +55,241 @@ class LoyaltyIntegrationTest {
     private long branch;
     private long slot;
 
+    @Autowired com.gokulsweets.restaurant.badges.CustomerBadgeService badges;
+    @Autowired com.gokulsweets.restaurant.badges.CustomerBadgeAdminController badgeAdmin;
+    private final List<Long> testBadges = new ArrayList<>();
+
+    private long badge(int orders, String minimum, String bonus) {
+        long id =
+                jdbc.queryForObject(
+                        "INSERT INTO"
+                            + " customer_badges(code,name,description,required_orders,minimum_subtotal,bonus_percent)"
+                            + " VALUES(?,'Test tier','A funded test tier',?,?,?) RETURNING id",
+                        Long.class,
+                        "TEST_"
+                                + UUID.randomUUID()
+                                        .toString()
+                                        .replace("-", "")
+                                        .toUpperCase(java.util.Locale.ROOT),
+                        orders,
+                        new BigDecimal(minimum),
+                        new BigDecimal(bonus));
+        testBadges.add(id);
+        return id;
+    }
+
+    @AfterEach
+    void removeTestBadges() {
+        for (long id : testBadges) {
+            jdbc.update("DELETE FROM customer_badge_awards WHERE badge_id=?", id);
+            jdbc.update("DELETE FROM customer_badge_audit WHERE badge_id=?", id);
+            jdbc.update("DELETE FROM customer_badges WHERE id=?", id);
+        }
+    }
+
+    @Test
+    void badgeProgressRequiresCompletedPaidOwnedThresholdOrders() {
+        long tier = badge(1, "149", "20");
+        var qualified = order("PICKED_UP", false);
+        paid(qualified.getId(), "PAID");
+        var below = order("PICKED_UP", false);
+        paid(below.getId(), "PAID");
+        jdbc.update("UPDATE orders SET subtotal=148.99 WHERE id=?", below.getId());
+        var pending = order("CONFIRMED", false);
+        paid(pending.getId(), "PAID");
+        order("PICKED_UP", false);
+        var refund = order("PICKED_UP", false);
+        paid(refund.getId(), "PAID");
+        paid(refund.getId(), "REFUND_PENDING");
+        var test = order("PICKED_UP", false);
+        paid(test.getId(), "PAID");
+        jdbc.update("UPDATE orders SET loyalty_test_order=true WHERE id=?", test.getId());
+        var progress =
+                badges.snapshot("DEV", subject).badges().stream()
+                        .filter(b -> b.id() == tier)
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(progress.qualifyingOrders()).isEqualTo(1);
+        assertThat(progress.earned()).isTrue();
+        assertThat(badges.benefit("DEV", subject).percent()).isEqualByComparingTo("20");
+        assertThat(badges.benefit("QA", subject).percent()).isZero();
+        assertThat(badges.benefit("DEV", UUID.randomUUID()).percent()).isZero();
+    }
+
+    @Test
+    void badgeBonusUsesOneTierSavedAtPlacementAndRefundsWholeEarning() {
+        badge(1, "149", "20");
+        badge(1, "148", "70");
+        var prior = order("PICKED_UP", false);
+        paid(prior.getId(), "PAID");
+        var future = order("PENDING_PAYMENT", false);
+        new TransactionTemplate(manager).executeWithoutResult(tx -> loyalty.reserve(future, null));
+        assertThat(future.getLoyaltyBadgeBonusPercent()).isEqualByComparingTo("20");
+        jdbc.update(
+                "UPDATE orders SET"
+                    + " loyalty_enrolled=true,loyalty_badge_bonus_percent=?,loyalty_badge_name=?"
+                    + " WHERE id=?",
+                future.getLoyaltyBadgeBonusPercent(),
+                future.getLoyaltyBadgeName(),
+                future.getId());
+        loyalty.reconcile(future.getId());
+        assertThat(loyalty.wallet("DEV", subject, null).balance()).isZero();
+        paid(future.getId(), "PAID");
+        loyalty.reconcile(future.getId());
+        assertThat(loyalty.wallet("DEV", subject, null).balance()).isZero();
+        jdbc.update("UPDATE customer_badges SET bonus_percent=99 WHERE code LIKE 'TEST_%'");
+        jdbc.update("UPDATE orders SET order_status='PICKED_UP' WHERE id=?", future.getId());
+        loyalty.reconcile(future.getId());
+        loyalty.reconcile(future.getId());
+        var earned =
+                loyalty.wallet("DEV", subject, null).history().stream()
+                        .filter(e -> e.kind().equals("EARNED"))
+                        .findFirst()
+                        .orElseThrow();
+        assertThat(earned.coins()).isEqualTo(16);
+        assertThat(earned.badgeBonusCoins()).isEqualTo(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM loyalty_ledger WHERE order_id=? AND"
+                                        + " kind='EARNED'",
+                                Integer.class,
+                                future.getId()))
+                .isEqualTo(1);
+        paid(future.getId(), "REFUNDED");
+        loyalty.reconcile(future.getId());
+        loyalty.reconcile(future.getId());
+        assertThat(loyalty.wallet("DEV", subject, null).balance()).isZero();
+    }
+
+    @Test
+    void badgePresentationClaimIsScopedDurableAndDoesNotReplay() {
+        badge(1, "149", "20");
+        var completed = order("PICKED_UP", false);
+        paid(completed.getId(), "PAID");
+        var first = badges.claim("DEV", subject);
+        assertThat(first).isNotNull();
+        assertThatThrownBy(
+                        () ->
+                                badges.acknowledge(
+                                        "DEV", UUID.randomUUID(), first.awardId(), first.claimId()))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+        badges.acknowledge("DEV", subject, first.awardId(), first.claimId());
+        badges.acknowledge("DEV", subject, first.awardId(), first.claimId());
+        var next = badges.claim("DEV", subject);
+        assertThat(next).isNotNull();
+        assertThat(badges.claim("DEV", subject)).isNull();
+        jdbc.update(
+                "UPDATE customer_badge_awards SET claim_until=CURRENT_TIMESTAMP-INTERVAL '1 second'"
+                        + " WHERE id=?",
+                next.awardId());
+        var retry = badges.claim("DEV", subject);
+        assertThat(retry.awardId()).isEqualTo(next.awardId());
+        assertThat(retry.claimId()).isNotEqualTo(next.claimId());
+        badges.acknowledge("DEV", subject, retry.awardId(), retry.claimId());
+        assertThat(badges.claim("DEV", subject)).isNull();
+    }
+
+    @Test
+    void queuedRecognitionUsesCurrentHighestBenefitWithoutRewritingItsEarnedSnapshot() {
+        long tier = badge(1, "149", "20");
+        var completed = order("PICKED_UP", false);
+        paid(completed.getId(), "PAID");
+        badges.snapshot("DEV", subject);
+        jdbc.update(
+                "UPDATE customer_badge_awards SET celebrated_at=CURRENT_TIMESTAMP WHERE"
+                        + " subject_id=? AND badge_id<>?",
+                subject,
+                tier);
+        jdbc.update("UPDATE customer_badges SET bonus_percent=10 WHERE id=?", tier);
+        var first = badges.claim("DEV", subject);
+        assertThat(first.name()).isEqualTo("Test tier");
+        assertThat(first.bonusPercent()).isEqualByComparingTo("10");
+        assertThat(first.bonusPercent())
+                .isEqualByComparingTo(badges.benefit("DEV", subject).percent());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT bonus_percent FROM customer_badge_awards WHERE id=?",
+                                BigDecimal.class,
+                                first.awardId()))
+                .isEqualByComparingTo("20");
+
+        badge(2, "149", "40");
+        var second = order("PICKED_UP", false);
+        paid(second.getId(), "PAID");
+        jdbc.update(
+                "UPDATE customer_badge_awards SET claim_until=CURRENT_TIMESTAMP-INTERVAL '1 second'"
+                        + " WHERE id=?",
+                first.awardId());
+        var retry = badges.claim("DEV", subject);
+        assertThat(retry.awardId()).isEqualTo(first.awardId());
+        assertThat(retry.bonusPercent()).isEqualByComparingTo("40");
+        assertThat(retry.bonusPercent())
+                .isEqualByComparingTo(badges.benefit("DEV", subject).percent());
+    }
+
+    @Test
+    void refundRemovesUnshownBadgeAndLegacyOrdersHaveNoBonus() {
+        long tier = badge(1, "149", "20");
+        var completed = order("PICKED_UP", true);
+        paid(completed.getId(), "PAID");
+        loyalty.reconcile(completed.getId());
+        assertThat(loyalty.wallet("DEV", subject, null).balance()).isEqualTo(14);
+        paid(completed.getId(), "REFUND_PENDING");
+        assertThat(
+                        badges.snapshot("DEV", subject).badges().stream()
+                                .filter(b -> b.id() == tier)
+                                .findFirst()
+                                .orElseThrow()
+                                .earned())
+                .isFalse();
+        assertThat(badges.claim("DEV", subject)).isNull();
+    }
+
+    @Test
+    void badgeAdminRequiresOwnerAndChecksVersionAndAudits() {
+        long id = badge(1, "149", "20");
+        var user = new com.gokulsweets.restaurant.staff.StaffUser();
+        user.setId(77L);
+        var role = new com.gokulsweets.restaurant.staff.Role();
+        role.setName("BRANCH_ADMIN");
+        user.setRole(role);
+        org.mockito.Mockito.when(staff.getCurrentStaff()).thenReturn(user);
+        assertThatThrownBy(() -> badgeAdmin.list())
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        role.setName("OWNER_ADMIN");
+        String code =
+                jdbc.queryForObject(
+                        "SELECT code FROM customer_badges WHERE id=?", String.class, id);
+        var input =
+                new com.gokulsweets.restaurant.badges.CustomerBadgeAdminController.Input(
+                        id,
+                        1,
+                        code,
+                        "Regular test",
+                        "Benefits",
+                        2,
+                        new BigDecimal("500"),
+                        new BigDecimal("25"),
+                        "GOLD",
+                        true,
+                        "Owner approved benefit");
+        badgeAdmin.save(input);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT version FROM customer_badges WHERE id=?",
+                                Integer.class,
+                                id))
+                .isEqualTo(2);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM customer_badge_audit WHERE badge_id=?",
+                                Integer.class,
+                                id))
+                .isEqualTo(1);
+        assertThatThrownBy(() -> badgeAdmin.save(input))
+                .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+    }
+
     @BeforeEach
     void setup() {
         rewards = flags.isGokulRewards();
