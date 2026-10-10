@@ -31,6 +31,9 @@ try{for(const width of [320,390,640,1280]){
  });
  await page.goto(`${base}/profile/badges`);await page.getByRole('heading',{name:'Your badges',exact:true}).waitFor();
  await page.locator('.configured-badge').first().waitFor();assert.match(await page.locator('.configured-badge').first().innerText(),/subtotal ₹500/);assert.match(await page.locator('.configured-badge').nth(1).innerText(),/2 \/ 5/);
+ assert.equal(await page.locator('.configured-badge.is-earned').getByRole('img',{name:'Gokul regular · earned Gokul recognition',exact:true}).count(),1);
+ assert.equal(await page.locator('.configured-badge.is-locked').getByRole('img',{name:'Favourite · locked Gokul recognition',exact:true}).count(),1);
+ assert.equal(await page.locator('.configured-badge.is-locked').getByRole('img',{name:/earned Gokul recognition/}).count(),0);
  await page.getByRole('dialog',{name:'You’ve earned Gokul regular',exact:true}).waitFor();assert.match(await page.locator('.badge-celebration').innerText(),/\+25% bonus/);
  assert.ok(acks>=1);const medal=page.locator('.badge-celebration .badge-medallion');const r=await medal.boundingBox();assert.ok(Math.abs(r.width-r.height)<1);assert.ok(r.width>=80);
  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.badge-celebration').evaluate(n=>getComputedStyle(n).animationName),'none');

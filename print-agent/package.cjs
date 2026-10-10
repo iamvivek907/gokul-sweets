@@ -14,7 +14,10 @@ let offset = 0;
 const files = [], directory = [];
 for (const file of entries) {
     const name = Buffer.from(file);
-    const data = fs.readFileSync(path.join(__dirname, file));
+    // Git may check text out with CRLF on Windows. ZIP bytes must be identical on every host.
+    const source = fs.readFileSync(path.join(__dirname, file), 'utf8').replace(/\r\n?/g, '\n');
+    // Keep the Windows command launcher in its native CRLF form, independently of checkout settings.
+    const data = Buffer.from(file.endsWith('.cmd') ? source.replace(/\n/g, '\r\n') : source);
     const header = Buffer.alloc(30);
     header.writeUInt32LE(0x04034b50, 0); header.writeUInt16LE(20, 4);
     header.writeUInt16LE(0x21, 12); // 1980-01-01

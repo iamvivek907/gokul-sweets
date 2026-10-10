@@ -39,7 +39,7 @@ public class CustomerBadgeService {
     /** Active badge progress and the single highest currently qualifying tier. */
     public record Snapshot(List<Badge> badges, Badge current) {}
 
-    /** A subject-bound lease for one newly earned presentation. */
+    /** A subject-bound recognition lease with the customer's current highest-tier benefit. */
     public record Celebration(
             long awardId,
             UUID claimId,
@@ -199,7 +199,7 @@ WITH chosen AS (
 )
 UPDATE customer_badge_awards a SET claim_id=?,claim_until=CURRENT_TIMESTAMP+INTERVAL '2 minutes'
 FROM chosen WHERE a.id=chosen.id
-RETURNING a.id,a.name,a.description,a.bonus_percent,a.appearance
+RETURNING a.id,a.name,a.description,a.appearance
 """,
                             (rs, row) ->
                                     new Celebration(
@@ -207,8 +207,8 @@ RETURNING a.id,a.name,a.description,a.bonus_percent,a.appearance
                                             claim,
                                             rs.getString(2),
                                             rs.getString(3),
-                                            rs.getBigDecimal(4),
-                                            rs.getString(5)),
+                                            snapshot.current().bonusPercent(),
+                                            rs.getString(4)),
                             environment,
                             subject,
                             earned,

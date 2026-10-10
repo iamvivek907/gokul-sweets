@@ -190,6 +190,44 @@ class LoyaltyIntegrationTest {
     }
 
     @Test
+    void queuedRecognitionUsesCurrentHighestBenefitWithoutRewritingItsEarnedSnapshot() {
+        long tier = badge(1, "149", "20");
+        var completed = order("PICKED_UP", false);
+        paid(completed.getId(), "PAID");
+        badges.snapshot("DEV", subject);
+        jdbc.update(
+                "UPDATE customer_badge_awards SET celebrated_at=CURRENT_TIMESTAMP WHERE"
+                        + " subject_id=? AND badge_id<>?",
+                subject,
+                tier);
+        jdbc.update("UPDATE customer_badges SET bonus_percent=10 WHERE id=?", tier);
+        var first = badges.claim("DEV", subject);
+        assertThat(first.name()).isEqualTo("Test tier");
+        assertThat(first.bonusPercent()).isEqualByComparingTo("10");
+        assertThat(first.bonusPercent())
+                .isEqualByComparingTo(badges.benefit("DEV", subject).percent());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT bonus_percent FROM customer_badge_awards WHERE id=?",
+                                BigDecimal.class,
+                                first.awardId()))
+                .isEqualByComparingTo("20");
+
+        badge(2, "149", "40");
+        var second = order("PICKED_UP", false);
+        paid(second.getId(), "PAID");
+        jdbc.update(
+                "UPDATE customer_badge_awards SET claim_until=CURRENT_TIMESTAMP-INTERVAL '1 second'"
+                        + " WHERE id=?",
+                first.awardId());
+        var retry = badges.claim("DEV", subject);
+        assertThat(retry.awardId()).isEqualTo(first.awardId());
+        assertThat(retry.bonusPercent()).isEqualByComparingTo("40");
+        assertThat(retry.bonusPercent())
+                .isEqualByComparingTo(badges.benefit("DEV", subject).percent());
+    }
+
+    @Test
     void refundRemovesUnshownBadgeAndLegacyOrdersHaveNoBonus() {
         long tier = badge(1, "149", "20");
         var completed = order("PICKED_UP", true);
