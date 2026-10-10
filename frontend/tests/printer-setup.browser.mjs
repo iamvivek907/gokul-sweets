@@ -63,14 +63,11 @@ try {
   const releaseStalled=release;gate=null;releaseStalled();
   state={...state,enabled:false};
   const recoveredReply=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/printing/station');
-  // Process each timer tick and its network callbacks instead of jumping directly to
-  // one assumed interval boundary after the abort. A stuck guard still fails within two periods.
-  for(let tick=0;tick<10&&reads===stalledReads;tick++) {
-   await page.clock.runFor(1000);
-   await page.evaluate(()=>Promise.resolve());
-  }
-  assert.equal(reads,stalledReads+1,'Polling must recover within two intervals after abort');
-  await recoveredReply;
+  // Virtual timer ticks do not drain browser-to-Node route callbacks. Observe the
+  // actual response before counting reads; both waits are owned if recovery fails.
+  // A stuck guard still fails: only the next polling interval is advanced.
+  await Promise.all([page.clock.runFor(5000),recoveredReply]);
+  assert.equal(reads,stalledReads+1,'Polling must recover on the next interval after abort');
   await page.getByText('Paused',{exact:true}).waitFor();
   await page.waitForFunction(()=>!document.body.textContent.includes('Printer status request timed out. Retrying automatically.'));
   assert.equal(reads,stalledReads+1);
