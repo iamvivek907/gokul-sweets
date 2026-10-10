@@ -60,7 +60,7 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
  },[branchId,request,onChoosingChange]);
  async function choose(trigger:HTMLElement){
   if(busy)return;
-  setPickerTrigger(trigger);setPickerScroll({left:window.scrollX,top:window.scrollY});
+  setPickerTrigger(trigger);
   onChoosingChange?.(true);setBusy(true);setError("");const c=new AbortController();controller.current=c;
   try{
    const branchSnapshot=getStoredBranchSnapshot(),cartSnapshot=getCartSnapshot();
@@ -71,6 +71,8 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
    const signal=AbortSignal.any([c.signal,AbortSignal.timeout(15000)]);
    const value=items.length?await checkCartAvailability(branchId,today,days+1,items,signal):await discoverPickupDates(branchId,today,days+1,signal);
    if(!c.signal.aborted&&branchSnapshot===getStoredBranchSnapshot()&&cartSnapshot===getCartSnapshot()){
+    // Customers may keep browsing while the request runs; preserve where they are now.
+    setPickerScroll({left:window.scrollX,top:window.scrollY});
     setCartIds(items.map(item=>item.productId));setData(value);setOpen(true);
    }else onChoosingChange?.(false);
   }
