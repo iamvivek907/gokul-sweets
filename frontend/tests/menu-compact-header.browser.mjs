@@ -33,6 +33,7 @@ try{for(const [width,enabled,expired=false,reduced=true,cold=false] of [[320,tru
  await page.evaluate(()=>window.scrollTo({top:900,behavior:'instant'}));
  if(width>640||!enabled){await page.waitForTimeout(100);assert.equal(await page.locator('.menu-compact-header:visible').count(),0);assert.equal(await header.locator('[data-header-content]').getAttribute('aria-hidden'),null);await context.close();console.log(`Compact header scope preserved ${width}px enabled=${enabled}`);continue;}
  await page.locator('.menu-compact-header[aria-hidden=false]').waitFor();
+ await page.locator('.menu-compact-pickup').waitFor({state:'visible'});
  if(expired)assert.match(await page.locator('.menu-compact-pickup').innerText(),/Choose pickup date & time/);
  assert.equal(await header.locator('[data-header-content]').getAttribute('aria-hidden'),'true');
  assert.equal(await header.locator('[data-header-content]').evaluate(n=>n.inert),true,'hidden header controls cannot receive keyboard focus');
@@ -61,10 +62,15 @@ try{for(const [width,enabled,expired=false,reduced=true,cold=false] of [[320,tru
   let releaseDiscovery;pickerGate=new Promise(resolve=>{releaseDiscovery=resolve;});
   const requested=page.waitForRequest(isPickerRequest);
   await page.locator('.menu-compact-pickup').click();await requested;
-  await page.evaluate(()=>scrollTo({top:2500,behavior:'instant'}));const latestScroll=await page.evaluate(()=>scrollY);
+  // Let the pending-button render and browser anchoring finish before simulating later browsing.
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await page.evaluate(()=>scrollTo({top:2500,behavior:'instant'}));
+  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  const latestScroll=await page.evaluate(()=>scrollY);
   assert.ok(latestScroll>scroll+500,'customer continues browsing while pickup times load');
   releaseDiscovery();pickerGate=null;await picker.waitFor();
-  assert.ok(Math.abs((await page.evaluate(()=>scrollY))-latestScroll)<2,'opening a delayed picker keeps the latest browsing position');
+  const openedScroll=await page.evaluate(()=>scrollY);
+  assert.ok(Math.abs(openedScroll-latestScroll)<2,`opening a delayed picker keeps the latest browsing position (${latestScroll} → ${openedScroll})`);
   await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();await picker.waitFor({state:'hidden'});
   assert.ok(Math.abs((await page.evaluate(()=>scrollY))-latestScroll)<2,'closing a delayed picker keeps the latest browsing position');
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),saved);
