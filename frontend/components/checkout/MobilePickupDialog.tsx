@@ -1,6 +1,6 @@
 "use client";
 
-import {useEffect,useRef,useState} from "react";
+import {useLayoutEffect,useRef,useState} from "react";
 import {T,translate,useLanguage} from "@/lib/language";
 import {indiaToday} from "@/lib/pickupFreshness";
 import type {CartAvailability} from "@/services/availabilityApi";
@@ -27,7 +27,7 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
  const day=dates.find(day=>day.date===date);
  const times=options.filter(option=>option.date===date);
  const selected=times.find(option=>option.slot.id===selection?.slot.id&&option.pickupType===selection.pickupType);
- useEffect(()=>{
+ useLayoutEffect(()=>{
   mounted.current=true;
   const surface=dialog.current;if(!surface)return;
   // Capture the actual opener before its asynchronous load disables it and loses focus.
@@ -35,15 +35,18 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
   const pageUrl=location.href;
   // The local loading boundary keeps the menu in flow until the dialog is ready.
   const scroll={left:window.scrollX,top:window.scrollY};
-  const lock=document.documentElement,previous=lock.style.overflow;
+  const lock=document.documentElement,previous=lock.style.overflow,previousAnchor=lock.style.overflowAnchor,previousGutter=lock.style.scrollbarGutter;
+  // Keep scrollbar geometry and suppress later anchoring while this modal owns scrolling.
+  if(window.innerWidth>lock.clientWidth)lock.style.scrollbarGutter="stable";
+  lock.style.overflowAnchor="none";
   lock.style.overflow="hidden";surface.showModal();window.scrollTo({...scroll,behavior:"instant"});
   return()=>{
-   mounted.current=false;surface.close();lock.style.overflow=previous;
-   if(location.href!==pageUrl)return;
+   mounted.current=false;surface.close();lock.style.overflow=previous;lock.style.scrollbarGutter=previousGutter;
+   if(location.href!==pageUrl){lock.style.overflowAnchor=previousAnchor;return;}
    window.scrollTo({...scroll,behavior:"instant"});
    const openerAvailable=previousFocus?.isConnected&&!previousFocus.closest("[inert]")&&getComputedStyle(previousFocus).visibility!=="hidden";
    const target=openerAvailable?previousFocus:document.querySelector<HTMLElement>(".mobile-menu-pickup > button");
-   target?.focus({preventScroll:true});
+   target?.focus({preventScroll:true});lock.style.overflowAnchor=previousAnchor;
   };
  },[]);
  return <dialog ref={dialog} className="mobile-pickup-dialog" aria-labelledby="mobile-pickup-title" onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))onClose();}} onCancel={event=>{event.preventDefault();onClose();}}>

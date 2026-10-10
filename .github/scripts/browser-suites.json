@@ -18,6 +18,7 @@
     "tests/menu-service-hours.browser.mjs"
   ],
   "menu": [
+    "tests/menu-compact-header.browser.mjs",
     "tests/menu-picker-pickup-guard.browser.mjs",
     "tests/menu-soonest-pickup.browser.mjs",
     "tests/menu-pickup-groups.browser.mjs",
@@ -29,7 +30,6 @@
     "tests/menu-discovery.browser.mjs",
     "tests/menu-pickup-guidance.browser.mjs",
     "tests/menu-review-regressions.browser.mjs",
-    "tests/menu-compact-header.browser.mjs",
     "tests/menu-layout-recovery.browser.mjs",
     "tests/premium-menu.browser.mjs",
     "tests/mobile-ordering-polish.browser.mjs",
