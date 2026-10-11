@@ -340,7 +340,7 @@ public class WebPushTransport {
      *     unavailable}
      * @throws Exception if the underlying operation fails
      */
-    private nl.martijndwars.webpush.HttpRequest prepare(
+    nl.martijndwars.webpush.HttpRequest prepare(
             String endpoint,
             String publicKey,
             String auth,
@@ -377,12 +377,19 @@ public class WebPushTransport {
                             properties.getPrivateKey(),
                             properties.getSubject());
             var notification =
-                    new Notification(
-                            endpoint,
-                            publicKey,
-                            auth,
-                            payload.getBytes(StandardCharsets.UTF_8),
-                            60);
+                    Notification.builder()
+                            .endpoint(endpoint)
+                            .userPublicKey(publicKey)
+                            .userAuth(auth)
+                            .payload(payload.getBytes(StandardCharsets.UTF_8))
+                            // Urgent staff work should wake an idle push service promptly.
+                            // Keep the existing expiry so old kitchen work is not queued longer.
+                            .ttl(60)
+                            .urgency(
+                                    eventId.startsWith("staff:")
+                                            ? nl.martijndwars.webpush.Urgency.HIGH
+                                            : nl.martijndwars.webpush.Urgency.NORMAL)
+                            .build();
             return service.encrypted(notification);
         } finally {
             MethodTiming.finish(

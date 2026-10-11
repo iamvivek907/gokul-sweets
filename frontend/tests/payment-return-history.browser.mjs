@@ -1,11 +1,12 @@
+import {recoveryContext,recoveryFailure} from './recoveryEvidence.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const {chromium} = createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE ?? 'playwright');
 const browser = await chromium.launch({headless: true}), base = process.env.BROWSER_BASE ?? 'http://127.0.0.1:3311';
 try {
     for (const width of [390, 1280]) {
-        const context = await browser.newContext({viewport: {width, height: 900}, serviceWorkers: 'block'}), page = await context.newPage();
-        let status = 'PENDING', creates = 0, gatewayVisits = 0;
+        const context = await recoveryContext(browser,{viewport: {width, height: 900}, serviceWorkers: 'block'}), page = await context.newPage();
+        let status = 'PENDING', creates = 0, gatewayVisits = 0, orderDelay = 0;
         let providerDown = false, providerSettled = false, paymentExpired = false, lookupGate = null, lookupStarted = null;
         const branch = {id: 1, code: 'TEST', name: 'History branch', active: true, operational: true, pickupAvailable: true};
         const payment = () => ({paymentId: 10, orderNumber: 'TEST-HISTORY', provider: 'PHONEPE', paymentStatus: status, amount: 200, currency: 'INR', paymentUrl: null, providerOrderId: 'test', expiresAt: new Date(Date.now() + (paymentExpired ? -1000 : 600000)).toISOString()});
@@ -24,7 +25,7 @@ try {
             else if (path === '/api/payments/order/TEST-HISTORY') {if (lookupGate) {lookupStarted(); await lookupGate;} json = {payment: payment()};}
             else if (path === '/api/payments/10/refresh') {if (providerDown) return route.fulfill({status: 503, json: {message: 'Provider temporarily unavailable'}, headers}); if(providerSettled)status='PAID'; json = payment();}
             else if (path === '/api/payments/10/cancel-checkout') {status = 'EXPIRED'; json = payment();}
-            else if (path === '/api/orders/TEST-HISTORY') json = order();
+            else if (path === '/api/orders/TEST-HISTORY') {json=order();if(orderDelay&&json.paymentStatus==='PAID')await new Promise(resolve=>setTimeout(resolve,orderDelay));}
             else if (path === '/api/payments' && req.method() === 'POST') {creates++; json = payment();}
             return route.fulfill({json, headers});
         });
@@ -83,7 +84,27 @@ try {
         assert.equal(await page.locator('.ordering-tour-dialog,.ordering-tour-invite').count(), 0);
         await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`); await page.waitForURL('**/orders/TEST-HISTORY');
         assert.equal(creates, 0, 'paid history recovery never creates another payment');
-        status = 'EXPIRED'; await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`);
+        // Use real Next history entries. Each completed checkout must be consumed,
+        // so consecutive Android/system Back presses can reach the earlier page.
+        for(const legacy of [false,true]) for(const delay of [0,200]){
+            console.log(`Payment Back ${width}px legacy=${legacy} paid-read delay=${delay}ms`);orderDelay=delay;
+            if(legacy)await page.addInitScript(()=>Object.defineProperty(window,"navigation",{configurable:true,value:undefined}));
+            await page.goto(`${base}/branches`);
+            status='EXPIRED';await page.goto(`${base}/checkout/payment/TEST-HISTORY`);
+            const view=width<=640?page.getByRole('link',{name:'View order',exact:true}):page.getByRole('button',{name:'View Order Details',exact:true});
+            await view.waitFor();status='PAID';await view.click();
+            await page.waitForURL('**/orders/TEST-HISTORY');await (width<=640?page.getByText('Payment: PAID',{exact:true}):page.locator('p').filter({hasText:/^✓\s*Confirmed$/})).waitFor();
+            await page.evaluate(()=>history.back());
+            await page.waitForURL('**/orders');await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();assert.equal(await pay().count(),0);
+            // Forward restores the paid order, then Back must return to the rewritten
+            // history entry rather than recreating a payment/Orders loop.
+            await page.evaluate(()=>history.forward());await page.waitForURL('**/orders/TEST-HISTORY');
+            await (width<=640?page.getByText('Payment: PAID',{exact:true}):page.locator('p').filter({hasText:/^✓\s*Confirmed$/})).waitFor();
+            await page.evaluate(()=>history.back());await page.waitForURL('**/orders');await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();
+            await page.evaluate(()=>history.back());await page.waitForURL(`${base}/branches`);
+            assert.equal(creates,0);assert.equal(gatewayVisits,1);
+        }
+        orderDelay=0;status = 'EXPIRED'; await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`);
         await page.locator('.gokul-mobile-launch').waitFor({state: 'hidden'});
         if (width <= 640) await page.getByRole('link', {name: 'View order', exact: true}).waitFor();
         else await page.getByRole('button', {name: 'View Order Details', exact: true}).waitFor();
@@ -117,4 +138,4 @@ try {
         await context.close();
     }
     console.log('PASS: PhonePe history replacement, stale paid/cancelled snapshots, pre-Pay recheck and browser-cache restoration.');
-} finally { await browser.close(); }
+} catch(error) {await recoveryFailure(browser,'payment-return-history');throw error;} finally { await browser.close(); }

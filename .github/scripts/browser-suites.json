@@ -19,6 +19,7 @@
   ],
   "menu": [
     "tests/menu-compact-header.browser.mjs",
+    "tests/menu-cart-pickup.browser.mjs",
     "tests/menu-picker-pickup-guard.browser.mjs",
     "tests/menu-soonest-pickup.browser.mjs",
     "tests/menu-pickup-groups.browser.mjs",

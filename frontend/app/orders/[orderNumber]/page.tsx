@@ -1,4 +1,5 @@
 "use client";
+import {guardCompletedCheckout} from "@/lib/paymentNavigation";
 import BrandLoading from "@/components/common/BrandLoading";
 import {ApiError} from "@/services/apiClient";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
@@ -12,6 +13,7 @@ import {formatWeight} from "@/lib/orderQuantity";
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState
@@ -171,6 +173,15 @@ export default function OrderDetailPage() {
             : null;
 
     const order = currentOrder?.order ?? null;
+    // Install before paid details are painted: an immediate system Back must be guarded.
+    useLayoutEffect(()=>{
+        if(order?.paymentStatus!=="PAID")return;
+        // Finish this history replacement with a document navigation. A client
+        // transition still settling from payment must not restore its old target.
+        return guardCompletedCheckout(order.orderNumber,()=>window.location.replace("/orders"));
+    },[order?.paymentStatus,order?.orderNumber]);
+
+
 
     useEffect(() => {
         if (features?.paidCartRecovery && order?.paymentStatus === "PAID") {

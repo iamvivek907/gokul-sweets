@@ -382,6 +382,16 @@ self.addEventListener("push", event => {
             icon: "/icon-192.png", tag: `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: staff, requireInteraction: staff,
             data: {url: destination, staff}
         });
+        if (staff) {
+            try {
+                const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
+                for (const client of windows) {
+                    if (new URL(client.url).pathname.startsWith("/admin")) {
+                        try {client.postMessage({type: "gokul-staff-alert"});} catch { /* Client closed. */ }
+                    }
+                }
+            } catch { /* Notification already displayed; client discovery cannot undo delivery or dedupe. */ }
+        }
         await cache.put(key, new Response(JSON.stringify([...(Array.isArray(seen) ? seen : []), eventId].slice(-256)),
             {headers: {"Content-Type": "application/json"}}));
     });

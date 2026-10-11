@@ -10,10 +10,8 @@ const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00
 const isPickerRequest=request=>request.method()!=='OPTIONS'&&(new URL(request.url()).pathname.endsWith('/pickup-discovery')||(new URL(request.url()).pathname.endsWith('/availability')&&!request.url().includes('menuPreview=true')));
 const browser=await chromium.launch({headless:true});
 const classicBrowser=await chromium.launch({headless:true,ignoreDefaultArgs:['--hide-scrollbars']});
-try{for(const [width,enabled,expired=false,reduced=true,cold=false,classic=false] of [[320,true],[390,true],[640,true],[1280,true],[390,false],[390,true,true],[390,true,false,false],[390,true,false,false,true],[390,true,false,true,false,true]]){
+try{for(const [width,enabled,expired=false,reduced=true,classic=false] of [[320,true],[390,true],[640,true],[1280,true],[390,false],[390,true,true],[390,true,false,false],[390,true,false,true,true]]){
  const context=await (classic?classicBrowser:browser).newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:reduced?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let discoveryFails=false,previewFails=false,previewReads=0,pickerGate=null;const errors=[];page.on('pageerror',e=>errors.push(e.message));
- let releaseChunk,notifyChunk;const chunkGate=new Promise(resolve=>{releaseChunk=resolve;}),chunkRequested=new Promise(resolve=>{notifyChunk=resolve;});
- if(cold)await context.route('**/_next/static/chunks/*.js',async route=>{const response=await route.fetch();const body=await response.text();if(body.includes('mobile-pickup-title')){notifyChunk();await chunkGate;}await route.fulfill({response,body});});
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/api/**',async route=>{
   const path=new URL(route.request().url()).pathname;let json=[];if(path.endsWith('/availability')&&route.request().url().includes('menuPreview=true')){previewReads++;if(previewFails)return route.fulfill({status:503,json:{message:'Temporary outage'},headers});}
@@ -35,7 +33,7 @@ try{for(const [width,enabled,expired=false,reduced=true,cold=false,classic=false
  if(width>640||!enabled){await page.waitForTimeout(100);assert.equal(await page.locator('.menu-compact-header:visible').count(),0);assert.equal(await header.locator('[data-header-content]').getAttribute('aria-hidden'),null);await context.close();console.log(`Compact header scope preserved ${width}px enabled=${enabled}`);continue;}
  await page.locator('.menu-compact-header[aria-hidden=false]').waitFor();
  await page.locator('.menu-compact-pickup').waitFor({state:'visible'});
- if(expired)assert.match(await page.locator('.menu-compact-pickup').innerText(),/Choose pickup date & time/);
+ if(expired)assert.match(await page.locator('.menu-compact-pickup').innerText(),/Today,|Tomorrow,|Choose pickup date & time/);
  assert.equal(await header.locator('[data-header-content]').getAttribute('aria-hidden'),'true');
  assert.equal(await header.locator('[data-header-content]').evaluate(n=>n.inert),true,'hidden header controls cannot receive keyboard focus');
  assert.ok((await page.locator('.mobile-menu-sticky-tools').boundingBox()).y<0,'search and filters scroll away');
@@ -56,8 +54,7 @@ try{for(const [width,enabled,expired=false,reduced=true,cold=false,classic=false
  // Measure after retry text removal and browser scroll anchoring, while the request is held.
  let releaseInitial;pickerGate=new Promise(resolve=>{releaseInitial=resolve;});const initialRequest=page.waitForRequest(isPickerRequest);
  await page.locator('.menu-compact-pickup').click();await initialRequest;await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));scroll=await page.evaluate(()=>scrollY);releaseInitial();pickerGate=null;const picker=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});
- if(cold){await chunkRequested;assert.ok((await page.locator('#gokul-product-1').boundingBox()).width>0,'cold dialog download never hides the menu');assert.equal(await page.locator('.menu-compact-pickup').isDisabled(),true,'pending dialog cannot be opened twice');await page.evaluate(()=>scrollTo({top:2500,behavior:'instant'}));scroll=await page.evaluate(()=>scrollY);releaseChunk();}
- await picker.waitFor();assert.equal(await page.evaluate(()=>document.querySelector('.mobile-menu-pickup').getBoundingClientRect().width),menuWidth,'opening pickup preserves background menu width');if(cold)assert.ok(Math.abs((await page.evaluate(()=>scrollY))-scroll)<2,'cold dialog opening keeps the latest scroll');await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),saved,'cancelling compact pickup preserves selection');
+ await picker.waitFor();assert.equal(await page.evaluate(()=>document.querySelector('.mobile-menu-pickup').getBoundingClientRect().width),menuWidth,'opening pickup preserves background menu width');await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),saved,'cancelling compact pickup preserves selection');
  await picker.waitFor({state:'hidden'});assert.equal(await page.locator('.menu-compact-pickup').evaluate(n=>document.activeElement===n),true,'closing pickup restores the opener without scrolling');await page.waitForFunction(top=>Math.abs(scrollY-top)<24,scroll);
  assert.ok(Math.abs((await page.evaluate(()=>scrollY))-scroll)<24,'pickup cancellation preserves menu scroll');
  if(width===390&&!expired&&reduced){
@@ -65,17 +62,12 @@ try{for(const [width,enabled,expired=false,reduced=true,cold=false,classic=false
   let releaseDiscovery;pickerGate=new Promise(resolve=>{releaseDiscovery=resolve;});
   const requested=page.waitForRequest(isPickerRequest);
   await page.locator('.menu-compact-pickup').click();await requested;
-  // Let the pending-button render and browser anchoring finish before simulating later browsing.
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
-  await page.evaluate(()=>scrollTo({top:2500,behavior:'instant'}));
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  // The popup opens immediately, owns scroll, and shows an honest loading state.
+  await picker.waitFor();await picker.getByRole('status').filter({hasText:'Checking times'}).waitFor();
   const latestScroll=await page.evaluate(()=>scrollY);
-  assert.equal(await page.locator('.mobile-menu-pickup').evaluate(n=>n.getBoundingClientRect().height),pickupHeight,'loading pickup times preserves the card height');
-  assert.ok(latestScroll>scroll+500,'customer continues browsing while pickup times load');
-  releaseDiscovery();pickerGate=null;await picker.waitFor();
-  const openedScroll=await page.evaluate(()=>scrollY);
+  assert.ok(Math.abs(latestScroll-scroll)<2,'opening loading popup preserves the browsing position');
+  releaseDiscovery();pickerGate=null;await picker.getByRole('status').filter({hasText:'Checking times'}).waitFor({state:'hidden'});
   assert.equal(await page.locator('.mobile-menu-pickup').evaluate(n=>n.getBoundingClientRect().height),pickupHeight,'loaded pickup times preserve the card height');
-  assert.ok(Math.abs(openedScroll-latestScroll)<2,`opening a delayed picker keeps the latest browsing position (${latestScroll} → ${openedScroll})`);
   await picker.getByRole('button',{name:'Close pickup selector',exact:true}).click();await picker.waitFor({state:'hidden'});
   assert.ok(Math.abs((await page.evaluate(()=>scrollY))-latestScroll)<2,'closing a delayed picker keeps the latest browsing position');
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),saved);

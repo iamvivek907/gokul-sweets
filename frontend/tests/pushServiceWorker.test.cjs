@@ -3,11 +3,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
-function worker() {
+function worker(clients = []) {
     const listeners = {}, shown = [], opened = [], entries = new Map();
     const self = {location: {origin: 'https://dev.gokulsweets.in'}, addEventListener(name, listener) {listeners[name] = listener;},
         registration: {async showNotification(title, options) {shown.push({title, ...options});}},
-        clients: {async matchAll() {return [];}, async openWindow(url) {opened.push(url);}}};
+        clients: {async matchAll() {if(clients instanceof Error)throw clients;return clients;}, async openWindow(url) {opened.push(url);}}};
     const caches = {async open() {return {async match(key) {const value = entries.get(key.url); return value ? new Response(value) : undefined;},
         async put(key, response) {entries.set(key.url, await response.text());}};}};
     vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../public/sw.js'), 'utf8'), {self, caches, URL, Request, Response, Promise, Array, String});
@@ -69,4 +69,23 @@ test('order stages replace the same device alert and optional review uses a safe
     runtime.listeners.notificationclick({notification:{data:runtime.shown[1].data,close(){}},waitUntil(value){pending=value;}});
     await pending;
     assert.deepEqual(runtime.opened,['https://dev.gokulsweets.in/orders/GS-81#order-review']);
+});
+
+test('staff push wakes only admin clients without losing notification dedupe on client failure', async () => {
+    const messages=[];
+    for(const clients of [
+        [{url:'https://dev.gokulsweets.in/admin/orders',postMessage(value){messages.push(value.type);}},
+         {url:'https://dev.gokulsweets.in/menu',postMessage(){throw new Error('Customer must not receive staff wake');}},
+         {url:'https://dev.gokulsweets.in/admin/closed',postMessage(){throw new Error('Client closed');}}],
+        new Error('Client discovery unavailable')]) {
+        const runtime=worker(clients);
+        for(let i=0;i<2;i++) {
+            let pending;
+            runtime.listeners.push({data:{json:()=>({eventId:'staff:99',title:'Preparation is due',body:'Start KOT',url:'/admin/orders/GS-99'})},waitUntil(value){pending=value;}});
+            await pending;
+        }
+        assert.equal(runtime.shown.length,1);
+        assert.equal(runtime.shown[0].silent,false);
+    }
+    assert.deepEqual(messages,['gokul-staff-alert']);
 });

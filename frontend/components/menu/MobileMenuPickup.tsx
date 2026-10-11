@@ -1,6 +1,6 @@
 "use client";
 import {confirmWalkthroughPickup} from "@/lib/orderingTour";
-import dynamic from "next/dynamic";
+import Dialog from "@/components/checkout/MobilePickupDialog";
 import {useEffect,useRef,useState} from "react";
 import {createPortal} from "react-dom";
 import {savePickupSlot,getPickupSlotSnapshot,clearPickupSlot} from "@/lib/checkoutStorage";
@@ -12,7 +12,6 @@ import {cartPickupOptions,menuPickupOptions} from "@/lib/menuPickupOptions";
 import {T,useLanguage,translate} from "@/lib/language";
 import type {MenuProduct} from "@/types/menu";
 import type {PickupSelection} from "@/types/pickup";
-const Dialog=dynamic(()=>import("@/components/checkout/MobilePickupDialog"),{loading:()=> <span className="sr-only" role="status"><T text="Checking times…"/></span>});
 export default function MobileMenuPickup({compactHeader=false,branchId,products,today,days,selection,date,expired,selectionUnavailable=false,noPickupMessage,availabilityError,onRetry,automatic=false,findingSoonest=false,onChoosingChange}:{compactHeader?:boolean;branchId:number;products:MenuProduct[];today:string;days:number;selection:PickupSelection|null;date?:string|null;expired:boolean;selectionUnavailable?:boolean;noPickupMessage?:string|null;availabilityError?:string|null;onRetry?:()=>void;automatic?:boolean;findingSoonest?:boolean;onChoosingChange?:(value:boolean)=>void}){
  const locale=useLanguage();
  const pickupRef=useRef<HTMLElement>(null);
@@ -59,7 +58,7 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
  },[branchId,request,onChoosingChange]);
  async function choose(trigger:HTMLElement){
   if(busy||open)return;
-  setPickerTrigger(trigger);
+  setPickerTrigger(trigger);setData(null);setOpen(true);
   onChoosingChange?.(true);setBusy(true);setError("");const c=new AbortController();controller.current=c;
   try{
    const branchSnapshot=getStoredBranchSnapshot(),cartSnapshot=getCartSnapshot();
@@ -71,10 +70,10 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
    const value=items.length?await checkCartAvailability(branchId,today,days+1,items,signal):await discoverPickupDates(branchId,today,days+1,signal);
    if(!c.signal.aborted&&branchSnapshot===getStoredBranchSnapshot()&&cartSnapshot===getCartSnapshot()){
     setCartIds(items.map(item=>item.productId));setData(value);setOpen(true);
-   }else onChoosingChange?.(false);
+   }else if(!c.signal.aborted&&controller.current===c){setOpen(false);onChoosingChange?.(false);setError("Your cart or branch changed. Open pickup times again.");}
   }
-  catch(error){onChoosingChange?.(false);if(!c.signal.aborted)setError(error instanceof Error?error.message:"We couldn’t load pickup times. Your cart is saved. Try again.");}
-  finally{if(!c.signal.aborted)setBusy(false);}
+  catch(error){if(!c.signal.aborted&&controller.current===c){setOpen(false);onChoosingChange?.(false);setError(error instanceof Error?error.message:"We couldn’t load pickup times. Your cart is saved. Try again.");}}
+  finally{if(!c.signal.aborted&&controller.current===c)setBusy(false);}
  }
  const ids=JSON.parse(request).map((item:{productId:number})=>item.productId);
  const searchMenu=()=>{
@@ -91,7 +90,7 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
  {noPickupMessage&&<p className="menu-pickup-conflict" role="status"><T text={noPickupMessage}/></p>}
  {availabilityError&&<p role="alert"><T text={availabilityError}/> <button type="button" onClick={onRetry}><T text="Retry availability"/></button></p>}
  {error&&<p role="alert">{error}</p>}
- {open&&data&&<Dialog restoreFocus={pickerTrigger} advisory today={today} dates={data.dates} options={cartIds.length?cartPickupOptions(data):menuPickupOptions(data,ids)} chosen={selection} initialDate={date??today} disabled={false} onClose={()=>{controller.current?.abort();setOpen(false);onChoosingChange?.(false);}} onConfirm={async value=>{
+ {open&&<Dialog loading={busy} restoreFocus={pickerTrigger} advisory today={today} dates={data?.dates??[]} options={data?(cartIds.length?cartPickupOptions(data):menuPickupOptions(data,ids)):[]} chosen={selection} initialDate={date??today} disabled={busy} onClose={()=>{controller.current?.abort();setBusy(false);setOpen(false);onChoosingChange?.(false);}} onConfirm={async value=>{
   const branch=getStoredBranchSnapshot(),pickup=getPickupSlotSnapshot(),cartSnapshot=getCartSnapshot();
   const cart=parseCart(cartSnapshot);
   if(cart.items.length&&cart.branchId!==branchId)throw new Error("Choose your cart’s branch before changing pickup.");
