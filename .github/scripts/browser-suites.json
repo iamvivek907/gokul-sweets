@@ -79,6 +79,7 @@
     "tests/owner-account.browser.mjs",
     "tests/printer-setup.browser.mjs",
     "tests/printer-setup-navigation.browser.mjs",
-    "tests/badge-admin.browser.mjs"
+    "tests/badge-admin.browser.mjs",
+    "tests/native-kitchen-alarm.browser.mjs"
   ]
 }

@@ -44,7 +44,7 @@ jobs:
         run: |
           node --test print-agent/package.test.cjs
           node print-agent/package.cjs
-          python -c "import zipfile; z=zipfile.ZipFile('print-agent/dist/gokul-print-agent.zip'); assert z.testzip() is None; assert set(z.namelist()) == {'agent.py','background.py','install.cmd','install.ps1','requirements.txt'}"
+          python -c "import zipfile; z=zipfile.ZipFile('print-agent/dist/gokul-print-agent.zip'); assert z.testzip() is None; assert set(z.namelist()) == {'agent.py','alarm.py','background.py','install.cmd','install.ps1','requirements.txt'}"
 
       - name: Verify committed download matches installer sources
         run: git diff --exit-code -- frontend/lib/generatedPrintInstaller.ts

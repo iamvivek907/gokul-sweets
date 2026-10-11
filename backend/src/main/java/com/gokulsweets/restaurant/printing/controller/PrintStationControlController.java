@@ -25,6 +25,7 @@ public class PrintStationControlController {
     private final PrintStationControlService service;
     private final PrintStationActionService actions;
     private final PrintAgentAuthenticationService authentication;
+    private final NativeKitchenAlarmService alarms;
 
     /** Requested future printing mode. */
     public record Mode(@NotNull Boolean enabled) {}
@@ -134,6 +135,85 @@ public class PrintStationControlController {
                     started,
                     PrintStationControlController.class,
                     "reconcile(Long,PrinterStation,UUID)");
+        }
+    }
+
+    /** Bounded native alarm observation from the private shop agent. */
+    public record AlarmReport(
+            @NotNull @jakarta.validation.constraints.Positive Long branchId,
+            @NotNull PrinterStation station,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 120)
+                    String agentId,
+            @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 32)
+                    String status,
+            @jakarta.validation.constraints.Min(0) long testReceipt) {}
+
+    /** Enables the independently running kitchen alarm after branch authorization. */
+    @PostMapping("/api/admin/printing/station/alarm-mode")
+    @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
+    public Map<String, Object> alarmMode(
+            @RequestParam Long branchId,
+            @RequestParam PrinterStation station,
+            @Valid @RequestBody Mode mode,
+            @RequestParam UUID requestId) {
+        final long started =
+                MethodTiming.start(
+                        PrintStationControlController.class,
+                        "alarmMode(Long,PrinterStation,Mode,UUID)");
+        try {
+            return actions.perform(
+                    branchId,
+                    station,
+                    requestId,
+                    () -> alarms.mode(branchId, station, mode.enabled()));
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    PrintStationControlController.class,
+                    "alarmMode(Long,PrinterStation,Mode,UUID)");
+        }
+    }
+
+    /** Requests a sound test without changing printer state. */
+    @PostMapping("/api/admin/printing/station/alarm-test")
+    @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
+    public Map<String, Object> alarmTest(
+            @RequestParam Long branchId,
+            @RequestParam PrinterStation station,
+            @RequestParam UUID requestId) {
+        final long started =
+                MethodTiming.start(
+                        PrintStationControlController.class, "alarmTest(Long,PrinterStation,UUID)");
+        try {
+            return actions.perform(
+                    branchId, station, requestId, () -> alarms.test(branchId, station));
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    PrintStationControlController.class,
+                    "alarmTest(Long,PrinterStation,UUID)");
+        }
+    }
+
+    /** Authenticates native alarm polling independently of printing and browser sessions. */
+    @PostMapping("/api/print-agent/alarm")
+    public Map<String, Object> alarm(
+            @RequestHeader(value = "X-Print-Agent-Key", required = false) String key,
+            @Valid @RequestBody AlarmReport report) {
+        final long started =
+                MethodTiming.start(
+                        PrintStationControlController.class, "alarm(String,AlarmReport)");
+        try {
+            authentication.authenticate(key);
+            return alarms.poll(
+                    report.branchId(),
+                    report.station(),
+                    report.agentId(),
+                    report.status(),
+                    report.testReceipt());
+        } finally {
+            MethodTiming.finish(
+                    started, PrintStationControlController.class, "alarm(String,AlarmReport)");
         }
     }
 

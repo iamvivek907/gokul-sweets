@@ -260,9 +260,10 @@ WHERE branch_id=? AND station=? AND agent_id=?
                         HttpStatus.BAD_REQUEST, "Unknown printer action.");
             var rows =
                     jdbc.queryForList(
-                            "SELECT *,last_seen_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds' AS"
-                                    + " online FROM print_station_controls WHERE branch_id=? AND"
-                                    + " station=? FOR UPDATE",
+                            "SELECT *,alarm_last_seen_at > CURRENT_TIMESTAMP - INTERVAL '20"
+                                + " seconds' AS alarm_online, last_seen_at > CURRENT_TIMESTAMP -"
+                                + " INTERVAL '60 seconds' AS online FROM print_station_controls"
+                                + " WHERE branch_id=? AND station=? FOR UPDATE",
                             branchId,
                             station.name());
             if (rows.isEmpty())
@@ -323,9 +324,10 @@ WHERE branch_id=? AND station=? AND agent_id=?
         try {
             var rows =
                     jdbc.queryForList(
-                            "SELECT *,last_seen_at > CURRENT_TIMESTAMP - INTERVAL '60 seconds' AS"
-                                    + " online FROM print_station_controls WHERE branch_id=? AND"
-                                    + " station=?",
+                            "SELECT *,alarm_last_seen_at > CURRENT_TIMESTAMP - INTERVAL '20"
+                                + " seconds' AS alarm_online, last_seen_at > CURRENT_TIMESTAMP -"
+                                + " INTERVAL '60 seconds' AS online FROM print_station_controls"
+                                + " WHERE branch_id=? AND station=?",
                             branchId,
                             station.name());
             if (rows.isEmpty()) return Map.of("configured", false);
@@ -336,6 +338,14 @@ WHERE branch_id=? AND station=? AND agent_id=?
             result.put("enabled", row.get("enabled"));
             result.put("online", Boolean.TRUE.equals(row.get("online")));
             result.put("runtime", decode(row.get("runtime")));
+            Map<String, Object> alarm = new HashMap<>();
+            alarm.put("enabled", row.get("alarm_enabled"));
+            alarm.put("status", row.get("alarm_status"));
+            alarm.put("lastSeenAt", row.get("alarm_last_seen_at"));
+            alarm.put("testSequence", row.get("alarm_test_sequence"));
+            alarm.put("testReceipt", row.get("alarm_test_receipt"));
+            alarm.put("online", Boolean.TRUE.equals(row.get("alarm_online")));
+            result.put("alarm", alarm);
             result.put("command", decode(row.get("command")));
             result.put("commandResult", decode(row.get("command_result")));
             return result;

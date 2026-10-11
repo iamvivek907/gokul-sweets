@@ -12,9 +12,7 @@ import java.time.Instant;
 
 class VerifiedCustomerSubjectStoreTest {
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
-    private final VerifiedCustomerSubjectStore store =
-            new VerifiedCustomerSubjectStore(
-                    jdbc, new org.springframework.mock.env.MockEnvironment());
+    private final VerifiedCustomerSubjectStore store = new VerifiedCustomerSubjectStore(jdbc);
 
     @Test
     void rejectsUnverifiedPhoneShapesWithoutDatabaseWrites() {

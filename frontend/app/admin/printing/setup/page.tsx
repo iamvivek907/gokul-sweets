@@ -225,6 +225,18 @@ export default function PrinterSetupPage() {
                 </div>
             </div>}
         </section>
+        {station === "KITCHEN" && state?.configured && <section aria-labelledby="native-alarm" className="space-y-3 rounded-xl border border-stone-200 bg-white p-5">
+            <h2 id="native-alarm" className="text-lg font-semibold">Kitchen computer sound</h2>
+            <p>Sound runs on the Windows shop computer, independently of this webpage and printing. Keep the computer signed in with working speakers. A different tone warns when order checks fail.</p>
+            <p role="status"><strong>{!state.alarm?.online ? "Alarm agent offline" : state.alarm.status === "ERROR" || state.alarm.status === "OFFLINE" ? "Alarm needs attention" : state.alarm.status === "STARTING" ? "Starting alarm" : state.alarm.status === "TESTING" ? "Playing test sound" : state.alarm.enabled ? state.alarm.status === "RINGING" ? "Order alarm ringing" : "Alarm enabled" : "Alarm disabled"}</strong></p>
+            <p>Last alarm contact: {state.alarm?.lastSeenAt ? new Date(state.alarm.lastSeenAt).toLocaleString() : "Not received — install or upgrade the Windows agent."}</p>
+            <div className="flex flex-wrap gap-3">
+                <button className={button} disabled={actionBlocked || !canConfigure} onClick={() => void mutate("/alarm-mode", {enabled: !state.alarm?.enabled})}>{state.alarm?.enabled ? "Disable computer alarm" : "Enable computer alarm"}</button>
+                <button className={button} disabled={actionBlocked || !canConfigure || !state.alarm?.online} onClick={() => void mutate("/alarm-test", {})}>Test computer sound</button>
+            </div>
+            {!!state.alarm?.testSequence && <p>{(state.alarm.testReceipt ?? 0) >= state.alarm.testSequence ? "Windows accepted the latest sound test. Confirm that you heard it at the shop." : "Waiting for sound test receipt. Tests expire after one minute; retry if no sound was heard."}</p>}
+            <p>Existing installations: download the updated installer and run it with your saved profile using the same Windows account. It preserves the private key and print journal. Enable sound here after checking the speakers.</p>
+        </section>}
         <section aria-labelledby="install-help" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-5">
             <h2 id="install-help" className="text-xl font-bold">One-time installation — including an 80 mm printer</h2>
             <ol className="list-decimal space-y-2 pl-6">

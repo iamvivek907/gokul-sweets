@@ -15,7 +15,7 @@ test('installer ZIP and tracked payload are identical for LF and Windows CRLF ch
             fs.mkdirSync(agent, {recursive: true});
             fs.mkdirSync(path.join(checkout, 'frontend/lib'), {recursive: true});
             fs.copyFileSync(path.join(__dirname, 'package.cjs'), path.join(agent, 'package.cjs'));
-            for (const name of ['agent.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd']) {
+            for (const name of ['agent.py', 'alarm.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd']) {
                 const source = fs.readFileSync(path.join(__dirname, name), 'utf8').replace(/\r\n?/g, '\n');
                 fs.writeFileSync(path.join(agent, name), source.replace(/\n/g, ending));
             }

@@ -9,7 +9,7 @@ function crc32(data) {
     }
     return (crc ^ 0xffffffff) >>> 0;
 }
-const entries = ['agent.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd'];
+const entries = ['agent.py', 'alarm.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd'];
 let offset = 0;
 const files = [], directory = [];
 for (const file of entries) {

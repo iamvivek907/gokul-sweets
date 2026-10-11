@@ -107,15 +107,18 @@ public class LoyaltyAdminController {
                     "accounts",
                     jdbc.queryForList(
                             "SELECT a.environment,a.subject_id,COALESCE(SUM(l.coins),0) AS coins"
-                                + " FROM loyalty_accounts a LEFT JOIN loyalty_ledger l ON"
-                                + " l.environment=a.environment AND l.subject_id=a.subject_id GROUP"
-                                + " BY a.environment,a.subject_id ORDER BY"
-                                + " a.environment,a.subject_id LIMIT 500"));
+                                + " FROM loyalty_accounts a LEFT JOIN loyalty_account_ledger l ON"
+                                + " l.environment=a.environment AND l.subject_id=a.subject_id WHERE"
+                                + " NOT EXISTS (SELECT 1 FROM verified_customer_account_aliases x"
+                                + " WHERE x.environment=a.environment AND"
+                                + " x.prior_subject_id=a.subject_id) GROUP BY"
+                                + " a.environment,a.subject_id ORDER BY a.environment,a.subject_id"
+                                + " LIMIT 500"));
             output.put(
                     "adjustments",
                     jdbc.queryForList(
                             "SELECT a.*,l.environment,l.subject_id,l.coins,l.created_at FROM"
-                                    + " loyalty_adjustment_audit a JOIN loyalty_ledger l ON"
+                                    + " loyalty_adjustment_audit a JOIN loyalty_account_ledger l ON"
                                     + " l.id=a.ledger_id ORDER BY l.id DESC LIMIT 100"));
             output.put(
                     "exclusions",
@@ -133,8 +136,8 @@ public class LoyaltyAdminController {
             long outstanding =
                     jdbc.queryForObject(
                             "SELECT COALESCE(SUM(GREATEST(coins,0)),0) FROM (SELECT SUM(coins)"
-                                    + " coins FROM loyalty_ledger GROUP BY environment,subject_id)"
-                                    + " balances",
+                                    + " coins FROM loyalty_account_ledger GROUP BY"
+                                    + " environment,subject_id) balances",
                             Long.class);
             output.put(
                     "reservedDiscountRupees",
@@ -340,7 +343,7 @@ public class LoyaltyAdminController {
                     .cacheControl(CacheControl.noStore())
                     .body(
                             jdbc.queryForList(
-                                    "SELECT * FROM loyalty_ledger WHERE environment=? AND"
+                                    "SELECT * FROM loyalty_account_ledger WHERE environment=? AND"
                                             + " subject_id=? ORDER BY id DESC LIMIT 500",
                                     environment,
                                     subject));

@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
-@SpringBootTest(properties = "gokul.identity.phone-only-order-recovery=true")
+@SpringBootTest(properties = "gokul.identity.phone-only-order-recovery=false")
 @Transactional
 class VerifiedIdentityIssuanceIntegrationTest {
     @Autowired VerifiedIdentityIssuance issuance;
@@ -65,7 +65,7 @@ class VerifiedIdentityIssuanceIntegrationTest {
     }
 
     @Test
-    void reverifiedPhoneGetsFreshSubjectAndCannotInheritSessionsOrConsent() {
+    void reverifiedPhoneKeepsAccountAndIndependentDeviceSessions() {
         var now = Instant.parse("2026-09-26T18:29:59Z"); // just before IST midnight
         var phone = "+919876543210";
         var first =
@@ -84,16 +84,16 @@ class VerifiedIdentityIssuanceIntegrationTest {
         var newSubject =
                 sessions.subject(ConsentEnvironment.DEV, second.token(), now.plusSeconds(2))
                         .orElseThrow();
-        assertThat(newSubject).isNotEqualTo(oldSubject);
+        assertThat(newSubject).isEqualTo(oldSubject);
         assertThat(sessions.subject(ConsentEnvironment.DEV, first.token(), now.plusSeconds(2)))
-                .isEmpty();
+                .contains(oldSubject);
         assertThat(
                         consent.current(
                                         ConsentEnvironment.DEV,
                                         newSubject,
                                         ConsentPurpose.MARKETING)
                                 .granted())
-                .isFalse();
+                .isTrue();
         assertThat(
                         jdbc.queryForObject(
                                 """
@@ -103,11 +103,16 @@ WHERE environment = 'DEV' AND prior_subject_id = ? AND new_subject_id = ?
                                 Integer.class,
                                 oldSubject,
                                 newSubject))
-                .isEqualTo(1);
+                .isZero();
+        sessions.revoke(ConsentEnvironment.DEV, second.token(), now.plusSeconds(3));
+        assertThat(sessions.subject(ConsentEnvironment.DEV, second.token(), now.plusSeconds(3)))
+                .isEmpty();
+        assertThat(sessions.subject(ConsentEnvironment.DEV, first.token(), now.plusSeconds(3)))
+                .contains(oldSubject);
     }
 
     @Test
-    void phoneOtpAloneRecoversVerifiedOrdersAcrossDevicesAndAuditsEachTransfer() {
+    void samePhoneAcrossDevicesKeepsVerifiedOrdersWithoutTransferringOrClaimingGuests() {
         var now = Instant.now();
         var phone = "+919876543210";
         var first =
@@ -170,7 +175,7 @@ RETURNING id
         var continuedSubject =
                 sessions.subject(ConsentEnvironment.DEV, continued.token(), now.plusSeconds(1))
                         .orElseThrow();
-        assertThat(continuedSubject).isNotEqualTo(oldSubject);
+        assertThat(continuedSubject).isEqualTo(oldSubject);
         assertThat(
                         jdbc.queryForObject(
                                 """
@@ -180,7 +185,7 @@ SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
                                 order))
                 .isEqualTo(continuedSubject);
         assertThat(sessions.subject(ConsentEnvironment.DEV, first.token(), now.plusSeconds(1)))
-                .isEmpty();
+                .contains(oldSubject);
 
         var newHolder =
                 issuance.issue(
@@ -191,7 +196,7 @@ SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
         var newSubject =
                 sessions.subject(ConsentEnvironment.DEV, newHolder.token(), now.plusSeconds(2))
                         .orElseThrow();
-        assertThat(newSubject).isNotEqualTo(continuedSubject);
+        assertThat(newSubject).isEqualTo(continuedSubject);
         assertThat(
                         jdbc.queryForObject(
                                 """
@@ -208,7 +213,7 @@ SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
                                 """,
                                 Integer.class,
                                 order))
-                .isEqualTo(2);
+                .isZero();
         assertThat(
                         jdbc.queryForObject(
                                 """
@@ -220,13 +225,13 @@ SELECT verified_subject_id FROM verified_order_ownership WHERE order_id = ?
         assertThat(
                         jdbc.queryForObject(
                                 """
-                                SELECT sum(transferred_order_count) FROM verified_subject_rotations
-                                WHERE environment = 'DEV' AND new_subject_id IN (?, ?)
-                                """,
+SELECT COALESCE(sum(transferred_order_count),0) FROM verified_subject_rotations
+WHERE environment = 'DEV' AND new_subject_id IN (?, ?)
+""",
                                 Long.class,
                                 continuedSubject,
                                 newSubject))
-                .isEqualTo(2L);
+                .isZero();
     }
 
     @Test

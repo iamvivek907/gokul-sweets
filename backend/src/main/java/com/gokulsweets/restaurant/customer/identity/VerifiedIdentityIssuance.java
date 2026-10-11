@@ -118,8 +118,10 @@ RETURNING environment
             }
             var previousSubject =
                     sessions.subject(environment, previousSessionToken, now).orElse(null);
-            var subject =
-                    subjects.recordVerifiedPhone(environment, verifiedPhone, now, previousSubject);
+            var subject = subjects.recordVerifiedPhone(environment, verifiedPhone, now);
+            // Replace only this device's prior session; keep other devices signed in.
+            if (subject.equals(previousSubject))
+                sessions.revoke(environment, previousSessionToken, now);
             return sessions.issue(environment, subject, now);
         } finally {
             MethodTiming.finish(

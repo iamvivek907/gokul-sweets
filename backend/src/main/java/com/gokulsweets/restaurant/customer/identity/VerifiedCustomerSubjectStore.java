@@ -5,7 +5,6 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import lombok.RequiredArgsConstructor;
 
-import org.springframework.core.env.Environment;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,8 +20,6 @@ import java.util.UUID;
 public class VerifiedCustomerSubjectStore {
 
     private final JdbcTemplate jdbc;
-
-    private final Environment settings;
 
     /**
      * Records verified phone.
@@ -74,9 +71,7 @@ public class VerifiedCustomerSubjectStore {
             if (verifiedPhone == null || !verifiedPhone.matches("\\+91[6-9][0-9]{9}")) {
                 throw new IllegalArgumentException("A provider-verified Indian mobile is required");
             }
-            // Serialize first verification and repeat verification across app instances.
-            // A reused phone loses its prior sessions and consent. Owner-selected
-            // phone-only order recovery deliberately transfers verified orders.
+            // One account per provider-verified phone; sessions remain device-specific.
             jdbc.query(
                     "SELECT pg_advisory_xact_lock(hashtextextended(?, 0))",
                     rs -> {
@@ -84,88 +79,23 @@ public class VerifiedCustomerSubjectStore {
                         return null;
                     },
                     environment.name() + ":" + verifiedPhone);
-            UUID prior =
-                    jdbc.query(
+            UUID current =
+                    jdbc.queryForObject(
                             """
-                            SELECT id FROM verified_customer_subjects
-                            WHERE environment = ? AND verified_phone = ?
-                            """,
-                            rs -> rs.next() ? (UUID) rs.getObject(1) : null,
+INSERT INTO verified_customer_subjects
+    (id, environment, verified_phone, created_at, last_verified_at)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT (environment, verified_phone) DO UPDATE
+    SET last_verified_at = GREATEST(verified_customer_subjects.last_verified_at,
+                                   EXCLUDED.last_verified_at)
+RETURNING id
+""",
+                            UUID.class,
+                            UUID.randomUUID(),
                             environment.name(),
-                            verifiedPhone);
-            UUID current = UUID.randomUUID();
-            if (prior == null) {
-                jdbc.update(
-                        """
-                        INSERT INTO verified_customer_subjects
-                            (id, environment, verified_phone, created_at, last_verified_at)
-                        VALUES (?, ?, ?, ?, ?)
-                        """,
-                        current,
-                        environment.name(),
-                        verifiedPhone,
-                        Timestamp.from(now),
-                        Timestamp.from(now));
-            } else {
-                jdbc.update(
-                        """
-                        UPDATE verified_customer_sessions SET revoked_at = ?
-                        WHERE environment = ? AND verified_subject_id = ? AND revoked_at IS NULL
-                        """,
-                        Timestamp.from(now),
-                        environment.name(),
-                        prior);
-                jdbc.update(
-                        """
-UPDATE verified_customer_subjects SET id = ?, last_verified_at = GREATEST(last_verified_at, ?)
-WHERE environment = ? AND verified_phone = ?
-""",
-                        current,
-                        Timestamp.from(now),
-                        environment.name(),
-                        verifiedPhone);
-                int transferred = 0;
-                int updated = 0;
-                if (prior.equals(previousSessionSubject)
-                        || settings.getProperty(
-                                "gokul.identity.phone-only-order-recovery", Boolean.class, false)) {
-                    transferred =
-                            jdbc.update(
-                                    """
-INSERT INTO verified_order_transfer_audit
-    (order_id, environment, prior_subject_id, new_subject_id, transferred_at)
-SELECT order_id, environment, verified_subject_id, ?, ?
-FROM verified_order_ownership
-WHERE environment = ? AND verified_subject_id = ?
-""",
-                                    current,
-                                    Timestamp.from(now),
-                                    environment.name(),
-                                    prior);
-                    updated =
-                            jdbc.update(
-                                    """
-                                    UPDATE verified_order_ownership SET verified_subject_id = ?
-                                    WHERE environment = ? AND verified_subject_id = ?
-                                    """,
-                                    current,
-                                    environment.name(),
-                                    prior);
-                }
-                if (transferred != updated)
-                    throw new IllegalStateException("Order transfer count changed");
-                jdbc.update(
-                        """
-INSERT INTO verified_subject_rotations
-    (environment, prior_subject_id, new_subject_id, rotated_at, reason, transferred_order_count)
-VALUES (?, ?, ?, ?, 'PHONE_REVERIFICATION', ?)
-""",
-                        environment.name(),
-                        prior,
-                        current,
-                        Timestamp.from(now),
-                        transferred);
-            }
+                            verifiedPhone,
+                            Timestamp.from(now),
+                            Timestamp.from(now));
             // Only provider proof reaches this method. Typed checkout phones never promote a
             // contact.
             jdbc.update(

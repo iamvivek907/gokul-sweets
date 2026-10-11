@@ -5,6 +5,9 @@ import os
 from pathlib import Path
 import sys
 import time
+import threading
+
+import alarm
 
 import agent
 
@@ -37,6 +40,11 @@ def main():
         sys.stdout = sys.stderr = LogOutput(handler)
         key = win32crypt.CryptUnprotectData((root / "key.dpapi").read_bytes(), None, None, None, 0)[1]
         os.environ["PRINT_AGENT_API_KEY"] = key.decode("utf-8")
+        cfg = agent.load_config(root / "config.local.json")
+        # Separate loop: blocked printer drivers, pending KOTs and page refreshes
+        # cannot block the alarm. The OS startup task supervises this process.
+        threading.Thread(target=alarm.run, args=(cfg, root / "config.local.json"),
+                         name="kitchen-alarm", daemon=True).start()
         while True:
             try:
                 cfg = agent.load_config(root / "config.local.json")

@@ -29,7 +29,23 @@ try {
     if (![long]::TryParse([string]$profile.branch_id, [ref]$branchNumber) -or $branchNumber -lt 1 -or $profile.station -notin @('KITCHEN','SWEETS','BEVERAGE','FAST_FOOD','BILLING')) { throw 'Invalid printer profile.' }
     $paths = Get-AgentPaths "$branchNumber-$($profile.station)"
     $folder = $paths.Folder
-    if (Test-Path (Join-Path $folder 'config.local.json')) { throw 'This station is already installed. Manage it in Admin setup. Contact your administrator for an agent software upgrade.' }
+    if (Test-Path (Join-Path $folder 'config.local.json')) {
+        $installed = Get-Content -LiteralPath (Join-Path $folder 'config.local.json') -Raw | ConvertFrom-Json
+        if ($installed.api_url -ne $profile.api_url -or $installed.agent_id -ne $profile.agent_id -or $installed.printer_code -ne $profile.printer_code) { throw 'Upgrade requires the same installed backend, agent ID and printer code.' }
+        if (!(Test-Path (Join-Path $folder 'key.dpapi'))) { throw 'Existing encrypted key is missing. Ask your administrator to repair the installation.' }
+        $taskName = "GokulPrint-$branchNumber-$($profile.station)"
+        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        # Wait for the supervised process to exit before replacing source files.
+        for ($attempt = 0; $attempt -lt 10; $attempt++) {
+            if ((Get-ScheduledTask -TaskName $taskName).State -ne 'Running') { break }
+            Start-Sleep -Seconds 1
+        }
+        if ((Get-ScheduledTask -TaskName $taskName).State -eq 'Running') { throw 'Agent did not stop. Retry after stopping the task.' }
+        foreach ($file in @('agent.py','alarm.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
+        Start-ScheduledTask -TaskName $taskName
+        Write-Host 'Agent upgraded. Key, profile and print journal preserved. Test and enable Kitchen computer sound in Admin setup.'
+        exit 0
+    }
     $python = $paths.Python
     if (!(Test-Path $python)) {
         Write-Host 'Installing Python 3.13 using Windows Package Manager...'
@@ -38,7 +54,7 @@ try {
         if ($LASTEXITCODE -ne 0 -or !(Test-Path $python)) { throw 'Python installation did not complete. Check Windows Package Manager and retry.' }
     }
     New-Item -ItemType Directory -Force -Path $folder | Out-Null
-    foreach ($file in @('agent.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
+    foreach ($file in @('agent.py','alarm.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
     & $python -m venv (Join-Path $folder '.venv')
     if ($LASTEXITCODE -ne 0) { throw 'Could not create the agent environment.' }
     $runtime = $paths.Runtime
