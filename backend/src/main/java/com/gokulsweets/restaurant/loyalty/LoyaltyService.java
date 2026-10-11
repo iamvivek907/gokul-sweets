@@ -385,7 +385,7 @@ public class LoyaltyService {
         try {
             return jdbc.query(
                     """
-SELECT l.id,p.remaining,GREATEST(l.expires_at,a.last_qualifying_activity + (l.expiry_days * INTERVAL '1 day')) AS expires_at,l.source_credit_id FROM loyalty_lots p JOIN loyalty_account_ledger l ON l.id=p.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.original_subject_id
+SELECT l.id,p.remaining,GREATEST(l.expires_at,a.last_qualifying_activity + (l.expiry_days * INTERVAL '1 day')) AS expires_at,l.source_credit_id FROM loyalty_lots p JOIN loyalty_account_ledger l ON l.id=p.ledger_id LEFT JOIN loyalty_account_ledger origin ON origin.id=l.source_credit_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=COALESCE(origin.original_subject_id,l.original_subject_id)
 WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at NULLS LAST,l.id
 """,
                     (rs, row) ->
@@ -1314,10 +1314,12 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
                     Boolean.TRUE.equals(
                             jdbc.queryForObject(
                                     "SELECT EXISTS(SELECT 1 FROM loyalty_hold_lots h JOIN"
-                                        + " loyalty_account_ledger l ON l.id=h.ledger_id JOIN"
-                                        + " loyalty_accounts a ON a.environment=l.environment AND"
-                                        + " a.subject_id=l.original_subject_id JOIN loyalty_holds"
-                                        + " hold ON hold.order_id=h.order_id AND"
+                                        + " loyalty_account_ledger l ON l.id=h.ledger_id LEFT JOIN"
+                                        + " loyalty_account_ledger origin ON"
+                                        + " origin.id=l.source_credit_id JOIN loyalty_accounts a ON"
+                                        + " a.environment=l.environment AND"
+                                        + " a.subject_id=COALESCE(origin.original_subject_id,l.original_subject_id)"
+                                        + " JOIN loyalty_holds hold ON hold.order_id=h.order_id AND"
                                         + " hold.generation=h.generation WHERE h.order_id=? AND"
                                         + " hold.state='RESERVED' AND"
                                         + " GREATEST(l.expires_at,a.last_qualifying_activity+(l.expiry_days*INTERVAL"

@@ -53,6 +53,8 @@ class AlarmState:
         self.status = "STARTING"
         try:
             saved = json.loads(self.path.read_text())
+            if not isinstance(saved, dict):
+                raise ValueError("Invalid alarm cache")
             if saved.get("identity") == identity:
                 self.enabled = saved.get("enabled") is True
                 self.due = saved.get("due") is True

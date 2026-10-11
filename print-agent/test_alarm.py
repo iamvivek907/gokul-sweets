@@ -84,5 +84,6 @@ class AlarmTest(unittest.TestCase):
         self.assertEqual(self.sound.play.call_count, before)
 
     def test_corrupt_cache_does_not_enable_alarm(self):
-        Path(str(self.path) + '.alarm.json').write_text('broken')
-        self.assertFalse(AlarmState(self.path, self.identity).enabled)
+        for content in ['broken', '[]', 'null', 'false']:
+            Path(str(self.path) + '.alarm.json').write_text(content)
+            self.assertFalse(AlarmState(self.path, self.identity).enabled)

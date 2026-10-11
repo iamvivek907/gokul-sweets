@@ -60,9 +60,11 @@ ORDER BY o.id LIMIT 500
             var expiring =
                     jdbc.queryForList(
                             "SELECT DISTINCT l.environment,l.subject_id FROM loyalty_lots p JOIN"
-                                + " loyalty_account_ledger l ON l.id=p.ledger_id JOIN"
-                                + " loyalty_accounts a ON a.environment=l.environment AND"
-                                + " a.subject_id=l.original_subject_id WHERE p.remaining>0 AND"
+                                + " loyalty_account_ledger l ON l.id=p.ledger_id LEFT JOIN"
+                                + " loyalty_account_ledger origin ON origin.id=l.source_credit_id"
+                                + " JOIN loyalty_accounts a ON a.environment=l.environment AND"
+                                + " a.subject_id=COALESCE(origin.original_subject_id,l.original_subject_id)"
+                                + " WHERE p.remaining>0 AND"
                                 + " GREATEST(l.expires_at,a.last_qualifying_activity+(l.expiry_days*INTERVAL"
                                 + " '1 day'))<=CURRENT_TIMESTAMP LIMIT 500");
             for (var account : expiring) {
