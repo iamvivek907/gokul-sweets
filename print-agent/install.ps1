@@ -25,6 +25,20 @@ function Start-AgentAfterUpgrade([string]$TaskName) {
     throw 'Agent failed to start after the upgrade.'
 }
 function Update-AgentInstallation([string]$Folder, [string]$Source, [string]$TaskName) {
+    # FileShare.None excludes other installer processes; closing releases even after a crash.
+    # Keep the lock file so all runs open the same file throughout rollback.
+    try {
+        $lock = [IO.File]::Open((Join-Path $Folder '.install.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch {
+        throw "Could not acquire the installation lock. Another installer may be running; wait for it to finish and retry. $($_.Exception.Message)"
+    }
+    try {
+        Update-AgentInstallationLocked $Folder $Source $TaskName
+    } finally {
+        $lock.Dispose()
+    }
+}
+function Update-AgentInstallationLocked([string]$Folder, [string]$Source, [string]$TaskName) {
     $stage = Join-Path $Folder ('.upgrade-' + [guid]::NewGuid().ToString())
     $backup = Join-Path $stage 'backup'
     $files = @('agent.py','alarm.py','background.py','requirements.txt')

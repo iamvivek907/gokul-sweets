@@ -47,6 +47,7 @@ class MacInstallerTest(unittest.TestCase):
             self.assertGreater(len(context.get_ca_certs()), 0)
 
 
+@unittest.skipIf(__import__('sys').platform == 'win32', 'macOS installer uses Unix file locks')
 class MacUpgradeTest(unittest.TestCase):
     def fixture(self, root):
         installed = root / 'installed'
@@ -115,3 +116,63 @@ class MacUpgradeTest(unittest.TestCase):
                     activate(installed, staged, plist, new_plist, 'gui/1', 'alarm')
                 launch.assert_not_called()
             self.assertEqual((installed / 'agent.py').read_text(), 'old-agent.py')
+
+    def test_overlapping_upgrade_cannot_mix_rollback_versions(self):
+        import tempfile
+        import shutil
+        import subprocess
+        from unittest.mock import Mock, patch
+        from macos import activate, installation_lock
+        with tempfile.TemporaryDirectory() as folder:
+            installed, staged, plist, new_plist, names = self.fixture(Path(folder))
+            other = installed / '.other'
+            other.mkdir()
+            for name in names:
+                (other / name).write_text('other-' + name)
+            (other / 'launch.plist').write_text('other-plist')
+            copy = shutil.copyfile
+            attempts = []
+            def overlap(source, target):
+                result = copy(source, target)
+                if Path(target) == staged / 'backup' / 'agent.py':
+                    with self.assertRaisesRegex(RuntimeError, 'Another installer'):
+                        activate(installed, other, plist, other / 'launch.plist', 'gui/1', 'alarm')
+                    attempts.append(True)
+                return result
+            def launch(args, **kwargs):
+                if 'bootstrap' in args and plist.read_text() == 'new-plist':
+                    raise subprocess.CalledProcessError(1, args)
+                return Mock(returncode=0)
+            with patch('macos.shutil.copyfile', side_effect=overlap), patch('macos.subprocess.run', side_effect=launch):
+                with self.assertRaisesRegex(RuntimeError, 'restored and restarted'):
+                    activate(installed, staged, plist, new_plist, 'gui/1', 'alarm')
+            self.assertEqual(attempts, [True])
+            self.assertFalse((other / 'backup').exists())
+            for name in names:
+                self.assertEqual((installed / name).read_text(), 'old-' + name)
+            self.assertEqual(plist.read_text(), 'old-plist')
+            with installation_lock(installed):
+                pass
+
+    def test_process_crash_releases_lock_without_removing_lock_file(self):
+        import tempfile
+        import subprocess
+        import sys
+        from macos import installation_lock
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            script = 'from pathlib import Path; from macos import installation_lock; import sys,time\nwith installation_lock(Path(sys.argv[1])):\n print("locked", flush=True)\n time.sleep(30)\n'
+            process = subprocess.Popen([sys.executable, '-c', script, folder],
+                cwd=str(Path(__file__).parent), stdout=subprocess.PIPE, text=True)
+            try:
+                self.assertEqual(process.stdout.readline().strip(), 'locked')
+                with self.assertRaisesRegex(RuntimeError, 'Another installer'):
+                    with installation_lock(root):
+                        pass
+            finally:
+                process.kill()
+                process.wait(timeout=5)
+                process.stdout.close()
+            self.assertTrue((root / '.install.lock').exists())
+            with installation_lock(root):
+                pass

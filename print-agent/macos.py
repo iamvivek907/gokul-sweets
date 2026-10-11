@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import ast
+from contextlib import contextmanager
 
 import agent
 import alarm
@@ -72,7 +73,27 @@ def stop_service(domain, label):
         raise RuntimeError('Could not stop the alarm. No installed files were changed.')
 
 
+@contextmanager
+def installation_lock(root):
+    import fcntl
+    # Keep the inode: unlinking a lock file lets another installer lock a different file.
+    with (root / '.install.lock').open('a') as stream:
+        try:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError('Another installer is running for this kitchen. Wait for it to finish and retry.') from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(stream, fcntl.LOCK_UN)
+
+
 def activate(root, staged, plist, staged_plist, domain, label):
+    with installation_lock(root):
+        _activate(root, staged, plist, staged_plist, domain, label)
+
+
+def _activate(root, staged, plist, staged_plist, domain, label):
     """Back up before stopping; restore files and startup registration on any failure."""
     names = ('agent.py', 'alarm.py', 'macos.py', 'cacert.pem', 'config.local.json')
     backup = staged / 'backup'
@@ -109,6 +130,14 @@ def activate(root, staged, plist, staged_plist, domain, label):
 
 def install(profile):
     cfg = agent.load_config(profile)
+    root = Path.home() / 'Library/Application Support/GokulAlarm' / str(cfg['branch_id'])
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    with installation_lock(root):
+        _install(profile)
+
+
+def _install(profile):
+    cfg = agent.load_config(profile)
     if cfg['station'] != 'KITCHEN':
         raise ValueError('Select the KITCHEN station profile for the macOS alarm.')
     root = Path.home() / 'Library/Application Support/GokulAlarm' / str(cfg['branch_id'])
@@ -144,7 +173,7 @@ def install(profile):
         with staged_plist.open('wb') as stream:
             plistlib.dump(launch_definition(root, sys.executable, label), stream)
         os.chmod(staged_plist, 0o600)
-        activate(root, staged, plist, staged_plist, domain, label)
+        _activate(root, staged, plist, staged_plist, domain, label)
     except RuntimeError as exc:
         if 'Recovery files retained' in str(exc):
             raise

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 # Load only pure upgrade functions: do not execute the interactive installer or touch real tasks.
 $tree = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'install.ps1'), [ref]$null, [ref]$null)
-foreach ($definition in $tree.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Stop-AgentForUpgrade','Start-AgentAfterUpgrade','Update-AgentInstallation') }, $true)) {
+foreach ($definition in $tree.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Stop-AgentForUpgrade','Start-AgentAfterUpgrade','Update-AgentInstallation','Update-AgentInstallationLocked') }, $true)) {
     . ([scriptblock]::Create($definition.Extent.Text))
 }
 function Stop-ScheduledTask { param($TaskName) $script:state = 'Ready'; $script:stops++ }
@@ -36,6 +36,16 @@ try {
         if ($scenario -eq 'missing-source') { Remove-Item -LiteralPath (Join-Path $source 'alarm.py') }
         $script:state = 'Running'; $script:stops = 0; $script:starts = 0
         $script:failStart = $scenario -eq 'activation'; $script:failCopy = $scenario -eq 'replacement'
+        $held = [IO.File]::Open((Join-Path $script:installed '.install.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        try {
+            $rejected = $false
+            try { Update-AgentInstallation $script:installed $source 'fixture-task' } catch {
+                if ($_.Exception.Message -notlike '*installation lock*') { throw }
+                $rejected = $true
+            }
+            if (!$rejected -or $script:stops -ne 0 -or $script:starts -ne 0) { throw 'Concurrent installer was not rejected before stopping the task.' }
+            if ((Get-ChildItem -LiteralPath $script:installed -Directory -Filter '.upgrade-*').Count -ne 0) { throw 'Concurrent installer created staging files.' }
+        } finally { $held.Dispose() }
         $failed = $false
         try { Update-AgentInstallation $script:installed $source 'fixture-task' } catch { $failed = $true }
         if ($failed -ne ($scenario -ne 'success')) { throw "Unexpected outcome: $scenario" }
@@ -47,6 +57,9 @@ try {
         }
         if ($scenario -ne 'success' -and (Test-Path -LiteralPath (Join-Path $script:installed 'alarm.py'))) { throw 'Rollback left a file absent from the original version.' }
         if ((Get-Content -LiteralPath (Join-Path $script:installed 'key.dpapi') -Raw).Trim() -ne 'original-key' -or (Get-Content -LiteralPath (Join-Path $script:installed 'journal.sqlite') -Raw).Trim() -ne 'original-journal') { throw 'Upgrade touched credentials or the journal.' }
+        # Success and every failure path release the lock for the next installer.
+        $released = [IO.File]::Open((Join-Path $script:installed '.install.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+        $released.Dispose()
         Write-Host "Windows upgrade $scenario passed."
     }
 } finally {
