@@ -27,11 +27,19 @@ try {
   const page=await context.newPage();await page.goto(base+'/admin/printing/setup');
   const enable=page.getByRole('button',{name:'Enable computer alarm',exact:true});await enable.waitFor();
   assert.equal(await enable.isEnabled(),configure);
+  const mac=page.getByRole("link",{name:"Download macOS alarm installer",exact:true});
+  assert.equal(await mac.getAttribute("href"),"/downloads/gokul-kitchen-alarm-macos.zip");
+  if(width===390 && configure) {
+   const download=await context.request.get(base+"/downloads/gokul-kitchen-alarm-macos.zip");
+   assert.equal(download.status(),200);
+   assert.match(download.headers()["content-disposition"],/gokul-kitchen-alarm-macos.zip/);
+   assert.ok((await download.body()).includes(Buffer.from("install-macos.command")));
+  }
   if(configure) {
    await enable.click();await page.getByText('Alarm enabled',{exact:true}).waitFor();
    await page.getByRole('button',{name:'Test computer sound',exact:true}).click();
    await page.getByText('Playing test sound',{exact:true}).waitFor();
-   await page.getByText('Windows accepted the latest sound test. Confirm that you heard it at the shop.',{exact:true}).waitFor();
+   await page.getByText('The computer accepted the latest sound test. Confirm that you heard it at the shop.',{exact:true}).waitFor();
    await page.reload();await page.getByRole('button',{name:'Disable computer alarm',exact:true}).waitFor();
    alarm={...alarm,online:false};await page.getByText('Alarm agent offline',{exact:true}).waitFor();
    assert.equal(await page.getByRole('button',{name:'Test computer sound',exact:true}).isEnabled(),false);

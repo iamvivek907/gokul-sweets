@@ -87,3 +87,34 @@ class AlarmTest(unittest.TestCase):
         for content in ['broken', '[]', 'null', 'false']:
             Path(str(self.path) + '.alarm.json').write_text(content)
             self.assertFalse(AlarmState(self.path, self.identity).enabled)
+
+class SupervisorTest(unittest.TestCase):
+    def test_startup_lock_failure_retries_without_waiting_for_printer_loop(self):
+        from unittest.mock import patch
+        from alarm import supervise
+        stop = Mock()
+        stop.is_set.return_value = False
+        stop.wait.side_effect = [False, True]
+        with patch('alarm.run', side_effect=[BlockingIOError('locked'), OSError('temporary')]) as run:
+            supervise({'station': 'KITCHEN'}, Path('profile.json'), stop)
+        self.assertEqual(run.call_count, 2)
+        stop.wait.assert_called_with(5)
+
+    def test_macos_interrupted_playback_restarts_and_disable_stops_child_group(self):
+        from unittest.mock import patch
+        from alarm import MacSound
+        with tempfile.TemporaryDirectory() as folder:
+            first, second = Mock(), Mock()
+            first.poll.side_effect = [None, 1, 1]
+            second.poll.return_value = None
+            with patch('alarm.subprocess.Popen', side_effect=[first, second]) as popen, patch('alarm.os.killpg') as kill:
+                sound = MacSound(Path(folder))
+                sound.play('due')
+                sound.play('due')
+                self.assertEqual(popen.call_count, 1)
+                sound.play('due')
+                self.assertEqual(popen.call_count, 2)
+                sound.play(None)
+                kill.assert_called_once()
+                second.wait.assert_called_once()
+                self.assertIsNone(sound.process)

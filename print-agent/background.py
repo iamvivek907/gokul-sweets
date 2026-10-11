@@ -43,7 +43,7 @@ def main():
         cfg = agent.load_config(root / "config.local.json")
         # Separate loop: blocked printer drivers, pending KOTs and page refreshes
         # cannot block the alarm. The OS startup task supervises this process.
-        threading.Thread(target=alarm.run, args=(cfg, root / "config.local.json"),
+        threading.Thread(target=alarm.supervise, args=(cfg, root / "config.local.json"),
                          name="kitchen-alarm", daemon=True).start()
         while True:
             try:

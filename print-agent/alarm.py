@@ -5,6 +5,8 @@ import math
 import os
 from pathlib import Path
 import struct
+import subprocess
+import signal
 import sys
 import time
 from urllib.error import HTTPError, URLError
@@ -40,6 +42,50 @@ class WindowsSound:
             flags = 0x80000001  # prevent automatic sleep while the alarm is enabled
         if not ctypes.windll.kernel32.SetThreadExecutionState(flags):
             raise RuntimeError("Windows wake request failed")
+
+
+class MacSound:
+    """macOS Core Audio through the system afplay utility; reassert after interruption."""
+    def __init__(self, root):
+        self.paths = {}
+        self.process = None
+        self.mode = None
+        for name, frequency in (("due", 880), ("fault", 440), ("test", 660)):
+            path = root / ("alarm-" + name + ".wav")
+            samples = [int(22000 * math.sin(2 * math.pi * frequency * n / 16000))
+                       if n < 8000 else 0 for n in range(32000)]
+            with wave.open(str(path), "wb") as wav:
+                wav.setparams((1, 2, 16000, len(samples), "NONE", "not compressed"))
+                wav.writeframes(struct.pack("<" + "h" * len(samples), *samples))
+            self.paths[name] = path
+
+    def play(self, mode):
+        if mode == self.mode and self.process is not None and self.process.poll() is None:
+            return
+        if self.process is not None and self.process.poll() is None:
+            os.killpg(self.process.pid, signal.SIGTERM)
+            self.process.wait(timeout=3)
+        self.process = None
+        self.mode = mode
+        if mode is not None:
+            self.process = subprocess.Popen(
+                ["/bin/sh", "-c", 'while /usr/bin/afplay "$1"; do :; done',
+                 "gokul-sound", str(self.paths[mode])], start_new_session=True)
+
+
+def supervise(cfg, path, stop=None):
+    """Retry startup/lock failures as well as failures inside the polling loop."""
+    if cfg["station"] != "KITCHEN":
+        return
+    while stop is None or not stop.is_set():
+        try:
+            run(cfg, path)
+        except Exception as exc:
+            print("Kitchen alarm restarting:", type(exc).__name__, flush=True)
+        if stop is None:
+            time.sleep(5)
+        elif stop.wait(5):
+            return
 
 
 class AlarmState:
@@ -117,24 +163,28 @@ def run(cfg, path):
     state = AlarmState(path, dict(api.identity(), api_url=cfg["api_url"]))
     with agent.exclusive_profile(str(path) + ".alarm"):
         sound = None
-        while True:
-            try:
-                if sound is None:
-                    sound = WindowsSound(Path(path).parent)
-                response = api.post("alarm", dict(api.identity(), status=state.status,
-                                                  testReceipt=state.test_receipt))
-                state.update(response, sound, time.monotonic())
-            except Exception as exc:
+        try:
+            while True:
                 try:
-                    if sound is not None:
-                        state.failed(sound, isinstance(exc, HTTPError) and exc.code in (401, 403, 404, 409))
-                        if not isinstance(exc, (HTTPError, URLError, TimeoutError, ValueError)):
+                    if sound is None:
+                        sound = (MacSound if sys.platform == "darwin" else WindowsSound)(Path(path).parent)
+                    response = api.post("alarm", dict(api.identity(), status=state.status,
+                                                      testReceipt=state.test_receipt))
+                    state.update(response, sound, time.monotonic())
+                except Exception as exc:
+                    try:
+                        if sound is not None:
+                            state.failed(sound, isinstance(exc, HTTPError) and exc.code in (401, 403, 404, 409))
+                            if not isinstance(exc, (HTTPError, URLError, TimeoutError, ValueError)):
+                                state.status = "ERROR"
+                        else:
                             state.status = "ERROR"
-                    else:
+                            # Report missing audio without starting a second scheduler.
+                            api.post("alarm", dict(api.identity(), status="ERROR", testReceipt=state.test_receipt))
+                    except Exception:
                         state.status = "ERROR"
-                        # Report missing audio without starting a second scheduler.
-                        api.post("alarm", dict(api.identity(), status="ERROR", testReceipt=state.test_receipt))
-                except Exception:
-                    state.status = "ERROR"
-                print("Kitchen alarm needs attention:", type(exc).__name__, flush=True)
-            time.sleep(5)
+                    print("Kitchen alarm needs attention:", type(exc).__name__, flush=True)
+                time.sleep(5)
+        finally:
+            if sound is not None:
+                sound.play(None)

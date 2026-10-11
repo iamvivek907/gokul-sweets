@@ -19,3 +19,16 @@ Admin shows alarm contact time, offline/error state and test receipt separately 
 ## Verification
 
 Coverage includes stable and concurrent fresh-device OTP logins; single-device revocation; audited multi-generation migration with unchanged ledger/lots/holds and environment isolation; recovered coin balance/expiry and replay/refund behavior; native agent interruption/restart/revocation/tests; and Admin controls/permissions/offline state at phone and desktop widths. Physical Windows speaker output and task restart need a DEV device check.
+
+## MacBook / macOS installation
+
+Admin provides **Download macOS alarm installer** beside the Windows download. It supports Apple Silicon Macs and plays kitchen alarms; it does not print tickets. Deploy the backend/frontend first, then save/download a KITCHEN station profile. If there is no printer, register a kitchen profile with USB target `Alarm only` and leave printing paused; that target is not used by sound. Use one primary computer per registered KITCHEN profile, rather than sharing its identity between a running Mac and Windows computer.
+
+1. Install Python 3.12 or later using the universal macOS installer from https://www.python.org/downloads/macos/ if needed. The program uses Python's standard library and built-in macOS audio and Keychain services.
+2. Extract the ZIP. In Terminal type `bash `, drag `install-macos.command` into Terminal, then press Return. This works even if Finder does not retain executable permission.
+3. Drag the downloaded `config.local.json` into Terminal when prompted. Enter the backend `PRINT_AGENT_API_KEY` at the hidden prompt. It is stored in the installing account's login Keychain, never in the profile or startup plist. Allow Gokul credential access if macOS prompts.
+4. In Admin select **Test computer sound**, confirm it is audible, then **Enable computer alarm**. Check alarm contact separately from printer status: printing remains offline on an alarm-only Mac.
+
+The per-user LaunchAgent restarts the process and starts at sign-in. Idle sleep is prevented while it runs, including while watching for new orders. Keep the Mac plugged in, signed in, lid open, speakers audible and login Keychain accessible. Lid closure, explicit sleep, logout, shutdown and muted speakers still interrupt sound; no external manager escalation is configured.
+
+For upgrades run the installer/profile from the same account. It stops the old LaunchAgent before replacing files and preserves Keychain credentials and cached mode. To uninstall, disable sound in Admin, run `launchctl bootout gui/$(id -u)/in.gokulsweets.alarm.BRANCH_ID` with your branch number, then remove that branch's plist from `~/Library/LaunchAgents` and folder from `~/Library/Application Support/GokulAlarm`. Remove the credential separately in Keychain Access if desired.

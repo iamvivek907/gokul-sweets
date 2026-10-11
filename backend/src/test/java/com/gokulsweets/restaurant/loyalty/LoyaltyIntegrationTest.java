@@ -368,14 +368,14 @@ class LoyaltyIntegrationTest {
         grant(100, 1);
         jdbc.update(
                 "UPDATE loyalty_accounts SET last_qualifying_activity=CURRENT_TIMESTAMP WHERE"
-                    + " environment='DEV' AND subject_id=?",
+                        + " environment='DEV' AND subject_id=?",
                 subject);
         UUID original = subject;
         var spending = order("PENDING_PAYMENT", true);
         UUID recovered = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES"
-                    + " (?,'DEV',?)",
+                        + " (?,'DEV',?)",
                 recovered,
                 "+91"
                         + (6000000000L
@@ -388,7 +388,7 @@ class LoyaltyIntegrationTest {
                 recovered);
         jdbc.update(
                 "UPDATE verified_order_ownership SET verified_subject_id=? WHERE environment='DEV'"
-                    + " AND verified_subject_id=?",
+                        + " AND verified_subject_id=?",
                 recovered,
                 original);
         var expiry = loyalty.wallet("DEV", recovered, null).nextExpiry();
