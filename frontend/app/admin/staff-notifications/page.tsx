@@ -74,6 +74,21 @@ export default function StaffNotificationsPage() {
             } catch (reason) {if (created) await created.unsubscribe().catch(() => false); throw reason;}
         });
     }
+    async function testDeviceSound() {
+        await perform(async () => {
+            if (Notification.permission !== "granted") throw new Error("Allow notifications before testing device sound.");
+            const registration = await navigator.serviceWorker.getRegistration();
+            if(!registration)throw new Error("Register staff push in this browser before testing notification sound.");
+            const options: NotificationOptions & {vibrate:number[];renotify:boolean} = {
+                body: "If this is silent, long-press this notification and enable Alerting and Sound in Android settings.",
+                icon: "/icon-192.png", badge: "/notification-badge.svg", silent: false,
+                vibrate: [300,120,300], tag: "gokul-staff-sound-test", renotify: true,
+                requireInteraction: true, data: {staff:true,url:"/admin/staff-notifications"}
+            };
+            await registration.showNotification("Kitchen alert sound test",options);
+            setMessage("Device notification displayed. This tests the phone notification channel, not server push delivery. If silent, check notification Sound, volume and Do Not Disturb.");
+        });
+    }
     if (profile && !hasPermission("ORDER_VIEW")) return <p className="p-6">You need order-view permission to use staff alerts.</p>;
     if (settings && settings.staffId !== profile?.staffId) return <p role="status" className="p-6">Loading your staff alerts…</p>;
     return <main className="mx-auto max-w-4xl p-4 sm:p-8">
@@ -90,6 +105,7 @@ export default function StaffNotificationsPage() {
                 <div className="mt-3 flex items-center justify-between gap-2"><h2 className="font-bold">Get alerts when the portal is closed</h2><AdminHelp title="Staff push and session duration" description="Push sends branch alerts to this registered browser, including when the portal is closed. Sound and delivery depend on browser permission and phone settings. Logout, expired sessions and revoked access stop alerts. Staff sessions renew during use with a 365-day inactivity limit; admins must sign in again after 15 hours." guidance="Enable staff push separately on each device and allow browser notifications. On iPhone, use the installed Home Screen app and allow Notifications, Banners and Sounds. Refresh keeps registration; Check staff registration verifies it. Disable staff push affects this browser only."/></div>
                 <p className="mt-3 rounded-xl bg-[#e7f0e9] p-4 text-sm"><T text="For iPhone banners: open the installed app, enable staff push here, then allow Notifications, Banners and Sounds in iPhone Settings. Focus or Silent mode can suppress alerts."/></p>
                 <p className="mt-2 text-sm leading-6">Register each staff browser separately. Alerts stop after logout or session expiry (staff sessions renew for up to a year of inactivity; administrator sessions last 15 hours). Browser permission, device mute and OS settings control delivery and sound. On iOS/iPadOS 16.4+, use the installed Home Screen app.</p>
+                <section aria-label="Android notification sound setup" className="mt-3 rounded-xl border p-4 text-sm leading-6"><h3 className="font-semibold">Android: check alert sound on this device</h3><ol className="mt-2 list-decimal pl-5"><li>Enable staff push here, then test the device notification below.</li><li>Long-press that notification → Settings. Choose Alerting and turn on Sound for this app or Chrome website notification channel.</li><li>Raise notification volume and disable Do Not Disturb or Silent mode. Allow background activity if your phone restricts the app.</li><li>Test a DEV preparation reminder with the app in the background, then closed. Do not force-stop the app or browser.</li></ol><p className="mt-2">Open tabs can repeat the kitchen alarm. Closed apps use the system notification sound. A PWA cannot guarantee a repeating alarm when closed or override your phone settings. Keep an enabled kitchen screen available for continuous alarms.</p><button type="button" disabled={busy||!settings.deviceActive||permission!=="granted"} onClick={()=>void testDeviceSound()} className="mt-3 min-h-11 rounded-xl border px-4 font-semibold">Test device notification sound</button></section>
                 <p className="mt-2 text-sm">Order references and branch timing may appear on your lock screen.</p>
                 {!supported && <p className="mt-3 text-sm">Push is unsupported here. This inbox and the preparation queue remain available.</p>}
                 {!settings.pushConfigured && <p className="mt-3 text-sm">Push sender configuration is missing. Contact your administrator; no registration is available yet.</p>}

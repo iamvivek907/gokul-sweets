@@ -62,8 +62,19 @@ try{for(const width of [320,390,1280]){
   assert.equal((await saved()).date,tomorrow);assert.equal((await saved()).slot.id,2);
   await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
  }
- // Incomplete recovery must never alter a cart or an unfinished checkout.
- for(const guard of ['gokul-cart','gokul-pending-order','gokul-pending-payment','gokul-mobile-order-attempt']){
+ // A saved cart with no slot recovers only after every actual amount fits.
+ await page.evaluate(({today,product})=>{
+  localStorage.removeItem('gokul-selected-pickup-slot');
+  localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));
+  localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'fixed',pickup:''}));
+  localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:2,weightGrams:null}]}));
+ },{today,product});
+ await page.reload();await pickup.getByText(/Tomorrow, .*8:00/).waitFor();
+ assert.equal((await saved()).date,tomorrow);
+ assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),2);
+ await page.evaluate(()=>localStorage.removeItem('gokul-cart'));
+ // Unfinished checkout must never be altered by automatic defaults.
+ for(const guard of ['gokul-pending-order','gokul-pending-payment','gokul-mobile-order-attempt']){
   await page.evaluate(({today,guard,product})=>{
    localStorage.removeItem('gokul-selected-pickup-slot');
    localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date:today}));

@@ -19,14 +19,19 @@ export function isSoonestPickup(raw: string, branchId: number | null | undefined
 }
 /** A date without a confirmed slot is incomplete, even if an older date picker
  * wrote fixed mode. Recover only empty slot storage; preserve saved pickups,
- * malformed state and a fixed mode bound to a previously confirmed pickup. */
+ * malformed state. A recognizable old mode snapshot cannot lock an absent slot. */
 export function canRecoverIncompleteMenuPickup(raw: string, branchId: number | null | undefined, pickup: string) {
     if (!Number.isSafeInteger(branchId) || pickup) return false;
     if (!raw) return true;
     try {
         const value = JSON.parse(raw);
         if (!Number.isSafeInteger(value?.branchId) || !["fixed", "soonest"].includes(value?.mode) || typeof value?.pickup !== "string") return false;
-        return value.branchId !== branchId || value.pickup === "";
+        if(value.branchId !== branchId || value.pickup === "")return true;
+        const previous=JSON.parse(value.pickup);
+        return previous.slot?.branchId===branchId&&Number.isSafeInteger(previous.slot.id)&&previous.slot.id>0
+            &&typeof previous.date==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(previous.date)
+            &&previous.slot.slotDate===previous.date&&["NORMAL","PRIORITY"].includes(previous.pickupType)
+            &&typeof previous.slot.startTime==="string";
     } catch {return false;}
 }
 export function setMenuPickupMode(branchId: number, automatic: boolean, pickup = localStorage.getItem("gokul-selected-pickup-slot") ?? "") {

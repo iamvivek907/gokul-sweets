@@ -7,7 +7,7 @@ import {T,useTranslation} from "@/lib/language";
 import Link from "next/link";
 import {usePickupClock} from "@/hooks/usePickupClock";
 import {indiaToday,pickupIsFresh,validPickupDate} from "@/lib/pickupFreshness";
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -15,7 +15,7 @@ import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
 import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, type CartAvailability} from "@/services/availabilityApi";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
 import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/checkoutStorage";
-import {getCartSnapshot, parseCart} from "@/lib/cartStorage";
+import {getCartSnapshot} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {findSoonestMenuPickup} from "@/lib/soonestMenuPickup";
 import {menuPickupOptions} from "@/lib/menuPickupOptions";
@@ -38,9 +38,10 @@ export function useDateAvailability(products?: MenuProduct[]) {
         productId: product.id, quantity: product.saleMode === "WEIGHT" ? null : 1,
         weightGrams: product.saleMode === "WEIGHT" ? product.minimumWeightGrams : null
     })) ?? [];
-    const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))];
+    const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))].sort((a,b)=>a.productId-b.productId);
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
+    const verifiedDefault=useRef<{branchId:number;date:string;itemsJson:string;menuRevision:unknown;data:CartAvailability}|null>(null);
     const [choosing,setChoosing] = useState(false);
     const [automaticResult,setAutomaticResult] = useState<{key:string; error?:string; empty?:boolean} | null>(null);
     const requestDate = intent.date;
@@ -53,6 +54,10 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const validDate = requestDate && features?.smartAvailability && Number.isInteger(features.futureOrderingDays) && validPickupDate(requestDate,today,features.futureOrderingDays);
     useEffect(() => {
         if (!features?.smartAvailability || !branch || !requestDate || !validDate || !JSON.parse(itemsJson).length) return;
+        const warm=verifiedDefault.current;
+        if(warm&&warm.branchId===branch.id&&warm.date===requestDate&&warm.itemsJson===itemsJson&&warm.menuRevision===menuRevision){
+            verifiedDefault.current=null;let active=true;queueMicrotask(()=>{if(active)setResult({key,scope,data:warm.data});});return()=>{active=false;};
+        }
         const controller = new AbortController();
         const timer = window.setTimeout(() => {
             const started = performance.now();
@@ -68,9 +73,9 @@ export function useDateAvailability(products?: MenuProduct[]) {
                     console.warn("Date availability check failed.", error);
                     setResult({key, scope, error: "We couldn't check this pickup. Your cart is saved. Try again."});
                 }});
-        }, 350);
+        }, 150);
         return () => {controller.abort(); window.clearTimeout(timer);};
-    }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview]);
+    }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview,menuRevision]);
     // Recheck slot capacity, cutoff and preparation as time passes, without changing the pickup.
     useEffect(() => {
         if (!menuPreview || !features?.smartAvailability) return;
@@ -102,11 +107,13 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const selectedStillFits = !!data && !!intent.selection && menuPickupOptions(data,candidates.map(item=>item.productId))
         .some(value=>value.date===intent.selection?.date && value.slot.id===intent.selection.slot.id && value.pickupType==="NORMAL");
     const pendingCheckout = !!clock && (!!localStorage.getItem("gokul-pending-order") || !!localStorage.getItem("gokul-pending-payment") || !!sessionStorage.getItem("gokul-mobile-order-attempt"));
-    const needsAutomatic = !!features?.smartAvailability && candidates.length > 0 && !pendingCheckout && !!clock && menuPreview && intent.automatic && cart.isEmpty && !choosing && (!intent.selection || !validDate || (!!data && !selectedStillFits));
+    const needsAutomatic = !!features?.smartAvailability && candidates.length > 0 && !pendingCheckout && !!clock && menuPreview && (intent.automatic || intent.expired) && (cart.isEmpty || cart.branchId===branch?.id&&(!intent.selection||intent.expired)) && !choosing && (!intent.selection || !validDate || (!!data && !selectedStillFits));
     useEffect(() => {
         if (!needsAutomatic || !branch || !features?.smartAvailability || !today || !Number.isInteger(features.futureOrderingDays) || !candidates.length) return;
         const pending = () => !!localStorage.getItem("gokul-pending-order") || !!localStorage.getItem("gokul-pending-payment") || !!sessionStorage.getItem("gokul-mobile-order-attempt");
         if (pending()) return;
+        const actualCart=cart.branchId===branch.id?availabilityItems(cart.items):[];
+        if(actualCart.length>100)return;
         const businessDayBefore = indiaToday();
         const before = [getStoredBranchSnapshot(),getPickupSlotSnapshot(),getCartSnapshot(),localStorage.getItem("gokul-pickup-intent"),getMenuPickupModeSnapshot()];
         const controller = new AbortController();
@@ -115,18 +122,22 @@ export function useDateAvailability(products?: MenuProduct[]) {
             setAutomaticResult({key:autoKey});
             void discoverPickupDates(branch.id,today,features.futureOrderingDays+1,signal)
                 .then(discovery=>findSoonestMenuPickup(discovery,JSON.parse(itemsJson).map((item:{productId:number})=>item.productId),today,features.futureOrderingDays,
-                    date=>checkMenuAvailability(branch.id,date,1,JSON.parse(itemsJson),signal),signal))
+                    async date=>{
+                        const checked=await (actualCart.length?checkCartAvailability:checkMenuAvailability)(branch.id,date,1,actualCart.length?actualCart:JSON.parse(itemsJson),signal);
+                        if(!actualCart.length){const warm={branchId:branch.id,date,itemsJson,menuRevision,data:checked};verifiedDefault.current=warm;setTimeout(()=>{if(verifiedDefault.current===warm)verifiedDefault.current=null;},5000);}
+                        return checked;
+                    },signal,()=>new Date(),!!actualCart.length))
                 .then(first=>{
                     if (controller.signal.aborted) return;
                     const after = [getStoredBranchSnapshot(),getPickupSlotSnapshot(),getCartSnapshot(),localStorage.getItem("gokul-pickup-intent"),getMenuPickupModeSnapshot()];
-                    if (pending() || before.some((value,index)=>value!==after[index]) || parseCart(getCartSnapshot()).items.length || businessDayBefore!==indiaToday()) return;
+                    if (pending() || before.some((value,index)=>value!==after[index]) || businessDayBefore!==indiaToday()) return;
                     if (first && !pickupIsFresh(first,new Date())) {setRevision(value=>value+1);return;}
                     setAutomaticResult({key:autoKey,empty:!first});
-                    if (first) {savePickupIntent(branch.id,first.date,true);savePickupSlot(first,true);}
+                    if (first) {savePickupIntent(branch.id,first.date,true);savePickupSlot(first,!actualCart.length);}
                 }).catch(()=>{if (!controller.signal.aborted) setAutomaticResult({key:autoKey,error:"We couldn’t find the soonest pickup. Try again or choose a time."});});
-        },350);
+        },0);
         return ()=>{controller.abort();clearTimeout(timer);};
-    },[needsAutomatic,autoKey,branch,features?.smartAvailability,features?.futureOrderingDays,today,itemsJson,candidates.length]);
+    },[needsAutomatic,autoKey,branch,features?.smartAvailability,features?.futureOrderingDays,today,itemsJson,candidates.length,cart.branchId,cart.items,menuRevision]);
     const automaticState = automaticResult?.key===autoKey ? automaticResult : null;
     const noPickupMessage = automaticState?.empty ? "No verified normal pickup is available in the booking window. Choose a date to explore other times." : null;
     const pickupRequired = menuPreview && !!features?.smartAvailability && (!intent.selection || !validDate);

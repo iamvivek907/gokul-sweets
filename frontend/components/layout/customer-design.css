@@ -364,3 +364,7 @@
  .future-storefront[data-premium-menu=true] .menu-compact-header button:focus-visible{outline:2px solid #8f1838;outline-offset:-2px}
 }
 @media(prefers-reduced-motion:reduce){.future-storefront[data-premium-menu=true] .customer-site-header>[data-header-content],.future-storefront[data-premium-menu=true] .menu-compact-header,.future-storefront[data-premium-menu=true] .customer-site-header[data-menu-compact]>[data-header-content]{transition:none;transform:none}}
+
+/* Press feedback changes paint only: no movement of sticky controls or menu rows. */
+.future-storefront[data-customer-design=reference] :is(button,a[href]):not(:disabled):not([aria-disabled=true]){touch-action:manipulation}
+.future-storefront[data-customer-design=reference] :is(button,a[href]):not(:disabled):not([aria-disabled=true]):active{filter:brightness(.92);box-shadow:inset 0 0 0 2px #14393618}

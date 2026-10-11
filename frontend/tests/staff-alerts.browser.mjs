@@ -17,7 +17,7 @@ await context.addInitScript(() => {
     }}
     Object.defineProperty(window, "Notification", {value: Notification, configurable: true});
     const subscription = {endpoint: "https://fcm.googleapis.com/fcm/send/staff-browser-test", toJSON: () => ({keys: {p256dh: "test-key", auth: "test-auth"}}), async unsubscribe() {return true;}};
-    const registration = {pushManager: {async getSubscription() {return subscription;}, async subscribe() {return subscription;}}};
+    const registration = {async showNotification(title,options){window._testNotification={title,options};},pushManager: {async getSubscription() {return subscription;}, async subscribe() {return subscription;}}};
     Object.defineProperty(navigator, "serviceWorker", {value: {async register() {return registration;}, ready: Promise.resolve(registration), async getRegistration() {return registration;}, async getRegistrations() {return [];}}});
 });
 const order = () => ({orderNumber: "STAFF-ORDER", branchId: 1, branchName: "Main branch", branchAddress: "Test branch",
@@ -73,6 +73,10 @@ try {
     await page.evaluate(value => {window._denyPush = value;}, denied);
     await page.getByRole("button", {name: "Enable staff push for this browser"}).click();
     await page.getByRole("button", {name: "Check staff registration"}).waitFor();
+    await page.getByRole("button",{name:"Test device notification sound"}).click();
+    await page.getByText("Device notification displayed.",{exact:false}).waitFor();
+    assert.equal(await page.evaluate(()=>window._testNotification.options.silent),false);
+    assert.equal(await page.evaluate(()=>window._testNotification.options.renotify),true);
     await page.getByRole("button", {name: "Disable staff push"}).click();
     await page.locator('main [role="alert"]').waitFor(); assert.equal(registered, true);
     assert.equal(await page.getByRole("button", {name: "Disable staff push"}).count(), 1);

@@ -1,4 +1,5 @@
 "use client";
+import {guardCompletedCheckout} from "@/lib/paymentNavigation";
 import BrandLoading from "@/components/common/BrandLoading";
 import {ApiError} from "@/services/apiClient";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
@@ -171,6 +172,12 @@ export default function OrderDetailPage() {
             : null;
 
     const order = currentOrder?.order ?? null;
+    useEffect(()=>{
+        if(order?.paymentStatus!=="PAID")return;
+        return guardCompletedCheckout(order.orderNumber,()=>router.replace("/orders"));
+    },[order?.paymentStatus,order?.orderNumber,router]);
+
+
 
     useEffect(() => {
         if (features?.paidCartRecovery && order?.paymentStatus === "PAID") {

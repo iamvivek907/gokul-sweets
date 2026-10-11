@@ -48,6 +48,23 @@ class WebPushTransportTest {
                         42);
         assertThat(request.getHeaders()).containsEntry("Content-Encoding", "aes128gcm");
         assertThat(request.getHeaders().get("Authorization")).startsWith("vapid ");
+        assertThat(request.getHeaders()).containsEntry("TTL", "60");
+        var staffRequest =
+                transport.prepare(
+                        "https://fcm.googleapis.com/fcm/send/test-token",
+                        encoder.encodeToString(
+                                ((org.bouncycastle.jce.interfaces.ECPublicKey)
+                                                recipient.getPublic())
+                                        .getQ()
+                                        .getEncoded(false)),
+                        encoder.encodeToString(new byte[16]),
+                        "staff:43",
+                        "Preparation is due",
+                        "Start preparation",
+                        "/admin/orders/TEST-43");
+        assertThat(staffRequest.getHeaders())
+                .containsEntry("Urgency", "high")
+                .containsEntry("TTL", "60");
         assertThat(request.getBody()).isNotEmpty();
         assertThat(new String(request.getBody(), java.nio.charset.StandardCharsets.UTF_8))
                 .doesNotContain("account update", "eventId", "profile");

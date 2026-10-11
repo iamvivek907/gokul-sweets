@@ -157,3 +157,14 @@ for(const scenario of ['defer','paid','later-pickup','other-cart','other-checkou
  else if(scenario==='later-pickup'){assert.equal(result,true);assert.equal(map.get('gokul-selected-pickup-slot'),later);assert.equal(JSON.parse(map.get('gokul-pickup-intent')).date,tomorrow);}
  else {assert.equal(result,false);assert.equal(cart.parseCart(cart.getCartSnapshot()).items.length,1);assert.equal(map.get('gokul-selected-pickup-slot'),pickup);if(!['other-cart','other-checkout'].includes(scenario))assert.ok(map.has('payment'),'defer cleanup rather than discard the recovery fingerprint');}
 });
+
+test('a deleted confirmed slot can recover from its recognizable old fixed-mode snapshot',()=>{
+ const {mode}=storage();const previous=JSON.stringify({date:today,slot:slot(today,8).slot,pickupType:'NORMAL'});
+ assert.equal(mode.canRecoverIncompleteMenuPickup(JSON.stringify({branchId:1,mode:'fixed',pickup:previous}),1,''),true);
+ assert.equal(mode.canRecoverIncompleteMenuPickup(JSON.stringify({branchId:1,mode:'fixed',pickup:previous}),1,previous),false);
+});
+test('saved-cart default accepts only a time verified for every actual quantity',async()=>{
+ const discovery=data([day(today,[slot(today,1)]),day(tomorrow,[slot(tomorrow,2)])]);
+ const first=await findSoonestMenuPickup(discovery,[1,2],today,7,async date=>data([day(date,[{...slot(date,date===today?1:2),normalAvailable:date===tomorrow,issues:date===today?[{productId:1,available:false}]:[]}])]),signal(),now,true);
+ assert.equal(first.date,tomorrow);assert.equal(first.slot.id,2);
+});

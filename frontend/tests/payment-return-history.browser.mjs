@@ -83,6 +83,19 @@ try {
         assert.equal(await page.locator('.ordering-tour-dialog,.ordering-tour-invite').count(), 0);
         await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`); await page.waitForURL('**/orders/TEST-HISTORY');
         assert.equal(creates, 0, 'paid history recovery never creates another payment');
+        // Android/system Back must leave completed checkout for order history.
+        for(const legacy of [false,true]){
+            if(legacy)await page.addInitScript(()=>Object.defineProperty(window,"navigation",{configurable:true,value:undefined}));
+            await page.goto(`${base}/orders/TEST-HISTORY`);await page.getByRole('heading',{name:width<=640?'Order details':'TEST-HISTORY',exact:true}).waitFor();
+            await page.evaluate(legacy=>{
+                void legacy;
+                history.replaceState(history.state,'','/checkout/payment/TEST-HISTORY');
+                history.pushState(history.state,'','/orders/TEST-HISTORY');
+            },legacy);
+            await page.waitForTimeout(150);await page.evaluate(()=>history.back());
+            await page.waitForURL('**/orders');await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();assert.equal(await pay().count(),0);
+            assert.equal(creates,0);assert.equal(gatewayVisits,1);
+        }
         status = 'EXPIRED'; await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`);
         await page.locator('.gokul-mobile-launch').waitFor({state: 'hidden'});
         if (width <= 640) await page.getByRole('link', {name: 'View order', exact: true}).waitFor();

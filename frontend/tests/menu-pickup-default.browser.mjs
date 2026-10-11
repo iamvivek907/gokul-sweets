@@ -90,7 +90,7 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
    localStorage.setItem('gokul-menu-pickup-mode:v1',JSON.stringify({branchId:1,mode:'soonest',pickup:localStorage.getItem('gokul-selected-pickup-slot')}));
    if(retain)localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product,quantity:1,weightGrams:null}]}));else localStorage.removeItem('gokul-cart');
   },{yesterday,breakfast,product:products[1],retain});await load();
-  if(!retain)await pickup.getByText(/Today, .* · 8:00/).waitFor();else {await pickup.getByText(/Your previous pickup has passed/).waitFor();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),yesterday);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);}
+  if(!retain)await pickup.getByText(/Today, .* · 8:00/).waitFor();else {await pickup.getByText(/Today, .* · 8:00/).waitFor();assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),today);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items[0].quantity),1);}
  }
  // An uncertain checkout attempt prevents automatic pickup replacement even with an empty cart.
  await page.evaluate(()=>{localStorage.removeItem('gokul-cart');localStorage.removeItem('gokul-menu-pickup-mode:v1');localStorage.removeItem('gokul-pickup-intent');localStorage.removeItem('gokul-selected-pickup-slot');sessionStorage.setItem('gokul-mobile-order-attempt','pending');});
