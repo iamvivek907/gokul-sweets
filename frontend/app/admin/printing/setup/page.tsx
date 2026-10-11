@@ -45,6 +45,10 @@ export default function PrinterSetupPage() {
     const [station, setStation] = useState("KITCHEN");
     const [state, setState] = useState<PrintStation | null>(null);
     const [connection, setConnection] = useState("ESC_POS_USB");
+    const [soundDraft, setSoundDraft] = useState<{scope: string; saved: string; value: "BUZZER" | "BELL" | "CHIME"} | null>(null);
+    const soundScope = `${branchId}:${station}`;
+    const savedSound = state?.alarm?.soundProfile ?? "BUZZER";
+    const alarmSound = soundDraft?.scope === soundScope && soundDraft.saved === savedSound ? soundDraft.value : savedSound;
     const backend = ADMIN_API_BASE_URL;
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
@@ -230,6 +234,14 @@ export default function PrinterSetupPage() {
             <p>Sound runs on your Windows or Mac computer, independently of this webpage. Keep the computer signed in with working speakers. A different tone warns when order checks fail.</p>
             <p role="status"><strong>{!state.alarm?.online ? "Alarm agent offline" : state.alarm.status === "ERROR" || state.alarm.status === "OFFLINE" ? "Alarm needs attention" : state.alarm.status === "STARTING" ? "Starting alarm" : state.alarm.status === "TESTING" ? "Playing test sound" : state.alarm.enabled ? state.alarm.status === "RINGING" ? "Order alarm ringing" : "Alarm enabled" : "Alarm disabled"}</strong></p>
             <p>Last alarm contact: {state.alarm?.lastSeenAt ? new Date(state.alarm.lastSeenAt).toLocaleString() : "Not received — install or update the computer alarm."}</p>
+            <div className="flex flex-wrap items-end gap-3">
+                <div><label htmlFor="kitchen-alarm-sound">Order alarm sound</label><select id="kitchen-alarm-sound" className={field} value={alarmSound} disabled={actionBlocked || !canConfigure} onChange={event => setSoundDraft({scope: soundScope, saved: savedSound, value: event.target.value as typeof alarmSound})}>
+                    <option value="BUZZER">Kitchen buzzer</option><option value="BELL">Bell</option><option value="CHIME">Repeating chime</option>
+                </select></div>
+                <button className={button} disabled={actionBlocked || !canConfigure || alarmSound === (state.alarm?.soundProfile ?? "BUZZER")} onClick={() => void mutate("/alarm-sound", {soundProfile: alarmSound})}>Save sound</button>
+            </div>
+            <p>Save your choice, then use Test computer sound to hear it on the kitchen computer. The alarm repeats until the due work is resolved. Connection failures use a separate warning tone.</p>
+            {(state.alarm?.soundVersion ?? 0) < 1 && <p role="status">Update the installed Windows or Mac agent to use sound choices. Older agents keep the original buzzer.</p>}
             <div className="flex flex-wrap gap-3">
                 <button className={button} disabled={actionBlocked || !canConfigure} onClick={() => void mutate("/alarm-mode", {enabled: !state.alarm?.enabled})}>{state.alarm?.enabled ? "Disable computer alarm" : "Enable computer alarm"}</button>
                 <button className={button} disabled={actionBlocked || !canConfigure || !state.alarm?.online} onClick={() => void mutate("/alarm-test", {})}>Test computer sound</button>
@@ -249,7 +261,7 @@ export default function PrinterSetupPage() {
             <p>Windows starts the agent in the background after the installing account signs in. No daily PowerShell commands are needed. Closing this webpage does not stop printing. Hardware pairing, paper changes and fixing a disconnected computer still happen at the shop.</p>
             <a href="/downloads/gokul-print-agent.zip" download style={{color: "#fff"}} className="inline-block rounded bg-stone-800 px-4 py-3 font-semibold text-white">Download Windows installer</a>
             {station === "KITCHEN" && <div className="space-y-2 rounded border border-stone-200 bg-white p-3">
-                <a href="/downloads/gokul-kitchen-alarm-macos.zip" download className={button + " inline-block"}>Download macOS alarm installer</a>
+                <a href="/downloads/gokul-kitchen-alarm-macos.zip" download style={{color: "#fff"}} className={button + " inline-block"}>Download macOS alarm installer</a>
                 <p>On your Mac, extract the ZIP, open Terminal, type <code>bash </code>, drag <code>install-macos.command</code> into Terminal and press Return. The installer finds Python 3.12+ or downloads and verifies the official Python package. macOS may ask for your administrator password to install Python; setup then continues automatically. Select your downloaded KITCHEN profile when prompted. Enter the private backend key only in Terminal; it is saved in your login Keychain.</p>
                 <p>The Mac alarm starts at sign-in and restarts automatically. Keep the lid open and speakers audible. It plays alarms; this installer does not print tickets. Use one primary alarm computer for each registered KITCHEN profile. Choose Test computer sound above and confirm you hear it before enabling.</p>
             </div>}

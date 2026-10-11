@@ -61,7 +61,7 @@ class PrintStationControlTest {
         flags.setAdminPreparationBoard(true);
         try {
             service.save(profile);
-            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "STARTING", 0))
+            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "STARTING", 0, 0))
                     .containsEntry("enabled", false);
             assertThatThrownBy(
                             () ->
@@ -70,12 +70,18 @@ class PrintStationControlTest {
                                             PrinterStation.KITCHEN,
                                             "another-device",
                                             "IDLE",
+                                            0,
                                             0))
                     .isInstanceOf(ResponseStatusException.class);
             assertThatThrownBy(
                             () ->
                                     alarms.poll(
-                                            branch, PrinterStation.BILLING, "shop-test", "IDLE", 0))
+                                            branch,
+                                            PrinterStation.BILLING,
+                                            "shop-test",
+                                            "IDLE",
+                                            0,
+                                            0))
                     .isInstanceOf(ResponseStatusException.class);
             alarms.mode(branch, PrinterStation.KITCHEN, true);
             assertThat(service.get(branch, PrinterStation.KITCHEN)).containsEntry("enabled", false);
@@ -96,16 +102,16 @@ class PrintStationControlTest {
                         slot,
                         status);
             }
-            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "RINGING", 0))
+            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "RINGING", 0, 0))
                     .containsEntry("needsPreparation", 1L)
                     .containsEntry("readyOverdue", 1L);
             jdbc.update(
                     "UPDATE orders SET order_status='READY_FOR_PICKUP' WHERE branch_id=?", branch);
-            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "RINGING", 0))
+            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "RINGING", 0, 0))
                     .containsEntry("needsPreparation", 0L)
                     .containsEntry("readyOverdue", 0L);
             alarms.test(branch, PrinterStation.KITCHEN);
-            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "TESTING", 1))
+            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "TESTING", 1, 0))
                     .containsEntry("testSequence", 1L);
             assertThat(
                             ((Map<?, ?>) service.get(branch, PrinterStation.KITCHEN).get("alarm"))
@@ -121,11 +127,44 @@ class PrintStationControlTest {
                                     .get("online"))
                     .isEqualTo(false);
             alarms.mode(branch, PrinterStation.KITCHEN, false);
-            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "DISABLED", 1))
+            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "DISABLED", 1, 0))
                     .containsEntry("enabled", false);
         } finally {
             flags.setAdminPreparationBoard(previous);
         }
+    }
+
+    @Test
+    void soundChoicesPersistWithoutChangingModeAndAreAdvertisedToBothAgentVersions() {
+        service.save(profile);
+        for (KitchenAlarmSound choice : KitchenAlarmSound.values()) {
+            Map<String, Object> saved = alarms.sound(branch, PrinterStation.KITCHEN, choice);
+            assertThat((Map<String, Object>) saved.get("alarm"))
+                    .containsEntry("soundProfile", choice.name());
+            assertThat(saved).containsEntry("enabled", false);
+            assertThat((Map<String, Object>) saved.get("alarm")).containsEntry("enabled", false);
+            assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "DISABLED", 0, 1))
+                    .containsEntry("soundProfile", choice.name());
+            assertThat(
+                            (Map<String, Object>)
+                                    service.get(branch, PrinterStation.KITCHEN).get("alarm"))
+                    .containsEntry("soundVersion", 1);
+        }
+        assertThat(alarms.poll(branch, PrinterStation.KITCHEN, "shop-test", "DISABLED", 0, 0))
+                .containsEntry("soundProfile", "CHIME");
+        assertThat((Map<String, Object>) service.get(branch, PrinterStation.KITCHEN).get("alarm"))
+                .containsEntry("soundVersion", 0);
+        assertThatThrownBy(
+                        () -> alarms.sound(branch, PrinterStation.BILLING, KitchenAlarmSound.BELL))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> alarms.sound(branch, PrinterStation.KITCHEN, null))
+                .isInstanceOf(ResponseStatusException.class);
+        doThrow(new AccessDeniedException("Forbidden branch"))
+                .when(authorization)
+                .requireBranchAccess(branch);
+        assertThatThrownBy(
+                        () -> alarms.sound(branch, PrinterStation.KITCHEN, KitchenAlarmSound.BELL))
+                .isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
@@ -135,6 +174,9 @@ class PrintStationControlTest {
                 .when(authorization)
                 .requirePermission(PermissionName.BRANCH_MANAGE);
         assertThatThrownBy(() -> alarms.mode(branch, PrinterStation.KITCHEN, true))
+                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(
+                        () -> alarms.sound(branch, PrinterStation.KITCHEN, KitchenAlarmSound.BELL))
                 .isInstanceOf(AccessDeniedException.class);
         var key = mock(PrintAgentAuthenticationService.class);
         var nativeAlarm = mock(NativeKitchenAlarmService.class);
@@ -151,9 +193,25 @@ class PrintStationControlTest {
                                                 PrinterStation.KITCHEN,
                                                 "shop-test",
                                                 "IDLE",
-                                                0)))
+                                                0,
+                                                null)))
                 .isInstanceOf(AccessDeniedException.class);
         verifyNoInteractions(nativeAlarm);
+    }
+
+    @Test
+    void legacyAlarmReportsDefaultToOriginalSoundCapability() {
+        var key = mock(PrintAgentAuthenticationService.class);
+        var nativeAlarm = mock(NativeKitchenAlarmService.class);
+        var controller =
+                new PrintStationControlController(
+                        service, mock(PrintStationActionService.class), key, nativeAlarm);
+        controller.alarm(
+                "valid",
+                new PrintStationControlController.AlarmReport(
+                        branch, PrinterStation.KITCHEN, "shop-test", "IDLE", 0, null));
+        verify(key).authenticate("valid");
+        verify(nativeAlarm).poll(branch, PrinterStation.KITCHEN, "shop-test", "IDLE", 0, 0);
     }
 
     @Test
@@ -241,7 +299,7 @@ class PrintStationControlTest {
                         Map.of("status", "READY"),
                         firstId,
                         Map.of("status", "DONE"));
-        assertThat((Map<?, ?>) service.report(reply).get("command")).isEmpty();
+        assertThat((Map<String, Object>) service.report(reply).get("command")).isEmpty();
         var second = service.command(branch, PrinterStation.KITCHEN, "TEST", null);
         service.report(reply); // Lost response from previous completed command.
         assertThat(service.get(branch, PrinterStation.KITCHEN).get("command"))

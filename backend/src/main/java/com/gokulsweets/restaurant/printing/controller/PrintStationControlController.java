@@ -2,6 +2,7 @@ package com.gokulsweets.restaurant.printing.controller;
 
 import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.printing.dto.*;
+import com.gokulsweets.restaurant.printing.enums.KitchenAlarmSound;
 import com.gokulsweets.restaurant.printing.enums.PrinterStation;
 import com.gokulsweets.restaurant.printing.service.*;
 
@@ -146,7 +147,38 @@ public class PrintStationControlController {
                     String agentId,
             @jakarta.validation.constraints.NotBlank @jakarta.validation.constraints.Size(max = 32)
                     String status,
-            @jakarta.validation.constraints.Min(0) long testReceipt) {}
+            @jakarta.validation.constraints.Min(0) long testReceipt,
+            @jakarta.validation.constraints.Min(0) @jakarta.validation.constraints.Max(1)
+                    Integer soundVersion) {}
+
+    /** Built-in sound choice. */
+    public record SoundChoice(@NotNull KitchenAlarmSound soundProfile) {}
+
+    /** Changes only the authorized kitchen's sound choice, with action replay protection. */
+    @PostMapping("/api/admin/printing/station/alarm-sound")
+    @PreAuthorize("hasAuthority('BRANCH_MANAGE')")
+    public Map<String, Object> alarmSound(
+            @RequestParam Long branchId,
+            @RequestParam PrinterStation station,
+            @Valid @RequestBody SoundChoice choice,
+            @RequestParam UUID requestId) {
+        final long started =
+                MethodTiming.start(
+                        PrintStationControlController.class,
+                        "alarmSound(Long,PrinterStation,SoundChoice,UUID)");
+        try {
+            return actions.perform(
+                    branchId,
+                    station,
+                    requestId,
+                    () -> alarms.sound(branchId, station, choice.soundProfile()));
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    PrintStationControlController.class,
+                    "alarmSound(Long,PrinterStation,SoundChoice,UUID)");
+        }
+    }
 
     /** Enables the independently running kitchen alarm after branch authorization. */
     @PostMapping("/api/admin/printing/station/alarm-mode")
@@ -210,7 +242,8 @@ public class PrintStationControlController {
                     report.station(),
                     report.agentId(),
                     report.status(),
-                    report.testReceipt());
+                    report.testReceipt(),
+                    report.soundVersion() == null ? 0 : report.soundVersion());
         } finally {
             MethodTiming.finish(
                     started, PrintStationControlController.class, "alarm(String,AlarmReport)");
