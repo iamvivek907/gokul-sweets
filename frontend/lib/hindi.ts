@@ -130,8 +130,8 @@ export const hindi: Record<string,string> = {
  "Start with your current location": "अपने वर्तमान स्थान से शुरू करें",
  "Use my current location": "मेरा वर्तमान स्थान इस्तेमाल करें",
  "Booked the wrong order?": "गलत ऑर्डर हो गया?",
- "Customer cancellation is available for 10 minutes after payment confirmation. Only the food amount is refundable; additional charges and their taxes are retained.": "भुगतान की पुष्टि के बाद 10 मिनट तक ऑर्डर रद्द कर सकते हैं। केवल खाने की राशि वापस होगी; अतिरिक्त शुल्क और उनके कर वापस नहीं होंगे।",
- "Check the branch before paying. Customer cancellation is available for 10 minutes after payment confirmation. Only the food amount is refundable; additional charges and their taxes are retained.": "भुगतान से पहले शाखा जाँचें। भुगतान की पुष्टि के बाद 10 मिनट तक ऑर्डर रद्द कर सकते हैं। केवल खाने की राशि वापस होगी; अतिरिक्त शुल्क और उनके कर वापस नहीं होंगे।",
+ "Future-slot orders can be cancelled only until preparation eligibility begins. Orders in the current slot cannot be cancelled by the customer. Only the food amount is refundable; additional charges and their taxes are retained.": "अगले स्लॉट का ऑर्डर तैयारी की पात्रता शुरू होने तक ही रद्द कर सकते हैं। वर्तमान स्लॉट का ऑर्डर ग्राहक रद्द नहीं कर सकते। केवल खाने की राशि वापस होगी; अतिरिक्त शुल्क और उनके कर वापस नहीं होंगे।",
+ "Check the branch before paying. Future-slot orders can be cancelled only until preparation eligibility begins. Orders in the current slot cannot be cancelled by the customer. Only the food amount is refundable; additional charges and their taxes are retained.": "भुगतान से पहले शाखा जाँचें। अगले स्लॉट का ऑर्डर तैयारी की पात्रता शुरू होने तक ही रद्द कर सकते हैं। वर्तमान स्लॉट का ऑर्डर ग्राहक रद्द नहीं कर सकते। केवल खाने की राशि वापस होगी; अतिरिक्त शुल्क और उनके कर वापस नहीं होंगे।",
 
  "Install Gokul Sweets": "गोकुल स्वीट्स ऐप इंस्टॉल करें",
  "Gokul, one tap away": "गोकुल, बस एक टैप पर",

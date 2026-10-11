@@ -4,6 +4,7 @@ import BrandLoading from "@/components/common/BrandLoading";
 import {ApiError} from "@/services/apiClient";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
+import OrderCancellation from "@/components/order/OrderCancellation";
 import MobileOrderDetail from "@/components/order/MobileOrderDetail";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import PickupCodeCard from "@/components/order/PickupCodeCard";
@@ -468,6 +469,8 @@ export default function OrderDetailPage() {
                             <p className="mt-2">Latest shop status: {status.label} · checked {formatUpdatedAt(order.updatedAt)} IST</p>
                         </div>
                     )}
+
+                    {["REFUND_PENDING","REFUNDED","REFUND_FAILED"].includes(order.paymentStatus??"") && <OrderCancellation orderNumber={order.orderNumber} onChanged={() => void handleRefresh()} />}
 
                     {showOperationalTimeline && (
                         <div className="mt-7">

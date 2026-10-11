@@ -59,6 +59,9 @@ public class OrderCorrectionService {
 
     private final Clock inventoryClock;
 
+    private final com.gokulsweets.restaurant.order.service.PreparationEligibilityService
+            preparation;
+
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
     private static final Set<OrderStatus> CANCEL =
@@ -81,6 +84,9 @@ public class OrderCorrectionService {
      * @param refundAmount the refund amount
      * @param retainedCharges the retained charges
      * @param refundStatus the refund status
+     * @param refundReferenceId the merchant refund request reference
+     * @param providerRefundId the payment provider refund identifier
+     * @param refundProvider the payment provider name
      * @param refundReviewRequired the refund review required
      * @param explanation the explanation
      */
@@ -94,6 +100,9 @@ public class OrderCorrectionService {
             BigDecimal refundAmount,
             BigDecimal retainedCharges,
             String refundStatus,
+            String refundReferenceId,
+            String providerRefundId,
+            String refundProvider,
             boolean refundReviewRequired,
             String explanation) {}
 
@@ -273,18 +282,32 @@ public class OrderCorrectionService {
                                     .filter(p -> p.getRefundReferenceId() != null)
                                     .findFirst()
                                     .orElse(null);
-            Instant deadline =
-                    payment != null && payment.getPaidAt() != null
-                            ? payment.getPaidAt().atZone(IST).toInstant().plusSeconds(600)
-                            : null;
+            Instant now = inventoryClock.instant();
+            // Apply the kitchen's preparation policy to customer cancellation only.
+            Instant deadline = null;
+            if (!manager && order.getOrderStatus() == OrderStatus.CONFIRMED && paid.size() == 1) {
+                var eligibility = preparation.evaluate(order, LocalDateTime.ofInstant(now, IST));
+                if (eligibility.eligibleAt() != null && eligibility.pickupAt() != null) {
+                    deadline = eligibility.eligibleAt().atZone(IST).toInstant();
+                    var slotStart = eligibility.pickupAt().atZone(IST).toInstant();
+                    if (slotStart.isBefore(deadline)) deadline = slotStart;
+                }
+            }
             BigDecimal fees = retained(order),
                     food = money(order.getTotalAmount()).subtract(fees).max(BigDecimal.ZERO);
             boolean cancel =
                     CANCEL.contains(order.getOrderStatus())
                             && paid.size() == 1
-                            && (manager
-                                    || deadline != null
-                                            && inventoryClock.instant().isBefore(deadline));
+                            && (manager || deadline != null && now.isBefore(deadline));
+            boolean refundRequested = payment != null && payment.getRefundReferenceId() != null;
+            if (refundRequested) {
+                food =
+                        money(
+                                payment.getRefundAmount() != null
+                                        ? payment.getRefundAmount()
+                                        : payment.getAmount());
+                fees = money(payment.getAmount()).subtract(food).max(BigDecimal.ZERO);
+            }
             String state =
                     payment != null && payment.getRefundReferenceId() != null
                             ? payment.getPaymentStatus().name()
@@ -297,7 +320,7 @@ public class OrderCorrectionService {
             return new Summary(
                     order.getOrderNumber(),
                     order.getBranch().getName(),
-                    inventoryClock.instant(),
+                    now,
                     deadline,
                     cancel,
                     manager
@@ -307,14 +330,19 @@ public class OrderCorrectionService {
                     food,
                     fees,
                     state,
+                    payment != null ? payment.getRefundReferenceId() : null,
+                    payment != null ? payment.getProviderRefundId() : null,
+                    payment != null && payment.getProvider() != null
+                            ? payment.getProvider().name()
+                            : null,
                     payment != null && payment.isRefundReviewRequired(),
                     cancel
                             ? "The food amount is refundable. Priority, delivery, convenience and"
                                     + " payment processing charges, including their taxes, are not"
                                     + " refunded."
-                            : "Customer cancellation is available for 10 minutes after payment"
-                                    + " confirmation, including during preparation. Collected or"
-                                    + " dispatched orders cannot be cancelled here. Contact the"
+                            : "Customer cancellation closes when the order becomes eligible for"
+                                    + " preparation. Orders in the current slot or already being"
+                                    + " prepared cannot be cancelled by the customer. Contact the"
                                     + " branch for help.");
         } finally {
             MethodTiming.finish(
