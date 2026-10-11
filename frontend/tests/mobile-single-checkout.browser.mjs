@@ -44,6 +44,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   else if(p==='/api/branches')json=[branch];else if(p==='/api/branches/1')json=branch;
   else if(p==='/api/menu')json=[{id:1,name:'Meals',displayOrder:0,products:[half,full]},{id:2,name:'Drinks',displayOrder:1,products:[drink]}];
   else if(p==='/api/menu/portion-groups')json={version:1,groups:[{key:'paneer',title:'Paneer meal',choices:[{productId:10,label:'Half'},{productId:11,label:'Full'}]}]};
+  else if(p.endsWith('/pickup-discovery'))json={today:date,maximumDate:secondDate,dates:[{date,slots:[{slot,normalAvailable:true,issues:[]}]},{date:secondDate,slots:[{slot:{...slot,id:2,slotDate:secondDate,startTime:'10:00:00',endTime:'11:00:00'},normalAvailable:true,issues:[]}]}]};
   else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&req.postDataJSON().startDate===secondDate&&scenario==='pickup-network')return route.fulfill({status:503,json:{message:'Availability unavailable'},headers});
   else if(p.endsWith('/availability')&&req.postDataJSON().days===1&&req.postDataJSON().startDate===secondDate&&scenario==='pickup-unavailable')json={today:date,maximumDate:secondDate,dates:[{date:secondDate,available:false,slots:[]}]};
   else if(p.endsWith('/availability')&&pickupRegression){
@@ -82,6 +83,8 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('.gokul-menu-product-card').first().waitFor();
  if(width>640){assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.locator('.mobile-menu-filters').count(),0);await page.getByRole('button',{name:'Add Paneer meal Half to cart',exact:true}).click();assert.equal(await page.locator('.gokul-floating-cart a').getAttribute('href'),'/cart');await page.goto(`${base}/checkout/mobile`);await page.waitForURL('**/cart');assert.equal(previews,0);assert.equal(orders.length,0);await context.close();continue;}
  const portion=page.locator('.mobile-portion-card');await portion.waitFor();
+ const recoveredDefault=['menu-pickup-date-only','menu-pickup-no-selection'].includes(scenario);
+ if(recoveredDefault)await page.waitForFunction(date=>{try{return JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date===date;}catch{return false;}},secondDate);
  assert.equal(await page.getByRole('button',{name:'View Paneer meal on the menu',exact:true}).count(),0);
  assert.equal(await page.getByRole('button',{name:'View Paneer meal Full on the menu',exact:true}).count(),0);
  if(!pickupRegression){await page.getByLabel('Find a favourite',{exact:true}).fill('Paneer meal');
@@ -109,6 +112,14 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   assert.equal(await confirm.getAttribute('data-payment-ready'),'false');assert.equal(orders.length,0);assert.equal(payments,0);
  }
  if(pickupRegression){
+  if(recoveredDefault){
+   const selected=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));
+   assert.equal(selected.date,secondDate);assert.equal(selected.slot.id,2);assert.equal(selected.pickupType,'NORMAL');
+   assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),2);
+   await ready();assert.equal(orders.length,0);assert.equal(payments,0);
+   await page.getByRole('button',{name:'Pay now',exact:true}).click();await page.waitForURL('https://gateway.example.invalid/**');
+   assert.equal(orders.length,1);assert.equal(payments,1);assert.equal(orders[0].request.pickupSlotId,2);assert.deepEqual(errors,[]);await context.close();continue;
+  }
   const before=await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot'));
   if(scenario==='menu-pickup-quantity'){await ready();await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).click();}
   if(scenario==='menu-pickup-expired'){await ready();await page.clock.setFixedTime(new Date(`${date}T21:01:00+05:30`));await page.getByText('Your pickup time has passed. Choose another time. Your pickup hasn’t changed.',{exact:true}).waitFor();}
