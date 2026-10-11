@@ -286,15 +286,90 @@ class OrderCorrectionIntegrationTest {
     }
 
     @Test
-    void customerFullTenMinutesDuringPreparationAndBoundaryIsServerClock() {
-        jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?", order);
-        ((AdjustableClock) clock).setInstant(NOW.plusSeconds(299));
+    void futureSlotCancellationEndsExactlyAtPreparationEligibility() {
+        var deadline = corrections.preview(reference, false).cancellationDeadline();
+        assertThat(deadline).isAfter(NOW.plusSeconds(600));
+        ((AdjustableClock) clock).setInstant(deadline.minusSeconds(120));
+        var preview = corrections.preview(reference, false);
+        assertThat(preview.canCancel()).isTrue();
+        assertThat(
+                        Duration.between(preview.serverTime(), preview.cancellationDeadline())
+                                .toSeconds())
+                .isEqualTo(120);
+        var input = cancel(UUID.randomUUID());
+        ((AdjustableClock) clock).setInstant(deadline.minusSeconds(1));
         assertThat(corrections.preview(reference, false).canCancel()).isTrue();
-        ((AdjustableClock) clock).setInstant(NOW.plusSeconds(300));
+        ((AdjustableClock) clock).setInstant(deadline);
+        assertThat(corrections.preview(reference, false).canCancel()).isFalse();
+        assertThatThrownBy(() -> corrections.cancel(reference, input, false))
+                .hasMessageContaining("window");
+        assertThat(booked(sourceSlot)).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT payment_status FROM payments WHERE id=?",
+                                String.class,
+                                payment))
+                .isEqualTo("PAID");
+    }
+
+    @Test
+    void currentSlotAndStartedPreparationCannotBeCancelledByCustomer() {
+        ((AdjustableClock) clock).setInstant(Instant.parse("2026-10-05T12:30:00Z")); // 18:00 IST
+        jdbc.update(
+                "UPDATE payments SET paid_at=TIMESTAMP '2026-10-05 18:00:00' WHERE id=?", payment);
         assertThat(corrections.preview(reference, false).canCancel()).isFalse();
         assertThatThrownBy(() -> corrections.cancel(reference, cancel(UUID.randomUUID()), false))
                 .hasMessageContaining("window");
+        ((AdjustableClock) clock).setInstant(NOW);
+        jdbc.update("UPDATE orders SET order_status='PREPARING' WHERE id=?", order);
+        assertThat(corrections.preview(reference, false).canCancel()).isFalse();
+        assertThat(corrections.preview(reference, true).canCancel()).isTrue();
         assertThat(booked(sourceSlot)).isEqualTo(1);
+    }
+
+    @Test
+    void cancellationUsesPriorityAndEarlyPreparationPolicies() {
+        var normal = corrections.preview(reference, false).cancellationDeadline();
+        jdbc.update("UPDATE orders SET pickup_type='PRIORITY' WHERE id=?", order);
+        assertThat(corrections.preview(reference, false).cancellationDeadline())
+                .isEqualTo(normal.plusSeconds(1800));
+        jdbc.update(
+                "UPDATE branch_products SET early_preparation_allowed=true WHERE id=?", sourceBp);
+        assertThat(corrections.preview(reference, false).canCancel()).isFalse();
+    }
+
+    @Test
+    void refundDetailsExposeProviderAndMerchantReferencesWithoutInventingAnId() {
+        var pending = corrections.cancel(reference, cancel(UUID.randomUUID()), false);
+        assertThat(pending.refundReferenceId()).startsWith("GKC-");
+        assertThat(pending.providerRefundId()).isNull();
+        assertThat(pending.refundProvider()).isEqualTo("RAZORPAY");
+        jdbc.update(
+                "UPDATE payments SET"
+                    + " payment_status='REFUNDED',provider_refund_id='refund_provider_123' WHERE"
+                    + " id=?",
+                payment);
+        var confirmed = corrections.preview(reference, false);
+        assertThat(confirmed.providerRefundId()).isEqualTo("refund_provider_123");
+        assertThat(confirmed.refundReferenceId()).isEqualTo(pending.refundReferenceId());
+        assertThat(confirmed.refundStatus()).isEqualTo("REFUNDED");
+    }
+
+    @Test
+    void automaticFullRefundShowsActualRefundRatherThanFoodCancellationQuote() {
+        jdbc.update(
+                "UPDATE orders SET order_status='CANCELLED',convenience_fee=10,total_amount=110"
+                        + " WHERE id=?",
+                order);
+        jdbc.update(
+                "UPDATE payments SET"
+                    + " amount=110,payment_status='REFUNDED',refund_reference_id='auto-refund',provider_refund_id='provider-auto'"
+                    + " WHERE id=?",
+                payment);
+        var summary = corrections.preview(reference, false);
+        assertThat(summary.refundAmount()).isEqualByComparingTo("110");
+        assertThat(summary.retainedCharges()).isEqualByComparingTo("0");
+        assertThat(summary.providerRefundId()).isEqualTo("provider-auto");
     }
 
     @Test
