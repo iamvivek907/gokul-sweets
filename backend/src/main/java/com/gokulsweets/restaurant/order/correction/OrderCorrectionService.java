@@ -419,6 +419,9 @@ public class OrderCorrectionService {
             var payment = captured(order).getFirst();
             jdbc.queryForList(
                     "SELECT id FROM payments WHERE id=? FOR UPDATE", Long.class, payment.getId());
+            // Waiting for the payment lock must not extend the customer's cancellation window.
+            if (!manager && !inventoryClock.instant().isBefore(preview.cancellationDeadline()))
+                throw conflict("The cancellation window has ended. Contact the branch.");
             if (payment.getAmount().compareTo(order.getTotalAmount()) != 0)
                 throw conflict("Payment reconciliation is required before cancelling.");
             String actor = manager ? "staff:" + staff.getCurrentStaff().getId() : "customer";
