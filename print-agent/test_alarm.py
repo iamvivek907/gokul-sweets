@@ -159,6 +159,51 @@ class SupervisorTest(unittest.TestCase):
                 self.assertEqual(popen.call_count, 2)
                 self.assertIn(str(sound.profiles['BELL']), popen.call_args.args[0])
 
+    def test_macos_tune_change_cannot_prevent_stop_when_work_clears_or_disabled(self):
+        from unittest.mock import patch
+        from subprocess import TimeoutExpired
+        from alarm import MacSound
+        for initial_mode in ('due', 'test', 'fault'):
+            for enabled in (True, False):
+                with self.subTest(initial_mode=initial_mode, enabled=enabled), tempfile.TemporaryDirectory() as folder:
+                    root = Path(folder)
+                    process = Mock()
+                    process.poll.return_value = None
+                    process.wait.side_effect = [TimeoutExpired('afplay', .15), 0]
+                    with patch('alarm.subprocess.Popen', return_value=process) as popen:
+                        sound = MacSound(root)
+                        sound.play(initial_mode)
+                        state = AlarmState(root / 'config.json', {'branchId': 1})
+                        state.enabled = True
+                        state.update({'enabled': enabled, 'needsPreparation': 0,
+                                      'readyOverdue': 0, 'testSequence': 0,
+                                      'soundProfile': 'BELL'}, sound, 100)
+                        process.terminate.assert_called_once()
+                        self.assertIsNone(sound.process)
+                        state.update({'enabled': enabled, 'needsPreparation': 0,
+                                      'readyOverdue': 0, 'testSequence': 0,
+                                      'soundProfile': 'BELL'}, sound, 105)
+                        self.assertEqual(popen.call_count, 1)
+
+    def test_macos_tune_change_then_revocation_stops_active_loop(self):
+        from unittest.mock import patch
+        from subprocess import TimeoutExpired
+        from alarm import MacSound
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            process = Mock()
+            process.poll.return_value = None
+            process.wait.side_effect = [TimeoutExpired('afplay', .15), 0]
+            with patch('alarm.subprocess.Popen', return_value=process):
+                sound = MacSound(root)
+                sound.play('due')
+                sound.select('CHIME')
+                state = AlarmState(root / 'config.json', {'branchId': 1})
+                state.enabled = True
+                state.failed(sound, forbidden=True)
+                process.terminate.assert_called_once()
+                self.assertIsNone(sound.process)
+
     def test_startup_lock_failure_retries_without_waiting_for_printer_loop(self):
         from unittest.mock import patch
         from alarm import supervise

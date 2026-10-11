@@ -65,9 +65,6 @@ class SoundChoices:
             return
         self.profile = profile
         self.paths.update(due=self.profiles[profile], test=self.profiles[profile])
-        # A running Mac loop must restart when its selected WAV changes.
-        if hasattr(self, "mode"):
-            self.mode = None
 
 
 class WindowsSound(SoundChoices):
@@ -96,10 +93,13 @@ class MacSound(SoundChoices):
     def __init__(self, root):
         self.process = None
         self.mode = None
+        self.playing_path = None
         self.prepare(root)
 
     def play(self, mode):
-        if mode == self.mode and self.process is not None and self.process.poll() is None:
+        path = self.paths[mode] if mode is not None else None
+        if (mode is not None and mode == self.mode and path == self.playing_path
+                and self.process is not None and self.process.poll() is None):
             return
         if self.process is not None and self.process.poll() is None:
             self.process.terminate()
@@ -110,6 +110,7 @@ class MacSound(SoundChoices):
                 self.process.wait(timeout=3)
         self.process = None
         self.mode = mode
+        self.playing_path = path
         if mode is not None:
             self.process = subprocess.Popen(
                 ["/bin/sh", "-c",

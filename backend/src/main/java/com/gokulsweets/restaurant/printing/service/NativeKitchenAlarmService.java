@@ -49,7 +49,7 @@ public class NativeKitchenAlarmService {
                         HttpStatus.BAD_REQUEST, "Select a kitchen alarm sound.");
             if (jdbc.update(
                             "UPDATE print_station_controls SET alarm_sound_profile=? WHERE"
-                                + " branch_id=? AND station='KITCHEN'",
+                                    + " branch_id=? AND station='KITCHEN'",
                             sound.name(),
                             branchId)
                     != 1)
