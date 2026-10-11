@@ -25,12 +25,7 @@ export function guardCompletedCheckout(orderNumber:string,onLeave:()=>void) {
   history.replaceState(history.state,"","/orders");
   onLeave();
  });
- const navigation=(window as Window&{navigation?:EventTarget}).navigation;
- const traverse=(event:Event)=>{
-  const nav=event as Event&{navigationType?:string;canIntercept?:boolean;destination?:{url:string}};
-  if(nav.navigationType!=="traverse"||!nav.canIntercept||!nav.cancelable||!nav.destination||!isCheckout(nav.destination.url))return;
-  nav.preventDefault();onLeave();
- };
- navigation?.addEventListener("navigate",traverse,true);
- return()=>{unguard();navigation?.removeEventListener("navigate",traverse,true);};
+ // Let Back advance to the old entry before replacing it. Cancelling a modern
+ // Navigation API traversal leaves that entry behind the Orders page forever.
+ return unguard;
 }

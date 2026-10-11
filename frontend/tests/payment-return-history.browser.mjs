@@ -83,17 +83,23 @@ try {
         assert.equal(await page.locator('.ordering-tour-dialog,.ordering-tour-invite').count(), 0);
         await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`); await page.waitForURL('**/orders/TEST-HISTORY');
         assert.equal(creates, 0, 'paid history recovery never creates another payment');
-        // Android/system Back must leave completed checkout for order history.
+        // Use real Next history entries. Each completed checkout must be consumed,
+        // so consecutive Android/system Back presses can reach the earlier page.
         for(const legacy of [false,true]){
             if(legacy)await page.addInitScript(()=>Object.defineProperty(window,"navigation",{configurable:true,value:undefined}));
-            await page.goto(`${base}/orders/TEST-HISTORY`);await page.getByRole('heading',{name:width<=640?'Order details':'TEST-HISTORY',exact:true}).waitFor();
-            await page.evaluate(legacy=>{
-                void legacy;
-                history.replaceState(history.state,'','/checkout/payment/TEST-HISTORY');
-                history.pushState(history.state,'','/orders/TEST-HISTORY');
-            },legacy);
-            await page.waitForTimeout(150);await page.evaluate(()=>history.back());
+            await page.goto(`${base}/branches`);
+            status='EXPIRED';await page.goto(`${base}/checkout/payment/TEST-HISTORY`);
+            const view=width<=640?page.getByRole('link',{name:'View order',exact:true}):page.getByRole('button',{name:'View Order Details',exact:true});
+            await view.waitFor();status='PAID';await view.click();
+            await page.waitForURL('**/orders/TEST-HISTORY');await page.getByRole('heading',{name:width<=640?'Order details':'TEST-HISTORY',exact:true}).waitFor();
+            await page.evaluate(()=>history.back());
             await page.waitForURL('**/orders');await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();assert.equal(await pay().count(),0);
+            // Forward restores the paid order, then Back must return to the rewritten
+            // history entry rather than recreating a payment/Orders loop.
+            await page.evaluate(()=>history.forward());await page.waitForURL('**/orders/TEST-HISTORY');
+            await page.getByRole('heading',{name:width<=640?'Order details':'TEST-HISTORY',exact:true}).waitFor();
+            await page.evaluate(()=>history.back());await page.waitForURL('**/orders');await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();
+            await page.evaluate(()=>history.back());await page.waitForURL(`${base}/branches`);
             assert.equal(creates,0);assert.equal(gatewayVisits,1);
         }
         status = 'EXPIRED'; await seed(); await page.goto(`${base}/checkout/payment/TEST-HISTORY`);
