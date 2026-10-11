@@ -344,6 +344,8 @@ WHERE branch_id=? AND station=? AND agent_id=?
             alarm.put("lastSeenAt", row.get("alarm_last_seen_at"));
             alarm.put("testSequence", row.get("alarm_test_sequence"));
             alarm.put("testReceipt", row.get("alarm_test_receipt"));
+            alarm.put("soundProfile", row.get("alarm_sound_profile"));
+            alarm.put("soundVersion", row.get("alarm_sound_version"));
             alarm.put("online", Boolean.TRUE.equals(row.get("alarm_online")));
             result.put("alarm", alarm);
             result.put("command", decode(row.get("command")));

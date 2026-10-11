@@ -88,7 +88,77 @@ class AlarmTest(unittest.TestCase):
             Path(str(self.path) + '.alarm.json').write_text(content)
             self.assertFalse(AlarmState(self.path, self.identity).enabled)
 
+    def test_selected_sound_applies_to_due_work_and_preview_with_distinct_fault(self):
+        from alarm import SoundChoices
+        player = SoundChoices()
+        player.prepare(Path(self.root.name))
+        player.play = Mock()
+        for choice in ('BUZZER', 'BELL', 'CHIME'):
+            self.state.update(dict(self.snapshot(sequence=1), soundProfile=choice), player, 100)
+            self.assertEqual(player.paths['test'], player.paths['due'])
+            self.assertEqual(player.paths['due'], player.profiles[choice])
+            self.assertNotEqual(player.paths['fault'], player.paths['due'])
+        self.state.failed(player)
+        player.play.assert_called_with('fault')
+
+    def test_old_backend_defaults_to_buzzer_and_invalid_sound_cannot_silence_work(self):
+        self.state.update(self.snapshot(), self.sound, 100)
+        self.sound.select.assert_called_with('BUZZER')
+        with self.assertRaises(ValueError):
+            self.state.update(dict(self.snapshot(due=0), soundProfile='../other'), self.sound, 101)
+        self.assertTrue(self.state.due)
+
+    def test_generated_choices_have_distinct_pcm_and_quiet_gaps_without_clipping(self):
+        from alarm import SoundChoices
+        import wave
+        import struct
+        player = SoundChoices()
+        player.prepare(Path(self.root.name))
+        sounds = []
+        for path in player.profiles.values():
+            with wave.open(str(path), 'rb') as wav:
+                self.assertEqual(wav.getparams()[:4], (1, 2, 16000, 32000))
+                data = wav.readframes(wav.getnframes())
+            samples = struct.unpack('<32000h', data)
+            self.assertLess(max(map(abs, samples)), 32767)
+            self.assertGreater(max(map(abs, samples)), 10000)
+            self.assertEqual(set(samples[-8000:]), {0})
+            sounds.append(data)
+        self.assertEqual(len(set(sounds)), 4)
+
 class SupervisorTest(unittest.TestCase):
+    def test_windows_plays_selected_sound_for_due_orders_and_test(self):
+        from unittest.mock import patch
+        from alarm import WindowsSound
+        player = Mock(SND_FILENAME=1, SND_ASYNC=2, SND_LOOP=4, SND_NODEFAULT=8)
+        with tempfile.TemporaryDirectory() as folder:
+            with patch('alarm.sys.platform', 'win32'), patch.dict('sys.modules', winsound=player), patch('alarm.ctypes.windll', Mock(), create=True):
+                sound = WindowsSound(Path(folder))
+                sound.select('CHIME')
+                for mode in ('due', 'test'):
+                    sound.play(mode)
+                    player.PlaySound.assert_called_with(str(sound.profiles['CHIME']), 15)
+                sound.play('fault')
+                player.PlaySound.assert_called_with(str(sound.profiles['FAULT']), 15)
+
+    def test_macos_changes_loop_when_selected_sound_changes(self):
+        from unittest.mock import patch
+        from subprocess import TimeoutExpired
+        from alarm import MacSound
+        with tempfile.TemporaryDirectory() as folder:
+            first, second = Mock(), Mock()
+            first.poll.return_value = second.poll.return_value = None
+            first.wait.side_effect = [TimeoutExpired('afplay', .15), 0]
+            second.wait.side_effect = TimeoutExpired('afplay', .15)
+            with patch('alarm.subprocess.Popen', side_effect=[first, second]) as popen:
+                sound = MacSound(Path(folder))
+                sound.play('due')
+                sound.select('BELL')
+                sound.play('due')
+                first.terminate.assert_called_once()
+                self.assertEqual(popen.call_count, 2)
+                self.assertIn(str(sound.profiles['BELL']), popen.call_args.args[0])
+
     def test_startup_lock_failure_retries_without_waiting_for_printer_loop(self):
         from unittest.mock import patch
         from alarm import supervise

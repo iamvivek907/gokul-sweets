@@ -5,6 +5,7 @@ import com.gokulsweets.restaurant.config.EnhancementProperties;
 import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.order.config.PreparationWindowProperties;
 import com.gokulsweets.restaurant.order.service.AppConstant;
+import com.gokulsweets.restaurant.printing.enums.KitchenAlarmSound;
 import com.gokulsweets.restaurant.printing.enums.PrinterStation;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import com.gokulsweets.restaurant.staff.PermissionName;
@@ -31,6 +32,37 @@ public class NativeKitchenAlarmService {
     private final EnhancementProperties flags;
     private final StaffAuthorizationService authorization;
     private final PrintStationControlService stations;
+
+    /** Saves a branch's sound without changing order state, test sequence or alarm mode. */
+    @Transactional
+    public Map<String, Object> sound(
+            Long branchId, PrinterStation station, KitchenAlarmSound sound) {
+        final long started =
+                MethodTiming.start(
+                        NativeKitchenAlarmService.class,
+                        "sound(Long,PrinterStation,KitchenAlarmSound)");
+        try {
+            authorization.requirePermission(PermissionName.BRANCH_MANAGE);
+            authorization.requireBranchAccess(branchId);
+            if (station != PrinterStation.KITCHEN || sound == null)
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Select a kitchen alarm sound.");
+            if (jdbc.update(
+                            "UPDATE print_station_controls SET alarm_sound_profile=? WHERE"
+                                + " branch_id=? AND station='KITCHEN'",
+                            sound.name(),
+                            branchId)
+                    != 1)
+                throw new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Register the kitchen station first.");
+            return stations.get(branchId, station);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    NativeKitchenAlarmService.class,
+                    "sound(Long,PrinterStation,KitchenAlarmSound)");
+        }
+    }
 
     /** Sets alarm mode separately from printing, using branch management authorization. */
     @Transactional
@@ -92,11 +124,12 @@ public class NativeKitchenAlarmService {
             PrinterStation station,
             String agentId,
             String status,
-            long testReceipt) {
+            long testReceipt,
+            int soundVersion) {
         final long started =
                 MethodTiming.start(
                         NativeKitchenAlarmService.class,
-                        "poll(Long,PrinterStation,String,String,long)");
+                        "poll(Long,PrinterStation,String,String,long,int)");
         try {
             if (station != PrinterStation.KITCHEN
                     || !List.of(
@@ -111,11 +144,11 @@ public class NativeKitchenAlarmService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
             var rows =
                     jdbc.queryForList(
-                            "SELECT alarm_enabled, CASE WHEN alarm_test_requested_at >"
-                                + " CURRENT_TIMESTAMP - INTERVAL '60 seconds' THEN"
-                                + " alarm_test_sequence ELSE 0 END AS test_sequence FROM"
-                                + " print_station_controls WHERE branch_id=? AND station='KITCHEN'"
-                                + " AND agent_id=? FOR UPDATE",
+                            "SELECT alarm_enabled, alarm_sound_profile, CASE WHEN"
+                                + " alarm_test_requested_at > CURRENT_TIMESTAMP - INTERVAL '60"
+                                + " seconds' THEN alarm_test_sequence ELSE 0 END AS test_sequence"
+                                + " FROM print_station_controls WHERE branch_id=? AND"
+                                + " station='KITCHEN' AND agent_id=? FOR UPDATE",
                             branchId,
                             agentId);
             if (rows.isEmpty())
@@ -145,9 +178,11 @@ SELECT COUNT(*) FILTER(WHERE order_status='CONFIRMED' AND bucket IN ('ELIGIBLE',
             jdbc.update(
                     "UPDATE print_station_controls SET alarm_last_seen_at=CURRENT_TIMESTAMP,"
                         + " alarm_status=?, alarm_test_receipt=GREATEST(alarm_test_receipt,"
-                        + " LEAST(?,alarm_test_sequence)) WHERE branch_id=? AND station='KITCHEN'",
+                        + " LEAST(?,alarm_test_sequence)), alarm_sound_version=? WHERE branch_id=?"
+                        + " AND station='KITCHEN'",
                     status,
                     testReceipt,
+                    soundVersion,
                     branchId);
             return Map.of(
                     "enabled",
@@ -157,12 +192,14 @@ SELECT COUNT(*) FILTER(WHERE order_status='CONFIRMED' AND bucket IN ('ELIGIBLE',
                     "readyOverdue",
                     counts[1],
                     "testSequence",
-                    rows.getFirst().get("test_sequence"));
+                    rows.getFirst().get("test_sequence"),
+                    "soundProfile",
+                    rows.getFirst().get("alarm_sound_profile"));
         } finally {
             MethodTiming.finish(
                     started,
                     NativeKitchenAlarmService.class,
-                    "poll(Long,PrinterStation,String,String,long)");
+                    "poll(Long,PrinterStation,String,String,long,int)");
         }
     }
 }

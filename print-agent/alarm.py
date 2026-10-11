@@ -14,21 +14,69 @@ import wave
 import agent
 
 
-class WindowsSound:
+SOUND_PROFILES = ("BUZZER", "BELL", "CHIME")
+
+
+def sound_samples(profile, rate=16000):
+    """Two-second repeating patterns with short fades to avoid abrupt clicks."""
+    if profile not in (*SOUND_PROFILES, "FAULT"):
+        raise ValueError("Unknown kitchen alarm sound")
+    samples = []
+    for n in range(rate * 2):
+        t = n / rate
+        value = 0.0
+        if profile in ("BUZZER", "FAULT") and t < .5:
+            fade = min(1.0, t / .005, (.5 - t) / .005)
+            value = .67 * fade * math.sin(2 * math.pi * (880 if profile == "BUZZER" else 440) * t)
+        elif profile == "BELL" and t < 1.2:
+            fade = min(1.0, t / .005, (1.2 - t) / .01)
+            value = fade * math.exp(-4 * t) * (
+                .5 * math.sin(2 * math.pi * 1046.5 * t) +
+                .17 * math.sin(2 * math.pi * 2093 * t) +
+                .08 * math.sin(2 * math.pi * 3139.5 * t))
+        elif profile == "CHIME" and t < .75:
+            note = min(2, int(t / .25))
+            elapsed = t - note * .25
+            fade = min(1.0, elapsed / .005, (.25 - elapsed) / .01)
+            value = .65 * fade * math.exp(-5 * elapsed) * math.sin(
+                2 * math.pi * (660, 880, 1108.7)[note] * elapsed)
+        samples.append(round(32767 * value))
+    return samples
+
+
+class SoundChoices:
+    def prepare(self, root):
+        self.profiles = {}
+        for profile in (*SOUND_PROFILES, "FAULT"):
+            path = root / ("alarm-" + profile.lower() + ".wav")
+            samples = sound_samples(profile)
+            with wave.open(str(path), "wb") as wav:
+                wav.setparams((1, 2, 16000, len(samples), "NONE", "not compressed"))
+                wav.writeframes(struct.pack("<" + "h" * len(samples), *samples))
+            self.profiles[profile] = path
+        self.paths = {"fault": self.profiles["FAULT"]}
+        self.profile = None
+        self.select("BUZZER")
+
+    def select(self, profile):
+        if profile not in SOUND_PROFILES:
+            raise ValueError("Unknown kitchen alarm sound")
+        if profile == self.profile:
+            return
+        self.profile = profile
+        self.paths.update(due=self.profiles[profile], test=self.profiles[profile])
+        # A running Mac loop must restart when its selected WAV changes.
+        if hasattr(self, "mode"):
+            self.mode = None
+
+
+class WindowsSound(SoundChoices):
     def __init__(self, root):
         if sys.platform != "win32":
             raise RuntimeError("Native kitchen sound requires Windows")
         import winsound
         self.sound = winsound
-        self.paths = {}
-        for name, frequency in (("due", 880), ("fault", 440), ("test", 660)):
-            path = root / ("alarm-" + name + ".wav")
-            samples = [int(22000 * math.sin(2 * math.pi * frequency * n / 16000))
-                       if n < 8000 else 0 for n in range(32000)]
-            with wave.open(str(path), "wb") as wav:
-                wav.setparams((1, 2, 16000, len(samples), "NONE", "not compressed"))
-                wav.writeframes(struct.pack("<" + "h" * len(samples), *samples))
-            self.paths[name] = path
+        self.prepare(root)
 
     def play(self, mode):
         # Reassert playback each poll so interruptions are retried automatically.
@@ -43,20 +91,12 @@ class WindowsSound:
             raise RuntimeError("Windows wake request failed")
 
 
-class MacSound:
+class MacSound(SoundChoices):
     """macOS Core Audio through the system afplay utility; reassert after interruption."""
     def __init__(self, root):
-        self.paths = {}
         self.process = None
         self.mode = None
-        for name, frequency in (("due", 880), ("fault", 440), ("test", 660)):
-            path = root / ("alarm-" + name + ".wav")
-            samples = [int(22000 * math.sin(2 * math.pi * frequency * n / 16000))
-                       if n < 8000 else 0 for n in range(32000)]
-            with wave.open(str(path), "wb") as wav:
-                wav.setparams((1, 2, 16000, len(samples), "NONE", "not compressed"))
-                wav.writeframes(struct.pack("<" + "h" * len(samples), *samples))
-            self.paths[name] = path
+        self.prepare(root)
 
     def play(self, mode):
         if mode == self.mode and self.process is not None and self.process.poll() is None:
@@ -131,6 +171,10 @@ class AlarmState:
                 any(type(response.get(k)) is not int or response[k] < 0
                     for k in ("needsPreparation", "readyOverdue", "testSequence"))):
             raise ValueError("Invalid alarm snapshot")
+        profile = response.get("soundProfile", "BUZZER")
+        if profile not in SOUND_PROFILES:
+            raise ValueError("Unknown kitchen alarm sound")
+        sound.select(profile)
         if self.enabled and not response["enabled"]:
             self.test_until = 0
         self.enabled = response["enabled"]
@@ -180,7 +224,7 @@ def run(cfg, path):
                     if sound is None:
                         sound = (MacSound if sys.platform == "darwin" else WindowsSound)(Path(path).parent)
                     response = api.post("alarm", dict(api.identity(), status=state.status,
-                                                      testReceipt=state.test_receipt))
+                                                      testReceipt=state.test_receipt, soundVersion=1))
                     state.update(response, sound, time.monotonic())
                 except Exception as exc:
                     try:
@@ -191,7 +235,7 @@ def run(cfg, path):
                         else:
                             state.status = "ERROR"
                             # Report missing audio without starting a second scheduler.
-                            api.post("alarm", dict(api.identity(), status="ERROR", testReceipt=state.test_receipt))
+                            api.post("alarm", dict(api.identity(), status="ERROR", testReceipt=state.test_receipt, soundVersion=1))
                     except Exception:
                         state.status = "ERROR"
                     print("Kitchen alarm needs attention:", type(exc).__name__, flush=True)
