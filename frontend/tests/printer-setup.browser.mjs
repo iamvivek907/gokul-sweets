@@ -1,17 +1,20 @@
+import {recoveryContext,recoveryFailure} from './recoveryEvidence.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 try {
- for(const width of [390,1280]) {
-  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
-  await page.clock.install();
+ for(const recoveryDelay of [0,200]) for(const width of [390,1280]) {
+  const context=await recoveryContext(browser,{viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+  const clockStart=new Date("2026-10-11T06:00:00Z");
+  await page.clock.install({time:clockStart});
+  await page.clock.pauseAt(clockStart);
   await context.addInitScript(()=>{AbortSignal.timeout=milliseconds=>{
    const controller=new AbortController();
    setTimeout(()=>controller.abort(new DOMException('Request deadline exceeded','TimeoutError')),milliseconds);
    return controller.signal;
   };});
-  let reads=0,release,started,stalledRequest;
+  let reads=0,release,started,stalledRequest,healthyRecovery=false;
   const firstStarted=new Promise(resolve=>{started=resolve;});
   let gate=new Promise(resolve=>{release=resolve;});
   let state={configured:true,enabled:false,online:true,profile:{branchId:1,station:'KITCHEN',agentId:'shop',printerCode:'KITCHEN_MAIN',protocol:'ESC_POS_USB',target:'Test Queue',port:9100,baudRate:9600,paperWidthMm:80,autoCut:false},runtime:{status:'READY',devices:{usb:['Test Queue'],bluetooth:[]}}};
@@ -25,6 +28,7 @@ try {
    else if(path==='/api/admin/printing/station') {
     reads++;stalledRequest=request;json=structuredClone(state);
     if(gate){started();await gate;}
+    else if(healthyRecovery&&recoveryDelay)await new Promise(resolve=>setTimeout(resolve,recoveryDelay));
    } else if(path.endsWith('/printing/station/mode')) {
     assert.equal(request.headers()['x-staff-csrf'],'test-csrf');
     state={...state,enabled:request.postDataJSON().enabled};json={...state,actionReceipt:{requestId:new URL(request.url()).searchParams.get("requestId"),outcome:"ACCEPTED"}};
@@ -38,7 +42,7 @@ try {
   const firstReply=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/printing/station');
   const releaseFirst=release;gate=null;releaseFirst();await firstReply;
   const start=page.getByRole('button',{name:'Start printing',exact:true});
-  await start.waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('button')].some(button=>button.textContent==='Start printing'&&!button.disabled));
+  await start.waitFor();await page.locator('button:not([disabled])').filter({hasText:/^Start printing$/}).waitFor();
   assert.equal(await page.getByText('Paused',{exact:true}).isVisible(),true);
   // A staff mutation must still invalidate a poll already in flight.
   const secondStarted=new Promise(resolve=>{started=resolve;});gate=new Promise(resolve=>{release=resolve;});
@@ -46,7 +50,7 @@ try {
   const staleReply=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/printing/station');
   await start.click();await page.getByText('Running',{exact:true}).waitFor();
   const releaseSecond=release;gate=null;releaseSecond();await (await staleReply).finished();
-  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+  await page.clock.runFor(32);
   assert.equal(await page.getByText('Running',{exact:true}).isVisible(),true);
   assert.equal(await page.getByRole('button',{name:'Pause printing',exact:true}).isEnabled(),true);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
@@ -61,7 +65,7 @@ try {
   assert.equal(reads,stalledReads,'A stuck request must be aborted before a new poll starts');
   // Abort left the old route pending; release it before starting a healthy read.
   const releaseStalled=release;gate=null;releaseStalled();
-  state={...state,enabled:false};
+  state={...state,enabled:false};healthyRecovery=true;
   const recoveredReply=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/printing/station');
   // Virtual timer ticks do not drain browser-to-Node route callbacks. Observe the
   // actual response before counting reads; both waits are owned if recovery fails.
@@ -69,13 +73,13 @@ try {
   await Promise.all([page.clock.runFor(5000),recoveredReply]);
   assert.equal(reads,stalledReads+1,'Polling must recover on the next interval after abort');
   await page.getByText('Paused',{exact:true}).waitFor();
-  await page.waitForFunction(()=>!document.body.textContent.includes('Printer status request timed out. Retrying automatically.'));
+  await page.getByText('Printer status request timed out. Retrying automatically.',{exact:true}).waitFor({state:'hidden'});
   assert.equal(reads,stalledReads+1);
   assert.equal(await start.isEnabled(),true);
-  await context.close();console.log(`Printer setup slow polling, mutation ordering and stalled-request recovery passed at ${width}px`);
+  await context.close();console.log(`Printer setup slow polling, mutation ordering and stalled-request recovery passed at ${width}px (recovery delay ${recoveryDelay}ms)`);
  }
  for(const width of [390,1280]) for(const action of ['mode','TEST','RETRY','PRINTED','profile','rejected']) {
-  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+  const context=await recoveryContext(browser,{viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
   await page.clock.install();
   await context.addInitScript(()=>{AbortSignal.timeout=milliseconds=>{
    const controller=new AbortController();
@@ -147,7 +151,7 @@ try {
   await context.close();console.log(`Printer ${action} lost reply and failed/successful reconciliation passed at ${width}px`);
  }
  for(const width of [390,1280]) {
-  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+  const context=await recoveryContext(browser,{viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
   await page.clock.install();
   await context.addInitScript(()=>{AbortSignal.timeout=milliseconds=>{
    const controller=new AbortController();
@@ -215,7 +219,7 @@ try {
   await context.close();console.log(`Late commit cancellation and reload reconciliation passed at ${width}px`);
  }
  for(const width of [390,1280]) for(const oldReply of ['accepted','rejected']) {
-  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+  const context=await recoveryContext(browser,{viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
   let posts=0,releaseA,releaseB,startedA,startedB,finishedA,finishedB,ids=[],reconciledIds=[],cancelledB=false;
   const gateA=new Promise(r=>releaseA=r),gateB=new Promise(r=>releaseB=r);
   const aStarted=new Promise(r=>startedA=r),bStarted=new Promise(r=>startedB=r);
@@ -264,4 +268,4 @@ try {
   assert.equal(posts,2,'Neither uncertain request is automatically resent');
   await context.close();console.log(`Printer navigation and delayed ${oldReply} reply preserves newer action at ${width}px`);
  }
-} finally {await browser.close();}
+} catch(error) {await recoveryFailure(browser,'printer-setup');throw error;} finally {await browser.close();}

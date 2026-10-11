@@ -1,6 +1,14 @@
 /** Installed by the customer shell before router effects, so legacy Back can be guarded. */
+const confirmedCheckouts=new Map<string,()=>void>();
 let backGuard:((event:PopStateEvent)=>void)|null=null;
-if(typeof window!=="undefined")window.addEventListener("popstate",event=>backGuard?.(event),true);
+if(typeof window!=="undefined")window.addEventListener("popstate",event=>{
+ // Cached pages can briefly deactivate effects during a history restoration.
+ // Keep the authoritative paid knowledge for this document, independent of that lifecycle.
+ const match=location.pathname.match(/^\/checkout\/(?:payment|offers)\/([^/]+)$/);
+ const leave=match?confirmedCheckouts.get(match[1]):undefined;
+ if(leave){event.stopImmediatePropagation();leave();return;}
+ backGuard?.(event);
+},true);
 export function guardPaymentBack(handler:(event:PopStateEvent)=>void){
  backGuard=handler;
  return()=>{if(backGuard===handler)backGuard=null;};
@@ -19,13 +27,25 @@ export function guardCompletedCheckout(orderNumber:string,onLeave:()=>void) {
   try{return !localStorage.getItem("gokul-pending-order")&&!localStorage.getItem("gokul-pending-payment")&&!sessionStorage.getItem("gokul-mobile-order-attempt")&&!JSON.parse(localStorage.getItem("gokul-cart")??"null")?.items?.length;}
   catch{return false;}
  };
+ const consume=()=>{history.replaceState(history.state,"","/orders");onLeave();};
+ confirmedCheckouts.set(encodeURIComponent(orderNumber),consume);
+ // Bound document-lifetime bookkeeping; no customer/payment data is persisted.
+ if(confirmedCheckouts.size>50)confirmedCheckouts.delete(confirmedCheckouts.keys().next().value!);
+ const navigation=(window as Window&{navigation?:EventTarget}).navigation;
+ const traverse=(event:Event)=>{
+  const nav=event as Event&{navigationType?:string;canIntercept?:boolean;destination?:{url:string};intercept?:(options:{handler:()=>Promise<void>})=>void};
+  if(nav.navigationType!=="traverse"||!nav.canIntercept||!nav.destination||!nav.intercept||!isCheckout(nav.destination.url))return;
+  // Commit the traversal before replacing its destination. Cancelling it would
+  // leave the completed payment entry behind Orders and recreate a Back loop.
+  nav.intercept({handler:async()=>{if(isCheckout(location.href))consume();}});
+ };
+ navigation?.addEventListener("navigate",traverse,true);
  const unguard=guardPaymentBack(event=>{
   if(!isCheckout(location.href))return;
   event.stopImmediatePropagation();
-  history.replaceState(history.state,"","/orders");
-  onLeave();
+  consume();
  });
  // Let Back advance to the old entry before replacing it. Cancelling a modern
  // Navigation API traversal leaves that entry behind the Orders page forever.
- return unguard;
+ return()=>{unguard();navigation?.removeEventListener("navigate",traverse,true);};
 }

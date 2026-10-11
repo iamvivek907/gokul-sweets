@@ -13,6 +13,7 @@ import {formatWeight} from "@/lib/orderQuantity";
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState
@@ -172,10 +173,13 @@ export default function OrderDetailPage() {
             : null;
 
     const order = currentOrder?.order ?? null;
-    useEffect(()=>{
+    // Install before paid details are painted: an immediate system Back must be guarded.
+    useLayoutEffect(()=>{
         if(order?.paymentStatus!=="PAID")return;
-        return guardCompletedCheckout(order.orderNumber,()=>router.replace("/orders"));
-    },[order?.paymentStatus,order?.orderNumber,router]);
+        // Finish this history replacement with a document navigation. A client
+        // transition still settling from payment must not restore its old target.
+        return guardCompletedCheckout(order.orderNumber,()=>window.location.replace("/orders"));
+    },[order?.paymentStatus,order?.orderNumber]);
 
 
 

@@ -120,6 +120,7 @@ jobs:
           echo "PLAYWRIGHT_MODULE=$browser_runner/node_modules/playwright" >> "$GITHUB_ENV"
       - name: Browser regressions with per-script timings
         env:
+          BROWSER_RECOVERY_REPEATS: '2'
           BROWSER_SUITE: ${{ matrix.suite }}
           SCREENSHOT_DIR: /tmp/gokul-layouts
         run: |
