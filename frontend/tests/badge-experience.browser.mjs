@@ -38,12 +38,13 @@ try{for(const width of [320,390,640,1280]){
  assert.equal(await page.locator('.configured-badge.is-locked').getByRole('img',{name:/earned Gokul recognition/}).count(),0);
  await page.evaluate(()=>{const d=document.createElement('dialog');d.id='onboarding-dialog';document.body.append(d);d.showModal();});
  await page.waitForTimeout(3000);assert.equal(claims,0,'no claim while another dialog is open');
+ const acknowledgement=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/customer/identity/badges/1/acknowledge'&&response.request().method()==='POST'&&response.status()===204);
  await page.evaluate(width=>{document.getElementById('onboarding-dialog').remove();if(width===1280)document.querySelector('[popover]').showPopover();},width);
  if(width===1280){await page.waitForTimeout(1500);assert.equal(claims,0,'branch selection postpones badge claims');assert.equal(await page.locator(':popover-open').count(),1,'branch picker remains open');await page.evaluate(()=>document.querySelector(':popover-open').hidePopover());}
  if(width===640){await page.locator(':popover-open').waitFor({state:'attached'});await page.waitForTimeout(700);assert.equal(acks,0,'a badge claimed during branch selection is not acknowledged prematurely');assert.equal(await page.locator('.badge-celebration[open]').count(),0);await page.evaluate(()=>document.querySelector(':popover-open').hidePopover());}
  if(width===390){await page.locator('#claim-race-dialog[open]').waitFor({state:'attached'});await page.waitForTimeout(700);assert.equal(acks,0,'a claimed award is not acknowledged behind another dialog');await page.evaluate(()=>document.getElementById('claim-race-dialog').remove());}
  await page.getByRole('dialog',{name:'You’ve earned Gokul regular',exact:true}).waitFor();assert.match(await page.locator('.badge-celebration').innerText(),/\+25% bonus/);
- assert.ok(acks>=1);const medal=page.locator('.badge-celebration .badge-medallion');const r=await medal.boundingBox();assert.ok(Math.abs(r.width-r.height)<1);assert.ok(r.width>=80);
+ await acknowledgement;assert.ok(acks>=1);const medal=page.locator('.badge-celebration .badge-medallion');const r=await medal.boundingBox();assert.ok(Math.abs(r.width-r.height)<1);assert.ok(r.width>=80);
  await page.emulateMedia({reducedMotion:'reduce'});assert.equal(await page.locator('.badge-celebration').evaluate(n=>getComputedStyle(n).animationName),'none');
  if(width>=640){
  const presentedAcks=acks;
@@ -62,10 +63,10 @@ try{for(const width of [320,390,640,1280]){
  await page.waitForTimeout(500); // Let the existing responsive Orders shell settle before measuring the optional wallet.
  await page.getByRole('heading',{name:'Coins unavailable',exact:true}).waitFor();
  assert.equal(await page.locator('.order-reward-guidance').getByRole('button',{name:'Retry loading coins',exact:true}).isEnabled(),true);
- const before=(await page.getByText('No orders yet',{exact:true}).boundingBox()).y;
+ const before=await page.getByText('No orders yet',{exact:true}).evaluate(node=>node.getBoundingClientRect().top+window.scrollY);
  await page.getByRole('button',{name:'Retry loading coins',exact:true}).click();
  await page.getByRole('heading',{name:'30 coins available',exact:true}).waitFor();
- const after=(await page.getByText('No orders yet',{exact:true}).boundingBox()).y;
+ const after=await page.getByText('No orders yet',{exact:true}).evaluate(node=>node.getBoundingClientRect().top+window.scrollY);
  assert.ok(Math.abs(after-before)<1,`late wallet moved order history ${after-before}px`);
  await page.locator('.order-reward-guidance').getByRole('button',{name:'Details',exact:true}).click();assert.match(await page.locator('.order-reward-guidance').innerText(),/25 normal \+ 5 Gokul regular bonus/);assert.match(await page.locator('.order-reward-guidance').innerText(),/₹500 or more/);
  rewardsEnabled=false;await page.clock.fastForward(61000);
@@ -79,5 +80,5 @@ try{for(const width of [320,390,640,1280]){
  assert.equal(orders,0);assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await context.close();console.log(`Configured badges, durable celebration and nonblocking rewards passed at ${width}px (${claims} claims).`);
  }
- const response=await fetch(`${base}/downloads/gokul-print-agent.zip`);assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/application\/zip/);assert.match(response.headers.get('content-disposition'),/gokul-print-agent.zip/);const bytes=Buffer.from(await response.arrayBuffer());assert.equal(bytes.readUInt32LE(0),0x04034b50);assert.ok(bytes.includes(Buffer.from('install.ps1')));const names=[];for(let offset=0;bytes.readUInt32LE(offset)===0x04034b50;){const length=bytes.readUInt16LE(offset+26),extra=bytes.readUInt16LE(offset+28),size=bytes.readUInt32LE(offset+18);names.push(bytes.subarray(offset+30,offset+30+length).toString());offset+=30+length+extra+size;}assert.deepEqual(names,['agent.py','background.py','requirements.txt','install.ps1','install.cmd']);console.log('Deployed installer route returns the actual ZIP.');
+ const response=await fetch(`${base}/downloads/gokul-print-agent.zip`);assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/application\/zip/);assert.match(response.headers.get('content-disposition'),/gokul-print-agent.zip/);const bytes=Buffer.from(await response.arrayBuffer());assert.equal(bytes.readUInt32LE(0),0x04034b50);assert.ok(bytes.includes(Buffer.from('install.ps1')));const names=[];for(let offset=0;bytes.readUInt32LE(offset)===0x04034b50;){const length=bytes.readUInt16LE(offset+26),extra=bytes.readUInt16LE(offset+28),size=bytes.readUInt32LE(offset+18);names.push(bytes.subarray(offset+30,offset+30+length).toString());offset+=30+length+extra+size;}assert.deepEqual(names,['agent.py','alarm.py','background.py','requirements.txt','install.ps1','install.cmd','macos.py','install-macos.command']);console.log('Deployed installer route returns the actual ZIP.');
 }finally{await browser.close();}
