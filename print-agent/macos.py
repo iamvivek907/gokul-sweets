@@ -2,7 +2,6 @@
 import ctypes
 from ctypes import byref, c_void_p, c_uint32
 import getpass
-import json
 import os
 from pathlib import Path
 import plistlib
@@ -53,6 +52,17 @@ def launch_definition(root, python, label):
             'StandardOutPath': '/dev/null', 'StandardErrorPath': '/dev/null'}
 
 
+def install_certificates(root):
+    # python.org's OpenSSL runtime may have no default CA bundle on a fresh Mac.
+    # Use the operating system's root certificates without disabling TLS verification.
+    result = subprocess.run(['/usr/bin/security', 'find-certificate', '-a', '-p',
+                             '/System/Library/Keychains/SystemRootCertificates.keychain'],
+                            check=True, capture_output=True, text=True)
+    if '-----BEGIN CERTIFICATE-----' not in result.stdout:
+        raise RuntimeError('macOS root certificates could not be loaded.')
+    (root / 'cacert.pem').write_text(result.stdout, encoding='ascii')
+
+
 def install(profile):
     cfg = agent.load_config(profile)
     if cfg['station'] != 'KITCHEN':
@@ -60,6 +70,7 @@ def install(profile):
     root = Path.home() / 'Library/Application Support/GokulAlarm' / str(cfg['branch_id'])
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(root, 0o700)
+    install_certificates(root)
     installed = root / 'config.local.json'
     if installed.exists():
         old = agent.load_config(installed)
@@ -108,6 +119,7 @@ def main():
         return
     path = Path(sys.argv[1])
     cfg = agent.load_config(path)
+    os.environ['SSL_CERT_FILE'] = str(path.parent / 'cacert.pem')
     os.environ['PRINT_AGENT_API_KEY'] = keychain(service(cfg))
     # -w makes caffeinate exit with this process, including abnormal termination.
     awake = subprocess.Popen(['/usr/bin/caffeinate', '-i', '-w', str(os.getpid())])

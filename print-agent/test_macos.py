@@ -19,3 +19,28 @@ class MacInstallerTest(unittest.TestCase):
         cfg = {'branch_id': 1, 'agent_id': 'kitchen', 'api_url': 'https://dev.example.test'}
         for key, value in [('branch_id', 2), ('agent_id', 'another'), ('api_url', 'https://prod.example.test')]:
             self.assertNotEqual(service(cfg), service(dict(cfg, **{key: value})))
+
+    def test_fresh_python_receives_system_root_certificates(self):
+        import tempfile
+        from unittest.mock import Mock, patch
+        from macos import install_certificates
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            certificate = '-----BEGIN CERTIFICATE-----\ntest\n-----END CERTIFICATE-----\n'
+            with patch('macos.subprocess.run', return_value=Mock(stdout=certificate)):
+                install_certificates(root)
+            self.assertEqual((root / 'cacert.pem').read_text(), certificate)
+            with patch('macos.subprocess.run', return_value=Mock(stdout='')):
+                with self.assertRaises(RuntimeError):
+                    install_certificates(root)
+
+    @unittest.skipUnless(__import__('sys').platform == 'darwin', 'requires macOS system certificates')
+    def test_native_root_export_is_accepted_by_python_tls(self):
+        import ssl
+        import tempfile
+        from macos import install_certificates
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            install_certificates(root)
+            context = ssl.create_default_context(cafile=str(root / 'cacert.pem'))
+            self.assertGreater(len(context.get_ca_certs()), 0)

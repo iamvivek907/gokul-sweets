@@ -105,9 +105,12 @@ class SupervisorTest(unittest.TestCase):
         from alarm import MacSound
         with tempfile.TemporaryDirectory() as folder:
             first, second = Mock(), Mock()
+            from subprocess import TimeoutExpired
+            first.wait.side_effect = TimeoutExpired("afplay", .15)
+            second.wait.side_effect = [TimeoutExpired("afplay", .15), 0]
             first.poll.side_effect = [None, 1, 1]
             second.poll.return_value = None
-            with patch('alarm.subprocess.Popen', side_effect=[first, second]) as popen, patch('alarm.os.killpg') as kill:
+            with patch('alarm.subprocess.Popen', side_effect=[first, second]) as popen, patch('alarm.os.killpg', create=True) as kill:
                 sound = MacSound(Path(folder))
                 sound.play('due')
                 sound.play('due')
@@ -116,5 +119,16 @@ class SupervisorTest(unittest.TestCase):
                 self.assertEqual(popen.call_count, 2)
                 sound.play(None)
                 kill.assert_called_once()
-                second.wait.assert_called_once()
+                second.wait.assert_called_with(timeout=3)
                 self.assertIsNone(sound.process)
+
+    def test_macos_immediate_audio_failure_is_not_acknowledged(self):
+        from unittest.mock import patch
+        from alarm import MacSound
+        with tempfile.TemporaryDirectory() as folder:
+            process = Mock()
+            process.wait.return_value = 1
+            with patch('alarm.subprocess.Popen', return_value=process):
+                sound = MacSound(Path(folder))
+                with self.assertRaisesRegex(RuntimeError, 'playback'):
+                    sound.play('test')

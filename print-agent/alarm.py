@@ -71,6 +71,11 @@ class MacSound:
             self.process = subprocess.Popen(
                 ["/bin/sh", "-c", 'while /usr/bin/afplay "$1"; do :; done',
                  "gokul-sound", str(self.paths[mode])], start_new_session=True)
+            try:
+                self.process.wait(timeout=.15)
+            except subprocess.TimeoutExpired:
+                return
+            raise RuntimeError("macOS audio playback failed to start")
 
 
 def supervise(cfg, path, stop=None):
