@@ -4,16 +4,16 @@ import {mkdir} from 'node:fs/promises';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 try{
- for(const width of [320,390,640,641]){
+ for(const width of [320,390,640,641,1280]){
   const compact=width<641,context=await browser.newContext({viewport:{width,height:844},serviceWorkers:'block',timezoneId:'America/Los_Angeles'}),page=await context.newPage();
   const branch={id:1,code:'FIX',name:'Gokul Tamkuhi Road',address:'Station Road, opposite the bus stand',city:'Tamkuhi Road',pincode:'274407',active:true,operational:true,pickupAvailable:true};
   const now=new Date().toISOString(),date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
   const order={id:1,orderNumber:'CORRECTION-TEST',customerOrderNumber:42,branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:'9876543210',orderStatus:'PREPARING',paymentStatus:'PAID',fulfillmentType:width===390?'DELIVERY':'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'Samosa',saleMode:'UNIT',quantity:1,unitPrice:100,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:1,paymentFee:2,paymentFeeTax:.2,totalAmount:112,createdAt:now,updatedAt:now};
   const wallet={policyVersion:'1',balance:600,debt:0,pendingCoins:20,completedOrders:5,rewards:[{code:'SWEET_75',name:'Sweet saving',coins:750,discount:75,minimumSubtotal:699,eligible:false,unavailableReason:'More coins needed'}],history:[],nextExpiry:null,maximumRedemptionPercent:10,terms:'Coins are earned on completed paid food orders. Fees are excluded.'};
-  let name='',addresses=[],saved=0,location=0,otp=0,cancelBodies=[];
+  let name='',addresses=[],saved=0,location=0,otp=0,cancelBodies=[],failAddress=false,nextAddressId=1;
   let cancellationOpen=true,fullRefund=false;
   const summary=()=>({orderNumber:order.orderNumber,branchName:branch.name,serverTime:new Date().toISOString(),cancellationDeadline:new Date(Date.now()+120000).toISOString(),canCancel:cancellationOpen&&order.orderStatus!=='CANCELLED',canTransfer:false,refundAmount:fullRefund?112:100,retainedCharges:fullRefund?0:12,refundStatus:order.orderStatus==='CANCELLED'?order.paymentStatus:'NOT_REQUESTED',refundReferenceId:order.orderStatus==='CANCELLED'?'GKC-merchant-refund-test':null,providerRefundId:order.paymentStatus==='REFUNDED'?'refund_provider_test_123':null,refundProvider:'RAZORPAY',explanation:'Food refund only.'});
-  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('gokul-mobile-launch-seen','1');window.geoCalls=0;navigator.geolocation.getCurrentPosition=success=>{window.geoCalls++;success({coords:{latitude:26.75,longitude:84.02},timestamp:Date.now()});};},branch);
+  await context.addInitScript(branch=>{localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('gokul-mobile-launch-seen','1');window.geoCalls=0;navigator.geolocation.getCurrentPosition=success=>{window.geoCalls++;success({coords:{latitude:26.75,longitude:84.02},timestamp:Date.now()});};},branch);
   await context.route('**/api/**',async route=>{
    const req=route.request(),path=new URL(req.url()).pathname;let json=[];
    if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,customerAccountHub:true,notificationInbox:true,gokulRewards:true,branchExperience:true,truthfulOrderTracking:true};
@@ -26,7 +26,8 @@ try{
    else if(path==='/api/customer/identity/badges/celebration')json=null;
    else if(path==='/api/customer/identity/account')json={paidOrders:8,completedOrders:5,favouriteProductIds:[],addresses,preferences:{dietaryNotes:null,preferredBranchId:null}};
    else if(path==='/api/customer/identity/account/location'){if(req.method()==='POST'){location++;json={addressLine:'Station Road, Tamkuhi',locality:'Tamkuhi Road',postalCode:'274407',attribution:'Google Maps'};}else json={enabled:true};}
-   else if(path==='/api/customer/identity/account/addresses'){saved++;json={id:1,...req.postDataJSON()};addresses=[json];}
+   else if(path==='/api/customer/identity/account/addresses'){if(failAddress){failAddress=false;return route.fulfill({status:503,json:{message:'Temporarily unavailable'}});}saved++;json={id:nextAddressId++,...req.postDataJSON()};addresses=[...addresses,json];}
+   else if(path.startsWith('/api/customer/identity/account/addresses/')){const id=Number(path.split('/').at(-1));if(req.method()==='DELETE'){addresses=addresses.filter(address=>address.id!==id);return route.fulfill({status:204});}json={id,...req.postDataJSON()};addresses=addresses.map(address=>address.id===id?json:address);}
    else if(path==='/api/customer/identity/rewards')json=wallet;
    else if(path==='/api/customer/identity/orders')json=[order];
    else if(path==='/api/customer/identity/notification-preferences')json={offerInboxEnabled:false,marketingConsentGranted:false};
@@ -69,6 +70,28 @@ try{
   await page.getByText('GKC-merchant-refund-test',{exact:true}).waitFor();
   assert.equal(await page.locator('[data-copyable]').filter({hasText:'refund_provider_test_123'}).count(),1);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  await page.goto(`${base}/profile/details`);await page.locator('#account-details').waitFor();
+  await page.locator('#account-details').getByRole('button',{name:name?'Edit name':'Add your name',exact:true}).click();
+  await page.locator('#account-name-edit').fill('Vivek Kumar');await page.getByRole('button',{name:'Save name',exact:true}).click();
+  await page.locator('#account-details').getByText('Vivek Kumar',{exact:true}).first().waitFor();assert.equal(name,'Vivek Kumar');
+  await page.reload();await page.locator('#account-details').getByText('Vivek Kumar',{exact:true}).first().waitFor();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  if(process.env.SCREENSHOT_DIR){await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/profile-studio-${width}.png`,fullPage:true});}
+  await page.goto(`${base}/profile/addresses`);await page.locator('#account-addresses').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+  const addressLine=page.getByLabel('Address line',{exact:true});await addressLine.fill('  House 88, Station Road  ');
+  await page.getByLabel('Locality',{exact:true}).fill('Tamkuhi Road');await page.getByLabel('Postal code',{exact:true}).fill('274407');
+  assert.equal(await addressLine.inputValue(),'  House 88, Station Road  ');const previousLocation=location;failAddress=true;await page.getByRole('button',{name:'Save address',exact:true}).click();
+  await page.getByRole('status').filter({hasText:'Your address could not be saved'}).waitFor();assert.equal(await addressLine.inputValue(),'  House 88, Station Road  ');
+  await page.getByRole('button',{name:'Save address',exact:true}).click();await page.getByText('Address saved.',{exact:true}).waitFor();
+  assert.equal(addresses.at(-1).addressLine,'House 88, Station Road');assert.equal(location,previousLocation);
+  const place=page.locator('#account-addresses article').filter({hasText:'House 88, Station Road'});
+  await place.getByRole('button',{name:'Edit',exact:true}).click();await addressLine.fill('House 89, Station Road');
+  await page.getByRole('button',{name:'Save changes',exact:true}).click();await page.getByText('Address updated.',{exact:true}).waitFor();
+  const updatedPlace=page.locator('#account-addresses article').filter({hasText:'House 89, Station Road'});await updatedPlace.waitFor();
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/address-studio-${width}.png`,fullPage:true});
+  await updatedPlace.getByRole('button',{name:'Remove',exact:true}).click();await updatedPlace.getByRole('button',{name:'Keep address',exact:true}).click();assert.equal(addresses.at(-1).addressLine,'House 89, Station Road');
+  await updatedPlace.getByRole('button',{name:'Remove',exact:true}).click();await updatedPlace.getByRole('button',{name:'Remove address',exact:true}).click();await page.getByText('Address removed.',{exact:true}).waitFor();assert.equal(addresses.some(address=>address.addressLine==='House 89, Station Road'),false);
   await context.close();console.log(`New account/correction ${width}px passed`);
  }
  const noJs=await browser.newContext({javaScriptEnabled:false,viewport:{width:390,height:844}}),noJsPage=await noJs.newPage();

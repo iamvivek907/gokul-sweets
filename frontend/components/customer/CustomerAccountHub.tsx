@@ -8,6 +8,7 @@ import ReorderDialog from "./ReorderDialog";
 import CustomerRewards from "./CustomerRewards";
 import AddressLocationAssist from "./AddressLocationAssist";
 import AccountTierMark from "./AccountTierMark";
+import ProfileDetailsStudio, {ProfileCompletion} from "./ProfileDetailsStudio";
 import MobilePageBack from "./MobilePageBack";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {T} from "@/lib/language";
@@ -201,7 +202,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
         {features?.gokulRewards?<CustomerRewards overview/>:<>
         <section className="mobile-profile-rewards" aria-label="Rewards"><div><T text="Rewards" /><strong><T text="Coming soon" /></strong></div><p><T text="Earned points are not available yet. A balance will appear here when the rewards programme is launched." /></p></section>
         </>}
-        {!session.name?.trim()&&<aside className="account-name-invitation"><div><strong><T text="What should we call you?"/></strong><p><T text="Add your name for a warmer welcome. It is optional."/></p></div><button type="button" onClick={()=>{setEditingDetails(true);showSection("details");}}><T text="Add your name"/></button></aside>}
+        {modern&&!initialSection?<ProfileCompletion named={!!session.name?.trim()} addresses={account.addresses.length} onName={()=>{setNameDraft(session.name??"");setEditingDetails(true);showSection("details");}} onAddresses={()=>compact?router.push("/profile/addresses"):showSection("addresses")}/>:!modern&&!session.name?.trim()&&<aside className="account-name-invitation"><div><strong><T text="What should we call you?"/></strong><p><T text="Add your name for a warmer welcome. It is optional."/></p></div><button type="button" onClick={()=>{setEditingDetails(true);showSection("details");}}><T text="Add your name"/></button></aside>}
         <div className="account-layout mt-6">
             <nav className="account-navigation" aria-label="Profile sections">
                 {([['badges', 'Badges'], ['orders', 'Order history'], ['favourites', 'Favourites'],
@@ -258,6 +259,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
             </dialog>
             <nav className="profile-history-pagination" aria-label="Order history pages"><span aria-live="polite">{orders.length} orders loaded</span>{pages[pageIndex]?.nextBefore && <button type="button" disabled={paging} onClick={()=>void changeOrderPage(pageIndex+1)}><T text={paging?"Loading…":"Load more"}/></button>}</nav>
         </>}</section>}
+        {modern&&(activeSection==="details"||activeSection==="addresses")&&<ProfileDetailsStudio key={activeSection} mode={activeSection} name={session.name??""} phone={maskedPhone} nameDraft={nameDraft} onNameDraft={setNameDraft} editing={editingDetails} onEditing={setEditingDetails} onSaveName={saveDetails} nameBusy={busy} addresses={account.addresses} onRefresh={reload} onPreferences={()=>showSection("preferences")} onSignOut={()=>setLogoutOpen(true)}/>}
         {activeSection === "preferences" && <section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]"><T text="Your preferences" /></h2>
             <p className="mt-1 text-sm text-[#756763]"><T text="Dietary notes are for your reference; check ingredients with the branch for each order." /></p>
             <label htmlFor="dietary-notes" className="mt-5 block text-sm font-semibold"><T text="Dietary notes" /></label>
@@ -266,7 +268,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
                 className="mt-3 min-h-11 rounded-xl bg-[#7a1625] px-5 text-sm font-semibold text-white disabled:opacity-50"><T text="Save preferences" /></button>
             <p className="mt-5 text-xs text-[#756763]">{account.preferences.preferredBranchId === branch?.id && branch ? `${branch.name} is your saved branch.` : "Choose your branch from the site header when ordering."}</p>
             {branch && account.preferences.preferredBranchId !== branch.id && <button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({dietaryNotes: dietary, preferredBranchId: branch.id})}), "Preferred branch saved.");}} className="mt-3 min-h-11 text-sm font-semibold text-[#7a1625] underline"><T text="Save" />{" "}{branch.name}{" "}<T text="as preferred" /></button>}</section>}
-            {activeSection === "addresses" && <section id="account-addresses" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]"><T text="Saved addresses" /></h2>
+            {activeSection === "addresses" && !modern && <section id="account-addresses" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]"><T text="Saved addresses" /></h2>
                 <p className="mt-1 text-sm text-[#756763]"><T text="Saved for your account. Delivery coverage and final address are checked separately at checkout." /></p>
                 {account.addresses.map(saved => <div key={saved.id} className="mt-4 flex flex-wrap items-start justify-between gap-4 border-t border-[#eadfd6] pt-3"><div><strong className="text-sm">{saved.label}</strong><p className="text-sm text-[#756763]">{saved.addressLine}, {saved.locality} {saved.postalCode}</p></div>
                     <div className="flex gap-3"><button type="button" disabled={busy} onClick={() => {setEditingAddressId(saved.id); setAddress({label: saved.label, addressLine: saved.addressLine, locality: saved.locality, postalCode: saved.postalCode});}} className="text-sm font-semibold text-[#7a1625]"><T text="Edit" /></button>
@@ -283,7 +285,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
             {branch ? <><button type="button" disabled={busy} onClick={() => {setBusy(true); void getMenu(branch.id).then(categories => setMenu(categories.flatMap(category => category.products))).catch(() => setMessage("Menu unavailable. Please try again.")).finally(() => setBusy(false));}} className="mt-4 min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Browse" />{" "}{branch.name}{" "}<T text="items" /></button>
                 {menu.length > 0 && <div className="mt-4 grid gap-2 sm:grid-cols-2">{menu.filter(product => product.available).slice(0, 30).map(product => <div key={product.id} className="flex items-center justify-between gap-3 border-t border-[#eadfd6] py-2"><span className="text-sm">{product.name}</span><button type="button" disabled={busy} onClick={() => {void perform(() => apiClient<void>(`${base}/favourites/${product.id}`, {method: account.favouriteProductIds.includes(product.id) ? "DELETE" : "PUT", credentials: "include"}), "Favourites updated.");}} className="min-h-11 text-sm font-semibold text-[#7a1625]">{account.favouriteProductIds.includes(product.id) ? "Remove" : "Save"}</button></div>)}</div>}</> : <Link href="/menu" className="mt-4 inline-block text-sm font-semibold text-[#7a1625] underline"><T text="Choose a branch →" /></Link>}
         </section>}
-        {activeSection === "details" && <section id="account-details" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
+        {activeSection === "details" && !modern && <section id="account-details" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
                 <div><h2 className="text-xl font-bold text-[#241715]"><T text="Profile details" /></h2>
                     <p className="mt-1 text-sm text-[#756763]"><T text="Your contact and saved choices." /></p></div>
