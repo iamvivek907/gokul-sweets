@@ -24,19 +24,23 @@ function Start-AgentAfterUpgrade([string]$TaskName) {
     }
     throw 'Agent failed to start after the upgrade.'
 }
-function Update-AgentInstallation([string]$Folder, [string]$Source, [string]$TaskName) {
+function Invoke-AgentInstallation([string]$Folder, [scriptblock]$Operation) {
     # FileShare.None excludes other installer processes; closing releases even after a crash.
     # Keep the lock file so all runs open the same file throughout rollback.
+    New-Item -ItemType Directory -Force -Path $Folder | Out-Null
     try {
         $lock = [IO.File]::Open((Join-Path $Folder '.install.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
     } catch {
         throw "Could not acquire the installation lock. Another installer may be running; wait for it to finish and retry. $($_.Exception.Message)"
     }
     try {
-        Update-AgentInstallationLocked $Folder $Source $TaskName
+        & $Operation
     } finally {
         $lock.Dispose()
     }
+}
+function Update-AgentInstallation([string]$Folder, [string]$Source, [string]$TaskName) {
+    Invoke-AgentInstallation $Folder { Update-AgentInstallationLocked $Folder $Source $TaskName }
 }
 function Update-AgentInstallationLocked([string]$Folder, [string]$Source, [string]$TaskName) {
     $stage = Join-Path $Folder ('.upgrade-' + [guid]::NewGuid().ToString())
@@ -106,48 +110,49 @@ try {
     if (![long]::TryParse([string]$profile.branch_id, [ref]$branchNumber) -or $branchNumber -lt 1 -or $profile.station -notin @('KITCHEN','SWEETS','BEVERAGE','FAST_FOOD','BILLING')) { throw 'Invalid printer profile.' }
     $paths = Get-AgentPaths "$branchNumber-$($profile.station)"
     $folder = $paths.Folder
-    if (Test-Path (Join-Path $folder 'config.local.json')) {
-        $installed = Get-Content -LiteralPath (Join-Path $folder 'config.local.json') -Raw | ConvertFrom-Json
-        if ($installed.api_url -ne $profile.api_url -or $installed.agent_id -ne $profile.agent_id -or $installed.printer_code -ne $profile.printer_code) { throw 'Upgrade requires the same installed backend, agent ID and printer code.' }
-        if (!(Test-Path (Join-Path $folder 'key.dpapi'))) { throw 'Existing encrypted key is missing. Ask your administrator to repair the installation.' }
+    Invoke-AgentInstallation $folder {
+        if (Test-Path (Join-Path $folder 'config.local.json')) {
+            $installed = Get-Content -LiteralPath (Join-Path $folder 'config.local.json') -Raw | ConvertFrom-Json
+            if ($installed.api_url -ne $profile.api_url -or $installed.agent_id -ne $profile.agent_id -or $installed.printer_code -ne $profile.printer_code) { throw 'Upgrade requires the same installed backend, agent ID and printer code.' }
+            if (!(Test-Path (Join-Path $folder 'key.dpapi'))) { throw 'Existing encrypted key is missing. Ask your administrator to repair the installation.' }
+            $taskName = "GokulPrint-$branchNumber-$($profile.station)"
+            Update-AgentInstallationLocked $folder $PSScriptRoot $taskName
+            Write-Host 'Agent upgraded. Key, profile and print journal preserved. Test and enable Kitchen computer sound in Admin setup.'
+            return
+        }
+        $python = $paths.Python
+        if (!(Test-Path $python)) {
+            Write-Host 'Installing Python 3.13 using Windows Package Manager...'
+            if (!(Get-Command winget -ErrorAction SilentlyContinue)) { throw 'Install Microsoft App Installer (WinGet) first, then run this installer again.' }
+            & winget install --id Python.Python.3.13 --exact --source winget --scope user --silent --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0 -or !(Test-Path $python)) { throw 'Python installation did not complete. Check Windows Package Manager and retry.' }
+        }
+        foreach ($file in @('agent.py','alarm.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
+        & $python -m venv (Join-Path $folder '.venv')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create the agent environment.' }
+        $runtime = $paths.Runtime
+        & $runtime -m pip install -r (Join-Path $folder 'requirements.txt')
+        if ($LASTEXITCODE -ne 0) { throw 'Agent dependency installation failed.' }
+        & $runtime (Join-Path $folder 'agent.py') --config $picker.FileName validate
+        if ($LASTEXITCODE -ne 0) { throw 'Printer profile validation failed.' }
+        $secureKey = Read-Host 'Private PRINT_AGENT_API_KEY (from your backend administrator)' -AsSecureString
+        $plainKey = [System.Net.NetworkCredential]::new('', $secureKey).Password
+        if ([string]::IsNullOrWhiteSpace($plainKey)) { throw 'The private agent key is required.' }
+        $encrypted = [System.Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes($plainKey), $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+        [IO.File]::WriteAllBytes((Join-Path $folder 'key.dpapi'), $encrypted)
+        $plainKey = $null
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
         $taskName = "GokulPrint-$branchNumber-$($profile.station)"
-        Update-AgentInstallation $folder $PSScriptRoot $taskName
-        Write-Host 'Agent upgraded. Key, profile and print journal preserved. Test and enable Kitchen computer sound in Admin setup.'
-        exit 0
+        $action = New-ScheduledTaskAction -Execute $paths.Background -Argument ('"' + (Join-Path $folder 'background.py') + '"') -WorkingDirectory $folder
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
+        $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
+        $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+        Copy-Item -LiteralPath $picker.FileName -Destination (Join-Path $folder 'config.local.json')
+        Start-ScheduledTask -TaskName $taskName
+        Write-Host 'Installed. Return to Admin setup, wait for Online, print a test, then Start printing.'
+        Write-Host 'The agent starts automatically after this Windows account signs in. Keep Windows awake and signed in.'
     }
-    $python = $paths.Python
-    if (!(Test-Path $python)) {
-        Write-Host 'Installing Python 3.13 using Windows Package Manager...'
-        if (!(Get-Command winget -ErrorAction SilentlyContinue)) { throw 'Install Microsoft App Installer (WinGet) first, then run this installer again.' }
-        & winget install --id Python.Python.3.13 --exact --source winget --scope user --silent --accept-package-agreements --accept-source-agreements
-        if ($LASTEXITCODE -ne 0 -or !(Test-Path $python)) { throw 'Python installation did not complete. Check Windows Package Manager and retry.' }
-    }
-    New-Item -ItemType Directory -Force -Path $folder | Out-Null
-    foreach ($file in @('agent.py','alarm.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
-    & $python -m venv (Join-Path $folder '.venv')
-    if ($LASTEXITCODE -ne 0) { throw 'Could not create the agent environment.' }
-    $runtime = $paths.Runtime
-    & $runtime -m pip install -r (Join-Path $folder 'requirements.txt')
-    if ($LASTEXITCODE -ne 0) { throw 'Agent dependency installation failed.' }
-    & $runtime (Join-Path $folder 'agent.py') --config $picker.FileName validate
-    if ($LASTEXITCODE -ne 0) { throw 'Printer profile validation failed.' }
-    $secureKey = Read-Host 'Private PRINT_AGENT_API_KEY (from your backend administrator)' -AsSecureString
-    $plainKey = [System.Net.NetworkCredential]::new('', $secureKey).Password
-    if ([string]::IsNullOrWhiteSpace($plainKey)) { throw 'The private agent key is required.' }
-    $encrypted = [System.Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes($plainKey), $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
-    [IO.File]::WriteAllBytes((Join-Path $folder 'key.dpapi'), $encrypted)
-    $plainKey = $null
-    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    $taskName = "GokulPrint-$branchNumber-$($profile.station)"
-    $action = New-ScheduledTaskAction -Execute $paths.Background -Argument ('"' + (Join-Path $folder 'background.py') + '"') -WorkingDirectory $folder
-    $trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
-    $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
-    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
-    Copy-Item -LiteralPath $picker.FileName -Destination (Join-Path $folder 'config.local.json')
-    Start-ScheduledTask -TaskName $taskName
-    Write-Host 'Installed. Return to Admin setup, wait for Online, print a test, then Start printing.'
-    Write-Host 'The agent starts automatically after this Windows account signs in. Keep Windows awake and signed in.'
 } catch {
     Write-Host ('Installation failed: ' + $_.Exception.Message) -ForegroundColor Red
     # Leave the encrypted key and journal untouched; no destructive automatic cleanup.

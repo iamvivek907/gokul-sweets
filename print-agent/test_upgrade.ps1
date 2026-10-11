@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 # Load only pure upgrade functions: do not execute the interactive installer or touch real tasks.
 $tree = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'install.ps1'), [ref]$null, [ref]$null)
-foreach ($definition in $tree.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Stop-AgentForUpgrade','Start-AgentAfterUpgrade','Update-AgentInstallation','Update-AgentInstallationLocked') }, $true)) {
+foreach ($definition in $tree.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Stop-AgentForUpgrade','Start-AgentAfterUpgrade','Invoke-AgentInstallation','Update-AgentInstallation','Update-AgentInstallationLocked') }, $true)) {
     . ([scriptblock]::Create($definition.Extent.Text))
 }
 function Stop-ScheduledTask { param($TaskName) $script:state = 'Ready'; $script:stops++ }
@@ -22,6 +22,30 @@ function Copy-Item {
 }
 $root = Join-Path ([IO.Path]::GetTempPath()) ('gokul-upgrade-tests-' + [guid]::NewGuid().ToString())
 try {
+    $fresh = Join-Path $root 'fresh-installed'
+    $script:rejectedFresh = $false
+    Invoke-AgentInstallation $fresh {
+        if (Test-Path (Join-Path $fresh 'config.local.json')) { throw 'Fixture must start without an installed profile.' }
+        try {
+            Invoke-AgentInstallation $fresh {
+                Set-Content -LiteralPath (Join-Path $fresh 'key.dpapi') -Value 'wrong-key'
+                throw 'Concurrent fresh setup entered its mutation block.'
+            }
+        } catch {
+            if ($_.Exception.Message -notlike '*installation lock*') { throw }
+            $script:rejectedFresh = $true
+        }
+        if (!$script:rejectedFresh -or (Test-Path (Join-Path $fresh 'key.dpapi'))) { throw 'Fresh setup was not excluded before mutation.' }
+        Set-Content -LiteralPath (Join-Path $fresh 'config.local.json') -Value 'installed-profile'
+    }
+    # Recheck existence inside the lock: a queued/retried installer must observe the completed setup.
+    Invoke-AgentInstallation $fresh {
+        if (!(Test-Path (Join-Path $fresh 'config.local.json'))) { throw 'Retry did not observe completed installation.' }
+    }
+    try { Invoke-AgentInstallation $fresh { throw 'Injected fresh setup failure' } } catch {
+        if ($_.Exception.Message -ne 'Injected fresh setup failure') { throw }
+    }
+    Invoke-AgentInstallation $fresh { Write-Host 'Windows fresh setup exclusion and failure release passed.' }
     foreach ($scenario in @('success','missing-source','activation','replacement')) {
         $script:installed = Join-Path $root "$scenario-installed"
         $source = Join-Path $root "$scenario-source"
