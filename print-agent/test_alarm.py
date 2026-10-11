@@ -110,7 +110,7 @@ class SupervisorTest(unittest.TestCase):
             second.wait.side_effect = [TimeoutExpired("afplay", .15), 0]
             first.poll.side_effect = [None, 1, 1]
             second.poll.return_value = None
-            with patch('alarm.subprocess.Popen', side_effect=[first, second]) as popen, patch('alarm.os.killpg', create=True) as kill:
+            with patch('alarm.subprocess.Popen', side_effect=[first, second]) as popen:
                 sound = MacSound(Path(folder))
                 sound.play('due')
                 sound.play('due')
@@ -118,7 +118,8 @@ class SupervisorTest(unittest.TestCase):
                 sound.play('due')
                 self.assertEqual(popen.call_count, 2)
                 sound.play(None)
-                kill.assert_called_once()
+                second.terminate.assert_called_once()
+                self.assertNotIn("start_new_session", popen.call_args.kwargs)
                 second.wait.assert_called_with(timeout=3)
                 self.assertIsNone(sound.process)
 
@@ -132,3 +133,61 @@ class SupervisorTest(unittest.TestCase):
                 sound = MacSound(Path(folder))
                 with self.assertRaisesRegex(RuntimeError, 'playback'):
                     sound.play('test')
+
+class MacCrashTest(unittest.TestCase):
+    @unittest.skipIf(__import__('sys').platform == 'win32', 'requires Unix processes')
+    def test_playback_shares_parent_group_and_exits_after_parent_is_killed(self):
+        import os
+        import signal
+        import subprocess
+        import sys
+        import time
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            fake = root / 'afplay'
+            fake.write_text('#!/bin/sh\nsleep .2\n')
+            fake.chmod(0o755)
+            marker = root / 'audio.pid'
+            code = '''import subprocess,sys,time
+from pathlib import Path
+import alarm
+real = subprocess.Popen
+def fake(args, **kwargs):
+    args = [arg.replace('/usr/bin/afplay', sys.argv[2]) if isinstance(arg,str) else arg for arg in args]
+    return real(args, **kwargs)
+alarm.subprocess.Popen = fake
+sound = alarm.MacSound(Path(sys.argv[1]))
+sound.play('due')
+Path(sys.argv[1], 'audio.pid').write_text(str(sound.process.pid))
+time.sleep(30)
+'''
+            parent = subprocess.Popen([sys.executable, '-c', code, str(root), str(fake)],
+                                      cwd=str(Path(__file__).parent), start_new_session=True)
+            child = None
+            try:
+                deadline = time.monotonic() + 5
+                while not marker.exists() and time.monotonic() < deadline:
+                    time.sleep(.02)
+                self.assertTrue(marker.exists(), 'playback did not start')
+                child = int(marker.read_text())
+                self.assertEqual(os.getpgid(child), os.getpgid(parent.pid))
+                parent.kill()
+                parent.wait(timeout=3)
+                # Even without launchd cleanup, the loop's parent guard ends playback.
+                deadline = time.monotonic() + 3
+                state = ''
+                while time.monotonic() < deadline:
+                    state = subprocess.run(['/bin/ps', '-o', 'stat=', '-p', str(child)],
+                                           capture_output=True, text=True).stdout.strip()
+                    if not state or state.startswith('Z'):
+                        break
+                    time.sleep(.02)
+                self.assertTrue(not state or state.startswith('Z'), 'orphan playback remained running')
+            finally:
+                if parent.poll() is None:
+                    parent.kill()
+                    parent.wait(timeout=3)
+                try:
+                    os.killpg(parent.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass

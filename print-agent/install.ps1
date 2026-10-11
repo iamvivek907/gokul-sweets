@@ -8,6 +8,69 @@ function Get-AgentPaths([string]$BranchStation) {
     $scripts = Join-Path (Join-Path $folder '.venv') 'Scripts'
     return @{ Folder = $folder; Python = $pythonRoot; Runtime = (Join-Path $scripts 'python.exe'); Background = (Join-Path $scripts 'pythonw.exe') }
 }
+function Stop-AgentForUpgrade([string]$TaskName) {
+    Stop-ScheduledTask -TaskName $TaskName
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        if ((Get-ScheduledTask -TaskName $TaskName).State -ne 'Running') { return }
+        Start-Sleep -Seconds 1
+    }
+    throw 'Agent did not stop. Installed files were not replaced.'
+}
+function Start-AgentAfterUpgrade([string]$TaskName) {
+    Start-ScheduledTask -TaskName $TaskName
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        if ((Get-ScheduledTask -TaskName $TaskName).State -eq 'Running') { return }
+        Start-Sleep -Seconds 1
+    }
+    throw 'Agent failed to start after the upgrade.'
+}
+function Update-AgentInstallation([string]$Folder, [string]$Source, [string]$TaskName) {
+    $stage = Join-Path $Folder ('.upgrade-' + [guid]::NewGuid().ToString())
+    $backup = Join-Path $stage 'backup'
+    $files = @('agent.py','alarm.py','background.py','requirements.txt')
+    $originals = @()
+    $stopped = $false
+    $retainBackup = $false
+    try {
+        New-Item -ItemType Directory -Path $backup -Force | Out-Null
+        # Every new file and every backup is copied and checked before the running task stops.
+        foreach ($file in $files) {
+            $sourcePath = Join-Path $Source $file
+            $stagedPath = Join-Path $stage $file
+            Copy-Item -LiteralPath $sourcePath -Destination $stagedPath
+            if ((Get-FileHash -LiteralPath $sourcePath).Hash -ne (Get-FileHash -LiteralPath $stagedPath).Hash) { throw 'Staged installer file failed verification.' }
+            $installedPath = Join-Path $Folder $file
+            if (Test-Path -LiteralPath $installedPath) {
+                Copy-Item -LiteralPath $installedPath -Destination (Join-Path $backup $file)
+                $originals += $file
+            }
+        }
+        Stop-AgentForUpgrade $TaskName
+        $stopped = $true
+        foreach ($file in $files) { Copy-Item -LiteralPath (Join-Path $stage $file) -Destination (Join-Path $Folder $file) -Force }
+        Start-AgentAfterUpgrade $TaskName
+    } catch {
+        $failure = $_
+        if ($stopped) {
+            try {
+                Stop-AgentForUpgrade $TaskName
+                foreach ($file in $files) {
+                    $target = Join-Path $Folder $file
+                    if ($originals -contains $file) { Copy-Item -LiteralPath (Join-Path $backup $file) -Destination $target -Force }
+                    elseif (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
+                }
+                Start-AgentAfterUpgrade $TaskName
+            } catch {
+                $retainBackup = $true
+                throw "Upgrade and rollback failed. Recovery files retained at $stage. $($_.Exception.Message)"
+            }
+            throw "Upgrade failed; previous installation restored and restarted. $($failure.Exception.Message)"
+        }
+        throw $failure
+    } finally {
+        if (!$retainBackup -and (Test-Path -LiteralPath $stage)) { Remove-Item -LiteralPath $stage -Recurse -Force }
+    }
+}
 if ($VerifyPaths) {
     $paths = Get-AgentPaths '1-KITCHEN'
     $expectedFolder = [IO.Path]::Combine($env:LOCALAPPDATA, 'GokulPrint', '1-KITCHEN')
@@ -34,15 +97,7 @@ try {
         if ($installed.api_url -ne $profile.api_url -or $installed.agent_id -ne $profile.agent_id -or $installed.printer_code -ne $profile.printer_code) { throw 'Upgrade requires the same installed backend, agent ID and printer code.' }
         if (!(Test-Path (Join-Path $folder 'key.dpapi'))) { throw 'Existing encrypted key is missing. Ask your administrator to repair the installation.' }
         $taskName = "GokulPrint-$branchNumber-$($profile.station)"
-        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
-        # Wait for the supervised process to exit before replacing source files.
-        for ($attempt = 0; $attempt -lt 10; $attempt++) {
-            if ((Get-ScheduledTask -TaskName $taskName).State -ne 'Running') { break }
-            Start-Sleep -Seconds 1
-        }
-        if ((Get-ScheduledTask -TaskName $taskName).State -eq 'Running') { throw 'Agent did not stop. Retry after stopping the task.' }
-        foreach ($file in @('agent.py','alarm.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
-        Start-ScheduledTask -TaskName $taskName
+        Update-AgentInstallation $folder $PSScriptRoot $taskName
         Write-Host 'Agent upgraded. Key, profile and print journal preserved. Test and enable Kitchen computer sound in Admin setup.'
         exit 0
     }

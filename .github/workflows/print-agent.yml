@@ -40,6 +40,10 @@ jobs:
           $principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
           $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
           if ($settings.ExecutionTimeLimit -ne 'PT0S' -or $principal.LogonType -ne 'Interactive') { throw 'Invalid task configuration' }
+      - name: Verify Windows upgrade rollback
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./print-agent/test_upgrade.ps1
       - name: Check macOS installer shell syntax
         if: runner.os != 'Windows'
         run: bash -n print-agent/install-macos.command

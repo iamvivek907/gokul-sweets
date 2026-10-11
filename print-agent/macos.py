@@ -8,6 +8,8 @@ import plistlib
 import shutil
 import subprocess
 import sys
+import tempfile
+import ast
 
 import agent
 import alarm
@@ -49,6 +51,7 @@ def service(cfg):
 def launch_definition(root, python, label):
     return {'Label': label, 'ProgramArguments': [python, str(root / 'macos.py'), str(root / 'config.local.json')],
             'WorkingDirectory': str(root), 'RunAtLoad': True, 'KeepAlive': True, 'ThrottleInterval': 10,
+            'AbandonProcessGroup': False,
             'StandardOutPath': '/dev/null', 'StandardErrorPath': '/dev/null'}
 
 
@@ -63,6 +66,47 @@ def install_certificates(root):
     (root / 'cacert.pem').write_text(result.stdout, encoding='ascii')
 
 
+def stop_service(domain, label):
+    result = subprocess.run(['/bin/launchctl', 'bootout', domain + '/' + label], capture_output=True)
+    if result.returncode and subprocess.run(['/bin/launchctl', 'print', domain + '/' + label], capture_output=True).returncode == 0:
+        raise RuntimeError('Could not stop the alarm. No installed files were changed.')
+
+
+def activate(root, staged, plist, staged_plist, domain, label):
+    """Back up before stopping; restore files and startup registration on any failure."""
+    names = ('agent.py', 'alarm.py', 'macos.py', 'cacert.pem', 'config.local.json')
+    backup = staged / 'backup'
+    backup.mkdir()
+    originals = [name for name in names if (root / name).exists()]
+    for name in originals:
+        shutil.copyfile(root / name, backup / name)
+    had_plist = plist.exists()
+    if had_plist:
+        shutil.copyfile(plist, backup / 'launch.plist')
+    stop_service(domain, label)
+    try:
+        for name in names:
+            os.replace(staged / name, root / name)
+        os.replace(staged_plist, plist)
+        subprocess.run(['/bin/launchctl', 'bootstrap', domain, str(plist)], check=True)
+    except BaseException as failure:
+        try:
+            stop_service(domain, label)
+            for name in names:
+                if name in originals:
+                    os.replace(backup / name, root / name)
+                else:
+                    (root / name).unlink(missing_ok=True)
+            if had_plist:
+                os.replace(backup / 'launch.plist', plist)
+                subprocess.run(['/bin/launchctl', 'bootstrap', domain, str(plist)], check=True)
+            else:
+                plist.unlink(missing_ok=True)
+        except BaseException as rollback:
+            raise RuntimeError('Upgrade and rollback failed. Recovery files retained at ' + str(staged)) from rollback
+        raise RuntimeError('Upgrade failed; previous installation restored and restarted.') from failure
+
+
 def install(profile):
     cfg = agent.load_config(profile)
     if cfg['station'] != 'KITCHEN':
@@ -70,7 +114,6 @@ def install(profile):
     root = Path.home() / 'Library/Application Support/GokulAlarm' / str(cfg['branch_id'])
     root.mkdir(parents=True, exist_ok=True, mode=0o700)
     os.chmod(root, 0o700)
-    install_certificates(root)
     installed = root / 'config.local.json'
     if installed.exists():
         old = agent.load_config(installed)
@@ -84,22 +127,34 @@ def install(profile):
         keychain(service(cfg), secret)
     label = 'in.gokulsweets.alarm.' + str(cfg['branch_id'])
     domain = 'gui/' + str(os.getuid())
-    # Stop the old process and its audio children before updating source files.
-    result = subprocess.run(['/bin/launchctl', 'bootout', domain + '/' + label], capture_output=True)
-    if result.returncode and subprocess.run(['/bin/launchctl', 'print', domain + '/' + label], capture_output=True).returncode == 0:
-        raise RuntimeError('Could not stop the old alarm. Retry before updating files.')
-    for name in ('agent.py', 'alarm.py', 'macos.py'):
-        shutil.copyfile(Path(__file__).parent / name, root / name)
-    if profile.resolve() != installed.resolve():
-        shutil.copyfile(profile, installed)
-    os.chmod(installed, 0o600)
     folder = Path.home() / 'Library/LaunchAgents'
     folder.mkdir(parents=True, exist_ok=True)
     plist = folder / (label + '.plist')
-    with plist.open('wb') as stream:
-        plistlib.dump(launch_definition(root, sys.executable, label), stream)
-    os.chmod(plist, 0o600)
-    subprocess.run(['/bin/launchctl', 'bootstrap', domain, str(plist)], check=True)
+    staged = Path(tempfile.mkdtemp(prefix='.upgrade-', dir=root))
+    os.chmod(staged, 0o700)
+    try:
+        for name in ('agent.py', 'alarm.py', 'macos.py'):
+            source = Path(__file__).parent / name
+            shutil.copyfile(source, staged / name)
+            ast.parse((staged / name).read_text(encoding='utf-8'), filename=name)
+        shutil.copyfile(profile, staged / 'config.local.json')
+        os.chmod(staged / 'config.local.json', 0o600)
+        install_certificates(staged)
+        staged_plist = staged / 'launch.plist'
+        with staged_plist.open('wb') as stream:
+            plistlib.dump(launch_definition(root, sys.executable, label), stream)
+        os.chmod(staged_plist, 0o600)
+        activate(root, staged, plist, staged_plist, domain, label)
+    except RuntimeError as exc:
+        if 'Recovery files retained' in str(exc):
+            raise
+        shutil.rmtree(staged)
+        raise
+    except BaseException:
+        shutil.rmtree(staged)
+        raise
+    else:
+        shutil.rmtree(staged)
     print('Installed. In Admin, test computer sound, confirm you hear it, then enable the alarm.')
     print('Starts automatically when this Mac account signs in. Keep the lid open and speakers audible.')
     print('This Mac installation plays kitchen alarms; Windows remains the supported USB printer installer.')

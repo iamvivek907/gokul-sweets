@@ -1,0 +1,54 @@
+$ErrorActionPreference = 'Stop'
+# Load only pure upgrade functions: do not execute the interactive installer or touch real tasks.
+$tree = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $PSScriptRoot 'install.ps1'), [ref]$null, [ref]$null)
+foreach ($definition in $tree.FindAll({ param($node) $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -in @('Stop-AgentForUpgrade','Start-AgentAfterUpgrade','Update-AgentInstallation') }, $true)) {
+    . ([scriptblock]::Create($definition.Extent.Text))
+}
+function Stop-ScheduledTask { param($TaskName) $script:state = 'Ready'; $script:stops++ }
+function Get-ScheduledTask { param($TaskName) return @{State = $script:state} }
+function Start-ScheduledTask {
+    param($TaskName)
+    $script:starts++
+    if ($script:failStart -and $script:starts -eq 1) { throw 'Injected activation failure' }
+    $script:state = 'Running'
+}
+function Copy-Item {
+    param($LiteralPath, $Destination, [switch]$Force)
+    if ($script:failCopy -and $Destination -eq (Join-Path $script:installed 'alarm.py')) {
+        $script:failCopy = $false
+        throw 'Injected replacement failure'
+    }
+    Microsoft.PowerShell.Management\Copy-Item -LiteralPath $LiteralPath -Destination $Destination -Force:$Force
+}
+$root = Join-Path ([IO.Path]::GetTempPath()) ('gokul-upgrade-tests-' + [guid]::NewGuid().ToString())
+try {
+    foreach ($scenario in @('success','missing-source','activation','replacement')) {
+        $script:installed = Join-Path $root "$scenario-installed"
+        $source = Join-Path $root "$scenario-source"
+        New-Item -ItemType Directory -Path $script:installed,$source -Force | Out-Null
+        foreach ($name in @('agent.py','alarm.py','background.py','requirements.txt')) {
+            Set-Content -LiteralPath (Join-Path $source $name) -Value "new-$name"
+            # Simulate upgrading an older installation that did not have alarm.py yet.
+            if ($name -ne 'alarm.py') { Set-Content -LiteralPath (Join-Path $script:installed $name) -Value "old-$name" }
+        }
+        Set-Content -LiteralPath (Join-Path $script:installed 'key.dpapi') -Value 'original-key'
+        Set-Content -LiteralPath (Join-Path $script:installed 'journal.sqlite') -Value 'original-journal'
+        if ($scenario -eq 'missing-source') { Remove-Item -LiteralPath (Join-Path $source 'alarm.py') }
+        $script:state = 'Running'; $script:stops = 0; $script:starts = 0
+        $script:failStart = $scenario -eq 'activation'; $script:failCopy = $scenario -eq 'replacement'
+        $failed = $false
+        try { Update-AgentInstallation $script:installed $source 'fixture-task' } catch { $failed = $true }
+        if ($failed -ne ($scenario -ne 'success')) { throw "Unexpected outcome: $scenario" }
+        if ($script:state -ne 'Running') { throw "Previous task was not recovered: $scenario" }
+        if ($scenario -eq 'missing-source' -and $script:stops -ne 0) { throw 'Staging failure stopped the existing task.' }
+        foreach ($name in @('agent.py','background.py','requirements.txt')) {
+            $prefix = if ($scenario -eq 'success') { 'new-' } else { 'old-' }
+            if ((Get-Content -LiteralPath (Join-Path $script:installed $name) -Raw).Trim() -ne ($prefix + $name)) { throw "File not restored: $scenario / $name" }
+        }
+        if ($scenario -ne 'success' -and (Test-Path -LiteralPath (Join-Path $script:installed 'alarm.py'))) { throw 'Rollback left a file absent from the original version.' }
+        if ((Get-Content -LiteralPath (Join-Path $script:installed 'key.dpapi') -Raw).Trim() -ne 'original-key' -or (Get-Content -LiteralPath (Join-Path $script:installed 'journal.sqlite') -Raw).Trim() -ne 'original-journal') { throw 'Upgrade touched credentials or the journal.' }
+        Write-Host "Windows upgrade $scenario passed."
+    }
+} finally {
+    Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
+}

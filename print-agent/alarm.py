@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 import struct
 import subprocess
-import signal
 import sys
 import time
 from urllib.error import HTTPError, URLError
@@ -63,14 +62,21 @@ class MacSound:
         if mode == self.mode and self.process is not None and self.process.poll() is None:
             return
         if self.process is not None and self.process.poll() is None:
-            os.killpg(self.process.pid, signal.SIGTERM)
-            self.process.wait(timeout=3)
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=3)
         self.process = None
         self.mode = mode
         if mode is not None:
             self.process = subprocess.Popen(
-                ["/bin/sh", "-c", 'while /usr/bin/afplay "$1"; do :; done',
-                 "gokul-sound", str(self.paths[mode])], start_new_session=True)
+                ["/bin/sh", "-c",
+                 """trap 'kill "$audio" 2>/dev/null; exit' TERM INT; """
+                 'while kill -0 "$2" 2>/dev/null; do '
+                 '/usr/bin/afplay "$1" & audio=$!; wait "$audio" || exit; done',
+                 "gokul-sound", str(self.paths[mode]), str(os.getpid())])
             try:
                 self.process.wait(timeout=.15)
             except subprocess.TimeoutExpired:
