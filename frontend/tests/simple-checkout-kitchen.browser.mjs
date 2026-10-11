@@ -93,7 +93,7 @@ for(const width of [1280,390]){
  await page.reload();assert.match(page.url(),/desk=scheduled/);await page.getByRole('heading',{name:'Order desk',exact:true}).waitFor();
  await chooseLanguage(page,'hi');await page.getByRole('heading',{name:'ऑर्डर कार्य-पटल',exact:true}).waitFor();await page.getByRole('button',{name:'रसोई का अलार्म चालू करें'}).waitFor();await chooseLanguage(page,'en');
  await page.getByRole('button',{name:'Enable kitchen alarm'}).click();await page.waitForFunction(()=>window.__chimes>=6);
- await page.reload();await page.getByRole('button',{name:'Kitchen alarm enabled',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Resume kitchen sound'}).count(),0);await page.waitForFunction(()=>window.__chimes>=3);
+ await page.reload();await page.getByRole('button',{name:'Kitchen alarm enabled',exact:true}).waitFor();await page.waitForFunction(()=>window.__chimes>=3);assert.equal(await page.getByRole('button',{name:'Resume kitchen sound'}).count(),0);
  // Hidden tabs keep checking authoritative counts and sounding while their audio context runs.
  await page.evaluate(()=>{Object.defineProperty(document,'visibilityState',{configurable:true,get:()=> 'hidden'});document.dispatchEvent(new Event('visibilitychange'));});
  const backgroundChimes=await page.evaluate(()=>window.__chimes);await page.waitForFunction(previous=>window.__chimes>previous,backgroundChimes);

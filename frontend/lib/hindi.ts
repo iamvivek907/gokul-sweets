@@ -1061,6 +1061,8 @@ Object.assign(hindi, {
  "Choose a time":"समय चुनें",
  "Check & save pickup":"जाँचें और पिकअप सहेजें",
  "Pickup time changed.":"पिकअप का समय बदल दिया गया।",
+ "Alarm enabled, but sound is paused by this browser. Tap Resume kitchen sound. Orders will keep being checked.":"अलार्म चालू है, लेकिन ब्राउज़र ने आवाज़ रोक दी है। रसोई की आवाज़ फिर शुरू करें पर टैप करें। ऑर्डर की जाँच जारी रहेगी।",
+ "Live alert checks are delayed or unavailable. Retrying automatically. Verify orders and staff push notifications; sound pauses when order data is more than 45 seconds old.":"ऑर्डर की ताज़ा जाँच में देरी है या जाँच उपलब्ध नहीं है। अपने आप फिर प्रयास हो रहा है। ऑर्डर और स्टाफ पुश सूचनाएँ देखें; जानकारी 45 सेकंड से पुरानी होने पर आवाज़ रुकती है।",
  "Alarm enabled. Sound starts automatically after your next tap if the browser requires it.":"अलार्म चालू है। ब्राउज़र की आवश्यकता होने पर अगले सामान्य टैप के बाद आवाज़ शुरू होगी।",
  "Welcome to your Gokul branch":"आपकी गोकुल ब्रांच में स्वागत है",
  "Fresh sweets, snacks and meals from your neighbourhood Gokul branch.":"आपके पास की गोकुल ब्रांच से ताज़ी मिठाइयाँ, नाश्ता और भोजन।",

@@ -69,6 +69,7 @@
     "tests/staff-order-desk.browser.mjs",
     "tests/customer-notification-inbox.browser.mjs",
     "tests/staff-alerts.browser.mjs",
+    "tests/kitchen-alarm-recovery.browser.mjs",
     "tests/occasion-booking.browser.mjs",
     "tests/occasion-admin.browser.mjs",
     "tests/occasion-operations.browser.mjs",
