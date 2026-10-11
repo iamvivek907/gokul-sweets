@@ -290,6 +290,122 @@ class LoyaltyIntegrationTest {
                 .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
     }
 
+    @Test
+    void recoveredLedgerKeepsBalancesExpiryAndSuppressesHistoricalCreditReplay() {
+        var completed = order("PICKED_UP", true);
+        paid(completed.getId(), "PAID");
+        loyalty.reconcile(completed.getId());
+        var wallet = loyalty.wallet("DEV", subject, null);
+        var original =
+                jdbc.queryForList(
+                        "SELECT * FROM loyalty_ledger WHERE environment='DEV' AND subject_id=?"
+                                + " ORDER BY id",
+                        subject);
+        var originalLots =
+                jdbc.queryForList(
+                        "SELECT p.* FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id"
+                            + " WHERE l.environment='DEV' AND l.subject_id=? ORDER BY p.ledger_id",
+                        subject);
+        UUID recovered = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES"
+                        + " (?,'DEV',?)",
+                recovered,
+                "+91"
+                        + (6000000000L
+                                + Math.floorMod(recovered.getLeastSignificantBits(), 3999999999L)));
+        jdbc.update(
+                "INSERT INTO"
+                    + " verified_customer_account_aliases(environment,prior_subject_id,account_subject_id)"
+                    + " VALUES ('DEV',?,?)",
+                subject,
+                recovered);
+        jdbc.update(
+                "UPDATE verified_order_ownership SET verified_subject_id=? WHERE environment='DEV'"
+                        + " AND verified_subject_id=?",
+                recovered,
+                subject);
+        var recoveredWallet = loyalty.wallet("DEV", recovered, null);
+        assertThat(recoveredWallet.balance()).isEqualTo(wallet.balance());
+        assertThat(recoveredWallet.nextExpiry()).isEqualTo(wallet.nextExpiry());
+        loyalty.reconcile(completed.getId());
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT * FROM loyalty_ledger WHERE environment='DEV' AND"
+                                        + " subject_id=? ORDER BY id",
+                                subject))
+                .isEqualTo(original);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT p.* FROM loyalty_lots p JOIN loyalty_ledger l ON"
+                                        + " l.id=p.ledger_id WHERE l.environment='DEV' AND"
+                                        + " l.subject_id=? ORDER BY p.ledger_id",
+                                subject))
+                .isEqualTo(originalLots);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM loyalty_ledger WHERE environment='DEV' AND"
+                                        + " subject_id=?",
+                                Integer.class,
+                                recovered))
+                .isZero();
+        assertThat(loyalty.wallet("PROD", recovered, null).balance()).isZero();
+        paid(completed.getId(), "REFUNDED");
+        loyalty.reconcile(completed.getId());
+        loyalty.reconcile(completed.getId());
+        assertThat(loyalty.wallet("DEV", recovered, null).balance()).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM loyalty_ledger WHERE environment='DEV' AND"
+                                        + " subject_id=? AND kind='REVERSED'",
+                                Integer.class,
+                                recovered))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void releasingRecoveredCoinsPreservesOriginalActivityExtendedExpiry() {
+        grant(100, 1);
+        jdbc.update(
+                "UPDATE loyalty_accounts SET last_qualifying_activity=CURRENT_TIMESTAMP WHERE"
+                        + " environment='DEV' AND subject_id=?",
+                subject);
+        UUID original = subject;
+        var spending = order("PENDING_PAYMENT", true);
+        UUID recovered = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES"
+                        + " (?,'DEV',?)",
+                recovered,
+                "+91"
+                        + (6000000000L
+                                + Math.floorMod(recovered.getLeastSignificantBits(), 3999999999L)));
+        jdbc.update(
+                "INSERT INTO"
+                    + " verified_customer_account_aliases(environment,prior_subject_id,account_subject_id)"
+                    + " VALUES ('DEV',?,?)",
+                original,
+                recovered);
+        jdbc.update(
+                "UPDATE verified_order_ownership SET verified_subject_id=? WHERE environment='DEV'"
+                        + " AND verified_subject_id=?",
+                recovered,
+                original);
+        var expiry = loyalty.wallet("DEV", recovered, null).nextExpiry();
+        loyalty.reserve(spending, "SWEET_5");
+        loyalty.remove(spending);
+        assertThat(loyalty.wallet("DEV", recovered, null).balance()).isEqualTo(100);
+        assertThat(loyalty.wallet("DEV", recovered, null).nextExpiry()).isEqualTo(expiry);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT COUNT(*) FROM loyalty_ledger WHERE environment='DEV' AND"
+                                    + " subject_id=? AND kind='RESTORED' AND source_credit_id IS"
+                                    + " NOT NULL",
+                                Integer.class,
+                                recovered))
+                .isEqualTo(1);
+    }
+
     @BeforeEach
     void setup() {
         rewards = flags.isGokulRewards();

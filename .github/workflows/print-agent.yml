@@ -15,7 +15,7 @@ jobs:
   print-agent:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python: ['3.12', '3.13']
     runs-on: ${{ matrix.os }}
     timeout-minutes: 5
@@ -40,11 +40,18 @@ jobs:
           $principal = New-ScheduledTaskPrincipal -UserId ([System.Security.Principal.WindowsIdentity]::GetCurrent().Name) -LogonType Interactive -RunLevel Limited
           $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
           if ($settings.ExecutionTimeLimit -ne 'PT0S' -or $principal.LogonType -ne 'Interactive') { throw 'Invalid task configuration' }
+      - name: Verify Windows upgrade rollback
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./print-agent/test_upgrade.ps1
+      - name: Check macOS installer shell syntax
+        if: runner.os != 'Windows'
+        run: bash -n print-agent/install-macos.command
       - name: Validate downloadable package
         run: |
           node --test print-agent/package.test.cjs
           node print-agent/package.cjs
-          python -c "import zipfile; z=zipfile.ZipFile('print-agent/dist/gokul-print-agent.zip'); assert z.testzip() is None; assert set(z.namelist()) == {'agent.py','background.py','install.cmd','install.ps1','requirements.txt'}"
+          python -c "import zipfile; z=zipfile.ZipFile('print-agent/dist/gokul-print-agent.zip'); assert z.testzip() is None; assert (z.getinfo('install-macos.command').external_attr >> 16) & 0o111; assert set(z.namelist()) == {'agent.py','alarm.py','background.py','install.cmd','install.ps1','requirements.txt','macos.py','install-macos.command'}"
 
       - name: Verify committed download matches installer sources
         run: git diff --exit-code -- frontend/lib/generatedPrintInstaller.ts

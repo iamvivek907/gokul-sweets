@@ -92,5 +92,5 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[641,true],[3
  }
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  assert.deepEqual(errors,[]);if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.locator(".gokul-mobile-launch").waitFor({state:"hidden"});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/guidance-${width}-${enabled}.png`,fullPage:true});}
- await context.close();console.log(`Mobile guidance: ${width} enabled=${enabled} passed; ${previewCalls} previews, ${availabilityCalls} availability checks`);
+ await context.unrouteAll({behavior:'wait'});await context.close();console.log(`Mobile guidance: ${width} enabled=${enabled} passed; ${previewCalls} previews, ${availabilityCalls} availability checks`);
 }}finally{await browser.close();}

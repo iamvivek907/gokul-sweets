@@ -225,6 +225,18 @@ export default function PrinterSetupPage() {
                 </div>
             </div>}
         </section>
+        {station === "KITCHEN" && state?.configured && <section aria-labelledby="native-alarm" className="space-y-3 rounded-xl border border-stone-200 bg-white p-5">
+            <h2 id="native-alarm" className="text-lg font-semibold">Kitchen computer sound</h2>
+            <p>Sound runs on your Windows or Mac computer, independently of this webpage. Keep the computer signed in with working speakers. A different tone warns when order checks fail.</p>
+            <p role="status"><strong>{!state.alarm?.online ? "Alarm agent offline" : state.alarm.status === "ERROR" || state.alarm.status === "OFFLINE" ? "Alarm needs attention" : state.alarm.status === "STARTING" ? "Starting alarm" : state.alarm.status === "TESTING" ? "Playing test sound" : state.alarm.enabled ? state.alarm.status === "RINGING" ? "Order alarm ringing" : "Alarm enabled" : "Alarm disabled"}</strong></p>
+            <p>Last alarm contact: {state.alarm?.lastSeenAt ? new Date(state.alarm.lastSeenAt).toLocaleString() : "Not received — install or update the computer alarm."}</p>
+            <div className="flex flex-wrap gap-3">
+                <button className={button} disabled={actionBlocked || !canConfigure} onClick={() => void mutate("/alarm-mode", {enabled: !state.alarm?.enabled})}>{state.alarm?.enabled ? "Disable computer alarm" : "Enable computer alarm"}</button>
+                <button className={button} disabled={actionBlocked || !canConfigure || !state.alarm?.online} onClick={() => void mutate("/alarm-test", {})}>Test computer sound</button>
+            </div>
+            {!!state.alarm?.testSequence && <p>{(state.alarm.testReceipt ?? 0) >= state.alarm.testSequence ? "The computer accepted the latest sound test. Confirm that you heard it at the shop." : "Waiting for sound test receipt. Tests expire after one minute; retry if no sound was heard."}</p>}
+            <p>Existing Windows installations: run the updated installer with your saved profile using the same Windows account. It preserves the private key and print journal. For Mac, use the macOS installer below. Test the speakers before enabling sound.</p>
+        </section>}
         <section aria-labelledby="install-help" className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-5">
             <h2 id="install-help" className="text-xl font-bold">One-time installation — including an 80 mm printer</h2>
             <ol className="list-decimal space-y-2 pl-6">
@@ -236,6 +248,11 @@ export default function PrinterSetupPage() {
             </ol>
             <p>Windows starts the agent in the background after the installing account signs in. No daily PowerShell commands are needed. Closing this webpage does not stop printing. Hardware pairing, paper changes and fixing a disconnected computer still happen at the shop.</p>
             <a href="/downloads/gokul-print-agent.zip" download style={{color: "#fff"}} className="inline-block rounded bg-stone-800 px-4 py-3 font-semibold text-white">Download Windows installer</a>
+            {station === "KITCHEN" && <div className="space-y-2 rounded border border-stone-200 bg-white p-3">
+                <a href="/downloads/gokul-kitchen-alarm-macos.zip" download className={button + " inline-block"}>Download macOS alarm installer</a>
+                <p>On your Mac, extract the ZIP, open Terminal, type <code>bash </code>, drag <code>install-macos.command</code> into Terminal and press Return. The installer finds Python 3.12+ or downloads and verifies the official Python package. macOS may ask for your administrator password to install Python; setup then continues automatically. Select your downloaded KITCHEN profile when prompted. Enter the private backend key only in Terminal; it is saved in your login Keychain.</p>
+                <p>The Mac alarm starts at sign-in and restarts automatically. Keep the lid open and speakers audible. It plays alarms; this installer does not print tickets. Use one primary alarm computer for each registered KITCHEN profile. Choose Test computer sound above and confirm you hear it before enabling.</p>
+            </div>}
             <label className="block">Backend HTTPS address (this environment)<input className={field} type="url" value={backend} readOnly /></label>
             <button className={button} disabled={!state?.profile || busy} onClick={() => {
                 try {if (state?.profile) exportProfile(state.profile, backend);}

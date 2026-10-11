@@ -9,6 +9,8 @@ export type PrintStation = {
     configured: boolean; profile?: PrinterProfile; enabled?: boolean; online?: boolean;
     runtime?: {status?: string; message?: string; pendingJobId?: number; pendingState?: string;
         devices?: {usb?: string[]; bluetooth?: string[]}};
+    alarm?: {enabled?: boolean; online?: boolean; status?: string; lastSeenAt?: string;
+        testSequence?: number; testReceipt?: number};
     command?: {id?: string}; commandResult?: {status?: string; message?: string};
 };
 export class PrintStationRequestError extends Error {

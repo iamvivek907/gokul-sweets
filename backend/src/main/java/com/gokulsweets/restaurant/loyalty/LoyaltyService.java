@@ -385,7 +385,7 @@ public class LoyaltyService {
         try {
             return jdbc.query(
                     """
-SELECT l.id,p.remaining,GREATEST(l.expires_at,a.last_qualifying_activity + (l.expiry_days * INTERVAL '1 day')) AS expires_at,l.source_credit_id FROM loyalty_lots p JOIN loyalty_ledger l ON l.id=p.ledger_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=l.subject_id
+SELECT l.id,p.remaining,GREATEST(l.expires_at,a.last_qualifying_activity + (l.expiry_days * INTERVAL '1 day')) AS expires_at,l.source_credit_id FROM loyalty_lots p JOIN loyalty_account_ledger l ON l.id=p.ledger_id LEFT JOIN loyalty_account_ledger origin ON origin.id=l.source_credit_id JOIN loyalty_accounts a ON a.environment=l.environment AND a.subject_id=COALESCE(origin.original_subject_id,l.original_subject_id)
 WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at NULLS LAST,l.id
 """,
                     (rs, row) ->
@@ -416,8 +416,8 @@ WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at N
                 MethodTiming.start(LoyaltyService.class, "signedBalance(String,UUID)");
         try {
             return jdbc.queryForObject(
-                    "SELECT COALESCE(SUM(coins),0)::integer FROM loyalty_ledger WHERE environment=?"
-                            + " AND subject_id=?",
+                    "SELECT COALESCE(SUM(coins),0)::integer FROM loyalty_account_ledger WHERE"
+                            + " environment=? AND subject_id=?",
                     Integer.class,
                     environment,
                     subject);
@@ -588,11 +588,14 @@ WHERE l.environment=? AND l.subject_id=? AND p.remaining>0 ORDER BY expires_at N
                         LoyaltyService.class,
                         "append(String,UUID,String,String,int,Long,String,Instant,Long,int,int,String)");
         try {
+            // The account lock serializes new events across all devices. Historical
+            // keys remain in their immutable rows and must also suppress replay.
+            if (exists(environment, subject, key)) return 0;
             int days =
                     origin == null
                             ? expiryDays
                             : jdbc.queryForObject(
-                                    "SELECT expiry_days FROM loyalty_ledger WHERE id=?",
+                                    "SELECT expiry_days FROM loyalty_account_ledger WHERE id=?",
                                     Integer.class,
                                     origin);
             var ids =
@@ -679,8 +682,8 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key)
         try {
             return Boolean.TRUE.equals(
                     jdbc.queryForObject(
-                            "SELECT EXISTS(SELECT 1 FROM loyalty_ledger WHERE environment=? AND"
-                                    + " subject_id=? AND event_key=?)",
+                            "SELECT EXISTS(SELECT 1 FROM loyalty_account_ledger WHERE environment=?"
+                                    + " AND subject_id=? AND event_key=?)",
                             Boolean.class,
                             environment,
                             subject,
@@ -839,7 +842,7 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,event_key)
             var history =
                     jdbc.query(
                             """
-SELECT l.id,l.kind,l.coins,l.reason,o.order_number,l.created_at,l.expires_at,o.customer_order_number,l.badge_bonus_coins,l.badge_name FROM loyalty_ledger l
+SELECT l.id,l.kind,l.coins,l.reason,o.order_number,l.created_at,l.expires_at,o.customer_order_number,l.badge_bonus_coins,l.badge_name FROM loyalty_account_ledger l
 LEFT JOIN orders o ON o.id=l.order_id WHERE l.environment=? AND l.subject_id=? ORDER BY l.id DESC LIMIT 100
 """,
                             (rs, row) ->
@@ -860,7 +863,7 @@ LEFT JOIN orders o ON o.id=l.order_id WHERE l.environment=? AND l.subject_id=? O
                             subject);
             int completed =
                     jdbc.queryForObject(
-                            "SELECT COUNT(*)::integer FROM loyalty_qualifying_orders WHERE"
+                            "SELECT COUNT(*)::integer FROM loyalty_account_qualifying_orders WHERE"
                                     + " environment=? AND subject_id=? AND NOT reversed",
                             Integer.class,
                             environment,
@@ -1122,7 +1125,7 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
             var originals =
                     new HashSet<>(
                             jdbc.queryForList(
-                                    "SELECT id FROM loyalty_ledger WHERE environment=? AND"
+                                    "SELECT id FROM loyalty_account_ledger WHERE environment=? AND"
                                             + " subject_id=? AND order_id=? AND kind IN"
                                             + " ('EARNED','WELCOME')",
                                     Long.class,
@@ -1169,8 +1172,8 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
             var allocations =
                     jdbc.query(
                             "SELECT a.ledger_id,a.coins,l.expires_at,l.source_credit_id FROM"
-                                + " loyalty_hold_lots a JOIN loyalty_ledger l ON l.id=a.ledger_id"
-                                + " WHERE a.order_id=? AND a.generation=?",
+                                    + " loyalty_hold_lots a JOIN loyalty_account_ledger l ON"
+                                    + " l.id=a.ledger_id WHERE a.order_id=? AND a.generation=?",
                             (rs, n) ->
                                     new Lot(
                                             rs.getLong(1),
@@ -1311,10 +1314,12 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
                     Boolean.TRUE.equals(
                             jdbc.queryForObject(
                                     "SELECT EXISTS(SELECT 1 FROM loyalty_hold_lots h JOIN"
-                                        + " loyalty_ledger l ON l.id=h.ledger_id JOIN"
-                                        + " loyalty_accounts a ON a.environment=l.environment AND"
-                                        + " a.subject_id=l.subject_id JOIN loyalty_holds hold ON"
-                                        + " hold.order_id=h.order_id AND"
+                                        + " loyalty_account_ledger l ON l.id=h.ledger_id LEFT JOIN"
+                                        + " loyalty_account_ledger origin ON"
+                                        + " origin.id=l.source_credit_id JOIN loyalty_accounts a ON"
+                                        + " a.environment=l.environment AND"
+                                        + " a.subject_id=COALESCE(origin.original_subject_id,l.original_subject_id)"
+                                        + " JOIN loyalty_holds hold ON hold.order_id=h.order_id AND"
                                         + " hold.generation=h.generation WHERE h.order_id=? AND"
                                         + " hold.state='RESERVED' AND"
                                         + " GREATEST(l.expires_at,a.last_qualifying_activity+(l.expiry_days*INTERVAL"
@@ -1395,7 +1400,7 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
             var old =
                     jdbc.query(
                             "SELECT a.ledger_id,a.old_balance,a.new_balance,l.coins,a.reason FROM"
-                                + " loyalty_adjustment_audit a JOIN loyalty_ledger l ON"
+                                + " loyalty_adjustment_audit a JOIN loyalty_account_ledger l ON"
                                 + " l.id=a.ledger_id WHERE l.environment=? AND l.subject_id=? AND"
                                 + " l.event_key=?",
                             (rs, n) -> {
@@ -1593,10 +1598,16 @@ FROM orders o WHERE o.id=?
                         "UPDATE loyalty_qualifying_orders SET reversed=TRUE WHERE order_id=?",
                         orderId);
                 jdbc.update(
-                        "UPDATE loyalty_accounts SET last_qualifying_activity=(SELECT"
-                                + " MAX(completed_at) FROM loyalty_qualifying_orders WHERE"
-                                + " environment=? AND subject_id=? AND NOT reversed) WHERE"
-                                + " environment=? AND subject_id=?",
+                        """
+                        UPDATE loyalty_accounts a SET last_qualifying_activity=(
+                          SELECT MAX(q.completed_at) FROM loyalty_qualifying_orders q
+                          WHERE q.environment=a.environment AND q.subject_id IN (a.subject_id, ?)
+                            AND NOT q.reversed)
+                        WHERE a.environment=? AND (a.subject_id=? OR a.subject_id IN (
+                          SELECT prior_subject_id FROM verified_customer_account_aliases
+                          WHERE environment=? AND account_subject_id=?))
+                        """,
+                        owner.subject(),
                         owner.environment(),
                         owner.subject(),
                         owner.environment(),
@@ -1604,22 +1615,23 @@ FROM orders o WHERE o.id=?
                 if (exists(owner.environment(), owner.subject(), "reverse:" + orderId)) return;
                 int earned =
                         jdbc.queryForObject(
-                                "SELECT COALESCE(SUM(coins),0)::integer FROM loyalty_ledger WHERE"
-                                    + " environment=? AND subject_id=? AND order_id=? AND kind IN"
-                                    + " ('EARNED','WELCOME')",
+                                "SELECT COALESCE(SUM(coins),0)::integer FROM loyalty_account_ledger"
+                                        + " WHERE environment=? AND subject_id=? AND order_id=? AND"
+                                        + " kind IN ('EARNED','WELCOME')",
                                 Integer.class,
                                 owner.environment(),
                                 owner.subject(),
                                 orderId);
                 int expired =
                         jdbc.queryForObject(
-                                "SELECT COALESCE(SUM(-e.coins),0)::integer FROM loyalty_ledger e"
-                                    + " JOIN loyalty_ledger original ON"
-                                    + " e.source_credit_id=original.id AND e.kind='EXPIRED' WHERE"
-                                    + " original.environment=? AND original.subject_id=? AND"
-                                    + " original.order_id=? AND original.kind IN"
-                                    + " ('EARNED','WELCOME') AND e.environment=original.environment"
-                                    + " AND e.subject_id=original.subject_id",
+                                "SELECT COALESCE(SUM(-e.coins),0)::integer FROM"
+                                        + " loyalty_account_ledger e JOIN loyalty_account_ledger"
+                                        + " original ON e.source_credit_id=original.id AND"
+                                        + " e.kind='EXPIRED' WHERE original.environment=? AND"
+                                        + " original.subject_id=? AND original.order_id=? AND"
+                                        + " original.kind IN ('EARNED','WELCOME') AND"
+                                        + " e.environment=original.environment AND"
+                                        + " e.subject_id=original.subject_id",
                                 Integer.class,
                                 owner.environment(),
                                 owner.subject(),
@@ -1659,9 +1671,15 @@ FROM orders o WHERE o.id=?
                         eligible,
                         timestamp(now()));
                 jdbc.update(
-                        "UPDATE loyalty_accounts SET last_qualifying_activity=? WHERE environment=?"
-                                + " AND subject_id=?",
+                        """
+                        UPDATE loyalty_accounts SET last_qualifying_activity=? WHERE environment=?
+                        AND (subject_id=? OR subject_id IN (
+                          SELECT prior_subject_id FROM verified_customer_account_aliases
+                          WHERE environment=? AND account_subject_id=?))
+                        """,
                         timestamp(now()),
+                        owner.environment(),
+                        owner.subject(),
                         owner.environment(),
                         owner.subject());
             }
