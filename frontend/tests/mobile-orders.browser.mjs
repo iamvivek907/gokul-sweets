@@ -102,7 +102,9 @@ try {
   await page.locator('.profile-order-card').first().waitFor();
   if(completed)await page.getByLabel('5 out of 5 stars',{exact:true}).waitFor();
   const historyCard=page.locator('.profile-order-card').first(),search=page.getByLabel('Search order history',{exact:true});
-  const submitSearch=async term=>{const response=page.waitForResponse(r=>{const url=new URL(r.url());return url.pathname==='/api/customer/identity/orders/page'&&(url.searchParams.get('q')??'')===term.trim();});await search.fill(term);await page.getByRole('button',{name:'Search',exact:true}).click();await (await response).finished();};
+  const observedHistory=[];
+  page.on('request',request=>{if(new URL(request.url()).pathname==='/api/customer/identity/orders/page')observedHistory.push(request.url());});
+  const submitSearch=async term=>{console.log('History search',JSON.stringify({term,url:page.url()}));const response=page.waitForResponse(r=>{const url=new URL(r.url());return url.pathname==='/api/customer/identity/orders/page'&&(url.searchParams.get('q')??'')===term.trim();});await search.fill(term);await page.getByRole('button',{name:'Search',exact:true}).click();await (await response.catch(async error=>{console.error('History search timeout',JSON.stringify({term,url:page.url(),value:await search.inputValue(),requests:observedHistory}));throw error;})).finished();};
   for(const term of [' test-order ','test-ord',...(order.customerOrderNumber?['#1','1']:[])]){
    await submitSearch(term);await historyCard.waitFor();
    if(order.customerOrderNumber)await historyCard.getByText('Order #1',{exact:true}).waitFor();
