@@ -13,6 +13,7 @@ import BrandLoading from "@/components/common/BrandLoading";
 import OrderRatingLink from "@/components/order/OrderRatingLink";
 import CustomerIcon from "./CustomerIcon";
 import ReorderDialog from "./ReorderDialog";
+import OrderRewardGuidance from "./OrderRewardGuidance";
 import type { CustomerOrderSummaryResponse } from "@/types/order";
 import styles from "./CustomerOrderHistory.module.css";
 type Props = {
@@ -90,6 +91,7 @@ function History({ phone, branchId, branchName }: Props) {
     const returnTo = `${path === "/profile" ? "/profile/orders" : path}?${search.toString()}`;
     return <div className={styles.history} data-modern={features?.futuristicStorefrontV2 || features?.checkoutExperienceV2 ? "true" : undefined}>
   <header className={styles.hero}><div><span>Your Gokul moments</span><Heading>Every order. Easy to find.</Heading><p>{branchName ?? "All your branches, together."}</p></div><CustomerIcon kind="receipt"/></header>
+  {path === "/orders" && <OrderRewardGuidance/>}
   <form className={styles.search} onSubmit={event => {
       event.preventDefault();
       // Read the submitted field, including input events not yet committed to React state.
