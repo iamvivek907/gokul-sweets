@@ -62,6 +62,8 @@ public class CustomerIdentityController {
 
     private final IdentityClientConnection clientConnection;
 
+    private final CustomerHistoryQuery historyQuery;
+
     private final VerifiedOrderOwnership ownership;
 
     private final OrderQueryService orders;
@@ -310,7 +312,8 @@ public class CustomerIdentityController {
      * @param orders the orders
      * @param nextBefore the next before
      */
-    public record OrderHistoryPage(List<CustomerOrderSummaryResponse> orders, String nextBefore) {}
+    public record OrderHistoryPage(
+            List<CustomerOrderSummaryResponse> orders, String nextBefore, String previousAfter) {}
 
     /**
      * Orders page.
@@ -332,8 +335,20 @@ public class CustomerIdentityController {
         try {
             var environment = enabledEnvironment();
             var subject = requiredSubject(request, environment);
-            var references = ownership.orderNumberPage(environment.name(), subject, before, limit);
-            var visible = references.stream().limit(limit).toList();
+            var slice =
+                    historyQuery.read(
+                            environment.name(),
+                            subject,
+                            new CustomerHistoryQuery.Criteria(
+                                    before,
+                                    request.getParameter("after"),
+                                    limit,
+                                    request.getParameter("branchId"),
+                                    request.getParameter("status"),
+                                    request.getParameter("q"),
+                                    request.getParameter("from"),
+                                    request.getParameter("to")));
+            var visible = slice.references();
             var summaries = orders.getCustomerOrderHistory(visible);
             // Retain the cursor query's deterministic id tie-breaker when creation times match.
             var byReference =
@@ -351,7 +366,13 @@ public class CustomerIdentityController {
                     .cacheControl(CacheControl.noStore())
                     .body(
                             new OrderHistoryPage(
-                                    ordered, references.size() > limit ? visible.getLast() : null));
+                                    ordered,
+                                    slice.hasNext() && !visible.isEmpty()
+                                            ? visible.getLast()
+                                            : null,
+                                    slice.hasPrevious() && !visible.isEmpty()
+                                            ? visible.getFirst()
+                                            : null));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

@@ -35,7 +35,7 @@ public class BranchDiscoveryService {
      * @param average the average
      * @param count the count
      */
-    public record Rating(double average, long count) {}
+    public record Rating(double average, long count, List<Long> distribution) {}
 
     /**
      * Immutable excerpt data contract.
@@ -140,10 +140,19 @@ public class BranchDiscoveryService {
             var rating =
                     jdbc.queryForObject(
                             """
-SELECT COALESCE(AVG(r.overall_rating),0),COUNT(*) FROM reviews r JOIN orders o ON o.id=r.order_id
+SELECT COALESCE(AVG(r.overall_rating),0),COUNT(*),COUNT(*) FILTER(WHERE r.overall_rating=1),COUNT(*) FILTER(WHERE r.overall_rating=2),COUNT(*) FILTER(WHERE r.overall_rating=3),COUNT(*) FILTER(WHERE r.overall_rating=4),COUNT(*) FILTER(WHERE r.overall_rating=5) FROM reviews r JOIN orders o ON o.id=r.order_id
 WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND o.order_status IN ('PICKED_UP','DELIVERED')
 """,
-                            (rs, n) -> new Rating(round(rs.getDouble(1)), rs.getLong(2)),
+                            (rs, n) ->
+                                    new Rating(
+                                            round(rs.getDouble(1)),
+                                            rs.getLong(2),
+                                            List.of(
+                                                    rs.getLong(3),
+                                                    rs.getLong(4),
+                                                    rs.getLong(5),
+                                                    rs.getLong(6),
+                                                    rs.getLong(7))),
                             id);
             var available =
                     menu.getMenu(id).stream()

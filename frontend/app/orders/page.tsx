@@ -1,4 +1,7 @@
 "use client";
+import {Suspense} from "react";
+import CustomerOrderHistory from "@/components/customer/CustomerOrderHistory";
+import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel";
 import OrderRewardGuidance from "@/components/customer/OrderRewardGuidance";
 import BrandLoading from "@/components/common/BrandLoading";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
@@ -82,7 +85,7 @@ const FILTERS: Array<{
 ];
 
 
-export default function OrdersPage() {
+function LegacyOrdersPage() {
     const translate = useTranslation();
 
     const phone = usePhoneViewport();
@@ -539,4 +542,13 @@ export default function OrdersPage() {
             </section>
         </AppShell>
     );
+}
+
+export default function OrdersPage(){
+ const {branch}=useSelectedBranch();const [session,setSession]=useState<CustomerSession|null|undefined>(undefined),[revision,setRevision]=useState(0),[failed,setFailed]=useState(false);
+ useEffect(()=>subscribeCustomerIdentityChanges(()=>{setSession(undefined);setRevision(value=>value+1);},{revalidateOnResume:false}),[]);
+ useEffect(()=>{const controller=new AbortController();void apiClient<{enabled:boolean}>("/api/storefront/customer-identity",{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])}).then(async availability=>{const value=availability.enabled?await apiClient<CustomerSession>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])}):null;if(!controller.signal.aborted){setSession(value);setFailed(false);}}).catch(()=>{if(!controller.signal.aborted)setFailed(true);});return()=>controller.abort();},[revision]);
+ if(session===undefined)return <AppShell>{failed?<section role="alert"><p>Your account could not be checked. Your history position is kept.</p><button onClick={()=>setRevision(value=>value+1)}>Try again</button></section>:<BrandLoading label="Loading your orders…"/>}</AppShell>;
+ if(!session?.authenticated)return <LegacyOrdersPage/>;
+ return <AppShell><section className="mx-auto max-w-5xl"><Suspense fallback={<BrandLoading label="Loading your orders…"/>}>{branch?<CustomerOrderHistory phone={session.phone} branchId={branch.id} branchName={branch.name}/>:<p>Choose a branch from the header to see your orders.</p>}</Suspense></section></AppShell>;
 }

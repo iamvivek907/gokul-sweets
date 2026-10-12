@@ -1,4 +1,5 @@
 "use client";
+import {useHistoryReturn} from "@/lib/historyReturn";
 import {guardCompletedCheckout} from "@/lib/paymentNavigation";
 import BrandLoading from "@/components/common/BrandLoading";
 import {ApiError} from "@/services/apiClient";
@@ -131,6 +132,7 @@ function formatUpdatedAt(value: string): string {
 
 
 export default function OrderDetailPage() {
+    const returnTo=useHistoryReturn();
     const translate = useTranslation();
 
     const phone = usePhoneViewport();
@@ -179,7 +181,7 @@ export default function OrderDetailPage() {
         if(order?.paymentStatus!=="PAID")return;
         // Finish this history replacement with a document navigation. A client
         // transition still settling from payment must not restore its old target.
-        return guardCompletedCheckout(order.orderNumber,()=>window.location.replace("/orders"));
+        return guardCompletedCheckout(order.orderNumber,()=>window.location.replace(returnTo));
     },[order?.paymentStatus,order?.orderNumber]);
 
 
@@ -367,7 +369,7 @@ export default function OrderDetailPage() {
                         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                             <button
                                 type="button"
-                                onClick={() => router.push("/orders")}
+                                onClick={() => router.push(returnTo)}
                                 className="min-h-11 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#7a1625]"
                             >
                                 <T text="My Orders" /></button>
@@ -418,7 +420,7 @@ export default function OrderDetailPage() {
 
                 <button
                     type="button"
-                    onClick={() => router.push("/orders")}
+                    onClick={() => router.push(returnTo)}
                     className="mb-4 text-sm font-bold text-[#7a1625]"
                 >
                     ← My Orders
@@ -588,7 +590,7 @@ export default function OrderDetailPage() {
                     </div>}
 
                     {order.orderStatus === terminalStatus && (
-                        <div id="order-review" className="scroll-mt-28"><OrderReviewCard
+                        <div id="order-review" className="scroll-mt-28"><OrderReviewCard key={order.orderNumber}
                             orderNumber={order.orderNumber}
                         /></div>
                     )}

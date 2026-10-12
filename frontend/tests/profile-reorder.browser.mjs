@@ -19,7 +19,7 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
   else if(path==='/api/storefront/customer-identity')json={enabled:true};
   else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone};
   else if(path==='/api/customer/identity/account')json={completedOrders:13,paidOrders:13,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
-  else if(path==='/api/customer/identity/orders/page'){pages++;if(url.searchParams.has('before')&&pageFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});json=url.searchParams.has('before')?{orders:history.slice(10),nextBefore:null}:{orders:history.slice(0,10),nextBefore:history[9].orderNumber};}
+  else if(path==='/api/customer/identity/orders/page'){pages++;if(url.searchParams.has('before')&&pageFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});json=url.searchParams.has('before')?{orders:history.slice(10),nextBefore:null,previousAfter:history[10].orderNumber}:{orders:history.slice(0,10),nextBefore:history[9].orderNumber};}
   else if(path.startsWith('/api/customer/identity/orders/HISTORY-'))json={...history[0],items:products.map(product=>({id:product.id,productId:product.id,productName:product.name,saleMode:product.saleMode,quantity:product.saleMode==='UNIT'?2:1,weightGrams:product.saleMode==='WEIGHT'?1000:null,unitPrice:product.price,lineTotal:product.saleMode==='WEIGHT'?1000:40}))};
   else if(path==='/api/branches')json=[branch,other];
   else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=other;
@@ -42,9 +42,10 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
  await page.goto(`${base}/profile/orders`);await page.locator('.profile-order-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const nav=page.getByRole('navigation',{name:'Order history pages'});
  assert.equal(await page.locator('.profile-order-card').count(),10);pageFailure=true;
- await nav.getByRole('button',{name:'Load more',exact:true}).click();await page.getByText('The next page could not load.',{exact:false}).waitFor();assert.equal(await page.locator('.profile-order-card').count(),10);
- pageFailure=false;await nav.getByRole('button',{name:'Load more',exact:true}).click();await nav.getByText('13 orders loaded',{exact:true}).waitFor();assert.equal(await page.locator('.profile-order-card').count(),13);assert.equal(await nav.getByRole('button',{name:'Load more',exact:true}).count(),0);
- assert.equal(pages,3,'failed page retry appends without refetching earlier pages');
+ await nav.getByRole('button',{name:'Next',exact:true}).click();await page.getByRole('alert').filter({hasText:'could not refresh'}).waitFor();
+ pageFailure=false;await page.getByRole('button',{name:'Retry',exact:true}).click();await nav.getByText('Page 2',{exact:true}).waitFor();await page.locator('.profile-order-card').first().waitFor();assert.equal(await page.locator('.profile-order-card').count(),3,'only the current page is rendered');
+ await nav.getByRole('button',{name:'Previous',exact:true}).click();await nav.getByText('Page 1',{exact:true}).waitFor();await page.locator('.profile-order-card').first().waitFor();assert.equal(await page.locator('.profile-order-card').count(),10);
+ assert.equal(pages,4,'failed page retry retains the cursor');
  const open=async()=>{await page.locator('.profile-order-card').first().getByRole('button',{name:'Reorder',exact:true}).click();await page.getByRole('dialog',{name:'Reorder for pickup'}).waitFor();};
  const dialog=page.getByRole('dialog',{name:'Reorder for pickup'}),continueButton=dialog.getByRole('button',{name:'Continue to checkout',exact:true});
  if(!smart){

@@ -40,4 +40,20 @@ DO $$ BEGIN
 END $$;
 SELECT jsonb_build_object('scenario',scenario,'phase',phase,'orders',100000,'payments',300000,'execution_ms',plan->0->'Execution Time','shared_hits',plan->0->'Plan'->'Shared Hit Blocks','local_hits',plan->0->'Plan'->'Local Hit Blocks','rows',plan->0->'Plan'->'Actual Rows','plan',plan->0->'Plan') FROM growth_reports ORDER BY scenario,phase DESC;
 SELECT jsonb_build_object('index',indexname,'bytes',pg_relation_size(indexname::regclass)) FROM pg_indexes WHERE tablename IN ('growth_orders','growth_payments') AND indexname IN ('idx_orders_branch_created','idx_orders_branch_status_created','idx_payments_order_latest_id');
+-- One million narrow history rows: 1,000 customers with 1,000 orders each.
+-- Measure the owner join and cursor query, rather than extrapolating menu traffic.
+CREATE TEMP TABLE history_orders(id bigint PRIMARY KEY, order_number text UNIQUE, created_at timestamp, branch_id bigint);
+CREATE TEMP TABLE history_ownership(order_id bigint PRIMARY KEY, environment text, subject_id bigint);
+INSERT INTO history_orders SELECT n,'HISTORY-'||n,timestamp '2025-01-01'+(n/10)*interval '1 second',n%3+1 FROM generate_series(1,1000000) n;
+INSERT INTO history_ownership SELECT n,'DEV',(n-1)/1000+1 FROM generate_series(1,1000000) n;
+CREATE INDEX history_owner_subject ON history_ownership(environment,subject_id,order_id);
+ANALYZE history_orders;
+ANALYZE history_ownership;
+SELECT pg_temp.growth_report('owner-history-million-orders','bounded', 'SELECT o.order_number FROM history_ownership own JOIN history_orders o ON o.id=own.order_id WHERE own.environment=''DEV'' AND own.subject_id=500 AND (o.created_at,o.id)<(SELECT created_at,id FROM history_orders WHERE order_number=''HISTORY-499940'') ORDER BY o.created_at DESC,o.id DESC LIMIT 13');
+DO $$ BEGIN
+ IF (SELECT (plan->0->'Plan'->>'Actual Rows')::int FROM growth_reports WHERE scenario='owner-history-million-orders')<>13 THEN RAISE EXCEPTION 'History page must remain bounded'; END IF;
+ IF NOT EXISTS(SELECT 1 FROM growth_reports WHERE scenario='owner-history-million-orders' AND plan::text LIKE '%history_owner_subject%') THEN RAISE EXCEPTION 'History must narrow by owner using the owner index'; END IF;
+ IF (SELECT count(*) FROM history_ownership WHERE environment='DEV' AND subject_id=500)<>1000 THEN RAISE EXCEPTION 'Large-history fixture size changed'; END IF;
+END $$;
+SELECT jsonb_build_object('scenario',scenario,'customers',1000,'orders_per_customer',1000,'execution_ms',plan->0->'Execution Time','plan',plan->0->'Plan') FROM growth_reports WHERE scenario='owner-history-million-orders';
 ROLLBACK;

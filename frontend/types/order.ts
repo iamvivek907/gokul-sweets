@@ -168,6 +168,7 @@ export interface CustomerOrderResponse {
  * the customer opens one order.
  */
 export interface CustomerOrderSummaryResponse {
+    reviewRating?: number | null;
     orderNumber: string;
     customerOrderNumber?: number | null;
     orderStatus: OrderStatus;

@@ -21,6 +21,160 @@ class CustomerAccountHubIntegrationTest {
     @Autowired CustomerAccountHub hub;
     @Autowired JdbcTemplate jdbc;
     @Autowired VerifiedOrderOwnership ownership;
+    @Autowired CustomerHistoryQuery history;
+
+    @Test
+    void thousandOrderHistoryKeepsPageSixAndFiltersBeforePaging() {
+        var subject = UUID.randomUUID();
+        var branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?, 'History') RETURNING id",
+                        Long.class,
+                        "HIST-" + UUID.randomUUID());
+        var second =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?, 'Older branch') RETURNING id",
+                        Long.class,
+                        "HIST-" + UUID.randomUUID());
+        var slot =
+                jdbc.queryForObject(
+                        "INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)"
+                                + " VALUES (?,CURRENT_DATE,'10:00','10:30',2000) RETURNING id",
+                        Long.class,
+                        branch);
+        var refs = new java.util.ArrayList<String>();
+        for (int index = 0; index < 1001; index++) {
+            var id = order(index == 0 ? second : branch, slot, "PICKED_UP");
+            jdbc.update("UPDATE orders SET created_at=TIMESTAMP '2025-01-01' WHERE id=?", id);
+            jdbc.update(
+                    "INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id)"
+                            + " VALUES (?, 'DEV', ?)",
+                    id,
+                    subject);
+            refs.addFirst(
+                    jdbc.queryForObject(
+                            "SELECT order_number FROM orders WHERE id=?", String.class, id));
+        }
+        String cursor = null;
+        CustomerHistoryQuery.Page page = null;
+        for (int number = 1; number <= 6; number++) {
+            page =
+                    history.read(
+                            "DEV",
+                            subject,
+                            new CustomerHistoryQuery.Criteria(
+                                    cursor, null, 12, null, "COMPLETED", null, null, null));
+            assertThat(page.references())
+                    .containsExactlyElementsOf(refs.subList((number - 1) * 12, number * 12));
+            cursor = page.references().getLast();
+        }
+        var previous =
+                history.read(
+                        "DEV",
+                        subject,
+                        new CustomerHistoryQuery.Criteria(
+                                null,
+                                page.references().getFirst(),
+                                12,
+                                null,
+                                "COMPLETED",
+                                null,
+                                null,
+                                null));
+        assertThat(previous.references()).containsExactlyElementsOf(refs.subList(48, 60));
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                String.valueOf(second),
+                                                null,
+                                                null,
+                                                null,
+                                                null))
+                                .references())
+                .containsExactly(refs.getLast());
+        assertThat(
+                        history.read(
+                                        "PROD",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, null, null, null, null))
+                                .references())
+                .isEmpty();
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        UUID.randomUUID(),
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, null, null, null, null))
+                                .references())
+                .isEmpty();
+        assertThatThrownBy(
+                        () ->
+                                history.read(
+                                        "DEV",
+                                        UUID.randomUUID(),
+                                        new CustomerHistoryQuery.Criteria(
+                                                refs.getFirst(),
+                                                null,
+                                                12,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null)))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, "ACTIVE", null, null, null))
+                                .references())
+                .isEmpty();
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, null, "%", null, null))
+                                .references())
+                .isEmpty();
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                null,
+                                                null,
+                                                null,
+                                                "2025-01-02",
+                                                null))
+                                .references())
+                .isEmpty();
+        assertThatThrownBy(
+                        () ->
+                                history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                null,
+                                                null,
+                                                null,
+                                                "2025-02-01",
+                                                "2025-01-01")))
+                .isInstanceOf(ResponseStatusException.class);
+    }
 
     @Test
     void savedChoicesRemainScopedToSubjectAndEnvironmentAndDeletedAddressCannotBeRead() {

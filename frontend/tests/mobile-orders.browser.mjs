@@ -29,6 +29,7 @@ try {
    if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,simplifiedCheckout:enabled,acceptedCheckoutQuote:true,truthfulOrderTracking:true,paidCartRecovery:true,paymentPollingV2:true,branchExperience:true};
    else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
    else if(path==='/api/customer/identity/me')json={authenticated:true,phone:'+919876543210'};
+   else if(path==='/api/customer/identity/orders/page'){const q=new URL(req.url()).searchParams.get('q')?.trim().toLowerCase().replace('#','');json={orders:!q||order.orderNumber.toLowerCase().includes(q)||String(order.customerOrderNumber).includes(q)?[{...order,reviewRating:completed?rating:null}]:[],nextBefore:null,previousAfter:null};}
    else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
    else if(path==='/api/orders/TEST-ORDER')json=order;
    else if(path==='/api/orders/TEST-ORDER/review'){
@@ -91,27 +92,26 @@ try {
   }
   if(completed){
    const review=page.locator('.customer-order-review');await review.waitFor();
+   await review.getByRole('button',{name:'Edit my feedback',exact:true}).click();
    await review.getByRole('group',{name:'Overall order rating'}).getByRole('button',{name:'5 stars',exact:true}).click();
    await review.getByRole('button',{name:'Update Review',exact:true}).click();await review.getByRole('status').getByText('Thank you for your valuable feedback!',{exact:true}).waitFor();assert.equal(rating,5);
   }
   await page.evaluate(()=>window.scrollTo(0,0));
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/order-${width}-${enabled}-${paymentStatus}.png`,fullPage:true});}
-  await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();
-  await page.locator(compact?'.mobile-order-card':'article').first().waitFor();
-  assert.equal(await page.locator('.mobile-order-card').count(),compact?1:0);
+  await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'Every order. Easy to find.',exact:true}).waitFor();
+  await page.locator('.profile-order-card').first().waitFor();
   if(completed)await page.getByLabel('5 out of 5 stars',{exact:true}).waitFor();
-  await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  const historyCard=page.locator(compact?'.mobile-order-card':'article').first(),search=page.getByLabel('Find an order',{exact:true});
+  const historyCard=page.locator('.profile-order-card').first(),search=page.getByLabel('Search order history',{exact:true});
   for(const term of [' test-order ','test-ord',...(order.customerOrderNumber?['#1','1']:[])]){
-   await search.fill(term);assert.equal(await search.inputValue(),term);await historyCard.waitFor();
-   if(order.customerOrderNumber){await historyCard.getByText(compact?'View order #1':'#1',{exact:true}).waitFor();assert.equal((await historyCard.textContent()).includes(order.orderNumber),false,'matching an opaque reference still displays only the short number');}
+   await search.fill(term);await page.getByRole('button',{name:'Search',exact:true}).click();await historyCard.waitFor();
+   if(order.customerOrderNumber)await historyCard.getByText('Order #1',{exact:true}).waitFor();
   }
-  await search.fill('missing-order-reference');assert.equal(await search.inputValue(),'missing-order-reference');await historyCard.waitFor({state:'hidden'});
-  await search.fill('');await historyCard.waitFor();
-  if(compact){await page.getByRole('link',{name:`View order ${order.customerOrderNumber ? '#'+order.customerOrderNumber : order.orderNumber}`,exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
+  await search.fill('missing-order-reference');await page.getByRole('button',{name:'Search',exact:true}).click();await historyCard.waitFor({state:'hidden'});
+  await search.fill('');await page.getByRole('button',{name:'Search',exact:true}).click();await historyCard.waitFor();
+  if(compact){await historyCard.getByRole('link',{name:'View Order',exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
   if((width<=640&&enabled)||paymentStatus==='PENDING'){
    if(compact&&paymentStatus==='PENDING'){
-    await page.locator('a[href="/orders/TEST-ORDER"]').first().click();await page.locator('.mobile-order-detail').waitFor();
+    await page.locator('.profile-order-card').first().getByRole('link',{name:'View Order',exact:true}).click();await page.locator('.mobile-order-detail').waitFor();
     await page.getByRole('link',{name:'Continue payment',exact:true}).click();await page.waitForURL('**/checkout/payment/TEST-ORDER');
    }else await page.goto(`${base}/checkout/payment/TEST-ORDER`);
    assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false);

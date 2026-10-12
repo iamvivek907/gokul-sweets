@@ -235,6 +235,11 @@ SELECT EXISTS (SELECT 1 FROM verified_order_ownership own
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(VerifiedOrderAccess.class, "active()");
         try {
+            // Production ownership must not depend on optional rollout or OTP-provider flags.
+            if ("PROD"
+                    .equalsIgnoreCase(
+                            settings.getProperty("gokul.environment-isolation.environment", "DEV")))
+                return true;
             return features.isCustomerOtpIdentity()
                     && settings.getProperty(
                             "gokul.identity.protect-legacy-routes", Boolean.class, false)
