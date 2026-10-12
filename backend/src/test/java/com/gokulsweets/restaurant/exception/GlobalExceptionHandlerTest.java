@@ -23,6 +23,17 @@ class GlobalExceptionHandlerTest {
                             : new IllegalStateException("Broken serializer"));
         }
 
+        @GetMapping("/test-unusable-response")
+        public String unusableResponse()
+                throws
+                        org.springframework.web.context.request.async
+                                .AsyncRequestNotUsableException {
+            throw new org.springframework.web.context.request.async.AsyncRequestNotUsableException(
+                    "ServletResponse failed to flushBuffer",
+                    new org.apache.catalina.connector.ClientAbortException(
+                            new java.io.IOException("Broken pipe")));
+        }
+
         @GetMapping("/test-rejection")
         public String reject(@RequestParam int status) {
             throw new ResponseStatusException(HttpStatus.valueOf(status), "Review required");
@@ -38,6 +49,15 @@ class GlobalExceptionHandlerTest {
                         .build();
         mvc.perform(get("/test-response-failure").param("disconnect", "true"))
                 .andExpect(content().string(""));
+        mvc.perform(get("/test-unusable-response"))
+                .andExpect(content().string(""))
+                .andExpect(
+                        result ->
+                                org.assertj.core.api.Assertions.assertThat(
+                                                result.getResolvedException())
+                                        .isInstanceOf(
+                                                org.springframework.web.context.request.async
+                                                        .AsyncRequestNotUsableException.class));
         mvc.perform(get("/test-response-failure").param("disconnect", "false"))
                 .andExpect(status().isInternalServerError())
                 .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
