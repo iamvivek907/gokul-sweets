@@ -430,7 +430,7 @@ VALUES (?, 'DEV', ?)
                 RETURNING id
                 """,
                 Long.class,
-                "GKS-HUB-" + UUID.randomUUID(),
+                "GKS-HUB-" + UUID.randomUUID().toString().toUpperCase(java.util.Locale.ROOT),
                 branch,
                 slot,
                 status);
