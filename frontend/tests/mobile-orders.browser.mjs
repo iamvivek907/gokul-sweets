@@ -102,12 +102,13 @@ try {
   await page.locator('.profile-order-card').first().waitFor();
   if(completed)await page.getByLabel('5 out of 5 stars',{exact:true}).waitFor();
   const historyCard=page.locator('.profile-order-card').first(),search=page.getByLabel('Search order history',{exact:true});
+  const submitSearch=async term=>{const response=page.waitForResponse(r=>{const url=new URL(r.url());return url.pathname==='/api/customer/identity/orders/page'&&(url.searchParams.get('q')??'')===term.trim();});await search.fill(term);await page.getByRole('button',{name:'Search',exact:true}).click();await (await response).finished();};
   for(const term of [' test-order ','test-ord',...(order.customerOrderNumber?['#1','1']:[])]){
-   await search.fill(term);await page.getByRole('button',{name:'Search',exact:true}).click();await historyCard.waitFor();
+   await submitSearch(term);await historyCard.waitFor();
    if(order.customerOrderNumber)await historyCard.getByText('Order #1',{exact:true}).waitFor();
   }
-  await search.fill('missing-order-reference');await page.getByRole('button',{name:'Search',exact:true}).click();await historyCard.waitFor({state:'hidden'});
-  await search.fill('');await page.getByRole('button',{name:'Search',exact:true}).click();await historyCard.waitFor();
+  await submitSearch('missing-order-reference');await historyCard.waitFor({state:'hidden'});
+  await submitSearch('');await historyCard.waitFor();
   if(compact){await historyCard.getByRole('link',{name:'View Order',exact:true}).click();await page.locator('.mobile-order-detail').waitFor();await page.getByRole('link',{name:'My orders',exact:true}).click();assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false,'route changes do not replay launch');}
   if((width<=640&&enabled)||paymentStatus==='PENDING'){
    if(compact&&paymentStatus==='PENDING'){

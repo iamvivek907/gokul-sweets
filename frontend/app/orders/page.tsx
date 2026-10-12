@@ -232,7 +232,7 @@ function LegacyOrdersPage() {
 
     const loading = currentHistory === null;
     const branchOrders = useMemo(() => (currentHistory?.orders ?? [])
-        .filter(order => branch !== null && order.branchId === branch.id), [currentHistory, branch]);
+        .filter(order => branch === null || order.branchId === branch.id), [currentHistory, branch]);
     const hasOrders = branchOrders.length > 0;
     const hasActiveOrders = branchOrders.some(order => isActiveOrderStatus(order.orderStatus));
 

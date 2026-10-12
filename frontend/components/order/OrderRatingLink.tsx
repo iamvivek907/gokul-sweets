@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getReviewContext } from "@/services/reviewApi";
-/** History remains usable while visible completed cards independently read their real rating. */
+/** Use the batched history rating; retain visible-card lookup for legacy callers. */
 export default function OrderRatingLink({ orderNumber, rating: knownRating, returnTo }: {
     orderNumber: string;
     rating?: number | null;

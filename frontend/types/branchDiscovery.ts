@@ -3,5 +3,5 @@ export interface BranchOfferingsSnapshot {version:number;draft:BranchOffering[];
 export interface BranchDiscovery {
  offerings:BranchOffering[];
  overallExperience:{average:number;count:number;distribution?:number[]};
- topRatedItems:{productId:number;name:string;imageUrl:string|null;categoryId:number;average:number;count:number;distribution?:number[];review:{comment:string;overallRating:number}|null}[];
+ topRatedItems:{productId:number;name:string;imageUrl:string|null;categoryId:number;average:number;count:number;review:{comment:string;overallRating:number}|null}[];
 }

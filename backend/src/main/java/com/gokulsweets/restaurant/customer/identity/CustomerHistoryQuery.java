@@ -100,8 +100,8 @@ public class CustomerHistoryQuery {
                 String query = criteria.query().trim().toLowerCase(Locale.ROOT);
                 sql.append(
                         " AND (POSITION(? IN LOWER(o.order_number))>0 OR POSITION(? IN"
-                            + " COALESCE(o.customer_order_number::text,''))>0 OR EXISTS(SELECT 1"
-                            + " FROM order_items i WHERE i.order_id=o.id AND POSITION(? IN"
+                            + " COALESCE('#'||o.customer_order_number::text,''))>0 OR EXISTS(SELECT"
+                            + " 1 FROM order_items i WHERE i.order_id=o.id AND POSITION(? IN"
                             + " LOWER(i.product_name))>0))");
                 args.add(query);
                 args.add(query);

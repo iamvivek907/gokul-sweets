@@ -22,6 +22,7 @@ class CustomerAccountHubIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired VerifiedOrderOwnership ownership;
     @Autowired CustomerHistoryQuery history;
+    @Autowired com.gokulsweets.restaurant.order.service.OrderQueryService orderQueries;
 
     @Test
     void thousandOrderHistoryKeepsPageSixAndFiltersBeforePaging() {
@@ -55,6 +56,42 @@ class CustomerAccountHubIntegrationTest {
                     jdbc.queryForObject(
                             "SELECT order_number FROM orders WHERE id=?", String.class, id));
         }
+        jdbc.update(
+                "UPDATE orders SET order_status='CONFIRMED' WHERE order_number=?", refs.getFirst());
+        var displayNumber =
+                jdbc.queryForObject(
+                        "SELECT customer_order_number FROM orders WHERE order_number=?",
+                        Long.class,
+                        refs.getFirst());
+        jdbc.update(
+                "UPDATE orders SET order_status='PICKED_UP' WHERE order_number=?", refs.getFirst());
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                null,
+                                                "COMPLETED",
+                                                "#" + displayNumber,
+                                                null,
+                                                null))
+                                .references())
+                .containsExactly(refs.getFirst());
+        jdbc.update(
+                "INSERT INTO"
+                    + " reviews(order_id,branch_id,overall_rating,review_status,created_at,updated_at)"
+                    + " SELECT id,branch_id,5,'HIDDEN',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM"
+                    + " orders WHERE order_number=?",
+                refs.getFirst());
+        assertThat(
+                        orderQueries
+                                .getCustomerOrderHistory(java.util.List.of(refs.getFirst()))
+                                .getFirst()
+                                .reviewRating())
+                .isEqualTo(5);
         String cursor = null;
         CustomerHistoryQuery.Page page = null;
         for (int number = 1; number <= 6; number++) {

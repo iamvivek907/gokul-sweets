@@ -28,6 +28,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[1280,true],[
   assert.equal(await page.getByRole('button',{name:'Refresh',exact:true}).count(),0);
   await page.locator('.customer-notification-bell').waitFor();
   const nav=page.getByRole('navigation',{name:'Primary navigation',exact:true});
+  await page.waitForFunction(()=>new Set(Array.from(document.querySelectorAll('nav[aria-label="Primary navigation"] a svg'),n=>getComputedStyle(n).stroke)).size===2);
   const colours=await nav.locator('a').evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n.querySelector('svg')).stroke));assert.equal(new Set(colours).size,2,'shared navigation uses maroon selection and muted inactive icons');
   assert.equal(await nav.locator('[data-nav-icon=orders]').getAttribute('aria-current'),'page');
   assert.equal(await nav.locator('[aria-current=page]').count(),1);
