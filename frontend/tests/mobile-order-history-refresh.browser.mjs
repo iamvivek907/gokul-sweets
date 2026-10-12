@@ -15,7 +15,7 @@ try{for(const [width,themed] of [[390,true],[1280,true],[390,false]]){
   return route.fulfill({json}).catch(()=>{});
  });
  await page.clock.install();await page.goto(`${base}/orders`);await page.locator('.profile-order-card').first().waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
- await page.getByRole('button',{name:'Active',exact:true}).click();await page.locator('.profile-order-card').first().waitFor();await page.clock.pauseAt(await page.evaluate(()=>Date.now()+1000));
+ const filtered=page.waitForResponse(response=>{const url=new URL(response.url());return url.pathname==='/api/customer/identity/orders/page'&&url.searchParams.get('status')==='ACTIVE';});await page.getByRole('button',{name:'Active',exact:true}).click();await (await filtered).finished();await page.locator('.profile-order-card').first().waitFor();await page.clock.pauseAt(await page.evaluate(()=>Date.now()+1000));
  hold=true;let count=reads;await page.clock.fastForward(15001);for(let n=0;n<100&&!release;n++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(release);assert.equal(reads,count+1);assert.equal(await page.locator('.profile-order-card').count(),1,'pending refresh retains cards');
  hold=false;order={...order,orderStatus:'READY_FOR_PICKUP'};release();await page.getByText('Ready for Pickup',{exact:true}).waitFor();
  count=reads;await page.evaluate(()=>{window.__ordersVisible=false;document.dispatchEvent(new Event('visibilitychange'));});await page.clock.fastForward(60000);assert.equal(reads,count,'hidden history does not poll');
