@@ -102,16 +102,15 @@ try {
   await page.locator('.profile-order-card').first().waitFor();
   if(completed)await page.getByLabel('5 out of 5 stars',{exact:true}).waitFor();
   const historyCard=page.locator('.profile-order-card').first(),search=page.getByLabel('Search order history',{exact:true});
-  await page.evaluate(()=>{
-   window.historySearchEvents=[];
-   for(const type of ['input','change','submit','reset','focusin','focusout'])document.addEventListener(type,event=>{
-    const field=document.querySelector('input[name="q"]');
-    if(event.target instanceof HTMLInputElement||event.target instanceof HTMLFormElement)window.historySearchEvents.push({type,target:event.target.getAttribute('name'),connected:event.target.isConnected,active:document.activeElement?.getAttribute('name'),value:field?.value,form:event.target instanceof HTMLFormElement?new FormData(event.target).get('q'):null});
-   },true);
-  });
   const observedHistory=[];
   page.on('request',request=>{if(new URL(request.url()).pathname==='/api/customer/identity/orders/page')observedHistory.push(request.url());});
-  const submitSearch=async term=>{console.log('History search',JSON.stringify({term,url:page.url()}));const response=page.waitForResponse(r=>{const url=new URL(r.url());return url.pathname==='/api/customer/identity/orders/page'&&(url.searchParams.get('q')??'')===term.trim();});await search.click();await search.fill(term);console.log('History field after fill',JSON.stringify({value:await search.inputValue(),events:await page.evaluate(()=>window.historySearchEvents)}));assert.equal(await search.inputValue(),term,'search typing is present before submitting');await page.getByRole('button',{name:'Search',exact:true}).click();await (await response.catch(async error=>{console.error('History search timeout',JSON.stringify({term,url:page.url(),value:await search.inputValue(),requests:observedHistory,events:await page.evaluate(()=>window.historySearchEvents)}));throw error;})).finished();};
+  const submitSearch=async term=>{
+   const response=page.waitForResponse(r=>{const url=new URL(r.url());return url.pathname==='/api/customer/identity/orders/page'&&(url.searchParams.get('q')??'')===term.trim();});
+   await search.click();await search.fill(term);
+   assert.equal(await search.inputValue(),term,'search typing is present before submitting');
+   await page.getByRole('button',{name:'Search',exact:true}).click();
+   await (await response.catch(async error=>{console.error('History search timeout',JSON.stringify({term,url:page.url(),value:await search.inputValue(),requests:observedHistory}));throw error;})).finished();
+  };
   for(const term of [' test-order ','test-ord',...(order.customerOrderNumber?['#1','1']:[])]){
    await submitSearch(term);await historyCard.waitFor();
    if(order.customerOrderNumber)await historyCard.getByText('Order #1',{exact:true}).waitFor();
@@ -125,7 +124,7 @@ try {
     await page.getByRole('link',{name:'Continue payment',exact:true}).click();await page.waitForURL('**/checkout/payment/TEST-ORDER');
    }else await page.goto(`${base}/checkout/payment/TEST-ORDER`);
    assert.equal(await page.locator('.gokul-mobile-launch').isVisible(),false);
-   if(paymentStatus==='PAID'){await page.waitForURL('**/orders/TEST-ORDER');await page.locator('.future-storefront').waitFor();if(compact)await page.locator('.mobile-order-detail').waitFor();await page.getByText('Milk sweet',{exact:false}).first().waitFor();assert.equal(await page.locator('.mobile-order-detail').count(),compact?1:0);}
+   if(paymentStatus==='PAID'){await page.waitForURL(url=>url.pathname==='/orders/TEST-ORDER');await page.locator('.future-storefront').waitFor();if(compact)await page.locator('.mobile-order-detail').waitFor();await page.getByText('Milk sweet',{exact:false}).first().waitFor();assert.equal(await page.locator('.mobile-order-detail').count(),compact?1:0);}
    else if(paymentStatus==='PENDING'){await page.getByRole('heading',{name:compact?'Checking your payment…':'Payment',exact:true}).waitFor();if(compact)assert.equal(await page.getByRole('heading',{name:'Payment',exact:true}).count(),0);await page.getByRole('button',{name:'Check Payment Status',exact:true}).waitFor();
     if(stalledRefresh){
      stallRefresh=true;const previous=refreshes;await page.getByRole('button',{name:'Check Payment Status',exact:true}).click();
@@ -155,7 +154,7 @@ try {
      const leave=page.getByRole('dialog');await leave.getByRole('alert').filter({hasText:'We haven’t confirmed whether cancellation completed'}).waitFor({timeout:20000});
      assert.equal(new URL(page.url()).pathname,paymentPath);assert.equal(cancels,1);
      assert.equal(await leave.getByRole('button',{name:'Stay on payment',exact:true}).isEnabled(),true);
-     stallCancellation=false;cancelError=false;await leave.getByRole('button',{name:'Retry payment check',exact:true}).click();await page.waitForURL('**/orders/TEST-ORDER');
+     stallCancellation=false;cancelError=false;await leave.getByRole('button',{name:'Retry payment check',exact:true}).click();await page.waitForURL(url=>url.pathname==='/orders/TEST-ORDER');
      assert.equal(cancels,2);assert.equal(mutations,0);await context.close();console.log('Stalled payment exit recovers safely');continue;
     }
     const leave=page.getByRole('dialog');await leave.getByRole('alert').filter({hasText:'Provider check unavailable'}).waitFor().catch(async e=>{console.log({url:page.url(),cancels,errors:await page.locator('[role=alert]').allTextContents(),dialog:await leave.allTextContents()});throw e;});
@@ -163,7 +162,7 @@ try {
     await leave.getByRole('button',{name:'Stay on payment',exact:true}).click();await leave.waitFor({state:'hidden'});
     cancelError=false;cancelPaid=width===640;
     await page.locator('a[href="/orders"]:visible').first().click();
-    await page.waitForURL(cancelPaid?'**/orders/TEST-ORDER':'**/orders');
+    await page.waitForURL(url=>url.pathname===(cancelPaid?'/orders/TEST-ORDER':'/orders'));
     assert.equal(cancels,2);assert.equal(mutations,0);
    }else{
    const leave=page.getByRole('dialog',{name:'Before you leave payment',exact:true});
@@ -180,7 +179,7 @@ try {
    assert.equal(new URL(page.url()).pathname,paymentPath);assert.equal(cancels,1,'failed provider check preserves the pending payment');
    cancelError=false;cancelPaid=width===640;
    await leave.getByRole('button',{name:'Cancel order & keep cart',exact:true}).click();
-   await page.waitForURL(cancelPaid?'**/orders/TEST-ORDER':fulfillment==='DELIVERY'?'**/delivery/check':width<=640?'**/checkout/review?paymentRecovery=failed':'**/checkout/review');
+   await page.waitForURL(url=>cancelPaid?url.pathname==='/orders/TEST-ORDER':fulfillment==='DELIVERY'?url.pathname==='/delivery/check':url.pathname==='/checkout/review'&&(width>640||url.searchParams.get('paymentRecovery')==='failed'));
    assert.equal(cancels,2);assert.equal(mutations,0,'leaving payment cannot create another order or payment');
    }
   }
