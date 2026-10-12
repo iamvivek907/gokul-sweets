@@ -30,18 +30,18 @@ try {
     await page.route("**/api/orders/history", route => route.fulfill({json: [guest]}));
     await page.route("**/api/storefront/customer-identity", route => route.fulfill({json: {enabled: true}}));
     await page.route("**/api/customer/identity/me", route => route.fulfill({json: {authenticated}}));
-    await page.route("**/api/customer/identity/orders", route => route.fulfill({json: [guest, verified]}));
+    await page.route("**/api/customer/identity/orders/page?*", route => route.fulfill({json: {orders:[guest, verified],nextBefore:null}}));
 
     const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3309";
     await page.goto(`${base}/orders`);
-    await page.getByText("VERIFIED-200", {exact: true}).waitFor();
-    assert.equal(await page.getByText("GUEST-100", {exact: true}).count(), 1,
+    await page.locator('a[href^="/orders/VERIFIED-200?"]').waitFor();
+    assert.equal(await page.locator('a[href^="/orders/GUEST-100"]').count(), 1,
         "Guest orders shared with the verified response must be deduplicated.");
 
     authenticated = false;
     await page.reload();
-    await page.getByText("GUEST-100", {exact: true}).waitFor();
-    assert.equal(await page.getByText("VERIFIED-200", {exact: true}).count(), 0,
+    await page.locator('a[href^="/orders/GUEST-100"]').waitFor();
+    assert.equal(await page.locator('a[href^="/orders/VERIFIED-200?"]').count(), 0,
         "Signing out must hide orders recovered from the verified session.");
     assert.equal(await page.evaluate(() => localStorage.getItem("gokul-cart-recovery-sentinel")), "keep-cart");
     assert.deepEqual(await page.evaluate(() => JSON.parse(localStorage.getItem("gokul-order-history"))),

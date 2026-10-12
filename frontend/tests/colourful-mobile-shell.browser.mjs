@@ -16,7 +16,7 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[1280,true],[
   else if(path==='/api/storefront/customer-identity')json={enabled:true};
   else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Vivek Customer',phone:'+919876543210'};
   else if(path==='/api/customer/identity/notifications')json={unreadCount:2,items:[]};
-  else if(path==='/api/customer/identity/orders'){reads++;json=orders;}
+  else if(path==='/api/customer/identity/orders/page'){reads++;json={orders,nextBefore:null};}
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
   else if(path.endsWith('/review'))json={eligible:false,review:null};
   return route.fulfill({headers,json});
@@ -40,9 +40,9 @@ try{for(const [width,enabled] of [[320,true],[390,true],[640,true],[1280,true],[
 
   assert.equal(await page.locator('.gokul-location-pin svg').count(),1);
   assert.equal(await page.locator('.language-trigger svg').count(),1);
-  const cards=page.locator('.mobile-order-card');assert.equal(await cards.count(),4);
+  const cards=page.locator('.profile-order-card');assert.equal(await cards.count(),4);
   assert.equal(new Set(await cards.evaluateAll(nodes=>nodes.map(n=>getComputedStyle(n).borderLeftColor))).size,4);
-  const previous=reads;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForFunction(()=>document.querySelectorAll('.mobile-order-card').length===4);for(let i=0;i<30&&reads===previous;i++)await page.waitForTimeout(50);assert.ok(reads>previous,'visible resume refreshes history without a manual button');
+  const previous=reads;await page.evaluate(()=>document.dispatchEvent(new Event('visibilitychange')));await page.waitForFunction(()=>document.querySelectorAll('.profile-order-card').length===4);for(let i=0;i<30&&reads===previous;i++)await page.waitForTimeout(50);assert.ok(reads>previous,'visible resume refreshes history without a manual button');
   await page.getByRole('button',{name:'Language / भाषा',exact:true}).click();await page.getByRole('button',{name:/हिन्दी.*अपनी भाषा/}).click();assert.equal(await page.evaluate(()=>document.documentElement.lang),'hi');assert.equal(await nav.locator('a>span:nth-child(2)').evaluateAll(nodes=>nodes.some(n=>n.scrollWidth>n.clientWidth||getComputedStyle(n).textOverflow==='ellipsis')),false,'Hindi navigation labels remain visible');
   await page.getByRole('button',{name:'Language / भाषा',exact:true}).click();await page.getByRole('button',{name:/English.*Order with ease/}).click();
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-orders-${width}.png`,fullPage:true});}

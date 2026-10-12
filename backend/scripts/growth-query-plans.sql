@@ -43,10 +43,10 @@ SELECT jsonb_build_object('index',indexname,'bytes',pg_relation_size(indexname::
 -- One million narrow history rows: 1,000 customers with 1,000 orders each.
 -- Measure the owner join and cursor query, rather than extrapolating menu traffic.
 CREATE TEMP TABLE history_orders(id bigint PRIMARY KEY, order_number text UNIQUE, created_at timestamp, branch_id bigint);
-CREATE TEMP TABLE history_ownership(order_id bigint PRIMARY KEY, environment text, subject_id bigint);
+CREATE TEMP TABLE history_ownership(order_id bigint PRIMARY KEY, environment text, subject_id bigint, bound_at timestamp DEFAULT CURRENT_TIMESTAMP);
 INSERT INTO history_orders SELECT n,'HISTORY-'||n,timestamp '2025-01-01'+(n/10)*interval '1 second',n%3+1 FROM generate_series(1,1000000) n;
-INSERT INTO history_ownership SELECT n,'DEV',(n-1)/1000+1 FROM generate_series(1,1000000) n;
-CREATE INDEX history_owner_subject ON history_ownership(environment,subject_id,order_id);
+INSERT INTO history_ownership(order_id,environment,subject_id) SELECT n,'DEV',(n-1)/1000+1 FROM generate_series(1,1000000) n;
+CREATE INDEX history_owner_subject ON history_ownership(environment,subject_id,bound_at DESC);
 ANALYZE history_orders;
 ANALYZE history_ownership;
 SELECT pg_temp.growth_report('owner-history-million-orders','bounded', 'SELECT o.order_number FROM history_ownership own JOIN history_orders o ON o.id=own.order_id WHERE own.environment=''DEV'' AND own.subject_id=500 AND (o.created_at,o.id)<(SELECT created_at,id FROM history_orders WHERE order_number=''HISTORY-499940'') ORDER BY o.created_at DESC,o.id DESC LIMIT 13');

@@ -10,7 +10,7 @@ try{for(const width of [320,390,1280]){
  let bulk=0,reviewReads=0,fail=false;
  await context.route('**/api/**',async route=>{
   const req=route.request(),url=new URL(req.url()),path=url.pathname;let json=[];
-  if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,simplifiedCheckout:true,customerAccountHub:true,today:'2026-10-12'};
+  if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,simplifiedCheckout:true,acceptedCheckoutQuote:true,customerAccountHub:true,today:'2026-10-12'};
   else if(path==='/api/storefront/customer-identity')json={enabled:true};
   else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone:'+919876543210'};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
@@ -36,7 +36,7 @@ try{for(const width of [320,390,1280]){
  await page.getByRole('button',{name:'Edit my feedback',exact:true}).click();await page.getByRole('group',{name:'Overall order rating'}).getByRole('button',{name:'5 stars',exact:true}).click();
  const submit=page.getByRole('button',{name:'Update Review',exact:true});assert.deepEqual(await submit.evaluate(el=>({color:getComputedStyle(el).color,background:getComputedStyle(el).backgroundColor})),{color:'rgb(255, 255, 255)',background:'rgb(143, 24, 56)'});
  await submit.click();await page.getByText('Thank you for your valuable feedback!',{exact:true}).waitFor();
- await page.getByRole(width<=640?'link':'button',{name:/Back|My orders/}).first().click();await nav.getByText('Page 6',{exact:true}).waitFor();
+ await page.getByRole(width<=640?'link':'button',{name:/Back|My orders/i}).first().click();await nav.getByText('Page 6',{exact:true}).waitFor();
  await page.locator('.profile-order-card').first().getByLabel('5 out of 5 stars',{exact:true}).waitFor();assert.equal(await page.locator('.profile-order-card').count(),12);
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  fail=true;await page.evaluate(()=>window.dispatchEvent(new Event('online')));await page.getByRole('alert').filter({hasText:'could not refresh'}).waitFor();assert.equal(await nav.getByText('Page 6',{exact:true}).isVisible(),true);assert.equal(await page.locator('.profile-order-card').count(),12);
