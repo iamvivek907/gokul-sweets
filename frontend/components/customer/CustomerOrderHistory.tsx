@@ -91,7 +91,12 @@ function History({ phone, branchId, branchName }: Props) {
     const returnTo = `${path === "/profile" ? "/profile/orders" : path}?${search.toString()}`;
     return <div className={styles.history} data-modern={features?.futuristicStorefrontV2 || features?.checkoutExperienceV2 ? "true" : undefined}>
   <header className={styles.hero}><div><span>Your Gokul moments</span><Heading>Every order. Easy to find.</Heading><p>{branchName ?? "All your branches, together."}</p></div><CustomerIcon kind="receipt"/></header>
-  <form className={styles.search} onSubmit={event => { event.preventDefault(); navigate({ q: draft.trim() || null }, true); }}><CustomerIcon kind="receipt"/><input aria-label="Search order history" maxLength={100} placeholder="Order number or dish name" value={draft} onChange={event => setDraft({ query, value: event.target.value })}/><button type="submit">Search</button></form>
+  <form className={styles.search} onSubmit={event => {
+      event.preventDefault();
+      // Read the submitted field, including input events not yet committed to React state.
+      const submitted = new FormData(event.currentTarget).get("q");
+      navigate({ q: typeof submitted === "string" ? submitted.trim() || null : null }, true);
+  }}><CustomerIcon kind="receipt"/><input name="q" aria-label="Search order history" maxLength={100} placeholder="Order number or dish name" value={draft} onChange={event => setDraft({ query, value: event.target.value })}/><button type="submit">Search</button></form>
   <div className={styles.filters} aria-label="Order status">{[["ALL", "All"], ["ACTIVE", "Active"], ["COMPLETED", "Completed"], ["ISSUES", "Cancelled / Failed"]].map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => navigate({ status: value }, true)}>{label}</button>)}</div>
   <div className={styles.dates}><label>From<input type="date" value={from} max={to || undefined} onChange={event => navigate({ from: event.target.value || null }, true)}/></label><label>To<input type="date" value={to} min={from || undefined} onChange={event => navigate({ to: event.target.value || null }, true)}/></label></div>
   {error && <div className={styles.error} role="alert"><p>{error}</p><button type="button" onClick={() => setRevision(value => value + 1)}>Retry</button><button type="button" onClick={() => navigate({}, true)}>Latest orders</button></div>}
