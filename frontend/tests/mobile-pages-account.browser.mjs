@@ -102,7 +102,7 @@ try{
    await page.locator('.mobile-profile-order-types').getByRole('button',{name:'Pickup orders',exact:true}).click();
    await page.locator('.profile-order-card').first().waitFor();
    await page.getByRole('link',{name:'Back to profile',exact:true}).click();await page.waitForURL('**/profile');await page.getByRole('button',{name:'Badges',exact:true}).click();await page.waitForURL('**/profile/badges');await page.getByRole('link',{name:'Back to profile',exact:true}).click();await page.waitForURL('**/profile');
-   assert.equal(await page.locator('a[href="/profile/privacy"]:visible').count(),1,'one privacy link');
+   await page.locator('.account-hub').waitFor();await page.locator('a[href="/profile/privacy"]:visible').waitFor();assert.equal(await page.locator('a[href="/profile/privacy"]:visible').count(),1,'one privacy link');
    const lastLink=page.locator('.profile-social-actions a').last();
    await lastLink.scrollIntoViewIfNeeded();await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
    const lastBox=await lastLink.boundingBox(),navigationBox=await page.locator('.customer-bottom-navigation').boundingBox();

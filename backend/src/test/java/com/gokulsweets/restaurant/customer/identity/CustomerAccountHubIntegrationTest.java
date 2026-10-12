@@ -7,10 +7,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 @SpringBootTest
 @Transactional
@@ -64,6 +67,70 @@ class CustomerAccountHubIntegrationTest {
                 .isInstanceOf(ResponseStatusException.class);
         hub.deleteAddress("DEV", subject, address.id());
         assertThat(hub.snapshot("DEV", subject).addresses()).isEmpty();
+    }
+
+    @Test
+    void identicalAddressRetriesReturnOriginalEvenAtLimitAndStayOwnerScoped() {
+        var subject = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id, environment, verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543210')",
+                subject);
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id, environment, verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543211')",
+                other);
+        var input = new CustomerAccountHub.AddressInput("Home", "Main Road", "Tamkuhi", "274407");
+        var first = hub.addAddress("DEV", subject, input);
+        var retry =
+                hub.addAddress(
+                        "DEV",
+                        subject,
+                        new CustomerAccountHub.AddressInput(
+                                " Home ", " Main Road ", " Tamkuhi ", "274407"));
+        assertThat(retry).isEqualTo(first);
+        assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(1);
+        for (int index = 1; index < 5; index++) {
+            hub.addAddress(
+                    "DEV",
+                    subject,
+                    new CustomerAccountHub.AddressInput(
+                            "Place " + index, "Road " + index, "Tamkuhi", "274407"));
+        }
+        assertThat(hub.addAddress("DEV", subject, input)).isEqualTo(first);
+        assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(5);
+        assertThatThrownBy(
+                        () ->
+                                hub.addAddress(
+                                        "DEV",
+                                        subject,
+                                        new CustomerAccountHub.AddressInput(
+                                                "Extra", "Another road", "Tamkuhi", "274407")))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(hub.addAddress("DEV", other, input).id()).isNotEqualTo(first.id());
+        assertThat(hub.snapshot("DEV", other).addresses()).hasSize(1);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentIdenticalCreatesKeepOneAddress() throws Exception {
+        var subject = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id, environment, verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543299')",
+                subject);
+        try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+            var input =
+                    new CustomerAccountHub.AddressInput("Home", "Main Road", "Tamkuhi", "274407");
+            var first = workers.submit(() -> hub.addAddress("DEV", subject, input));
+            var second = workers.submit(() -> hub.addAddress("DEV", subject, input));
+            assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(second.get(10, TimeUnit.SECONDS));
+            assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(1);
+        } finally {
+            jdbc.update("DELETE FROM verified_customer_addresses WHERE subject_id = ?", subject);
+            jdbc.update("DELETE FROM verified_customer_subjects WHERE id = ?", subject);
+        }
     }
 
     @Test
