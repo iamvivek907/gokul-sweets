@@ -1,7 +1,15 @@
 "use client";
+import {Fragment} from "react";
+import type {ReactNode} from "react";
+import {T} from "@/lib/language";
 
+import MobilePortionCard from "./MobilePortionCard";
+import {mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
 import ProductCard
     from "@/components/menu/ProductCard";
+import type {ItemAvailability} from "@/services/availabilityApi";
+import styles from "./CustomerHomeExperience.module.css";
+import {describePickupAvailability} from "@/lib/storefrontPresentation";
 
 import type {
     MenuProduct
@@ -13,6 +21,15 @@ import type {
 
 
 interface ProductGridProps {
+    pairingSeed?:number;
+    pairing?:ReactNode;
+    portionGroups?: PortionGroup[];
+    catalogProducts?: MenuProduct[];
+    refined?: boolean;
+    pickupItems?: ItemAvailability[];
+    pickupChecking?: boolean;
+    pickupStatusMessage?: string;
+    dateAware?: boolean;
 
     products:
         MenuProduct[];
@@ -41,6 +58,11 @@ interface ProductGridProps {
 
 
 export default function ProductGrid({
+    pairingSeed,
+    pairing,
+    portionGroups,
+    catalogProducts,
+    refined = false,
     products,
     ratingSummaries,
     ratingsLoading,
@@ -48,7 +70,11 @@ export default function ProductGrid({
     weights,
     onIncrease,
     onDecrease,
-    onAdd
+    onAdd,
+    pickupItems,
+    pickupChecking,
+    pickupStatusMessage,
+    dateAware
 }: ProductGridProps) {
 
     if (
@@ -84,8 +110,7 @@ export default function ProductGrid({
                         font-bold
                     "
                 >
-                    No items found
-                </h3>
+                    <T text="No items found" /></h3>
 
                 <p
                     className="
@@ -94,8 +119,7 @@ export default function ProductGrid({
                         text-[#756763]
                     "
                 >
-                    Try another category or search term.
-                </p>
+                    <T text="Try another category or search term." /></p>
 
             </div>
         );
@@ -103,64 +127,44 @@ export default function ProductGrid({
 
 
     return (
-        <div
-            className="
-                grid
-                grid-cols-1
-                gap-3
-
-                sm:grid-cols-2
-                sm:gap-4
-
-                lg:grid-cols-3
-            "
-        >
-
-            {products.map(
-                product => (
-
-                    <ProductCard
-                        key={
-                            product.id
-                        }
-                        product={
-                            product
-                        }
-                        ratingSummary={
-                            ratingSummaries[
-                                product.id
-                            ]
-                            ?? null
-                        }
-                        ratingLoading={
-                            ratingsLoading
-                        }
-                        quantity={
-                            quantities[
-                                product.id
-                            ]
-                            ?? 0
-                        }
-                        weightGrams={
-                            weights[
-                                product.id
-                            ]
-                            ?? null
-                        }
-                        onIncrease={
-                            onIncrease
-                        }
-                        onDecrease={
-                            onDecrease
-                        }
-                        onAdd={
-                            onAdd
-                        }
-                    />
-
-                )
-            )}
-
+        <div className={dateAware ? styles.products : undefined}>
+            <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
+                {mobileMenuRows(products,portionGroups??[],catalogProducts??products).map(row => {
+                    const product=row.product;
+                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
+                    const pickup = pickupItems?.find(item => item.productId === product.id);
+                    const unavailable = !!dateAware && (pickupChecking || pickup?.available !== true);
+                    return (
+                        <Fragment key={product.id}><div id={`gokul-product-${product.id}`} className="relative min-w-0 scroll-mt-24">
+                            {dateAware && (pickup || pickupChecking) && !(refined && unavailable) && (
+                                <span className={`menu-availability-chip ${unavailable ? "menu-availability-chip--unavailable" : pickupChecking && !pickup ? "menu-availability-chip--checking" : ""}`}>
+                                    <span aria-hidden="true">{unavailable ? "!" : pickupChecking && !pickup ? "◌" : "✓"}</span>
+                                    {unavailable ? "Date unavailable" : pickupChecking && !pickup ? "Checking date" : "Date preview"}
+                                </span>
+                            )}
+                            <ProductCard
+                                premium={portionGroups!==undefined}
+                                refined={refined}
+                                unavailableForPickup={unavailable}
+                                pickupMessage={pickupChecking ? "Checking pickup" : "Not at this time"}
+                                product={product}
+                                ratingSummary={ratingSummaries[product.id] ?? null}
+                                ratingLoading={ratingsLoading}
+                                quantity={quantities[product.id] ?? 0}
+                                weightGrams={weights[product.id] ?? null}
+                                onIncrease={onIncrease}
+                                onDecrease={onDecrease}
+                                onAdd={onAdd}
+                            />
+                            {unavailable && (
+                                <p role="status" className="menu-availability-note">
+                                    <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>{!pickupChecking&&pickup?.available===false&&<button type="button" className="pickup-attention-action" onClick={()=>window.dispatchEvent(new Event("gokul-pickup-attention"))}><T text="Change pickup date"/></button>}
+                                </p>
+                            )}
+                        </div>{pairing&&product.id===pairingSeed&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>
+                    );
+                })}
+            </div>
         </div>
     );
 }

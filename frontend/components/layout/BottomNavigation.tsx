@@ -1,4 +1,8 @@
 "use client";
+import {useEffect,useRef,useState} from "react";
+import {useTranslation} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
 
 import Link
     from "next/link";
@@ -10,6 +14,9 @@ import {
 import {
     useCart
 } from "@/hooks/useCart";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useSelectedBranch} from "@/hooks/useSelectedBranch";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 
 
 interface NavigationItem {
@@ -72,9 +79,43 @@ const items: NavigationItem[] = [
 
 
 export default function BottomNavigation() {
+    const translate = useTranslation();
 
     const pathname =
         usePathname();
+    const features = useStorefrontFeatures();
+    const checkoutExperienceV2 = features?.checkoutExperienceV2 === true;
+    const navRef=useRef<HTMLElement>(null);
+    const [scrollHidden,setScrollHidden]=useState(false);
+    const modern=features?.futuristicStorefrontV2===true||checkoutExperienceV2;
+    const phone = usePhoneViewport();
+    // Use the same phone destinations and icons throughout the enabled customer app.
+    const referenceMenu = modern && phone === true;
+    const visibleItems = referenceMenu ? items.filter(item => item.icon !== "cart") : items;
+    useEffect(()=>{
+        if(!modern||checkoutExperienceV2&&pathname.startsWith("/checkout/"))return;
+        let active=true,lastY=window.scrollY;
+        let timer:ReturnType<typeof setTimeout>|undefined;
+        const show=()=>{clearTimeout(timer);if(active)setScrollHidden(false);};
+        queueMicrotask(show);
+        const scroll=()=>{
+            const next=window.scrollY,delta=Math.abs(next-lastY);lastY=next;
+            if(!window.matchMedia("(max-width:640px)").matches||window.matchMedia("(prefers-reduced-motion:reduce)").matches||next<24||(navRef.current?.contains(document.activeElement)&&document.activeElement?.matches(":focus-visible"))||document.querySelector("dialog[open]")){show();return;}
+            if(delta<2)return;
+            setScrollHidden(true);clearTimeout(timer);timer=setTimeout(show,450);
+        };
+        const keyboard=(event:KeyboardEvent)=>{if(event.key==="Tab"||event.key==="Escape")show();};
+        window.addEventListener("scroll",scroll,{passive:true});
+        window.addEventListener("keydown",keyboard);
+        navRef.current?.addEventListener("focusin",show);
+        const nav=navRef.current;
+        return()=>{active=false;clearTimeout(timer);window.removeEventListener("scroll",scroll);window.removeEventListener("keydown",keyboard);nav?.removeEventListener("focusin",show);};
+    },[pathname,modern,checkoutExperienceV2]);
+
+    const selectedBranch = useSelectedBranch().branch;
+    const homeHref = features?.branchExperience === true
+        ? selectedBranch ? `/branches/${selectedBranch.id}` : "/branches"
+        : "/";
 
 
     const {
@@ -91,7 +132,7 @@ export default function BottomNavigation() {
             href === "/"
         ) {
 
-            return pathname === "/";
+            return pathname === homeHref;
         }
 
 
@@ -101,10 +142,15 @@ export default function BottomNavigation() {
     }
 
 
+    if (checkoutExperienceV2 && pathname.startsWith("/checkout/")) return null;
+
     return (
         <nav
+            ref={navRef}
+            data-scroll-hidden={scrollHidden}
+            data-reference-menu={referenceMenu || undefined}
             aria-label="Primary navigation"
-            className="
+            className="customer-bottom-navigation
                 fixed
                 inset-x-0
                 bottom-0
@@ -126,14 +172,14 @@ export default function BottomNavigation() {
                     grid
                     w-full
                     max-w-[600px]
-                    grid-cols-5
                     px-1
                     pb-[env(safe-area-inset-bottom)]
                 "
+                style={{gridTemplateColumns: `repeat(${visibleItems.length}, minmax(0, 1fr))`}}
             >
 
                 {
-                    items.map(
+                    visibleItems.map(
                         item => {
 
                             const active =
@@ -145,11 +191,13 @@ export default function BottomNavigation() {
                             return (
                                 <Link
                                     key={
-                                        item.href
+                                        item.icon === "home" ? homeHref : item.href
                                     }
                                     href={
-                                        item.href
+                                        item.icon === "home" ? homeHref : item.href
                                     }
+                                    data-ordering-target={item.href === "/menu" ? "menu" : undefined}
+                                    data-nav-icon={item.icon}
                                     aria-current={
                                         active
                                             ? "page"
@@ -208,6 +256,7 @@ export default function BottomNavigation() {
                                             active={
                                                 active
                                             }
+                                            referenceMenu={referenceMenu}
                                         />
 
 
@@ -252,14 +301,15 @@ export default function BottomNavigation() {
                                     <span
                                         className="
                                             max-w-full
-                                            truncate
-                                            leading-none
+                                            whitespace-normal
+                                            text-center
+                                            leading-tight
                                         "
                                     >
-                                        {item.label}
+                                        {translate(item.label)}
                                     </span>
 
-                                </Link>
+                                <LinkFeedback href={item.icon === "home" ? homeHref : item.href} /></Link>
                             );
                         }
                     )
@@ -274,10 +324,12 @@ export default function BottomNavigation() {
 
 function NavigationIcon({
     icon,
-    active
+    active,
+    referenceMenu = false
 }: {
     icon: NavigationItem["icon"];
     active: boolean;
+    referenceMenu?: boolean;
 }) {
 
     const className =
@@ -316,85 +368,37 @@ function NavigationIcon({
     }
 
 
-    if (
-        icon === "menu"
-    ) {
-
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-                className={className}
-            >
-                <path
-                    d="M5 10.5h14a7 7 0 0 0-14 0Z"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-                <path
-                    d="M3.5 10.5h17"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-                <path
-                    d="M7 14h10"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-                <path
-                    d="M9 17.5h6"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-                <path
-                    d="M12 3.5v1"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                />
-            </svg>
-        );
+    if (icon === "menu") {
+        if (referenceMenu) return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.7" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.6" />
+            <rect x="14" y="3" width="7" height="7" rx="1.6" />
+            <rect x="3" y="14" width="7" height="7" rx="1.6" />
+            <rect x="14" y="14" width="7" height="7" rx="1.6" />
+        </svg>;
+        return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="5.5" />
+            <circle cx="12" cy="12" r="3" />
+            <path d="M2 4v5h3V4M3.5 4v16M21 4v16M21 4c-3 3-3 7 0 7" />
+        </svg>;
     }
 
-
-    if (
-        icon === "cart"
-    ) {
-
-        return (
-            <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-                className={className}
-            >
-                <path
-                    d="M3.5 5h2l1.7 9.1a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 1.9-1.5L20.5 8H6.1"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
-                <circle
-                    cx="9.5"
-                    cy="19"
-                    r="1"
-                    strokeWidth="1.8"
-                />
-                <circle
-                    cx="17"
-                    cy="19"
-                    r="1"
-                    strokeWidth="1.8"
-                />
-            </svg>
-        );
+    if (icon === "cart") {
+        return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 7h14l1 12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2L5 7ZM9 7V5a3 3 0 0 1 6 0v2" />
+            <path d="M8.5 14a3.5 3.5 0 0 1 7 0h-7ZM8.5 17h7" />
+        </svg>;
     }
 
 
     if (
         icon === "orders"
     ) {
+
+        if (referenceMenu) return <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className={className} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-3" />
+            <rect x="9" y="2" width="6" height="4" rx="1.4" />
+            <path d="M8 10h8M8 14h8M8 18h5" />
+        </svg>;
 
         return (
             <svg

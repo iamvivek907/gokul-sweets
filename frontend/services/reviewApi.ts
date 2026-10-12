@@ -13,7 +13,7 @@ export function getReviewContext(
 ): Promise<ReviewContext> {
     return apiClient<ReviewContext>(
         `/api/orders/${encodeURIComponent(orderNumber)}/review`,
-        {signal}
+        {signal, credentials: "include"}
     );
 }
 
@@ -25,6 +25,8 @@ export function saveReview(
         `/api/orders/${encodeURIComponent(orderNumber)}/review`,
         {
             method: "PUT",
+            signal: AbortSignal.timeout(15000),
+            credentials: "include",
             body: JSON.stringify(request)
         }
     );

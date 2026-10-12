@@ -1,0 +1,9 @@
+# Customer history and reviews before production
+
+Verified history loads at most 12 orders per screen (API maximum 50), using owner-scoped forward/backward cursors. Branch, status, dates and literal order/dish search are applied before pagination. Page position and filters live in the URL. An order update, failed refresh or return from review submission does not discard that URL. Newest orders are available by resetting filters/navigation; live inserts cannot move the forward cursor boundary.
+
+Each page includes submitted overall ratings in one batched database query. Hidden reviews remain visible to their own customer; public branch averages and star distributions include only published reviews of completed orders. The account hub loads history only when its order section is opened, and replaces the previous page instead of accumulating cards.
+
+In `PROD`, legacy order/payment/review access checks registered ownership regardless of optional identity rollout flags. Guest order-number access is retained only for orders without registered ownership. Keep environment isolation, HTTPS, trusted forwarding/CORS and OTP provider abuse controls correctly configured; this change does not verify provider settings. Test OTP sign-in and owned order access from the actual production origin before opening checkout.
+
+Verification includes a 1,001-order account regression, equal-timestamp navigation and cross-account/environment checks. The disposable growth SQL adds 1,000 customers with 1,000 historical orders each and checks an indexed, bounded owner cursor query. This is database plan evidence, not an end-to-end capacity guarantee. Use the deployment smoke workload against the actual 1 CPU / 2 GB service and its database before rollout. Free-tier sleep, database limits, real payment webhooks and device alarm delivery still require operational validation.

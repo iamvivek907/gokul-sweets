@@ -1,4 +1,7 @@
 "use client";
+import {T} from "@/lib/language";
+
+import {preferredAdminReportBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useEffect,
@@ -39,6 +42,14 @@ export default function AdminSalesReportsPage() {
     } =
         useAdminAuth();
 
+
+    function selectReportBranch(value: string) {
+        const id = value ? Number(value) : null;
+        setBranchId(id);
+        if (profile) rememberAdminBranchId(profile.staffId, id);
+    }
+
+    const staffId = profile?.staffId;
 
     const canView =
         hasPermission(
@@ -159,9 +170,8 @@ export default function AdminSalesReportsPage() {
                         reportResult
                     ]) => {
 
-                        setOptions(
-                            optionsResult
-                        );
+                        setOptions(optionsResult);
+                        if (staffId) setBranchId(current => current ?? preferredAdminReportBranchId(staffId, optionsResult.branches));
 
                         setReport(
                             reportResult
@@ -205,7 +215,8 @@ export default function AdminSalesReportsPage() {
             canView,
             fromDate,
             toDate,
-            branchId
+            branchId,
+            staffId
         ]
     );
 
@@ -288,19 +299,11 @@ export default function AdminSalesReportsPage() {
                         }
                         onChange={
                             event =>
-                                setBranchId(
-                                    event.target.value
-                                        ? Number(
-                                            event.target.value
-                                        )
-                                        : null
-                                )
+                                selectReportBranch(event.target.value)
                         }
                         className={INPUT_CLASS}
                     >
-                        <option value="">
-                            All branches
-                        </option>
+                        <option value="">{" "}<T text="All branches" />{" "}</option>
 
                         {
                             options?.branches.map(
@@ -535,9 +538,9 @@ export default function AdminSalesReportsPage() {
                                                 <tr className="border-b border-[#eadfd6] text-left text-xs uppercase tracking-[0.08em] text-[#756763]">
                                                     <th className="px-3 py-3">Date</th>
                                                     <th className="px-3 py-3 text-right">Revenue</th>
-                                                    <th className="px-3 py-3 text-right">Orders</th>
+                                                    <th className="px-3 py-3 text-right"><T text="Orders" /></th>
                                                     <th className="px-3 py-3 text-right">Units</th>
-                                                    <th className="px-3 py-3 text-right">Customers</th>
+                                                    <th className="px-3 py-3 text-right"><T text="Customers" /></th>
                                                 </tr>
                                             </thead>
 

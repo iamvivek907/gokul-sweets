@@ -4,6 +4,7 @@ import type {
 } from "next";
 
 import "./globals.css";
+import "@/components/common/brand-experience.css";
 
 import AppProviders
     from "@/components/providers/AppProviders";
@@ -15,15 +16,15 @@ import {
 
 export const metadata: Metadata = {
     title: {
-        default: APP_NAME,
+        default: "Gokul Sweets | Fresh Sweets & Snacks",
         template: `%s | ${APP_NAME}`
     },
     description: APP_DESCRIPTION,
-    applicationName: APP_NAME,
+    applicationName: "Gokul",
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
-        title: APP_NAME
+        title: "Gokul"
     },
     formatDetection: {
         telephone: false
@@ -34,7 +35,8 @@ export const viewport: Viewport = {
     width: "device-width",
     initialScale: 1,
     maximumScale: 1,
-    themeColor: "#7a1625"
+    userScalable: false,
+    themeColor: "#980c31"
 };
 
 export default function RootLayout({

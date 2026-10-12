@@ -1,9 +1,23 @@
 "use client";
+import {useHistoryReturn} from "@/lib/historyReturn";
+import {guardCompletedCheckout} from "@/lib/paymentNavigation";
+import BrandLoading from "@/components/common/BrandLoading";
+import {ApiError} from "@/services/apiClient";
+import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
+import OrderCancellation from "@/components/order/OrderCancellation";
+import MobileOrderDetail from "@/components/order/MobileOrderDetail";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
+import PickupCodeCard from "@/components/order/PickupCodeCard";
+import {T,useTranslation} from "@/lib/language";
+import {formatWeight} from "@/lib/orderQuantity";
 
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
+    useRef,
     useState
 } from "react";
 
@@ -14,6 +28,12 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {reconcilePaidCart} from "@/lib/paidCartRecovery";
+import Link from "next/link";
+
+import NotificationReadOnOpen from "@/components/customer/NotificationReadOnOpen";
 
 import OrderReviewCard
     from "@/components/order/OrderReviewCard";
@@ -41,6 +61,9 @@ interface LoadedOrder {
     orderNumber: string;
     order: CustomerOrderResponse | null;
     error: string | null;
+    checkedAt: number;
+    refreshError?: string;
+    retainOnError?: boolean;
 }
 
 
@@ -74,6 +97,14 @@ const TIMELINE_STEPS: TimelineStep[] = [
     }
 ];
 
+const DELIVERY_TIMELINE_STEPS: TimelineStep[] = [
+    {status: "CONFIRMED", label: "Confirmed", description: "The branch has received your order."},
+    {status: "PREPARING", label: "Preparing", description: "Your order is being prepared."},
+    {status: "READY_FOR_DELIVERY", label: "Ready for delivery", description: "Your order is waiting for rider handoff."},
+    {status: "OUT_FOR_DELIVERY", label: "Out for delivery", description: "Your order has left the branch."},
+    {status: "DELIVERED", label: "Delivered", description: "The branch has confirmed delivery."}
+];
+
 
 const TIMELINE_INDEX:
     Partial<Record<OrderStatus, number>> = {
@@ -83,29 +114,30 @@ const TIMELINE_INDEX:
         PICKED_UP: 3
     };
 
+const DELIVERY_TIMELINE_INDEX: Partial<Record<OrderStatus, number>> = {
+    CONFIRMED: 0,
+    PREPARING: 1,
+    READY_FOR_DELIVERY: 2,
+    OUT_FOR_DELIVERY: 3,
+    DELIVERED: 4
+};
+
 
 function formatUpdatedAt(value: string): string {
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return value;
-    }
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            day: "numeric",
-            month: "short",
-            year: "numeric",
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(date);
+    return formatBusinessTimestamp(value, {
+        day: "numeric", month: "short", year: "numeric",
+        hour: "numeric", minute: "2-digit"
+    });
 }
 
 
 export default function OrderDetailPage() {
+    const returnTo=useHistoryReturn();
+    const translate = useTranslation();
+
+    const phone = usePhoneViewport();
+    const features = useStorefrontFeatures();
+    const trackingEnabled = features?.truthfulOrderTracking === true;
 
     const router = useRouter();
 
@@ -123,38 +155,76 @@ export default function OrderDetailPage() {
     const [refreshing, setRefreshing] =
         useState(false);
 
+    const activeRequest = useRef<AbortController | null>(null);
+    const [identityRevision, setIdentityRevision] = useState(0);
+    useEffect(() => subscribeCustomerIdentityChanges(() => {
+        activeRequest.current?.abort();
+        activeRequest.current = null;
+        setLoadedOrder(null);
+        setRefreshing(false);
+        setIdentityRevision(value => value + 1);
+    }, {revalidateOnResume: false}), []);
+    const applyResult = useCallback((result: LoadedOrder) => {
+        setLoadedOrder(previous => result.error && result.retainOnError && previous?.orderNumber === result.orderNumber && previous.order
+            ? {...previous, refreshError: result.error}
+            : result);
+    }, []);
+
     const currentOrder =
         loadedOrder?.orderNumber === orderNumber
             ? loadedOrder
             : null;
 
     const order = currentOrder?.order ?? null;
+    // Install before paid details are painted: an immediate system Back must be guarded.
+    useLayoutEffect(()=>{
+        if(order?.paymentStatus!=="PAID")return;
+        // Finish this history replacement with a document navigation. A client
+        // transition still settling from payment must not restore its old target.
+        return guardCompletedCheckout(order.orderNumber,()=>window.location.replace(returnTo));
+    },[order?.paymentStatus,order?.orderNumber,returnTo]);
+
+
+
+    useEffect(() => {
+        if (features?.paidCartRecovery && order?.paymentStatus === "PAID") {
+            reconcilePaidCart(orderNumber,order);
+        }
+    }, [features?.paidCartRecovery, order, orderNumber]);
 
     const fetchOrder =
         useCallback(
             async (
                 signal?: AbortSignal
             ): Promise<LoadedOrder | null> => {
+                if (signal?.aborted || activeRequest.current) return null;
+                const request = new AbortController();
+                activeRequest.current = request;
+                let timedOut = false;
+                const abort = () => request.abort();
+                signal?.addEventListener("abort", abort, {once: true});
+                const timeout = window.setTimeout(() => {timedOut = true; request.abort();}, 15000);
                 try {
                     const response =
                         await getCustomerOrder(
                             orderNumber,
-                            signal
+                            request.signal
                         );
 
-                    if (signal?.aborted) {
+                    if (request.signal.aborted && !timedOut) {
                         return null;
                     }
 
                     return {
                         orderNumber,
                         order: response,
-                        error: null
+                        error: null,
+                        checkedAt: Date.now()
                     };
 
                 } catch (exception) {
 
-                    if (signal?.aborted) {
+                    if (request.signal.aborted && !timedOut) {
                         return null;
                     }
 
@@ -166,11 +236,17 @@ export default function OrderDetailPage() {
                     return {
                         orderNumber,
                         order: null,
+                        retainOnError: timedOut || exception instanceof ApiError && (exception.status === 0 || exception.status === 408 || exception.status === 429 || exception.status >= 500),
+                        checkedAt: Date.now(),
                         error:
-                            exception instanceof Error
+                            timedOut ? "Order status took too long to update. Please try again." : exception instanceof Error
                                 ? exception.message
                                 : "Unable to load this order."
                     };
+                } finally {
+                    window.clearTimeout(timeout);
+                    signal?.removeEventListener("abort", abort);
+                    if (activeRequest.current === request) activeRequest.current = null;
                 }
             },
             [orderNumber]
@@ -189,7 +265,7 @@ export default function OrderDetailPage() {
                 await fetchOrder();
 
             if (result) {
-                setLoadedOrder(result);
+                applyResult(result);
             }
         } finally {
             setRefreshing(false);
@@ -207,14 +283,16 @@ export default function OrderDetailPage() {
                     &&
                     !controller.signal.aborted
                 ) {
-                    setLoadedOrder(result);
+                    applyResult(result);
                 }
             });
 
         return () => {
             controller.abort();
+            activeRequest.current?.abort();
+            activeRequest.current = null;
         };
-    }, [fetchOrder]);
+    }, [fetchOrder, applyResult, identityRevision]);
 
     const shouldPoll =
         order !== null
@@ -229,13 +307,15 @@ export default function OrderDetailPage() {
             return;
         }
 
+        const controller = new AbortController();
         const timer = window.setInterval(
             () => {
-                void fetchOrder()
+                if (document.visibilityState !== "visible" || !navigator.onLine) return;
+                void fetchOrder(controller.signal)
                     .then(result => {
 
-                        if (result) {
-                            setLoadedOrder(result);
+                        if (result && !controller.signal.aborted) {
+                            applyResult(result);
                         }
                     });
             },
@@ -243,21 +323,26 @@ export default function OrderDetailPage() {
         );
 
         return () => {
+            controller.abort();
             window.clearInterval(timer);
         };
 
-    }, [fetchOrder, shouldPoll]);
+    }, [fetchOrder, shouldPoll, applyResult]);
 
     const currentTimelineIndex =
         order
-            ? TIMELINE_INDEX[order.orderStatus] ?? -1
+            ? (order.fulfillmentType === "DELIVERY" ? DELIVERY_TIMELINE_INDEX : TIMELINE_INDEX)[order.orderStatus] ?? -1
             : -1;
 
     const status =
         useMemo(
             () =>
                 order
-                    ? getOrderStatusPresentation(order.orderStatus)
+                    ? order.orderStatus === "CONFIRMED" && order.paymentStatus !== "PAID"
+                        ? {label: "Payment verification pending", message: "We cannot confirm payment yet. Check again shortly or contact the branch if you were charged.", tone: "amber" as const}
+                        : order.orderStatus === "CONFIRMED" && order.paymentStatus === "PAID"
+                            ? {...getOrderStatusPresentation(order.orderStatus, order.fulfillmentType), tone: "green" as const}
+                            : getOrderStatusPresentation(order.orderStatus, order.fulfillmentType)
                     : null,
             [order]
         );
@@ -266,10 +351,7 @@ export default function OrderDetailPage() {
         return (
             <AppShell>
                 <section className="mx-auto max-w-2xl px-4 pb-28 pt-5 sm:px-6">
-                    <div className="rounded-3xl border border-[#eadfd6] bg-white py-16 text-center">
-                        <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#eadfd6] border-t-[#7a1625]" />
-                        <p className="mt-4 font-semibold text-[#241715]">Loading your order...</p>
-                    </div>
+                    <BrandLoading label="Loading your order..." />
                 </section>
             </AppShell>
         );
@@ -287,18 +369,17 @@ export default function OrderDetailPage() {
                         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                             <button
                                 type="button"
-                                onClick={() => router.push("/orders")}
+                                onClick={() => router.push(returnTo)}
                                 className="min-h-11 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#7a1625]"
                             >
-                                My Orders
-                            </button>
+                                <T text="My Orders" /></button>
                             <button
                                 type="button"
                                 disabled={refreshing}
                                 onClick={() => void handleRefresh()}
                                 className="min-h-11 flex-1 rounded-xl bg-[#7a1625] font-bold text-white! disabled:opacity-50"
                             >
-                                {refreshing ? "Trying again..." : "Try again"}
+                                {refreshing ? "Trying again..." : translate("Try again")}
                             </button>
                         </div>
                     </div>
@@ -308,20 +389,38 @@ export default function OrderDetailPage() {
     }
 
     const showOperationalTimeline =
+        order.paymentStatus === "PAID" &&
         [
             "CONFIRMED",
             "PREPARING",
-            "READY_FOR_PICKUP",
-            "PICKED_UP"
+            ...(order.fulfillmentType === "DELIVERY"
+                ? ["READY_FOR_DELIVERY", "OUT_FOR_DELIVERY", "DELIVERED"]
+                : ["READY_FOR_PICKUP", "PICKED_UP"])
         ].includes(order.orderStatus);
+    const timelineSteps = order.fulfillmentType === "DELIVERY" ? DELIVERY_TIMELINE_STEPS : TIMELINE_STEPS;
+    const terminalStatus = order.fulfillmentType === "DELIVERY" ? "DELIVERED" : "PICKED_UP";
+
+    const pendingPreparation = order.orderStatus === "CONFIRMED" || order.orderStatus === "PREPARING";
+    const pastPickupWindow = order.fulfillmentType === "PICKUP" && pendingPreparation &&
+        !!order.pickupDate && !!order.pickupEndTime &&
+        parseBusinessTimestamp(`${order.pickupDate}T${order.pickupEndTime}`).getTime() <= currentOrder.checkedAt;
+
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
+        <NotificationReadOnOpen orderNumber={orderNumber} />
+        {currentOrder.refreshError && <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">{currentOrder.refreshError} <button type="button" disabled={refreshing} onClick={() => void handleRefresh()}><T text="Try again" /></button></p>}
+        <MobileOrderDetail order={order} status={status} onRefresh={() => void handleRefresh()} trackingEnabled={trackingEnabled} pastPickupWindow={pastPickupWindow} />
+    </AppShell>;
 
     return (
         <AppShell>
+            <NotificationReadOnOpen orderNumber={orderNumber} />
+            {currentOrder.refreshError && <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">{currentOrder.refreshError} <button type="button" disabled={refreshing} onClick={() => void handleRefresh()}><T text="Try again" /></button></p>}
+            {order.paymentStatus==="PAID" && order.fulfillmentType!=="DELIVERY" && ["CONFIRMED","PREPARING","READY_FOR_PICKUP","PICKUP_WINDOW_EXPIRED"].includes(order.orderStatus) && <div className="mx-auto w-full max-w-3xl px-4 sm:px-6"><PickupCodeCard orderNumber={orderNumber}/></div>}
             <section className="mx-auto w-full max-w-3xl px-4 pb-28 pt-5 sm:px-6 sm:pt-7">
 
                 <button
                     type="button"
-                    onClick={() => router.push("/orders")}
+                    onClick={() => router.push(returnTo)}
                     className="mb-4 text-sm font-bold text-[#7a1625]"
                 >
                     ← My Orders
@@ -331,8 +430,8 @@ export default function OrderDetailPage() {
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                             <p className="text-xs font-bold uppercase tracking-wide text-[#c88a20]">Order tracking</p>
-                            <h1 className="mt-2 break-all text-xl font-bold text-[#241715] sm:text-2xl">
-                                {order.orderNumber}
+                            <h1 data-copyable className="mt-2 break-all text-xl font-bold text-[#241715] sm:text-2xl">
+                                {orderDisplayNumber(order)}
                             </h1>
                             <p className="mt-2 text-xs text-[#756763]">
                                 Last updated {formatUpdatedAt(order.updatedAt)}
@@ -345,28 +444,56 @@ export default function OrderDetailPage() {
                     </div>
 
                     <div className={`mt-5 rounded-2xl border p-4 ${getStatusClasses(status.tone)}`}>
+                        {order.orderStatus === "CONFIRMED" && order.paymentStatus === "PAID" &&
+                            <p className="mb-2 flex items-center gap-3 text-xl font-bold text-green-800"><span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-green-700 text-white">✓</span> <T text="Confirmed" /></p>}
                         <p className="font-bold">{status.label}</p>
                         <p className="mt-1 text-sm leading-6">{status.message}</p>
                     </div>
+
+                    {trackingEnabled && order.fulfillmentType === "PICKUP" && order.estimatedReadyAt && order.delayReportedAt && (
+                        <div role="status" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-[#241715]">
+                            <p className="font-bold">{pendingPreparation ? "Revised ready estimate" : "Previous ready time update"}</p>
+                            <p className="mt-1">{formatUpdatedAt(order.estimatedReadyAt)} IST</p>
+                            <p className="mt-1">{order.delayReason}</p>
+                            <p className="mt-2 text-xs">Reported {formatUpdatedAt(order.delayReportedAt)} IST. Your booked pickup slot is shown below; confirm any collection change with the branch.</p>
+                        </div>
+                    )}
+                    {trackingEnabled && pastPickupWindow && !order.estimatedReadyAt && (
+                        <div role="status" className="mt-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm">
+                            The booked pickup window has passed and the shop has not reported a revised ready time. Contact the branch before travelling; the status above is the latest confirmed update.
+                        </div>
+                    )}
+
+                    {trackingEnabled && (
+                        <div className="mt-5 rounded-2xl border border-[#eadfd6] p-4 text-sm text-[#241715]">
+                            <p>Placed {formatUpdatedAt(order.createdAt)} IST</p>
+                            <p className="mt-2">Payment: {order.paymentStatus === "PAID" ? "Paid" : order.paymentStatus ? order.paymentStatus.replaceAll("_", " ").toLowerCase() : "No payment attempt recorded"}</p>
+                            <p className="mt-2">Latest shop status: {status.label} · checked {formatUpdatedAt(order.updatedAt)} IST</p>
+                        </div>
+                    )}
+
+                    {["REFUND_PENDING","REFUNDED","REFUND_FAILED"].includes(order.paymentStatus??"") && <OrderCancellation orderNumber={order.orderNumber} onChanged={() => void handleRefresh()} />}
 
                     {showOperationalTimeline && (
                         <div className="mt-7">
                             <h2 className="text-lg font-bold text-[#241715]">Order progress</h2>
                             <div className="mt-5 space-y-0">
-                                {TIMELINE_STEPS.map((step, index) => {
-                                    const completed = index < currentTimelineIndex || order.orderStatus === "PICKED_UP";
-                                    const current = index === currentTimelineIndex && order.orderStatus !== "PICKED_UP";
+                                {timelineSteps.map((step, index) => {
+                                    const completed = index < currentTimelineIndex || order.orderStatus === terminalStatus;
+                                    const current = index === currentTimelineIndex && order.orderStatus !== terminalStatus;
 
                                     return (
                                         <div key={step.status} className="relative flex gap-4 pb-7 last:pb-0">
-                                            {index < TIMELINE_STEPS.length - 1 && (
+                                            {index < timelineSteps.length - 1 && (
                                                 <div className={`absolute left-[15px] top-8 h-[calc(100%-1rem)] w-0.5 ${index < currentTimelineIndex ? "bg-green-500" : "bg-[#eadfd6]"}`} />
                                             )}
                                             <div className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold ${
                                                 completed
                                                     ? "border-green-600 bg-green-600 text-white!"
                                                     : current
-                                                        ? "border-[#7a1625] bg-[#fff4e5] text-[#7a1625]"
+                                                        ? order.orderStatus === "CONFIRMED" && order.paymentStatus === "PAID"
+                                                            ? "border-green-600 bg-green-50 text-green-800"
+                                                            : "border-[#7a1625] bg-[#fff4e5] text-[#7a1625]"
                                                         : "border-[#d8cbc3] bg-white text-[#9b8b84]"
                                             }`}>
                                                 {completed ? "✓" : index + 1}
@@ -386,24 +513,34 @@ export default function OrderDetailPage() {
 
                     <div className="mt-7 grid gap-4 border-t border-[#eadfd6] pt-6 sm:grid-cols-2">
                         <div className="rounded-2xl bg-[#fffaf3] p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">Pickup from</p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Preparing at" : translate("Pickup from")}</p>
                             <p className="mt-2 font-bold text-[#241715]">{order.branchName}</p>
                             <p className="mt-1 text-sm leading-6 text-[#756763]">{order.branchAddress}</p>
+                            {trackingEnabled && order.branchPhone && (
+                                <a className="mt-3 inline-block font-bold text-[#7a1625] underline" href={`tel:${order.branchPhone.replace(/[^+\d]/g, "")}`}>
+                                    <T text="Call" />{" "}{order.branchName}: {order.branchPhone}
+                                </a>
+                            )}
+                            {trackingEnabled && (
+                                <p className="mt-2 text-xs text-[#756763]">For help, quote order {orderDisplayNumber(order)}. {!order.branchPhone && <Link className="underline" href="/about#our-branches">Find branch contact details</Link>}</p>
+                            )}
                         </div>
                         <div className="rounded-2xl bg-[#fffaf3] p-4">
-                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">Pickup time</p>
-                            <p className="mt-2 font-bold text-[#241715]">{formatOrderDate(order.pickupDate)}</p>
-                            <p className="mt-1 text-sm text-[#756763]">
-                                {formatOrderTime(order.pickupStartTime)} – {formatOrderTime(order.pickupEndTime)}
-                            </p>
-                            <p className="mt-2 text-xs font-semibold text-[#7a1625]">
-                                {order.pickupType === "PRIORITY" ? "Priority pickup" : "Normal pickup"}
-                            </p>
+                            <p className="text-xs font-bold uppercase tracking-wide text-[#756763]">{order.fulfillmentType === "DELIVERY" ? "Delivery window" : translate("Pickup time")}</p>
+                            {order.fulfillmentType === "DELIVERY" ? <>
+                                <p className="mt-2 font-bold text-[#241715]">{order.deliveryDate ? formatOrderDate(order.deliveryDate) : "Confirming window"}</p>
+                                <p className="mt-1 text-sm text-[#756763]">{order.deliveryStartTime && order.deliveryEndTime ? `${formatOrderTime(order.deliveryStartTime)} – ${formatOrderTime(order.deliveryEndTime)} IST` : "Window pending"}</p>
+                                <p className="mt-2 text-xs text-[#756763]">{order.deliveryAddressLine}, {order.deliveryLocality} {order.deliveryPostalCode}</p>
+                            </> : <>
+                                <p className="mt-2 font-bold text-[#241715]">{order.pickupDate ? formatOrderDate(order.pickupDate) : "Pickup time pending"}</p>
+                                <p className="mt-1 text-sm text-[#756763]">{order.pickupStartTime && order.pickupEndTime ? `${formatOrderTime(order.pickupStartTime)} – ${formatOrderTime(order.pickupEndTime)}` : "Time pending"}</p>
+                                <p className="mt-2 text-xs font-semibold text-[#7a1625]">{order.pickupType === "PRIORITY" ? translate("Priority pickup") : translate("Normal pickup")}</p>
+                            </>}
                         </div>
                     </div>
 
                     <div className="mt-7 border-t border-[#eadfd6] pt-6">
-                        <h2 className="text-lg font-bold text-[#241715]">Items</h2>
+                        <h2 className="text-lg font-bold text-[#241715]"><T text="Items" /></h2>
                         <div className="mt-3 divide-y divide-[#eadfd6]">
                             {order.items.map(item => (
                                 <div key={item.id} className="flex items-start justify-between gap-4 py-4">
@@ -411,7 +548,7 @@ export default function OrderDetailPage() {
                                         <p className="font-semibold text-[#241715]">{item.productName}</p>
                                         <p className="mt-1 text-xs text-[#756763]">
                                             {item.saleMode === "WEIGHT"
-                                                ? `${item.weightGrams ?? 0} g × ${formatOrderCurrency(item.unitPrice)}/kg`
+                                                ? `${formatWeight(item.weightGrams)} × ${formatOrderCurrency(item.unitPrice)}/kg`
                                                 : `${item.quantity} × ${formatOrderCurrency(item.unitPrice)}`}
                                         </p>
                                     </div>
@@ -429,9 +566,11 @@ export default function OrderDetailPage() {
                             <span className="font-semibold text-[#241715]">{formatOrderCurrency(order.subtotal)}</span>
                         </div>
                         <div className="mt-2 flex justify-between text-sm text-[#756763]">
-                            <span>Tax</span>
+                            <span><T text="Tax" /></span>
                             <span className="font-semibold text-[#241715]">{formatOrderCurrency(order.taxAmount)}</span>
                         </div>
+                        {(order.paymentFee??0)>0&&<div className="mt-2 flex justify-between text-sm"><span><T text="Online payment fee" /> ({order.paymentFeeRate}%)<small className="block"><T text="Includes" /> {formatOrderCurrency(order.paymentFeeTax??0)} <T text="fee tax" /></small></span><span>{formatOrderCurrency(order.paymentFee??0)}</span></div>}
+                        {(order.convenienceFee ?? 0)>0 && <div className="mt-2 flex justify-between text-sm"><span><T text="Convenience fee" />{" "}<small className="block"><T text="Includes" />{" "}{formatOrderCurrency(order.convenienceFeeTax??0)}{" "}<T text="fee tax" /></small></span><span>{formatOrderCurrency(order.convenienceFee ?? 0)}</span></div>}
                         {order.priorityCharge > 0 && (
                             <div className="mt-2 flex justify-between text-sm text-[#756763]">
                                 <span>Priority charge</span>
@@ -444,10 +583,16 @@ export default function OrderDetailPage() {
                         </div>
                     </div>
 
-                    {order.orderStatus === "PICKED_UP" && (
-                        <OrderReviewCard
+                    {order.branchFssaiLicenceNumber && <div className="gokul-fssai order-fssai" aria-label={`FSSAI licence number for ${order.branchName}: ${order.branchFssaiLicenceNumber}`}>
+                        <span className="gokul-fssai-business">Gokul Sweets · {order.branchName}</span>
+                        <span className="gokul-fssai-mark" aria-hidden="true">fssai</span>
+                        <span className="gokul-fssai-number">Lic. No. {order.branchFssaiLicenceNumber}</span>
+                    </div>}
+
+                    {order.orderStatus === terminalStatus && (
+                        <div id="order-review" className="scroll-mt-28"><OrderReviewCard key={order.orderNumber}
                             orderNumber={order.orderNumber}
-                        />
+                        /></div>
                     )}
 
                     <div className="mt-6 flex flex-col gap-3 sm:flex-row">

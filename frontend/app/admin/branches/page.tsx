@@ -1,4 +1,9 @@
 "use client";
+import {T} from "@/lib/language";
+
+import BranchOperationalToggle from "@/components/admin/BranchOperationalToggle";
+import PickupFeeSettings from "@/components/admin/PickupFeeSettings";
+import OnlinePaymentFeeSettings from "@/components/admin/OnlinePaymentFeeSettings";
 
 import {
     useCallback,
@@ -21,6 +26,11 @@ import {
 import {
     BranchOperationalSettings
 } from "@/components/admin/BranchOperationalSettings";
+import {DeliveryZonesSettings} from "@/components/admin/DeliveryZonesSettings";
+import BranchOfferingsEditor from "@/components/admin/BranchOfferingsEditor";
+import BranchExperienceEditor from "@/components/admin/BranchExperienceEditor";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import type {
     AdminBranch,
@@ -44,6 +54,7 @@ interface BranchFormState {
     pincode: string;
 
     phone: string;
+    fssaiLicenceNumber: string;
 
     latitude: string;
 
@@ -72,6 +83,7 @@ const EMPTY_FORM: BranchFormState = {
     pincode: "",
 
     phone: "",
+    fssaiLicenceNumber: "",
 
     latitude: "",
 
@@ -115,6 +127,7 @@ function toFormState(
         phone:
             branch.phone
             ?? "",
+        fssaiLicenceNumber: branch.fssaiLicenceNumber ?? "",
 
         latitude:
             branch.latitude === null
@@ -246,12 +259,16 @@ function formatDateTime(
 
 export default function AdminBranchesPage() {
 
+    const features = useStorefrontFeatures();
+    const deliveryZonesEnabled = features?.deliveryZones === true;
+
     const {
         profile,
         authorization,
         hasPermission
     } =
         useAdminAuth();
+    const staffId = profile?.staffId;
 
 
     const [
@@ -368,17 +385,10 @@ export default function AdminBranchesPage() {
                     );
 
 
-                const targetBranch =
-                    preferredBranchId !== undefined
-                        ? result.find(
-                            branch =>
-                                branch.id
-                                === preferredBranchId
-                        )
-                        ?? result[0]
-                        ?? null
-                        : result[0]
-                        ?? null;
+                const targetId = staffId
+                    ? preferredAdminBranchId(staffId, result, preferredBranchId)
+                    : result[0]?.id ?? null;
+                const targetBranch = result.find(branch => branch.id === targetId) ?? null;
 
 
                 setBranches(
@@ -405,7 +415,7 @@ export default function AdminBranchesPage() {
                     false
                 );
             },
-            []
+            [staffId]
         );
 
 
@@ -434,9 +444,10 @@ export default function AdminBranchesPage() {
                 .then(
                     result => {
 
-                        const firstBranch =
-                            result[0]
-                            ?? null;
+                        const selectedId = staffId
+                            ? preferredAdminBranchId(staffId, result)
+                            : result[0]?.id ?? null;
+                        const firstBranch = result.find(branch => branch.id === selectedId) ?? null;
 
 
                         setBranches(
@@ -499,7 +510,8 @@ export default function AdminBranchesPage() {
         },
         [
             authorization,
-            canManage
+            canManage,
+            staffId
         ]
     );
 
@@ -635,6 +647,7 @@ export default function AdminBranchesPage() {
                         nullableText(
                             form.phone
                         ),
+                    fssaiLicenceNumber: nullableText(form.fssaiLicenceNumber),
 
                     latitude:
                         nullableNumber(
@@ -725,6 +738,7 @@ export default function AdminBranchesPage() {
                         nullableText(
                             form.phone
                         ),
+                    fssaiLicenceNumber: nullableText(form.fssaiLicenceNumber),
 
                     latitude:
                         nullableNumber(
@@ -1137,9 +1151,7 @@ export default function AdminBranchesPage() {
                                             font-bold
                                             text-[#241715]
                                         "
-                                    >
-                                        Branches
-                                    </h2>
+                                    >{" "}<T text="Branches" />{" "}</h2>
 
 
                                     <p
@@ -1257,6 +1269,7 @@ export default function AdminBranchesPage() {
                                                                     setSelectedBranchId(
                                                                         branch.id
                                                                     );
+                                                                    if (profile) rememberAdminBranchId(profile.staffId, branch.id);
 
 
                                                                     setForm(
@@ -1656,6 +1669,19 @@ export default function AdminBranchesPage() {
                                             </Field>
 
 
+                                            <Field label="FSSAI licence number">
+                                                <input
+                                                    value={form.fssaiLicenceNumber}
+                                                    disabled={saving}
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]{14}"
+                                                    maxLength={14}
+                                                    placeholder="14-digit licence number"
+                                                    onChange={event => updateField("fssaiLicenceNumber", event.target.value)}
+                                                    className="min-h-11 w-full rounded-xl border border-[#eadfd6] px-4 text-sm text-[#241715]"
+                                                />
+                                            </Field>
+
                                             <Field
                                                 label="Pincode"
                                             >
@@ -2034,8 +2060,7 @@ export default function AdminBranchesPage() {
                                                             text-xs
                                                             text-[#756763]
                                                         "
-                                                    >
-                                                        Last updated:{" "}
+                                                    >{" "}<T text="Last updated:" />{" "}
                                                         <span
                                                             className="
                                                                 font-semibold
@@ -2169,9 +2194,7 @@ export default function AdminBranchesPage() {
 
                                                             disabled:opacity-50
                                                         "
-                                                    >
-                                                        Cancel
-                                                    </button>
+                                                    >{" "}<T text="Cancel" />{" "}</button>
 
                                                 )
                                             }
@@ -2190,8 +2213,24 @@ export default function AdminBranchesPage() {
                             selectedBranch
                             &&
                             authorization
-                            && (
-
+                            && (<>
+                                {hasPermission("BRANCH_MANAGE") && <BranchOfferingsEditor key={`offerings-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization} />}
+                                <BranchExperienceEditor key={`experience-${selectedBranch.id}`}
+                                    branch={selectedBranch} authorization={authorization}
+                                    allowed={hasPermission("MENU_MANAGE")}
+                                    customerVisible={features?.branchExperience ?? null} />
+                                <section className="m-5 rounded-2xl border border-[#eadfd6] bg-[#fffaf3] p-5" aria-label="Branch services">
+                                    <h3 className="text-lg font-bold">Services at this branch</h3>
+                                    <p className="mt-2 text-sm">Public branch artwork: {features === null ? "checking deployment configuration"
+                                        : features.branchExperience ? "published content is visible"
+                                            : "deployment flag is OFF; drafts and publications are hidden from customers"}.</p>
+                                    <p className="mt-2 text-sm">Pickup availability is managed in the operational settings below and checked against live slots. Table, occasion and banquet booking are not available to publish until their booking systems are implemented.</p>
+                                    <p className="mt-2 text-sm">Homepage campaign media is managed separately in <a className="font-semibold underline" href="/admin/homepage-campaigns">Storefront campaigns</a>.</p>
+                                    <p className="mt-2 text-sm">Customer-facing service labels show only supported, enabled services. Future booking settings will appear here when the service can accept bookings.</p>
+                                </section>
+                                <BranchOperationalToggle key={`operational-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization}/>
+                                <PickupFeeSettings key={`fee-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization}/>
+                                <OnlinePaymentFeeSettings key={`payment-fee-${selectedBranch.id}`} branchId={selectedBranch.id} authorization={authorization}/>
                                 <BranchOperationalSettings
                                     key={
                                         selectedBranch.id
@@ -2207,7 +2246,13 @@ export default function AdminBranchesPage() {
                                     }
                                 />
 
-                            )
+                                {deliveryZonesEnabled && <DeliveryZonesSettings
+                                    key={`delivery-${selectedBranch.id}`}
+                                    branchId={selectedBranch.id}
+                                    authorization={authorization}
+                                />}
+
+                            </>)
                         }
 
                     </section>

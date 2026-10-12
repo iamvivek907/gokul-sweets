@@ -21,6 +21,14 @@ export interface MenuProduct {
 
     available: boolean;
 
+    /** Absent only for older API responses; never infer a dietary label. */
+    vegetarian?: boolean;
+
+    /** Live menu revision used to invalidate dated service-hour previews. */
+    availabilityRevision?: string;
+
+    serviceAvailability?: {available: boolean; code: string; message: string | null; nextChangeAt: string | null; evaluatedAt?: string | null; receivedMonotonic?: number} | null;
+
     saleMode: ProductSaleMode;
 
     minimumWeightGrams: number | null;

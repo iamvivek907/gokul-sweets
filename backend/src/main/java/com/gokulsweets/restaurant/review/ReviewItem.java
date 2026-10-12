@@ -1,12 +1,16 @@
 package com.gokulsweets.restaurant.review;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.product.Product;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
 
+/** Persisted review item state. */
 @Entity
 @Table(name = "review_items")
 @Getter
@@ -37,15 +41,27 @@ public class ReviewItem {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** Ons create. */
     @PrePersist
     void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos = MethodTiming.start(ReviewItem.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, ReviewItem.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos = MethodTiming.start(ReviewItem.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, ReviewItem.class, "onUpdate()");
+        }
     }
 }

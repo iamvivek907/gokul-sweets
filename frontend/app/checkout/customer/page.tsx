@@ -1,9 +1,16 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
+import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
+import {formatBusinessTime} from "@/lib/businessTime";
 
 import {
+    useEffect,
     useMemo,
+    useState,
     useSyncExternalStore
 } from "react";
 
@@ -19,6 +26,9 @@ import CheckoutStateCard
 
 import CustomerDetailsForm
     from "@/components/checkout/CustomerDetailsForm";
+import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer/CustomerIdentityPanel";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import {
     useCart
@@ -65,42 +75,19 @@ function formatCurrency(
 function formatTime(
     value: string
 ): string {
-
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 
 export default function CustomerPage() {
+    const translate = useTranslation();
+    const checkoutExperienceV2 = useStorefrontFeatures()?.checkoutExperienceV2 === true;
 
     const router =
         useRouter();
+
+    const [guestAllowed, setGuestAllowed] = useState(false);
+    const [identity, setIdentity] = useState<CustomerSession | null>(null);
 
 
     const {
@@ -175,6 +162,19 @@ export default function CustomerPage() {
         );
 
 
+    const verifiedPhone = identity?.authenticated ? identity.phone ?? null : null;
+    const checkoutCustomer = identity?.authenticated
+        ? verifiedCheckoutContact(identity)
+        : existingCustomer;
+
+    useEffect(() => {
+        const contact = identity?.authenticated ? verifiedCheckoutContact(identity) : null;
+        if (!contact || !checkoutExperienceV2 || !window.matchMedia("(max-width: 640px)").matches
+                || isEmpty || !pickupSlot || branch?.id !== branchId) return;
+        saveCustomerDetails(contact);
+        router.replace("/checkout/review");
+    }, [identity, checkoutExperienceV2, isEmpty, pickupSlot, branch?.id, branchId, router]);
+
     /*
      * =========================================================
      * CUSTOMER SUBMIT
@@ -185,11 +185,13 @@ export default function CustomerPage() {
             CustomerDetails
     ) {
 
+        if (!guestAllowed && !verifiedPhone) return;
         saveCustomerDetails(
             customer
         );
 
 
+        window.dispatchEvent(new Event("gokul-navigation-start"));
         router.push(
             "/checkout/review"
         );
@@ -216,11 +218,11 @@ export default function CustomerPage() {
                 >
 
                     <CheckoutStateCard
-                        title="Your cart is empty"
+                        title={translate("Your cart is empty")}
                         message="Add items before entering pickup details."
                         primaryAction={{
                             label:
-                                "Explore Menu",
+                                translate("Explore Menu"),
 
                             href:
                                 "/menu"
@@ -264,14 +266,14 @@ export default function CustomerPage() {
                         detail="Your cart is safe. Select the correct branch, then continue checkout."
                         primaryAction={{
                             label:
-                                "Select Branch",
+                                translate("Select Branch"),
 
                             href:
                                 "/"
                         }}
                         secondaryAction={{
                             label:
-                                "Return to Cart",
+                                translate("Return to Cart"),
 
                             href:
                                 "/cart"
@@ -315,7 +317,7 @@ export default function CustomerPage() {
                         }}
                         secondaryAction={{
                             label:
-                                "Return to Cart",
+                                translate("Return to Cart"),
 
                             href:
                                 "/cart"
@@ -336,6 +338,7 @@ export default function CustomerPage() {
      */
     return (
         <AppShell>
+            <CheckoutExperienceFrame enabled={checkoutExperienceV2} stage="details" allowBranchChange>
 
             <section
                 className="
@@ -374,8 +377,7 @@ export default function CustomerPage() {
                                 text-[#756763]
                             "
                         >
-                            Pickup
-                        </span>
+                            <T text="Pickup" /></span>
 
 
                         <span
@@ -393,8 +395,7 @@ export default function CustomerPage() {
                                 text-[#7a1625]
                             "
                         >
-                            Your details
-                        </span>
+                            <T text="Your details" /></span>
 
 
                         <span
@@ -412,8 +413,7 @@ export default function CustomerPage() {
                                 text-[#756763]
                             "
                         >
-                            Review
-                        </span>
+                            <T text="Review" /></span>
 
                     </div>
 
@@ -428,8 +428,7 @@ export default function CustomerPage() {
                             text-[#c88a20]
                         "
                     >
-                        Checkout
-                    </p>
+                        <T text="Checkout" /></p>
 
 
                     <h1
@@ -442,8 +441,7 @@ export default function CustomerPage() {
                             sm:text-4xl
                         "
                     >
-                        Who&apos;s picking up?
-                    </h1>
+                        <T text="Who's picking up?" /></h1>
 
 
                     <p
@@ -455,9 +453,7 @@ export default function CustomerPage() {
                             text-[#756763]
                         "
                     >
-                        Enter the name and mobile number we should use for
-                        pickup identification and order updates.
-                    </p>
+                        <T text="Enter the name and mobile number we should use for pickup identification and order updates." /></p>
 
                 </div>
 
@@ -504,8 +500,7 @@ export default function CustomerPage() {
                                     text-[#241715]
                                 "
                             >
-                                Pickup contact
-                            </p>
+                                <T text="Pickup contact" /></p>
 
 
                             <p
@@ -516,21 +511,23 @@ export default function CustomerPage() {
                                     text-[#756763]
                                 "
                             >
-                                No account is required. We&apos;ll only use these details
-                                for this checkout and pickup communication.
-                            </p>
+                                <T text={guestAllowed ? "We'll use these details for pickup and order updates. Sign in to fill your verified contact, or continue as a guest." : "Sign in to fill your verified contact details and continue to payment."} /></p>
 
                         </div>
 
 
-                        <CustomerDetailsForm
+                        <CustomerIdentityPanel mode="checkout" onSessionChange={setIdentity} onGuestCheckoutChange={setGuestAllowed} />
+
+                        {(guestAllowed || verifiedPhone) && <CustomerDetailsForm
+                            key={identity?.authenticated ? `verified:${identity.phone}:${identity.name ?? ""}` : "guest"}
                             initialValue={
-                                existingCustomer
+                                checkoutCustomer
                             }
+                            verifiedPhone={verifiedPhone}
                             onSubmit={
                                 handleCustomerSubmit
                             }
-                        />
+                        />}
 
                     </div>
 
@@ -585,8 +582,7 @@ export default function CustomerPage() {
                                             text-[#c88a20]
                                         "
                                     >
-                                        Pickup from
-                                    </p>
+                                        <T text="Pickup from" /></p>
 
 
                                     <p
@@ -637,8 +633,7 @@ export default function CustomerPage() {
                                         hover:underline
                                     "
                                 >
-                                    Change
-                                </Link>
+                                    <T text="Change" /><LinkFeedback /></Link>
 
                             </div>
 
@@ -677,8 +672,7 @@ export default function CustomerPage() {
                                             text-[#c88a20]
                                         "
                                     >
-                                        Pickup time
-                                    </p>
+                                        <T text="Pickup time" /></p>
 
 
                                     <p
@@ -714,8 +708,8 @@ export default function CustomerPage() {
                                     >
                                         {
                                             pickupSlot.pickupType === "PRIORITY"
-                                                ? "Priority pickup"
-                                                : "Normal pickup"
+                                                ? translate("Priority pickup")
+                                                : translate("Normal pickup")
                                         }
                                     </p>
 
@@ -730,8 +724,7 @@ export default function CustomerPage() {
                                         text-[#7a1625]
                                     "
                                 >
-                                    Change
-                                </Link>
+                                    <T text="Change" /><LinkFeedback /></Link>
 
                             </div>
 
@@ -759,8 +752,7 @@ export default function CustomerPage() {
                                     text-[#c88a20]
                                 "
                             >
-                                Order summary
-                            </p>
+                                <T text="Order summary" /></p>
 
 
                             <div
@@ -782,12 +774,7 @@ export default function CustomerPage() {
                                         itemCount
                                     }
                                     {" "}
-                                    item
-                                    {
-                                        itemCount === 1
-                                            ? ""
-                                            : "s"
-                                    }
+                                    {translate(itemCount === 1 ? "item" : "items")}
                                 </span>
 
 
@@ -896,12 +883,7 @@ export default function CustomerPage() {
                                                 - 3
                                             }
                                             {" "}
-                                            more item
-                                            {
-                                                items.length - 3 === 1
-                                                    ? ""
-                                                    : "s"
-                                            }
+                                            {translate(items.length - 3 === 1 ? "more item" : "more items")}
                                         </p>
 
                                     )
@@ -929,11 +911,11 @@ export default function CustomerPage() {
                         hover:underline
                     "
                 >
-                    ← Back to Pickup Time
-                </Link>
+                    <T text="← Back to Pickup Time" /><LinkFeedback /></Link>
 
             </section>
 
+            </CheckoutExperienceFrame>
         </AppShell>
     );
 }

@@ -1,4 +1,8 @@
 "use client";
+import Link from "next/link";
+import {T} from "@/lib/language";
+
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useCallback,
@@ -591,7 +595,7 @@ export default function AdminPrintingPage() {
                     ) {
 
                         setSelectedBranchId(
-                            allowed[0].id
+                            preferredAdminBranchId(currentProfile.staffId, allowed)
                         );
                     }
 
@@ -1128,6 +1132,11 @@ export default function AdminPrintingPage() {
                             Monitor automatic KOT printing, failures and retries.
                         </p>
 
+                        <Link href={selectedBranchId === null ? "/admin/printing/setup" : `/admin/printing/setup?branchId=${selectedBranchId}`} style={{color: "#fff"}} className="mt-3 inline-block rounded-lg bg-[#7a1625] px-4 py-3 font-semibold">
+                            Set up printer
+                        </Link>
+                        <p className="mt-2 text-sm text-[#756763]">Open printer setup to configure a USB or Bluetooth printer, download the one-time Windows installer and manage printing for {branches.find(branch => branch.id === selectedBranchId)?.name ?? "your selected branch"}.</p>
+
                     </div>
 
 
@@ -1147,9 +1156,7 @@ export default function AdminPrintingPage() {
                                 font-semibold
                                 text-[#241715]
                             "
-                        >
-                            Branch
-                        </label>
+                        >{" "}<T text="Branch" />{" "}</label>
 
 
                         <select
@@ -1166,6 +1173,7 @@ export default function AdminPrintingPage() {
                                             event.target.value
                                         )
                                     );
+                                    if (profile) rememberAdminBranchId(profile.staffId, Number(event.target.value));
 
 
                                     setPage(
@@ -1629,9 +1637,9 @@ export default function AdminPrintingPage() {
                                     >
                                         {
                                             health?.printer.host
-                                            &&
-                                            health.printer.port
-                                                ? `${health.printer.host}:${health.printer.port}`
+                                                ? health.printer.protocol === "ESC_POS_TCP"
+                                                    ? `${health.printer.host}:${health.printer.port}`
+                                                    : health.printer.host
                                                 : "—"
                                         }
                                     </dd>
@@ -2109,8 +2117,7 @@ export default function AdminPrintingPage() {
                                     text-xs
                                     text-[#756763]
                                 "
-                            >
-                                Updated{" "}
+                            >{" "}<T text="Updated" />{" "}
                                 {
                                     lastUpdated
                                         ? lastUpdated.toLocaleTimeString(
@@ -2306,8 +2313,7 @@ export default function AdminPrintingPage() {
                                                                             text-sm
                                                                             text-[#756763]
                                                                         "
-                                                                    >
-                                                                        Order {job.orderNumber}
+                                                                    >{" "}<T text="Order" />{" "}{job.orderNumber}
                                                                     </p>
 
 
@@ -2552,9 +2558,7 @@ export default function AdminPrintingPage() {
                                         text-[#7a1625]
                                         disabled:opacity-40
                                     "
-                                >
-                                    Previous
-                                </button>
+                                >{" "}<T text="Previous" />{" "}</button>
 
 
                                 <span
@@ -2562,8 +2566,7 @@ export default function AdminPrintingPage() {
                                         text-sm
                                         text-[#756763]
                                     "
-                                >
-                                    Page{" "}
+                                >{" "}<T text="Page" />{" "}
                                     {page + 1}
                                     {" of "}
                                     {result.totalPages}
@@ -2596,9 +2599,7 @@ export default function AdminPrintingPage() {
                                         text-[#7a1625]
                                         disabled:opacity-40
                                     "
-                                >
-                                    Next
-                                </button>
+                                >{" "}<T text="Next" />{" "}</button>
 
                             </div>
 

@@ -1,0 +1,12 @@
+.gokul-payment-cancel-dialog{display:none}
+@media(max-width:640px){
+ .gokul-payment-cancel-dialog[open]{display:block;position:fixed;inset:auto 12px calc(12px + env(safe-area-inset-bottom));margin:0;width:calc(100vw - 24px);max-width:none;border:1px solid #d9e5df;border-radius:22px;padding:24px 20px;background:#fffaf2;color:#172e2c;box-shadow:0 12px 40px #09272540}
+ .gokul-payment-cancel-dialog::backdrop{background:#09272580}
+ .gokul-payment-cancel-dialog h2{font-size:20px;font-weight:750}
+ .gokul-payment-cancel-dialog p{font-size:13px;line-height:1.6;margin:12px 0}
+ .gokul-payment-cancel-dialog>div{display:flex;gap:10px;margin-top:18px}
+ .gokul-payment-cancel-dialog button{flex:1;min-height:48px;padding:10px;border:1px solid #d9e5df;border-radius:12px;color:#143936;font-size:13px;font-weight:750;background:white}
+ .gokul-payment-cancel-dialog button:last-child{background:#143936;color:white}
+ .gokul-payment-cancel-dialog button:disabled{opacity:.5}
+ .gokul-payment-cancel-dialog button:focus-visible{outline:3px solid #c76752;outline-offset:3px}
+}

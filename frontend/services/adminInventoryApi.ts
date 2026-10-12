@@ -13,6 +13,18 @@ import type {
     InventoryPolicyRequest
 } from "@/types/adminInventory";
 
+export type InventoryPlanChange = {id: number; performedBy: string; changedAt: string;
+    beforeState: string; afterState: string};
+
+export async function getInventoryPlanHistory(branchProductId: number, serviceDate: string,
+                                              authorization: string): Promise<InventoryPlanChange[]> {
+    const response = await adminFetch(
+        `/api/admin/inventory/allocations/${branchProductId}/${encodeURIComponent(serviceDate)}/history`,
+        authorization, {method: "GET", cache: "no-store"}
+    );
+    return parseResponse(response, "Unable to load plan history.");
+}
+
 async function parseResponse<T>(
     response: Response,
     fallback: string

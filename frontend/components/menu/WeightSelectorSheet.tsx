@@ -1,8 +1,10 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {
     useEffect,
     useId,
+    useRef,
     useState
 } from "react";
 
@@ -161,6 +163,28 @@ function WeightSelectorDialog({
     onClose,
     onConfirm
 }: WeightSelectorDialogProps) {
+    const dialogRef = useRef<HTMLElement>(null);
+    useEffect(() => {
+        const previouslyFocused = document.activeElement;
+        const dialog = dialogRef.current;
+        const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex="0"]'
+        ) ?? []);
+        focusable()[0]?.focus();
+        function trapFocus(event: KeyboardEvent) {
+            if (event.key !== "Tab") return;
+            const elements = focusable();
+            const first = elements[0];
+            const last = elements[elements.length - 1];
+            if (event.shiftKey && document.activeElement === first) {event.preventDefault(); last?.focus();}
+            if (!event.shiftKey && document.activeElement === last) {event.preventDefault(); first?.focus();}
+        }
+        dialog?.addEventListener("keydown", trapFocus);
+        return () => {
+            dialog?.removeEventListener("keydown", trapFocus);
+            if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus({preventScroll:true});
+        };
+    }, []);
 
     const minimum =
         product.minimumWeightGrams
@@ -455,7 +479,7 @@ function WeightSelectorDialog({
     return (
         <div
             role="presentation"
-            className="fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5"
+            className="gokul-weight-overlay fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5"
             onMouseDown={
                 event => {
 
@@ -471,6 +495,7 @@ function WeightSelectorDialog({
         >
 
             <section
+                ref={dialogRef}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="weight-selector-title"
@@ -491,8 +516,7 @@ function WeightSelectorDialog({
                         <p
                             className="text-xs font-semibold uppercase tracking-[0.12em] text-[#c88a20]"
                         >
-                            Choose quantity
-                        </p>
+                            <T text="Choose quantity" /></p>
 
 
                         <h2
@@ -540,8 +564,7 @@ function WeightSelectorDialog({
                     <p
                         className="text-xs font-bold text-[#241715]"
                     >
-                        Quick select
-                    </p>
+                        <T text="Quick select" /></p>
 
 
                     <div
@@ -601,15 +624,13 @@ function WeightSelectorDialog({
                                 }
                                 className="text-xs font-bold text-[#241715]"
                             >
-                                Enter exact quantity
-                            </label>
+                                <T text="Enter exact quantity" /></label>
 
 
                             <p
                                 className="mt-0.5 text-[11px] text-[#756763]"
                             >
-                                Minimum {formatWeight(minimum)} · {formatWeight(step)} steps
-                            </p>
+                                <T text="Minimum" />{" "}{formatWeight(minimum)} · {formatWeight(step)} <T text="steps" /></p>
 
                         </div>
 
@@ -783,8 +804,7 @@ function WeightSelectorDialog({
                         <p
                             className="text-xs text-[#756763]"
                         >
-                            Estimated price
-                        </p>
+                            <T text="Estimated price" /></p>
 
 
                         <p
@@ -839,8 +859,7 @@ function WeightSelectorDialog({
                 <p
                     className="mt-3 text-center text-[11px] leading-4 text-[#756763]"
                 >
-                    Final amount is calculated by Gokul Sweets using the selected weight.
-                </p>
+                    <T text="Final amount is calculated by Gokul Sweets using the selected weight." /></p>
 
             </section>
 

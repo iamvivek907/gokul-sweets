@@ -1,5 +1,7 @@
 const VERSION =
-    "v1";
+    "v2";
+
+const PUSH_DEDUPE_CACHE = "gokul-push-dedupe-v1";
 
 const STATIC_CACHE =
     `gokul-static-${VERSION}`;
@@ -49,7 +51,8 @@ self.addEventListener(
         const allowedCaches = [
             STATIC_CACHE,
             PAGE_CACHE,
-            IMAGE_CACHE
+            IMAGE_CACHE,
+            PUSH_DEDUPE_CACHE
         ];
 
         event.waitUntil(
@@ -351,3 +354,60 @@ async function networkFirstNavigation(
         return Response.error();
     }
 }
+
+// Stage-specific push works while the app is closed; custom audio belongs to an explicitly activated page.
+function notificationDestination(value, staff = false) {
+    if (staff) return typeof value === "string" && (/^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/admin\/occasion-enquiries\?branch=[0-9]{1,20}&enquiry=[a-f0-9-]{36}$/.test(value)) ? value : "/admin/staff-notifications";
+    return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}(?:#order-review)?$/.test(value) || /^\/occasions(?:#occasion-|\/requests\?enquiry=)[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
+}
+let pushSequence = Promise.resolve();
+self.addEventListener("push", event => {
+    let payload;
+    try {payload = event.data?.json();} catch {return;}
+    if (!payload || !/^(?:staff:)?[0-9]{1,20}$/.test(String(payload.eventId))) return;
+    const eventId = String(payload.eventId);
+    pushSequence = pushSequence.catch(() => {}).then(async () => {
+        const cache = await caches.open(PUSH_DEDUPE_CACHE);
+        const key = new Request(new URL("/__push_seen", self.location.origin));
+        const previous = await cache.match(key);
+        const seen = previous ? await previous.json() : [];
+        if (Array.isArray(seen) && seen.includes(eventId)) return;
+        const staff = eventId.startsWith("staff:");
+        const destination = notificationDestination(payload.url, staff);
+        const custom = destination !== "/profile#account-notifications" && destination !== "/admin/staff-notifications";
+        const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
+        const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
+        await self.registration.showNotification(title, {
+            body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
+            icon: "/icon-192.png", tag: `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: staff, requireInteraction: staff,
+            data: {url: destination, staff}
+        });
+        if (staff) {
+            try {
+                const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
+                for (const client of windows) {
+                    if (new URL(client.url).pathname.startsWith("/admin")) {
+                        try {client.postMessage({type: "gokul-staff-alert"});} catch { /* Client closed. */ }
+                    }
+                }
+            } catch { /* Notification already displayed; client discovery cannot undo delivery or dedupe. */ }
+        }
+        await cache.put(key, new Response(JSON.stringify([...(Array.isArray(seen) ? seen : []), eventId].slice(-256)),
+            {headers: {"Content-Type": "application/json"}}));
+    });
+    event.waitUntil(pushSequence);
+});
+self.addEventListener("notificationclick", event => {
+    event.notification.close();
+    event.waitUntil((async () => {
+        const url = new URL(notificationDestination(event.notification.data?.url, event.notification.data?.staff === true), self.location.origin).href;
+        const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
+        for (const client of windows) {
+            const current = new URL(client.url);
+            if (current.origin === self.location.origin && (current.pathname.startsWith("/admin") === (event.notification.data?.staff === true))) {
+                await client.navigate(url); await client.focus(); return;
+            }
+        }
+        await self.clients.openWindow(url);
+    })());
+});

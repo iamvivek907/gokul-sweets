@@ -1,10 +1,11 @@
 package com.gokulsweets.restaurant.order.service.lifecycle.config;
 
-import com.gokulsweets.restaurant.order.lifecycle.config.PickupLifecycleProperties;
-import org.junit.jupiter.api.Test;
-
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.gokulsweets.restaurant.order.lifecycle.config.PickupLifecycleProperties;
+
+import org.junit.jupiter.api.Test;
 
 class PickupLifecyclePropertiesTest {
 

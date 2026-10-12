@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useState
@@ -13,6 +14,8 @@ interface CustomerDetailsFormProps {
 
     initialValue?:
         CustomerDetails | null;
+
+    verifiedPhone?: string | null;
 
     onSubmit:
         (customer: CustomerDetails) => void;
@@ -29,10 +32,16 @@ function normalizePhone(
     value: string
 ): string {
 
-    return value.replace(
+    const digits = value.replace(
         /\D/g,
         ""
     );
+
+    // Contact autofill can provide the international prefix even though +91
+    // is already displayed beside this field. Strip it before limiting input.
+    if (digits.length > 10 && digits.startsWith("0091")) return digits.slice(4);
+    if (digits.length > 10 && digits.startsWith("91")) return digits.slice(2);
+    return digits;
 }
 
 
@@ -48,9 +57,12 @@ function validateIndianPhone(
 
 export default function CustomerDetailsForm({
     initialValue,
+    verifiedPhone,
     onSubmit
 }: CustomerDetailsFormProps) {
+    const translate = useTranslation();
 
+    const [continuing,setContinuing]=useState(false);
     const [
         name,
         setName
@@ -66,7 +78,7 @@ export default function CustomerDetailsForm({
         setPhone
     ] =
         useState(
-            initialValue?.phone
+            normalizePhone(initialValue?.phone ?? "")
             ?? ""
         );
 
@@ -85,15 +97,16 @@ export default function CustomerDetailsForm({
     ) {
 
         event.preventDefault();
+        if(continuing)return;
 
 
         const normalizedName =
-            name.trim();
+            name.trim() || (verifiedPhone ? "GOKUL_GUEST" : "");
 
 
         const normalizedPhone =
             normalizePhone(
-                phone
+                verifiedPhone ?? phone
             );
 
 
@@ -136,6 +149,7 @@ export default function CustomerDetailsForm({
         }
 
 
+        setContinuing(true);
         onSubmit(
             {
                 name:
@@ -169,8 +183,7 @@ export default function CustomerDetailsForm({
                         text-[#241715]
                     "
                 >
-                    Your name
-                </label>
+                    <T text={verifiedPhone ? "Your name (optional)" : "Your name"} /></label>
 
 
                 <input
@@ -186,7 +199,7 @@ export default function CustomerDetailsForm({
                             )
                     }
                     autoComplete="name"
-                    placeholder="Enter your name"
+                    placeholder={translate(verifiedPhone ? "Optional — we will use GOKUL_GUEST" : "Enter your name")}
                     className="
                         mt-2
                         min-h-12
@@ -242,8 +255,7 @@ export default function CustomerDetailsForm({
                         text-[#241715]
                     "
                 >
-                    Mobile number
-                </label>
+                    <T text="Mobile number" /></label>
 
 
                 <div
@@ -286,6 +298,7 @@ export default function CustomerDetailsForm({
                         value={
                             phone
                         }
+                        readOnly={Boolean(verifiedPhone)}
                         onChange={
                             event => {
 
@@ -304,7 +317,7 @@ export default function CustomerDetailsForm({
                             }
                         }
                         autoComplete="tel"
-                        placeholder="9876543210"
+                        placeholder={translate("Enter 10-digit mobile number")}
                         className="
                             min-h-12
                             min-w-0
@@ -348,9 +361,7 @@ export default function CustomerDetailsForm({
                         text-[#756763]
                     "
                 >
-                    We&apos;ll use this number for
-                    order updates and pickup
-                    identification.
+                    {verifiedPhone ? translate("Your verified number is used for order updates and pickup identification.") : translate("We’ll use this number for order updates and pickup identification.")}
                 </p>
 
             </div>
@@ -358,6 +369,7 @@ export default function CustomerDetailsForm({
 
             <button
                 type="submit"
+                disabled={continuing}
                 className="
                     flex
                     min-h-12
@@ -373,8 +385,7 @@ export default function CustomerDetailsForm({
                     active:scale-[0.98]
                 "
             >
-                Continue to Review
-            </button>
+                {continuing?translate("Opening…"):<T text="Continue to Review" />}</button>
 
         </form>
     );

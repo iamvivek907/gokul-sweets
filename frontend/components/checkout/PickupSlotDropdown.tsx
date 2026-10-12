@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useEffect,
@@ -9,6 +10,7 @@ import {
 import type {
     PickupSlot
 } from "@/types/pickup";
+import {formatBusinessTime} from "@/lib/businessTime";
 
 
 interface PickupSlotDropdownProps {
@@ -32,36 +34,7 @@ function formatTime(
     value: string
 ): string {
 
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour:
-                "numeric",
-            minute:
-                "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 
@@ -115,6 +88,7 @@ export default function PickupSlotDropdown({
     reservedSlotId = null,
     onSelect
 }: PickupSlotDropdownProps) {
+    const translate = useTranslation();
 
     const [
         open,
@@ -361,8 +335,7 @@ export default function PickupSlotDropdown({
                                             text-[#241715]
                                         "
                                     >
-                                        Select pickup time
-                                    </p>
+                                        <T text="Select pickup time" /></p>
 
 
                                     <p
@@ -372,8 +345,7 @@ export default function PickupSlotDropdown({
                                             text-[#756763]
                                         "
                                     >
-                                        Tap to view available slots
-                                    </p>
+                                        <T text="Tap to view available slots" /></p>
 
                                 </>
                             )
@@ -409,7 +381,7 @@ export default function PickupSlotDropdown({
 
                     <div
                         role="listbox"
-                        aria-label="Pickup time"
+                        aria-label={translate("Pickup time")}
                         className="
                             absolute
                             left-0
@@ -558,8 +530,7 @@ export default function PickupSlotDropdown({
                                                                     text-[#7a1625]
                                                                 "
                                                             >
-                                                                Priority
-                                                            </span>
+                                                                <T text="Priority" /></span>
 
                                                         )
                                                     }

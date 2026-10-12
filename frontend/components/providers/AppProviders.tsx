@@ -1,4 +1,8 @@
 "use client";
+import PwaInstallRuntime from "@/components/pwa/PwaInstallRuntime";
+import MobileBrandLaunch from "@/components/common/MobileBrandLaunch";
+import NavigationFeedback from "@/components/common/NavigationFeedback";
+import {LanguageRuntime} from "@/lib/language";
 
 import type {
     ReactNode
@@ -9,6 +13,8 @@ import ServiceWorkerRegistration
 
 import OfflineBanner
     from "@/components/common/OfflineBanner";
+import StorefrontVitals from "@/components/common/StorefrontVitals";
+import AccessibleOrderingRuntime from "@/components/common/AccessibleOrderingRuntime";
 
 
 interface AppProvidersProps {
@@ -22,9 +28,15 @@ export default function AppProviders({
 
     return (
         <>
+            <LanguageRuntime />
+            <MobileBrandLaunch />
+            <NavigationFeedback />
             <ServiceWorkerRegistration />
+            <PwaInstallRuntime />
 
             <OfflineBanner />
+            <StorefrontVitals />
+            <AccessibleOrderingRuntime />
 
             {children}
         </>

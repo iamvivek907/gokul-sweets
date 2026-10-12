@@ -1,0 +1,438 @@
+package com.gokulsweets.restaurant.customer.identity;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+
+@SpringBootTest
+@Transactional
+class CustomerAccountHubIntegrationTest {
+    @Autowired CustomerAccountHub hub;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired VerifiedOrderOwnership ownership;
+    @Autowired CustomerHistoryQuery history;
+    @Autowired com.gokulsweets.restaurant.order.service.OrderQueryService orderQueries;
+
+    @Test
+    void thousandOrderHistoryKeepsPageSixAndFiltersBeforePaging() {
+        var subject = UUID.randomUUID();
+        var branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?, 'History') RETURNING id",
+                        Long.class,
+                        "HIST-" + UUID.randomUUID());
+        var second =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?, 'Older branch') RETURNING id",
+                        Long.class,
+                        "HIST-" + UUID.randomUUID());
+        var slot =
+                jdbc.queryForObject(
+                        "INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)"
+                                + " VALUES (?,CURRENT_DATE,'10:00','10:30',2000) RETURNING id",
+                        Long.class,
+                        branch);
+        var refs = new java.util.ArrayList<String>();
+        for (int index = 0; index < 1001; index++) {
+            var id = order(index == 0 ? second : branch, slot, "PICKED_UP");
+            jdbc.update("UPDATE orders SET created_at=TIMESTAMP '2025-01-01' WHERE id=?", id);
+            jdbc.update(
+                    "INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id)"
+                            + " VALUES (?, 'DEV', ?)",
+                    id,
+                    subject);
+            refs.addFirst(
+                    jdbc.queryForObject(
+                            "SELECT order_number FROM orders WHERE id=?", String.class, id));
+        }
+        jdbc.update(
+                "UPDATE orders SET order_status='CONFIRMED' WHERE order_number=?", refs.getFirst());
+        var displayNumber =
+                jdbc.queryForObject(
+                        "SELECT customer_order_number FROM orders WHERE order_number=?",
+                        Long.class,
+                        refs.getFirst());
+        jdbc.update(
+                "UPDATE orders SET order_status='PICKED_UP' WHERE order_number=?", refs.getFirst());
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                null,
+                                                "COMPLETED",
+                                                "#" + displayNumber,
+                                                null,
+                                                null))
+                                .references())
+                .containsExactly(refs.getFirst());
+        jdbc.update(
+                "INSERT INTO"
+                    + " reviews(order_id,branch_id,overall_rating,review_status,created_at,updated_at)"
+                    + " SELECT id,branch_id,5,'HIDDEN',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM"
+                    + " orders WHERE order_number=?",
+                refs.getFirst());
+        assertThat(
+                        orderQueries
+                                .getCustomerOrderHistory(java.util.List.of(refs.getFirst()))
+                                .getFirst()
+                                .reviewRating())
+                .isEqualTo(5);
+        String cursor = null;
+        CustomerHistoryQuery.Page page = null;
+        for (int number = 1; number <= 6; number++) {
+            page =
+                    history.read(
+                            "DEV",
+                            subject,
+                            new CustomerHistoryQuery.Criteria(
+                                    cursor, null, 12, null, "COMPLETED", null, null, null));
+            assertThat(page.references())
+                    .containsExactlyElementsOf(refs.subList((number - 1) * 12, number * 12));
+            cursor = page.references().getLast();
+        }
+        var previous =
+                history.read(
+                        "DEV",
+                        subject,
+                        new CustomerHistoryQuery.Criteria(
+                                null,
+                                page.references().getFirst(),
+                                12,
+                                null,
+                                "COMPLETED",
+                                null,
+                                null,
+                                null));
+        assertThat(previous.references()).containsExactlyElementsOf(refs.subList(48, 60));
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                String.valueOf(second),
+                                                null,
+                                                null,
+                                                null,
+                                                null))
+                                .references())
+                .containsExactly(refs.getLast());
+        assertThat(
+                        history.read(
+                                        "PROD",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, null, null, null, null))
+                                .references())
+                .isEmpty();
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        UUID.randomUUID(),
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, null, null, null, null))
+                                .references())
+                .isEmpty();
+        assertThatThrownBy(
+                        () ->
+                                history.read(
+                                        "DEV",
+                                        UUID.randomUUID(),
+                                        new CustomerHistoryQuery.Criteria(
+                                                refs.getFirst(),
+                                                null,
+                                                12,
+                                                null,
+                                                null,
+                                                null,
+                                                null,
+                                                null)))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, "ACTIVE", null, null, null))
+                                .references())
+                .isEmpty();
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null, null, 12, null, null, "%", null, null))
+                                .references())
+                .isEmpty();
+        assertThat(
+                        history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                null,
+                                                null,
+                                                null,
+                                                "2025-01-02",
+                                                null))
+                                .references())
+                .isEmpty();
+        assertThatThrownBy(
+                        () ->
+                                history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                null,
+                                                null,
+                                                12,
+                                                null,
+                                                null,
+                                                null,
+                                                "2025-02-01",
+                                                "2025-01-01")))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void savedChoicesRemainScopedToSubjectAndEnvironmentAndDeletedAddressCannotBeRead() {
+        var subject = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        jdbc.update(
+                """
+                INSERT INTO verified_customer_subjects(id, environment, verified_phone)
+                VALUES (?, 'DEV', '+919876543210')
+                """,
+                subject);
+        hub.savePreferences("DEV", subject, new CustomerAccountHub.Preferences("No nuts", null));
+        var address =
+                hub.addAddress(
+                        "DEV",
+                        subject,
+                        new CustomerAccountHub.AddressInput(
+                                "Home", "Main Road", "Tamkuhi", "274407"));
+        assertThat(hub.snapshot("DEV", subject).preferences().dietaryNotes()).isEqualTo("No nuts");
+        assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(1);
+        assertThat(hub.snapshot("DEV", other).addresses()).isEmpty();
+        assertThat(hub.snapshot("PROD", subject).preferences().dietaryNotes()).isNull();
+        assertThatThrownBy(
+                        () ->
+                                hub.updateAddress(
+                                        "DEV",
+                                        other,
+                                        address.id(),
+                                        new CustomerAccountHub.AddressInput(
+                                                "Office", "Park Road", "Tamkuhi", "274407")))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(
+                        hub.updateAddress(
+                                        "DEV",
+                                        subject,
+                                        address.id(),
+                                        new CustomerAccountHub.AddressInput(
+                                                "Office", "Park Road", "Tamkuhi", "274407"))
+                                .label())
+                .isEqualTo("Office");
+        assertThat(hub.snapshot("DEV", subject).addresses().getFirst().addressLine())
+                .isEqualTo("Park Road");
+        assertThatThrownBy(() -> hub.deleteAddress("DEV", other, address.id()))
+                .isInstanceOf(ResponseStatusException.class);
+        hub.deleteAddress("DEV", subject, address.id());
+        assertThat(hub.snapshot("DEV", subject).addresses()).isEmpty();
+    }
+
+    @Test
+    void identicalAddressRetriesReturnOriginalEvenAtLimitAndStayOwnerScoped() {
+        var subject = UUID.randomUUID();
+        var other = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id, environment, verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543210')",
+                subject);
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id, environment, verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543211')",
+                other);
+        var input = new CustomerAccountHub.AddressInput("Home", "Main Road", "Tamkuhi", "274407");
+        var first = hub.addAddress("DEV", subject, input);
+        var retry =
+                hub.addAddress(
+                        "DEV",
+                        subject,
+                        new CustomerAccountHub.AddressInput(
+                                " Home ", " Main Road ", " Tamkuhi ", "274407"));
+        assertThat(retry).isEqualTo(first);
+        assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(1);
+        for (int index = 1; index < 5; index++) {
+            hub.addAddress(
+                    "DEV",
+                    subject,
+                    new CustomerAccountHub.AddressInput(
+                            "Place " + index, "Road " + index, "Tamkuhi", "274407"));
+        }
+        assertThat(hub.addAddress("DEV", subject, input)).isEqualTo(first);
+        assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(5);
+        assertThatThrownBy(
+                        () ->
+                                hub.addAddress(
+                                        "DEV",
+                                        subject,
+                                        new CustomerAccountHub.AddressInput(
+                                                "Extra", "Another road", "Tamkuhi", "274407")))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(hub.addAddress("DEV", other, input).id()).isNotEqualTo(first.id());
+        assertThat(hub.snapshot("DEV", other).addresses()).hasSize(1);
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void concurrentIdenticalCreatesKeepOneAddress() throws Exception {
+        var subject = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id, environment, verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543299')",
+                subject);
+        try (var workers = Executors.newVirtualThreadPerTaskExecutor()) {
+            var input =
+                    new CustomerAccountHub.AddressInput("Home", "Main Road", "Tamkuhi", "274407");
+            var first = workers.submit(() -> hub.addAddress("DEV", subject, input));
+            var second = workers.submit(() -> hub.addAddress("DEV", subject, input));
+            assertThat(first.get(10, TimeUnit.SECONDS)).isEqualTo(second.get(10, TimeUnit.SECONDS));
+            assertThat(hub.snapshot("DEV", subject).addresses()).hasSize(1);
+        } finally {
+            jdbc.update("DELETE FROM verified_customer_addresses WHERE subject_id = ?", subject);
+            jdbc.update("DELETE FROM verified_customer_subjects WHERE id = ?", subject);
+        }
+    }
+
+    @Test
+    void tickCountIncludesPaidOwnedOrdersButNotGuestUnpaidOrCancelled() {
+        var subject = UUID.randomUUID();
+        var branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code, name) VALUES (?, 'Test branch') RETURNING id",
+                        Long.class,
+                        "HUB-" + UUID.randomUUID().toString().substring(0, 8));
+        var slot =
+                jdbc.queryForObject(
+                        """
+INSERT INTO pickup_slots(branch_id, slot_date, start_time, end_time, capacity)
+VALUES (?, CURRENT_DATE, '10:00', '10:30', 2) RETURNING id
+""",
+                        Long.class,
+                        branch);
+        var paid = order(branch, slot, "CONFIRMED");
+        var unpaid = order(branch, slot, "PENDING_PAYMENT");
+        var cancelled = order(branch, slot, "CANCELLED");
+        var guest = order(branch, slot, "CONFIRMED");
+        for (var id : new Long[] {paid, unpaid, cancelled})
+            jdbc.update(
+                    """
+INSERT INTO verified_order_ownership(order_id, environment, verified_subject_id)
+VALUES (?, 'DEV', ?)
+""",
+                    id,
+                    subject);
+        for (var id : new Long[] {paid, cancelled, guest})
+            jdbc.update(
+                    """
+                    INSERT INTO payments(order_id, provider, amount, payment_status)
+                    VALUES (?, 'PHONEPE', 100, 'PAID')
+                    """,
+                    id);
+        assertThat(hub.snapshot("DEV", subject).paidOrders()).isEqualTo(1);
+        assertThat(hub.snapshot("DEV", UUID.randomUUID()).paidOrders()).isZero();
+        assertThat(hub.snapshot("PROD", subject).paidOrders()).isZero();
+        jdbc.update("UPDATE orders SET order_status = 'CANCELLED' WHERE id = ?", paid);
+        assertThat(hub.snapshot("DEV", subject).paidOrders()).isZero();
+    }
+
+    @Test
+    void historyCursorIsBoundedStableAndOwnerScopedWithEqualTimestamps() {
+        var subject = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES (?,"
+                        + " 'DEV', '+919876543210')",
+                subject);
+        var branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?, 'Paging') RETURNING id",
+                        Long.class,
+                        "PAGE-" + UUID.randomUUID().toString().substring(0, 8));
+        var slot =
+                jdbc.queryForObject(
+                        "INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)"
+                                + " VALUES (?,CURRENT_DATE,'10:00','10:30',20) RETURNING id",
+                        Long.class,
+                        branch);
+        var expected = new java.util.ArrayList<String>();
+        for (int i = 0; i < 12; i++) {
+            var id = order(branch, slot, "CONFIRMED");
+            jdbc.update(
+                    "INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id)"
+                            + " VALUES (?, 'DEV', ?)",
+                    id,
+                    subject);
+            expected.addFirst(
+                    jdbc.queryForObject(
+                            "SELECT order_number FROM orders WHERE id=?", String.class, id));
+        }
+        var first = ownership.orderNumberPage("DEV", subject, null, 5);
+        assertThat(first).containsExactlyElementsOf(expected.subList(0, 6));
+        // An inserted order cannot shift the next page behind the existing cursor.
+        var newer = order(branch, slot, "CONFIRMED");
+        jdbc.update(
+                "INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id)"
+                        + " VALUES (?, 'DEV', ?)",
+                newer,
+                subject);
+        assertThat(ownership.orderNumberPage("DEV", subject, first.get(4), 5))
+                .containsExactlyElementsOf(expected.subList(5, 11));
+        assertThat(ownership.orderNumberPage("DEV", subject, expected.get(9), 5))
+                .containsExactlyElementsOf(expected.subList(10, 12));
+        assertThat(ownership.orderNumberPage("PROD", subject, null, 5)).isEmpty();
+        assertThat(ownership.orderNumberPage("DEV", UUID.randomUUID(), null, 5)).isEmpty();
+        var guest = order(branch, slot, "CONFIRMED");
+        var foreign =
+                jdbc.queryForObject(
+                        "SELECT order_number FROM orders WHERE id=?", String.class, guest);
+        assertThatThrownBy(() -> ownership.orderNumberPage("DEV", subject, foreign, 5))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> ownership.orderNumberPage("DEV", subject, null, 51))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    private Long order(Long branch, Long slot, String status) {
+        return jdbc.queryForObject(
+                """
+                INSERT INTO orders(order_number, branch_id, pickup_slot_id, customer_name,
+                    customer_phone, pickup_type, order_status, reservation_expires_at)
+                VALUES (?, ?, ?, 'Customer', '9876543210', 'NORMAL', ?, CURRENT_TIMESTAMP)
+                RETURNING id
+                """,
+                Long.class,
+                "GKS-HUB-" + UUID.randomUUID().toString().toUpperCase(java.util.Locale.ROOT),
+                branch,
+                slot,
+                status);
+    }
+}

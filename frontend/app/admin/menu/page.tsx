@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link
     from "next/link";
@@ -181,6 +183,12 @@ export default function AdminMenuPage() {
                         "
                     >
 
+                        <Link href="/admin/menu/workspace" className="rounded-2xl border border-[#eadfd6] bg-[#7a1625] p-6 text-white">
+                            <h2 className="text-xl font-bold" style={{color:"#ffffff"}}>Menu &amp; inventory workspace</h2>
+                            <p className="mt-3 text-sm" style={{color:"#fff1e6"}}>Manage products, prices, photos, stock, groups and appearance from one place.</p>
+                            <span className="mt-6 block font-semibold" style={{color:"#ffffff"}}>Open workspace →</span>
+                        </Link>
+
                         {/* Live Menu */}
 
                         <Link
@@ -223,9 +231,7 @@ export default function AdminMenuPage() {
                                         tracking-wide
                                         text-[#7a1625]
                                     "
-                                >
-                                    Daily operations
-                                </div>
+                                >{" "}<T text="Daily operations" />{" "}</div>
 
 
                                 <h3
@@ -294,6 +300,7 @@ export default function AdminMenuPage() {
                         </Link>
 
 
+                        <Link href="/admin/menu/portions" className="rounded-2xl border border-[#eadfd6] bg-white p-6"><h3 className="text-2xl font-bold">Product groups & sizes</h3><p className="mt-3 text-sm">Group pack sizes, flavours and Half / Full portions in one mobile card. Each option keeps its own price and stock.</p></Link>
                         {/* Excel Import */}
 
                         <Link
@@ -449,9 +456,7 @@ export default function AdminMenuPage() {
                                         tracking-wide
                                         text-[#b87900]
                                     "
-                                >
-                                    Product images
-                                </div>
+                                >{" "}<T text="Product images" />{" "}</div>
 
 
                                 <h3

@@ -1,3 +1,4 @@
+import {setMenuPickupMode} from "@/lib/menuPickupMode";
 import type {
     CustomerDetails
 } from "@/types/customer";
@@ -199,7 +200,8 @@ export function parsePickupSlot(
 
 
 export function savePickupSlot(
-    selection: PickupSelection
+    selection: PickupSelection,
+    automatic = false
 ): void {
 
     localStorage.setItem(
@@ -210,6 +212,7 @@ export function savePickupSlot(
     );
 
 
+    setMenuPickupMode(selection.slot.branchId, automatic);
     window.dispatchEvent(
         new Event(
             PICKUP_SLOT_CHANGE_EVENT

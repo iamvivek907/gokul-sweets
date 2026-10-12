@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useCallback,
@@ -1335,8 +1337,7 @@ export default function AdminApprovalsPage() {
                                     font-semibold
                                     text-[#756763]
                                 "
-                            >
-                                Page {
+                            >{" "}<T text="Page" />{" "}{
                                     approvals.totalPages === 0
                                         ? 0
                                         : approvals.number + 1
@@ -1536,9 +1537,7 @@ export default function AdminApprovalsPage() {
                                     }
                                 }
                                 className={SECONDARY_BUTTON_CLASS}
-                            >
-                                Previous
-                            </button>
+                            >{" "}<T text="Previous" />{" "}</button>
 
 
                             <button
@@ -1557,9 +1556,7 @@ export default function AdminApprovalsPage() {
                                     }
                                 }
                                 className={SECONDARY_BUTTON_CLASS}
-                            >
-                                Next
-                            </button>
+                            >{" "}<T text="Next" />{" "}</button>
 
                         </div>
 
@@ -1945,9 +1942,7 @@ export default function AdminApprovalsPage() {
                                                                                 }
                                                                             }
                                                                             className={SECONDARY_BUTTON_CLASS}
-                                                                        >
-                                                                            Cancel
-                                                                        </button>
+                                                                        >{" "}<T text="Cancel" />{" "}</button>
 
                                                                     </div>
 

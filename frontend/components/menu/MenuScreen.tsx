@@ -1,8 +1,37 @@
 "use client";
+import MenuToolbar,{measureMenuToolbar} from "./MenuToolbar";
+import {reportLoadingStage} from "@/lib/customerLoading";
+import BrandLoading from "@/components/common/BrandLoading";
+import dynamic from "next/dynamic";
+import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
+import {pickupIsFresh} from "@/lib/pickupFreshness";
+import {menuFamily,retailCollections} from "@/lib/menuPresentation";
+import RetailSweetRail from "./RetailSweetRail";
+import MobileMenuHighlights from "./MobileMenuHighlights";
+import MenuCategorySection from "./MenuCategorySection";
+import MenuOffers from "./MenuOffers";
+import FloatingMenuCategories from "./FloatingMenuCategories";
+const MobileMenuPickup=dynamic(()=>import("./MobileMenuPickup"));
+import MobileMenuSuggestions from "./MobileMenuSuggestions";
+import {useMenuServiceRefresh} from "@/hooks/useMenuServiceRefresh";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
+import {apiClient} from "@/services/apiClient";
+import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
+import MobileMenuFilters from "./MobileMenuFilters";
+import {T,useTranslation} from "@/lib/language";
+import {groupMenuProducts} from "@/lib/menuGroups";
 
 import Link from "next/link";
+import BranchMenuGallery from "@/components/menu/BranchMenuGallery";
+import BranchMenuAppearance from "@/components/menu/BranchMenuAppearance";
+import NewBranchItems from "@/components/menu/NewBranchItems";
+import {useDateAvailability} from "@/components/menu/PickupContext";
 
 import {
+    useCallback,
     useEffect,
     useMemo,
     useRef,
@@ -44,6 +73,7 @@ import {
     useCart
 } from "@/hooks/useCart";
 
+import type {AvailableRebateResponse} from "@/types/rebate";
 import type {
     MenuCategory,
     MenuProduct
@@ -61,12 +91,19 @@ interface ProductRatingState {
 
 
 export default function MenuScreen() {
+    const translate = useTranslation();
+    const renderStarted = useRef<number | null>(null);
+    const [appearanceState, setAppearanceState] = useState<{branchId:number|null;orders:Record<number,number>}>({branchId:null,orders:{}});
+    const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
     const {
         branch
     } =
         useSelectedBranch();
 
+
+    const appearanceOrder = appearanceState.branchId === branch?.id ? appearanceState.orders : {};
+    const saveAppearanceOrder = useCallback((orders:Record<number,number>)=>setAppearanceState({branchId:branch?.id??null,orders}),[branch?.id]);
 
     const {
         items,
@@ -88,6 +125,15 @@ export default function MenuScreen() {
         useState<MenuCategory[]>(
             []
         );
+    useEffect(() => {
+        if (!categories.length || renderStarted.current === null) return;
+        const started = renderStarted.current;
+        renderStarted.current = null;
+        let paint = 0;
+        const frame = requestAnimationFrame(() => {paint = requestAnimationFrame(() => reportLoadingStage("MENU_RENDER", started));});
+        return () => {cancelAnimationFrame(frame); cancelAnimationFrame(paint);};
+    }, [categories]);
+    useMenuServiceRefresh(branch?.id,categories,setCategories);
 
 
     const [
@@ -256,7 +302,14 @@ export default function MenuScreen() {
                     const result =
                         await getMenu(
                             selectedBranch.id,
-                            controller.signal
+                            controller.signal,
+                            catalog => {
+                                if (controller.signal.aborted) return;
+                                renderStarted.current = performance.now();
+                                setCategories(catalog);
+                                setLoadedBranchId(selectedBranch.id);
+                                setLoading(false);
+                            }
                         );
 
 
@@ -268,13 +321,12 @@ export default function MenuScreen() {
                     }
 
 
+                    renderStarted.current = performance.now();
                     setCategories(
                         result
                     );
 
-                    setSelectedCategoryId(
-                        null
-                    );
+                    setSelectedCategoryId(Number(new URLSearchParams(window.location.search).get("category")) || null);
 
                     setSearch(
                         ""
@@ -655,6 +707,20 @@ export default function MenuScreen() {
         );
 
 
+    const phone=usePhoneViewport();
+    const mobileFeatures=useStorefrontFeatures();
+    const phoneMenu=phone===true&&(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true;
+    const [browseCategory,setBrowseCategory]=useState<{branchId:number;id:number}|null|undefined>(undefined);
+    const initialCategoryId=browseCategory===undefined?(effectiveCategoryId??undefined):undefined;
+    const activeBrowseId=phoneMenu?(browseCategory?.branchId===branch?.id?browseCategory?.id:initialCategoryId):undefined;
+    const activeBrowse=categories.find(c=>c.id===activeBrowseId);
+    const retailBrowse=!!activeBrowse&&/snack|dairy|drink|beverage|biscuit|namkeen/i.test(activeBrowse.name);
+    const [mobileCategories,setMobileCategories]=useState<number[]|null>(null);
+    const [maximumPrice,setMaximumPrice]=useState<number|null>(null);
+    const [portionsOnly,setPortionsOnly]=useState(false);
+    const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
+    const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
+    useEffect(()=>{if(!phoneMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[phoneMenu,branch]);
     const filteredProducts =
         useMemo(
             () => {
@@ -668,7 +734,7 @@ export default function MenuScreen() {
                 return allProducts.filter(
                     product => {
 
-                        const categoryMatch =
+                        const categoryMatch = phoneMenu&&mobileCategories!==null ? !mobileCategories.length||mobileCategories.includes(product.categoryId) :
                             effectiveCategoryId
                             === null
                             ||
@@ -694,8 +760,10 @@ export default function MenuScreen() {
 
                         return (
                             categoryMatch
+                            && (!phoneMenu||!!query||!activeBrowse||(menuFamily(product.categoryName)===menuFamily(activeBrowse.name)))
                             &&
                             searchMatch
+                            && (!phoneMenu||matchesMobileFilters(product,null,maximumPrice,portionsOnly,portionGroups))
                         );
                     }
                 );
@@ -703,22 +771,71 @@ export default function MenuScreen() {
             [
                 allProducts,
                 effectiveCategoryId,
-                search
+                search,phoneMenu,mobileCategories,maximumPrice,portionsOnly,portionGroups,activeBrowse
             ]
         );
 
 
+    const [browseScroll,setBrowseScroll]=useState<{branchId:number;id:number;revision:number}|null>(null);
+    const completedBrowseScroll=useRef<object|null>(null);
+    function browseMenu(id:number|null){
+        setBrowseCategory(id===null||!branch?null:{branchId:branch.id,id});
+        setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);setSearch("");
+        setBrowseScroll(previous=>id===null||!branch?null:{branchId:branch.id,id,revision:(previous?.revision??0)+1});
+    }
+    function jumpMenuCategory(id:number|null){
+        setBrowseCategory(null);setSelectedCategoryId(id);setMobileCategories(id===null?[]:[id]);
+        setMaximumPrice(null);setPortionsOnly(false);setSearch("");
+        if(branch)setBrowseScroll(previous=>({branchId:branch.id,id:id??0,revision:(previous?.revision??0)+1}));
+    }
+    // Scroll only after React has committed the cleared search and destination collection.
+    useEffect(()=>{
+        if(!browseScroll||completedBrowseScroll.current===browseScroll||browseScroll.branchId!==branch?.id)return;
+        const frame=requestAnimationFrame(()=>{
+            const section=document.getElementById(browseScroll.id===0?"gokul-menu-items":`menu-category-${browseScroll.id}`);
+            if(!section)return;
+            completedBrowseScroll.current=browseScroll;
+            const disclosure=section.querySelector("details");if(disclosure)disclosure.open=true;
+            const toolbar=document.querySelector<HTMLElement>(".mobile-menu-sticky-tools");
+            if(phoneMenu&&toolbar)measureMenuToolbar(toolbar);
+            section.scrollIntoView({block:"start",behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"instant":"smooth"});
+        });
+        return()=>cancelAnimationFrame(frame);
+    },[phoneMenu,browseScroll,branch?.id,filteredProducts]);
+
     const hasActiveFilters =
         search.trim().length > 0
         ||
-        effectiveCategoryId !== null;
+        (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
 
+    const pickupCheck = useDateAvailability(allProducts);
+    const pickupChecking = !!pickupCheck.features?.smartAvailability && (pickupCheck.pickupRequired || pickupCheck.findingSoonest || !pickupCheck.items || !!pickupCheck.error || !!pickupCheck.automaticError);
+    const pickupStatusMessage = pickupCheck.error || pickupCheck.automaticError ? "Pickup check failed. Please retry."
+        : pickupCheck.findingSoonest ? "Finding soonest pickup…"
+        : pickupCheck.pickupRequired ? "Choose pickup time to add" : "Checking pickup";
+    const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
+    const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
+    const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
+        portionGroups={phoneMenu?portionGroups:undefined} catalogProducts={phoneMenu?allProducts:undefined}
+        refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
+        pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
+        ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
+        onIncrease={guardedIncrease} onDecrease={decreaseQuantity} onAdd={handleAddToCart}/>;
+    const [menuOffer,setMenuOffer]=useState<{key:string;target:AvailableRebateResponse|null}|null>(null);
+    const offerContext=JSON.stringify([branch?.id,items,pickupCheck.intent.selection]);
+    const onMenuTarget=useCallback((target:AvailableRebateResponse|null)=>setMenuOffer({key:offerContext,target}),[offerContext]);
+    const [lastAdded,setLastAdded]=useState<number|null>(null);
+    const pairingSeed=lastAdded??items.at(-1)?.product.id;
+    const pairing=phoneMenu&&mobileFeatures?.pickupAddOns&&branch&&items.some(i=>i.product.id===pairingSeed)&&filteredProducts.some(p=>p.id===pairingSeed)?<div className="mobile-menu-pairing-slot"><MobileMenuSuggestions seedName={allProducts.find(p=>p.id===pairingSeed)?.name} branchId={branch.id} products={allProducts} groups={portionGroups} pickupItems={pickupCheck.items}/></div>:null;
 
+    const weightPickup = useRef("");
     function handleAddToCart(
         product: MenuProduct
     ) {
 
+        if (!product.available || !pickupAllows(product.id)) return;
         if (product.saleMode === "WEIGHT") {
+            weightPickup.current=getPickupSlotSnapshot();
             setWeightProduct(product);
             return;
         }
@@ -740,6 +857,19 @@ export default function MenuScreen() {
         }
 
 
+        const anchor=document.getElementById(`gokul-product-${product.id}`);
+        const anchorTop=anchor?.getBoundingClientRect().top;
+        // Adding/moving the inline rail must not dislodge the control the customer tapped.
+        requestAnimationFrame(()=>{
+            if(anchor?.isConnected&&anchorTop!==undefined){
+                const delta=anchor.getBoundingClientRect().top-anchorTop;
+                if(Math.abs(delta)>1)window.scrollBy({top:delta,behavior:"instant"});
+            }
+        });
+
+        if (weightGrams && pickupCheck.features?.smartAvailability && weightPickup.current!==getPickupSlotSnapshot()) {setCartNotice("Pickup changed. Review the displayed time before adding.");return;}
+        const liveProduct=categories.flatMap(category=>category.products).find(item=>item.id===product.id);
+        if(!liveProduct?.available || !pickupAllows(product.id)){setWeightProduct(null);setCartNotice(liveProduct?.serviceAvailability?.message??"This item is currently unavailable.");return;}
         const result =
             addItem(
                 product,
@@ -752,6 +882,7 @@ export default function MenuScreen() {
             result === "added"
         ) {
 
+            setLastAdded(product.id);
             showCartNotice(
                 product.name
             );
@@ -788,6 +919,7 @@ export default function MenuScreen() {
             );
 
 
+            setLastAdded(product.id);
             showCartNotice(
                 product.name
             );
@@ -826,6 +958,7 @@ export default function MenuScreen() {
 
 
     function clearFilters() {
+        setBrowseCategory(null);setBrowseScroll(null);setMobileCategories([]); setMaximumPrice(null); setPortionsOnly(false);
 
         setSearch(
             ""
@@ -891,8 +1024,7 @@ export default function MenuScreen() {
                             text-[#c88a20]
                         "
                     >
-                        Pickup location required
-                    </p>
+                        <T text="Pickup location required" /></p>
 
 
                     <h1
@@ -904,8 +1036,7 @@ export default function MenuScreen() {
                             text-[#241715]
                         "
                     >
-                        Select your pickup branch
-                    </h1>
+                        <T text="Select your pickup branch" /></h1>
 
 
                     <p
@@ -918,9 +1049,7 @@ export default function MenuScreen() {
                             text-[#756763]
                         "
                     >
-                        Your branch determines which products,
-                        prices and pickup options are available.
-                    </p>
+                        <T text="Your branch determines which products, prices and pickup options are available." /></p>
 
 
                     <Link
@@ -943,8 +1072,7 @@ export default function MenuScreen() {
                             active:scale-[0.98]
                         "
                     >
-                        Choose Branch
-                    </Link>
+                        <T text="Choose Branch" /><LinkFeedback /></Link>
 
                 </div>
 
@@ -953,13 +1081,19 @@ export default function MenuScreen() {
     }
 
 
+    if (isLoading) return <BrandLoading className="customer-menu-loading" />;
+
     return (
         <>
 
             <section
                 className={`
+                    ${phoneMenu?"menu-products-first":""}
+                    ${pickupCheck.features?.contextualStorefrontV2 ? "gokul-editorial-menu" : ""}
+                    ${branchTab === "details" ? "branch-details-active" : ""}
                     mx-auto
                     max-w-295
+                    future-menu-width
 
                     ${
                         itemCount > 0
@@ -968,6 +1102,8 @@ export default function MenuScreen() {
                     }
                 `}
             >
+
+                {pickupCheck.features?.contextualStorefrontV2 && <BranchMenuGallery branch={branch} products={allProducts} activeTab={branchTab} onTabChange={setBranchTab} />}
 
                 <header
                     className="
@@ -982,7 +1118,7 @@ export default function MenuScreen() {
                     "
                 >
 
-                    <div
+                    {!pickupCheck.features?.contextualStorefrontV2 && <div
                         className="
                             flex
                             flex-col
@@ -1004,8 +1140,7 @@ export default function MenuScreen() {
                                     text-[#c88a20]
                                 "
                             >
-                                Freshly prepared
-                            </p>
+                                <T text="Freshly prepared" /></p>
 
 
                             <h1
@@ -1018,7 +1153,7 @@ export default function MenuScreen() {
                                     sm:text-4xl
                                 "
                             >
-                                Explore our menu
+                                {pickupCheck.features?.contextualStorefrontV2 ? "Find something worth sharing" : "Explore our menu"}
                             </h1>
 
 
@@ -1031,15 +1166,17 @@ export default function MenuScreen() {
                                     text-[#756763]
                                 "
                             >
-                                Choose your favourites now.
-                                You&apos;ll select a convenient pickup
-                                time during checkout.
+                                {pickupCheck.features?.contextualStorefrontV2
+                                    ? `Browsing ${branch.name}. Prices are shown per piece or per kg. Choose a pickup date to preview availability; we confirm the final quote before payment.`
+                                    : pickupCheck.features?.smartAvailability
+                                    ? "Choose a pickup date to see what fits, or browse first and decide later."
+                                    : "Choose your favourites now. You'll select a convenient pickup time during checkout."}
                             </p>
 
                         </div>
 
 
-                        <div
+                        {!pickupCheck.features?.contextualStorefrontV2 && <div
                             className="
                                 rounded-2xl
                                 border
@@ -1059,8 +1196,7 @@ export default function MenuScreen() {
                                     text-[#c88a20]
                                 "
                             >
-                                Pickup branch
-                            </p>
+                                <T text="Pickup branch" /></p>
 
 
                             <p
@@ -1087,15 +1223,26 @@ export default function MenuScreen() {
                                     hover:underline
                                 "
                             >
-                                Change branch
-                            </Link>
+                                <T text="Change branch" /><LinkFeedback /></Link>
 
-                        </div>
+                        </div>}
 
-                    </div>
+                    </div>}
 
+                <BranchMenuAppearance key={branch.id} branchId={branch.id} categories={categories} onSelect={id=>jumpMenuCategory(id)} onOrder={saveAppearanceOrder}/>
 
-                    {!isLoading
+                {!phoneMenu && pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
+                    <NewBranchItems branch={branch} products={allProducts} portionGroups={phoneMenu?portionGroups:undefined} onSelect={product => {
+                        setSearch("");
+                        setSelectedCategoryId(product.categoryId);
+                        if(phoneMenu){setMobileCategories([product.categoryId]);setMaximumPrice(null);setPortionsOnly(false);}
+                        const group=phoneMenu?portionGroups.find(g=>g.choices.some(c=>c.productId===product.id)):null;
+                        const target=group?.choices.find(c=>allProducts.some(p=>p.id===c.productId))?.productId??product.id;
+                        requestAnimationFrame(() =>
+                            document.getElementById(`gokul-product-${target}`)?.scrollIntoView({behavior: "smooth", block: "center"}));
+                    }} />}
+
+                    {!pickupCheck.features?.contextualStorefrontV2 && !isLoading
                         &&
                         !error
                         && (
@@ -1115,7 +1262,7 @@ export default function MenuScreen() {
                                     value={
                                         `${allProducts.length} ${
                                             allProducts.length === 1
-                                                ? "item"
+                                                ? translate("item")
                                                 : "items"
                                         }`
                                     }
@@ -1141,8 +1288,11 @@ export default function MenuScreen() {
                 </header>
 
 
+                <MenuToolbar enabled={phoneMenu}>
+                {mobileFeatures?.smartAvailability&&<MobileMenuPickup compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
+
                 <div
-                    className="
+                    className="gokul-menu-tools
                         mt-5
                         rounded-3xl
                         border
@@ -1155,6 +1305,8 @@ export default function MenuScreen() {
                 >
 
                     <MenuSearch
+                        premium={phoneMenu}
+                        refined={pickupCheck.features?.contextualStorefrontV2 === true}
                         value={
                             search
                         }
@@ -1171,12 +1323,10 @@ export default function MenuScreen() {
                         categories.length > 0
                         && (
                             <div
-                                className="
-                                    mt-4
-                                "
+                                className={phoneMenu ? "mobile-menu-category-entry" : "mt-4"}
                             >
 
-                                <CategoryTabs
+                                {phoneMenu?<MobileMenuFilters activeId={activeBrowseId} onBrowse={browseMenu} offersAvailable={!!mobileFeatures?.pickupAddOns} categories={categories} selected={mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])} onCategories={ids=>{setBrowseCategory(null);setBrowseScroll(null);setMobileCategories(ids);}} maximum={maximumPrice} onMaximum={setMaximumPrice} portions={portionsOnly} onPortions={setPortionsOnly} onResetSearch={()=>{if(search)setSearch("");}}/>:<CategoryTabs
                                     categories={
                                         categories
                                     }
@@ -1186,15 +1336,19 @@ export default function MenuScreen() {
                                     onSelect={
                                         setSelectedCategoryId
                                     }
-                                />
+                                />}
 
                             </div>
                         )}
 
                 </div>
+                </MenuToolbar>
 
+
+                {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
 
                 <div
+                    id="gokul-menu-items"
                     className="
                         mt-6
                     "
@@ -1230,7 +1384,7 @@ export default function MenuScreen() {
                             <MenuEmptyState
                                 title="Menu is not available yet"
                                 description={`There are currently no menu items available for ${branch.name}. Please check again shortly or choose another branch.`}
-                                actionLabel="Change branch"
+                                actionLabel={translate("Change branch")}
                                 actionHref="/"
                             />
                         )}
@@ -1247,7 +1401,7 @@ export default function MenuScreen() {
                             <>
 
                                 <div
-                                    className="
+                                    className="menu-result-heading
                                         mb-4
                                         flex
                                         items-end
@@ -1268,9 +1422,9 @@ export default function MenuScreen() {
                                             "
                                         >
                                             {
-                                                selectedCategory
+                                                phoneMenu&&mobileCategories!==null ? mobileCategories.map(id=>categories.find(c=>c.id===id)?.name).filter(Boolean).join(" + ")||translate("All items") : selectedCategory
                                                     ? selectedCategory.name
-                                                    : "All items"
+                                                    : translate("All items")
                                             }
                                         </p>
 
@@ -1292,9 +1446,9 @@ export default function MenuScreen() {
                                                     }`
                                                     : `${filteredProducts.length} ${
                                                         filteredProducts.length === 1
-                                                            ? "item"
+                                                            ? translate("item")
                                                             : "items"
-                                                    } available`
+                                                    } on the menu`
                                             }
                                         </h2>
 
@@ -1316,14 +1470,26 @@ export default function MenuScreen() {
                                                     hover:underline
                                                 "
                                             >
-                                                Clear filters
-                                            </button>
+                                                <T text="Clear filters" /></button>
                                         )}
 
                                 </div>
 
 
+                                {phoneMenu&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
+                                {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
+                                {pickupCheck.features?.contextualStorefrontV2 ? <div>
+                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}
+                                </div> : (
                                 <ProductGrid
+                                    pairingSeed={pairingSeed}
+                                    pairing={retailBrowse?null:pairing}
+                                    portionGroups={phoneMenu?portionGroups:undefined}
+                                    catalogProducts={phoneMenu?allProducts:undefined}
+                                    refined={pickupCheck.features?.contextualStorefrontV2 === true}
+                                    pickupItems={pickupCheck.items}
+                                    pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}
+                                    dateAware={!!pickupCheck.features?.smartAvailability}
                                     products={
                                         filteredProducts
                                     }
@@ -1340,7 +1506,7 @@ export default function MenuScreen() {
                                         productWeights
                                     }
                                     onIncrease={
-                                        increaseQuantity
+                                        guardedIncrease
                                     }
                                     onDecrease={
                                         decreaseQuantity
@@ -1349,7 +1515,9 @@ export default function MenuScreen() {
                                         handleAddToCart
                                     }
                                 />
+                                )}
 
+                                {phoneMenu&&retailBrowse&&!search.trim()&&<RetailSweetRail products={allProducts} onBrowse={browseMenu}/>}
                             </>
                         )}
 
@@ -1400,8 +1568,7 @@ export default function MenuScreen() {
                                         text-[#241715]
                                     "
                                 >
-                                    No matching items
-                                </h2>
+                                    <T text="No matching items" /></h2>
 
 
                                 <p
@@ -1414,9 +1581,7 @@ export default function MenuScreen() {
                                         text-[#756763]
                                     "
                                 >
-                                    Try another search or category
-                                    to see more of the menu.
-                                </p>
+                                    <T text="Try another search or category to see more of the menu." /></p>
 
 
                                 <button
@@ -1441,8 +1606,7 @@ export default function MenuScreen() {
                                         active:scale-[0.98]
                                     "
                                 >
-                                    Show all items
-                                </button>
+                                    <T text="Show all items" /></button>
 
                             </div>
                         )}
@@ -1457,7 +1621,7 @@ export default function MenuScreen() {
                     <div
                         role="status"
                         aria-live="polite"
-                        className="
+                        className={`${phoneMenu ? "menu-cart-announcement" : ""}
                             fixed
                             bottom-40
                             left-1/2
@@ -1473,14 +1637,16 @@ export default function MenuScreen() {
                             font-semibold
                             text-white
                             shadow-lg
-                        "
+                        `}
                     >
                         ✓ {cartNotice}
                     </div>
                 )}
 
 
+            {(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true&&!error&&categories.length>0&&<FloatingMenuCategories key={branch.id} categories={categories} selectedId={phoneMenu?(mobileCategories?.length===1?mobileCategories[0]:undefined):(effectiveCategoryId??undefined)} hasCart={itemCount>0} onSelect={jumpMenuCategory}/>}
             <FloatingCartButton
+                offerEnabled={phoneMenu&&!!mobileFeatures?.pickupAddOns} offerTarget={phoneMenu&&menuOffer?.key===offerContext?menuOffer.target:null}
                 itemCount={
                     itemCount
                 }
@@ -1514,6 +1680,7 @@ function InfoPill({
 }: {
     value: string;
 }) {
+    useTranslation();
 
     return (
         <span
@@ -1542,6 +1709,7 @@ function MenuError({
     message: string;
     onRetry: () => void;
 }) {
+    useTranslation();
 
     return (
         <div
@@ -1582,8 +1750,7 @@ function MenuError({
                     text-[#241715]
                 "
             >
-                Unable to load menu
-            </h2>
+                <T text="Unable to load menu" /></h2>
 
 
             <p
@@ -1620,8 +1787,7 @@ function MenuError({
                     active:scale-[0.98]
                 "
             >
-                Try again
-            </button>
+                <T text="Try again" /></button>
 
         </div>
     );
@@ -1639,6 +1805,7 @@ function MenuEmptyState({
     actionLabel: string;
     actionHref: string;
 }) {
+    useTranslation();
 
     return (
         <div
@@ -1720,7 +1887,7 @@ function MenuEmptyState({
                 "
             >
                 {actionLabel}
-            </Link>
+            <LinkFeedback /></Link>
 
         </div>
     );

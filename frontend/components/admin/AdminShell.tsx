@@ -1,5 +1,7 @@
 "use client";
 
+
+
 import {
     useEffect,
     type ReactNode
@@ -19,6 +21,7 @@ import AdminSidebar
 
 import AdminTopbar
     from "@/components/admin/AdminTopbar";
+import {LanguagePicker} from "@/lib/language";
 
 
 export default function AdminShell({
@@ -44,6 +47,8 @@ export default function AdminShell({
         pathname
         === "/admin/login";
 
+
+    const isAccountAccessPage = pathname === "/admin/setup" || pathname === "/admin/recover";
 
     /*
      * ---------------------------------------------------------
@@ -95,6 +100,7 @@ export default function AdminShell({
 
             if (
                 !isLoginPage
+                && !isAccountAccessPage
                 &&
                 !isAuthenticated
             ) {
@@ -109,6 +115,7 @@ export default function AdminShell({
             ready,
             isAuthenticated,
             isLoginPage,
+            isAccountAccessPage,
             router
         ]
     );
@@ -149,9 +156,9 @@ export default function AdminShell({
      * Login page must remain outside
      * the authenticated admin shell.
      */
-    if (isLoginPage) {
+    if (isLoginPage || isAccountAccessPage) {
 
-        if (isAuthenticated) {
+        if (isAuthenticated && !isAccountAccessPage) {
 
             return null;
         }
@@ -159,6 +166,7 @@ export default function AdminShell({
 
         return (
             <>
+                <div className="absolute right-4 top-4 z-20"><LanguagePicker /></div>
                 {children}
             </>
         );

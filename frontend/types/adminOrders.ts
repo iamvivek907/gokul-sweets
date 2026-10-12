@@ -4,6 +4,9 @@ export type OrderStatus =
     | "PREPARING"
     | "READY_FOR_PICKUP"
     | "PICKED_UP"
+    | "READY_FOR_DELIVERY"
+    | "OUT_FOR_DELIVERY"
+    | "DELIVERED"
     | "PAYMENT_FAILED"
     | "CANCELLED"
     | "NO_SHOW"
@@ -52,6 +55,7 @@ export type PreparationBatchResult =
 export interface AdminOrderSummary {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 
@@ -61,13 +65,17 @@ export interface AdminOrderSummary {
 
     maskedCustomerPhone: string | null;
 
-    pickupDate: string;
+    pickupDate: string | null;
 
-    pickupStartTime: string;
+    pickupStartTime: string | null;
 
-    pickupEndTime: string;
+    pickupEndTime: string | null;
 
-    pickupType: PickupType;
+    pickupType: PickupType | null;
+    fulfillmentType: "PICKUP" | "DELIVERY";
+    deliveryDate: string | null;
+    deliveryStartTime: string | null;
+    deliveryEndTime: string | null;
 
     totalAmount: number;
 
@@ -76,6 +84,8 @@ export interface AdminOrderSummary {
     paymentStatus: PaymentStatus | null;
 
     createdAt: string;
+    estimatedReadyAt?: string | null;
+    delayReportedAt?: string | null;
 }
 
 
@@ -102,6 +112,7 @@ export interface AdminOrderPageResponse {
 export interface AdminOrderQueueItem {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 
@@ -111,13 +122,17 @@ export interface AdminOrderQueueItem {
 
     maskedCustomerPhone: string | null;
 
-    pickupDate: string;
+    pickupDate: string | null;
 
-    pickupStartTime: string;
+    pickupStartTime: string | null;
 
-    pickupEndTime: string;
+    pickupEndTime: string | null;
 
-    pickupType: PickupType;
+    pickupType: PickupType | null;
+    fulfillmentType: "PICKUP" | "DELIVERY";
+    deliveryDate: string | null;
+    deliveryStartTime: string | null;
+    deliveryEndTime: string | null;
 
     totalAmount: number;
 
@@ -203,6 +218,7 @@ export interface AdminStartSelectedPreparationRequest {
 export interface AdminBatchPreparationItem {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     result: PreparationBatchResult;
 
@@ -240,6 +256,10 @@ export interface AdminOrderItem {
 
     productName: string;
 
+    saleMode?: "UNIT" | "WEIGHT";
+
+    weightGrams?: number | null;
+
     quantity: number;
 
     unitPrice: number;
@@ -255,24 +275,35 @@ export interface AdminOrderItem {
 export interface AdminOrderDetail {
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 
     branchName: string;
 
     branchAddress: string;
+    estimatedReadyAt?: string | null;
+    delayReason?: string | null;
+    delayReportedAt?: string | null;
 
     customerName: string;
 
     customerPhone: string;
 
-    pickupDate: string;
+    pickupDate: string | null;
 
-    pickupStartTime: string;
+    pickupStartTime: string | null;
 
-    pickupEndTime: string;
+    pickupEndTime: string | null;
 
-    pickupType: PickupType;
+    pickupType: PickupType | null;
+    fulfillmentType: "PICKUP" | "DELIVERY";
+    deliveryDate: string | null;
+    deliveryStartTime: string | null;
+    deliveryEndTime: string | null;
+    deliveryAddressLine: string | null;
+    deliveryLocality: string | null;
+    deliveryPostalCode: string | null;
 
     orderStatus: OrderStatus;
 
@@ -283,6 +314,8 @@ export interface AdminOrderDetail {
     taxAmount: number;
 
     priorityCharge: number;
+    convenienceFee?: number;
+    convenienceFeeTax?: number;
 
     totalAmount: number;
 
@@ -305,6 +338,7 @@ export interface AdminOrderDetail {
  */
 
 export interface AdminOrderStatusUpdateRequest {
+    pickupCode?: string;
 
     status: OrderStatus;
 }

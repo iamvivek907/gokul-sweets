@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useEffect,
@@ -2841,9 +2843,7 @@ export default function AdminStaffPage() {
                                                             font-semibold
                                                             text-[#7a1625]
                                                         "
-                                                    >
-                                                        Cancel
-                                                    </button>
+                                                    >{" "}<T text="Cancel" />{" "}</button>
 
                                                 )
                                             }

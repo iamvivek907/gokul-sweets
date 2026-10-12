@@ -8,6 +8,7 @@ export interface Branch {
     state: string | null;
     pincode: string | null;
     phone: string | null;
+    fssaiLicenceNumber: string | null;
 
     latitude: number | null;
     longitude: number | null;
@@ -16,4 +17,10 @@ export interface Branch {
     closingTime: string | null;
 
     active: boolean;
+    operational?: boolean;
+    coverImageUrl?: string | null;
+    mobileCoverImageUrl?: string | null;
+    coverAltText?: string | null;
+    description?: string | null;
+    pickupAvailable?: boolean;
 }

@@ -1,0 +1,161 @@
+# Run once as the shop's Windows account. No secret is sent to the website or command line.
+param([switch]$VerifyPaths)
+$ErrorActionPreference = 'Stop'
+$profilePattern = '*.json'
+function Get-AgentPaths([string]$BranchStation) {
+    $folder = Join-Path (Join-Path $env:LOCALAPPDATA 'GokulPrint') $BranchStation
+    $pythonRoot = Join-Path (Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Programs') 'Python') 'Python313') 'python.exe'
+    $scripts = Join-Path (Join-Path $folder '.venv') 'Scripts'
+    return @{ Folder = $folder; Python = $pythonRoot; Runtime = (Join-Path $scripts 'python.exe'); Background = (Join-Path $scripts 'pythonw.exe') }
+}
+function Stop-AgentForUpgrade([string]$TaskName) {
+    Stop-ScheduledTask -TaskName $TaskName
+    for ($attempt = 0; $attempt -lt 10; $attempt++) {
+        if ((Get-ScheduledTask -TaskName $TaskName).State -ne 'Running') { return }
+        Start-Sleep -Seconds 1
+    }
+    throw 'Agent did not stop. Installed files were not replaced.'
+}
+function Start-AgentAfterUpgrade([string]$TaskName) {
+    Start-ScheduledTask -TaskName $TaskName
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        if ((Get-ScheduledTask -TaskName $TaskName).State -eq 'Running') { return }
+        Start-Sleep -Seconds 1
+    }
+    throw 'Agent failed to start after the upgrade.'
+}
+function Invoke-AgentInstallation([string]$Folder, [scriptblock]$Operation) {
+    # FileShare.None excludes other installer processes; closing releases even after a crash.
+    # Keep the lock file so all runs open the same file throughout rollback.
+    New-Item -ItemType Directory -Force -Path $Folder | Out-Null
+    try {
+        $lock = [IO.File]::Open((Join-Path $Folder '.install.lock'), [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+    } catch {
+        throw "Could not acquire the installation lock. Another installer may be running; wait for it to finish and retry. $($_.Exception.Message)"
+    }
+    try {
+        & $Operation
+    } finally {
+        $lock.Dispose()
+    }
+}
+function Update-AgentInstallation([string]$Folder, [string]$Source, [string]$TaskName) {
+    Invoke-AgentInstallation $Folder { Update-AgentInstallationLocked $Folder $Source $TaskName }
+}
+function Update-AgentInstallationLocked([string]$Folder, [string]$Source, [string]$TaskName) {
+    $stage = Join-Path $Folder ('.upgrade-' + [guid]::NewGuid().ToString())
+    $backup = Join-Path $stage 'backup'
+    $files = @('agent.py','alarm.py','background.py','requirements.txt')
+    $originals = @()
+    $stopped = $false
+    $retainBackup = $false
+    try {
+        New-Item -ItemType Directory -Path $backup -Force | Out-Null
+        # Every new file and every backup is copied and checked before the running task stops.
+        foreach ($file in $files) {
+            $sourcePath = Join-Path $Source $file
+            $stagedPath = Join-Path $stage $file
+            Copy-Item -LiteralPath $sourcePath -Destination $stagedPath
+            if ((Get-FileHash -LiteralPath $sourcePath).Hash -ne (Get-FileHash -LiteralPath $stagedPath).Hash) { throw 'Staged installer file failed verification.' }
+            $installedPath = Join-Path $Folder $file
+            if (Test-Path -LiteralPath $installedPath) {
+                Copy-Item -LiteralPath $installedPath -Destination (Join-Path $backup $file)
+                $originals += $file
+            }
+        }
+        Stop-AgentForUpgrade $TaskName
+        $stopped = $true
+        foreach ($file in $files) { Copy-Item -LiteralPath (Join-Path $stage $file) -Destination (Join-Path $Folder $file) -Force }
+        Start-AgentAfterUpgrade $TaskName
+    } catch {
+        $failure = $_
+        if ($stopped) {
+            try {
+                Stop-AgentForUpgrade $TaskName
+                foreach ($file in $files) {
+                    $target = Join-Path $Folder $file
+                    if ($originals -contains $file) { Copy-Item -LiteralPath (Join-Path $backup $file) -Destination $target -Force }
+                    elseif (Test-Path -LiteralPath $target) { Remove-Item -LiteralPath $target -Force }
+                }
+                Start-AgentAfterUpgrade $TaskName
+            } catch {
+                $retainBackup = $true
+                throw "Upgrade and rollback failed. Recovery files retained at $stage. $($_.Exception.Message)"
+            }
+            throw "Upgrade failed; previous installation restored and restarted. $($failure.Exception.Message)"
+        }
+        throw $failure
+    } finally {
+        if (!$retainBackup -and (Test-Path -LiteralPath $stage)) { Remove-Item -LiteralPath $stage -Recurse -Force }
+    }
+}
+if ($VerifyPaths) {
+    $paths = Get-AgentPaths '1-KITCHEN'
+    $expectedFolder = [IO.Path]::Combine($env:LOCALAPPDATA, 'GokulPrint', '1-KITCHEN')
+    $expectedPython = [IO.Path]::Combine([IO.Path]::Combine($env:LOCALAPPDATA, 'Programs', 'Python', 'Python313'), 'python.exe')
+    if ($paths.Folder -ne $expectedFolder -or $paths.Python -ne $expectedPython -or $paths.Runtime -ne [IO.Path]::Combine($expectedFolder, '.venv', 'Scripts', 'python.exe') -or $paths.Background -ne [IO.Path]::Combine($expectedFolder, '.venv', 'Scripts', 'pythonw.exe')) { throw 'Installer path verification failed.' }
+    if ('config.local.json' -notlike $profilePattern -or 'config.local (1).json' -notlike $profilePattern -or 'config.local (2).json' -notlike $profilePattern -or 'profile.exe' -like $profilePattern) { throw 'Installer profile filter verification failed.' }
+    Write-Host 'Installer runtime and startup paths verified.'
+    exit 0
+}
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Security
+try {
+    $picker = New-Object System.Windows.Forms.OpenFileDialog
+    $picker.Title = 'Select the printer profile downloaded from Admin setup'
+    $picker.Filter = "Printer profile (*.json)|$profilePattern"
+    if ($picker.ShowDialog() -ne 'OK') { exit 0 }
+    $profile = Get-Content -LiteralPath $picker.FileName -Raw | ConvertFrom-Json
+    [long]$branchNumber = 0
+    if (![long]::TryParse([string]$profile.branch_id, [ref]$branchNumber) -or $branchNumber -lt 1 -or $profile.station -notin @('KITCHEN','SWEETS','BEVERAGE','FAST_FOOD','BILLING')) { throw 'Invalid printer profile.' }
+    $paths = Get-AgentPaths "$branchNumber-$($profile.station)"
+    $folder = $paths.Folder
+    Invoke-AgentInstallation $folder {
+        if (Test-Path (Join-Path $folder 'config.local.json')) {
+            $installed = Get-Content -LiteralPath (Join-Path $folder 'config.local.json') -Raw | ConvertFrom-Json
+            if ($installed.api_url -ne $profile.api_url -or $installed.agent_id -ne $profile.agent_id -or $installed.printer_code -ne $profile.printer_code) { throw 'Upgrade requires the same installed backend, agent ID and printer code.' }
+            if (!(Test-Path (Join-Path $folder 'key.dpapi'))) { throw 'Existing encrypted key is missing. Ask your administrator to repair the installation.' }
+            $taskName = "GokulPrint-$branchNumber-$($profile.station)"
+            Update-AgentInstallationLocked $folder $PSScriptRoot $taskName
+            Write-Host 'Agent upgraded. Key, profile and print journal preserved. Test and enable Kitchen computer sound in Admin setup.'
+            return
+        }
+        $python = $paths.Python
+        if (!(Test-Path $python)) {
+            Write-Host 'Installing Python 3.13 using Windows Package Manager...'
+            if (!(Get-Command winget -ErrorAction SilentlyContinue)) { throw 'Install Microsoft App Installer (WinGet) first, then run this installer again.' }
+            & winget install --id Python.Python.3.13 --exact --source winget --scope user --silent --accept-package-agreements --accept-source-agreements
+            if ($LASTEXITCODE -ne 0 -or !(Test-Path $python)) { throw 'Python installation did not complete. Check Windows Package Manager and retry.' }
+        }
+        foreach ($file in @('agent.py','alarm.py','background.py','requirements.txt')) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $folder -Force }
+        & $python -m venv (Join-Path $folder '.venv')
+        if ($LASTEXITCODE -ne 0) { throw 'Could not create the agent environment.' }
+        $runtime = $paths.Runtime
+        & $runtime -m pip install -r (Join-Path $folder 'requirements.txt')
+        if ($LASTEXITCODE -ne 0) { throw 'Agent dependency installation failed.' }
+        & $runtime (Join-Path $folder 'agent.py') --config $picker.FileName validate
+        if ($LASTEXITCODE -ne 0) { throw 'Printer profile validation failed.' }
+        $secureKey = Read-Host 'Private PRINT_AGENT_API_KEY (from your backend administrator)' -AsSecureString
+        $plainKey = [System.Net.NetworkCredential]::new('', $secureKey).Password
+        if ([string]::IsNullOrWhiteSpace($plainKey)) { throw 'The private agent key is required.' }
+        $encrypted = [System.Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes($plainKey), $null, [System.Security.Cryptography.DataProtectionScope]::CurrentUser)
+        [IO.File]::WriteAllBytes((Join-Path $folder 'key.dpapi'), $encrypted)
+        $plainKey = $null
+        $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+        $taskName = "GokulPrint-$branchNumber-$($profile.station)"
+        $action = New-ScheduledTaskAction -Execute $paths.Background -Argument ('"' + (Join-Path $folder 'background.py') + '"') -WorkingDirectory $folder
+        $trigger = New-ScheduledTaskTrigger -AtLogOn -User $identity
+        $principal = New-ScheduledTaskPrincipal -UserId $identity -LogonType Interactive -RunLevel Limited
+        $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+        Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Principal $principal -Settings $settings -Force | Out-Null
+        Copy-Item -LiteralPath $picker.FileName -Destination (Join-Path $folder 'config.local.json')
+        Start-ScheduledTask -TaskName $taskName
+        Write-Host 'Installed. Return to Admin setup, wait for Online, print a test, then Start printing.'
+        Write-Host 'The agent starts automatically after this Windows account signs in. Keep Windows awake and signed in.'
+    }
+} catch {
+    Write-Host ('Installation failed: ' + $_.Exception.Message) -ForegroundColor Red
+    # Leave the encrypted key and journal untouched; no destructive automatic cleanup.
+    Write-Host 'If task registration failed, run this installer from the SAME shop Windows account with administrator rights. Ask your administrator to remove the incomplete config.local.json first.'
+    exit 1
+}

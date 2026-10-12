@@ -1,14 +1,18 @@
 package com.gokulsweets.restaurant.rebate;
 
 import com.gokulsweets.restaurant.branch.Branch;
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.staff.StaffUser;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted rebate state. */
 @Entity
 @Table(name = "rebates")
 @Getter
@@ -16,69 +20,37 @@ import java.time.LocalDateTime;
 public class Rebate {
 
     @Id
-    @GeneratedValue(
-            strategy = GenerationType.IDENTITY
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(
-            nullable = false,
-            unique = true,
-            length = 50
-    )
+    @Column(nullable = false, unique = true, length = 50)
     private String code;
 
-    @Column(
-            nullable = false,
-            length = 150
-    )
+    @Column(nullable = false, length = 150)
     private String name;
 
     @Column(length = 500)
     private String description;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            nullable = false,
-            length = 30
-    )
+    @Column(nullable = false, length = 30)
     private RebateScope scope;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            nullable = false,
-            length = 30
-    )
-    private RebateVisibility visibility =
-            RebateVisibility.PUBLIC;
+    @Column(nullable = false, length = 30)
+    private RebateVisibility visibility = RebateVisibility.PUBLIC;
 
     @Enumerated(EnumType.STRING)
-    @Column(
-            name = "rebate_type",
-            nullable = false,
-            length = 30
-    )
+    @Column(name = "rebate_type", nullable = false, length = 30)
     private RebateType rebateType;
 
-    @Column(
-            name = "rebate_value",
-            precision = 12,
-            scale = 2
-    )
+    @Column(name = "rebate_value", precision = 12, scale = 2)
     private BigDecimal rebateValue;
 
-    @Column(
-            name = "minimum_order_amount",
-            precision = 12,
-            scale = 2
-    )
+    @Column(name = "minimum_order_amount", precision = 12, scale = 2)
     private BigDecimal minimumOrderAmount;
 
-    @Column(
-            name = "maximum_discount_amount",
-            precision = 12,
-            scale = 2
-    )
+    @Column(name = "maximum_discount_amount", precision = 12, scale = 2)
     private BigDecimal maximumDiscountAmount;
 
     @Column(name = "max_total_uses")
@@ -91,57 +63,46 @@ public class Rebate {
     @JoinColumn(name = "branch_id")
     private Branch branch;
 
-    @Column(
-            name = "valid_from",
-            nullable = false
-    )
+    @Column(name = "valid_from", nullable = false)
     private LocalDateTime validFrom;
 
-    @Column(
-            name = "valid_until",
-            nullable = false
-    )
+    @Column(name = "valid_until", nullable = false)
     private LocalDateTime validUntil;
 
     @Column(nullable = false)
     private boolean active = true;
 
-    @ManyToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "created_by",
-            nullable = false
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "created_by", nullable = false)
     private StaffUser createdBy;
 
-    @Column(
-            name = "created_at",
-            nullable = false
-    )
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(
-            name = "updated_at",
-            nullable = false
-    )
+    @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-
-        LocalDateTime now =
-                LocalDateTime.now();
-
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos = MethodTiming.start(Rebate.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Rebate.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-
-        updatedAt =
-                LocalDateTime.now();
+        final long __gokulMethodStartedNanos = MethodTiming.start(Rebate.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, Rebate.class, "onUpdate()");
+        }
     }
 }

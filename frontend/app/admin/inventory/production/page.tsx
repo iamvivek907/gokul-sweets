@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useEffect,
@@ -325,6 +327,7 @@ export default function AdminProductionPage() {
 
                         <div className="flex flex-wrap items-center gap-3 self-start xl:self-auto">
                             <InventoryHelp context="PRODUCTION" />
+                            {hasPermission("ORDER_VIEW")&&<Link href={`/admin/occasion-enquiries${branchId?`?branch=${branchId}`:""}`} className="min-h-11 rounded-xl border bg-white px-4 py-3 text-sm font-bold">Dedicated bulk production by date</Link>}
                             <Link
                                 href="/admin/inventory"
                                 className="inline-flex min-h-11 items-center justify-center rounded-xl border border-[#eadfd6] bg-white px-5 text-sm font-bold text-[#7a1625] transition hover:border-[#c88a20] hover:bg-[#fff4e5]"
@@ -342,9 +345,7 @@ export default function AdminProductionPage() {
                     </div>
 
                     <div className="mt-6 grid gap-4 md:grid-cols-3">
-                        <label className="text-sm font-semibold text-[#241715]">
-                            Branch
-                            <select
+                        <label className="text-sm font-semibold text-[#241715]">{" "}<T text="Branch" />{" "}<select
                                 value={branchId ?? ""}
                                 onChange={event => {
                                     const next = Number(event.target.value);
@@ -553,9 +554,7 @@ export default function AdminProductionPage() {
                                 onClick={() => setActionState(null)}
                                 disabled={saving}
                                 className="min-h-12 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#756763]"
-                            >
-                                Cancel
-                            </button>
+                            >{" "}<T text="Cancel" />{" "}</button>
                             <button
                                 type="button"
                                 onClick={submitAction}

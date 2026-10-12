@@ -4,11 +4,19 @@ import {
 
 import type {
     CreateOrderRequest,
+    CheckoutQuote,
     CustomerOrderResponse,
     CustomerOrderSummaryResponse,
     OrderResponse,
     UpdatePendingOrderRequest
 } from "@/types/order";
+
+export async function previewCheckoutQuote(request: CreateOrderRequest, pendingOrderNumber?: string, signal: AbortSignal = AbortSignal.timeout(15000)): Promise<CheckoutQuote> {
+    const path = pendingOrderNumber
+        ? `/api/orders/${encodeURIComponent(pendingOrderNumber)}/quote`
+        : "/api/orders/quote";
+    return apiClient<CheckoutQuote>(path, {method: "POST", body: JSON.stringify(request), credentials: "include", signal});
+}
 
 
 export async function createOrder(
@@ -26,9 +34,17 @@ export async function createOrder(
                     idempotencyKey
             },
             body: JSON.stringify(request),
+            credentials: "include",
             signal
         }
     );
+}
+
+/** Only the currently verified subject's orders; excludes phone-matched guest history. */
+export function getVerifiedCustomerOrders(signal?: AbortSignal): Promise<CustomerOrderSummaryResponse[]> {
+    return apiClient<CustomerOrderSummaryResponse[]>("/api/customer/identity/orders", {
+        credentials: "include", signal
+    });
 }
 
 
@@ -43,6 +59,7 @@ export async function updatePendingCheckout(
         {
             method: "PUT",
             body: JSON.stringify(request),
+            credentials: "include",
             signal
         }
     );
@@ -58,6 +75,7 @@ export async function getCustomerOrder(
         `/api/orders/${encodeURIComponent(orderNumber)}`,
         {
             method: "GET",
+            credentials: "include",
             signal
         }
     );
@@ -76,7 +94,14 @@ export async function getCustomerOrderHistory(
             body: JSON.stringify({
                 orderNumbers
             }),
+            credentials: "include",
             signal
         }
     );
+}
+
+export interface VerifiedOrderPage {orders:CustomerOrderSummaryResponse[];nextBefore:string|null;previousAfter?:string|null}
+export function getVerifiedOrderPage(before:string|null=null,signal?:AbortSignal,filters:Record<string,string>={}):Promise<VerifiedOrderPage>{
+    const query=new URLSearchParams({limit:"10",...filters});if(before)query.set("before",before);
+    return apiClient<VerifiedOrderPage>(`/api/customer/identity/orders/page?${query}`,{credentials:"include",signal});
 }

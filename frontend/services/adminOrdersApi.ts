@@ -58,6 +58,24 @@ async function getErrorMessage(
     return fallback;
 }
 
+export async function reportAdminOrderDelay(
+    orderNumber: string,
+    estimatedReadyAt: string,
+    reason: string,
+    authorization: string
+): Promise<AdminOrderDetail> {
+    const response = await adminFetch(
+        `/api/admin/orders/${encodeURIComponent(orderNumber)}/delay`,
+        authorization,
+        {method: "PATCH", headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({estimatedReadyAt, reason})}
+    );
+    if (!response.ok) {
+        throw new Error(await getErrorMessage(response, "Could not publish the revised ready time."));
+    }
+    return response.json() as Promise<AdminOrderDetail>;
+}
+
 
 /*
  * =========================================================
@@ -618,6 +636,12 @@ export async function startSelectedAdminOrders(
  * =========================================================
  */
 
+export async function getAdminOrderByCustomerNumber(number: string, authorization: string): Promise<AdminOrderDetail> {
+    const response = await adminFetch(`/api/admin/orders/number/${encodeURIComponent(number)}`, authorization, {cache: "no-store"});
+    if (!response.ok) throw new Error(await getErrorMessage(response, "Could not find this order. Check the number and your branch access."));
+    return response.json();
+}
+
 export async function getAdminOrderDetail(
     orderNumber: string,
     authorization: string,
@@ -832,8 +856,19 @@ export async function updateAdminOrderStatus(
  */
 
 export function getNextOrderStatus(
-    currentStatus: OrderStatus
+    currentStatus: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ): OrderStatus | null {
+
+    if (fulfillmentType === "DELIVERY") {
+        switch (currentStatus) {
+            case "CONFIRMED": return "PREPARING";
+            case "PREPARING": return "READY_FOR_DELIVERY";
+            case "READY_FOR_DELIVERY": return "OUT_FOR_DELIVERY";
+            case "OUT_FOR_DELIVERY": return "DELIVERED";
+            default: return null;
+        }
+    }
 
     switch (
         currentStatus
@@ -855,8 +890,19 @@ export function getNextOrderStatus(
 
 
 export function getRequiredPermissionForTransition(
-    currentStatus: OrderStatus
+    currentStatus: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ): string | null {
+
+    if (fulfillmentType === "DELIVERY") {
+        switch (currentStatus) {
+            case "CONFIRMED": return "ORDER_START_PREPARATION";
+            case "PREPARING": return "ORDER_MARK_READY";
+            case "READY_FOR_DELIVERY": return "ORDER_DISPATCH_DELIVERY";
+            case "OUT_FOR_DELIVERY": return "ORDER_CONFIRM_DELIVERY";
+            default: return null;
+        }
+    }
 
     switch (
         currentStatus

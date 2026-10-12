@@ -1,4 +1,8 @@
 "use client";
+import {formatWeight} from "@/lib/orderQuantity";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
+import {T} from "@/lib/language";
+
 
 import {
     useEffect,
@@ -515,20 +519,11 @@ export default function AdminKotPrintPage() {
     }
 
 
-    const totalQuantity =
-        kot
-            ? kot.items.reduce(
-                (
-                    total,
-                    item
-                ) =>
-                    total
-                    +
-                    item.quantity,
-                0
-            )
-            : 0;
-
+    const totalQuantity = kot ? [
+        kot.items.filter(item=>item.saleMode==="UNIT").reduce((n,item)=>n+item.quantity,0)+" pcs",
+        formatWeight(kot.items.filter(item=>item.saleMode==="WEIGHT").reduce((n,item)=>n+(item.weightGrams??0),0)),
+        kot.items.some(item=>item.saleMode==null)?"Legacy units need confirmation":""
+    ].filter(value=>value!=="0 pcs"&&value!=="0 g"&&value!=="").join(" · ") : "";
 
     const waitingForKot =
         ready
@@ -930,9 +925,7 @@ export default function AdminKotPrintPage() {
                                 uppercase
                                 leading-tight
                             "
-                        >
-                            Gokul Sweets
-                        </h1>
+                        >{" "}<T text="Gokul Sweets" />{" "}</h1>
 
 
                         <p
@@ -1005,18 +998,16 @@ export default function AdminKotPrintPage() {
 
                         <TicketRow
                             label="Order"
-                            value={
-                                kot.orderNumber
-                            }
+                            value={orderDisplayNumber(kot)}
                             strong
                         />
 
 
                         <TicketRow
-                            label="Pickup"
+                            label={kot.fulfillmentType === "DELIVERY" ? "Delivery window" : "Pickup"}
                             value={
                                 formatPickupDate(
-                                    kot.pickupDate
+                                    (kot.fulfillmentType === "DELIVERY" ? kot.deliveryDate : kot.pickupDate) ?? ""
                                 )
                             }
                         />
@@ -1026,9 +1017,9 @@ export default function AdminKotPrintPage() {
                             label="Time"
                             value={
                                 `${formatTime(
-                                    kot.pickupStartTime
+                                    (kot.fulfillmentType === "DELIVERY" ? kot.deliveryStartTime : kot.pickupStartTime) ?? ""
                                 )} - ${formatTime(
-                                    kot.pickupEndTime
+                                    (kot.fulfillmentType === "DELIVERY" ? kot.deliveryEndTime : kot.pickupEndTime) ?? ""
                                 )}`
                             }
                         />
@@ -1037,7 +1028,7 @@ export default function AdminKotPrintPage() {
 
 
                     {
-                        kot.pickupType
+                        kot.fulfillmentType === "PICKUP" && kot.pickupType && kot.pickupType
                         !== "NORMAL"
                         && (
 
@@ -1079,7 +1070,7 @@ export default function AdminKotPrintPage() {
                     <div
                         className="
                             grid
-                            grid-cols-[10mm_1fr]
+                            grid-cols-[20mm_1fr]
                             gap-2
                             text-[11px]
                             font-black
@@ -1125,7 +1116,7 @@ export default function AdminKotPrintPage() {
                                         }
                                         className="
                                             grid
-                                            grid-cols-[10mm_1fr]
+                                            grid-cols-[20mm_1fr]
                                             gap-2
                                             text-[14px]
                                             font-bold
@@ -1141,7 +1132,7 @@ export default function AdminKotPrintPage() {
                                             "
                                         >
                                             {
-                                                item.quantity
+                                                item.saleMode === "WEIGHT" ? formatWeight(item.weightGrams) : item.saleMode === "UNIT" ? `${item.quantity} pcs` : `${item.quantity} (check unit)`
                                             }
                                         </span>
 

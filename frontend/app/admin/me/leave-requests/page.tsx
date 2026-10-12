@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link
     from "next/link";
@@ -1423,9 +1425,7 @@ export default function MyLeaveRequestsPage() {
                                     }
                                 }
                                 className={SECONDARY_BUTTON_CLASS}
-                            >
-                                Previous
-                            </button>
+                            >{" "}<T text="Previous" />{" "}</button>
 
 
                             <span
@@ -1459,9 +1459,7 @@ export default function MyLeaveRequestsPage() {
                                     }
                                 }
                                 className={SECONDARY_BUTTON_CLASS}
-                            >
-                                Next
-                            </button>
+                            >{" "}<T text="Next" />{" "}</button>
 
                         </div>
 
@@ -1888,9 +1886,7 @@ export default function MyLeaveRequestsPage() {
                                                                     }
                                                                 }
                                                                 className={SECONDARY_BUTTON_CLASS}
-                                                            >
-                                                                Cancel
-                                                            </button>
+                                                            >{" "}<T text="Cancel" />{" "}</button>
 
                                                         )
                                                         : null

@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useCallback,
@@ -14,10 +16,12 @@ import {
 
 import {
     completeBulkInventorySetup,
+    getInventoryPlanHistory,
     getInventoryCatalogue,
     updateBulkInventoryPolicies,
     updateBulkInventoryReadiness
 } from "@/services/adminInventoryApi";
+import type {InventoryPlanChange} from "@/services/adminInventoryApi";
 
 import type {
     InventoryCatalogueFilter,
@@ -165,6 +169,9 @@ export default function AdminInventoryPage() {
     const [editorApproved, setEditorApproved] = useState("");
     const [editorReady, setEditorReady] = useState("");
     const [editorItem, setEditorItem] = useState<InventoryCatalogueItem | null>(null);
+    const [planHistory, setPlanHistory] = useState<InventoryPlanChange[] | null>(null);
+    const [historyError, setHistoryError] = useState<string | null>(null);
+    const [historyLoading, setHistoryLoading] = useState(false);
     const [showBulkQuantityPanel, setShowBulkQuantityPanel] = useState(false);
     const [bulkGroupInputs, setBulkGroupInputs] = useState<Record<InventoryUnit, string>>({
         GRAM: "",
@@ -472,6 +479,8 @@ export default function AdminInventoryPage() {
     }
 
     function openItemEditor(item: InventoryCatalogueItem) {
+        setPlanHistory(null);
+        setHistoryError(null);
         setBulkPolicyGroups([]);
         setBulkPolicyGroupIndex(0);
         loadConfiguration([item]);
@@ -480,7 +489,21 @@ export default function AdminInventoryPage() {
     function closeConfiguration() {
         setShowPolicyPanel(false);
         setEditorItem(null);
+        setPlanHistory(null);
         setPolicyTargetItems([]);
+    }
+
+    async function loadPlanHistory(item: InventoryCatalogueItem) {
+        if (!authorization) return;
+        setHistoryLoading(true);
+        setHistoryError(null);
+        try {
+            setPlanHistory(await getInventoryPlanHistory(item.branchProductId, serviceDate, authorization));
+        } catch (cause) {
+            setHistoryError(cause instanceof Error ? cause.message : "Unable to load plan history.");
+        } finally {
+            setHistoryLoading(false);
+        }
     }
 
     function policyFromEditor(): InventoryPolicyRequest | null {
@@ -939,9 +962,7 @@ export default function AdminInventoryPage() {
                     <div className="flex flex-col items-stretch gap-3">
                         <InventoryHelp context="SETUP" />
                         <div className="grid gap-3 sm:grid-cols-2">
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">
-                            Branch
-                            <select
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">{" "}<T text="Branch" />{" "}<select
                                 value={branchId ?? ""}
                                 onChange={event => {
                                     const next = Number(event.target.value);
@@ -956,9 +977,7 @@ export default function AdminInventoryPage() {
                                 ))}
                             </select>
                         </label>
-                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">
-                            Pickup date
-                            <input
+                        <label className="text-xs font-bold uppercase tracking-wide text-[#756763]">{" "}<T text="Pickup date" />{" "}<input
                                 type="date"
                                 min={todayInIndia()}
                                 value={serviceDate}
@@ -1031,13 +1050,11 @@ export default function AdminInventoryPage() {
                             <option value="NOT_CONFIGURED">Not configured</option>
                             <option value="DRAFT">Draft</option>
                             <option value="APPROVED">Approved</option>
-                            <option value="READY">Ready</option>
+                            <option value="READY"><T text="Ready" /></option>
                             <option value="DELAYED">Delayed</option>
                             <option value="UNAVAILABLE">Unavailable</option>
                         </select>
-                        <button type="button" onClick={refresh} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-bold text-[#7a1625]">
-                            Refresh
-                        </button>
+                        <button type="button" onClick={refresh} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-bold text-[#7a1625]">{" "}<T text="Refresh" />{" "}</button>
                     </div>
 
                     {selected.size > 0 && canManage && (
@@ -1072,8 +1089,8 @@ export default function AdminInventoryPage() {
                                         <Field label="Control mode" helpKey="controlMode"><select value={controlMode} onChange={event => setControlMode(event.target.value as InventoryControlMode)} className="field"><option value="READY_STOCK">Ready stock</option><option value="DAILY_PRODUCTION">Daily production</option><option value="MANUAL">Manual allocation</option></select></Field>
                                         <Field label="Inventory unit" helpKey="inventoryUnit"><div className="field flex items-center justify-between"><span className="font-semibold">{inventoryUnit === "GRAM" ? "Weight · kilograms" : "Unit · pieces"}</span><span className="text-xs text-[#756763]">Automatic</span></div></Field>
                                         <Field label={`Safety buffer (${inventoryInputUnit(inventoryUnit)})`} helpKey="safetyBuffer"><input type="number" min="0" step={inventoryUnit === "GRAM" ? ".05" : "1"} value={safetyBuffer} onChange={event => setSafetyBuffer(event.target.value)} className="field" /></Field>
-                                        <Field label={`Daily maximum (${inventoryInputUnit(inventoryUnit)})`} helpKey="dailyMaximum"><input type="number" min="0" step={inventoryUnit === "GRAM" ? ".05" : "1"} value={maximumAllocation} onChange={event => setMaximumAllocation(event.target.value)} placeholder="No maximum" className="field" /></Field>
-                                        <Field label="Booking horizon (days)" helpKey="bookingHorizon"><input type="number" min="0" value={bookingHorizon} onChange={event => setBookingHorizon(event.target.value)} className="field" /></Field>
+                                        <Field label={`Daily production capacity (${inventoryInputUnit(inventoryUnit)})`} helpKey="dailyMaximum"><input type="number" min="0" step={inventoryUnit === "GRAM" ? ".05" : "1"} value={maximumAllocation} onChange={event => setMaximumAllocation(event.target.value)} placeholder="No maximum" className="field" /></Field>
+                                        <Field label="Future ordering window (days)" helpKey="bookingHorizon"><input type="number" min="0" value={bookingHorizon} onChange={event => setBookingHorizon(event.target.value)} className="field" /></Field>
                                         <Field label="Production lead (hours)" helpKey="productionLead"><input type="number" min="0" step=".25" value={leadHours} onChange={event => setLeadHours(event.target.value)} className="field" /></Field>
                                         <Field label="Shelf life (days)" helpKey="shelfLife"><input type="number" min="0" step=".25" value={shelfLifeDays} onChange={event => setShelfLifeDays(event.target.value)} placeholder="Optional" className="field" /></Field>
                                         <div className="flex flex-col justify-end gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={onlineEnabled} onChange={event => setOnlineEnabled(event.target.checked)} />Online ordering enabled <InventoryInfo helpKey="onlineEnabled" /></label><label className="flex items-center gap-2"><input type="checkbox" checked={readyStockRequired} onChange={event => setReadyStockRequired(event.target.checked)} />Ready stock required <InventoryInfo helpKey="readyStockRequired" /></label></div>
@@ -1092,12 +1109,28 @@ export default function AdminInventoryPage() {
                                         </div>
                                     )}
 
+                                    {editorItem && <section className="mt-6 rounded-2xl border border-[#eadfd6] p-4" aria-label="Production plan history">
+                                        <div className="flex flex-wrap items-center justify-between gap-3">
+                                            <div><h3 className="font-bold text-[#241715]">Plan history</h3><p className="text-xs text-[#756763]">Recent approvals and readiness changes for this product and pickup date.</p></div>
+                                            <button type="button" disabled={historyLoading} onClick={() => void loadPlanHistory(editorItem)} className="min-h-10 rounded-lg border border-[#eadfd6] px-3 text-xs font-bold text-[#7a1625] disabled:opacity-50">{historyLoading ? "Loading…" : planHistory ? "Refresh history" : "View history"}</button>
+                                        </div>
+                                        {historyError && <p role="alert" className="mt-3 text-sm text-red-700">{historyError}</p>}
+                                        {planHistory?.length === 0 && <p className="mt-3 text-sm text-[#756763]">No plan changes recorded for this date.</p>}
+                                        {planHistory && planHistory.length > 0 && <ol className="mt-4 max-h-64 space-y-3 overflow-y-auto text-xs">
+                                            {planHistory.map(change => <li key={change.id} className="rounded-xl bg-[#fffaf3] p-3">
+                                                <p className="font-bold text-[#241715]">{change.performedBy} · {change.changedAt.replace("T", " ")}</p>
+                                                <p className="mt-1 break-words text-[#756763]">Before: {change.beforeState.replaceAll("; ", " · ")}</p>
+                                                <p className="mt-1 break-words text-[#241715]">After: {change.afterState.replaceAll("; ", " · ")}</p>
+                                            </li>)}
+                                        </ol>}
+                                    </section>}
+
                                     {error && <Message tone="error" text={error} />}
                                 </div>
 
                                 <div className="sticky bottom-0 flex flex-wrap justify-end gap-3 border-t border-[#eadfd6] bg-white px-5 py-4 sm:px-6">
                                     <button type="button" onClick={() => { resetPolicyForm(); setPolicyEditorMessage("Form reset to safe defaults. Saved data is unchanged until you save."); }} disabled={saving} className="min-h-11 px-3 text-sm font-semibold text-[#756763] disabled:opacity-50">Reset form</button>
-                                    <button type="button" onClick={closeConfiguration} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] bg-white px-5 text-sm font-bold text-[#7a1625] disabled:opacity-50">Cancel</button>
+                                    <button type="button" onClick={closeConfiguration} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] bg-white px-5 text-sm font-bold text-[#7a1625] disabled:opacity-50"><T text="Cancel" /></button>
                                     <button type="button" onClick={savePolicies} disabled={saving} className="min-h-11 rounded-xl border border-[#7a1625] bg-white px-5 text-sm font-bold text-[#7a1625] disabled:opacity-50">{editorItem ? "Save policy only" : bulkPolicyGroupIndex + 1 < bulkPolicyGroups.length ? "Save group & continue" : "Save policy & enter quantities"}</button>
                                     {editorItem && <button type="button" onClick={saveItemAndMakeAvailable} disabled={saving} className="min-h-11 rounded-xl bg-[#7a1625] px-6 text-sm font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Save & make available"}</button>}
                                 </div>
@@ -1170,7 +1203,7 @@ export default function AdminInventoryPage() {
 
                                 <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] bg-white px-5 py-4 sm:px-6">
                                     <p className="text-xs text-[#756763]">The complete batch is validated and saved in one backend transaction.</p>
-                                    <div className="flex gap-3"><button type="button" onClick={() => setShowBulkQuantityPanel(false)} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] px-5 text-sm font-bold text-[#756763] disabled:opacity-50">Back</button><button type="button" onClick={confirmBulkQuantities} disabled={saving} className="min-h-11 rounded-xl bg-[#7a1625] px-6 text-sm font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Confirm bulk update"}</button></div>
+                                    <div className="flex gap-3"><button type="button" onClick={() => setShowBulkQuantityPanel(false)} disabled={saving} className="min-h-11 rounded-xl border border-[#eadfd6] px-5 text-sm font-bold text-[#756763] disabled:opacity-50"><T text="Back" /></button><button type="button" onClick={confirmBulkQuantities} disabled={saving} className="min-h-11 rounded-xl bg-[#7a1625] px-6 text-sm font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Confirm bulk update"}</button></div>
                                 </div>
                             </div>
                         </div>
@@ -1219,8 +1252,8 @@ export default function AdminInventoryPage() {
 
                 {catalogue && catalogue.totalPages > 1 && (
                     <div className="flex items-center justify-between border-t border-[#eadfd6] p-5 text-sm">
-                        <span className="text-[#756763]">Page {catalogue.page + 1} of {catalogue.totalPages} · {catalogue.totalElements} products</span>
-                        <div className="flex gap-2"><button type="button" disabled={page === 0} onClick={() => setPage(value => value - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Previous</button><button type="button" disabled={page + 1 >= catalogue.totalPages} onClick={() => setPage(value => value + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Next</button></div>
+                        <span className="text-[#756763]"><T text="Page" />{" "}{catalogue.page + 1} of {catalogue.totalPages} · {catalogue.totalElements} products</span>
+                        <div className="flex gap-2"><button type="button" disabled={page === 0} onClick={() => setPage(value => value - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40"><T text="Previous" /></button><button type="button" disabled={page + 1 >= catalogue.totalPages} onClick={() => setPage(value => value + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40"><T text="Next" /></button></div>
                     </div>
                 )}
             </section>

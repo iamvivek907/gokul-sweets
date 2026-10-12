@@ -1,0 +1,244 @@
+package com.gokulsweets.restaurant.payment.service;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import com.gokulsweets.restaurant.config.EnhancementProperties;
+import com.gokulsweets.restaurant.delivery.DeliveryRiderHoldService;
+import com.gokulsweets.restaurant.inventory.service.OrderInventoryCommitmentService;
+import com.gokulsweets.restaurant.inventory.service.OrderInventoryReservationService;
+import com.gokulsweets.restaurant.order.entity.Order;
+import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.order.enums.OrderStatus;
+import com.gokulsweets.restaurant.order.enums.PickupType;
+import com.gokulsweets.restaurant.order.repository.OrderRepository;
+import com.gokulsweets.restaurant.payment.entity.Payment;
+import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
+import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
+import com.gokulsweets.restaurant.pickup.PickupSlot;
+import com.gokulsweets.restaurant.pickup.service.PickupSlotReservationService;
+import com.gokulsweets.restaurant.rebate.RebateRedemptionService;
+
+import org.junit.jupiter.api.Test;
+
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.List;
+import java.util.Optional;
+
+class PaymentStatusLateSuccessTest {
+    @Test
+    void duplicateSuccessAfterRefundIsQueuedDoesNotReopenFulfilment() {
+        var repository = mock(PaymentRepository.class);
+        var slots = mock(PickupSlotReservationService.class);
+        var commitments = mock(OrderInventoryCommitmentService.class);
+        var holds = mock(OrderInventoryReservationService.class);
+        var service =
+                new PaymentStatusService(
+                        mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
+                        repository,
+                        mock(OrderRepository.class),
+                        slots,
+                        mock(RebateRedemptionService.class),
+                        commitments,
+                        holds,
+                        new PaymentReconciliationPolicy(new EnhancementProperties()),
+                        mock(DeliveryRiderHoldService.class),
+                        mock(
+                                com.gokulsweets.restaurant.customer.notification
+                                        .CustomerNotificationInbox.class),
+                        mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
+        var order = new Order();
+        order.setOrderStatus(OrderStatus.CANCELLED);
+        Payment queued = payment(order, PaymentStatus.REFUND_PENDING);
+        when(repository.findById(21L)).thenReturn(Optional.of(queued));
+        service.markPaid(21L, "same-provider-transaction");
+        verify(repository, never()).transitionStatusFromAny(any(), any(), any());
+        verifyNoInteractions(slots, holds, commitments);
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void successAfterDeadlineReleasesHoldAndStartsOneRefundWithoutConfirmingOrder() {
+        var repository = mock(PaymentRepository.class);
+        var orders = mock(OrderRepository.class);
+        var slots = mock(PickupSlotReservationService.class);
+        var redemptions = mock(RebateRedemptionService.class);
+        var commitments = mock(OrderInventoryCommitmentService.class);
+        var holds = mock(OrderInventoryReservationService.class);
+        var features = new EnhancementProperties();
+        features.setPaymentReconciliationV2(true);
+        var service =
+                new PaymentStatusService(
+                        mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
+                        repository,
+                        orders,
+                        slots,
+                        redemptions,
+                        commitments,
+                        holds,
+                        new PaymentReconciliationPolicy(features),
+                        mock(DeliveryRiderHoldService.class),
+                        mock(
+                                com.gokulsweets.restaurant.customer.notification
+                                        .CustomerNotificationInbox.class),
+                        mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
+
+        var order = new Order();
+        order.setId(11L);
+        order.setOrderNumber("GKS-TEST");
+        order.setOrderStatus(OrderStatus.PENDING_PAYMENT);
+        order.setPickupType(PickupType.NORMAL);
+        order.setReservationExpiresAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")).minusMinutes(1));
+        var slot = new PickupSlot();
+        slot.setId(42L);
+        order.setPickupSlot(slot);
+        Payment pending = payment(order, PaymentStatus.PENDING);
+        pending.setExpiresAt(LocalDateTime.now(ZoneId.of("Asia/Kolkata")).minusMinutes(1));
+        Payment expired = payment(order, PaymentStatus.EXPIRED);
+        Payment refund = payment(order, PaymentStatus.REFUND_PENDING);
+        when(repository.findById(21L))
+                .thenReturn(
+                        Optional.of(pending),
+                        Optional.of(expired),
+                        Optional.of(expired),
+                        Optional.of(refund));
+        when(repository.transitionStatus(21L, PaymentStatus.PENDING, PaymentStatus.EXPIRED))
+                .thenReturn(1);
+        when(repository.transitionStatusFromAny(
+                        eq(21L),
+                        eq(List.of(PaymentStatus.FAILED, PaymentStatus.EXPIRED)),
+                        eq(PaymentStatus.REFUND_PENDING)))
+                .thenReturn(1);
+
+        service.markPaid(21L, "provider-transaction");
+
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(refund.getProviderPaymentId()).isEqualTo("provider-transaction");
+        assertThat(refund.getRefundReferenceId()).isNotBlank();
+        verify(slots, times(1)).releaseNormalCapacity(42L);
+        verify(holds, times(1)).releasePendingOrderHolds(eq("GKS-TEST"), any());
+        verifyNoInteractions(commitments, redemptions);
+    }
+
+    @Test
+    void duplicatePaidDeliveryConfirmationCommitsRiderHoldWithoutPickupCapacity() {
+        var payments = mock(PaymentRepository.class);
+        var orders = mock(OrderRepository.class);
+        var slots = mock(PickupSlotReservationService.class);
+        var inventory = mock(OrderInventoryCommitmentService.class);
+        var riders = mock(DeliveryRiderHoldService.class);
+        when(riders.commit("server-issued-hold")).thenReturn(true);
+        var service =
+                new PaymentStatusService(
+                        mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
+                        payments,
+                        orders,
+                        slots,
+                        mock(RebateRedemptionService.class),
+                        inventory,
+                        mock(OrderInventoryReservationService.class),
+                        new PaymentReconciliationPolicy(new EnhancementProperties()),
+                        riders,
+                        mock(
+                                com.gokulsweets.restaurant.customer.notification
+                                        .CustomerNotificationInbox.class),
+                        mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
+        var order = new Order();
+        order.setId(12L);
+        order.setOrderNumber("GKS-DELIVERY");
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        order.setDeliveryHoldKey("server-issued-hold");
+        order.setOrderStatus(OrderStatus.PENDING_PAYMENT);
+        when(payments.findById(25L)).thenReturn(Optional.of(payment(order, PaymentStatus.PAID)));
+
+        service.markPaid(25L, "provider-transaction");
+
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.CONFIRMED);
+        verify(riders).commit("server-issued-hold");
+        verifyNoInteractions(slots);
+        verify(inventory).confirmPendingOrderHolds("GKS-DELIVERY");
+    }
+
+    @Test
+    void failedDeliveryPaymentReleasesRiderWithoutTouchingPickupSlot() {
+        var payments = mock(PaymentRepository.class);
+        var pickup = mock(PickupSlotReservationService.class);
+        var inventory = mock(OrderInventoryReservationService.class);
+        var riders = mock(DeliveryRiderHoldService.class);
+        var order = new Order();
+        order.setId(15L);
+        order.setOrderNumber("GKS-DELIVERY-FAILED");
+        order.setOrderStatus(OrderStatus.PENDING_PAYMENT);
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        order.setDeliveryHoldKey("server-issued-hold");
+        when(payments.findById(26L)).thenReturn(Optional.of(payment(order, PaymentStatus.PENDING)));
+        when(payments.transitionStatus(26L, PaymentStatus.PENDING, PaymentStatus.FAILED))
+                .thenReturn(1);
+        when(riders.release("server-issued-hold")).thenReturn(true);
+        var service =
+                new PaymentStatusService(
+                        mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
+                        payments,
+                        mock(OrderRepository.class),
+                        pickup,
+                        mock(RebateRedemptionService.class),
+                        mock(OrderInventoryCommitmentService.class),
+                        inventory,
+                        new PaymentReconciliationPolicy(new EnhancementProperties()),
+                        riders,
+                        mock(
+                                com.gokulsweets.restaurant.customer.notification
+                                        .CustomerNotificationInbox.class),
+                        mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
+
+        service.markFailed(26L, "Provider declined");
+
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.PAYMENT_FAILED);
+        verify(riders).release("server-issued-hold");
+        verifyNoInteractions(pickup);
+        verify(inventory).releasePendingOrderHolds("GKS-DELIVERY-FAILED", "Payment failed.");
+    }
+
+    @Test
+    void lateFailureAfterDeliveryDoesNotReleaseCommittedRiderOrInventory() {
+        var payments = mock(PaymentRepository.class);
+        var pickup = mock(PickupSlotReservationService.class);
+        var inventory = mock(OrderInventoryReservationService.class);
+        var riders = mock(DeliveryRiderHoldService.class);
+        var order = new Order();
+        order.setOrderNumber("GKS-DELIVERED");
+        order.setOrderStatus(OrderStatus.DELIVERED);
+        order.setFulfillmentType(FulfillmentType.DELIVERY);
+        when(payments.findById(27L)).thenReturn(Optional.of(payment(order, PaymentStatus.PAID)));
+        var service =
+                new PaymentStatusService(
+                        mock(com.gokulsweets.restaurant.loyalty.LoyaltyService.class),
+                        payments,
+                        mock(OrderRepository.class),
+                        pickup,
+                        mock(RebateRedemptionService.class),
+                        mock(OrderInventoryCommitmentService.class),
+                        inventory,
+                        new PaymentReconciliationPolicy(new EnhancementProperties()),
+                        riders,
+                        mock(
+                                com.gokulsweets.restaurant.customer.notification
+                                        .CustomerNotificationInbox.class),
+                        mock(com.gokulsweets.restaurant.staff.notification.StaffOrderAlerts.class));
+
+        service.markFailed(27L, "Late provider failure");
+
+        assertThat(order.getOrderStatus()).isEqualTo(OrderStatus.DELIVERED);
+        verifyNoInteractions(pickup, riders, inventory);
+    }
+
+    private static Payment payment(Order order, PaymentStatus status) {
+        Payment payment = new Payment();
+        payment.setId(21L);
+        payment.setOrder(order);
+        payment.setPaymentStatus(status);
+        return payment;
+    }
+}

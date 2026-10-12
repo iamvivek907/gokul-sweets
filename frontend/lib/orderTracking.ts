@@ -2,6 +2,7 @@ import type {
     CustomerOrderSummaryResponse,
     OrderStatus
 } from "@/types/order";
+import {formatBusinessTimestamp, parseBusinessDate} from "@/lib/businessTime";
 
 
 export type OrderHistoryFilter =
@@ -32,7 +33,9 @@ const ACTIVE_STATUSES:
         "PENDING_PAYMENT",
         "CONFIRMED",
         "PREPARING",
-        "READY_FOR_PICKUP"
+        "READY_FOR_PICKUP",
+        "READY_FOR_DELIVERY",
+        "OUT_FOR_DELIVERY"
     ]);
 
 
@@ -47,8 +50,18 @@ const ISSUE_STATUSES:
 
 
 export function getOrderStatusPresentation(
-    status: OrderStatus
+    status: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ): OrderStatusPresentation {
+
+    if (fulfillmentType === "DELIVERY") {
+        if (status === "PENDING_PAYMENT") return {label: "Awaiting Payment", message: "Your delivery window is held while checkout is completed.", tone: "amber"};
+        if (status === "READY_FOR_DELIVERY") return {label: "Ready for Delivery", message: "Your order is prepared and waiting for a rider handoff at the branch.", tone: "green"};
+        if (status === "OUT_FOR_DELIVERY") return {label: "Out for Delivery", message: "Your order has left the branch for delivery.", tone: "blue"};
+        if (status === "DELIVERED") return {label: "Delivered", message: "The branch has confirmed delivery of your order.", tone: "green"};
+        if (status === "READY_FOR_PICKUP" || status === "PICKED_UP" || status === "NO_SHOW" || status === "PICKUP_WINDOW_EXPIRED")
+            return {label: "Order Update", message: "Contact the branch for the latest delivery status.", tone: "blue"};
+    }
 
     switch (status) {
 
@@ -86,6 +99,11 @@ export function getOrderStatusPresentation(
                 message: "This order has been collected successfully.",
                 tone: "green"
             };
+
+        case "READY_FOR_DELIVERY":
+        case "OUT_FOR_DELIVERY":
+        case "DELIVERED":
+            return {label: "Order Update", message: "Contact the branch for the latest order status.", tone: "blue"};
 
         case "PAYMENT_FAILED":
             return {
@@ -160,7 +178,7 @@ export function matchesOrderFilter(
         case "ACTIVE":
             return isActiveOrderStatus(order.orderStatus);
         case "COMPLETED":
-            return order.orderStatus === "PICKED_UP";
+            return order.orderStatus === "PICKED_UP" || order.orderStatus === "DELIVERED";
         case "ISSUES":
             return isIssueOrderStatus(order.orderStatus);
         case "ALL":
@@ -188,8 +206,7 @@ export function formatOrderDate(
     value: string
 ): string {
 
-    const date =
-        new Date(`${value}T00:00:00`);
+    const date = parseBusinessDate(value);
 
     if (Number.isNaN(date.getTime())) {
         return value;
@@ -200,7 +217,8 @@ export function formatOrderDate(
         {
             day: "numeric",
             month: "short",
-            year: "numeric"
+            year: "numeric",
+            timeZone: "Asia/Kolkata"
         }
     ).format(date);
 }
@@ -213,14 +231,14 @@ export function formatOrderTime(
     const [hour, minute] =
         value.split(":");
 
-    const date = new Date();
-    date.setHours(Number(hour), Number(minute), 0, 0);
+    const date = new Date(Date.UTC(2020, 0, 1, Number(hour), Number(minute)));
 
     return new Intl.DateTimeFormat(
         "en-IN",
         {
             hour: "numeric",
-            minute: "2-digit"
+            minute: "2-digit",
+            timeZone: "UTC"
         }
     ).format(date);
 }
@@ -230,17 +248,9 @@ export function getOrderMonthLabel(
     createdAt: string
 ): string {
 
-    const date = new Date(createdAt);
-
-    if (Number.isNaN(date.getTime())) {
-        return "Earlier Orders";
-    }
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            month: "long",
-            year: "numeric"
-        }
-    ).format(date);
+    const formatted = formatBusinessTimestamp(createdAt, {
+        month: "long",
+        year: "numeric"
+    });
+    return formatted === createdAt ? "Earlier Orders" : formatted;
 }

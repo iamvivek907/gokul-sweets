@@ -76,6 +76,7 @@ export interface AdminCustomerOrderHistoryItem {
     orderId: number;
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 

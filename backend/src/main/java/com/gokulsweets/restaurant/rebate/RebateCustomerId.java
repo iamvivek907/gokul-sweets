@@ -7,12 +7,12 @@ import lombok.Setter;
 
 import java.io.Serializable;
 
+/** Backend rebate customer id contract and implementation. */
 @Getter
 @Setter
 @NoArgsConstructor
 @EqualsAndHashCode
-public class RebateCustomerId
-        implements Serializable {
+public class RebateCustomerId implements Serializable {
 
     private Long rebate;
 

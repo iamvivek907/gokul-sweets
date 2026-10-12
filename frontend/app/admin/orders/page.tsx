@@ -1,4 +1,11 @@
 "use client";
+import Link from "next/link";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
+import {T} from "@/lib/language";
+
+
+import PickupHandoverAction from "@/components/admin/PickupHandoverAction";
+import {formatWeight} from "@/lib/orderQuantity";
 
 import {
     useCallback,
@@ -17,15 +24,20 @@ import {
 
 import {
     getAdminOrderDetail,
+    getAdminOrderByCustomerNumber,
     getAdminOrders,
     getAdminPreparationQueue,
     getAdminPreparationQueueCounts,
     getNextOrderStatus,
     getRequiredPermissionForTransition,
+    reportAdminOrderDelay,
     startNextAdminOrders,
     startSelectedAdminOrders,
     updateAdminOrderStatus
 } from "@/services/adminOrdersApi";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {formatBusinessTimestamp} from "@/lib/businessTime";
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import type {
     AdminBatchPreparationResponse,
@@ -110,6 +122,9 @@ const STATUS_TABS: {
         value: "PICKED_UP",
         label: "Picked Up"
     },
+    {value: "READY_FOR_DELIVERY", label: "Ready for Delivery"},
+    {value: "OUT_FOR_DELIVERY", label: "Out for Delivery"},
+    {value: "DELIVERED", label: "Delivered"},
     {
         value: "PENDING_PAYMENT",
         label: "Pending Payment"
@@ -195,6 +210,15 @@ function formatStatus(
 
         case "PICKED_UP":
             return "Picked Up";
+
+        case "READY_FOR_DELIVERY":
+            return "Ready for Delivery";
+
+        case "OUT_FOR_DELIVERY":
+            return "Out for Delivery";
+
+        case "DELIVERED":
+            return "Delivered";
 
         case "PAYMENT_FAILED":
             return "Payment Failed";
@@ -306,6 +330,15 @@ function statusClasses(
         case "PICKED_UP":
             return "bg-emerald-50 text-emerald-800 border-emerald-200";
 
+        case "READY_FOR_DELIVERY":
+            return "bg-green-50 text-green-800 border-green-200";
+
+        case "OUT_FOR_DELIVERY":
+            return "bg-blue-50 text-blue-800 border-blue-200";
+
+        case "DELIVERED":
+            return "bg-emerald-50 text-emerald-800 border-emerald-200";
+
         case "PENDING_PAYMENT":
             return "bg-yellow-50 text-yellow-800 border-yellow-200";
 
@@ -355,8 +388,10 @@ function paymentStatusClasses(
 
 
 function formatMinutesUntilPickup(
-    minutesUntilPickup: number
+    minutesUntilPickup: number,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ) {
+    const destination = fulfillmentType === "DELIVERY" ? "delivery window" : "pickup";
 
     if (minutesUntilPickup < 0) {
 
@@ -374,12 +409,12 @@ function formatMinutesUntilPickup(
 
 
     if (minutesUntilPickup === 0) {
-        return "Pickup time now";
+        return fulfillmentType === "DELIVERY" ? "Delivery window now" : "Pickup time now";
     }
 
 
     if (minutesUntilPickup < 60) {
-        return `${minutesUntilPickup} min until pickup`;
+        return `${minutesUntilPickup} min until ${destination}`;
     }
 
 
@@ -394,11 +429,11 @@ function formatMinutesUntilPickup(
 
 
     if (minutes === 0) {
-        return `${hours} hr until pickup`;
+        return `${hours} hr until ${destination}`;
     }
 
 
-    return `${hours} hr ${minutes} min until pickup`;
+    return `${hours} hr ${minutes} min until ${destination}`;
 }
 
 
@@ -447,8 +482,19 @@ function getBatchSummaryMessage(
 
 
 function getTransitionLabel(
-    currentStatus: OrderStatus
+    currentStatus: OrderStatus,
+    fulfillmentType: "PICKUP" | "DELIVERY" = "PICKUP"
 ) {
+
+    if (fulfillmentType === "DELIVERY") {
+        switch (currentStatus) {
+            case "CONFIRMED": return "Start Preparation";
+            case "PREPARING": return "Mark Ready for Delivery";
+            case "READY_FOR_DELIVERY": return "Record Rider Handoff";
+            case "OUT_FOR_DELIVERY": return "Confirm Delivered";
+            default: return null;
+        }
+    }
 
     switch (
         currentStatus
@@ -470,6 +516,9 @@ function getTransitionLabel(
 
 
 export default function AdminOrdersPage() {
+    const [numberLookupBusy, setNumberLookupBusy] = useState(false);
+    const [numberLookupError, setNumberLookupError] = useState("");
+    const useKitchenBoard=useStorefrontFeatures()?.adminPreparationBoard===true;
 
     const {
         profile,
@@ -831,7 +880,7 @@ export default function AdminOrdersPage() {
                     ) {
 
                         setSelectedBranchId(
-                            allowedBranches[0].id
+                            preferredAdminBranchId(currentProfile.staffId, allowedBranches)
                         );
                     }
 
@@ -1833,6 +1882,18 @@ export default function AdminOrdersPage() {
      * =========================================================
      */
 
+    async function findCustomerOrderNumber() {
+        const number = search.trim().replace(/^#/, "");
+        if (!authorization || numberLookupBusy || !/^[1-9]\d*$/.test(number)) return;
+        setNumberLookupBusy(true); setNumberLookupError("");
+        try {
+            const found = await getAdminOrderByCustomerNumber(number, authorization);
+            await openOrderDetail(found.orderNumber);
+        } catch (cause) {
+            setNumberLookupError(cause instanceof Error ? cause.message : "Could not find this order.");
+        } finally {setNumberLookupBusy(false);}
+    }
+
     async function openOrderDetail(
         orderNumber: string
     ) {
@@ -2084,7 +2145,8 @@ export default function AdminOrdersPage() {
 
         const targetStatus =
             getNextOrderStatus(
-                currentStatus
+                currentStatus,
+                selectedOrder.fulfillmentType
             );
 
 
@@ -2099,12 +2161,14 @@ export default function AdminOrdersPage() {
 
         if (
             targetStatus
-            === "PICKED_UP"
+            === "PICKED_UP" || targetStatus === "DELIVERED"
         ) {
 
             const confirmed =
                 window.confirm(
-                    `Mark order ${selectedOrder.orderNumber} as picked up?`
+                    targetStatus === "DELIVERED"
+                        ? `Confirm that order ${selectedOrder.orderNumber} has reached the customer?`
+                        : `Mark order ${selectedOrder.orderNumber} as picked up?`
                 );
 
 
@@ -2154,13 +2218,12 @@ export default function AdminOrdersPage() {
 
 
             setOrderActionSuccess(
-                targetStatus
-                === "PREPARING"
-                    ? "Order preparation started successfully."
-                    : targetStatus
-                    === "READY_FOR_PICKUP"
-                        ? "Order marked ready for pickup."
-                        : "Order marked picked up successfully."
+                targetStatus === "PREPARING" ? "Order preparation started successfully."
+                    : targetStatus === "READY_FOR_PICKUP" ? "Order marked ready for pickup."
+                    : targetStatus === "READY_FOR_DELIVERY" ? "Order marked ready for delivery."
+                    : targetStatus === "OUT_FOR_DELIVERY" ? "Rider handoff recorded."
+                    : targetStatus === "DELIVERED" ? "Delivery confirmed."
+                    : "Order marked picked up successfully."
             );
 
 
@@ -2378,12 +2441,16 @@ export default function AdminOrdersPage() {
                         const searchable =
                             [
                                 order.orderNumber,
+                                orderDisplayNumber(order),
                                 order.customerName,
                                 order.maskedCustomerPhone
                                     ?? "",
                                 order.pickupDate,
                                 order.pickupStartTime,
-                                order.pickupEndTime
+                                order.pickupEndTime,
+                                order.deliveryDate,
+                                order.deliveryStartTime,
+                                order.deliveryEndTime
                             ]
                                 .join(
                                     " "
@@ -2512,9 +2579,7 @@ export default function AdminOrdersPage() {
                                     tracking-[0.16em]
                                     text-[#c88a20]
                                 "
-                            >
-                                Daily operations
-                            </p>
+                            >{" "}<T text="Daily operations" />{" "}</p>
 
 
                             <h1
@@ -2527,9 +2592,7 @@ export default function AdminOrdersPage() {
 
                                     sm:text-4xl
                                 "
-                            >
-                                Live Orders
-                            </h1>
+                            >{" "}<T text="Live Orders" />{" "}</h1>
 
 
                             <p
@@ -2540,9 +2603,7 @@ export default function AdminOrdersPage() {
                                     leading-6
                                     text-[#756763]
                                 "
-                            >
-                                Monitor customer pickup orders and move them through preparation and pickup.
-                            </p>
+                            >{" "}<T text="Monitor customer pickup and delivery orders as they move through preparation." />{" "}</p>
 
                         </div>
 
@@ -2565,9 +2626,7 @@ export default function AdminOrdersPage() {
                                     font-semibold
                                     text-[#241715]
                                 "
-                            >
-                                Branch
-                            </label>
+                            >{" "}<T text="Branch" />{" "}</label>
 
 
                             <select
@@ -2594,6 +2653,7 @@ export default function AdminOrdersPage() {
                                         setSelectedBranchId(
                                             value
                                         );
+                                        if (profile) rememberAdminBranchId(profile.staffId, value);
 
 
                                         setPage(
@@ -2647,9 +2707,7 @@ export default function AdminOrdersPage() {
                                     === 0
                                     && (
 
-                                        <option value="">
-                                            No branch available
-                                        </option>
+                                        <option value="">{" "}<T text="No branch available" />{" "}</option>
 
                                     )
                                 }
@@ -2787,8 +2845,7 @@ export default function AdminOrdersPage() {
                                                     text-xs
                                                     text-[#756763]
                                                 "
-                                            >
-                                                Last updated:{" "}
+                                            >{" "}<T text="Last updated:" />{" "}
 
                                                 <span
                                                     className="
@@ -2854,8 +2911,10 @@ export default function AdminOrdersPage() {
                     }
 
 
+                    {useKitchenBoard && <Link href="/admin/order-desk" className="mt-6 flex min-h-12 items-center justify-between rounded-2xl bg-[#7a1625] px-5 py-4 font-semibold text-white"><T text="Open order desk"/><span aria-hidden="true">→</span></Link>}
                     {/* OPERATIONAL PREPARATION QUEUE */}
 
+                    {!useKitchenBoard && <>
                     <section
                         className="
                             mt-6
@@ -2901,9 +2960,7 @@ export default function AdminOrdersPage() {
                                             tracking-[0.14em]
                                             text-[#c88a20]
                                         "
-                                    >
-                                        Kitchen operations
-                                    </p>
+                                    >{" "}<T text="Kitchen operations" />{" "}</p>
 
 
                                     <h2
@@ -2915,9 +2972,7 @@ export default function AdminOrdersPage() {
 
                                             sm:text-2xl
                                         "
-                                    >
-                                        Preparation Queue
-                                    </h2>
+                                    >{" "}<T text="Preparation Queue" />{" "}</h2>
 
 
                                     <p
@@ -2929,7 +2984,7 @@ export default function AdminOrdersPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Only confirmed orders whose preparation window is open appear here. Orders are ordered by pickup urgency.
+                                        Only confirmed orders whose preparation window is open appear here. Orders are ordered by booked pickup or delivery window.
                                     </p>
 
                                 </div>
@@ -3347,9 +3402,7 @@ export default function AdminOrdersPage() {
                                                     disabled:cursor-not-allowed
                                                     disabled:opacity-40
                                                 "
-                                            >
-                                                Clear selection
-                                            </button>
+                                            >{" "}<T text="Clear selection" />{" "}</button>
 
                                         </div>
 
@@ -3502,6 +3555,7 @@ export default function AdminOrdersPage() {
                     </section>
 
 
+                    </>}
                     {/* GENERAL ORDERS */}
 
                     <div
@@ -3696,6 +3750,9 @@ export default function AdminOrdersPage() {
                                     "
                                 />
 
+                                {/^(?:#)?[1-9]\d*$/.test(search.trim()) && <button type="button" disabled={numberLookupBusy} onClick={() => void findCustomerOrderNumber()} className="mt-3 min-h-11 rounded-xl border border-[#173c39] px-4 font-bold text-[#173c39] disabled:opacity-50">{numberLookupBusy ? "Finding order…" : `Find order #${search.trim().replace(/^#/, "")} across pages`}</button>}
+                                {numberLookupError && <p role="alert" className="mt-2 text-sm text-red-800">{numberLookupError}</p>}
+
                             </div>
 
 
@@ -3884,8 +3941,7 @@ export default function AdminOrdersPage() {
                                         text-sm
                                         text-[#756763]
                                     "
-                                >
-                                    Page{" "}
+                                >{" "}<T text="Page" />{" "}
 
                                     <strong
                                         className="
@@ -3965,9 +4021,7 @@ export default function AdminOrdersPage() {
                                             disabled:cursor-not-allowed
                                             disabled:opacity-40
                                         "
-                                    >
-                                        Previous
-                                    </button>
+                                    >{" "}<T text="Previous" />{" "}</button>
 
 
                                     <button
@@ -4007,9 +4061,7 @@ export default function AdminOrdersPage() {
                                             disabled:cursor-not-allowed
                                             disabled:opacity-40
                                         "
-                                    >
-                                        Next
-                                    </button>
+                                    >{" "}<T text="Next" />{" "}</button>
 
                                 </div>
 
@@ -4214,7 +4266,7 @@ function PreparationQueueCard({
                     <input
                         type="checkbox"
                         aria-label={
-                            `Select ${order.orderNumber}`
+                            `Select ${orderDisplayNumber(order)}`
                         }
                         checked={
                             selected
@@ -4284,7 +4336,8 @@ function PreparationQueueCard({
                             >
                                 {
                                     formatMinutesUntilPickup(
-                                        order.minutesUntilPickup
+                                        order.minutesUntilPickup,
+                                        order.fulfillmentType
                                     )
                                 }
                             </span>
@@ -4312,9 +4365,7 @@ function PreparationQueueCard({
                                 hover:underline
                             "
                         >
-                            {
-                                order.orderNumber
-                            }
+                            {orderDisplayNumber(order)}
                         </button>
 
 
@@ -4350,17 +4401,17 @@ function PreparationQueueCard({
                                         text-[#241715]
                                     "
                                 >
-                                    Pickup:
+                                    {order.fulfillmentType === "DELIVERY" ? "Delivery window (IST):" : "Pickup:"}
                                 </strong>{" "}
                                 {
-                                    order.pickupDate
+                                    (order.fulfillmentType === "DELIVERY" ? order.deliveryDate : order.pickupDate) ?? "—"
                                 }{","}{" "}
                                 {
-                                    order.pickupStartTime
+                                    (order.fulfillmentType === "DELIVERY" ? order.deliveryStartTime : order.pickupStartTime) ?? "—"
                                 }
                                 {" - "}
                                 {
-                                    order.pickupEndTime
+                                    (order.fulfillmentType === "DELIVERY" ? order.deliveryEndTime : order.pickupEndTime) ?? "—"
                                 }
                             </span>
 
@@ -4374,9 +4425,7 @@ function PreparationQueueCard({
                                     Type:
                                 </strong>{" "}
                                 {
-                                    formatPickupType(
-                                        order.pickupType
-                                    )
+                                    order.fulfillmentType === "DELIVERY" ? "Delivery" : formatPickupType(order.pickupType ?? "NORMAL")
                                 }
                             </span>
 
@@ -4447,6 +4496,8 @@ function OrderCard({
     ) => void;
 }) {
 
+    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
+
     return (
         <article
             className="
@@ -4493,9 +4544,7 @@ function OrderCard({
                                 text-[#241715]
                             "
                         >
-                            {
-                                order.orderNumber
-                            }
+                            {orderDisplayNumber(order)}
                         </h2>
 
 
@@ -4548,6 +4597,12 @@ function OrderCard({
                     </div>
 
 
+                    {trackingEnabled && order.estimatedReadyAt && order.delayReportedAt && (
+                        <p className="mt-3 rounded-lg bg-amber-50 p-2 text-xs text-[#6b3900]">
+                            Ready estimate {formatBusinessTimestamp(order.estimatedReadyAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST · Reported {formatBusinessTimestamp(order.delayReportedAt, {hour: "numeric", minute: "2-digit"})} IST
+                        </p>
+                    )}
+
                     <p
                         className="
                             mt-3
@@ -4593,17 +4648,19 @@ function OrderCard({
                     >
 
                         <InfoItem
-                            label="Pickup date"
+                            label={order.fulfillmentType === "DELIVERY" ? "Delivery date" : "Pickup date"}
                             value={
-                                order.pickupDate
+                                (order.fulfillmentType === "DELIVERY" ? order.deliveryDate : order.pickupDate) ?? "—"
                             }
                         />
 
 
                         <InfoItem
-                            label="Pickup time"
+                            label={order.fulfillmentType === "DELIVERY" ? "Delivery window (IST)" : "Pickup time"}
                             value={
-                                `${order.pickupStartTime} - ${order.pickupEndTime}`
+                                order.fulfillmentType === "DELIVERY"
+                                    ? `${order.deliveryStartTime ?? "—"} - ${order.deliveryEndTime ?? "—"}`
+                                    : `${order.pickupStartTime ?? "—"} - ${order.pickupEndTime ?? "—"}`
                             }
                         />
 
@@ -4611,9 +4668,7 @@ function OrderCard({
                         <InfoItem
                             label="Pickup type"
                             value={
-                                formatPickupType(
-                                    order.pickupType
-                                )
+                                order.fulfillmentType === "DELIVERY" ? "Delivery" : formatPickupType(order.pickupType ?? "NORMAL")
                             }
                         />
 
@@ -4710,7 +4765,6 @@ function OrderCard({
 
 
 function OrderDetailDrawer({
-    orderNumber,
     order,
     loading,
     refreshing,
@@ -4756,13 +4810,38 @@ function OrderDetailDrawer({
     onClose: () => void;
 }) {
 
+    const trackingEnabled = useStorefrontFeatures()?.truthfulOrderTracking === true;
+    const [delayTime, setDelayTime] = useState("");
+    const [delayReason, setDelayReason] = useState("");
+    const [delaySaving, setDelaySaving] = useState(false);
+    const [delayError, setDelayError] = useState<string | null>(null);
+    const [delaySuccess, setDelaySuccess] = useState<string | null>(null);
+
+    async function publishDelay() {
+        if (!order || delaySaving || !hasPermission("ORDER_MARK_READY")) return;
+        setDelaySaving(true);
+        setDelayError(null);
+        setDelaySuccess(null);
+        try {
+            await reportAdminOrderDelay(order.orderNumber,
+                `${delayTime}:00`, delayReason.trim(), authorization);
+            await onRefresh();
+            setDelaySuccess("Ready estimate published to the customer order page.");
+        } catch (error) {
+            setDelayError(error instanceof Error ? error.message : "Could not publish the delay.");
+        } finally {
+            setDelaySaving(false);
+        }
+    }
+
     const router =
     useRouter();
 
     const nextStatus =
         order
             ? getNextOrderStatus(
-                order.orderStatus
+                order.orderStatus,
+                order.fulfillmentType
             )
             : null;
 
@@ -4770,7 +4849,8 @@ function OrderDetailDrawer({
     const requiredPermission =
         order
             ? getRequiredPermissionForTransition(
-                order.orderStatus
+                order.orderStatus,
+                order.fulfillmentType
             )
             : null;
 
@@ -4778,7 +4858,8 @@ function OrderDetailDrawer({
     const actionLabel =
         order
             ? getTransitionLabel(
-                order.orderStatus
+                order.orderStatus,
+                order.fulfillmentType
             )
             : null;
 
@@ -4803,6 +4884,9 @@ function OrderDetailDrawer({
         ||
         order.orderStatus
         === "PICKED_UP"
+        || order.orderStatus === "READY_FOR_DELIVERY"
+        || order.orderStatus === "OUT_FOR_DELIVERY"
+        || order.orderStatus === "DELIVERED"
     );
 
 
@@ -4847,7 +4931,7 @@ function OrderDetailDrawer({
 
         const confirmed =
             window.confirm(
-                `Queue another kitchen print for order ${order.orderNumber}?`
+                `Queue another kitchen print for order ${orderDisplayNumber(order)}?`
             );
 
 
@@ -4930,7 +5014,7 @@ function OrderDetailDrawer({
                 role="dialog"
                 aria-modal="true"
                 aria-label={
-                    `Order ${orderNumber}`
+                    `Order ${order ? orderDisplayNumber(order) : "details"}`
                 }
                 className="
                     absolute
@@ -4983,9 +5067,7 @@ function OrderDetailDrawer({
                                     tracking-[0.14em]
                                     text-[#c88a20]
                                 "
-                            >
-                                Order details
-                            </p>
+                            >{" "}<T text="Order details" />{" "}</p>
 
 
                             <h2
@@ -4999,9 +5081,7 @@ function OrderDetailDrawer({
                                     sm:text-2xl
                                 "
                             >
-                                {
-                                    orderNumber
-                                }
+                                {order ? orderDisplayNumber(order) : "Loading order…"}
                             </h2>
 
                         </div>
@@ -5581,6 +5661,27 @@ function OrderDetailDrawer({
                                     }
 
 
+                                    {trackingEnabled && order?.fulfillmentType === "PICKUP" && (
+                                        <section className="mt-5 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm" aria-label="Order delay">
+                                            <h3 className="font-bold">Customer ready time update · {orderDisplayNumber(order)}</h3>
+                                            {order.estimatedReadyAt && order.delayReportedAt && (
+                                                <p className="mt-2">Current estimate: {formatBusinessTimestamp(order.estimatedReadyAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. Reported {formatBusinessTimestamp(order.delayReportedAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST. {order.delayReason}</p>
+                                            )}
+                                            {(order.orderStatus === "CONFIRMED" || order.orderStatus === "PREPARING") && hasPermission("ORDER_MARK_READY") && (
+                                                <form className="mt-3 space-y-3" onSubmit={event => {event.preventDefault(); void publishDelay();}}>
+                                                    <label className="block font-semibold" htmlFor="order-delay-time">Revised ready time (IST)</label>
+                                                    <input id="order-delay-time" type="datetime-local" required value={delayTime} onChange={event => setDelayTime(event.target.value)} className="min-h-11 w-full rounded-lg border p-2" />
+                                                    <label className="block font-semibold" htmlFor="order-delay-reason">Reason shown to customer</label>
+                                                    <textarea id="order-delay-reason" minLength={10} maxLength={300} required value={delayReason} onChange={event => setDelayReason(event.target.value)} className="w-full rounded-lg border p-2" />
+                                                    <p className="text-xs">The original booked slot remains on the order. Contact the customer to agree any pickup change.</p>
+                                                    <button type="submit" disabled={delaySaving || actionLoading || refreshing} className="min-h-11 rounded-lg bg-[#7a1625] px-4 font-bold text-white disabled:opacity-50">{delaySaving ? "Publishing..." : "Publish ready estimate"}</button>
+                                                </form>
+                                            )}
+                                            {delayError && <p role="alert" className="mt-2 text-red-700">{delayError}</p>}
+                                            {delaySuccess && <p role="status" className="mt-2 text-green-800">{delaySuccess}</p>}
+                                        </section>
+                                    )}
+
                                     {
                                         nextStatus
                                         &&
@@ -5632,6 +5733,7 @@ function OrderDetailDrawer({
                                                 </p>
 
 
+                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction orderNumber={order.orderNumber} customerOrderNumber={order.customerOrderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
                                                 <button
                                                     type="button"
                                                     disabled={
@@ -5669,6 +5771,7 @@ function OrderDetailDrawer({
                                                             : actionLabel
                                                     }
                                                 </button>
+                                                )}
 
                                             </div>
 
@@ -5816,7 +5919,7 @@ function OrderDetailDrawer({
                                 {/* PICKUP */}
 
                                 <DetailSection
-                                    title="Pickup"
+                                    title={order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}
                                 >
 
                                     <div
@@ -5843,19 +5946,26 @@ function OrderDetailDrawer({
                                             }
                                         />
 
+                                        {order.fulfillmentType === "DELIVERY" && <DetailValue
+                                            label="Deliver to"
+                                            value={`${order.deliveryAddressLine ?? ""}, ${order.deliveryLocality ?? ""} ${order.deliveryPostalCode ?? ""}`}
+                                        />}
+
 
                                         <DetailValue
-                                            label="Pickup date"
+                                            label={order.fulfillmentType === "DELIVERY" ? "Delivery date" : "Pickup date"}
                                             value={
-                                                order.pickupDate
+                                                (order.fulfillmentType === "DELIVERY" ? order.deliveryDate : order.pickupDate) ?? "—"
                                             }
                                         />
 
 
                                         <DetailValue
-                                            label="Pickup time"
+                                            label={order.fulfillmentType === "DELIVERY" ? "Delivery window (IST)" : "Pickup time"}
                                             value={
-                                                `${order.pickupStartTime} - ${order.pickupEndTime}`
+                                                order.fulfillmentType === "DELIVERY"
+                                                    ? `${order.deliveryStartTime ?? "—"} - ${order.deliveryEndTime ?? "—"}`
+                                                    : `${order.pickupStartTime ?? "—"} - ${order.pickupEndTime ?? "—"}`
                                             }
                                         />
 
@@ -5863,9 +5973,7 @@ function OrderDetailDrawer({
                                         <DetailValue
                                             label="Pickup type"
                                             value={
-                                                formatPickupType(
-                                                    order.pickupType
-                                                )
+                                                order.fulfillmentType === "DELIVERY" ? "Delivery" : formatPickupType(order.pickupType ?? "NORMAL")
                                             }
                                         />
 
@@ -5939,14 +6047,12 @@ function OrderDetailDrawer({
                                                                         text-[#756763]
                                                                     "
                                                                 >
-                                                                    {
-                                                                        item.quantity
-                                                                    } ×{" "}
-                                                                    {
-                                                                        formatPrice(
-                                                                            item.unitPrice
-                                                                        )
-                                                                    }
+                                                                    Quantity: {item.saleMode === "WEIGHT"
+                                                                        ? formatWeight(item.weightGrams)
+                                                                        : `${item.quantity} pcs`}
+                                                                    <br />
+                                                                    Unit price: {formatPrice(item.unitPrice)}
+                                                                    {item.saleMode === "WEIGHT" ? " / kg" : " / pc"}
                                                                 </p>
 
                                                             </div>
@@ -6039,6 +6145,7 @@ function OrderDetailDrawer({
                                         />
 
 
+                                        {(order.convenienceFee ?? 0)>0 && <AmountRow label={`Convenience fee (includes ${new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(order.convenienceFeeTax??0)} tax)`} value={order.convenienceFee ?? 0}/>}
                                         {
                                             order.priorityCharge
                                             > 0

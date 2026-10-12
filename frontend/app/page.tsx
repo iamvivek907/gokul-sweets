@@ -1,8 +1,12 @@
+
+import {T} from "@/lib/language";
 import Link from "next/link";
 
 import AppShell from "@/components/layout/AppShell";
 import BranchSelector from "@/components/branch/BranchSelector";
 import InstallAppBanner from "@/components/pwa/InstallAppBanner";
+import CustomerHomeExperience from "@/components/menu/CustomerHomeExperience";
+import HomeEntry from "@/components/menu/HomeEntry";
 
 
 const MENU_HIGHLIGHTS = [
@@ -70,6 +74,10 @@ const PICKUP_STEPS = [
 
 
 export default function Home() {
+    return <HomeEntry><CustomerHomeExperience fallback={<LegacyHome />} /></HomeEntry>;
+}
+
+function LegacyHome() {
 
     return (
         <AppShell>
@@ -227,9 +235,7 @@ export default function Home() {
                                     hover:bg-[#f2d28d]
                                     active:scale-[0.98]
                                 "
-                            >
-                                Explore Menu
-                            </Link>
+                            >{" "}<T text="Explore Menu" />{" "}</Link>
 
 
                             <a

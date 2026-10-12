@@ -1,6 +1,5 @@
-import {
-    apiClient
-} from "@/services/apiClient";
+import {adminFetch} from "@/services/adminApi";
+async function imageRequest(path:string,init:RequestInit):Promise<ProductResponse>{const response=await adminFetch(path,"staff-session",init);if(!response.ok){let message="Unable to change product image. Check your permissions and retry.";try{message=(await response.json()).message||message;}catch{}throw new Error(message);}return response.json();}
 
 
 export interface ProductResponse {
@@ -42,8 +41,8 @@ export async function uploadProductImage(
     );
 
 
-    return apiClient<ProductResponse>(
-        `/api/products/${productId}/image`,
+    return imageRequest(
+        `/api/admin/products/${productId}/image`,
         {
             method: "POST",
             body: formData
@@ -56,8 +55,8 @@ export async function removeProductImage(
     productId: number
 ): Promise<ProductResponse> {
 
-    return apiClient<ProductResponse>(
-        `/api/products/${productId}/image`,
+    return imageRequest(
+        `/api/admin/products/${productId}/image`,
         {
             method: "DELETE"
         }

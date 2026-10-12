@@ -74,6 +74,9 @@ export interface ApplyRebateRequest {
  * DELETE /api/orders/{orderNumber}/rebate
  */
 export interface AppliedRebateResponse {
+    paymentFee?: number;
+    paymentFeeTax?: number;
+    paymentFeeRate?: number;
 
     orderNumber: string;
 

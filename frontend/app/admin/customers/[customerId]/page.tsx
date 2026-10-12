@@ -1,4 +1,7 @@
 "use client";
+import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
+import {T} from "@/lib/language";
+
 
 import Link
     from "next/link";
@@ -513,7 +516,7 @@ export default function AdminCustomerDetailPage({
 
 
                                             <p className="mt-1 text-xs text-[#756763]">
-                                                All checkout attempts are shown here. Purchase metrics above count PICKED_UP orders only.
+                                                All checkout attempts are shown here. Purchase metrics above count picked up and delivered orders.
                                             </p>
 
                                         </div>
@@ -541,9 +544,9 @@ export default function AdminCustomerDetailPage({
                                                                         text-[#756763]
                                                                     "
                                                                 >
-                                                                    <th className="px-5 py-3">Order</th>
-                                                                    <th className="px-5 py-3">Branch</th>
-                                                                    <th className="px-5 py-3">Pickup</th>
+                                                                    <th className="px-5 py-3"><T text="Order" /></th>
+                                                                    <th className="px-5 py-3"><T text="Branch" /></th>
+                                                                    <th className="px-5 py-3"><T text="Pickup" /></th>
                                                                     <th className="px-5 py-3">Status</th>
                                                                     <th className="px-5 py-3 text-right">Discount</th>
                                                                     <th className="px-5 py-3 text-right">Total</th>
@@ -567,7 +570,7 @@ export default function AdminCustomerDetailPage({
                                                                             >
 
                                                                                 <td className="px-5 py-4 font-semibold text-[#241715]">
-                                                                                    {order.orderNumber}
+                                                                                    {orderDisplayNumber(order)}
                                                                                 </td>
 
                                                                                 <td className="px-5 py-4 text-sm text-[#756763]">
@@ -639,8 +642,7 @@ export default function AdminCustomerDetailPage({
                                                 "
                                             >
 
-                                                <p className="text-sm text-[#756763]">
-                                                    Page {orders.page + 1} of {orders.totalPages}
+                                                <p className="text-sm text-[#756763]">{" "}<T text="Page" />{" "}{orders.page + 1} of {orders.totalPages}
                                                 </p>
 
 
@@ -662,9 +664,7 @@ export default function AdminCustomerDetailPage({
                                                                 )
                                                         }
                                                         className={PAGE_BUTTON_CLASS}
-                                                    >
-                                                        Previous
-                                                    </button>
+                                                    >{" "}<T text="Previous" />{" "}</button>
 
 
                                                     <button
@@ -681,9 +681,7 @@ export default function AdminCustomerDetailPage({
                                                                 )
                                                         }
                                                         className={PAGE_BUTTON_CLASS}
-                                                    >
-                                                        Next
-                                                    </button>
+                                                    >{" "}<T text="Next" />{" "}</button>
 
                                                 </div>
 

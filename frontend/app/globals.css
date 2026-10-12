@@ -51,6 +51,20 @@ html {
     scroll-behavior: smooth;
 }
 
+html[data-accessible-ordering="true"] :is(a, button, input, select, textarea):focus-visible {
+    outline: 3px solid #9a5116;
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html[data-accessible-ordering="true"] { scroll-behavior: auto; }
+    html[data-accessible-ordering="true"] * {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
+    }
+}
+
 html,
 body {
     margin: 0;
@@ -199,3 +213,20 @@ a {
     display:
         none;
 }
+
+/* Native Devanagari families remain readable offline on staff PWAs. */
+html:lang(hi){--font-hindi:"Kohinoor Devanagari","Noto Sans Devanagari","Nirmala UI","Mangal",sans-serif}
+html:lang(hi) body,html:lang(hi) :is(h1,h2,h3,h4,h5,h6,p,span,small,strong,b,label,button,input,select,option,textarea,a,summary){font-family:var(--font-hindi)!important;letter-spacing:normal!important;text-transform:none;line-height:1.65}
+html:lang(hi) :is(h1,h2,h3){font-weight:700;line-height:1.45}
+html:lang(hi) :is(button,a,select){overflow-wrap:break-word}
+html:lang(hi) button{height:auto}
+
+.language-control{position:relative;flex-shrink:0;z-index:65}.language-trigger{display:flex;align-items:center;justify-content:center;gap:5px;min-width:44px;min-height:44px;padding:6px 10px;border:1px solid #c4d4c9;border-radius:50px;background:#fffaf2;color:#143936;font-size:11px;font-weight:750}.language-trigger>span:first-child{font-size:16px}.language-popover{z-index:110;overflow-y:auto;overscroll-behavior:contain;position:absolute;right:0;top:calc(100% + 8px);width:min(270px,calc(100vw - 32px));padding:12px;border:1px solid #c4d4c9;border-radius:18px;background:#fffaf2;color:#143936;box-shadow:0 12px 40px #09272530}.language-popover>strong{display:block;font-size:12px;margin:4px 8px 10px}.language-popover button{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:60px;padding:10px;border-radius:12px;text-align:left}.language-popover button[aria-pressed=true]{background:#e5efe8}.language-popover small{display:block;font-size:11px;opacity:.8}.language-control button:focus-visible,.language-popover button:focus-visible{outline:3px solid #c76752;outline-offset:2px}@media(max-width:390px){.customer-header-actions{gap:5px!important}.language-trigger{padding:6px;gap:3px}.language-trigger>span:last-child{font-size:10px}}
+
+/* Slow navigation stays visible without covering controls or changing link geometry. */
+.navigation-feedback{position:fixed;top:0;left:0;right:0;height:3px;z-index:10000;background:#8f18381a;pointer-events:none;overflow:hidden}
+.navigation-feedback .navigation-progress{position:absolute;inset:0 auto 0 0;width:35%;background:#8f1838;animation:navigation-progress 1.2s ease-in-out infinite}
+@keyframes navigation-progress{from{transform:translateX(-100%)}to{transform:translateX(390%)}}
+@media(prefers-reduced-motion:reduce){.navigation-feedback .navigation-progress{animation:none;width:100%}}
+
+html:lang(hi) :is(h1,h2,h3){line-height:1.4;font-weight:700}html:lang(hi) .language-trigger{line-height:1.2}

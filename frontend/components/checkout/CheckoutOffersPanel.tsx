@@ -1,7 +1,21 @@
 "use client";
-
-import Link
-    from "next/link";
+import {CheckoutSavingsUncertainError,CheckoutUpdateUncertainError} from "@/lib/checkoutRefresh";
+import OrderRewards from "./OrderRewards";
+import OfferChoiceDialog from "./OfferChoiceDialog";
+import type {RewardCheckout} from "@/services/loyaltyApi";
+import {T,useTranslation} from "@/lib/language";
+import CheckoutAdjustmentDialog from "./CheckoutAdjustmentDialog";
+import type {CartItem} from "@/types/cart";
+import type {PickupSelection} from "@/types/pickup";
+import CheckoutMobileAction from "./CheckoutMobileAction";
+import {usefulRebateTarget} from "@/lib/pickupAddOnRebate";
+import {getCartSnapshot,parseCart,saveCart} from "@/lib/cartStorage";
+import {getStoredBranchSnapshot} from "@/lib/branchStorage";
+import {getCustomerSnapshot,getPickupSlotSnapshot,parseCustomerDetails,parsePickupSlot,savePickupSlot} from "@/lib/checkoutStorage";
+import {previewCheckoutQuote,updatePendingCheckout} from "@/services/orderApi";
+import {apiClient} from "@/services/apiClient";
+import PickupAddOns from "@/components/checkout/PickupAddOns";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import {
     useEffect,
@@ -60,6 +74,10 @@ import type {
 
 
 interface CheckoutOffersPanelProps {
+    reviewRequired?:boolean;
+    onCartMutationBusy?: (busy:boolean)=>void;
+    onUpdateError?: (message:string)=>void;
+    onRefreshRequiredChange?: (required:boolean)=>void;
 
     orderNumber:
         string;
@@ -123,9 +141,20 @@ function padSeconds(
 
 
 export default function CheckoutOffersPanel({
-    orderNumber
+    orderNumber, onCartMutationBusy, onUpdateError, onRefreshRequiredChange, reviewRequired=false
 }: CheckoutOffersPanelProps) {
+    const translate = useTranslation();
+    const [navigating,setNavigating]=useState(false);
 
+    const features=useStorefrontFeatures();
+    const [savingsBusy,setSavingsBusy]=useState(false),[offerPopup,setOfferPopup]=useState(false);
+    const [addonBusy,setAddonBusy]=useState(false);
+    const [priceReviewRequired,setPriceReviewRequired]=useState(reviewRequired);
+    const [totalChanged,setTotalChanged]=useState(reviewRequired);
+    const [refreshFailed,setRefreshFailed]=useState(false);
+    const [savingsUncertain,setSavingsUncertain]=useState(false);
+    const [spendTargets,setSpendTargets]=useState<AvailableRebateResponse[]>([]);
+    useEffect(()=>{const c=new AbortController();apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal:c.signal}).then(setSpendTargets).catch(()=>{});return()=>c.abort();},[orderNumber]);
     const router =
         useRouter();
 
@@ -156,6 +185,9 @@ export default function CheckoutOffersPanel({
         );
 
 
+    const savingsRecheckRequired=savingsUncertain||pendingOrder?.offerRecheckRequired===true;
+    const needsPriceReview=priceReviewRequired||pendingOrder?.priceReviewRequired===true;
+
     const currentCartFingerprint =
         useMemo(
             () =>
@@ -177,6 +209,7 @@ export default function CheckoutOffersPanel({
             &&
             pendingOrder.cartFingerprint !==
                 currentCartFingerprint
+            && !addonBusy
         );
 
 
@@ -375,6 +408,7 @@ export default function CheckoutOffersPanel({
                         );
 
 
+                    if (controller.signal.aborted) return;
                     setOrderSummary(
                         response
                     );
@@ -544,6 +578,7 @@ export default function CheckoutOffersPanel({
 
 
     async function handleFindOffers() {
+        if(addonBusy||savingsBusy)return;
 
         if (
             loading
@@ -676,6 +711,7 @@ export default function CheckoutOffersPanel({
             | "exclusive"
     ) {
 
+        if(addonBusy||savingsBusy)return;
         const normalizedCode =
             code
                 .trim()
@@ -743,6 +779,9 @@ export default function CheckoutOffersPanel({
                         ? {
                             ...current,
 
+                            paymentFee:response.paymentFee??current.paymentFee,
+                            paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax,
+                            paymentFeeRate:response.paymentFeeRate??current.paymentFeeRate,
                             totalAmount:
                                 response.totalAmount
                         }
@@ -766,6 +805,7 @@ export default function CheckoutOffersPanel({
 
         } catch (exception) {
 
+            if(exception instanceof CheckoutSavingsUncertainError)requireSavingsRecheck();
             console.error(
                 "Unable to apply offer code:",
                 exception
@@ -793,6 +833,7 @@ export default function CheckoutOffersPanel({
 
 
     async function handleRemove() {
+        if(addonBusy||savingsBusy)return;
 
         if (
             removing
@@ -857,6 +898,9 @@ export default function CheckoutOffersPanel({
                         ? {
                             ...current,
 
+                            paymentFee:response.paymentFee??current.paymentFee,
+                            paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax,
+                            paymentFeeRate:response.paymentFeeRate??current.paymentFeeRate,
                             totalAmount:
                                 response.totalAmount
                         }
@@ -870,6 +914,7 @@ export default function CheckoutOffersPanel({
 
         } catch (exception) {
 
+            if(exception instanceof CheckoutSavingsUncertainError)requireSavingsRecheck();
             console.error(
                 "Unable to remove applied offer:",
                 exception
@@ -903,6 +948,8 @@ export default function CheckoutOffersPanel({
 
 
     function handleContinueToPayment() {
+        if(savingsBusy)return;
+        if(navigating || addonBusy || needsPriceReview || refreshFailed || savingsRecheckRequired || applyingCode || removing)return;
 
         if (
             !pendingOrder
@@ -929,7 +976,7 @@ export default function CheckoutOffersPanel({
         ) {
 
             setError(
-                "Your pickup reservation has expired. Please choose a pickup slot again."
+                translate("Your pickup reservation has expired. Please choose a pickup slot again.")
             );
 
 
@@ -946,7 +993,7 @@ export default function CheckoutOffersPanel({
         ) {
 
             setError(
-                "Your cart has changed. Review the updated cart before payment."
+                translate("Your cart has changed. Review the updated cart before payment.")
             );
 
 
@@ -968,6 +1015,7 @@ export default function CheckoutOffersPanel({
         }
 
 
+        setNavigating(true);
         router.push(
             `/checkout/payment/${encodeURIComponent(
                 orderNumber
@@ -996,6 +1044,81 @@ export default function CheckoutOffersPanel({
         );
     }
 
+
+    function requireSavingsRecheck(){
+        const saved=parsePendingOrder(getPendingOrderSnapshot());
+        if(saved?.orderNumber===orderNumber)savePendingOrder({...saved,offerRecheckRequired:true,priceReviewRequired:true});
+        setSavingsUncertain(true);setRefreshFailed(true);setPriceReviewRequired(true);setTotalChanged(true);setAppliedRebate(null);
+        onRefreshRequiredChange?.(true);
+    }
+    async function recoverSavingsTotal(){
+        const signal=AbortSignal.timeout(15000),snapshot=getPendingOrderSnapshot();
+        try{
+            const summary=await getCustomerOrder(orderNumber,signal);
+            if(getPendingOrderSnapshot()!==snapshot)throw new Error("Your reservation changed elsewhere. Check it again.");
+            if(summary.orderStatus!=="PENDING_PAYMENT"||summary.paymentStatus!==null)throw new Error("This order has a payment attempt or has changed. Review its payment status before continuing.");
+            const saved=parsePendingOrder(snapshot);
+            if(!saved||saved.orderNumber!==orderNumber)throw new Error("No pending checkout was found. Review your orders.");
+            setOrderSummary(summary);setAppliedRebate(null);
+            savePendingOrder({...saved,totalAmount:summary.totalAmount,offerRecheckRequired:false,priceReviewRequired:true});
+            setSavingsUncertain(false);setRefreshFailed(false);setTotalChanged(true);setPriceReviewRequired(true);
+            setError(null);setErrorSource(null);onRefreshRequiredChange?.(false);
+            setSuccessMessage("Reserved total recovered. Review the confirmed amount before payment.");
+            // Offer discovery is optional; a failed read cannot replace the confirmed total.
+            const offers=await getAvailableRebates(orderNumber,signal).catch(()=>null);
+            if(offers&&parsePendingOrder(getPendingOrderSnapshot())?.orderNumber===orderNumber){setRebates(offers);setOffersLoadedSuccessfully(true);}
+        }catch(error){setRefreshFailed(true);setError(error instanceof Error?error.message:"Could not recover the reserved total. Try again.");setErrorSource("general");throw error;}
+    }
+    function confirmPriceReview(checked:boolean){
+        if(refreshFailed||savingsRecheckRequired)return;
+        setTotalChanged(true);
+        setPriceReviewRequired(!checked);
+        const saved=parsePendingOrder(getPendingOrderSnapshot());
+        if(saved?.orderNumber===orderNumber)savePendingOrder({...saved,priceReviewRequired:!checked});
+    }
+
+    async function savingsChanged(result:RewardCheckout){
+        if(result.offer){setAppliedRebate(result.offer);updatePendingOrderTotal(result.offer.totalAmount);}
+        setPriceReviewRequired(true);setTotalChanged(true);
+        try{const signal=AbortSignal.timeout(15000);const [summary,offers]=await Promise.all([getCustomerOrder(orderNumber,signal),getAvailableRebates(orderNumber,signal)]);setOrderSummary(summary);setRebates(offers);setOffersLoadedSuccessfully(true);setRefreshFailed(false);}catch{setRefreshFailed(true);throw new Error("Savings were updated. Reload this checkout to review the confirmed total before payment.");}
+    }
+    async function chooseOffer(code:string){
+        if(savingsBusy||addonBusy)throw new Error("Wait for the current checkout check.");
+        setSavingsBusy(true);
+        try{const response=await applyRebate(orderNumber,code);setAppliedRebate(response);updatePendingOrderTotal(response.totalAmount);setOrderSummary(current=>current?{...current,totalAmount:response.totalAmount,paymentFee:response.paymentFee??current.paymentFee,paymentFeeTax:response.paymentFeeTax??current.paymentFeeTax}:current);}catch(error){if(error instanceof CheckoutSavingsUncertainError)requireSavingsRecheck();throw error;}finally{setSavingsBusy(false);}
+    }
+    const [adjusting,setAdjusting]=useState(false);
+    async function refreshAfterAddition(changedItems?:CartItem[],changedPickup?:PickupSelection, signal:AbortSignal=AbortSignal.timeout(15000)) {
+        setTotalChanged(true);setPriceReviewRequired(true);setAppliedRebate(null);setSuccessMessage(null);
+        const cartSnapshot=getCartSnapshot(), pickupSnapshot=getPickupSlotSnapshot(), branchSnapshot=getStoredBranchSnapshot();
+        const storedCart=parseCart(cartSnapshot),cart=changedItems?{...storedCart,items:changedItems}:storedCart,pickup=changedPickup??parsePickupSlot(pickupSnapshot),customer=parseCustomerDetails(getCustomerSnapshot());
+        const saved=parsePendingOrder(getPendingOrderSnapshot());
+        const unchanged=()=>cartSnapshot===getCartSnapshot()&&pickupSnapshot===getPickupSlotSnapshot()&&branchSnapshot===getStoredBranchSnapshot()&&parsePendingOrder(getPendingOrderSnapshot())?.orderNumber===orderNumber;
+        let updateStarted=false;
+        try {
+            if(!saved || saved.orderNumber!==orderNumber || saved.branchId!==cart.branchId || !pickup || pickup.pickupType!=="NORMAL" || !customer || !cart.items.length)throw new Error("Review your cart and pickup details before refreshing the price.");
+            const current=await getCustomerOrder(orderNumber,signal);
+            if(current.orderStatus!=="PENDING_PAYMENT" || current.paymentStatus!==null)throw new Error("This order has a payment attempt or has changed. Review its payment status before adding items.");
+            const request={branchId:saved.branchId,pickupSlotId:pickup.slot.id,pickupType:pickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};
+            const quote=features?.acceptedCheckoutQuote?await previewCheckoutQuote(request,orderNumber,signal):null;
+            if(!unchanged())throw new Error("Your cart or pickup changed during the price check. Review it again.");
+            updateStarted=true;
+            const updated=await updatePendingCheckout(orderNumber,{pickupSlotId:request.pickupSlotId,pickupType:request.pickupType,items:request.items,quoteToken:quote?.token},signal);
+            if(!unchanged() || updated.orderStatus!=="PENDING_PAYMENT")throw new Error("Your checkout changed. Review the cart before continuing.");
+            if(changedItems)saveCart(cart);if(changedPickup)savePickupSlot(changedPickup);
+            setOrderSummary({...current,pickupDate:pickup.date,pickupStartTime:pickup.slot.startTime,pickupEndTime:pickup.slot.endTime,pickupType:pickup.pickupType,items:updated.items,subtotal:updated.subtotal,taxAmount:updated.taxAmount,priorityCharge:updated.priorityCharge,convenienceFee:updated.convenienceFee,convenienceFeeTax:updated.convenienceFeeTax,paymentFee:updated.paymentFee,paymentFeeTax:updated.paymentFeeTax,paymentFeeRate:updated.paymentFeeRate,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt});
+            savePendingOrder({...saved,pickupSlotId:pickup.slot.id,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(cart.items)});
+            setRefreshFailed(false);onRefreshRequiredChange?.(false);setError(null);setErrorSource(null);
+            const [offers,targets]=await Promise.allSettled([getAvailableRebates(orderNumber,signal),apiClient<AvailableRebateResponse[]>(`/api/orders/${encodeURIComponent(orderNumber)}/rebate-spend-targets`,{credentials:"include",signal})]);
+            setRebates(offers.status==="fulfilled"?offers.value:[]);setOffersLoadedSuccessfully(offers.status==="fulfilled");
+            setSpendTargets(targets.status==="fulfilled"?targets.value:[]);
+            setSuccessMessage("Addition checked. Review the updated total and choose any available offer before payment.");
+        } catch(cause) {
+            const failure=updateStarted?new CheckoutUpdateUncertainError():cause;
+            const message=failure instanceof Error?failure.message:"Could not refresh the price. Review your cart before payment.";
+            setRefreshFailed(true);onRefreshRequiredChange?.(true);setRebates([]);setSpendTargets([]);setOffersLoadedSuccessfully(false);setError(message);setErrorSource("general");onUpdateError?.(message);throw failure;
+        }
+    }
 
     const displayTotal =
         appliedRebate
@@ -1052,8 +1175,7 @@ export default function CheckoutOffersPanel({
                                 text-[#7a1625]
                             "
                         >
-                            Pickup reserved
-                        </p>
+                            <T text="Pickup reserved" /></p>
 
 
                         <p
@@ -1063,8 +1185,7 @@ export default function CheckoutOffersPanel({
                                 text-[#756763]
                             "
                         >
-                            Complete checkout before the timer ends.
-                        </p>
+                            <T text="Complete checkout before the timer ends." /></p>
 
                     </div>
 
@@ -1101,8 +1222,7 @@ export default function CheckoutOffersPanel({
                                 text-[#756763]
                             "
                         >
-                            remaining
-                        </p>
+                            <T text="remaining" /></p>
 
                     </div>
 
@@ -1124,13 +1244,10 @@ export default function CheckoutOffersPanel({
                             "
                         >
                             <p className="font-bold text-red-700">
-                                Pickup reservation expired
-                            </p>
+                                <T text="Pickup reservation expired" /></p>
 
                             <p className="mt-2 text-sm leading-6 text-[#756763]">
-                                Choose a new pickup time before continuing.
-                                Your cart is still available.
-                            </p>
+                                <T text="Choose a new pickup time before continuing. Your cart is still available." /></p>
 
                             {
                                 reservationReleaseError
@@ -1188,16 +1305,11 @@ export default function CheckoutOffersPanel({
                                 "
                             >
                                 <p className="font-bold text-[#7a1625]">
-                                    Your cart has changed
-                                </p>
+                                    <T text="Your cart has changed" /></p>
 
-                                <p className="mt-2 text-sm leading-6 text-[#756763]">
-                                    Review the cart again so this same pending
-                                    order can be updated before payment.
-                                </p>
+                                <p className="mt-2 text-sm leading-6 text-[#756763]">{" "}<T text="Review the cart again so this same pending order can be updated before payment." />{" "}</p>
 
-                                <Link
-                                    href="/cart"
+                                <button type="button" onClick={()=>setAdjusting(true)}
                                     className="
                                         mt-4
                                         inline-flex
@@ -1208,13 +1320,14 @@ export default function CheckoutOffersPanel({
                                         text-[#7a1625]
                                     "
                                 >
-                                    Review Cart →
-                                </Link>
+                                    <T text="Review changes here" /></button>
                             </div>
                         )
                         : (
                             <>
-
+                                {features?.gokulRewards&&<OrderRewards orderNumber={orderNumber} disabled={loading||addonBusy||!!applyingCode||removing||reservationExpired} onBusy={setSavingsBusy} onChanged={savingsChanged}/>}
+                                {offersLoadedSuccessfully&&rebates.length>0&&<button type="button" className="checkout-change-offer mb-3" disabled={savingsBusy||loading||!!applyingCode||removing} onClick={()=>setOfferPopup(true)}><T text="Change offer" /></button>}
+                                {offerPopup&&<OfferChoiceDialog offers={rebates} selected={appliedRebate?.rebateCode??null} onApply={chooseOffer} onClose={()=>setOfferPopup(false)}/>}
                                 <div
                                     className="
                                         rounded-3xl
@@ -1236,12 +1349,10 @@ export default function CheckoutOffersPanel({
                                     >
                                         <div>
                                             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#c88a20]">
-                                                Offers & savings
-                                            </p>
+                                                <T text="Offers & savings" /></p>
 
                                             <h2 className="mt-1 text-xl font-bold text-[#241715]">
-                                                Save on this order
-                                            </h2>
+                                                <T text="Save on this order" /></h2>
                                         </div>
 
                                         {
@@ -1292,8 +1403,7 @@ export default function CheckoutOffersPanel({
                                                                 text-[#241715]
                                                             "
                                                         >
-                                                            See offers available for this order
-                                                        </p>
+                                                            <T text="See offers available for this order" /></p>
 
 
                                                         <p
@@ -1304,10 +1414,7 @@ export default function CheckoutOffersPanel({
                                                                 text-[#756763]
                                                             "
                                                         >
-                                                            We&apos;ll check the server using your
-                                                            final cart value, branch, pickup type
-                                                            and eligibility.
-                                                        </p>
+                                                            <T text="We'll check the server using your final cart value, branch, pickup type and eligibility." /></p>
 
 
                                                         <button
@@ -1337,8 +1444,7 @@ export default function CheckoutOffersPanel({
                                                                 active:scale-[0.98]
                                                             "
                                                         >
-                                                            Find available offers
-                                                        </button>
+                                                            <T text="Find available offers" /></button>
 
                                                     </div>
                                                 )
@@ -1346,12 +1452,9 @@ export default function CheckoutOffersPanel({
                                                     ? (
                                                         <div className="mt-5 rounded-2xl bg-[#fffaf3] p-4 text-center">
                                                             <p className="text-sm font-bold text-[#241715]">
-                                                                No public offers available
-                                                            </p>
+                                                                <T text="No public offers available" /></p>
                                                             <p className="mt-1 text-xs leading-5 text-[#756763]">
-                                                                Have a creator, partner or promotional
-                                                                code? You can still enter it below.
-                                                            </p>
+                                                                <T text="Have a creator, partner or promotional code? You can still enter it below." /></p>
                                                         </div>
                                                     )
                                                     : (
@@ -1402,8 +1505,7 @@ export default function CheckoutOffersPanel({
                                                                                                 !isApplied
                                                                                                 && (
                                                                                                     <span className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-green-700">
-                                                                                                        Best saving
-                                                                                                    </span>
+                                                                                                        <T text="Best saving" /></span>
                                                                                                 )
                                                                                             }
 
@@ -1411,8 +1513,7 @@ export default function CheckoutOffersPanel({
                                                                                                 isApplied
                                                                                                 && (
                                                                                                     <span className="rounded-full bg-green-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-green-700">
-                                                                                                        Applied ✓
-                                                                                                    </span>
+                                                                                                        <T text="Applied ✓" /></span>
                                                                                                 )
                                                                                             }
                                                                                         </div>
@@ -1437,8 +1538,7 @@ export default function CheckoutOffersPanel({
 
                                                                                     <div className="shrink-0 text-right">
                                                                                         <p className="text-[10px] font-semibold uppercase tracking-wide text-[#756763]">
-                                                                                            Save
-                                                                                        </p>
+                                                                                            <T text="Save" /></p>
                                                                                         <p className="mt-1 text-lg font-extrabold text-green-700">
                                                                                             {formatCurrency(rebate.rebateAmount)}
                                                                                         </p>
@@ -1446,14 +1546,10 @@ export default function CheckoutOffersPanel({
                                                                                 </div>
 
                                                                                 {
-                                                                                    rebate.amountNeededForNextSlab !== null
-                                                                                    &&
-                                                                                    rebate.amountNeededForNextSlab > 0
+                                                                                    usefulRebateTarget([rebate]) !== null
                                                                                     && (
                                                                                         <p className="mt-3 rounded-xl bg-[#fffaf3] px-3 py-2 text-xs leading-5 text-[#756763]">
-                                                                                            Add {formatCurrency(rebate.amountNeededForNextSlab)} more
-                                                                                            to unlock the next saving level.
-                                                                                        </p>
+                                                                                            <T text="Add" />{" "}{formatCurrency(rebate.amountNeededForNextSlab!)} <T text="more to unlock the next saving level." /></p>
                                                                                     )
                                                                                 }
 
@@ -1461,7 +1557,7 @@ export default function CheckoutOffersPanel({
                                                                                     type="button"
                                                                                     disabled={
                                                                                         Boolean(
-                                                                                            applyingCode
+                                                                                            addonBusy || applyingCode
                                                                                             ||
                                                                                             removing
                                                                                         )
@@ -1514,15 +1610,13 @@ export default function CheckoutOffersPanel({
                                     }
 
 
+                                    {features?.pickupAddOns && pendingOrder && orderSummary?.pickupType==="NORMAL" && orderSummary.pickupDate && orderSummary.orderStatus==="PENDING_PAYMENT" && orderSummary.paymentStatus==null && <PickupAddOns branchId={pendingOrder.branchId} date={orderSummary.pickupDate} orderNumber={orderNumber} offers={spendTargets} disabled={loading || reservationExpired || !!applyingCode || removing} onBusy={busy=>{setAddonBusy(busy);onCartMutationBusy?.(busy);}} onAdded={signal=>refreshAfterAddition(undefined,undefined,signal)} onAdjust={()=>setAdjusting(true)}/>}
                                     <div className="mt-5 border-t border-[#eadfd6] pt-5">
                                         <p className="text-sm font-bold text-[#241715]">
-                                            Have a creator or exclusive code?
-                                        </p>
+                                            <T text="Have a creator or exclusive code?" /></p>
 
                                         <p className="mt-1 text-xs leading-5 text-[#756763]">
-                                            Enter a code shared by an influencer,
-                                            partner, event or private campaign.
-                                        </p>
+                                            <T text="Enter a code shared by an influencer, partner, event or private campaign." /></p>
 
                                         <form
                                             onSubmit={
@@ -1625,7 +1719,7 @@ export default function CheckoutOffersPanel({
                                                         exclusiveCode
                                                             .trim()
                                                             .toUpperCase()
-                                                        ? "Checking..."
+                                                        ? translate("Checking...")
                                                         : "Apply"
                                                 }
                                             </button>
@@ -1643,8 +1737,7 @@ export default function CheckoutOffersPanel({
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="min-w-0">
                                                         <p className="text-xs font-bold uppercase tracking-wide text-green-700">
-                                                            Offer applied ✓
-                                                        </p>
+                                                            <T text="Offer applied ✓" /></p>
 
                                                         <p className="mt-1 font-bold text-[#241715]">
                                                             {appliedRebate.rebateCode}
@@ -1713,7 +1806,7 @@ export default function CheckoutOffersPanel({
                                                 className="mt-4 rounded-xl border border-red-100 bg-red-50 p-3"
                                             >
                                                 <p className="text-sm font-semibold text-red-700">
-                                                    {error}
+                                                    {translate(error)}
                                                 </p>
 
                                                 {
@@ -1725,8 +1818,7 @@ export default function CheckoutOffersPanel({
                                                             onClick={handleRetry}
                                                             className="mt-2 text-xs font-bold text-[#7a1625]"
                                                         >
-                                                            Try checking offers again
-                                                        </button>
+                                                            <T text="Try checking offers again" /></button>
                                                     )
                                                 }
                                             </div>
@@ -1747,8 +1839,7 @@ export default function CheckoutOffersPanel({
                                     "
                                 >
                                     <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#c88a20]">
-                                        Final price
-                                    </p>
+                                        <T text="Final price" /></p>
 
                                     {
                                         orderSummary
@@ -1756,8 +1847,7 @@ export default function CheckoutOffersPanel({
                                             <div className="mt-4 space-y-2 text-sm">
                                                 <div className="flex items-center justify-between gap-4">
                                                     <span className="text-[#756763]">
-                                                        Items subtotal
-                                                    </span>
+                                                        <T text="Items subtotal" /></span>
                                                     <span className="font-semibold text-[#241715]">
                                                         {formatCurrency(orderSummary.subtotal)}
                                                     </span>
@@ -1765,21 +1855,21 @@ export default function CheckoutOffersPanel({
 
                                                 <div className="flex items-center justify-between gap-4">
                                                     <span className="text-[#756763]">
-                                                        GST
-                                                    </span>
+                                                        <T text="GST" /></span>
                                                     <span className="font-semibold text-[#241715]">
                                                         {formatCurrency(orderSummary.taxAmount)}
                                                     </span>
                                                 </div>
 
+                                                {(orderSummary.paymentFee??0)>0&&<div className="flex justify-between gap-4"><span><T text="Online payment fee" /> ({orderSummary.paymentFeeRate}%, <T text="tax included" />)</span><span>{formatCurrency(orderSummary.paymentFee??0)}</span></div>}
+                                                {(orderSummary.convenienceFee ?? 0)>0 && <div className="flex justify-between gap-4"><span><T text="Convenience fee (tax included)" /></span><span>{formatCurrency(orderSummary.convenienceFee ?? 0)}</span></div>}
                                                 {
                                                     orderSummary.priorityCharge >
                                                         0
                                                     && (
                                                         <div className="flex items-center justify-between gap-4">
                                                             <span className="text-[#756763]">
-                                                                Priority pickup
-                                                            </span>
+                                                                <T text="Priority pickup" /></span>
                                                             <span className="font-semibold text-[#241715]">
                                                                 {formatCurrency(orderSummary.priorityCharge)}
                                                             </span>
@@ -1787,13 +1877,19 @@ export default function CheckoutOffersPanel({
                                                     )
                                                 }
 
+                                                {(orderSummary.loyaltyDiscount ?? 0) > 0 && (
+                                                    <div className="flex items-center justify-between gap-4">
+                                                        <span className="text-green-700"><T text="Reward saving" /></span>
+                                                        <span className="font-bold text-green-700">-{formatCurrency(orderSummary.loyaltyDiscount ?? 0)}</span>
+                                                    </div>
+                                                )}
+
                                                 {
                                                     appliedRebate
                                                     && (
                                                         <div className="flex items-center justify-between gap-4">
                                                             <span className="text-green-700">
-                                                                Offer saving
-                                                            </span>
+                                                                <T text="Offer saving" /></span>
                                                             <span className="font-bold text-green-700">
                                                                 -{formatCurrency(appliedRebate.rebateAmount)}
                                                             </span>
@@ -1807,11 +1903,9 @@ export default function CheckoutOffersPanel({
                                     <div className="mt-4 flex items-end justify-between gap-4 border-t border-[#eadfd6] pt-4">
                                         <div>
                                             <p className="text-sm font-semibold text-[#241715]">
-                                                Payable
-                                            </p>
+                                                <T text="Payable" /></p>
                                             <p className="mt-1 text-xs text-[#756763]">
-                                                Confirmed final amount
-                                            </p>
+                                                <T text="Confirmed final amount" /></p>
                                         </div>
 
                                         <p className="text-2xl font-extrabold text-[#7a1625]">
@@ -1819,10 +1913,11 @@ export default function CheckoutOffersPanel({
                                         </p>
                                     </div>
 
+                                    {(totalChanged||pendingOrder?.priceReviewRequired) && <label className="mt-4 flex min-h-11 items-start gap-3 rounded-xl border border-[#d4e1d9] bg-[#fffaf2] p-3 text-sm text-[#173a37]"><input type="checkbox" className="mt-1 h-5 w-5" disabled={refreshFailed||savingsRecheckRequired||addonBusy} checked={!needsPriceReview} onChange={e=>confirmPriceReview(e.target.checked)} />{" "}<T text="I have reviewed the updated total and offers." /></label>}
                                     <button
                                         type="button"
                                         disabled={
-                                            loading
+                                            savingsBusy || navigating || needsPriceReview || savingsRecheckRequired || refreshFailed || loading || addonBusy
                                             ||
                                             Boolean(
                                                 applyingCode
@@ -1831,7 +1926,7 @@ export default function CheckoutOffersPanel({
                                             )
                                         }
                                         onClick={handleContinueToPayment}
-                                        className="
+                                        className="checkout-payment-desktop-action
                                             mt-5
                                             flex
                                             min-h-14
@@ -1851,11 +1946,10 @@ export default function CheckoutOffersPanel({
                                             disabled:bg-[#c9b9b4]
                                         "
                                     >
-                                        Continue to Payment
-                                    </button>
+                                        {navigating?translate("Opening secure payment…"):translate("Continue to Payment")}</button>
 
-                                    <Link
-                                        href="/cart"
+                                    <button type="button" disabled={addonBusy} onClick={()=>setAdjusting(true)}
+
                                         className="
                                             mt-3
                                             flex
@@ -1867,14 +1961,16 @@ export default function CheckoutOffersPanel({
                                             text-[#7a1625]
                                         "
                                     >
-                                        Add or change items
-                                    </Link>
+                                        <T text="Adjust quantities or pickup" /></button>
                                 </div>
 
                             </>
                         )
             }
 
+            {(refreshFailed||savingsRecheckRequired) && !reservationExpired && <button type="button" disabled={addonBusy} className="min-h-12 rounded-xl border px-4 font-semibold" onClick={async()=>{setAddonBusy(true);onCartMutationBusy?.(true);try{if(savingsRecheckRequired)await recoverSavingsTotal();else await refreshAfterAddition();}catch{/* The current-screen error already explains how to retry. */}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}><T text={savingsRecheckRequired?"Recheck reserved total":"Recheck current cart and total"} /></button>}
+            {adjusting && pendingOrder && parsePickupSlot(getPickupSlotSnapshot()) && <CheckoutAdjustmentDialog items={items} pickup={parsePickupSlot(getPickupSlotSnapshot())!} branchId={pendingOrder.branchId} days={features?.futureOrderingDays??30} onClose={()=>setAdjusting(false)} onApply={async(changedItems,changedPickup)=>{setAddonBusy(true);onCartMutationBusy?.(true);try{await refreshAfterAddition(changedItems,changedPickup);}finally{setAddonBusy(false);onCartMutationBusy?.(false);}}}/>}
+            {!reservationExpired && !cartChanged && <CheckoutMobileAction label={navigating?translate("Opening secure payment…"):needsPriceReview ? translate("Review updated total") : translate("Continue to payment")} amount={displayTotal} disabled={savingsBusy || navigating || needsPriceReview || savingsRecheckRequired || refreshFailed || addonBusy || loading || !!applyingCode || removing} onContinue={handleContinueToPayment} />}
         </div>
     );
 }
