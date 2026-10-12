@@ -100,8 +100,8 @@ export async function getCustomerOrderHistory(
     );
 }
 
-export interface VerifiedOrderPage {orders:CustomerOrderSummaryResponse[];nextBefore:string|null}
-export function getVerifiedOrderPage(before:string|null=null,signal?:AbortSignal):Promise<VerifiedOrderPage>{
-    const query=new URLSearchParams({limit:"10"});if(before)query.set("before",before);
+export interface VerifiedOrderPage {orders:CustomerOrderSummaryResponse[];nextBefore:string|null;previousAfter?:string|null}
+export function getVerifiedOrderPage(before:string|null=null,signal?:AbortSignal,filters:Record<string,string>={}):Promise<VerifiedOrderPage>{
+    const query=new URLSearchParams({limit:"10",...filters});if(before)query.set("before",before);
     return apiClient<VerifiedOrderPage>(`/api/customer/identity/orders/page?${query}`,{credentials:"include",signal});
 }

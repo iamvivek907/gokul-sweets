@@ -1,10 +1,9 @@
 "use client";
 import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
-import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import dynamic from "next/dynamic";
 const OccasionRequests=dynamic(()=>import("@/components/occasion/OccasionRequests"),{loading:()=> <BrandLoading compact label="Loading your requests…" />});
-import ReorderDialog from "./ReorderDialog";
+import CustomerOrderHistory from "./CustomerOrderHistory";
 import CustomerRewards from "./CustomerRewards";
 import AddressLocationAssist from "./AddressLocationAssist";
 import AccountTierMark from "./AccountTierMark";
@@ -13,23 +12,19 @@ import MobilePageBack from "./MobilePageBack";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {T} from "@/lib/language";
 
-import {formatWeight} from "@/lib/orderQuantity";
 
 import CustomerNotificationLink from "./CustomerNotificationLink";
 import LogoutConfirmation from "./LogoutConfirmation";
-import {Suspense, useCallback, useEffect, useRef, useState} from "react";
+import {Suspense, useCallback, useEffect, useState} from "react";
 import Link from "next/link";
 import {useRouter} from "next/navigation";
-import {apiClient,ApiError} from "@/services/apiClient";
+import {apiClient} from "@/services/apiClient";
 import {getMenu} from "@/services/menuApi";
-import {getVerifiedOrderPage, type VerifiedOrderPage} from "@/services/orderApi";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import BadgeCards, {useBadges} from "./BadgeCards";
 import type {CustomerSession} from "@/components/customer/CustomerIdentityPanel";
-import type {CustomerOrderSummaryResponse, CustomerOrderResponse} from "@/types/order";
 import type {MenuProduct} from "@/types/menu";
-import {formatOrderCurrency, formatOrderDate, formatOrderTime, getOrderStatusPresentation} from "@/lib/orderTracking";
 
 const base = "/api/customer/identity/account";
 type Address = {id: number; label: string; addressLine: string; locality: string; postalCode: string};
@@ -48,24 +43,12 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     const {branch} = useSelectedBranch();
     const router = useRouter();
     const [account, setAccount] = useState<Account | null>(null);
-    const [orders, setOrders] = useState<CustomerOrderSummaryResponse[]>([]);
-    const detailDialog = useRef<HTMLDialogElement>(null);
-    const [selectedOrder, setSelectedOrder] = useState<CustomerOrderResponse | null>(null);
-    const [detailError, setDetailError] = useState("");
-    const [detailLoading, setDetailLoading] = useState(false);
     const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
     const [dietary, setDietary] = useState("");
     const [address, setAddress] = useState({label: "", addressLine: "", locality: "", postalCode: ""});
     const [editingAddressId, setEditingAddressId] = useState<number | null>(null);
-    const [reorder,setReorder]=useState<CustomerOrderSummaryResponse|null>(null);
-    const closeReorder=useCallback(()=>setReorder(null),[]);
-    const [pages,setPages]=useState<VerifiedOrderPage[]>([]);
-    const [pageIndex,setPageIndex]=useState(0);
-    const [paging,setPaging]=useState(false);
-    const pageRequest=useRef<AbortController|null>(null);
-    useEffect(()=>()=>pageRequest.current?.abort(),[]);
     const [menu, setMenu] = useState<MenuProduct[]>([]);
     const [activeSection, setActiveSection] = useState<AccountSection>(initialSection??"badges");
     const [orderType,setOrderType]=useState<"pickup"|"bulk">("pickup");
@@ -87,22 +70,12 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     }, [router]);
 
     const reload = useCallback(async () => {
-        pageRequest.current?.abort();setPaging(false);
-        const [next, history] = await Promise.all([
-            apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedOrderPage(null,AbortSignal.timeout(8000))
-        ]);
-        setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history.orders);setPages([history]);setPageIndex(0);
-        setStatus("ready");
-    }, []);
-
-    useEffect(() => {
-        if (!enabled || !session?.authenticated) return;
-        let active = true;
-        void Promise.all([apiClient<Account>(base, {credentials: "include",signal:AbortSignal.timeout(8000)}), getVerifiedOrderPage(null,AbortSignal.timeout(8000))])
-            .then(([next, history]) => {if (active) {setAccount(next); setDietary(next.preferences.dietaryNotes ?? ""); setOrders(history.orders);setPages([history]);setPageIndex(0); setStatus("ready");}})
-            .catch(() => {if (active) setStatus("error");});
-        return () => {active = false;};
-    }, [enabled, session?.authenticated, session?.phone]);
+        const next = await apiClient<Account>(base,{credentials:"include",signal:AbortSignal.timeout(8000)});
+        setAccount(next);setDietary(next.preferences.dietaryNotes??"");setStatus("ready");
+    },[]);
+    useEffect(()=>{if(!enabled||!session?.authenticated)return;let active=true;
+        void apiClient<Account>(base,{credentials:"include",signal:AbortSignal.timeout(8000)}).then(next=>{if(active){setAccount(next);setDietary(next.preferences.dietaryNotes??"");setStatus("ready");}}).catch(()=>{if(active)setStatus("error");});return()=>{active=false;};
+    },[enabled,session?.authenticated,session?.phone]);
 
     if (!enabled || !session?.authenticated) return null;
     if (status === "loading") return <BrandLoading label="Loading your account…" />;
@@ -116,29 +89,6 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
         try {await action(); await reload(); setMessage(success);}
         catch {setMessage("We could not save that change. Please try again.");}
         finally {setBusy(false);}
-    }
-
-    async function showOrderDetails(orderNumber: string) {
-        setSelectedOrder(null); setDetailError(""); setDetailLoading(true);
-        detailDialog.current?.showModal();
-        try {
-            const detail = await apiClient<CustomerOrderResponse>(
-                `/api/customer/identity/orders/${encodeURIComponent(orderNumber)}`, {credentials: "include"});
-            if (detailDialog.current?.open) setSelectedOrder(detail);
-        } catch {
-            if (detailDialog.current?.open) setDetailError("Order details could not load. Please try again.");
-        } finally {setDetailLoading(false);}
-    }
-
-    async function changeOrderPage(index:number) {
-        if(paging)return;
-        const before=pages[pageIndex]?.nextBefore;if(index!==pageIndex+1||!before)return;
-        const controller=new AbortController();pageRequest.current=controller;setPaging(true);setMessage("");
-        try{const next=await getVerifiedOrderPage(before,AbortSignal.any([controller.signal,AbortSignal.timeout(8000)]));
-            if(controller.signal.aborted)return;
-            setPages(current=>[...current,next]);setOrders(current=>[...current,...next.orders.filter(order=>!current.some(existing=>existing.orderNumber===order.orderNumber))]);setPageIndex(index);
-        }catch(error){if(!controller.signal.aborted){if(error instanceof ApiError&&[401,403].includes(error.status)){setOrders([]);setPages([]);setStatus("error");}else setMessage("The next page could not load. Your current orders are saved. Try Load more again.");}}
-        finally{if(!controller.signal.aborted)setPaging(false);}
     }
 
     function showSection(section: AccountSection) {
@@ -179,7 +129,6 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     const maskedPhone = session.phone ? `+91 •••••• ${session.phone.replace(/\D/g, "").slice(-4)}` : "Phone verified";
     return <div className={`account-hub mt-6 ${initialSection?"account-focused":"account-overview"}`}>
         {initialSection&&<MobilePageBack href="/profile" label="Back to profile" className="account-focused-back"/>}
-        {reorder&&features&&<ReorderDialog key={`${session.phone}:${reorder.orderNumber}`} order={reorder} phone={session.phone} features={features} compact={compact} onClose={closeReorder}/>}
         <LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={signOut} />
         <header className="account-cover relative overflow-hidden rounded-3xl p-6 sm:p-9">
             <div className="account-cover-art" aria-hidden="true"><span>✦</span><span>✦</span><span>✦</span></div>
@@ -214,51 +163,10 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
             </nav>
             <div id="account-content" className="account-panels min-w-0 scroll-mt-28 space-y-6" aria-live="polite">
                 {activeSection === "badges" && <BadgeCards state={badgeState}/>}
-        {activeSection === "orders" && <section id="account-orders" className="profile-history rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8">
-            {features?.occasionEnquiries && <nav className="mobile-profile-order-types" aria-label="Order history types"><button type="button" aria-pressed={orderType==="pickup"} onClick={()=>setOrderType("pickup")}><T text="Pickup orders" /></button><button type="button" aria-pressed={orderType==="bulk"} onClick={()=>setOrderType("bulk")}><T text="Bulk order requests" /></button></nav>}
-            {orderType==="bulk"&&features?.occasionEnquiries?<Suspense fallback={<BrandLoading compact label="Loading your requests…" />}><OccasionRequests key={session.phone} embeddedSession={session}/></Suspense>:<><div className="profile-history-heading flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-bold text-[#241715]"><T text="Your orders" /></h2>
-                <p className="mt-1 text-sm text-[#756763]"><T text="Only orders placed while signed in to this account." /></p></div>
-                <span className="text-sm text-[#756763]"><T text="All branches" /></span></div>
-            {orders.length ? <div className="profile-history-list mt-4 space-y-3">{orders.map(order => {
-                if(!modern)return <div key={order.orderNumber} className="flex flex-wrap items-center justify-between gap-3 border-t border-[#eadfd6] pt-3"><div><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="text-left font-semibold text-[#7a1625] underline">{orderDisplayNumber(order)}</button><p className="text-xs text-[#756763]">{order.branchName} · {order.orderStatus.replaceAll("_"," ")}</p></div><div className="flex gap-2"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625]"><T text="Details"/></button><button type="button" disabled={busy} onClick={()=>{setReorder(order);}} className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-50"><T text="Reorder"/></button></div></div>;
-                const presentation=getOrderStatusPresentation(order.orderStatus,order.fulfillmentType);
-                const date=order.pickupDate??order.deliveryDate;
-                return <article key={order.orderNumber} className="profile-order-card">
-                    <div className="profile-order-top"><strong className="profile-order-number" title={order.orderNumber}>{order.customerOrderNumber!=null?`Order #${order.customerOrderNumber}`:`Reference …${order.orderNumber.slice(-6)}`}</strong><span className={`profile-order-status tone-${presentation.tone}`}><T text={presentation.label}/></span></div>
-                    <p className="profile-order-branch">{order.branchName}</p>
-                    <div className="profile-order-meta"><span>{order.fulfillmentType==="DELIVERY"?"Delivery":"Pickup"}{date?` · ${formatOrderDate(date)}`:""}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
-                    <div className="profile-order-actions"><button type="button" onClick={()=>{void showOrderDetails(order.orderNumber);}}><T text="Details"/><span aria-hidden="true"> →</span></button><button type="button" disabled={busy} onClick={()=>{setReorder(order);}}><T text="Reorder"/></button></div>
-                </article>;
-            })}</div> : <p className="mt-5 text-sm text-[#756763]"><T text="No orders belong to this verified account yet." /></p>}
-            <dialog ref={detailDialog} onClose={() => {setSelectedOrder(null); setDetailError("");}}
-                className="account-order-dialog m-auto max-h-[85dvh] w-[min(38rem,calc(100vw-2rem))] overflow-y-auto rounded-3xl border border-[#d9e5dc] bg-[#fffaf2] p-0 text-[#172e2c] shadow-2xl backdrop:bg-[#092725b3]"
-                aria-label="Order details">
-                <div className="flex items-start justify-between gap-4 bg-[#143936] px-5 py-5 text-white sm:px-7">
-                    <div><p className="text-xs font-bold uppercase tracking-[0.15em] text-[#f3bca9]"><T text="Your order" /></p>
-                        <h3 className="mt-1 font-serif text-3xl"><T text="Order details" /></h3></div>
-                    <button type="button" onClick={() => detailDialog.current?.close()} className="grid min-h-11 min-w-11 place-items-center rounded-full border border-white/50 text-xl hover:bg-white/15 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" aria-label="Close order details">×</button></div>
-                <div className="px-5 py-5 sm:px-7 sm:py-6">
-                {detailLoading && <BrandLoading compact label="Loading order details…" />}
-                {detailError && <p role="alert" className="text-[#9e2732]">{detailError}</p>}
-                {selectedOrder && <div className="space-y-5 text-sm">
-                    <div><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]"><T text="Order number" /></p>
-                        <p className="selectable-text mt-1 break-all font-semibold">{orderDisplayNumber(selectedOrder)}</p>{compact&&<Link className="inline-flex min-h-11 items-center rounded-xl border px-4 text-sm font-bold mt-3" href={`/orders/${encodeURIComponent(selectedOrder.orderNumber)}`}>Manage order & refund</Link>}</div>
-                    <div className="flex flex-wrap items-center gap-2"><strong className="text-base">{selectedOrder.branchName}</strong>
-                        <span className="rounded-full bg-[#e5f0e8] px-3 py-1 text-xs font-bold uppercase tracking-wide text-[#143936]">{selectedOrder.orderStatus.replaceAll("_", " ")}</span></div>
-                    <div className="rounded-2xl border border-[#d9e5dc] bg-white p-4"><p className="text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]">{selectedOrder.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"} schedule</p>
-                        <p className="mt-1 font-semibold">{selectedOrder.pickupDate
-                            ? formatOrderDate(selectedOrder.pickupDate) : selectedOrder.deliveryDate ? formatOrderDate(selectedOrder.deliveryDate) : "Date pending"}
-                            {selectedOrder.pickupStartTime ? ` · ${formatOrderTime(selectedOrder.pickupStartTime)}` : ""}</p></div>
-                    <div><h4 className="mb-2 text-xs font-bold uppercase tracking-[0.12em] text-[#59706a]"><T text="Items" /></h4>
-                        <ul className="divide-y divide-[#d9e5dc] border-y border-[#d9e5dc]">{selectedOrder.items.map(item =>
-                            <li key={item.id} className="flex justify-between gap-3 py-3"><span><strong className="font-semibold">{item.productName}</strong><small className="mt-1 block text-[#59706a]">{item.weightGrams ? formatWeight(item.weightGrams) : `${item.quantity} pieces`}</small></span><span className="selectable-text shrink-0 font-semibold">{formatOrderCurrency(item.lineTotal)}</span></li>)}</ul></div>
-                    {(selectedOrder.convenienceFee??0)>0 && <p className="flex justify-between gap-3"><span><T text="Convenience fee" />{" "}<small className="block text-[#59706a]"><T text="Includes" />{" "}{formatOrderCurrency(selectedOrder.convenienceFeeTax??0)}{" "}<T text="fee tax" /></small></span><span>{formatOrderCurrency(selectedOrder.convenienceFee??0)}</span></p>}
-                    <p className="flex justify-between border-t border-[#d9e5dc] pt-4 text-base font-bold"><span><T text="Order total" /></span><span className="selectable-text">{formatOrderCurrency(selectedOrder.totalAmount)}</span></p>
-                </div>}
-                </div>
-            </dialog>
-            <nav className="profile-history-pagination" aria-label="Order history pages"><span aria-live="polite">{orders.length} orders loaded</span>{pages[pageIndex]?.nextBefore && <button type="button" disabled={paging} onClick={()=>void changeOrderPage(pageIndex+1)}><T text={paging?"Loading…":"Load more"}/></button>}</nav>
-        </>}</section>}
+        {activeSection === "orders" && <section id="account-orders">
+            {features?.occasionEnquiries&&<nav className="mobile-profile-order-types" aria-label="Order history types"><button type="button" aria-pressed={orderType==="pickup"} onClick={()=>setOrderType("pickup")}><T text="Pickup orders"/></button><button type="button" aria-pressed={orderType==="bulk"} onClick={()=>setOrderType("bulk")}><T text="Bulk order requests"/></button></nav>}
+            {orderType==="bulk"&&features?.occasionEnquiries?<Suspense fallback={<BrandLoading compact label="Loading your requests…"/>}><OccasionRequests key={session.phone} embeddedSession={session}/></Suspense>:<CustomerOrderHistory phone={session.phone}/>}
+        </section>}
         {modern&&(activeSection==="details"||activeSection==="addresses")&&<ProfileDetailsStudio key={activeSection} mode={activeSection} name={session.name??""} phone={maskedPhone} nameDraft={nameDraft} onNameDraft={setNameDraft} editing={editingDetails} onEditing={setEditingDetails} onSaveName={saveDetails} nameBusy={busy} addresses={account.addresses} onRefresh={reload} onPreferences={()=>showSection("preferences")} onSignOut={()=>setLogoutOpen(true)}/>}
         {activeSection === "preferences" && <section id="account-preferences" className="rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8"><h2 className="text-xl font-bold text-[#241715]"><T text="Your preferences" /></h2>
             <p className="mt-1 text-sm text-[#756763]"><T text="Dietary notes are for your reference; check ingredients with the branch for each order." /></p>

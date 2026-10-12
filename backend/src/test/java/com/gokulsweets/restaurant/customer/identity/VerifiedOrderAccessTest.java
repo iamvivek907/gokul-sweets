@@ -71,6 +71,16 @@ class VerifiedOrderAccessTest {
                     jdbc);
 
     @Test
+    void productionProtectsOwnedOrdersEvenWhenOptionalFlagsAreOff() {
+        settings.withProperty("gokul.environment-isolation.environment", "PROD")
+                .withProperty("gokul.identity.protect-legacy-routes", "false")
+                .withProperty("gokul.identity.provider-abuse-controls-verified", "false");
+        when(jdbc.queryForObject(anyString(), eq(Boolean.class), eq("GKS-OWNED"))).thenReturn(true);
+        assertThat(access.mayRead("GKS-OWNED", request())).isFalse();
+        verifyNoInteractions(ownership);
+    }
+
+    @Test
     void flagOffPreservesGuestOrderNumberCapability() {
         assertThat(access.mayRead("GKS-ORDER", request())).isTrue();
         verifyNoInteractions(jdbc, sessions, ownership);

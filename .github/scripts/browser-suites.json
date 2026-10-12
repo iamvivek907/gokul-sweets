@@ -58,6 +58,7 @@
     "tests/mobile-account-corrections.browser.mjs",
     "tests/mobile-orders.browser.mjs",
     "tests/profile-reorder.browser.mjs",
+    "tests/history-rating.browser.mjs",
     "tests/pwa-install.browser.mjs",
     "tests/badge-experience.browser.mjs"
   ],

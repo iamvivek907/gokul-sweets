@@ -17,7 +17,7 @@ try{for(const navigation of ['link','history','edge']){
   else if(path==='/api/storefront/customer-identity')json={enabled:true};
   else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone:'+919876543210'};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/customer/identity/orders')json=[order];
+  else if(path==='/api/customer/identity/orders/page')json={orders:[order],nextBefore:null};
   else if(path==='/api/orders/HANDOVER-1'){
    detailReads++;if(deniedStatus)return route.fulfill({status:deniedStatus,headers,json:{message:'Order access denied'}});if(hold)await new Promise(resolve=>{release=resolve;});
    if(fail)return route.fulfill({status:503,headers,json:{message:'Status service unavailable'}});
@@ -28,7 +28,7 @@ try{for(const navigation of ['link','history','edge']){
   try{return await route.fulfill({headers,json});}catch{/* Leaving aborts the held read. */}
  });
  await page.clock.install();await page.goto(`${base}/orders`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
- await page.locator('a[href="/orders/HANDOVER-1"]').first().click();await page.getByRole('heading',{name:'Order details',exact:true}).waitFor();await page.getByText('1234',{exact:true}).waitFor();
+ await page.locator('a[href^="/orders/HANDOVER-1?"]').first().click();await page.getByRole('heading',{name:'Order details',exact:true}).waitFor();await page.getByText('1234',{exact:true}).waitFor();
  await page.clock.pauseAt(await page.evaluate(()=>Date.now()+1000));
  fail=true;await page.clock.fastForward(15001);await page.getByRole('alert').filter({hasText:'Status service unavailable'}).waitFor();assert.equal(await page.locator('.mobile-order-detail').isVisible(),true);
  fail=false;await page.clock.fastForward(15001);await page.waitForFunction(()=>!Array.from(document.querySelectorAll('[role=alert]')).some(n=>n.textContent.includes('Status service unavailable')));
@@ -57,7 +57,7 @@ try{for(const navigation of ['link','history','edge']){
  if(navigation==='link')await page.getByRole('link',{name:'My orders',exact:true}).click();
  else if(navigation==='history')await page.goBack();
  else await page.evaluate(()=>{const target=document.querySelector('.mobile-order-detail header'),touch=x=>new Touch({identifier:1,target,clientX:x,clientY:150});target.dispatchEvent(new TouchEvent('touchstart',{bubbles:true,touches:[touch(10)]}));target.dispatchEvent(new TouchEvent('touchmove',{bubbles:true,cancelable:true,touches:[touch(150)]}));target.dispatchEvent(new TouchEvent('touchend',{bubbles:true,changedTouches:[touch(150)],touches:[]}));});
- await page.waitForURL('**/orders');await page.locator('.mobile-orders-list').waitFor();
+ await page.waitForURL(url=>url.pathname==='/orders');await page.locator('.profile-order-card').first().waitFor();
  for(let i=0;i<100&&!aborted.length;i++)await new Promise(resolve=>setTimeout(resolve,10));assert.ok(aborted.length,'leaving aborts in-flight detail refresh');
  hold=false;release();await page.clock.fastForward(16000);assert.equal(detailReads,beforeHold+1,'departed page stops detail polling');
  for(const destination of ['/','/menu','/orders']){
@@ -65,6 +65,6 @@ try{for(const navigation of ['link','history','edge']){
   await page.waitForFunction(()=>{const main=document.querySelector('main');return main&&main.innerText.trim().length>20&&getComputedStyle(main).display!=='none';});
   assert.equal(await page.evaluate(()=>!!document.querySelector('dialog[open]')),false,'no stranded overlay');
  }
- await page.locator('a[href="/orders/HANDOVER-1"]').first().click();await page.getByRole('heading',{name:'Order details',exact:true}).waitFor();await page.getByRole('heading',{name:'Picked Up',exact:true}).waitFor();assert.equal(await page.getByText('1234',{exact:true}).count(),0);
+ await page.locator('a[href^="/orders/HANDOVER-1?"]').first().click();await page.getByRole('heading',{name:'Order details',exact:true}).waitFor();await page.getByRole('heading',{name:'Picked Up',exact:true}).waitFor();assert.equal(await page.getByText('1234',{exact:true}).count(),0);
  assert.deepEqual(errors,[]);await context.close();console.log(`Handover navigation ${navigation} passed`);
 }}finally{await browser.close();}

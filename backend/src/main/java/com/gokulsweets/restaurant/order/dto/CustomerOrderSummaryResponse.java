@@ -30,6 +30,7 @@ import java.time.LocalTime;
  * @param deliveryDate the delivery date
  * @param deliveryStartTime the delivery start time
  * @param deliveryEndTime the delivery end time
+ * @param reviewRating the customer's submitted overall rating
  */
 public record CustomerOrderSummaryResponse(
         String orderNumber,
@@ -49,4 +50,5 @@ public record CustomerOrderSummaryResponse(
         FulfillmentType fulfillmentType,
         LocalDate deliveryDate,
         LocalTime deliveryStartTime,
-        LocalTime deliveryEndTime) {}
+        LocalTime deliveryEndTime,
+        Integer reviewRating) {}

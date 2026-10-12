@@ -64,6 +64,7 @@ class CustomerIdentityControllerTest {
                     settings,
                     new WebCorsProperties(),
                     new IdentityClientConnection(settings),
+                    mock(CustomerHistoryQuery.class),
                     ownership,
                     orders,
                     rateLimiter,

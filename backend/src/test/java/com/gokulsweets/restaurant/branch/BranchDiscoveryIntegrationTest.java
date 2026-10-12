@@ -203,6 +203,7 @@ class BranchDiscoveryIntegrationTest {
         var result = discovery.get(b);
         assertThat(result.overallExperience().average()).isEqualTo(4);
         assertThat(result.overallExperience().count()).isEqualTo(2);
+        assertThat(result.overallExperience().distribution()).containsExactly(0L, 0L, 1L, 0L, 1L);
         assertThat(result.topRatedItems()).hasSize(1);
         var top = result.topRatedItems().getFirst();
         assertThat(top.name()).isEqualTo("Top rated sweet");

@@ -58,15 +58,15 @@ try{for(const width of [320,390,640,1280]){
  assert.equal(acks,presentedAcks,'feature changes do not acknowledge the same presentation again');
  }else await page.locator('.badge-celebration').getByRole('button',{name:'Continue',exact:true}).click();
  await page.reload();await page.locator('.configured-badge').first().waitFor();await page.waitForTimeout(3000);assert.equal(await page.locator('.badge-celebration[open]').count(),0,'acknowledged achievement never replays on document refresh');
- walletDelay=true;walletFailures=1;const start=Date.now();await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'My Orders',exact:true}).waitFor();assert.ok(Date.now()-start<2200,'order content does not await optional rewards');await page.locator('.order-reward-guidance').waitFor();
- await page.getByText('No orders yet',{exact:true}).waitFor();
+ walletDelay=true;walletFailures=1;const start=Date.now();await page.goto(`${base}/orders`);await page.getByRole('heading',{name:'Every order. Easy to find.',exact:true}).waitFor();assert.ok(Date.now()-start<2200,'order content does not await optional rewards');await page.locator('.order-reward-guidance').waitFor();
+ await page.getByText('No matching orders. Try a different branch, status, date or search.',{exact:true}).waitFor();
  await page.waitForTimeout(500); // Let the existing responsive Orders shell settle before measuring the optional wallet.
  await page.getByRole('heading',{name:'Coins unavailable',exact:true}).waitFor();
  assert.equal(await page.locator('.order-reward-guidance').getByRole('button',{name:'Retry loading coins',exact:true}).isEnabled(),true);
- const before=await page.getByText('No orders yet',{exact:true}).evaluate(node=>node.getBoundingClientRect().top+window.scrollY);
+ const before=await page.getByText('No matching orders. Try a different branch, status, date or search.',{exact:true}).evaluate(node=>node.getBoundingClientRect().top+window.scrollY);
  await page.getByRole('button',{name:'Retry loading coins',exact:true}).click();
  await page.getByRole('heading',{name:'30 coins available',exact:true}).waitFor();
- const after=await page.getByText('No orders yet',{exact:true}).evaluate(node=>node.getBoundingClientRect().top+window.scrollY);
+ const after=await page.getByText('No matching orders. Try a different branch, status, date or search.',{exact:true}).evaluate(node=>node.getBoundingClientRect().top+window.scrollY);
  assert.ok(Math.abs(after-before)<1,`late wallet moved order history ${after-before}px`);
  await page.locator('.order-reward-guidance').getByRole('button',{name:'Details',exact:true}).click();assert.match(await page.locator('.order-reward-guidance').innerText(),/25 normal \+ 5 Gokul regular bonus/);assert.match(await page.locator('.order-reward-guidance').innerText(),/₹500 or more/);
  rewardsEnabled=false;await page.clock.fastForward(61000);

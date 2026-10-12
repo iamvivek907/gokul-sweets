@@ -192,7 +192,19 @@ WHERE id IN (%s)
                                         return result;
                                     },
                                     deliveryWindowIds.toArray());
-            return orders.stream().map(order -> toSummaryResponse(order, windows)).toList();
+            Map<Long, Integer> ratings = new java.util.HashMap<>();
+            if (!orders.isEmpty()) {
+                jdbc.query(
+                        "SELECT order_id,overall_rating FROM reviews WHERE order_id IN ("
+                                + String.join(",", Collections.nCopies(orders.size(), "?"))
+                                + ")",
+                        (org.springframework.jdbc.core.RowCallbackHandler)
+                                rs -> ratings.put(rs.getLong(1), rs.getInt(2)),
+                        orders.stream().map(Order::getId).toArray());
+            }
+            return orders.stream()
+                    .map(order -> toSummaryResponse(order, windows, ratings))
+                    .toList();
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -209,11 +221,11 @@ WHERE id IN (%s)
      * @return the to summary response result
      */
     private CustomerOrderSummaryResponse toSummaryResponse(
-            Order order, Map<Long, DeliveryWindow> windows) {
+            Order order, Map<Long, DeliveryWindow> windows, Map<Long, Integer> ratings) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         OrderQueryService.class,
-                        "toSummaryResponse(Order,Map<Long,DeliveryWindow>)");
+                        "toSummaryResponse(Order,Map<Long,DeliveryWindow>,Map<Long,Integer>)");
         try {
             var window =
                     order.getFulfillmentType() == FulfillmentType.DELIVERY
@@ -240,12 +252,13 @@ WHERE id IN (%s)
                     order.getFulfillmentType(),
                     window == null ? null : window.date(),
                     window == null ? null : window.start(),
-                    window == null ? null : window.end());
+                    window == null ? null : window.end(),
+                    ratings.get(order.getId()));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     OrderQueryService.class,
-                    "toSummaryResponse(Order,Map<Long,DeliveryWindow>)");
+                    "toSummaryResponse(Order,Map<Long,DeliveryWindow>,Map<Long,Integer>)");
         }
     }
 
