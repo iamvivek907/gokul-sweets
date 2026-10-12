@@ -289,3 +289,5 @@ Compact header polish: keep both header layers mounted, with short opacity/4px m
 ## October 11 personal profile and saved places
 
 With the customer design enabled, profile details use a lavender/peach personal identity card, a verified phone marker and an optional first-name invitation framed around recognising a pickup order. The account overview offers name and saved-place steps without blocking orders or rewards. Home/Work/Other place cards have explicit edit/remove controls, confirmation before removal and structured locality/PIN inputs. Saved addresses are explicitly for future delivery planning; coverage is never promised. Location suggestions remain opt-in and require review and Save. Existing verified-account APIs persist data across devices; failed saves preserve drafts. Flag-OFF keeps the previous account presentation.
+
+Location results must be ignored after the address draft or editing target changes. An identical address create retry returns the existing place under the verified-subject lock, including at the five-place limit. An uncertain save is described as unconfirmed rather than a definite failure.

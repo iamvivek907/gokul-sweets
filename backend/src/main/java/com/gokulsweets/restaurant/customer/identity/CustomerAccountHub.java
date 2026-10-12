@@ -271,6 +271,31 @@ DELETE FROM verified_customer_favourites WHERE environment = ? AND subject_id = 
         try {
             validateAddress(input);
             lockSubject(environment, subject);
+            // A response can be lost after commit. Return the same saved place on retry,
+            // before enforcing the cap. The subject lock serializes simultaneous creates.
+            var existing =
+                    jdbc.query(
+                            """
+                            SELECT id, label, address_line, locality, postal_code
+                            FROM verified_customer_addresses
+                            WHERE environment = ? AND subject_id = ? AND label = ?
+                              AND address_line = ? AND locality = ? AND postal_code = ?
+                            ORDER BY id DESC LIMIT 1
+                            """,
+                            (rs, row) ->
+                                    new Address(
+                                            rs.getLong(1),
+                                            rs.getString(2),
+                                            rs.getString(3),
+                                            rs.getString(4),
+                                            rs.getString(5)),
+                            environment,
+                            subject,
+                            input.label().trim(),
+                            input.addressLine().trim(),
+                            input.locality().trim(),
+                            input.postalCode());
+            if (!existing.isEmpty()) return existing.getFirst();
             if (Boolean.TRUE.equals(
                     jdbc.queryForObject(
                             """

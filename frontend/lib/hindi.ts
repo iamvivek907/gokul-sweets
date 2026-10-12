@@ -1131,3 +1131,5 @@ Object.assign(hindi, {
 });
 
 Object.assign(hindi,{"✓ Name saved":"✓ नाम सेव है","○ Your name":"○ आपका नाम","✓ Address saved":"✓ पता सेव है","○ Your places":"○ आपके पते","✓ Linked to your verified phone":"✓ आपके सत्यापित फ़ोन से जुड़ा है"});
+
+Object.assign(hindi,{"Your address changed while location was loading. Your entered details were kept. Request location again if needed.":"लोकेशन लोड होते समय आपका पता बदल गया। आपके दर्ज किए विवरण सुरक्षित हैं। ज़रूरत हो तो लोकेशन फिर से माँगें।"});

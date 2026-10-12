@@ -37,7 +37,7 @@ export default function ProfileDetailsStudio({mode,name,phone,nameDraft,onNameDr
             const savedMessage=editId===null?"Address saved.":"Address updated.";
             setDraft(empty());setEditId(null);
             try {await onRefresh();setMessage(savedMessage);} catch {setMessage(`${savedMessage} Your list could not refresh. Reload the page to see it.`);}
-        } catch {setMessage("Your address could not be saved. Your details are still here. Please try again.");}
+        } catch {setMessage("The save could not be confirmed. Your details are still here. Retry to confirm this place; an identical saved address will not be added twice.");}
         finally {locked.current=false;setBusy(false);}
     }
     async function removeAddress(id:number) {
@@ -75,7 +75,7 @@ export default function ProfileDetailsStudio({mode,name,phone,nameDraft,onNameDr
         <form ref={form} className={styles.addressForm} onSubmit={event=>{event.preventDefault();void saveAddress();}}>
             <div className={styles.cardTitle}><CustomerIcon kind="pin"/><div><h3><T text={editId===null?"Save a place":"Update your place"}/></h3><p><T text="Keep the details you’d want us to find easily."/></p></div></div>
             <fieldset disabled={busy||nameBusy||editId===null&&addresses.length>=5}>
-                <AddressLocationAssist onSuggestion={value=>setDraft(current=>({...current,addressLine:value.addressLine,locality:value.locality,postalCode:value.postalCode}))}/>
+                <AddressLocationAssist contextKey={JSON.stringify([editId,draft])} onSuggestion={value=>setDraft(current=>({...current,addressLine:value.addressLine,locality:value.locality,postalCode:value.postalCode}))}/>
                 <div className={styles.labelChoices} role="group" aria-label="Address label">{["Home","Work","Other"].map(label=><button key={label} type="button" aria-pressed={draft.label===label} className={styles.secondary} onClick={()=>setDraft(current=>({...current,label}))}><T text={label}/></button>)}</div>
                 <div className={styles.fields}>
                     <label><T text="Label"/><input autoComplete="off" required maxLength={40} value={draft.label} onChange={event=>{const value=event.target.value;setDraft(current=>({...current,label:value}));}}/></label>
