@@ -98,7 +98,7 @@ try{
   const updatedPlace=page.locator('#account-addresses article').filter({hasText:'House 89, Station Road'});await updatedPlace.waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/address-studio-${width}.png`,fullPage:true});
-  await updatedPlace.getByRole('button',{name:'Remove',exact:true}).click();await updatedPlace.getByRole('button',{name:'Keep address',exact:true}).click();assert.equal(addresses.at(-1).addressLine,'House 89, Station Road');
+  await updatedPlace.getByRole('button',{name:'Remove',exact:true}).click();await updatedPlace.getByRole('button',{name:'Keep address',exact:true}).click();assert.equal(addresses.some(address=>address.addressLine==='House 89, Station Road'),true);
   await updatedPlace.getByRole('button',{name:'Remove',exact:true}).click();await updatedPlace.getByRole('button',{name:'Remove address',exact:true}).click();await page.getByText('Address removed.',{exact:true}).waitFor();assert.equal(addresses.some(address=>address.addressLine==='House 89, Station Road'),false);
   await context.close();console.log(`New account/correction ${width}px passed`);
  }
