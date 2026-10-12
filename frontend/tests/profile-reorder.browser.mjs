@@ -10,7 +10,7 @@ const branch={id:1,code:'ONE',name:'Original branch',active:true,operational:tru
 const products=[{id:1,categoryId:1,categoryName:'Sweets',name:'Peda',description:null,price:20,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},{id:2,categoryId:1,categoryName:'Sweets',name:'Kaju Barfi',description:null,price:1000,imageUrl:null,available:true,saleMode:'WEIGHT',minimumWeightGrams:250,weightStepGrams:50}];
 const history=Array.from({length:13},(_,i)=>({orderNumber:`HISTORY-${13-i}`,customerOrderNumber:13-i,orderStatus:'PICKED_UP',branchId:1,branchName:branch.name,pickupDate:today,totalAmount:1040,fulfillmentType:'PICKUP',createdAt:`${today}T09:00:00`,updatedAt:`${today}T09:00:00`}));
 try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1280,false]]){
- let pageFailure=false,availabilityFailure=false,slotLost=false,priceChanged=false,postCount=0,pages=0,checks=[],smartCalls=0,enforcement=true;
+ let pageFailure=false,availabilityFailure=false,slotLost=false,priceChanged=false,postCount=0,pages=0,checks=[],smartCalls=0,enforcement=true,detailGate=null;
  const context=await browser.newContext({viewport:{width,height:844},isMobile:width<=640,hasTouch:width<=640,serviceWorkers:'block'}),page=await context.newPage();
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');},other);
  await context.route('**/api/**',async route=>{
@@ -20,7 +20,7 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
   else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Test customer',phone};
   else if(path==='/api/customer/identity/account')json={completedOrders:13,paidOrders:13,favouriteProductIds:[],addresses:[],preferences:{dietaryNotes:null,preferredBranchId:null}};
   else if(path==='/api/customer/identity/orders/page'){pages++;if(url.searchParams.has('before')&&pageFailure)return route.fulfill({status:503,json:{message:'Unavailable'}});json=url.searchParams.has('before')?{orders:history.slice(10),nextBefore:null,previousAfter:history[10].orderNumber}:{orders:history.slice(0,10),nextBefore:history[9].orderNumber};}
-  else if(path.startsWith('/api/customer/identity/orders/HISTORY-'))json={...history[0],items:products.map(product=>({id:product.id,productId:product.id,productName:product.name,saleMode:product.saleMode,quantity:product.saleMode==='UNIT'?2:1,weightGrams:product.saleMode==='WEIGHT'?1000:null,unitPrice:product.price,lineTotal:product.saleMode==='WEIGHT'?1000:40}))};
+  else if(path.startsWith('/api/customer/identity/orders/HISTORY-')){if(detailGate)await detailGate;json={...history[0],items:products.map(product=>({id:product.id,productId:product.id,productName:product.name,saleMode:product.saleMode,quantity:product.saleMode==='UNIT'?2:1,weightGrams:product.saleMode==='WEIGHT'?1000:null,unitPrice:product.price,lineTotal:product.saleMode==='WEIGHT'?1000:40}))};}
   else if(path==='/api/branches')json=[branch,other];
   else if(path==='/api/branches/1')json=branch;else if(path==='/api/branches/2')json=other;
   else if(path==='/api/menu')json=[{id:1,name:'Sweets',products:products.map(p=>({...p,price:p.id===1&&priceChanged?25:p.price}))}];
@@ -73,7 +73,15 @@ try{for(const [width,smart] of [[320,true],[390,true],[1280,true],[320,false],[1
   assert.equal(smartCalls,0,'legacy never calls the disabled endpoint');assert.equal(postCount,0);
   await context.close();console.log(`Legacy reorder ${width}px passed`);continue;
  }
- await open();await dialog.locator('select').waitFor();assert.equal(await dialog.locator('select').inputValue(),tomorrow,'earliest whole-cart slot skips today');
+ let releaseDetail;
+ detailGate=new Promise(resolve=>{releaseDetail=resolve;});
+ const detailRequested=page.waitForRequest(request=>new URL(request.url()).pathname.startsWith('/api/customer/identity/orders/HISTORY-'));
+ await open();await detailRequested;
+ const refreshed=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/customer/identity/orders/page');
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));await (await refreshed).finished();
+ await page.getByText('10 orders shown',{exact:true}).waitFor();
+ releaseDetail();detailGate=null;
+ await dialog.locator('select').waitFor();assert.equal(await dialog.locator('.reorder-error').count(),0,'history refresh must not abort the open reorder');assert.equal(await dialog.locator('select').inputValue(),tomorrow,'earliest whole-cart slot skips today');
  await dialog.getByLabel('Peda quantity',{exact:true}).fill('3');await dialog.getByLabel('Kaju Barfi weight in grams',{exact:true}).fill('1500');
  await page.waitForFunction(()=>!document.querySelector('.reorder-dialog footer button:last-child').disabled);
  await dialog.locator('select').selectOption(later);

@@ -1,5 +1,5 @@
 "use client";
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ApiError } from "@/services/apiClient";
@@ -33,6 +33,7 @@ function History({ phone, branchId, branchName }: Props) {
         key: string;
         data: VerifiedOrderPage;
     } | null>(null), [reorder, setReorder] = useState<CustomerOrderSummaryResponse | null>(null);
+    const closeReorder = useCallback(() => setReorder(null), [setReorder]);
     const key = JSON.stringify([phone, scope, status, query, from, to, before, after]);
     const current = loaded?.key === key ? loaded.data : null;
     const request = useRef<AbortController | null>(null);
@@ -77,7 +78,16 @@ function History({ phone, branchId, branchName }: Props) {
     useEffect(() => { if (!current?.orders.some(order => ["PENDING_PAYMENT", "CONFIRMED", "PREPARING", "READY_FOR_PICKUP", "READY_FOR_DELIVERY", "OUT_FOR_DELIVERY"].includes(order.orderStatus)))
         return; const timer = window.setInterval(() => { if (document.visibilityState === "visible" && navigator.onLine && !request.current)
         setRevision(value => value + 1); }, 15000); return () => window.clearInterval(timer); }, [current]);
-    function navigate(changes: Record<string, string | null>, reset = false) { const params = new URLSearchParams(search.toString()); params.set("scope", scope); if (reset) {
+    function historyParams() {
+        const params = new URLSearchParams(search.toString());
+        if (!matches) {
+            for (const name of ["status", "q", "from", "to", "before", "after", "historyPage"])
+                params.delete(name);
+        }
+        params.set("scope", scope);
+        return params;
+    }
+    function navigate(changes: Record<string, string | null>, reset = false) { const params = historyParams(); if (reset) {
         params.delete("before");
         params.delete("after");
         params.set("historyPage", "1");
@@ -88,7 +98,7 @@ function History({ phone, branchId, branchName }: Props) {
             params.delete(name);
     } router.push(`${path}?${params}`, { scroll: false }); }
     const Heading = path === "/orders" ? "h1" : "h2";
-    const returnTo = `${path === "/profile" ? "/profile/orders" : path}?${search.toString()}`;
+    const returnTo = `${path === "/profile" ? "/profile/orders" : path}?${historyParams()}`;
     return <div className={styles.history} data-modern={features?.futuristicStorefrontV2 || features?.checkoutExperienceV2 ? "true" : undefined}>
   <header className={styles.hero}><div><span>Your Gokul moments</span><Heading>Every order. Easy to find.</Heading><p>{branchName ?? "All your branches, together."}</p></div><CustomerIcon kind="receipt"/></header>
   {path === "/orders" && <OrderRewardGuidance/>}
@@ -110,8 +120,8 @@ function History({ phone, branchId, branchName }: Props) {
    {["PICKED_UP", "DELIVERED"].includes(order.orderStatus) && <OrderRatingLink orderNumber={order.orderNumber} rating={order.reviewRating ?? null} returnTo={returnTo}/>}
    <div className={styles.actions}><Link href={href} className={styles.primary}>View Order</Link><button type="button" onClick={() => setReorder(order)}>Reorder</button></div>
   </article>;
-            })}</div>{!current.orders.length && <p className={styles.empty}>No matching orders. Try a different branch, status, date or search.</p>}
+            })}</div>{!current.orders.length && <div className={styles.empty}><p>No matching orders. Try a different branch, status, date or search.</p>{!error && (page > 1 || before || after) && <button type="button" disabled={busy} onClick={() => navigate({}, true)}>Latest orders</button>}</div>}
   <nav className={styles.pagination} aria-label="Order history pages"><button type="button" disabled={busy || !current.previousAfter} onClick={() => navigate({ before: null, after: current.previousAfter ?? null, historyPage: String(Math.max(1, page - 1)) })}>Previous</button><span>Page {page}</span><button type="button" disabled={busy || !current.nextBefore} onClick={() => navigate({ after: null, before: current.nextBefore, historyPage: String(page + 1) })}>Next</button></nav></>}
-  {reorder && features && <ReorderDialog key={`${phone}:${reorder.orderNumber}`} order={reorder} phone={phone} features={features} compact={compact} onClose={() => setReorder(null)}/>}
+  {reorder && features && <ReorderDialog key={`${phone}:${reorder.orderNumber}`} order={reorder} phone={phone} features={features} compact={compact} onClose={closeReorder}/>}
  </div>;
 }
