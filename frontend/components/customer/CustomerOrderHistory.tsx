@@ -27,7 +27,7 @@ function History({ phone, branchId, branchName }: Props) {
     const status = matches ? search.get("status") ?? "ALL" : "ALL", query = matches ? search.get("q") ?? "" : "", from = matches ? search.get("from") ?? "" : "", to = matches ? search.get("to") ?? "" : "";
     const page = matches ? Math.max(1, Math.min(100000, Math.floor(Number(search.get("historyPage"))) || 1)) : 1;
     const before = matches ? search.get("before") : null, after = matches ? search.get("after") : null;
-    const [draftState, setDraft] = useState({ query, value: query }), [revision, setRevision] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState("");
+    const [revision, setRevision] = useState(0), [busy, setBusy] = useState(false), [error, setError] = useState("");
     const [loaded, setLoaded] = useState<{
         key: string;
         data: VerifiedOrderPage;
@@ -35,7 +35,6 @@ function History({ phone, branchId, branchName }: Props) {
     const key = JSON.stringify([phone, scope, status, query, from, to, before, after]);
     const current = loaded?.key === key ? loaded.data : null;
     const request = useRef<AbortController | null>(null);
-    const draft = draftState.query === query ? draftState.value : query;
     useEffect(() => { const update = (event: Event) => { const detail = (event as CustomEvent<{
         orderNumber: string;
         rating: number;
@@ -96,7 +95,7 @@ function History({ phone, branchId, branchName }: Props) {
       // Read the submitted field, including input events not yet committed to React state.
       const submitted = new FormData(event.currentTarget).get("q");
       navigate({ q: typeof submitted === "string" ? submitted.trim() || null : null }, true);
-  }}><CustomerIcon kind="receipt"/><input name="q" aria-label="Search order history" maxLength={100} placeholder="Order number or dish name" value={draft} onChange={event => setDraft({ query, value: event.target.value })}/><button type="submit">Search</button></form>
+  }}><CustomerIcon kind="receipt"/><input name="q" aria-label="Search order history" maxLength={100} placeholder="Order number or dish name" key={query} defaultValue={query}/><button type="submit">Search</button></form>
   <div className={styles.filters} aria-label="Order status">{[["ALL", "All"], ["ACTIVE", "Active"], ["COMPLETED", "Completed"], ["ISSUES", "Cancelled / Failed"]].map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => navigate({ status: value }, true)}>{label}</button>)}</div>
   <div className={styles.dates}><label>From<input type="date" value={from} max={to || undefined} onChange={event => navigate({ from: event.target.value || null }, true)}/></label><label>To<input type="date" value={to} min={from || undefined} onChange={event => navigate({ to: event.target.value || null }, true)}/></label></div>
   {error && <div className={styles.error} role="alert"><p>{error}</p><button type="button" onClick={() => setRevision(value => value + 1)}>Retry</button><button type="button" onClick={() => navigate({}, true)}>Latest orders</button></div>}
