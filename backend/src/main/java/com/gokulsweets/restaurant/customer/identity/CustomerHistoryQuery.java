@@ -23,6 +23,7 @@ public class CustomerHistoryQuery {
     private final JdbcTemplate jdbc;
     private final VerifiedOrderOwnership ownership;
 
+    /** Filters for a single cursor page. */
     public record Criteria(
             String before,
             String after,
@@ -33,6 +34,7 @@ public class CustomerHistoryQuery {
             String from,
             String to) {}
 
+    /** Bounded references and cursor navigation availability. */
     public record Page(List<String> references, boolean hasPrevious, boolean hasNext) {}
 
     /**

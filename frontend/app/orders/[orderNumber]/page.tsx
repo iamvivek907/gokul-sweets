@@ -182,7 +182,7 @@ export default function OrderDetailPage() {
         // Finish this history replacement with a document navigation. A client
         // transition still settling from payment must not restore its old target.
         return guardCompletedCheckout(order.orderNumber,()=>window.location.replace(returnTo));
-    },[order?.paymentStatus,order?.orderNumber]);
+    },[order?.paymentStatus,order?.orderNumber,returnTo]);
 
 
 
