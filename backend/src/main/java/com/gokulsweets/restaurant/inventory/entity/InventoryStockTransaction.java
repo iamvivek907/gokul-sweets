@@ -2,13 +2,17 @@ package com.gokulsweets.restaurant.inventory.entity;
 
 import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.inventory.enums.InventoryTransactionType;
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted inventory stock transaction state. */
 @Entity
 @Table(name = "inventory_stock_transactions")
 @Getter
@@ -53,9 +57,16 @@ public class InventoryStockTransaction {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryStockTransaction.class, "onCreate()");
+        try {
+            createdAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryStockTransaction.class, "onCreate()");
+        }
     }
 }
-

@@ -3,7 +3,10 @@ package com.gokulsweets.restaurant.inventory.entity;
 import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus;
 import com.gokulsweets.restaurant.inventory.enums.InventoryUnit;
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
@@ -11,17 +14,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** Persisted inventory daily allocation state. */
 @Entity
 @Table(
         name = "inventory_daily_allocations",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_inventory_allocation_product_date",
-                columnNames = {
-                        "branch_product_id",
-                        "service_date"
-                }
-        )
-)
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_inventory_allocation_product_date",
+                        columnNames = {"branch_product_id", "service_date"}))
 @Getter
 @Setter
 public class InventoryDailyAllocation {
@@ -39,8 +39,7 @@ public class InventoryDailyAllocation {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
-    private InventoryAllocationStatus status =
-            InventoryAllocationStatus.DRAFT;
+    private InventoryAllocationStatus status = InventoryAllocationStatus.DRAFT;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "inventory_unit", nullable = false, length = 20)
@@ -98,16 +97,31 @@ public class InventoryDailyAllocation {
     @Column(nullable = false)
     private Long version;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryDailyAllocation.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryDailyAllocation.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryDailyAllocation.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryDailyAllocation.class, "onUpdate()");
+        }
     }
 }
-

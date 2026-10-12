@@ -10,7 +10,7 @@ export default function OfflinePage() {
                 min-h-screen
                 items-center
                 justify-center
-                bg-[#fffaf3]
+                bg-white
                 px-6
             "
         >
@@ -31,7 +31,7 @@ export default function OfflinePage() {
                         items-center
                         justify-center
                         rounded-full
-                        bg-[#fff0dc]
+                        bg-[#f1ecfa]
                         text-3xl
                     "
                 >
@@ -43,7 +43,7 @@ export default function OfflinePage() {
                         mt-6
                         text-2xl
                         font-bold
-                        text-[#5d0f1b]
+                        text-[#980c31]
                     "
                 >
                     You&apos;re offline
@@ -53,7 +53,7 @@ export default function OfflinePage() {
                     className="
                         mt-3
                         leading-6
-                        text-[#756763]
+                        text-[#596579]
                     "
                 >
                     You can browse cached content,

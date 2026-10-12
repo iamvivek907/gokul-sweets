@@ -15,6 +15,7 @@ export interface AdminBranch {
     pincode: string | null;
 
     phone: string | null;
+    fssaiLicenceNumber: string | null;
 
     latitude: number | null;
 
@@ -47,6 +48,7 @@ export interface AdminBranchCreateRequest {
     pincode: string | null;
 
     phone: string | null;
+    fssaiLicenceNumber: string | null;
 
     latitude: number | null;
 
@@ -73,6 +75,7 @@ export interface AdminBranchUpdateRequest {
     pincode: string | null;
 
     phone: string | null;
+    fssaiLicenceNumber: string | null;
 
     latitude: number | null;
 

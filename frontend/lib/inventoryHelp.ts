@@ -84,14 +84,14 @@ export const INVENTORY_HELP: InventoryHelpDefinition[] = [
     },
     {
         key: "dailyMaximum",
-        label: "Daily maximum",
+        label: "Daily production capacity",
         context: ["SETUP"],
         definition: "Hard product-level ceiling that may be allocated online for one service date.",
         guidance: "Enter the highest quantity this branch can reliably supply for one pickup date. Example: enter 10 kg if the branch must never accept more than 10 kg online that day."
     },
     {
         key: "bookingHorizon",
-        label: "Booking horizon",
+        label: "Future ordering window",
         context: ["SETUP", "AUTOMATION"],
         definition: "How many days in advance customers may book this product.",
         guidance: "Enter the furthest allowed advance booking. Example: 2 means customers may order today, tomorrow, and up to the permitted date boundary enforced by the backend."
@@ -168,10 +168,10 @@ export const INVENTORY_HELP: InventoryHelpDefinition[] = [
     },
     {
         key: "guaranteed",
-        label: "Guaranteed quantity",
+        label: "Guaranteed online quantity",
         context: ["AUTOMATION"],
-        definition: "Quantity the branch promises it can supply on every active selling date covered by the rule.",
-        guidance: "This may become sellable automatically, so use a conservative floor rather than an average or forecast."
+        definition: "Quantity the branch promises it can supply online on every active selling date covered by the rule, before the safety buffer is deducted.",
+        guidance: "This is the online sales quota, not stock withheld from sale. The separate safety buffer protects stock. Use a conservative promise, never an average or forecast."
     },
     {
         key: "forecastMaximum",
@@ -210,7 +210,7 @@ export const INVENTORY_HELP: InventoryHelpDefinition[] = [
     },
     {
         key: "generationHorizon",
-        label: "Generation horizon days",
+        label: "Automatic planning window (days)",
         context: ["AUTOMATION"],
         definition: "Number of future service dates for which this rule may generate allocation suggestions or drafts.",
         guidance: "Leave blank to use the product booking horizon. Never extend it beyond dates the branch can plan reliably."

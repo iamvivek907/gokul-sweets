@@ -1,8 +1,13 @@
 "use client";
+import {T} from "@/lib/language";
+
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
+import Link from "next/link";
 
 import {
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 
@@ -78,6 +83,9 @@ const ALLOWED_IMAGE_TYPES = [
 /* -------------------------------------------------------------------------- */
 
 export default function ImageManagementPage() {
+    const restoredProduct = useRef<number | null>(null);
+    const restored = useRef(false);
+    const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
     const {
         profile
@@ -156,6 +164,13 @@ export default function ImageManagementPage() {
         refreshing,
         setRefreshing
     ] = useState(false);
+
+    useEffect(() => {
+        if (!preferencesLoaded) return;
+        sessionStorage.setItem("gokul-admin-image-context", JSON.stringify({
+            branchId: selectedBranchId, search, category: categoryFilter, image: imageFilter, productId: selectedProduct?.id ?? restoredProduct.current
+        }));
+    }, [preferencesLoaded, selectedBranchId, search, categoryFilter, imageFilter, selectedProduct]);
 
 
     /* ---------------------------------------------------------------------- */
@@ -246,39 +261,25 @@ export default function ImageManagementPage() {
                             );
 
 
+                    if (!restored.current) {
+                        try {
+                            const saved = JSON.parse(sessionStorage.getItem("gokul-admin-image-context") ?? "null");
+                            if (saved) {
+                                setSearch(saved.search ?? "");
+                                setCategoryFilter(saved.category ?? "ALL");
+                                if (["ALL", "WITH_IMAGE", "WITHOUT_IMAGE"].includes(saved.image)) setImageFilter(saved.image);
+                                restoredProduct.current = saved.productId ?? null;
+                            }
+                        } catch (error) {console.warn("Image management preferences could not be restored.", error);}
+                        restored.current = true; setPreferencesLoaded(true);
+                    }
                     setBranches(
                         allowedBranches
                     );
 
 
-                    setSelectedBranchId(
-                        previousBranchId => {
-
-                            /*
-                             * Keep the current branch if it is still
-                             * available to the current admin.
-                             */
-                            if (
-                                previousBranchId
-                                &&
-                                allowedBranches.some(
-                                    branch =>
-                                        branch.id
-                                        === previousBranchId
-                                )
-                            ) {
-
-                                return previousBranchId;
-
-                            }
-
-
-                            return allowedBranches.length > 0
-                                ? allowedBranches[0].id
-                                : null;
-
-                        }
-                    );
+                    setSelectedBranchId(previousBranchId =>
+                        preferredAdminBranchId(currentProfile.staffId, allowedBranches, previousBranchId));
 
                 } catch (exception) {
 
@@ -382,6 +383,13 @@ export default function ImageManagementPage() {
     /* ---------------------------------------------------------------------- */
     /* Apply filters                                                          */
     /* ---------------------------------------------------------------------- */
+
+    useEffect(() => {
+        if (!restoredProduct.current || !products.length) return;
+        const product = products.find(item => item.id === restoredProduct.current);
+        if (product) setSelectedProduct(product);
+        restoredProduct.current = null;
+    }, [products]);
 
     const filteredProducts =
         useMemo(
@@ -506,6 +514,7 @@ export default function ImageManagementPage() {
         setSelectedBranchId(
             branchId
         );
+        if (profile) rememberAdminBranchId(profile.staffId, branchId);
 
 
         setSelectedProduct(
@@ -659,9 +668,7 @@ export default function ImageManagementPage() {
 
                         <div className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-500">
 
-                            <span>
-                                Menu
-                            </span>
+                            <Link href="/admin/menu" className="inline-flex min-h-11 items-center underline">Back to menu</Link>
 
                             <span>
                                 /
@@ -694,9 +701,7 @@ export default function ImageManagementPage() {
                         <label
                             htmlFor="image-branch"
                             className="mb-2 block text-sm font-semibold text-slate-900"
-                        >
-                            Branch
-                        </label>
+                        >{" "}<T text="Branch" />{" "}</label>
 
 
                         <select
@@ -751,9 +756,7 @@ export default function ImageManagementPage() {
                                 === 0
                                 && (
 
-                                    <option value="">
-                                        No branch available
-                                    </option>
+                                    <option value="">{" "}<T text="No branch available" />{" "}</option>
 
                                 )
                             }
@@ -957,9 +960,7 @@ export default function ImageManagementPage() {
 
                                 <div>
 
-                                    <h2 className="font-semibold text-amber-900">
-                                        No branch available
-                                    </h2>
+                                    <h2 className="font-semibold text-amber-900">{" "}<T text="No branch available" />{" "}</h2>
 
 
                                     <p className="mt-1 text-sm text-amber-800">
@@ -1433,6 +1434,8 @@ function ProductImageCard({
     onRemove: () => void;
 }) {
 
+    const [failedUrl, setFailedUrl] = useState<string | null>(null);
+
     return (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md sm:rounded-2xl">
 
@@ -1441,7 +1444,7 @@ function ProductImageCard({
             <div className="relative aspect-[4/3] overflow-hidden bg-slate-100 sm:aspect-[16/10]">
 
                 {
-                    product.imageUrl
+                    product.imageUrl && failedUrl !== product.imageUrl
                         ? (
 
                             <Image
@@ -1454,6 +1457,7 @@ function ProductImageCard({
                                 fill
                                 sizes="(max-width: 640px) 50vw, (max-width: 1024px) 50vw, 25vw"
                                 className="object-cover"
+                                onError={() => setFailedUrl(product.imageUrl)}
                             />
 
                         )
@@ -1467,7 +1471,7 @@ function ProductImageCard({
 
 
                                 <p className="mt-1 text-xs font-medium sm:mt-2 sm:text-sm">
-                                    No image
+                                    {failedUrl === product.imageUrl && product.imageUrl ? "Image URL cannot load" : "No image"}
                                 </p>
 
                             </div>
@@ -1598,9 +1602,7 @@ function ProductImageCard({
                                     sm:py-2.5
                                     sm:text-sm
                                 "
-                            >
-                                Remove
-                            </button>
+                            >{" "}<T text="Remove" />{" "}</button>
 
                         )
                     }
@@ -2690,9 +2692,7 @@ function ImageUploadModal({
 
                             sm:w-auto
                         "
-                    >
-                        Cancel
-                    </button>
+                    >{" "}<T text="Cancel" />{" "}</button>
 
 
                     <button

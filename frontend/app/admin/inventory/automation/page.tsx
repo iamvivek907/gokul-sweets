@@ -1,6 +1,10 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import Link from "next/link";
+import {businessDateOffset} from "@/lib/businessTime";
+import {adminManagementApi} from "@/services/adminManagementApi";
 import {
     useEffect,
     useMemo,
@@ -55,11 +59,7 @@ const dayOptions = [
 ];
 
 function indiaDate(offsetDays = 0): string {
-    const date = new Date();
-    date.setDate(date.getDate() + offsetDays);
-    return new Intl.DateTimeFormat("en-CA", {
-        timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit"
-    }).format(date);
+    return businessDateOffset(offsetDays);
 }
 
 function modeLabel(mode: InventoryAutomationMode): string {
@@ -280,9 +280,7 @@ export default function InventoryAutomationPage() {
                     </div>
 
                     <div className="mt-6 grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-                        <label className="text-sm font-semibold text-[#241715]">
-                            Branch
-                            <select
+                        <label className="text-sm font-semibold text-[#241715]">{" "}<T text="Branch" />{" "}<select
                                 value={branchId ?? ""}
                                 onChange={event => {
                                     const next = Number(event.target.value);
@@ -297,9 +295,7 @@ export default function InventoryAutomationPage() {
                             </select>
                         </label>
                         <div className="grid grid-cols-2 gap-3">
-                            <label className="text-sm font-semibold text-[#241715]">
-                                From
-                                <input type="date" value={fromDate} min={indiaDate()}
+                            <label className="text-sm font-semibold text-[#241715]">{" "}<T text="From" />{" "}<input type="date" value={fromDate} min={indiaDate()}
                                     onChange={event => {
                                         const next = event.target.value;
                                         setFromDate(next);
@@ -336,6 +332,13 @@ export default function InventoryAutomationPage() {
                 <div className="mt-6 rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
                     <strong>Safety boundary:</strong> forecasts are production suggestions. Only the guaranteed quantity configured under <strong>Auto-approve guaranteed</strong> becomes an approved allocation. Existing customer commitments and physical-stock activity are never overwritten.
                 </div>
+                <section className="mt-4 rounded-2xl border border-[#eadfd6] bg-white p-4 text-sm leading-6">
+                    <h2 className="font-bold">Make future pickup bookable</h2>
+                    <p><Link className="underline" href="/admin/inventory/setup">1. Set product policies</Link>: online enabled, preparation time, booking window and separate safety buffer.</p>
+                    <p>2. Configure explicit guaranteed production and generate dates here. A rule alone is not stock; drafts still need approval. A ready-stock policy also needs actual production marked ready.</p>
+                    <p><Link className="underline" href="/admin/inventory">3. Review daily availability</Link> for the requested date. Manual/stock-active rows are protected, not silently replaced by generation.</p>
+                    <p><Link className="underline" href="/admin/pickup-scheduling">4. Schedule pickup times</Link> for the same date range. Product, branch and global windows all apply.</p>
+                </section>
 
                 {notice && <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">{notice}</div>}
                 {error && <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-700">{error}</div>}
@@ -368,6 +371,7 @@ export default function InventoryAutomationPage() {
                                         <p className="text-[10px] font-bold uppercase tracking-wide text-[#c88a20]">{rule.categoryName}</p>
                                         <h2 className="mt-1 truncate font-bold text-[#241715]">{rule.productName}</h2>
                                         <p className="mt-1 text-xs text-[#756763]">{rule.productCode} · {rule.inventoryUnit}</p>
+                                        <p className="mt-2 text-xs">{rule.readyStockRequired ? "Actual ready stock required after approval" : "Approved production can be booked"} · up to {rule.bookingHorizonDays} days ahead · {rule.productionLeadMinutes} min preparation</p>
                                     </div>
                                     <div className="grid flex-1 grid-cols-2 gap-3 md:grid-cols-4">
                                         <RuleMetric label="Mode" value={modeLabel(rule.automationMode)} />
@@ -401,6 +405,7 @@ export default function InventoryAutomationPage() {
                                 <span className="text-emerald-700">{run.createdCount} created</span>
                                 <span className="text-blue-700">{run.updatedCount + run.suggestedCount} refreshed/suggested</span>
                                 <span className={run.errorCount > 0 ? "text-red-700" : "text-[#756763]"}>{run.skippedCount} skipped · {run.errorCount} errors</span>
+                                {authorization && branchId && <RunExplanation branchId={branchId} runId={run.id} authorization={authorization} />}
                             </div>
                         ))}
                     </div>
@@ -414,6 +419,25 @@ export default function InventoryAutomationPage() {
             )}
         </main>
     );
+}
+
+function RunExplanation({branchId, runId, authorization}: {branchId: number; runId: number; authorization: string}) {
+    const [rows, setRows] = useState<{productName: string; outcome: string; message: string; firstDate: string; lastDate: string; dates: number}[] | null>(null);
+    const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
+    async function load() {
+        if (loading || rows) return;
+        setLoading(true); setError("");
+        try {setRows(await adminManagementApi(`/api/admin/inventory/branches/${branchId}/automation/runs/${runId}/explanation`, authorization));}
+        catch (error) {setError(error instanceof Error ? error.message : "Unable to load run details.");}
+        finally {setLoading(false);}
+    }
+    return <details className="md:col-span-4" onToggle={event => {if (event.currentTarget.open) void load();}}>
+        <summary className="min-h-11 cursor-pointer py-2 underline">View product/date outcomes and skipped reasons</summary>
+        {loading && <p role="status">Loading run details...</p>}
+        {error && <p role="alert">{error} <button onClick={load} className="min-h-11 underline"><T text="Retry" /></button></p>}
+        {rows?.map((row, index) => <p key={index} className="mt-2 rounded-lg bg-[#fffaf3] p-3"><strong>{row.productName}</strong> · {row.outcome} · {row.dates} date(s), {row.firstDate} to {row.lastDate}<br />{row.message}</p>)}
+    </details>;
 }
 
 function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
@@ -450,7 +474,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                             <option value="AUTO_APPROVE_GUARANTEED">Auto-approve guaranteed quantity</option>
                         </select>
                     </Field>
-                    <Field label={`Guaranteed quantity (${inventoryInputUnit(rule.inventoryUnit)})`} helpKey="guaranteed">
+                    <Field label={`Guaranteed online quantity (${inventoryInputUnit(rule.inventoryUnit)})`} helpKey="guaranteed">
                         <input type="number" min="0" step={rule.inventoryUnit === "GRAM" ? .05 : 1} value={draft.guaranteedQuantity} onChange={event => update("guaranteedQuantity", Number(event.target.value))} className={formControlClass} />
                     </Field>
                     <Field label="Lookback weeks" helpKey="lookbackWeeks">
@@ -472,7 +496,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                             <option value="MANUAL_ONLY">Manual allocation only</option>
                         </select>
                     </Field>
-                    <Field label="Generation horizon days" helpKey="generationHorizon">
+                    <Field label="Automatic planning window (days)" helpKey="generationHorizon">
                         <input type="number" min="0" max="365" value={draft.generationHorizonDays ?? ""} onChange={event => update("generationHorizonDays", event.target.value === "" ? null : Number(event.target.value))} className={formControlClass} placeholder="Use policy horizon" />
                     </Field>
                 </div>
@@ -490,7 +514,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                                 <input value={window.name} onChange={event => updateWindow(index, {name: event.target.value})} className={formControlClass} placeholder="Festival name" />
                                 <input type="date" value={window.startDate} onChange={event => updateWindow(index, {startDate: event.target.value})} className={formControlClass} />
                                 <input type="date" value={window.endDate} onChange={event => updateWindow(index, {endDate: event.target.value})} className={formControlClass} />
-                                <button type="button" onClick={() => update("windows", draft.windows.filter((_, current) => current !== index))} className="px-3 text-sm font-bold text-red-600">Remove</button>
+                                <button type="button" onClick={() => update("windows", draft.windows.filter((_, current) => current !== index))} className="px-3 text-sm font-bold text-red-600"><T text="Remove" /></button>
                             </div>
                         ))}</div>
                     </div>
@@ -500,7 +524,7 @@ function RuleEditor({rule, draft, setDraft, saving, onCancel, onSave}: {
                     <label className="flex items-center gap-3 rounded-xl border border-[#eadfd6] p-4 text-sm font-semibold text-[#241715]"><input type="checkbox" checked={draft.forecastEnabled} onChange={event => update("forecastEnabled", event.target.checked)} /> <span className="inline-flex items-center gap-1.5">Forecast enabled <InventoryInfo helpKey="forecastEnabled" /></span></label>
                     <label className="flex items-center gap-3 rounded-xl border border-[#eadfd6] p-4 text-sm font-semibold text-[#241715]"><input type="checkbox" checked={draft.active} onChange={event => update("active", event.target.checked)} /> <span className="inline-flex items-center gap-1.5">Automation active <InventoryInfo helpKey="automationActive" /></span></label>
                 </div>
-                <div className="mt-6 flex gap-3"><button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#756763]">Cancel</button><button type="button" onClick={onSave} disabled={saving || draft.availableDaysMask === 0} className="min-h-12 flex-[1.5] rounded-xl bg-[#7a1625] font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Save rule"}</button></div>
+                <div className="mt-6 flex gap-3"><button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded-xl border border-[#eadfd6] font-bold text-[#756763]"><T text="Cancel" /></button><button type="button" onClick={onSave} disabled={saving || draft.availableDaysMask === 0} className="min-h-12 flex-[1.5] rounded-xl bg-[#7a1625] font-bold text-white disabled:opacity-50">{saving ? "Saving…" : "Save rule"}</button></div>
             </div>
         </div>
     );

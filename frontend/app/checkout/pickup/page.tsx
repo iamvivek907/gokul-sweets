@@ -1,10 +1,23 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
+import {T,useTranslation} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {apiClient} from "@/services/apiClient";
+import {verifiedCheckoutContact} from "@/lib/checkoutIdentity";
+import {saveCustomerDetails} from "@/lib/checkoutStorage";
 
 import Link from "next/link";
+import SmartPickupSelection from "@/components/checkout/SmartPickupSelection";
+import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
+import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
+import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
+import {formatBusinessTime, parseBusinessTimestamp} from "@/lib/businessTime";
 
 import {
     useEffect,
     useMemo,
+    useRef,
     useState,
     useSyncExternalStore
 } from "react";
@@ -99,12 +112,56 @@ function formatDateForApi(
     return `${year}-${month}-${day}`;
 }
 
+function formatDateInTimeZone(
+    date: Date,
+    timeZone: string
+): string {
+    const formatter =
+        new Intl.DateTimeFormat(
+            "en-CA",
+            {
+                timeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }
+        );
+
+    const parts =
+        formatter.formatToParts(date);
+
+    const year =
+        parts.find(
+            part => part.type === "year"
+        )?.value;
+
+    const month =
+        parts.find(
+            part => part.type === "month"
+        )?.value;
+
+    const day =
+        parts.find(
+            part => part.type === "day"
+        )?.value;
+
+    if (
+        !year
+        || !month
+        || !day
+    ) {
+        return formatDateForApi(date);
+    }
+
+    return `${year}-${month}-${day}`;
+}
 
 function getToday():
     string {
 
-    return formatDateForApi(
-        new Date()
+    return formatDateInTimeZone(
+        new Date(),
+        "Asia/Kolkata"
     );
 }
 
@@ -116,28 +173,40 @@ function getServerToday():
 }
 
 
-function subscribeToDate():
-    () => void {
+function subscribeToDate(listener: () => void): () => void {
+ const timer=window.setInterval(listener,15000);window.addEventListener("focus",listener);return ()=>{window.clearInterval(timer);window.removeEventListener("focus",listener);};
+}
 
-    return () => {};
+
+function getOccasionDate(): string | null {
+    const date = new URLSearchParams(window.location.search).get("occasionDate");
+    return date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(`${date}T00:00:00Z`))
+        ? date : null;
+}
+
+
+function getServerOccasionDate(): string | null {
+    return null;
 }
 
 
 function getMaximumPickupDate(
+    fromDate: string,
     numberOfDays: number
 ): string {
-
     const date =
-        new Date();
+        new Date(
+            `${fromDate}T12:00:00+05:30`
+        );
 
-    date.setDate(
-        date.getDate()
+    date.setUTCDate(
+        date.getUTCDate()
         + numberOfDays
     );
 
-
-    return formatDateForApi(
-        date
+    return formatDateInTimeZone(
+        date,
+        "Asia/Kolkata"
     );
 }
 
@@ -181,34 +250,7 @@ function formatDisplayDate(
 function formatTime(
     value: string
 ): string {
-
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 
@@ -226,6 +268,20 @@ function formatCurrency(
     ).format(
         amount
     );
+}
+
+function clampDateWithinBounds(
+    value: string,
+    minimum: string,
+    maximum: string
+): string {
+    if (value < minimum) {
+        return minimum;
+    }
+    if (maximum && value > maximum) {
+        return maximum;
+    }
+    return value;
 }
 
 
@@ -258,6 +314,38 @@ function isSlotAvailable(
 
 
 export default function PickupPage() {
+    useTranslation();
+    const {features, error: configurationError, retry} = useStorefrontConfiguration();
+    const [fallback, setFallback] = useState(false);
+    const pending = useSyncExternalStore(subscribeToPendingOrder, getPendingOrderSnapshot, getServerPendingOrderSnapshot);
+    if (!features && !fallback) return <AppShell showSocialPopup={false}>
+        {configurationError ? <div role="alert"><p>{configurationError}</p>
+            <button className="min-h-11 p-3 underline" onClick={retry}><T text="Retry settings" /></button>
+            <button className="min-h-11 p-3 underline" onClick={() => setFallback(true)}><T text="Use standard pickup selection" /></button></div>
+            : <BrandLoading label="Loading pickup options..." />}
+    </AppShell>;
+    // Unauthenticated previews must not add back another order's private holds. Owned checkout edits keep their existing flow.
+    if (features?.smartPickupSelection && !fallback && !parsePendingOrder(pending)) {
+        return <>{configurationError && <p role="status" className="p-3 text-center text-sm">{configurationError}{" "}<T text="Keeping your pickup layout." />{" "}<button onClick={retry} className="min-h-11 px-3 underline"><T text="Retry settings" /></button></p>}
+            <SmartPickupSelection features={features} onFallback={() => setFallback(true)} /></>;
+    }
+    return <>{features?.smartPickupSelection && parsePendingOrder(pending) && <p className="p-4 text-center text-sm">{" "}<T text="Editing a reserved order: your existing pickup selector keeps its held stock." /></p>}<LegacyPickupPage fallbackToday={features?.today ?? null} fallbackFutureOrderingDays={features?.futureOrderingDays ?? null}
+        cartSwitchPreview={!!features?.cartSwitchPreview} /></>;
+}
+
+function LegacyPickupPage({
+    fallbackToday,
+    fallbackFutureOrderingDays,
+    cartSwitchPreview
+}: {
+    fallbackToday: string | null;
+    fallbackFutureOrderingDays: number | null;
+    cartSwitchPreview: boolean;
+}) {
+    const translate = useTranslation();
+    const [continuing,setContinuing] = useState(false);
+    const continuingRef = useRef(false);
+
 
     const router =
         useRouter();
@@ -270,12 +358,15 @@ export default function PickupPage() {
 
 
     const {
+        items,
         branchId,
         itemCount,
         subtotal,
         isEmpty
     } =
         useCart();
+
+    const [proposedDate, setProposedDate] = useState<string | null>(null);
 
 
     const pendingOrderSnapshot =
@@ -288,10 +379,10 @@ export default function PickupPage() {
 
     const pendingOrder =
         useMemo(
-            () =>
-                parsePendingOrder(
-                    pendingOrderSnapshot
-                ),
+            () => {
+                const order = parsePendingOrder(pendingOrderSnapshot);
+                return order?.fulfillmentType === "DELIVERY" ? null : order;
+            },
             [
                 pendingOrderSnapshot
             ]
@@ -327,17 +418,24 @@ export default function PickupPage() {
     const today =
         useSyncExternalStore(
             subscribeToDate,
-            getToday,
+            () =>
+                [fallbackToday ?? "",getToday()].sort().at(-1)!,
             getServerToday
         );
 
 
     const maximumDate =
-        today
+        today && fallbackFutureOrderingDays !== null
             ? getMaximumPickupDate(
-                7
+                today,
+                fallbackFutureOrderingDays
             )
-            : "";
+            : today
+                ? getMaximumPickupDate(
+                    today,
+                    7
+                )
+                : "";
 
 
     const [
@@ -347,6 +445,9 @@ export default function PickupPage() {
         useState<string | null>(
             null
         );
+
+    // A requested occasion date is a preference only; checkout still validates live capacity.
+    const occasionDate = useSyncExternalStore(subscribeToDate, getOccasionDate, getServerOccasionDate);
 
 
     const [
@@ -418,8 +519,13 @@ export default function PickupPage() {
 
 
     const pickupDate =
-        selectedDate
-        ?? today;
+        clampDateWithinBounds(
+            selectedDate
+            ?? (pendingOrderNumber ? null : occasionDate)
+            ?? today,
+            today,
+            maximumDate
+        );
 
 
     /*
@@ -432,6 +538,11 @@ export default function PickupPage() {
         &&
         loadedCurrentReservation?.lookupKey ===
             currentReservationLookupKey
+            && loadedCurrentReservation.order
+            && loadedCurrentReservation.order.fulfillmentType === "PICKUP"
+            && loadedCurrentReservation.order.pickupDate
+            && loadedCurrentReservation.order.pickupStartTime
+            && loadedCurrentReservation.order.pickupEndTime
             ? loadedCurrentReservation.order
             : null;
 
@@ -513,7 +624,7 @@ export default function PickupPage() {
 
 
                 const expiresAt =
-                    new Date(
+                    parseBusinessTimestamp(
                         result.reservationExpiresAt
                     ).getTime();
 
@@ -767,6 +878,22 @@ export default function PickupPage() {
     function handleDateChange(
         value: string
     ) {
+        const nextDate =
+            clampDateWithinBounds(
+                value,
+                today,
+                maximumDate
+            );
+
+        if (cartSwitchPreview && !isEmpty && branch && nextDate && nextDate !== pickupDate) {
+            setProposedDate(nextDate);
+            return;
+        }
+
+        applyDateChange(nextDate);
+    }
+
+    function applyDateChange(nextDate: string) {
 
         setLoading(
             true
@@ -799,7 +926,7 @@ export default function PickupPage() {
 
 
         setSelectedDate(
-            value
+            nextDate
         );
     }
 
@@ -882,7 +1009,8 @@ export default function PickupPage() {
      * CONTINUE
      * =========================================================
      */
-    function handleContinue() {
+    async function handleContinue() {
+        if(continuingRef.current)return;
 
         if (
             !selectedSlot
@@ -893,7 +1021,7 @@ export default function PickupPage() {
         ) {
 
             setValidationError(
-                "Select a pickup date and an available pickup time before continuing."
+                translate("Select a pickup date and an available pickup time before continuing.")
             );
 
             return;
@@ -912,9 +1040,18 @@ export default function PickupPage() {
         });
 
 
-        router.push(
-            "/checkout/customer"
-        );
+        continuingRef.current=true;setContinuing(true);
+        let next="/checkout/customer";
+        try {
+                const config=await apiClient<{enabled:boolean}>("/api/storefront/customer-identity",{signal:AbortSignal.timeout(5000)});
+                if(config.enabled){
+                    const session=await apiClient<{authenticated:boolean;phone?:string;name?:string}>("/api/customer/identity/me",{credentials:"include",signal:AbortSignal.timeout(5000)});
+                    const contact=verifiedCheckoutContact(session);
+                    if(contact){saveCustomerDetails(contact);next="/checkout/review";}
+                }
+        }catch{/* Keep guest details available when identity cannot be confirmed. */}
+        window.dispatchEvent(new Event("gokul-navigation-start"));
+        router.push(next);
     }
 
 
@@ -936,11 +1073,11 @@ export default function PickupPage() {
                 >
 
                     <CheckoutStateCard
-                        title="Your cart is empty"
+                        title={translate("Your cart is empty")}
                         message="Add items to your cart before choosing a pickup time."
                         primaryAction={{
                             label:
-                                "Explore Menu",
+                                translate("Explore Menu"),
 
                             href:
                                 "/menu"
@@ -984,14 +1121,14 @@ export default function PickupPage() {
                         detail="Choose the cart's branch again before selecting a pickup slot. Your cart items will stay available."
                         primaryAction={{
                             label:
-                                "Select Branch",
+                                translate("Select Branch"),
 
                             href:
                                 "/"
                         }}
                         secondaryAction={{
                             label:
-                                "Return to Cart",
+                                translate("Return to Cart"),
 
                             href:
                                 "/cart"
@@ -1012,6 +1149,14 @@ export default function PickupPage() {
      */
     return (
         <AppShell>
+
+            {proposedDate && branch && <CartSwitchDialog branchId={branch.id} branchName={branch.name}
+                date={proposedDate} items={items} onKeep={() => setProposedDate(null)}
+                onSwitch={(preview: CartSwitchPreview) => {
+                    if (preview.conflicts) return;
+                    applyDateChange(proposedDate);
+                    setProposedDate(null);
+                }} />}
 
             <section
                 className="
@@ -1035,8 +1180,7 @@ export default function PickupPage() {
                             text-[#c88a20]
                         "
                     >
-                        Checkout
-                    </p>
+                        <T text="Checkout" /></p>
 
 
                     <h1
@@ -1048,8 +1192,7 @@ export default function PickupPage() {
                             text-[#241715]
                         "
                     >
-                        Choose pickup
-                    </h1>
+                        <T text="Choose pickup" /></h1>
 
 
                     <p
@@ -1059,9 +1202,7 @@ export default function PickupPage() {
                             text-[#756763]
                         "
                     >
-                        Pick the date and time that works best for you.
-                        Available capacity updates automatically.
-                    </p>
+                        <T text="Pick the date and time that works best for you. Available capacity updates automatically." /></p>
 
                 </div>
 
@@ -1086,8 +1227,7 @@ export default function PickupPage() {
                             text-[#c88a20]
                         "
                     >
-                        Pickup from
-                    </p>
+                        <T text="Pickup from" /></p>
 
 
                     <p
@@ -1145,8 +1285,7 @@ export default function PickupPage() {
                                     text-green-700
                                 "
                             >
-                                Currently reserved for you
-                            </p>
+                                <T text="Currently reserved for you" /></p>
 
 
                             <p
@@ -1158,7 +1297,7 @@ export default function PickupPage() {
                             >
                                 {
                                     formatDisplayDate(
-                                        currentReservation.pickupDate
+                                        currentReservation.pickupDate ?? ""
                                     )
                                 }
 
@@ -1166,7 +1305,7 @@ export default function PickupPage() {
 
                                 {
                                     formatTime(
-                                        currentReservation.pickupStartTime
+                                        currentReservation.pickupStartTime ?? ""
                                     )
                                 }
 
@@ -1174,7 +1313,7 @@ export default function PickupPage() {
 
                                 {
                                     formatTime(
-                                        currentReservation.pickupEndTime
+                                        currentReservation.pickupEndTime ?? ""
                                     )
                                 }
                             </p>
@@ -1188,10 +1327,7 @@ export default function PickupPage() {
                                     text-green-800
                                 "
                             >
-                                Keep this time or choose another available
-                                time below. Your current reservation remains
-                                safe until the change succeeds.
-                            </p>
+                                <T text="Keep this time or choose another available time below. Your current reservation remains safe until the change succeeds." /></p>
 
                         </div>
 
@@ -1225,8 +1361,7 @@ export default function PickupPage() {
                                 text-[#241715]
                             "
                         >
-                            Pickup date
-                        </label>
+                            <T text="Pickup date" /></label>
 
 
                         <input
@@ -1312,8 +1447,7 @@ export default function PickupPage() {
                                 text-[#241715]
                             "
                         >
-                            Pickup time
-                        </label>
+                            <T text="Pickup time" /></label>
 
 
                         <p
@@ -1324,8 +1458,7 @@ export default function PickupPage() {
                                 text-[#756763]
                             "
                         >
-                            Open the list and choose the most convenient available time.
-                        </p>
+                            <T text="Open the list and choose the most convenient available time." /></p>
 
 
                         {
@@ -1368,8 +1501,7 @@ export default function PickupPage() {
                                             text-red-700
                                         "
                                     >
-                                        Unable to load pickup times
-                                    </p>
+                                        <T text="Unable to load pickup times" /></p>
 
 
                                     <p
@@ -1379,7 +1511,7 @@ export default function PickupPage() {
                                             text-red-600
                                         "
                                     >
-                                        {error}
+                                        {translate(error)}
                                     </p>
 
 
@@ -1395,8 +1527,7 @@ export default function PickupPage() {
                                             text-[#7a1625]
                                         "
                                     >
-                                        Try again
-                                    </button>
+                                        <T text="Try again" /></button>
 
                                 </div>
 
@@ -1422,9 +1553,7 @@ export default function PickupPage() {
                                         text-[#756763]
                                     "
                                 >
-                                    No pickup times available
-                                    for this date.
-                                </div>
+                                    <T text="No pickup times available for this date." /></div>
 
                             )
                         }
@@ -1496,8 +1625,7 @@ export default function PickupPage() {
                                                 text-[#c88a20]
                                             "
                                         >
-                                            Selected time
-                                        </p>
+                                            <T text="Selected time" /></p>
 
 
                                         <p
@@ -1567,8 +1695,7 @@ export default function PickupPage() {
                                                             .priorityRemainingCapacity
                                                     }
                                                     {" "}
-                                                    priority left
-                                                </p>
+                                                    <T text="priority left" /></p>
 
                                             )
                                         }
@@ -1596,7 +1723,7 @@ export default function PickupPage() {
                                                 text-[#756763]
                                             "
                                         >
-                                            Priority pickup available for{" "}
+                                            <T text="Priority pickup available for" />{" "}
                                             <strong
                                                 className="
                                                     text-[#7a1625]
@@ -1610,8 +1737,7 @@ export default function PickupPage() {
                                                 }
                                             </strong>
                                             {" "}
-                                            extra.
-                                        </div>
+                                            <T text="extra." /></div>
 
                                     )
                                 }
@@ -1635,8 +1761,7 @@ export default function PickupPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Pickup type
-                                    </p>
+                                        <T text="Pickup type" /></p>
 
 
                                     <div
@@ -1711,8 +1836,7 @@ export default function PickupPage() {
                                                             text-[#241715]
                                                         "
                                                     >
-                                                        Normal Pickup
-                                                    </p>
+                                                        <T text="Normal Pickup" /></p>
 
 
                                                     <p
@@ -1723,8 +1847,7 @@ export default function PickupPage() {
                                                             text-[#756763]
                                                         "
                                                     >
-                                                        Included in your order.
-                                                    </p>
+                                                        <T text="Included in your order." /></p>
 
                                                 </div>
 
@@ -1748,8 +1871,7 @@ export default function PickupPage() {
                                                                     text-[#756763]
                                                                 "
                                                             >
-                                                                Full
-                                                            </span>
+                                                                <T text="Full" /></span>
                                                         )
                                                         : selectedPickupType === "NORMAL"
                                                             ? (
@@ -1888,8 +2010,7 @@ export default function PickupPage() {
                                                                 text-[#241715]
                                                             "
                                                         >
-                                                            Priority Pickup
-                                                        </p>
+                                                            <T text="Priority Pickup" /></p>
 
 
                                                         {
@@ -1923,8 +2044,7 @@ export default function PickupPage() {
                                                             text-[#756763]
                                                         "
                                                     >
-                                                        Uses priority pickup capacity.
-                                                    </p>
+                                                        <T text="Uses priority pickup capacity." /></p>
 
                                                 </div>
 
@@ -1952,8 +2072,7 @@ export default function PickupPage() {
                                                                     text-[#756763]
                                                                 "
                                                             >
-                                                                Full
-                                                            </span>
+                                                                <T text="Full" /></span>
                                                         )
                                                         : selectedPickupType === "PRIORITY"
                                                             ? (
@@ -2056,7 +2175,7 @@ export default function PickupPage() {
                             {itemCount}{" "}
                             {
                                 itemCount === 1
-                                    ? "item"
+                                    ? translate("item")
                                     : "items"
                             }
                         </span>
@@ -2108,7 +2227,7 @@ export default function PickupPage() {
                     <button
                         type="button"
                         disabled={
-                            !selectedSlot
+                            continuing || !selectedSlot
                             ||
                             !selectedPickupType
                         }
@@ -2138,7 +2257,7 @@ export default function PickupPage() {
                         {
                             selectedSlot
                             && selectedPickupType
-                                ? "Continue"
+                                ? continuing ? translate("Opening checkout…") : translate("Continue")
                                 : selectedSlot
                                     ? "Select Pickup Type"
                                     : "Select a Pickup Time"
@@ -2159,8 +2278,7 @@ export default function PickupPage() {
                             text-[#7a1625]
                         "
                     >
-                        Back to Cart
-                    </Link>
+                        <T text="Back to Cart" /><LinkFeedback /></Link>
 
                 </div>
 

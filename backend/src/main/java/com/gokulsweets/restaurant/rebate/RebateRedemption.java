@@ -1,13 +1,17 @@
 package com.gokulsweets.restaurant.rebate;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.order.entity.Order;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted rebate redemption state. */
 @Entity
 @Table(name = "rebate_redemptions")
 @Getter
@@ -15,57 +19,35 @@ import java.time.LocalDateTime;
 public class RebateRedemption {
 
     @Id
-    @GeneratedValue(
-            strategy = GenerationType.IDENTITY
-    )
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "rebate_id",
-            nullable = false
-    )
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "rebate_id", nullable = false)
     private Rebate rebate;
 
-    @OneToOne(
-            fetch = FetchType.LAZY,
-            optional = false
-    )
-    @JoinColumn(
-            name = "order_id",
-            nullable = false,
-            unique = true
-    )
+    @OneToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "order_id", nullable = false, unique = true)
     private Order order;
 
-    @Column(
-            name = "customer_phone",
-            nullable = false,
-            length = 20
-    )
+    @Column(name = "customer_phone", nullable = false, length = 20)
     private String customerPhone;
 
-    @Column(
-            name = "discount_amount",
-            nullable = false,
-            precision = 12,
-            scale = 2
-    )
+    @Column(name = "discount_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal discountAmount;
 
-    @Column(
-            name = "redeemed_at",
-            nullable = false
-    )
+    @Column(name = "redeemed_at", nullable = false)
     private LocalDateTime redeemedAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-
-        redeemedAt =
-                LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(RebateRedemption.class, "onCreate()");
+        try {
+            redeemedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, RebateRedemption.class, "onCreate()");
+        }
     }
 }

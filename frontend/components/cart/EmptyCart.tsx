@@ -1,3 +1,6 @@
+import EmptyMealIllustration from "./EmptyMealIllustration";
+import {T} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
 import Link
     from "next/link";
 
@@ -7,6 +10,7 @@ export default function EmptyCart() {
     return (
         <div
             className="
+                empty-cart-card
                 w-full
                 min-w-0
                 rounded-3xl
@@ -35,7 +39,7 @@ export default function EmptyCart() {
                     text-4xl
                 "
             >
-                🛍️
+                <span className="empty-cart-legacy-icon">🛍️</span><span className="empty-cart-food-icon"><EmptyMealIllustration/></span>
             </div>
 
 
@@ -49,8 +53,7 @@ export default function EmptyCart() {
                     text-[#c88a20]
                 "
             >
-                Nothing here yet
-            </p>
+                <T text="Nothing here yet" /></p>
 
 
             <h2
@@ -61,8 +64,7 @@ export default function EmptyCart() {
                     text-[#241715]
                 "
             >
-                Your cart is empty
-            </h2>
+                <T text="Your cart is empty" /></h2>
 
 
             <p
@@ -75,9 +77,7 @@ export default function EmptyCart() {
                     text-[#756763]
                 "
             >
-                Add your favourite sweets, snacks and meals,
-                then choose a convenient pickup time.
-            </p>
+                <T text="Add your favourite sweets, snacks and meals, then choose a convenient pickup time." /></p>
 
 
             <Link
@@ -100,8 +100,7 @@ export default function EmptyCart() {
                     active:scale-[0.98]
                 "
             >
-                Explore Menu
-            </Link>
+                <T text="Explore Menu" /><LinkFeedback /></Link>
 
         </div>
     );

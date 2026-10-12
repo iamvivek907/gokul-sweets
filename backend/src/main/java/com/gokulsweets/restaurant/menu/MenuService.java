@@ -1,217 +1,119 @@
 package com.gokulsweets.restaurant.menu;
 
-import com.gokulsweets.restaurant.branch.Branch;
-import com.gokulsweets.restaurant.branch.BranchRepository;
-import com.gokulsweets.restaurant.branchproduct.BranchProduct;
-import com.gokulsweets.restaurant.branchproduct.BranchProductRepository;
-import com.gokulsweets.restaurant.category.Category;
-import com.gokulsweets.restaurant.menu.dto.MenuCategoryResponse;
-import com.gokulsweets.restaurant.menu.dto.MenuProductResponse;
-import com.gokulsweets.restaurant.product.Product;
+import com.gokulsweets.restaurant.menu.dto.*;
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
+/**
+ * Legacy combined endpoint remains compatible; new clients refresh only the availability overlay.
+ */
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class MenuService {
 
-    private final BranchRepository branchRepository;
+    private final MenuCatalogService catalog;
 
-    private final BranchProductRepository branchProductRepository;
+    private final MenuAvailabilityService availability;
 
-
+    /**
+     * Returns menu.
+     *
+     * @param branchId the branch id
+     * @return the get menu result
+     */
     @Transactional(readOnly = true)
-    public List<MenuCategoryResponse> getMenu(
-            Long branchId
-    ) {
-
-        Branch branch =
-                validateBranch(
-                        branchId
-                );
-
-        List<BranchProduct> branchProducts =
-                branchProductRepository
-                        .findAvailableMenu(
-                                branch.getId()
-                        );
-
-        Map<Long, CategoryBucket> categories =
-                new LinkedHashMap<>();
-
-
-        for (
-                BranchProduct branchProduct :
-                branchProducts
-        ) {
-
-            Product product =
-                    branchProduct.getProduct();
-
-            Category category =
-                    product.getCategory();
-
-            CategoryBucket bucket =
-                    categories.computeIfAbsent(
-                            category.getId(),
-                            ignored ->
-                                    new CategoryBucket(
-                                            category
-                                    )
-                    );
-
-
-            bucket.products().add(
-                    toMenuProduct(
-                            branchProduct,
-                            product,
-                            category
-                    )
-            );
-        }
-
-
-        List<MenuCategoryResponse> response =
-                categories.values()
-                        .stream()
+    public List<MenuCategoryResponse> getMenu(Long branchId) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(MenuService.class, "getMenu(Long)");
+        try {
+            if (branchId == null) throw new IllegalArgumentException("Branch ID is required.");
+            for (int attempt = 0; attempt < 3; attempt++) {
+                var snapshot = catalog.get(branchId);
+                var live = availability.get(branchId);
+                if (!snapshot.revision().equals(live.revision())) continue;
+                var states = new HashMap<Long, MenuAvailabilityService.Item>();
+                live.items().forEach(i -> states.put(i.productId(), i));
+                return snapshot.categories().stream()
                         .map(
-                                bucket ->
+                                c ->
                                         new MenuCategoryResponse(
-                                                bucket.category().getId(),
-                                                bucket.category().getName(),
-                                                bucket.category().getDescription(),
-                                                bucket.category().getDisplayOrder(),
-                                                List.copyOf(
-                                                        bucket.products()
-                                                )
-                                        )
-                        )
+                                                c.id(),
+                                                c.name(),
+                                                c.description(),
+                                                c.displayOrder(),
+                                                c.products().stream()
+                                                        .filter(
+                                                                p ->
+                                                                        live.serviceWindowsEnabled()
+                                                                                || states.get(
+                                                                                                p
+                                                                                                        .id())
+                                                                                        .available())
+                                                        .map(
+                                                                p -> {
+                                                                    var state = states.get(p.id());
+                                                                    return new MenuProductResponse(
+                                                                            p.id(),
+                                                                            p.categoryId(),
+                                                                            p.categoryName(),
+                                                                            p.name(),
+                                                                            p.description(),
+                                                                            p.price(),
+                                                                            p.imageUrl(),
+                                                                            state.available(),
+                                                                            p.saleMode(),
+                                                                            p.minimumWeightGrams(),
+                                                                            p.weightStepGrams(),
+                                                                            retime(
+                                                                                    state
+                                                                                            .serviceAvailability(),
+                                                                                    live
+                                                                                            .observedAt()),
+                                                                            p.vegetarian());
+                                                                })
+                                                        .toList()))
+                        .filter(c -> !c.products().isEmpty())
                         .toList();
-
-
-        log.debug(
-                "Loaded customer menu: branchId={}, categoryCount={}, productCount={}",
-                branch.getId(),
-                response.size(),
-                branchProducts.size()
-        );
-
-
-        return response;
-    }
-
-
-    private Branch validateBranch(
-            Long branchId
-    ) {
-
-        if (branchId == null) {
-
-            throw new IllegalArgumentException(
-                    "Branch ID is required."
-            );
+            }
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                    "Menu is updating. Please try again.");
+        } finally {
+            MethodTiming.finish(__gokulMethodStartedNanos, MenuService.class, "getMenu(Long)");
         }
-
-
-        Branch branch =
-                branchRepository
-                        .findById(branchId)
-                        .orElseThrow(
-                                () -> {
-
-                                    log.warn(
-                                            "Menu requested for unknown branch: branchId={}",
-                                            branchId
-                                    );
-
-                                    return new IllegalArgumentException(
-                                            "Selected branch does not exist."
-                                    );
-                                }
-                        );
-
-
-        if (!branch.isActive()) {
-
-            log.warn(
-                    "Menu requested for inactive branch: branchId={}",
-                    branchId
-            );
-
-            throw new IllegalArgumentException(
-                    "Selected branch is currently unavailable."
-            );
-        }
-
-
-        return branch;
     }
 
-
-    private MenuProductResponse toMenuProduct(
-            BranchProduct branchProduct,
-            Product product,
-            Category category
-    ) {
-
-        BigDecimal effectivePrice =
-                branchProduct.getPriceOverride() != null
-                        ? branchProduct.getPriceOverride()
-                        : product.getBasePrice();
-
-
-        return new MenuProductResponse(
-
-                product.getId(),
-
-                category.getId(),
-
-                category.getName(),
-
-                product.getName(),
-
-                product.getDescription(),
-
-                effectivePrice,
-
-                /*
-                 * Cloudflare R2 public URL.
-                 */
-                product.getImageUrl(),
-
-                branchProduct.isAvailable(),
-
-                product.getSaleMode(),
-
-                product.getMinimumWeightGrams(),
-
-                product.getWeightStepGrams()
-        );
-    }
-
-
-    private record CategoryBucket(
-            Category category,
-            List<MenuProductResponse> products
-    ) {
-
-        private CategoryBucket(
-                Category category
-        ) {
-
-            this(
-                    category,
-                    new ArrayList<>()
-            );
+    /**
+     * Changes pickup timing for menu data and returns the {@code MenuServiceWindows.Status} result.
+     *
+     * @param status the status supplied to this method
+     * @param observedAt the observed at supplied to this method
+     * @return the {@code MenuServiceWindows.Status} result
+     */
+    private MenuServiceWindows.Status retime(
+            MenuServiceWindows.Status status, java.time.Instant observedAt) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        MenuService.class, "retime(MenuServiceWindows.Status,java.time.Instant)");
+        try {
+            if (status == null || observedAt == null) return status;
+            return new MenuServiceWindows.Status(
+                    status.available(),
+                    status.code(),
+                    status.message(),
+                    status.nextChangeAt(),
+                    observedAt);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    MenuService.class,
+                    "retime(MenuServiceWindows.Status,java.time.Instant)");
         }
     }
 }

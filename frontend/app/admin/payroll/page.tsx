@@ -1,4 +1,6 @@
 "use client";
+import {T} from "@/lib/language";
+
 
 import {
     useEffect,
@@ -711,9 +713,7 @@ export default function AdminPayrollPage() {
                             text-[#241715]
                             sm:text-4xl
                         "
-                    >
-                        Payroll
-                    </h1>
+                    >{" "}<T text="Payroll" />{" "}</h1>
 
 
                     <p
@@ -792,9 +792,7 @@ export default function AdminPayrollPage() {
 
                         <div className={CARD_HEADER_CLASS}>
 
-                            <h2 className="font-bold text-[#241715]">
-                                Staff
-                            </h2>
+                            <h2 className="font-bold text-[#241715]">{" "}<T text="Staff" />{" "}</h2>
 
 
                             <input

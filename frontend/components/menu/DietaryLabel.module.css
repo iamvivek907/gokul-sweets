@@ -1,0 +1,6 @@
+.label { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 650; line-height: 1.4; white-space: nowrap; vertical-align: middle; }
+.label svg { flex: 0 0 16px; width: 16px; height: 16px; }
+.veg { color: #087f55; }
+.nonveg { color: #8c3b26; }
+.group { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 7px; }
+.group small { color: #665550; font-size: 10px; }

@@ -1,4 +1,7 @@
 "use client";
+import {T} from "@/lib/language";
+
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useEffect,
@@ -14,6 +17,10 @@ import {
 
 import {
     downloadMenuImportTemplate,
+    getPendingMenuImportJob,
+    discardMenuImportRecovery,
+    resumeMenuImportJob,
+    type PendingMenuImportJob,
     importMenuFile,
     validateMenuImport
 } from "@/services/adminMenuImportApi";
@@ -219,7 +226,7 @@ export default function AdminMenuImportPage() {
                     ) {
 
                         setSelectedBranchId(
-                            allowedBranches[0].id
+                            preferredAdminBranchId(currentProfile.staffId, allowedBranches)
                         );
                     }
 
@@ -444,6 +451,7 @@ export default function AdminMenuImportPage() {
             setValidationResult(
                 result
             );
+            setValidatedFile(selectedFile);
 
         } catch (exception) {
 
@@ -550,6 +558,33 @@ export default function AdminMenuImportPage() {
     }
 
 
+    const [validatedFile, setValidatedFile] = useState<File | null>(null);
+    const [pendingJob, setPendingJob] = useState<PendingMenuImportJob | null>(null);
+    useEffect(() => {
+        let active = true;
+        Promise.resolve().then(() => {
+            if (active) setPendingJob(selectedBranchId === null ? null : getPendingMenuImportJob(selectedBranchId));
+        });
+        return () => { active = false; };
+    }, [selectedBranchId, validating, importing]);
+
+    async function handleResumeJob() {
+        if (selectedBranchId === null || authorization === null) return;
+        setImporting(true);
+        setError(null);
+        try {
+            const recovered = await resumeMenuImportJob(selectedBranchId, authorization);
+            if (recovered.operation === "VALIDATE") {
+                // A recovered validation may belong to a file from before the refresh.
+                setValidatedFile(null);
+                setValidationResult(recovered.result as MenuImportValidationResponse);
+            }
+            else setImportResult(recovered.result as MenuImportResultResponse);
+        } catch (failure) {
+            setError(failure instanceof Error ? failure.message : "Unable to check the menu job.");
+        } finally { setImporting(false); }
+    }
+
     const selectedBranch =
         branches.find(
             branch =>
@@ -565,7 +600,7 @@ export default function AdminMenuImportPage() {
         selectedFile
         !== null
         &&
-        !importing;
+        !importing && !pendingJob && validatedFile === selectedFile;
 
 
     return (
@@ -683,9 +718,7 @@ export default function AdminMenuImportPage() {
                                 font-semibold
                                 text-[#241715]
                             "
-                        >
-                            Branch
-                        </label>
+                        >{" "}<T text="Branch" />{" "}</label>
 
 
                         <select
@@ -695,7 +728,7 @@ export default function AdminMenuImportPage() {
                                 ?? ""
                             }
                             disabled={
-                                branchesLoading
+                                validating || importing || branchesLoading
                                 ||
                                 branches.length
                                 === 0
@@ -712,6 +745,7 @@ export default function AdminMenuImportPage() {
                                     setSelectedBranchId(
                                         value
                                     );
+                                    if (profile) rememberAdminBranchId(profile.staffId, value);
 
 
                                     setSelectedFile(
@@ -760,9 +794,7 @@ export default function AdminMenuImportPage() {
                                 === 0
                                 && (
 
-                                    <option value="">
-                                        No branch available
-                                    </option>
+                                    <option value="">{" "}<T text="No branch available" />{" "}</option>
 
                                 )
                             }
@@ -895,6 +927,24 @@ export default function AdminMenuImportPage() {
                 }
 
 
+                {pendingJob && (
+                    <section className="mt-6 rounded-2xl border border-[#eadfd6] bg-white p-5" aria-label="Pending menu job">
+                        <p className="text-sm text-[#756763]">A previous menu {pendingJob.operation === "IMPORT" ? "import" : "validation"} may still be running. Check its result before uploading again.</p>
+                        <button type="button" disabled={validating || importing} onClick={handleResumeJob}
+                            className="mt-3 min-h-12 rounded-xl bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-60">
+                            {importing ? "Checking status..." : "Resume status check"}
+                        </button>
+                        {pendingJob.submission && <button type="button" disabled={validating || importing}
+                            className="ml-3 min-h-12 px-3 text-sm underline disabled:opacity-60"
+                            onClick={() => {
+                                if (selectedBranchId !== null && window.confirm("Clear this recovery record? This does not cancel an upload that the backend may still be processing. Check the menu and job status before uploading again.")) {
+                                    discardMenuImportRecovery(selectedBranchId);
+                                    setPendingJob(null);
+                                }
+                            }}>Clear recovery record</button>}
+                    </section>
+                )}
+
                 <section
                     className="
                         mt-6
@@ -961,7 +1011,7 @@ export default function AdminMenuImportPage() {
                                     text-[#756763]
                                 "
                             >
-                                Download the template for the selected branch and fill in the menu rows. Keep the template columns unchanged.
+                                Download the template for the selected branch and fill in up to 500 menu rows. Keep columns A–Q unchanged and use only the Menu_Upload and Reference_Data sheets.
                             </p>
 
                         </div>
@@ -1218,7 +1268,7 @@ export default function AdminMenuImportPage() {
                                         selectedBranchId
                                         === null
                                         ||
-                                        validating
+                                        pendingJob !== null || importing || validating
                                     }
                                     onClick={
                                         handleValidate

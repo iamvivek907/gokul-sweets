@@ -1,4 +1,8 @@
 "use client";
+import {T} from "@/lib/language";
+
+import BrandAbout from "@/components/brand/BrandAbout";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 import Link from "next/link";
 import {useEffect, useState, type ReactNode} from "react";
@@ -6,6 +10,7 @@ import {useEffect, useState, type ReactNode} from "react";
 import AppShell from "@/components/layout/AppShell";
 import {getActiveBranches} from "@/services/branchApi";
 import type {Branch} from "@/types/branch";
+import {formatBusinessTime} from "@/lib/businessTime";
 
 const INSTAGRAM_URL = "https://www.instagram.com/_gokulsweets";
 const FACEBOOK_URL = "https://www.facebook.com/visitgokulsweets";
@@ -19,15 +24,7 @@ const POLICY_LINKS = [
 ] as const;
 
 function formatTime(value: string | null): string | null {
-    if (!value) return null;
-    const [hour, minute] = value.split(":").map(Number);
-    if (!Number.isFinite(hour) || !Number.isFinite(minute)) return value;
-    const date = new Date();
-    date.setHours(hour, minute, 0, 0);
-    return new Intl.DateTimeFormat("en-IN", {
-        hour: "numeric",
-        minute: "2-digit"
-    }).format(date);
+    return value ? formatBusinessTime(value) : null;
 }
 
 function formatAddress(branch: Branch): string {
@@ -206,6 +203,7 @@ function PolicyCenter() {
 }
 
 export default function AboutPage() {
+    const features=useStorefrontFeatures();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -241,9 +239,9 @@ export default function AboutPage() {
     return (
         <AppShell>
             <div className="mx-auto w-full max-w-6xl pb-12">
-                <section className="overflow-hidden rounded-3xl border border-[#eadfd6] bg-white shadow-[0_8px_30px_rgba(60,30,20,0.08)]">
+                {features?.brandCareers ? <BrandAbout/> : <section className="overflow-hidden rounded-3xl border border-[#eadfd6] bg-white shadow-[0_8px_30px_rgba(60,30,20,0.08)]">
                     <div className="bg-linear-to-br from-[#fff4e5] via-[#fffaf3] to-[#f6dfad]/40 px-6 py-9 sm:px-9 sm:py-12">
-                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]">Our story</p>
+                        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#c88a20]"><T text="Our story" /></p>
                         <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-[#7a1625] sm:text-5xl">More than sweets.<br />It&apos;s a feeling.</h1>
                         <p className="mt-4 max-w-2xl text-sm leading-7 text-[#756763] sm:text-base">Gokul Sweets prepares fresh sweets, savouries and food for moments shared with family and friends. Choose your favourites, pay securely and collect your order from your selected branch.</p>
                         <div className="mt-6 flex flex-wrap gap-3">
@@ -251,14 +249,14 @@ export default function AboutPage() {
                             <a href="#our-branches" className="flex min-h-12 items-center justify-center rounded-xl border border-[#eadfd6] bg-white px-6 font-bold text-[#7a1625]!">Find a Branch</a>
                         </div>
                     </div>
-                </section>
+                </section>}
 
                 <section id="our-branches" className="mt-8 scroll-mt-24">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#c88a20]">Visit us</p>
                     <h2 className="mt-1 text-3xl font-extrabold text-[#241715]">Our Branches</h2>
                     <p className="mt-2 text-sm leading-6 text-[#756763]">Choose your preferred pickup location while placing the order.</p>
 
-                    {loading && <div className="mt-5 grid gap-4 md:grid-cols-2">{[1, 2].map(item => <div key={item} className="h-64 animate-pulse rounded-3xl bg-[#f4ebe4]" />)}</div>}
+                    {loading && <div className="mt-5 grid gap-4 md:grid-cols-2">{[1, 2].map(item => <div key={item} className="h-64 animate-pulse motion-reduce:animate-none rounded-3xl bg-[#f1ecfa]" />)}</div>}
 
                     {!loading && error && (
                         <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5 text-center">
@@ -279,8 +277,8 @@ export default function AboutPage() {
                 <section className="mt-8 rounded-3xl bg-[#7a1625] p-6 text-white sm:p-8">
                     <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-center">
                         <div>
-                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#f6dfad]">Stay connected</p>
-                            <h2 className="mt-1 text-2xl font-extrabold">Follow Gokul Sweets</h2>
+                            <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#f6dfad]"><T text="Stay connected" /></p>
+                            <h2 className="mt-1 text-2xl font-extrabold"><T text="Follow Gokul Sweets" /></h2>
                             <p className="mt-2 text-sm leading-6 text-white/80">Discover festive specials, new products and updates from our shops.</p>
                         </div>
                         <div className="grid gap-3 sm:grid-cols-2 lg:min-w-[440px]">

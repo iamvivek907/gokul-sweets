@@ -3,21 +3,24 @@ package com.gokulsweets.restaurant.inventory.entity;
 import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.inventory.enums.InventoryControlMode;
 import com.gokulsweets.restaurant.inventory.enums.InventoryUnit;
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted branch inventory policy state. */
 @Entity
 @Table(
         name = "branch_inventory_policies",
-        uniqueConstraints = @UniqueConstraint(
-                name = "uk_inventory_policy_branch_product",
-                columnNames = "branch_product_id"
-        )
-)
+        uniqueConstraints =
+                @UniqueConstraint(
+                        name = "uk_inventory_policy_branch_product",
+                        columnNames = "branch_product_id"))
 @Getter
 @Setter
 public class BranchInventoryPolicy {
@@ -44,19 +47,10 @@ public class BranchInventoryPolicy {
     @Column(name = "ready_stock_required", nullable = false)
     private boolean readyStockRequired;
 
-    @Column(
-            name = "default_safety_buffer",
-            nullable = false,
-            precision = 14,
-            scale = 3
-    )
+    @Column(name = "default_safety_buffer", nullable = false, precision = 14, scale = 3)
     private BigDecimal defaultSafetyBuffer = BigDecimal.ZERO;
 
-    @Column(
-            name = "maximum_daily_allocation",
-            precision = 14,
-            scale = 3
-    )
+    @Column(name = "maximum_daily_allocation", precision = 14, scale = 3)
     private BigDecimal maximumDailyAllocation;
 
     @Column(name = "booking_horizon_days", nullable = false)
@@ -78,16 +72,31 @@ public class BranchInventoryPolicy {
     @Column(nullable = false)
     private Long version;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BranchInventoryPolicy.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, BranchInventoryPolicy.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BranchInventoryPolicy.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, BranchInventoryPolicy.class, "onUpdate()");
+        }
     }
 }
-

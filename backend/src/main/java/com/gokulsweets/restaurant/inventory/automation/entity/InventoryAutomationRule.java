@@ -3,13 +3,17 @@ package com.gokulsweets.restaurant.inventory.automation.entity;
 import com.gokulsweets.restaurant.branchproduct.BranchProduct;
 import com.gokulsweets.restaurant.inventory.automation.enums.InventoryAutomationMode;
 import com.gokulsweets.restaurant.inventory.automation.enums.InventorySeasonalMode;
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/** Persisted inventory automation rule state. */
 @Entity
 @Table(name = "inventory_automation_rules")
 @Getter
@@ -69,15 +73,31 @@ public class InventoryAutomationRule {
     @Column(nullable = false)
     private Long version;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryAutomationRule.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryAutomationRule.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryAutomationRule.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryAutomationRule.class, "onUpdate()");
+        }
     }
 }

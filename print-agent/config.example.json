@@ -1,0 +1,13 @@
+{
+  "api_url": "https://api-dev.gokulsweets.in",
+  "branch_id": 1,
+  "agent_id": "shop-1-kitchen",
+  "station": "KITCHEN",
+  "printer_code": "KITCHEN_USB",
+  "protocol": "ESC_POS_USB",
+  "target": "REPLACE_WITH_EXACT_WINDOWS_PRINTER_NAME",
+  "port": 9100,
+  "baud_rate": 9600,
+  "paper_width_mm": 80,
+  "auto_cut": false
+}

@@ -1,191 +1,56 @@
 "use client";
-
-import {useCallback, useEffect, useState} from "react";
-
-import {getReviewContext, saveReview} from "@/services/reviewApi";
-import type {ReviewContext} from "@/types/review";
-
-interface Props {
-    orderNumber: string;
-}
-
-function StarPicker({value, onChange, label}: {
+import { useCallback, useEffect, useState, useId } from "react";
+import { getReviewContext, saveReview } from "@/services/reviewApi";
+import type { ReviewContext } from "@/types/review";
+import { T } from "@/lib/language";
+import styles from "./OrderReviewCard.module.css";
+function StarPicker({ value, onChange, label, disabled }: {
     value: number;
     onChange: (rating: number) => void;
     label: string;
+    disabled?: boolean;
 }) {
-    return (
-        <div className="flex gap-1" role="group" aria-label={label}>
-            {[1, 2, 3, 4, 5].map(star => (
-                <button
-                    key={star}
-                    type="button"
-                    onClick={() => onChange(star)}
-                    aria-label={`${star} star${star === 1 ? "" : "s"}`}
-                    aria-pressed={star <= value}
-                    className={`min-h-11 min-w-10 text-3xl leading-none ${
-                        star <= value ? "text-[#d69216]" : "text-[#d8cbc3]"
-                    }`}
-                >
-                    ★
-                </button>
-            ))}
-        </div>
-    );
+    return <div className={styles.stars} role="group" aria-label={label}>{[1, 2, 3, 4, 5].map(star => <button key={star} type="button" disabled={disabled} className={styles.star} data-filled={star <= value} aria-label={`${star} star${star === 1 ? "" : "s"}`} aria-pressed={star === value} onClick={() => onChange(star)} onKeyDown={event => { if (["ArrowLeft", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+        const next = Math.max(1, Math.min(5, star + (event.key === "ArrowRight" ? 1 : -1)));
+        onChange(next);
+        (event.currentTarget.parentElement?.children[next - 1] as HTMLButtonElement | undefined)?.focus();
+    } }}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 2 3 6.4 7 1-5 5 1.2 7L12 18l-6.2 3.4L7 14.4l-5-5 7-1Z"/></svg></button>)}</div>;
 }
-
-export default function OrderReviewCard({orderNumber}: Props) {
-    const [context, setContext] = useState<ReviewContext | null>(null);
-    const [overallRating, setOverallRating] = useState(0);
-    const [comment, setComment] = useState("");
-    const [itemRatings, setItemRatings] = useState<Record<number, number>>({});
-    const [error, setError] = useState<string | null>(null);
-    const [saving, setSaving] = useState(false);
-    const [saved, setSaved] = useState(false);
-
-    const fetchContext = useCallback(
-        (signal?: AbortSignal) => getReviewContext(orderNumber, signal),
-        [orderNumber]
-    );
-
-    useEffect(() => {
-        const controller = new AbortController();
-
-        void fetchContext(controller.signal)
-            .then(response => {
-                if (controller.signal.aborted) return;
-
-                setContext(response);
-                setOverallRating(response.review?.overallRating ?? 0);
-                setComment(response.review?.comment ?? "");
-                setItemRatings(Object.fromEntries(
-                    (response.review?.itemRatings ?? [])
-                        .map(item => [item.productId, item.rating])
-                ));
-            })
-            .catch(exception => {
-                if (controller.signal.aborted) return;
-                setError(
-                    exception instanceof Error
-                        ? exception.message
-                        : "Unable to load the review form."
-                );
-            });
-
-        return () => controller.abort();
-    }, [fetchContext]);
-
-    async function handleSubmit(): Promise<void> {
-        if (saving || overallRating === 0) return;
-
-        setSaving(true);
-        setSaved(false);
-        setError(null);
-
-        try {
-            const review = await saveReview(orderNumber, {
-                overallRating,
-                comment: comment.trim() || null,
-                itemRatings: Object.entries(itemRatings).map(([productId, rating]) => ({
-                    productId: Number(productId),
-                    rating
-                }))
-            });
-
-            setContext(current => current ? {...current, review} : current);
-            setSaved(true);
-        } catch (exception) {
-            setError(
-                exception instanceof Error
-                    ? exception.message
-                    : "Unable to save your review."
-            );
-        } finally {
-            setSaving(false);
-        }
+export default function OrderReviewCard({ orderNumber }: {
+    orderNumber: string;
+}) {
+    const [context, setContext] = useState<ReviewContext | null>(null), [overallRating, setOverallRating] = useState(0), [comment, setComment] = useState(""), [itemRatings, setItemRatings] = useState<Record<number, number>>({}), [error, setError] = useState<string | null>(null), [saving, setSaving] = useState(false), [saved, setSaved] = useState(false), [editing, setEditing] = useState(true), [retry, setRetry] = useState(0);
+    const commentId = useId();
+    const fetchContext = useCallback((signal?: AbortSignal) => getReviewContext(orderNumber, signal), [orderNumber]);
+    useEffect(() => { const controller = new AbortController(); void fetchContext(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(response => { if (controller.signal.aborted)
+        return; setContext(response); setOverallRating(response.review?.overallRating ?? 0); setComment(response.review?.comment ?? ""); setItemRatings(Object.fromEntries((response.review?.itemRatings ?? []).map(item => [item.productId, item.rating]))); setEditing(!response.review); setError(null); }).catch(() => { if (!controller.signal.aborted)
+        setError("Unable to load the review form. Please try again."); }); return () => controller.abort(); }, [fetchContext, retry]);
+    async function handleSubmit() { if (saving || overallRating === 0)
+        return; setSaving(true); setSaved(false); setError(null); try {
+        const review = await saveReview(orderNumber, { overallRating, comment: comment.trim() || null, itemRatings: Object.entries(itemRatings).map(([productId, rating]) => ({ productId: Number(productId), rating })) });
+        setContext(current => current ? { ...current, review } : current);
+        setSaved(true);
+        setEditing(false);
+        window.dispatchEvent(new CustomEvent("gokul-order-review-updated", { detail: { orderNumber, rating: review.overallRating } }));
     }
-
-    if (!context && !error) {
-        return (
-            <div className="mt-7 rounded-2xl border border-[#eadfd6] p-5">
-                <p className="text-sm text-[#756763]">Loading review options...</p>
-            </div>
-        );
+    catch {
+        setError("Your feedback could not be confirmed. Keep your choices and try again.");
     }
-
-    if (!context) {
-        return (
-            <div className="mt-7 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700">
-                {error}
-            </div>
-        );
-    }
-
-    if (!context.eligible) return null;
-
-    return (
-        <div className="mt-7 rounded-2xl border border-[#eadfd6] bg-[#fffaf3] p-5 sm:p-6">
-            <h2 className="text-lg font-bold text-[#241715]">
-                {context.review ? "Your review" : "How was your order?"}
-            </h2>
-            <p className="mt-1 text-sm leading-6 text-[#756763]">
-                Your feedback helps us improve freshness, taste and pickup service.
-            </p>
-
-            <div className="mt-5">
-                <p className="text-sm font-bold text-[#241715]">Overall experience *</p>
-                <StarPicker value={overallRating} onChange={setOverallRating} label="Overall order rating" />
-            </div>
-
-            {context.products.length > 0 && (
-                <div className="mt-5 border-t border-[#eadfd6] pt-5">
-                    <p className="text-sm font-bold text-[#241715]">Rate individual items (optional)</p>
-                    <div className="mt-3 space-y-4">
-                        {context.products.map(product => (
-                            <div key={product.productId} className="rounded-xl bg-white p-3">
-                                <p className="text-sm font-semibold text-[#241715]">{product.productName}</p>
-                                <StarPicker
-                                    value={itemRatings[product.productId] ?? 0}
-                                    onChange={rating => setItemRatings(current => ({
-                                        ...current,
-                                        [product.productId]: rating
-                                    }))}
-                                    label={`${product.productName} rating`}
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            <label className="mt-5 block text-sm font-bold text-[#241715]" htmlFor="review-comment">
-                Tell us more (optional)
-            </label>
-            <textarea
-                id="review-comment"
-                value={comment}
-                maxLength={1000}
-                rows={4}
-                onChange={event => setComment(event.target.value)}
-                placeholder="What did you enjoy? What can we improve?"
-                className="mt-2 w-full rounded-xl border border-[#d8cbc3] bg-white p-3 text-[#241715] outline-none focus:border-[#7a1625]"
-            />
-            <p className="mt-1 text-right text-xs text-[#756763]">{comment.length}/1000</p>
-
-            {error && <p className="mt-3 text-sm font-semibold text-red-700">{error}</p>}
-            {saved && <p className="mt-3 text-sm font-semibold text-green-700">Thank you. Your review has been saved.</p>}
-            {context.review?.status === "HIDDEN" && (
-                <p className="mt-3 text-sm text-amber-800">This review is currently being checked by our team.</p>
-            )}
-
-            <button
-                type="button"
-                disabled={saving || overallRating === 0}
-                onClick={() => void handleSubmit()}
-                className="mt-5 min-h-12 w-full rounded-xl bg-[#7a1625] px-4 font-bold text-white! disabled:cursor-not-allowed disabled:opacity-50"
-            >
-                {saving ? "Saving..." : context.review ? "Update Review" : "Submit Review"}
-            </button>
-        </div>
-    );
+    finally {
+        setSaving(false);
+    } }
+    if (!context)
+        return <section className={styles.review}>{error ? <div><p role="alert">{error}</p><button type="button" className={styles.secondary} onClick={() => setRetry(value => value + 1)}>Try again</button></div> : <p role="status">Loading review options…</p>}</section>;
+    if (!context.eligible)
+        return null;
+    return <section className={`customer-order-review ${styles.review}`}><span className={styles.eyebrow}><T text="Your Gokul experience"/></span><h2><T text={context.review && !editing ? "Your review" : "How was your order?"}/></h2><p><T text="Your feedback helps us improve freshness, taste and pickup service."/></p>
+ {saved && <div className={styles.saved} role="status"><strong><T text="Thank you for your valuable feedback!"/></strong><p>Your feedback helps make the next visit better.</p></div>}
+ {!editing && context.review ? <><article className={styles.savedReview}><h3>Your overall experience</h3><div className={styles.submitted} aria-label={`${context.review.overallRating} out of 5 stars`}>{"★".repeat(context.review.overallRating)}{"☆".repeat(5 - context.review.overallRating)}</div>{context.review.comment && <p>{context.review.comment}</p>}<p>From your completed order</p></article><button type="button" className={styles.secondary} onClick={() => setEditing(true)}>Edit my feedback</button></> : <>
+ <div className={styles.overall}><h3>Overall experience *</h3><StarPicker value={overallRating} onChange={setOverallRating} label="Overall order rating" disabled={saving}/><span className={styles.feeling} aria-live="polite">{["Choose your stars", "Could be better", "Fair", "Good", "Really enjoyed it", "Loved it!"][overallRating]}</span></div>
+ {context.products.length > 0 && <details><summary>Rate your ordered dishes (optional)</summary>{context.products.map(product => <div key={product.productId} className={styles.product}><h3>{product.productName}</h3><StarPicker value={itemRatings[product.productId] ?? 0} onChange={rating => setItemRatings(current => ({ ...current, [product.productId]: rating }))} label={`${product.productName} rating`} disabled={saving}/>{itemRatings[product.productId] && <button type="button" className={styles.secondary} disabled={saving} onClick={() => setItemRatings(current => { const next = { ...current }; delete next[product.productId]; return next; })}>Clear dish rating</button>}</div>)}</details>}
+ <details><summary>Add a detailed review</summary><label htmlFor={commentId}>Tell us more (optional)</label><textarea id={commentId} maxLength={1000} disabled={saving} value={comment} onChange={event => setComment(event.target.value)} placeholder="What did you enjoy? What could we do better?"/><p>{comment.length}/1000</p></details>
+ <button type="button" className={styles.primary} disabled={saving || overallRating === 0} onClick={() => void handleSubmit()}>{saving ? "Saving…" : context.review ? "Update Review" : "Submit Review"}</button></>}
+ {error && <p className={styles.error} role="alert">{error}</p>}{context.review?.status === "HIDDEN" && <p>This review is currently being checked by our team.</p>}
+ </section>;
 }

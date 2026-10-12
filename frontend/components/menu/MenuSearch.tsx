@@ -1,7 +1,10 @@
 "use client";
+import {T} from "@/lib/language";
 
 
 interface MenuSearchProps {
+    refined?: boolean;
+    premium?: boolean;
 
     value: string;
 
@@ -11,13 +14,15 @@ interface MenuSearchProps {
 
 
 export default function MenuSearch({
+    refined = false,
+    premium = false,
     value,
     onChange
 }: MenuSearchProps) {
 
     return (
         <div
-            className="
+            className="menu-search
                 relative
                 w-full
             "
@@ -34,11 +39,14 @@ export default function MenuSearch({
                     text-[#756763]
                 "
             >
-                ⌕
+                <span className="menu-search-legacy-icon" aria-hidden="true">⌕</span><svg className="menu-search-modern-icon" aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg>
             </div>
 
 
+            {refined && <label htmlFor="gokul-menu-search" className="mb-2 block text-sm font-semibold text-[#241715]"><T text="Find a favourite" /></label>}
             <input
+                id="gokul-menu-search"
+                aria-label={refined ? undefined : "Search the menu"}
                 type="search"
                 value={value}
                 onChange={
@@ -47,7 +55,7 @@ export default function MenuSearch({
                             event.target.value
                         )
                 }
-                placeholder="Search sweets, snacks & meals"
+                placeholder={premium ? "Search your favourites" : "Search sweets, snacks & meals"}
                 className="
                     min-h-13
                     w-full

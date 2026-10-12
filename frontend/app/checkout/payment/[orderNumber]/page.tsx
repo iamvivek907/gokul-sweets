@@ -1,9 +1,19 @@
 "use client";
+import Link from "next/link";
+import {mergePaymentResponse, refreshKnownPayment} from "@/lib/paymentRecovery";
+import {getCartSnapshot} from "@/lib/cartStorage";
+
+import BrandLoading from "@/components/common/BrandLoading";
+import {usePhoneViewport} from "@/hooks/usePhoneViewport";
+import {T,useTranslation} from "@/lib/language";
+import PaymentLeaveChoice from "@/components/checkout/PaymentLeaveChoice";
 
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
+    useRef,
     useState,
     useSyncExternalStore
 } from "react";
@@ -15,6 +25,16 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import MobilePaymentCancelDialog from "@/components/checkout/MobilePaymentCancelDialog";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
+import ConfirmedPickupContext from "@/components/order/ConfirmedPickupContext";
+import {formatBusinessTimestamp, parseBusinessTimestamp} from "@/lib/businessTime";
+import {useStorefrontConfiguration} from "@/hooks/useStorefrontFeatures";
+import {usePaymentPolling, type PaymentPollResult} from "@/hooks/usePaymentPolling";
+import {hasOpenedPaymentGateway, markPaymentGatewayOpened, clearPaymentGatewayVisit} from "@/lib/paymentGatewayVisit";
+import {MIN_MANUAL_PAYMENT_CHECK_MS, isTemporaryPaymentFailure} from "@/lib/paymentPolling";
+import {ApiError} from "@/services/apiClient";
+import {reconcilePaidCart} from "@/lib/paidCartRecovery";
 
 import {
     useCart
@@ -50,7 +70,9 @@ import {
 } from "@/services/orderApi";
 
 import {
+    cancelPaymentCheckout,
     createPayment,
+    getPaymentForOrder,
     refreshPayment
 } from "@/services/paymentApi";
 
@@ -70,18 +92,21 @@ type PaymentStatusName =
     | string;
 
 
+/*
+ * =========================================================
+ * HELPERS
+ * =========================================================
+ */
+
 function getPaymentStatus(
-    payment:
-        PaymentResponse
-        | null
+    payment: PaymentResponse | null
 ): PaymentStatusName {
 
     return payment
-        ? String(
-            payment.paymentStatus
-        )
+        ? String(payment.paymentStatus)
         : "";
 }
+
 
 
 function formatCurrency(
@@ -95,39 +120,16 @@ function formatCurrency(
             currency: "INR",
             maximumFractionDigits: 2
         }
-    ).format(
-        amount
-    );
+    ).format(amount);
 }
 
 
 function formatExpiry(
     value: string
 ): string {
-
-    const date =
-        new Date(value);
-
-
-    if (
-        Number.isNaN(
-            date.getTime()
-        )
-    ) {
-
-        return value;
-    }
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTimestamp(value, {
+        hour: "numeric", minute: "2-digit"
+    });
 }
 
 
@@ -159,11 +161,10 @@ function formatStatusLabel(
             return "Refund needs attention";
 
         default:
-            return status
-                .replaceAll(
-                    "_",
-                    " "
-                );
+            return status.replaceAll(
+                "_",
+                " "
+            );
     }
 }
 
@@ -192,44 +193,14 @@ function statusBadgeClass(
 }
 
 
-function mergePaymentResponse(
-    refreshed: PaymentResponse,
-    existing:
-        PaymentResponse
-        | ReturnType<typeof parsePendingPayment>
-        | null
-): PaymentResponse {
-
-    return {
-        ...refreshed,
-
-        providerPaymentId:
-            refreshed.providerPaymentId
-            ?? existing?.providerPaymentId
-            ?? null,
-
-        providerOrderId:
-            refreshed.providerOrderId
-            ?? existing?.providerOrderId
-            ?? null,
-
-        paymentSessionId:
-            refreshed.paymentSessionId
-            ?? existing?.paymentSessionId
-            ?? null,
-
-        paymentUrl:
-            refreshed.paymentUrl
-            ?? existing?.paymentUrl
-            ?? null,
-
-        checkoutKeyId:
-            refreshed.checkoutKeyId
-            ?? existing?.checkoutKeyId
-            ?? null
-    };
-}
-
+/*
+ * =========================================================
+ * PAYMENT INITIALIZATION PROMISES
+ * =========================================================
+ *
+ * Prevents duplicate payment initialization for the same
+ * order while the page is mounting.
+ */
 
 const paymentInitializationPromises =
     new Map<
@@ -238,10 +209,21 @@ const paymentInitializationPromises =
     >();
 
 
+/*
+ * =========================================================
+ * PAGE
+ * =========================================================
+ */
+
 export default function PaymentPage() {
+    const translate = useTranslation();
+    const {features, error: configurationError} = useStorefrontConfiguration();
+    const paidCartRecovery = features?.paidCartRecovery;
+    const paymentPollingV2 = features?.paymentPollingV2 === true;
 
     const router =
         useRouter();
+    const phone = usePhoneViewport();
 
 
     const params =
@@ -287,6 +269,9 @@ export default function PaymentPage() {
                 pendingOrderSnapshot
             ]
         );
+
+    const deliveryOrder = pendingOrder?.orderNumber === orderNumber &&
+        pendingOrder.fulfillmentType === "DELIVERY";
 
 
     /*
@@ -364,6 +349,23 @@ export default function PaymentPage() {
         useState<string | null>(
             null
         );
+    const [pollingNotice, setPollingNotice] = useState<string | null>(null);
+    const [gatewayOpened, setGatewayOpened] = useState(false);
+    const initializedPaymentRef = useRef<{orderNumber: string; paymentId: number} | null>(null);
+    const refreshInFlightRef = useRef(false);
+    // A settled response stops any timer callback already queued before React
+    // has committed the corresponding status update.
+    const settledPaymentIdRef = useRef<number | null>(null);
+    const nextAllowedCheckRef = useRef(0);
+    const [paymentClock, setPaymentClock] = useState(0);
+    const activePaymentId = payment?.paymentId;
+    useEffect(() => {
+        if (!paymentPollingV2 || !activePaymentId) return;
+        const tick = () => setPaymentClock(Date.now());
+        tick();
+        const timer = window.setInterval(tick, 15_000);
+        return () => window.clearInterval(timer);
+    }, [paymentPollingV2, activePaymentId]);
 
 
     /*
@@ -400,30 +402,16 @@ export default function PaymentPage() {
      * =========================================================
      * STORE PAYMENT LOCALLY
      * =========================================================
-     *
-     * IMPORTANT:
-     *
-     * We deliberately keep FAILED / EXPIRED / REFUND_* payment
-     * records in local storage.
-     *
-     * A late provider success may move:
-     *
-     * FAILED / EXPIRED
-     *     ->
-     * REFUND_PENDING
-     *     ->
-     * REFUNDED / REFUND_FAILED
-     *
-     * Keeping paymentId lets this page continue checking the
-     * authoritative backend state.
      */
 
     const persistPayment =
         useCallback(
             (
-                response:
-                    PaymentResponse
+                response: PaymentResponse
             ) => {
+                // Storage notifies subscribers synchronously. Mark this payment
+                // before writing so initialization cannot restart on that update.
+                initializedPaymentRef.current = {orderNumber: response.orderNumber, paymentId: response.paymentId};
 
                 const fingerprint =
                     pendingOrder
@@ -494,18 +482,17 @@ export default function PaymentPage() {
     const completePaidPayment =
         useCallback(
             (
-                response:
-                    PaymentResponse
+                response: PaymentResponse
             ) => {
 
-                /*
-                 * Only PAID clears the cart.
-                 */
-                clearPendingPayment();
+                if (paidCartRecovery !== false) {
+                    reconcilePaidCart(response.orderNumber);
+                } else {
+                    clearPendingPayment();
 
-                clearPendingOrder();
+                    clearPendingOrder();
 
-                clearCart();
+                    clearCart();
 
 
                 if (
@@ -517,10 +504,10 @@ export default function PaymentPage() {
                         "gokul-selected-pickup-slot"
                     );
 
-
                     window.localStorage.removeItem(
                         "gokul-customer-details"
                     );
+                }
                 }
 
 
@@ -532,6 +519,7 @@ export default function PaymentPage() {
             },
             [
                 clearCart,
+                paidCartRecovery,
                 router
             ]
         );
@@ -546,9 +534,10 @@ export default function PaymentPage() {
     const applyPaymentResult =
         useCallback(
             (
-                response:
-                    PaymentResponse
+                response: PaymentResponse
             ) => {
+                settledPaymentIdRef.current = response.paymentStatus === "PENDING"
+                    ? null : response.paymentId;
 
                 persistPayment(
                     response
@@ -565,6 +554,7 @@ export default function PaymentPage() {
                     status ===
                     "PAID"
                 ) {
+                    clearPaymentGatewayVisit(response.orderNumber);
 
                     completePaidPayment(
                         response
@@ -576,10 +566,12 @@ export default function PaymentPage() {
 
                 /*
                  * A terminal checkout must no longer remain the
-                 * editable "pending order" for cart/offers.
+                 * editable pending order.
                  *
-                 * Keep the paymentId for refund reconciliation.
+                 * The payment itself remains persisted so late
+                 * provider success/refund reconciliation can occur.
                  */
+
                 if (
                     status ===
                         "FAILED"
@@ -596,22 +588,19 @@ export default function PaymentPage() {
                     status ===
                         "REFUND_FAILED"
                 ) {
+                    clearPaymentGatewayVisit(response.orderNumber);
 
-                    clearPendingOrder();
+                    if (!deliveryOrder) clearPendingOrder();
                 }
 
 
-                /*
-                 * These are normal backend states, not frontend
-                 * errors. The dedicated status UI below explains
-                 * them to the customer.
-                 */
                 setError(
                     null
                 );
             },
             [
                 completePaidPayment,
+                deliveryOrder,
                 persistPayment
             ]
         );
@@ -621,10 +610,23 @@ export default function PaymentPage() {
      * =========================================================
      * INITIAL PAYMENT FLOW
      * =========================================================
+     *
+     * IMPORTANT:
+     *
+     * Browser localStorage is NOT authoritative.
+     *
+     * The order number in the URL is enough to recover an
+     * existing payment from the backend.
+     *
+     * This is the critical PhonePe redirect recovery.
      */
 
     useEffect(
         () => {
+            // Wait for the rollout setting before recovering a payment. An initial
+            // null must never start the legacy five-second provider polling.
+            if (!features && !configurationError) return;
+            if (initializedPaymentRef.current?.orderNumber === orderNumber) return;
 
             let cancelled =
                 false;
@@ -646,16 +648,12 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 1. Existing locally stored payment FIRST
+                             * 1. LOCAL PAYMENT RECOVERY
                              * -------------------------------------------------
                              *
-                             * This is intentionally checked before requiring a
-                             * local pending-order record.
-                             *
-                             * FAILED / EXPIRED orders clear pendingOrder, but
-                             * their paymentId must remain refreshable so a late
-                             * A late provider success/refund can still be observed.
+                             * Fast path for normal browser navigation.
                              */
+
                             if (
                                 storedPayment
                                 &&
@@ -663,24 +661,65 @@ export default function PaymentPage() {
                                     orderNumber
                             ) {
 
-                                const refreshed =
-                                    await refreshPayment(
-                                        storedPayment.paymentId
-                                    );
-
-
-                                return mergePaymentResponse(
-                                    refreshed,
-                                    storedPayment
-                                );
+                                return refreshKnownPayment(storedPayment, paymentPollingV2);
                             }
 
 
                             /*
                              * -------------------------------------------------
-                             * 2. Creating a NEW payment requires live checkout
+                             * 2. BACKEND PAYMENT RECOVERY
+                             * -------------------------------------------------
+                             *
+                             * This is the important PhonePe/PWA fix.
+                             *
+                             * The backend returns:
+                             *
+                             * {
+                             *     "payment": null
+                             * }
+                             *
+                             * or:
+                             *
+                             * {
+                             *     "payment": { ... }
+                             * }
+                             */
+
+                            const lookup =
+                                await getPaymentForOrder(
+                                    orderNumber
+                                );
+
+
+                            const backendPayment =
+                                lookup.payment;
+
+
+                            if (
+                                backendPayment
+                                &&
+                                backendPayment.orderNumber ===
+                                    orderNumber
+                            ) {
+
+                                /*
+                                 * A payment already exists.
+                                 *
+                                 * NEVER create another payment attempt.
+                                 *
+                                 * Ask the provider for the current state.
+                                 */
+
+                                return refreshKnownPayment(backendPayment, paymentPollingV2);
+                            }
+
+
+                            /*
+                             * -------------------------------------------------
+                             * 3. CREATING A NEW PAYMENT REQUIRES LIVE CHECKOUT
                              * -------------------------------------------------
                              */
+
                             if (
                                 !pendingOrder
                                 ||
@@ -696,9 +735,10 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 3. Never pay a stale cart
+                             * 4. NEVER PAY A STALE CART
                              * -------------------------------------------------
                              */
+
                             if (
                                 pendingOrder.cartFingerprint !==
                                 currentCartFingerprint
@@ -710,9 +750,15 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 4. Check backend order before POST /payments
+                             * 5. CHECK BACKEND ORDER BEFORE CREATING PAYMENT
                              * -------------------------------------------------
                              */
+
+                            if(pendingOrder.offerRecheckRequired||pendingOrder.priceReviewRequired){
+                                router.replace(`/checkout/offers/${encodeURIComponent(orderNumber)}`);
+                                return null;
+                            }
+
                             const backendOrder =
                                 await getCustomerOrder(
                                     orderNumber
@@ -729,18 +775,24 @@ export default function PaymentPage() {
 
 
                             /*
-                             * Backend already confirms success.
+                             * -------------------------------------------------
+                             * 6. BACKEND ALREADY CONFIRMS SUCCESS
+                             * -------------------------------------------------
                              */
+
                             if (
                                 backendPaymentStatus ===
                                     "PAID"
                             ) {
 
-                                clearPendingPayment();
+                                if (paidCartRecovery !== false) {
+                                    reconcilePaidCart(orderNumber,backendOrder);
+                                } else {
+                                    clearPendingPayment();
 
-                                clearPendingOrder();
+                                    clearPendingOrder();
 
-                                clearCart();
+                                    clearCart();
 
 
                                 if (
@@ -756,6 +808,7 @@ export default function PaymentPage() {
                                         "gokul-customer-details"
                                     );
                                 }
+                                }
 
 
                                 router.replace(
@@ -770,11 +823,34 @@ export default function PaymentPage() {
 
 
                             /*
-                             * Before creating a NEW payment attempt, the
-                             * original reservation must still be active.
+                             * -------------------------------------------------
+                             * 7. SAFETY AGAINST DUPLICATE PAYMENT CREATION
+                             * -------------------------------------------------
+                             *
+                             * Normally this branch should not be reached for
+                             * a recoverable payment because step 2 already
+                             * recovered it.
                              */
+
+                            if (
+                                backendPaymentStatus ===
+                                    "PENDING"
+                            ) {
+
+                                throw new Error(
+                                    "A payment attempt already exists for this order, but the payment record could not be recovered. Please check My Orders."
+                                );
+                            }
+
+
+                            /*
+                             * -------------------------------------------------
+                             * 8. CHECK RESERVATION EXPIRY
+                             * -------------------------------------------------
+                             */
+
                             const reservationExpiresAtMs =
-                                new Date(
+                                parseBusinessTimestamp(
                                     backendOrder.reservationExpiresAt
                                 ).getTime();
 
@@ -795,41 +871,29 @@ export default function PaymentPage() {
                                     null
                             ) {
 
-                                clearPendingOrder();
+                                if (!deliveryOrder) clearPendingOrder();
 
 
                                 throw new Error(
-                                    "Your pickup reservation has expired. Your cart is still available, so please choose a pickup slot again."
+                                    deliveryOrder
+                                        ? "Your delivery reservation has expired. Your cart is still available, so please choose another rider window."
+                                        : "Your pickup reservation has expired. Your cart is still available, so please choose a pickup slot again."
                                 );
                             }
 
 
                             /*
-                             * If the backend knows a payment exists but local
-                             * storage lost its paymentId, never create a second
-                             * competing attempt.
+                             * -------------------------------------------------
+                             * 9. ORDER MUST STILL BE WAITING FOR PAYMENT
+                             * -------------------------------------------------
                              */
-                            if (
-                                backendPaymentStatus ===
-                                    "PENDING"
-                            ) {
 
-                                throw new Error(
-                                    "A payment attempt already exists for this order, but this browser no longer has its payment session. Please check My Orders instead of starting another payment."
-                                );
-                            }
-
-
-                            /*
-                             * Terminal backend order with no recoverable local
-                             * payment session.
-                             */
                             if (
                                 backendOrder.orderStatus !==
-                                    "PENDING_PAYMENT"
+                                "PENDING_PAYMENT"
                             ) {
 
-                                clearPendingOrder();
+                                if (!deliveryOrder) clearPendingOrder();
 
 
                                 throw new Error(
@@ -840,14 +904,16 @@ export default function PaymentPage() {
 
                             /*
                              * -------------------------------------------------
-                             * 5. Create exactly one new default payment attempt
+                             * 10. CREATE EXACTLY ONE NEW PAYMENT ATTEMPT
                              * -------------------------------------------------
+                             *
+                             * Provider intentionally omitted.
+                             *
+                             * Backend default provider controls selection.
                              */
-                            return createPayment({
-                                orderNumber,
 
-                                provider:
-                                    "RAZORPAY"
+                            return createPayment({
+                                orderNumber
                             });
                         }
                     )();
@@ -888,6 +954,7 @@ export default function PaymentPage() {
                     applyPaymentResult(
                         response
                     );
+                    setGatewayOpened(hasOpenedPaymentGateway(response.orderNumber, response.paymentId));
 
                 } catch (
                     exception
@@ -915,6 +982,11 @@ export default function PaymentPage() {
 
                 } finally {
 
+                    paymentInitializationPromises.delete(
+                        orderNumber
+                    );
+
+
                     if (
                         !cancelled
                     ) {
@@ -940,7 +1012,12 @@ export default function PaymentPage() {
         [
             applyPaymentResult,
             clearCart,
+            paidCartRecovery,
+            features,
+            configurationError,
+            paymentPollingV2,
             currentCartFingerprint,
+            deliveryOrder,
             orderNumber,
             pendingOrder,
             router,
@@ -957,16 +1034,27 @@ export default function PaymentPage() {
 
     const refreshCurrentPayment =
         useCallback(
-            async () => {
+            async (automatic = false): Promise<PaymentPollResult> => {
+
+                if (automatic && payment && (payment.paymentStatus !== "PENDING" ||
+                    settledPaymentIdRef.current === payment.paymentId)) {
+                    return {success: true, permanent: true};
+                }
 
                 if (
-                    refreshing
+                    (paymentPollingV2 ? refreshInFlightRef.current : refreshing)
                     ||
                     !payment
                 ) {
-
-                    return;
+                    return undefined;
                 }
+
+                if (paymentPollingV2 && Date.now() < nextAllowedCheckRef.current) {
+                    if (!automatic) setPollingNotice("We checked recently. Please wait a moment before checking again.");
+                    return {success: false, retryAfterMs: nextAllowedCheckRef.current - Date.now()};
+                }
+
+                refreshInFlightRef.current = true;
 
 
                 setRefreshing(
@@ -974,9 +1062,7 @@ export default function PaymentPage() {
                 );
 
 
-                setError(
-                    null
-                );
+                if (!automatic || !paymentPollingV2) setError(null);
 
 
                 try {
@@ -997,6 +1083,12 @@ export default function PaymentPage() {
                     applyPaymentResult(
                         response
                     );
+                    const terminal = response.paymentStatus !== "PENDING";
+                    if (paymentPollingV2) {
+                        nextAllowedCheckRef.current = Date.now() + MIN_MANUAL_PAYMENT_CHECK_MS;
+                        setPollingNotice(null);
+                    }
+                    return {success: true, permanent: terminal};
 
                 } catch (
                     exception
@@ -1008,22 +1100,28 @@ export default function PaymentPage() {
                     );
 
 
-                    setError(
-                        exception instanceof Error
-                            ? exception.message
-                            : "Unable to check payment status."
-                    );
+                    if (paymentPollingV2 && exception instanceof ApiError && isTemporaryPaymentFailure(exception.status)) {
+                        const delay = Math.max(30_000, exception.retryAfterMs ?? 0);
+                        nextAllowedCheckRef.current = Date.now() + delay;
+                        setPollingNotice("We couldn't confirm the latest payment status yet. Your payment may still be processing. We'll check again shortly.");
+                        setError(null);
+                        return {success: false, retryAfterMs: delay};
+                    }
+                    setError(exception instanceof Error ? exception.message : "Unable to check payment status.");
+                    return {success: false, permanent: paymentPollingV2};
 
                 } finally {
 
                     setRefreshing(
                         false
                     );
+                    refreshInFlightRef.current = false;
                 }
             },
             [
                 applyPaymentResult,
                 payment,
+                paymentPollingV2,
                 refreshing
             ]
         );
@@ -1031,14 +1129,8 @@ export default function PaymentPage() {
 
     /*
      * =========================================================
-     * REFUND PENDING AUTO REFRESH
+     * PAYMENT STATUS
      * =========================================================
-     *
-     * The browser does NOT perform refunds.
-     *
-     * Backend PaymentRefundScheduler owns provider refund status.
-     * This lightweight refresh only asks our backend for the
-     * latest locally persisted payment state.
      */
 
     const paymentStatus =
@@ -1046,16 +1138,23 @@ export default function PaymentPage() {
             payment
         );
 
+    const paymentDeadlineMs = payment ? parseBusinessTimestamp(payment.expiresAt).getTime() : 0;
+    usePaymentPolling(paymentPollingV2 && gatewayOpened, payment?.paymentId, paymentStatus,
+        Number.isFinite(paymentDeadlineMs) ? paymentDeadlineMs : 0,
+        openingPayment, () => refreshCurrentPayment(true),
+        () => setPollingNotice("Automatic status checks are paused after repeated connection errors. You can check again using the button below."));
+
 
     /*
-     * Razorpay can briefly remain authorised/pending while
-     * capture completes. Signed webhooks remain the durable
-     * fallback; this refresh keeps the visible page in sync so
-     * the customer never has to press "Refresh status".
+     * =========================================================
+     * PENDING PAYMENT AUTO REFRESH
+     * =========================================================
      */
+
     useEffect(
         () => {
 
+            if (paymentPollingV2) return;
             if (
                 paymentStatus !==
                     "PENDING"
@@ -1073,7 +1172,7 @@ export default function PaymentPage() {
                 window.setInterval(
                     () => {
 
-                        void refreshCurrentPayment();
+                        void refreshCurrentPayment(true);
 
                     },
                     5000
@@ -1091,15 +1190,23 @@ export default function PaymentPage() {
         [
             openingPayment,
             payment,
+            paymentPollingV2,
             paymentStatus,
             refreshCurrentPayment
         ]
     );
 
 
+    /*
+     * =========================================================
+     * REFUND PENDING AUTO REFRESH
+     * =========================================================
+     */
+
     useEffect(
         () => {
 
+            if (paymentPollingV2) return;
             if (
                 paymentStatus !==
                     "REFUND_PENDING"
@@ -1113,6 +1220,8 @@ export default function PaymentPage() {
                 window.setInterval(
                     () => {
 
+                        // Refund settlement has its own lifecycle; a payment
+                        // failure guard must not suppress refund reconciliation.
                         void refreshCurrentPayment();
 
                     },
@@ -1129,6 +1238,7 @@ export default function PaymentPage() {
 
         },
         [
+            paymentPollingV2,
             paymentStatus,
             refreshCurrentPayment
         ]
@@ -1141,11 +1251,52 @@ export default function PaymentPage() {
      * =========================================================
      */
 
+    const [feeBreakdown,setFeeBreakdown]=useState<{fee:number;tax:number;paymentFee:number;paymentTax:number;paymentRate:number}|null>(null);
+    useEffect(()=>{let alive=true;getCustomerOrder(orderNumber).then(order=>{if(alive)setFeeBreakdown({fee:order.convenienceFee??0,tax:order.convenienceFeeTax??0,paymentFee:order.paymentFee??0,paymentTax:order.paymentFeeTax??0,paymentRate:order.paymentFeeRate??0});}).catch(()=>{});return()=>{alive=false;};},[orderNumber]);
+    const [cancelling,setCancelling]=useState(false);
+    const cancellationRunning=useRef(false);
+    const [confirmCancel,setConfirmCancel]=useState(false);
+    async function cancelCheckout(destination?:string) {
+        if(!payment || cancellationRunning.current || paymentLaunchRunning.current || openingPayment || refreshing) return;
+        cancellationRunning.current=true;
+        setCancelling(true);setError(null);
+        const signal=AbortSignal.timeout(15000);
+        try {
+            const recoveryOrder=await getCustomerOrder(payment.orderNumber,signal);
+            const result=await cancelPaymentCheckout(payment.paymentId,signal);
+            applyPaymentResult(result);
+            if(result.paymentStatus==="EXPIRED" || result.paymentStatus==="FAILED") {
+                clearPendingPayment();clearPendingOrder();clearPaymentGatewayVisit(payment.orderNumber);
+                router.replace(destination ?? (recoveryOrder.fulfillmentType === "DELIVERY" ? "/delivery/check" : `${window.matchMedia("(max-width: 640px)").matches&&localStorage.getItem(`gokul-mobile-checkout:${payment.orderNumber}`)==="1"?"/checkout/mobile":"/checkout/review"}${window.matchMedia("(max-width: 640px)").matches ? `?paymentRecovery=${result.paymentStatus.toLowerCase()}` : ""}`));
+            } else {setConfirmCancel(false);setError("Payment was already confirmed. View this order before starting another checkout.");}
+        } catch(error) {setError(signal.aborted ? "The payment check took too long. We haven’t confirmed whether cancellation completed. Stay here or retry to check the latest status." : error instanceof Error ? error.message : "Could not check payment. Stay here or retry to check the latest status.");}
+        finally {cancellationRunning.current=false;setCancelling(false);}
+    }
+
+    const paymentLaunchRunning = useRef(false);
+
+    // Keep the restore subscription stable while other payment reads update
+    // state. A render must not invalidate a status check already in flight.
+    const recoveryState = useRef({payment, paymentPollingV2, applyPaymentResult});
+    useLayoutEffect(() => { recoveryState.current = {payment, paymentPollingV2, applyPaymentResult}; }, [payment, paymentPollingV2, applyPaymentResult]);
+    useLayoutEffect(() => {
+        let alive = true;
+        const restored = (event: PageTransitionEvent) => {
+            const state = recoveryState.current;
+            if (!event.persisted || !state.payment || state.payment.orderNumber !== orderNumber) return;
+            void refreshKnownPayment(state.payment, state.paymentPollingV2)
+                .then(current => { if (alive) recoveryState.current.applyPaymentResult(current); })
+                .catch(error => { if (alive) setError(error instanceof Error ? error.message : "Unable to check payment. Please check My Orders."); });
+        };
+        window.addEventListener("pageshow", restored);
+        return () => { alive = false; window.removeEventListener("pageshow", restored); };
+    }, [orderNumber]);
+
     async function handlePayNow():
         Promise<void> {
 
         if (
-            !payment
+            !payment || payment.orderNumber !== orderNumber || cancelling || cancellationRunning.current || refreshing || paymentLaunchRunning.current
         ) {
 
             return;
@@ -1179,27 +1330,45 @@ export default function PaymentPage() {
         }
 
 
-        setOpeningPayment(
-            true
-        );
-
-
-        setError(
-            null
-        );
-
-
+        paymentLaunchRunning.current = true;
+        setOpeningPayment(true);
+        setError(null);
+        let gatewayInvoked = false;
         try {
-
-            const outcome =
-                await openPaymentCheckout(
-                    payment
-                );
+            const cartBeforeCheck = getCartSnapshot();
+            const checkoutBeforeCheck = getPendingOrderSnapshot();
+            const current = await refreshKnownPayment(payment, paymentPollingV2, {allowTemporaryFallback: false});
+            applyPaymentResult(current);
+            if (current.paymentStatus !== "PENDING") return;
+            if (cartBeforeCheck !== getCartSnapshot() || checkoutBeforeCheck !== getPendingOrderSnapshot()) {
+                setError("Your checkout changed while payment was being checked. Review your order before paying.");
+                return;
+            }
+            if (current.paymentId !== payment.paymentId || current.provider !== payment.provider || current.amount !== payment.amount || current.currency !== payment.currency) {
+                setError("Payment details changed. Review them before continuing.");
+                return;
+            }
+            const expiresAt = parseBusinessTimestamp(current.expiresAt).getTime();
+            if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+                setError("This payment window has closed. Please check its status before starting another checkout.");
+                return;
+            }
+            if (current.provider === "PHONEPE" && !current.paymentUrl) {
+                setError("Your existing PhonePe payment is being checked. Please check My Orders before paying again.");
+                return;
+            }
+            if (paymentPollingV2) {
+                markPaymentGatewayOpened(current.orderNumber, current.paymentId);
+                setGatewayOpened(true);
+            }
+            gatewayInvoked = true;
+            const outcome = await openPaymentCheckout(current);
 
             if (
                 outcome.kind ===
                 "updated"
             ) {
+
                 applyPaymentResult(
                     outcome.payment
                 );
@@ -1208,20 +1377,34 @@ export default function PaymentPage() {
                 outcome.kind ===
                 "failed"
             ) {
+                if (paymentPollingV2) {
+                    clearPaymentGatewayVisit(payment.orderNumber);
+                    setGatewayOpened(false);
+                }
+
                 setError(
                     outcome.message
                 );
 
-                await refreshCurrentPayment();
+                if (!paymentPollingV2) await refreshCurrentPayment();
 
             } else {
-                /* Closing the gateway is not an order cancellation. */
+
+                /*
+                 * Closing the payment gateway does not cancel
+                 * the backend payment.
+                 */
+
                 await refreshCurrentPayment();
             }
 
         } catch (
             exception
         ) {
+            if (paymentPollingV2 && gatewayInvoked) {
+                clearPaymentGatewayVisit(payment.orderNumber);
+                setGatewayOpened(false);
+            }
 
             console.error(
                 "Unable to open payment checkout:",
@@ -1236,7 +1419,7 @@ export default function PaymentPage() {
             );
 
         } finally {
-
+            paymentLaunchRunning.current = false;
             setOpeningPayment(
                 false
             );
@@ -1252,18 +1435,6 @@ export default function PaymentPage() {
 
     function handleChooseNewPickupSlot() {
 
-        /*
-         * Keep:
-         * - cart
-         * - branch
-         * - customer details
-         *
-         * Clear only the dead checkout reservation.
-         *
-         * Keep the old paymentId in pendingPayment storage long
-         * enough for reconciliation/refund visibility. A future
-         * payment attempt for a different order will overwrite it.
-         */
         clearPendingOrder();
 
 
@@ -1278,9 +1449,7 @@ export default function PaymentPage() {
         }
 
 
-        router.push(
-            "/checkout/pickup"
-        );
+        router.push(deliveryOrder ? "/delivery/check" : "/checkout/pickup");
     }
 
 
@@ -1289,6 +1458,10 @@ export default function PaymentPage() {
      * LOADING
      * =========================================================
      */
+
+    if (phone && (loading || payment?.paymentStatus === "PAID") && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
+        <BrandLoading fullscreen className="payment-status-loading" label="Checking your payment…" detail="Waiting for the payment provider to confirm your payment. Please keep this page open." />
+    </AppShell>;
 
     if (
         loading
@@ -1318,29 +1491,7 @@ export default function PaymentPage() {
                         "
                     >
 
-                        <div
-                            className="
-                                mx-auto
-                                h-10
-                                w-10
-                                animate-spin
-                                rounded-full
-                                border-4
-                                border-[#eadfd6]
-                                border-t-[#7a1625]
-                            "
-                        />
-
-
-                        <p
-                            className="
-                                mt-5
-                                font-semibold
-                                text-[#241715]
-                            "
-                        >
-                            Preparing secure payment...
-                        </p>
+                        <BrandLoading label="Preparing secure payment..." detail="Checking your order and connecting to the payment provider. Please keep this page open." />
 
 
                         <p
@@ -1351,9 +1502,7 @@ export default function PaymentPage() {
                                 text-[#756763]
                             "
                         >
-                            We are checking the latest order
-                            and payment status with the backend.
-                        </p>
+                            <T text="We are checking the latest order and payment status with the backend." /></p>
 
                     </div>
 
@@ -1415,8 +1564,7 @@ export default function PaymentPage() {
                                 text-[#241715]
                             "
                         >
-                            Payment could not be prepared
-                        </h1>
+                            <T text="Payment could not be prepared" /></h1>
 
 
                         <p
@@ -1427,8 +1575,7 @@ export default function PaymentPage() {
                                 text-[#756763]
                             "
                         >
-                            Your cart has not been cleared.
-                        </p>
+                            <T text="Your cart has not been cleared." /></p>
 
 
                         {
@@ -1436,6 +1583,7 @@ export default function PaymentPage() {
                             && (
 
                                 <div
+                                    role="alert"
                                     className="
                                         mt-5
                                         rounded-xl
@@ -1454,7 +1602,7 @@ export default function PaymentPage() {
                                             text-red-700
                                         "
                                     >
-                                        {error}
+                                        {translate(error)}
                                     </p>
 
                                 </div>
@@ -1484,8 +1632,7 @@ export default function PaymentPage() {
                                 text-[#241715]
                             "
                         >
-                            Check My Orders
-                        </button>
+                            <T text="Check My Orders" /></button>
 
 
                         <button
@@ -1505,8 +1652,7 @@ export default function PaymentPage() {
                                 text-[#7a1625]
                             "
                         >
-                            Return to Cart
-                        </button>
+                            <T text="Return to Cart" /></button>
 
                     </div>
 
@@ -1532,6 +1678,9 @@ export default function PaymentPage() {
     const isPending =
         status ===
         "PENDING";
+
+    const paymentDeadlineReached = paymentPollingV2 && isPending && paymentClock > 0 &&
+        Number.isFinite(paymentDeadlineMs) && paymentClock >= paymentDeadlineMs;
 
 
     const isFailed =
@@ -1561,13 +1710,57 @@ export default function PaymentPage() {
 
     /*
      * =========================================================
+     * PHONEPE RECOVERY WITHOUT LOCAL CHECKOUT URL
+     * =========================================================
+     */
+
+    const phonePeStatusOnly =
+        isPending
+        &&
+        payment.provider ===
+            "PHONEPE"
+        &&
+        !payment.paymentUrl;
+
+
+    /*
+     * =========================================================
      * PAGE
      * =========================================================
      */
 
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote && isPending) return <AppShell showSocialPopup={false}>
+        <PaymentLeaveChoice autoCancel canStayWhileBusy={!cancelling} active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout} />
+        <MobilePaymentCancelDialog active={confirmCancel} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
+        <section className="mobile-order-detail"><nav><Link href="/orders">← My orders</Link><Link href={`/orders/${encodeURIComponent(orderNumber)}`}>View order</Link></nav>
+        <header><h1><T text="Checking your payment…" /></h1><p>{orderNumber}</p></header>
+        <section className="mobile-order-panel" role="status"><p><T text="Your cart is saved. Your order opens automatically once payment is confirmed." /></p><strong>{formatCurrency(payment.amount)}</strong>
+        {paymentDeadlineReached && <p><T text="This payment window has closed. Check payment before starting another checkout." /></p>}
+        {cartChanged && <p><T text="Your cart has changed. Check this order before starting another checkout." /></p>}
+        </section>{error && <p role="alert">{translate(error)}</p>}
+        {paymentPollingV2 && pollingNotice && <p role="status" className="mobile-order-note">{translate(pollingNotice)}</p>}
+        <div className="mobile-order-actions">
+        {!phonePeStatusOnly && <button type="button" disabled={openingPayment || refreshing || cancelling || cartChanged || paymentDeadlineReached} onClick={() => void handlePayNow()}>{openingPayment ? translate("Opening payment…") : translate("Continue payment")}</button>}
+        <button type="button" disabled={openingPayment || refreshing || cancelling} onClick={() => void refreshCurrentPayment()}>{refreshing ? translate("Checking payment…") : translate("Check Payment Status")}</button>
+        <Link href="/menu"><T text="Back to menu"/></Link>
+        <p className="mobile-payment-leave-note"><T text="Leaving this page checks payment and cancels an unpaid order. Your cart stays saved."/></p>
+        </div></section>
+    </AppShell>;
+
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote && (isFailed || isExpired)) return <AppShell showSocialPopup={false}>
+        <section className="mobile-order-detail"><nav><Link href="/orders">← My orders</Link><Link href="/menu">View menu</Link></nav>
+        <header><h1><T text="Payment didn’t complete" /></h1><p>{orderNumber}</p></header>
+        <section className="mobile-order-panel"><p><T text="Your cart is saved. We’ll check the payment before opening a fresh checkout." /></p><p>Payment: {payment.paymentStatus}</p><strong>{formatCurrency(payment.amount)}</strong></section>
+        {error && <p role="alert">{translate(error)}</p>}
+        <div className="mobile-order-actions"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={() => void cancelCheckout()}>{cancelling ? translate("Checking payment…") : translate("Retry checkout")}</button><Link href={`/orders/${encodeURIComponent(orderNumber)}`}>View order</Link></div>
+        </section>
+    </AppShell>;
+
     return (
 
         <AppShell>
+            <CheckoutExperienceFrame enabled={features?.checkoutExperienceV2 === true} stage="payment">
+            <MobilePaymentCancelDialog active={confirmCancel && (features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true)} busy={cancelling || refreshing || openingPayment} error={error} onKeep={() => setConfirmCancel(false)} onCancel={cancelCheckout} />
 
             <section
                 className="
@@ -1576,6 +1769,13 @@ export default function PaymentPage() {
                     pb-10
                 "
             >
+
+                {!deliveryOrder && <ConfirmedPickupContext orderNumber={orderNumber} />}
+                {(isFailed || isExpired) && <section className="mobile-payment-recovery" aria-label="Retry your order">
+                    <h2><T text="Payment didn’t complete" /></h2>
+                    <p><T text="Your cart is saved. We’ll check the payment before opening a fresh checkout." /></p>
+                    <button type="button" disabled={cancelling || refreshing || openingPayment} onClick={() => void cancelCheckout()}>{cancelling ? translate("Checking payment…") : translate("Retry checkout")}</button>
+                </section>}
 
                 <div
                     className="
@@ -1592,8 +1792,7 @@ export default function PaymentPage() {
                             text-[#c88a20]
                         "
                     >
-                        Secure checkout
-                    </p>
+                        <T text="Secure checkout" /></p>
 
 
                     <h1
@@ -1605,8 +1804,7 @@ export default function PaymentPage() {
                             text-[#241715]
                         "
                     >
-                        Payment
-                    </h1>
+                        <T text="Payment" /></h1>
 
 
                     <p
@@ -1617,7 +1815,7 @@ export default function PaymentPage() {
                             text-[#756763]
                         "
                     >
-                        Order{" "}
+                        <T text="Order" />{" "}
                         <span
                             className="
                                 font-semibold
@@ -1655,9 +1853,7 @@ export default function PaymentPage() {
                                     text-amber-800
                                 "
                             >
-                                Your cart changed after this
-                                payment was prepared.
-                            </p>
+                                <T text="Your cart changed after this payment was prepared." /></p>
 
 
                             <p
@@ -1668,11 +1864,48 @@ export default function PaymentPage() {
                                     text-amber-700
                                 "
                             >
-                                Do not pay this stale checkout.
-                                Return to the cart and continue
-                                checkout so the backend can
-                                validate the current items.
-                            </p>
+                                <T text="Do not pay this stale checkout. Return to the cart and continue checkout so the backend can validate the current items." /></p>
+
+                        </div>
+
+                    )
+                }
+
+
+                {
+                    phonePeStatusOnly
+                    && (
+
+                        <div
+                            className="
+                                mb-5
+                                rounded-2xl
+                                border
+                                border-blue-100
+                                bg-blue-50
+                                p-4
+                            "
+                        >
+
+                            <p
+                                className="
+                                    text-sm
+                                    font-bold
+                                    text-blue-800
+                                "
+                            >
+                                <T text="Existing PhonePe payment found" /></p>
+
+
+                            <p
+                                className="
+                                    mt-1
+                                    text-sm
+                                    leading-6
+                                    text-blue-700
+                                "
+                            >
+                                <T text="We recovered the payment from the backend. The browser no longer has the original checkout link, so we will continue checking the existing PhonePe payment instead of creating a duplicate payment." /></p>
 
                         </div>
 
@@ -1729,8 +1962,7 @@ export default function PaymentPage() {
                                             text-amber-900
                                         "
                                     >
-                                        Refund in progress
-                                    </h2>
+                                        <T text="Refund in progress" /></h2>
 
 
                                     <p
@@ -1745,7 +1977,7 @@ export default function PaymentPage() {
                                         payment after this order had
                                         already become terminal. We
                                         did not restore the cancelled
-                                        pickup reservation. A full
+                                        {deliveryOrder ? "delivery reservation" : "pickup reservation"}. A full
                                         refund for{" "}
                                         <strong>
                                             {
@@ -1766,10 +1998,7 @@ export default function PaymentPage() {
                                             text-amber-700
                                         "
                                     >
-                                        This page checks our backend
-                                        automatically. You can also
-                                        check again manually.
-                                    </p>
+                                        <T text="This page checks our backend automatically. You can also check again manually." /></p>
 
                                 </div>
 
@@ -1813,8 +2042,7 @@ export default function PaymentPage() {
                                     text-green-800
                                 "
                             >
-                                Refund completed
-                            </h2>
+                                <T text="Refund completed" /></h2>
 
 
                             <p
@@ -1835,7 +2063,7 @@ export default function PaymentPage() {
                                     }
                                 </strong>
                                 . The old order remains cancelled or
-                                failed, and its pickup slot stays
+                                failed, and its {deliveryOrder ? "rider window" : "pickup slot"} stays
                                 released.
                             </p>
 
@@ -1877,8 +2105,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Refund needs attention
-                            </h2>
+                                <T text="Refund needs attention" /></h2>
 
 
                             <p
@@ -1889,10 +2116,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The automatic refund did not reach
-                                a successful final state. Your old
-                                order has not been restored and no
-                                pickup slot has been re-reserved.
+                                <T text="The automatic refund did not reach a successful final state. Your old order has not been restored and no" />{" "}{deliveryOrder ? "rider window" : "pickup slot"} has been re-reserved.
                             </p>
 
 
@@ -1904,8 +2128,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Please keep this order number for
-                                support: {orderNumber}
+                                <T text="Please keep this order number for support:" />{" "}{orderNumber}
                             </p>
 
                         </div>
@@ -1946,8 +2169,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Payment failed
-                            </h2>
+                                <T text="Payment failed" /></h2>
 
 
                             <p
@@ -1958,10 +2180,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The order is no longer holding its
-                                pickup reservation. Your cart is
-                                still available.
-                            </p>
+                                <T text="The order is no longer holding its" />{" "}{deliveryOrder ? "delivery reservation" : "pickup reservation"}<T text=". Your cart is still available." /></p>
 
 
                             <p
@@ -1972,11 +2191,7 @@ export default function PaymentPage() {
                                     text-red-600
                                 "
                             >
-                                If the payment provider later reports that money
-                                was actually captured, the backend
-                                automatically starts the refund
-                                reconciliation flow.
-                            </p>
+                                <T text="If the payment provider later reports that money was actually captured, the backend automatically starts the refund reconciliation flow." /></p>
 
                         </div>
 
@@ -2016,8 +2231,7 @@ export default function PaymentPage() {
                                     text-red-800
                                 "
                             >
-                                Payment time expired
-                            </h2>
+                                <T text="Payment time expired" /></h2>
 
 
                             <p
@@ -2028,9 +2242,7 @@ export default function PaymentPage() {
                                     text-red-700
                                 "
                             >
-                                The old pickup reservation has been
-                                released. Your cart is still safe,
-                                so you can choose a new pickup slot.
+                                The old {deliveryOrder ? "delivery" : "pickup"} <T text="reservation has been released. Your cart is still safe, so you can choose a new" />{" "}{deliveryOrder ? "rider window" : "pickup slot"}.
                             </p>
 
 
@@ -2042,12 +2254,7 @@ export default function PaymentPage() {
                                     text-red-600
                                 "
                             >
-                                If the payment provider later reports a captured
-                                payment, the backend will move it
-                                into automatic refund reconciliation
-                                instead of confirming this expired
-                                order.
-                            </p>
+                                <T text="If the payment provider later reports a captured payment, the backend will move it into automatic refund reconciliation instead of confirming this expired order." /></p>
 
                         </div>
 
@@ -2086,8 +2293,7 @@ export default function PaymentPage() {
                                     text-[#c88a20]
                                 "
                             >
-                                Amount
-                            </p>
+                                <T text="Amount" /></p>
 
 
                             <p
@@ -2123,7 +2329,10 @@ export default function PaymentPage() {
                                 payment.provider ===
                                     "RAZORPAY"
                                     ? "Razorpay"
-                                    : "Paytm"
+                                    : payment.provider ===
+                                        "PAYTM"
+                                        ? "Paytm"
+                                        : "PhonePe"
                             }
                         </span>
 
@@ -2156,8 +2365,7 @@ export default function PaymentPage() {
                                     text-[#756763]
                                 "
                             >
-                                Payment status
-                            </span>
+                                <T text="Payment status" /></span>
 
 
                             <span
@@ -2198,8 +2406,7 @@ export default function PaymentPage() {
                                     text-[#756763]
                                 "
                             >
-                                Payment ID
-                            </span>
+                                <T text="Payment ID" /></span>
 
 
                             <span
@@ -2236,8 +2443,7 @@ export default function PaymentPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Provider transaction
-                                    </span>
+                                        <T text="Provider transaction" /></span>
 
 
                                     <span
@@ -2250,8 +2456,7 @@ export default function PaymentPage() {
                                         "
                                     >
                                         {
-                                            payment
-                                                .providerPaymentId
+                                            payment.providerPaymentId
                                         }
                                     </span>
 
@@ -2283,8 +2488,7 @@ export default function PaymentPage() {
                                             text-[#756763]
                                         "
                                     >
-                                        Payment deadline
-                                    </span>
+                                        <T text="Payment deadline" /></span>
 
 
                                     <span
@@ -2296,8 +2500,7 @@ export default function PaymentPage() {
                                     >
                                         {
                                             formatExpiry(
-                                                payment
-                                                    .expiresAt
+                                                payment.expiresAt
                                             )
                                         }
                                     </span>
@@ -2332,8 +2535,11 @@ export default function PaymentPage() {
                                         text-blue-800
                                     "
                                 >
-                                    Closing the payment window does not cancel
-                                    your order immediately.
+                                    {
+                                        phonePeStatusOnly
+                                            ? "Your existing PhonePe payment is being checked."
+                                            : translate("Closing the payment window does not cancel your order immediately.")
+                                    }
                                 </p>
 
 
@@ -2345,12 +2551,15 @@ export default function PaymentPage() {
                                         text-blue-700
                                     "
                                 >
-                                    We always verify the payment
-                                    through the backend. A pending
-                                    attempt remains active until
-                                    the provider reports a final result or
-                                    the backend payment deadline is
-                                    reached.
+                                    {
+                                        phonePeStatusOnly
+                                            ? (paymentPollingV2 && !gatewayOpened
+                                                ? "A payment attempt already exists. If you paid on another device, choose Check Payment Status below."
+                                                : "This payment is still being checked. You can safely leave and return to this order.")
+                                            : (paymentPollingV2 && !gatewayOpened
+                                                ? translate("Ready when you are. Tap Pay to open secure checkout.")
+                                                : "You can safely leave this page and return later. We'll show your order once the payment is confirmed.")
+                                    }
                                 </p>
 
                             </div>
@@ -2361,6 +2570,8 @@ export default function PaymentPage() {
 
                     {
                         isPending
+                        &&
+                        !phonePeStatusOnly
                         && (
 
                             <button
@@ -2371,6 +2582,8 @@ export default function PaymentPage() {
                                     refreshing
                                     ||
                                     cartChanged
+                                    ||
+                                    paymentDeadlineReached
                                 }
                                 onClick={
                                     () =>
@@ -2389,19 +2602,15 @@ export default function PaymentPage() {
                                     font-bold
                                     text-white
                                     transition
-
                                     hover:bg-[#5d0f1b]
-
                                     disabled:cursor-not-allowed
                                     disabled:bg-[#c9b9b4]
                                 "
                             >
                                 {
                                     openingPayment
-
                                         ? "Opening payment..."
-
-                                        : `Pay ${formatCurrency(
+                                        : `${gatewayOpened ? translate("Retry payment") : translate("Pay")} ${formatCurrency(
                                             payment.amount
                                         )}`
                                 }
@@ -2409,6 +2618,26 @@ export default function PaymentPage() {
 
                         )
                     }
+
+                    <PaymentLeaveChoice active={isPending} busy={cancelling || refreshing || openingPayment} error={translate(error)} onCancel={cancelCheckout}/>
+                    {feeBreakdown&&feeBreakdown.paymentFee>0&&<p className="mt-4 rounded-xl border p-3 text-sm"><T text="Online payment fee" /> ({feeBreakdown.paymentRate}%): {formatCurrency(feeBreakdown.paymentFee)} · <T text="Includes" /> {formatCurrency(feeBreakdown.paymentTax)} <T text="fee tax" /></p>}
+                    {feeBreakdown && feeBreakdown.fee>0 && <p className="mt-4 rounded-xl border p-3 text-sm"><T text="Payable amount includes a convenience fee of" />{" "}{formatCurrency(feeBreakdown.fee)} <T text="(including" />{" "}{formatCurrency(feeBreakdown.tax)} <T text="fee tax)." /></p>}
+                    {(isPending || isFailed || isExpired) && <section aria-label="Payment recovery" className="mt-4 rounded-2xl border border-[#c4d4c9] bg-[#fffaf2] p-4 text-[#173c39]">
+                        <p className="font-bold">{isPending ? translate("Need to stop this checkout?") : "Your cart is ready to try again"}</p>
+                        <p className="mt-1 text-sm leading-6"><T text="Check payment and release the unpaid pickup reservation. Keep your items for another attempt." /></p>
+                        {confirmCancel ? <div className="payment-cancel-inline mt-3"><p className="text-sm"><T text="Close the gateway first. A payment received after cancellation enters the refund process." /></p>
+                            <div className="mt-3 flex flex-wrap gap-3"><button type="button" disabled={cancelling || refreshing || openingPayment} onClick={()=>void cancelCheckout()} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white disabled:opacity-50">{cancelling ? translate("Checking payment…") : translate("Cancel order & keep cart")}</button>
+                            <button type="button" disabled={cancelling} onClick={()=>setConfirmCancel(false)} className="min-h-11 rounded-xl border px-4 font-bold"><T text="Continue payment" /></button></div></div>
+                            : <button type="button" disabled={openingPayment || refreshing} onClick={()=>setConfirmCancel(true)} className="mt-3 min-h-11 rounded-xl border border-[#c4d4c9] bg-white px-4 font-bold">{isPending ? translate("Cancel this order") : translate("Check & retry checkout")}</button>}
+                    </section>}
+                    {paymentPollingV2 && isPending && paymentDeadlineReached &&
+                        <p role="status" className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                            <T text="This payment window has closed. Please check its status before starting a new checkout. If you paid, it may take a little longer to confirm." /></p>}
+
+                    {paymentPollingV2 && pollingNotice && isPending &&
+                        <p role="status" className="mt-5 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
+                            {pollingNotice}
+                        </p>}
 
 
                     {
@@ -2450,22 +2679,17 @@ export default function PaymentPage() {
                                     font-semibold
                                     text-[#7a1625]
                                     transition
-
                                     hover:bg-[#fffaf3]
-
                                     disabled:cursor-not-allowed
                                     disabled:opacity-50
                                 "
                             >
                                 {
                                     refreshing
-
                                         ? "Checking latest status..."
-
                                         : isRefundPending
                                             ? "Check Refund Status"
-
-                                            : "Check Payment Status"
+                                            : translate("Check Payment Status")
                                 }
                             </button>
 
@@ -2496,11 +2720,10 @@ export default function PaymentPage() {
                                     font-bold
                                     text-white
                                     transition
-
                                     hover:bg-[#5d0f1b]
                                 "
                             >
-                                Choose New Pickup Slot
+                                {deliveryOrder ? "Choose New Delivery Window" : "Choose New Pickup Slot"}
                             </button>
 
                         )
@@ -2540,8 +2763,7 @@ export default function PaymentPage() {
                                     text-[#7a1625]
                                 "
                             >
-                                View Order Details
-                            </button>
+                                <T text="View Order Details" /></button>
 
                         )
                     }
@@ -2570,8 +2792,7 @@ export default function PaymentPage() {
                                     text-white
                                 "
                             >
-                                Return to Cart
-                            </button>
+                                <T text="Return to Cart" /></button>
 
                         )
                     }
@@ -2599,8 +2820,7 @@ export default function PaymentPage() {
                                         text-red-800
                                     "
                                 >
-                                    Do not retry the old payment.
-                                </p>
+                                    <T text="Do not retry the old payment." /></p>
 
 
                                 <p
@@ -2629,6 +2849,7 @@ export default function PaymentPage() {
                         && (
 
                             <div
+                                role="alert"
                                 className="
                                     mt-5
                                     rounded-xl
@@ -2646,7 +2867,7 @@ export default function PaymentPage() {
                                         text-red-700
                                     "
                                 >
-                                    {error}
+                                    {translate(error)}
                                 </p>
 
                             </div>
@@ -2666,15 +2887,11 @@ export default function PaymentPage() {
                         text-[#756763]
                     "
                 >
-                    Your order is confirmed only after
-                    our backend verifies a successful
-                    payment. Closing or going back
-                    from the payment window does not directly cancel
-                    the order.
-                </p>
+                    <T text="Your order is confirmed only after our backend verifies a successful payment. Closing or going back from the payment window does not directly cancel the order." /></p>
 
             </section>
 
+        </CheckoutExperienceFrame>
         </AppShell>
     );
 }

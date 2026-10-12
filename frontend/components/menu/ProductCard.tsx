@@ -1,12 +1,23 @@
 "use client";
+import {T} from "@/lib/language";
 
 import Image from "next/image";
+import DietaryLabel from "./DietaryLabel";
+import {useState,type ReactNode} from "react";
 
 import type { MenuProduct } from "@/types/menu";
 import type { ProductRatingSummary } from "@/types/review";
 
 
 interface ProductCardProps {
+    dietaryLabel?: ReactNode;
+    portionOptions?: ReactNode;
+    purchaseControl?: ReactNode;
+    refined?: boolean;
+    premium?: boolean;
+    priceFrom?: boolean;
+    unavailableForPickup?: boolean;
+    pickupMessage?: string;
     product: MenuProduct;
     ratingSummary: ProductRatingSummary | null;
     ratingLoading: boolean;
@@ -18,14 +29,15 @@ interface ProductCardProps {
 }
 
 
-function formatCurrency(amount: number): string {
+function formatCurrency(amount: number, exact = false, compact = false): string {
 
     return new Intl.NumberFormat(
         "en-IN",
         {
             style: "currency",
             currency: "INR",
-            maximumFractionDigits: 0
+            minimumFractionDigits: compact ? 0 : exact ? 2 : 0,
+            maximumFractionDigits: exact ? 2 : 0
         }
     ).format(amount);
 }
@@ -55,6 +67,14 @@ function formatWeight(
 
 
 export default function ProductCard({
+    dietaryLabel,
+    portionOptions,
+    purchaseControl,
+    refined = false,
+    premium = false,
+    priceFrom = false,
+    unavailableForPickup = false,
+    pickupMessage,
     product,
     ratingSummary,
     ratingLoading,
@@ -64,6 +84,7 @@ export default function ProductCard({
     onDecrease,
     onAdd
 }: ProductCardProps) {
+    const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
     const isAvailable =
         product.available !== false;
@@ -88,8 +109,10 @@ export default function ProductCard({
 
     return (
         <article
-            className="
-                group
+            onPointerDownCapture={event=>{if(unavailableForPickup&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
+            className={`
+                gokul-product-card group
+                ${refined ? "gokul-menu-product-card" : ""}
                 flex
                 min-h-32
                 overflow-hidden
@@ -104,7 +127,8 @@ export default function ProductCard({
                 hover:shadow-[0_10px_26px_rgba(60,30,20,0.11)]
 
                 sm:flex-col
-            "
+                ${refined ? "sm:rounded-3xl sm:shadow-[0_10px_30px_rgba(60,30,20,0.08)]" : ""}
+            `}
         >
 
             {/* ============================================================ */}
@@ -112,7 +136,7 @@ export default function ProductCard({
             {/* ============================================================ */}
 
             <div
-                className="
+                className="product-card-image
                     relative
                     h-32
                     w-28
@@ -127,7 +151,7 @@ export default function ProductCard({
             >
 
                 {
-                    product.imageUrl
+                    product.imageUrl && (!refined || failedImageUrl !== product.imageUrl)
                         ? (
                             <Image
                                 src={
@@ -137,12 +161,9 @@ export default function ProductCard({
                                     product.name
                                 }
                                 fill
-                                sizes="
-                                    (max-width: 639px) 112px,
-                                    (max-width: 768px) 45vw,
-                                    (max-width: 1024px) 30vw,
-                                    280px
-                                "
+                                sizes={refined ? "(max-width: 640px) 136px, (max-width: 768px) 45vw, (max-width: 1024px) 30vw, 280px" : "(max-width: 639px) 112px, (max-width: 768px) 45vw, (max-width: 1024px) 30vw, 280px"}
+                                loading="lazy"
+                                quality={75}
                                 className="
                                     object-cover
                                     transition
@@ -150,10 +171,11 @@ export default function ProductCard({
                                     group-hover:scale-105
                                 "
                                 draggable={false}
+                                onError={refined ? () => setFailedImageUrl(product.imageUrl) : undefined}
                             />
                         )
                         : (
-                            <div className="
+                            <div className="product-image-fallback
                                 flex
                                 h-full
                                 items-center
@@ -168,7 +190,7 @@ export default function ProductCard({
 
 
                 {
-                    !isAvailable
+                    (!refined && !isAvailable)
                     && (
                         <div className="
                             absolute
@@ -190,7 +212,7 @@ export default function ProductCard({
                                 font-bold
                                 text-[#5d0f1b]
                             ">
-                                Unavailable
+                                <T text={isAvailable ? pickupMessage ?? "Not at this time" : product.serviceAvailability?.code === "CHECKING" ? "Checking pickup" : product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.code === "OUTSIDE_SERVICE" ? "Available later" : "Unavailable"}/>
                             </span>
                         </div>
                     )
@@ -203,7 +225,7 @@ export default function ProductCard({
             {/* Product Details                                               */}
             {/* ============================================================ */}
 
-            <div className="
+            <div className="product-card-copy
                 flex
                 min-w-0
                 flex-1
@@ -213,6 +235,7 @@ export default function ProductCard({
                 sm:p-3.5
             ">
 
+                <div>{dietaryLabel ?? <DietaryLabel vegetarian={product.vegetarian}/>}</div>
                 <p className="
                     truncate
                     text-[9px]
@@ -245,8 +268,9 @@ export default function ProductCard({
 
                 {
                     product.description
+                    && (!refined || product.description.trim().toLowerCase() !== product.name.trim().toLowerCase())
                     && (
-                        <p className="
+                        <p className="product-card-description
                             mt-1
                             line-clamp-2
                             text-[11px]
@@ -264,9 +288,16 @@ export default function ProductCard({
                 }
 
 
+                {!isAvailable && (refined ? !unavailableForPickup : !!product.serviceAvailability?.message) && (
+                    <p className="menu-availability-note my-1 text-xs leading-5 text-[#a94d39]" role="status">
+                        <T text={refined && product.serviceAvailability?.code === "SOLD_OUT"
+                            ? "Sold out" : product.serviceAvailability?.message ?? "Unavailable"}/>
+                    </p>
+                )}
+
                 {/* Rating */}
 
-                <div className="mt-1.5 flex min-h-5 items-center">
+                <div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">
 
                     {
                         ratingLoading
@@ -288,7 +319,7 @@ export default function ProductCard({
                                 ? (
                                     <div
                                         aria-label={`${ratingSummary.averageRating.toFixed(1)} out of 5 from ${ratingSummary.ratingCount} ratings`}
-                                        className="
+                                        className="product-rating-summary
                                             flex
                                             items-center
                                             gap-1
@@ -345,8 +376,7 @@ export default function ProductCard({
                                         </span>
 
                                         <span>
-                                            New · No ratings yet
-                                        </span>
+                                            <T text="New · No ratings yet" /></span>
                                     </div>
                                 )
                     }
@@ -354,32 +384,34 @@ export default function ProductCard({
                 </div>
 
 
+                {refined&&isWeighted&&isInCart&&<p className="mobile-selected-weight-price">{selectionLabel} · {formatCurrency(product.price*(weightGrams??0)/1000,true)}</p>}
+                {portionOptions}
                 {/* Price + Add */}
 
-                <div className="
+                <div className={`
+                    product-card-purchase
                     mt-auto
                     flex
                     items-center
                     justify-between
                     gap-2
                     pt-2.5
-                ">
+                    ${refined ? "flex-wrap" : ""}
+                `}>
 
-                    <span className="
+                    <span data-copyable className="
                         text-sm
                         font-bold
                         text-[#241715]
 
                         sm:text-base
                     ">
-                        {
-                            formatCurrency(
-                                product.price
-                            )
-                        }
+                        {premium&&(isWeighted||priceFrom)&&<><T text="From"/> </>}
+                        {formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}
+                        {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
 
                         {
-                            isWeighted
+                            isWeighted && !premium
                             && (
                                 <span className="
                                     ml-1
@@ -389,15 +421,21 @@ export default function ProductCard({
 
                                     sm:text-xs
                                 ">
-                                    /kg
-                                </span>
+                                    <T text="/kg" /></span>
                             )
                         }
                     </span>
 
+                    {refined && isWeighted && !premium && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
+                        <T text="From" />{" "}{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{" "}{formatWeight(product.minimumWeightGrams ?? 250)}
+                    </span>}
 
-                    <div
+
+                    {premium&&!purchaseControl&&(isInCart||isWeighted)&&<small className="menu-product-caption">{isInCart?<>{isWeighted?selectionLabel:<>{quantity} <T text={quantity===1?"piece":"pieces"}/></>} · {formatCurrency(product.price*(isWeighted?(weightGrams??0)/1000:quantity),true,true)}</>:<T text="Choose weight"/>}</small>}
+
+                    {purchaseControl ?? <div
                         className={`
+                            product-card-controls
                             relative
                             h-10
                             shrink-0
@@ -414,8 +452,9 @@ export default function ProductCard({
                         {/* ADD */}
 
                         <button
+                            data-ordering-target="add"
                             type="button"
-                            disabled={!isAvailable}
+                            disabled={!isAvailable || unavailableForPickup}
                             tabIndex={
                                 isInCart
                                     ? -1
@@ -460,8 +499,7 @@ export default function ProductCard({
                                 }
                             `}
                         >
-                            ADD
-                        </button>
+                            <T text="ADD" /></button>
 
 
                         {/* Quantity */}
@@ -536,6 +574,7 @@ export default function ProductCard({
                                                 selectionLabel
                                             }
                                             type="button"
+                                            disabled={!isAvailable || unavailableForPickup}
                                             tabIndex={
                                                 isInCart
                                                     ? 0
@@ -581,8 +620,7 @@ export default function ProductCard({
                                                 tracking-[0.08em]
                                                 text-white/80
                                             ">
-                                                Change
-                                            </span>
+                                                <T text="Change" /></span>
                                         </button>
                                     )
                                     : (
@@ -607,7 +645,7 @@ export default function ProductCard({
                             <button
                                 type="button"
                                 disabled={
-                                    !isAvailable
+                                    !isAvailable || unavailableForPickup
                                 }
                                 tabIndex={
                                     isInCart
@@ -640,7 +678,7 @@ export default function ProductCard({
 
                         </div>
 
-                    </div>
+                    </div>}
 
                 </div>
 

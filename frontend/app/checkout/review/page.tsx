@@ -1,8 +1,26 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
+import LinkFeedback from "@/components/common/LinkFeedback";
 
+import {usePickupClock} from "@/hooks/usePickupClock";
+import {pickupIsFresh} from "@/lib/pickupFreshness";
+import CheckoutAdjustmentDialog from "@/components/checkout/CheckoutAdjustmentDialog";
+import {getCartSnapshot,parseCart,saveCart} from "@/lib/cartStorage";
+import {savePickupSlot} from "@/lib/checkoutStorage";
+import CheckoutPaymentNotice from "@/components/checkout/CheckoutPaymentNotice";
+import CheckoutMobileAction from "@/components/checkout/CheckoutMobileAction";
+import PickupAddOns from "@/components/checkout/PickupAddOns";
+import {formatWeight} from "@/lib/orderQuantity";
+
+import {CheckoutSavingsUncertainError} from "@/lib/checkoutRefresh";
+import {refreshCurrentCheckoutQuote} from "@/lib/checkoutQuoteRefresh";
+import {checkoutQuoteKey} from "@/lib/checkoutQuoteKey";
+import {applyBestRebate} from "@/services/rebateApi";
+import {apiClient} from "@/services/apiClient";
 import Link from "next/link";
 
 import {
+    useEffect,
     useMemo,
     useRef,
     useState,
@@ -15,6 +33,11 @@ import {
 
 import AppShell
     from "@/components/layout/AppShell";
+import BranchSelector from "@/components/branch/BranchSelector";
+import ReviewPickupRecovery from "@/components/checkout/ReviewPickupRecovery";
+import CheckoutExperienceFrame from "@/components/checkout/CheckoutExperienceFrame";
+import {formatBusinessTime, parseBusinessTimestamp} from "@/lib/businessTime";
+import {pendingCheckoutAction} from "@/lib/checkoutQuoteContext";
 
 
 import CheckoutOffersPanel
@@ -42,6 +65,7 @@ import {
 
 import {
     createOrder,
+    previewCheckoutQuote,
     getCustomerOrder,
     updatePendingCheckout
 } from "@/services/orderApi";
@@ -61,8 +85,11 @@ import {
 
 import type {
     CreateOrderRequest,
+    CheckoutQuote,
     UpdatePendingOrderRequest
 } from "@/types/order";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {useOnlineStatus} from "@/hooks/useOnlineStatus";
 
 import {
     addOrderToHistory
@@ -107,28 +134,6 @@ function cartItemSubtotal(
 }
 
 
-function formatWeight(
-    weightGrams: number
-): string {
-
-    if (weightGrams >= 1000) {
-        const kilograms =
-            weightGrams / 1000;
-
-        return `${new Intl.NumberFormat(
-            "en-IN",
-            {
-                maximumFractionDigits: 3
-            }
-        ).format(kilograms)} kg`;
-    }
-
-    return `${new Intl.NumberFormat(
-        "en-IN"
-    ).format(weightGrams)} g`;
-}
-
-
 function cartItemSelection(
     item: ReturnType<typeof useCart>["items"][number]
 ): string {
@@ -156,35 +161,7 @@ function cartItemSelection(
 function formatTime(
     value: string
 ): string {
-
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 
@@ -294,11 +271,12 @@ function formatInventoryQuantity(
 
 function ReviewInventoryIssue({
     issue,
-    branchPhone
+    branchPhone, onAdjust
 }: {
     issue: InventoryCheckResponse;
-    branchPhone: string | null;
+    branchPhone: string | null; onAdjust:()=>void;
 }) {
+    useTranslation();
 
     const unavailableItems =
         issue.items.filter(
@@ -329,8 +307,7 @@ function ReviewInventoryIssue({
                     text-[#c88a20]
                 "
             >
-                Quantity confirmation required
-            </p>
+                <T text="Quantity confirmation required" /></p>
 
             <h2
                 className="
@@ -340,9 +317,7 @@ function ReviewInventoryIssue({
                     text-[#7a1625]
                 "
             >
-                We cannot confirm the complete order
-                for this pickup date
-            </h2>
+                <T text="We cannot confirm the complete order for this pickup date" /></h2>
 
             <p
                 className="
@@ -352,9 +327,7 @@ function ReviewInventoryIssue({
                     text-[#756763]
                 "
             >
-                Some products need more preparation or
-                stock than is currently available online.
-            </p>
+                <T text="Some products need more preparation or stock than is currently available online." /></p>
 
             <div
                 className="
@@ -399,8 +372,7 @@ function ReviewInventoryIssue({
                                 >
                                     <div>
                                         <p className="text-xs text-[#756763]">
-                                            You requested
-                                        </p>
+                                            <T text="You requested" /></p>
 
                                         <p className="mt-1 font-bold text-[#241715]">
                                             {
@@ -414,8 +386,7 @@ function ReviewInventoryIssue({
 
                                     <div>
                                         <p className="text-xs text-[#756763]">
-                                            Available online
-                                        </p>
+                                            <T text="Available online" /></p>
 
                                         <p className="mt-1 font-bold text-[#7a1625]">
                                             {
@@ -436,11 +407,7 @@ function ReviewInventoryIssue({
                                         text-[#756763]
                                     "
                                 >
-                                    Please reduce the quantity,
-                                    choose another date, or contact
-                                    the branch for a large-order
-                                    confirmation.
-                                </p>
+                                    <T text="Please reduce the quantity, choose another date, or contact the branch for a large-order confirmation." /></p>
                             </div>
                         )
                     )
@@ -467,8 +434,7 @@ function ReviewInventoryIssue({
                                 text-green-800
                             "
                         >
-                            Earliest available date
-                        </p>
+                            <T text="Earliest available date" /></p>
 
                         <p
                             className="
@@ -508,8 +474,7 @@ function ReviewInventoryIssue({
                                 text-white!
                             "
                         >
-                            Choose This Pickup Date
-                        </Link>
+                            <T text="Choose This Pickup Date" /><LinkFeedback /></Link>
                     </div>
                 )
             }
@@ -531,8 +496,7 @@ function ReviewInventoryIssue({
                         text-[#241715]
                     "
                 >
-                    Need this quantity specially prepared?
-                </p>
+                    <T text="Need this quantity specially prepared?" /></p>
 
                 <p
                     className="
@@ -542,10 +506,7 @@ function ReviewInventoryIssue({
                         text-[#756763]
                     "
                 >
-                    Please call the selected branch. Our team
-                    can check production capacity and confirm
-                    whether this large order can be prepared.
-                </p>
+                    <T text="Please call the selected branch. Our team can check production capacity and confirm whether this large order can be prepared." /></p>
 
                 {
                     branchPhone
@@ -570,14 +531,13 @@ function ReviewInventoryIssue({
                                 text-[#7a1625]!
                             "
                         >
-                            Call {branchPhone}
+                            <T text="Call" />{" "}{branchPhone}
                         </a>
                     )
                 }
             </div>
 
-            <Link
-                href="/cart"
+            <button type="button" onClick={onAdjust}
                 className="
                     mt-3
                     flex
@@ -590,13 +550,37 @@ function ReviewInventoryIssue({
                     text-[#7a1625]!
                 "
             >
-                Adjust Cart Quantity
-            </Link>
+                <T text="Adjust Cart Quantity" /></button>
         </div>
     );
 }
 
 export default function ReviewPage() {
+    const translate = useTranslation();
+
+    const storefrontFeatures = useStorefrontFeatures();
+    const accessible = storefrontFeatures?.accessibleOrderingV2 === true;
+    const online = useOnlineStatus();
+    const [addonBusy,setAddonBusy]=useState(false);
+    // Keep the reservation recovery panel mounted after an uncertain cart update releases its busy state.
+    const [refreshOrderNumber,setRefreshOrderNumber]=useState<string|null>(null);
+    const quoteEnabled = storefrontFeatures?.acceptedCheckoutQuote === true;
+    const inPlaceBranchSwitch = storefrontFeatures?.inPlaceBranchSwitch === true;
+    const [acceptedQuote, setAcceptedQuote] = useState<{key: string; quote: CheckoutQuote} | null>(null);
+    const [quoteNotice, setQuoteNotice] = useState<{oldTotal: string; newTotal: string} | null>(null);
+    const [quoteClock, setQuoteClock] = useState(0);
+    useEffect(() => {
+        if (!acceptedQuote) return;
+        const immediate = window.setTimeout(() => setQuoteClock(Date.now()), 0);
+        const timer = window.setInterval(() => setQuoteClock(Date.now()), 15_000);
+        return () => {window.clearTimeout(immediate); window.clearInterval(timer);};
+    }, [acceptedQuote]);
+    const quoteExpired = acceptedQuote !== null && quoteClock > 0 &&
+        Date.parse(acceptedQuote.quote.expiresAt) <= quoteClock;
+    const [pickupRecovery, setPickupRecovery] = useState(false);
+    const [editingPickup, setEditingPickup] = useState(false);
+    const [adjustingCheckout,setAdjustingCheckout]=useState(false);
+    const [priceRevision,setPriceRevision]=useState(0);
 
     const router =
         useRouter();
@@ -712,14 +696,12 @@ export default function ReviewPage() {
         );
 
 
+    const pickupClock = usePickupClock();
     const pickupSelection =
         useMemo(
-            () =>
-                parsePickupSlot(
-                    pickupSnapshot
-                ),
+            () => {const saved = parsePickupSlot(pickupSnapshot); return saved && (!pickupClock || pickupIsFresh(saved,new Date(pickupClock))) ? saved : null;},
             [
-                pickupSnapshot
+                pickupSnapshot, pickupClock
             ]
         );
 
@@ -770,7 +752,68 @@ export default function ReviewPage() {
      * =========================================================
      */
 
+    const [priceChecking, setPriceChecking] = useState(false);
+    const autoPriceKey = useRef("");
+    const initialPriceKey = branch && pickupSelection && customer && items.length
+        ? JSON.stringify([{branchId: branch.id, pickupSlotId: pickupSelection.slot.id,
+            pickupType: pickupSelection.pickupType, customerName: customer.name.trim()||"GOKUL_GUEST", customerPhone: customer.phone,
+            items: items.map(item => ({productId: item.product.id,
+                quantity: item.product.saleMode === "UNIT" ? item.quantity : null, weightGrams: item.weightGrams}))}, undefined])
+        : "";
+    const pendingOrderNumber = pendingOrder?.orderNumber;
+    const visibleQuote=acceptedQuote&&initialPriceKey&&acceptedQuote.key===checkoutQuoteKey(JSON.parse(initialPriceKey)[0],pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch?.id?pendingOrderNumber:undefined)?acceptedQuote:null;
+    useEffect(() => {
+        if (!storefrontFeatures?.simplifiedCheckout || !quoteEnabled || invalidBranch || !initialPriceKey || pendingOrderNumber || !online) return;
+        if (autoPriceKey.current === initialPriceKey) return;
+        const request = JSON.parse(initialPriceKey)[0] as Parameters<typeof previewCheckoutQuote>[0];
+        let active = true;
+        const timer = window.setTimeout(() => {
+            autoPriceKey.current = initialPriceKey;
+            setPriceChecking(true); setAcceptedQuote(null);
+            void previewCheckoutQuote(request)
+                .then(quote => {if (active) setAcceptedQuote({key: checkoutQuoteKey(request), quote});})
+                .catch(() => {if (active) setOrderError("We couldn’t check your total. Tap Check price & offers to try again.");})
+                .finally(() => {if (active) setPriceChecking(false);});
+        }, 150);
+        return () => {
+            active = false; window.clearTimeout(timer);
+            if (autoPriceKey.current === initialPriceKey) autoPriceKey.current = "";
+            setPriceChecking(false);
+        };
+    }, [storefrontFeatures?.simplifiedCheckout, quoteEnabled, invalidBranch, initialPriceKey, pendingOrderNumber, online]);
+
+    async function openPaymentWithBestOffer(orderNumber:string) {
+        if (!storefrontFeatures?.simplifiedCheckout) return;
+        // The server applies the best offer atomically; this never initiates or charges a payment.
+        const cartSnapshot = getCartSnapshot(), pickupSnapshot = getPickupSlotSnapshot();
+        const reserved = parsePendingOrder(getPendingOrderSnapshot());
+        try {
+            const applied = await applyBestRebate(orderNumber);
+            const pending = parsePendingOrder(getPendingOrderSnapshot());
+            if (pending?.orderNumber !== orderNumber || pending.cartFingerprint !== reserved?.cartFingerprint ||
+                cartSnapshot !== getCartSnapshot() || pickupSnapshot !== getPickupSlotSnapshot()) {
+                setOrderError("Your cart or pickup changed in another tab. Review it before payment.");
+                return;
+            }
+            savePendingOrder({...pending, totalAmount: applied.totalAmount});
+            window.dispatchEvent(new Event("gokul-navigation-start"));
+            router.push(`/checkout/payment/${encodeURIComponent(orderNumber)}`);
+        } catch (error) {
+            if(error instanceof CheckoutSavingsUncertainError){
+                const pending=parsePendingOrder(getPendingOrderSnapshot());
+                if(pending?.orderNumber===orderNumber)savePendingOrder({...pending,offerRecheckRequired:true,priceReviewRequired:true});
+                setOrderError(error.message);
+            }else setOrderError("Your pickup is reserved. Choose an offer below or continue to payment.");
+        }
+    }
+
     async function handlePlaceOrder() {
+        if(addonBusy || priceChecking)return;
+
+        if (accessible && !online) {
+            setOrderError("You're offline. Your cart and pickup details are saved. Reconnect, then check your final price again.");
+            return;
+        }
 
         if (submitting) {
             return;
@@ -796,7 +839,7 @@ export default function ReviewPage() {
         if (!pickupSelection) {
 
             setOrderError(
-                "Please select a pickup date and time."
+                translate("Please select a pickup date and time.")
             );
 
             return;
@@ -806,7 +849,7 @@ export default function ReviewPage() {
         if (!customer) {
 
             setOrderError(
-                "Please enter your customer details."
+                translate("Please enter your customer details.")
             );
 
             return;
@@ -837,7 +880,7 @@ export default function ReviewPage() {
         ) {
 
             setOrderError(
-                "Please enter a valid 10-digit Indian mobile number."
+                translate("Please enter a valid 10-digit Indian mobile number.")
             );
 
             return;
@@ -845,7 +888,7 @@ export default function ReviewPage() {
 
 
         const customerName =
-            customer.name.trim();
+            customer.name.trim() || "GOKUL_GUEST";
 
 
         if (
@@ -853,7 +896,7 @@ export default function ReviewPage() {
         ) {
 
             setOrderError(
-                "Please enter a valid customer name."
+                translate("Please enter a valid customer name.")
             );
 
             return;
@@ -882,20 +925,67 @@ export default function ReviewPage() {
         const localPendingOrderCandidate =
             pendingOrder !== null
             &&
+            pendingOrder.fulfillmentType !== "DELIVERY"
+            &&
             pendingOrder.orderStatus ===
                 "PENDING_PAYMENT"
             &&
             pendingOrder.branchId ===
                 branch.id;
 
-
+        const quoteRequest: CreateOrderRequest = {
+            branchId: branch.id,
+            pickupSlotId: pickupSelection.slot.id,
+            customerName,
+            customerPhone,
+            pickupType: pickupSelection.pickupType,
+            items: requestItems
+        };
+        let quoteOrderNumber: string | undefined;
         setSubmitting(true);
 setOrderError(null);
 setInventoryIssue(null);
+setPickupRecovery(false);
 
 try {
+    const identityPolicy = await apiClient<{guestCheckoutEnabled?: boolean}>("/api/storefront/customer-identity", {signal: AbortSignal.timeout(5000)});
+    if (identityPolicy.guestCheckoutEnabled === false) {
+        const session = await apiClient<{authenticated: boolean; phone?: string}>("/api/customer/identity/me", {credentials: "include", signal: AbortSignal.timeout(5000)});
+        if (!session.authenticated || session.phone?.replace(/\D/g, "").slice(-10) !== customerPhone) {
+            router.push("/checkout/customer");
+            return;
+        }
+    }
+    // Resolve the browser's pending-order hint before binding a signed quote.
+    // An expired order must never supply a quote token for a new order.
+    let reusablePendingOrder = false;
+    if (localPendingOrderCandidate && pendingOrder) {
+        const serverOrder = await getCustomerOrder(pendingOrder.orderNumber);
+        const expiresAt = parseBusinessTimestamp(serverOrder.reservationExpiresAt).getTime();
+        const action = pendingCheckoutAction(serverOrder, expiresAt, Date.now());
+        reusablePendingOrder = action === "reuse";
+        if (!reusablePendingOrder) {
+            if (quoteEnabled && action === "payment") {
+                router.push(`/checkout/payment/${encodeURIComponent(pendingOrder.orderNumber)}`);
+                return;
+            }
+            if (quoteEnabled && action === "paid") {
+                if (pendingOrder.cartFingerprint === currentCartFingerprint) {
+                    router.push(`/orders/${encodeURIComponent(pendingOrder.orderNumber)}`);
+                    return;
+                }
+            }
+            clearPendingOrder();
+            setAcceptedQuote(null);
+            idempotencyKeyRef.current = null;
+        }
+    }
 
-    const inventory =
+    quoteOrderNumber = reusablePendingOrder ? pendingOrder?.orderNumber : undefined;
+    const quoteKey = checkoutQuoteKey(quoteRequest, quoteOrderNumber);
+
+    const ownReservationCheck = quoteOrderNumber && pendingOrder?.pickupSlotId===pickupSelection.slot.id ? await apiClient<{orderable:boolean}>(`/api/menu/pickup-addons/check?branchId=${branch.id}&orderNumber=${encodeURIComponent(quoteOrderNumber)}`,{method:"POST",body:JSON.stringify({serviceDate:pickupSelection.date,items:requestItems}),credentials:"include"}) : null;
+    const inventory = reusablePendingOrder ? null :
         await checkInventory(
             branch.id,
             {
@@ -909,16 +999,26 @@ try {
 
 
     if (
-        inventory.enforcementEnabled
+        inventory?.enforcementEnabled
         &&
         !inventory.orderable
     ) {
 
-        setInventoryIssue(
-            inventory
-        );
-
+        setInventoryIssue(inventory);
+        setAdjustingCheckout(true);
         return;
+    }
+
+    if(ownReservationCheck&&!ownReservationCheck.orderable){setOrderError("Your updated cart needs a quantity or pickup adjustment. Check the options here before continuing.");setAdjustingCheckout(true);return;}
+    if (quoteEnabled) {
+        if (!acceptedQuote || acceptedQuote.key !== quoteKey ||
+            Date.parse(acceptedQuote.quote.expiresAt) <= Date.now()) {
+            const refreshed = await previewCheckoutQuote(quoteRequest, quoteOrderNumber);
+            setAcceptedQuote({key: quoteKey, quote: refreshed});
+            setQuoteNotice(acceptedQuote?.key === quoteKey
+                ? {oldTotal: acceptedQuote.quote.totalAmount, newTotal: refreshed.totalAmount} : null);
+            return;
+        }
     }
 
 
@@ -938,56 +1038,7 @@ try {
              * the newly selected pickup time and recalculates
              * prices, tax, priority charge and rebate eligibility.
              */
-            if (
-                localPendingOrderCandidate
-                &&
-                pendingOrder
-            ) {
-
-                /*
-                 * localStorage is only a client-side hint.
-                 *
-                 * The backend may already have expired or
-                 * completed this order since the browser last
-                 * saved it.
-                 *
-                 * Always ask the backend before deciding that
-                 * the existing checkout can be edited.
-                 */
-                const serverOrder =
-                    await getCustomerOrder(
-                        pendingOrder.orderNumber
-                    );
-
-
-                const reservationExpiresAtMs =
-                    new Date(
-                        serverOrder.reservationExpiresAt
-                    ).getTime();
-
-
-                const reservationStillActive =
-                    Number.isFinite(
-                        reservationExpiresAtMs
-                    )
-                    &&
-                    reservationExpiresAtMs >
-                        Date.now();
-
-
-                const backendOrderReusable =
-                    serverOrder.orderStatus ===
-                        "PENDING_PAYMENT"
-                    &&
-                    serverOrder.paymentStatus ===
-                        null
-                    &&
-                    reservationStillActive;
-
-
-                if (
-                    backendOrderReusable
-                ) {
+            if (reusablePendingOrder && pendingOrder) {
 
                     const updateRequest:
                         UpdatePendingOrderRequest =
@@ -999,7 +1050,8 @@ try {
                                 pickupSelection.pickupType,
 
                             items:
-                                requestItems
+                                requestItems,
+                            quoteToken: quoteEnabled ? acceptedQuote?.quote.token : undefined
                         };
 
 
@@ -1053,34 +1105,8 @@ try {
                                 items
                             )
                     });
-
-
-
+                    await openPaymentWithBestOffer(response.orderNumber);
                     return;
-                }
-
-
-                /*
-                 * The browser still remembered an old pending
-                 * checkout, but the backend says it is no
-                 * longer editable.
-                 *
-                 * Clear ONLY the pending-order pointer.
-                 *
-                 * Keep:
-                 * - cart
-                 * - branch
-                 * - pickup selection
-                 * - customer details
-                 *
-                 * The normal create-order path below will
-                 * create a new reservation using the current
-                 * checkout data.
-                 */
-                clearPendingOrder();
-
-                idempotencyKeyRef.current =
-                    null;
             }
 
 
@@ -1107,7 +1133,8 @@ try {
                         pickupSelection.pickupType,
 
                     items:
-                        requestItems
+                        requestItems,
+                    quoteToken: quoteEnabled ? acceptedQuote?.quote.token : undefined
                 };
 
 
@@ -1180,9 +1207,7 @@ try {
                             items
                         )
                 });
-
-
-
+                await openPaymentWithBestOffer(response.orderNumber);
                 return;
             }
 
@@ -1192,6 +1217,52 @@ try {
             );
 
         } catch (exception) {
+
+            setAcceptedQuote(null);
+            const quoteChanged = quoteEnabled && exception instanceof Error &&
+                /quote expired|price quote expired|price or pickup details changed|review the current price/i.test(exception.message);
+            if (quoteChanged) {
+                try {
+                    let refreshOrderNumber = quoteOrderNumber;
+                    if (refreshOrderNumber) {
+                        const latest = await getCustomerOrder(refreshOrderNumber);
+                        const expiry = parseBusinessTimestamp(latest.reservationExpiresAt).getTime();
+                        const action = pendingCheckoutAction(latest, expiry, Date.now());
+                        if (action === "payment") {
+                            router.push(`/checkout/payment/${encodeURIComponent(refreshOrderNumber)}`);
+                            return;
+                        }
+                        if (action === "paid") {
+                            if (pendingOrder?.cartFingerprint === currentCartFingerprint) {
+                                router.push(`/orders/${encodeURIComponent(refreshOrderNumber)}`);
+                                return;
+                            }
+                        }
+                        if (action === "replace" || action === "paid") {
+                            clearPendingOrder();
+                            refreshOrderNumber = undefined;
+                            idempotencyKeyRef.current = null;
+                        }
+                    }
+                    const refreshed = await previewCheckoutQuote(quoteRequest, refreshOrderNumber);
+                    const refreshedKey = checkoutQuoteKey(quoteRequest, refreshOrderNumber);
+                    setAcceptedQuote({key: refreshedKey, quote: refreshed});
+                    setQuoteNotice(acceptedQuote?.key === refreshedKey
+                        ? {oldTotal: acceptedQuote.quote.totalAmount, newTotal: refreshed.totalAmount} : null);
+                    setOrderError(null);
+                    return;
+                } catch (refreshError) {
+                    console.warn("Unable to refresh checkout quote:", refreshError);
+                    setOrderError("We couldn't refresh your total. Your cart is saved; please try again.");
+                    return;
+                }
+            }
+            setQuoteNotice(null);
+            // A slot can cease to fit the cart between the initial preview and reservation.
+            // Offer newly checked times here, while keeping all checkout fields intact.
+            if (exception instanceof Error && /preparation time|ready later|later pickup|pickup time is no longer available/i.test(exception.message)) {
+                setPickupRecovery(true);setAdjustingCheckout(true);
+            }
 
             console.error(
                 "Unable to prepare order:",
@@ -1261,8 +1332,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Your cart is empty
-                        </h1>
+                            <T text="Your cart is empty" /></h1>
 
 
                         <p
@@ -1272,9 +1342,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Add some items before reviewing
-                            your order.
-                        </p>
+                            <T text="Add some items before reviewing your order." /></p>
 
 
                         <Link
@@ -1292,8 +1360,7 @@ try {
                                 text-white
                             "
                         >
-                            Explore Menu
-                        </Link>
+                            <T text="Explore Menu" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1351,8 +1418,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Branch mismatch
-                        </h1>
+                            <T text="Branch mismatch" /></h1>
 
 
                         <p
@@ -1362,9 +1428,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Please select the branch
-                            associated with your cart.
-                        </p>
+                            <T text="Please select the branch associated with your cart." /></p>
 
 
                         <Link
@@ -1382,8 +1446,7 @@ try {
                                 text-white
                             "
                         >
-                            Select Branch
-                        </Link>
+                            <T text="Select Branch" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1441,8 +1504,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Pickup time required
-                        </h1>
+                            <T text="Pickup time required" /></h1>
 
 
                         <p
@@ -1452,9 +1514,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Select a pickup date and time
-                            before reviewing your order.
-                        </p>
+                            <T text="Select a pickup date and time before reviewing your order." /></p>
 
 
                         <Link
@@ -1472,8 +1532,7 @@ try {
                                 text-white
                             "
                         >
-                            Choose Pickup
-                        </Link>
+                            <T text="Choose Pickup" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1531,8 +1590,7 @@ try {
                                 text-[#241715]
                             "
                         >
-                            Customer details required
-                        </h1>
+                            <T text="Customer details required" /></h1>
 
 
                         <p
@@ -1542,9 +1600,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Enter your name and phone number
-                            before reviewing your order.
-                        </p>
+                            <T text="Enter your name and phone number before reviewing your order." /></p>
 
 
                         <Link
@@ -1562,8 +1618,7 @@ try {
                                 text-white
                             "
                         >
-                            Enter Details
-                        </Link>
+                            <T text="Enter Details" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -1586,6 +1641,8 @@ try {
     const preparedOrderNumber =
         pendingOrder
         &&
+        pendingOrder.fulfillmentType !== "DELIVERY"
+        &&
         pendingOrder.orderStatus ===
             "PENDING_PAYMENT"
         &&
@@ -1595,8 +1652,8 @@ try {
         pendingOrder.pickupSlotId ===
             pickupSelection.slot.id
         &&
-        pendingOrder.cartFingerprint ===
-            currentCartFingerprint
+        (pendingOrder.cartFingerprint ===
+            currentCartFingerprint || addonBusy || refreshOrderNumber===pendingOrder.orderNumber)
             ? pendingOrder.orderNumber
             : null;
 
@@ -1609,6 +1666,8 @@ try {
 
     return (
         <AppShell>
+            <CheckoutExperienceFrame enabled={storefrontFeatures?.checkoutExperienceV2 === true} stage="review" allowBranchChange>
+                <CheckoutPaymentNotice />
 
             <section
                 className="
@@ -1633,15 +1692,7 @@ try {
                 >
 
                     <div
-                        className="
-                            flex
-                            items-center
-                            gap-2
-                            text-[11px]
-                            font-semibold
-                            uppercase
-                            tracking-[0.12em]
-                        "
+                        className={storefrontFeatures?.simplifiedCheckout ? "hidden" : "flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em]"}
                     >
 
                         <span
@@ -1649,8 +1700,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Pickup
-                        </span>
+                            <T text="Pickup" /></span>
 
 
                         <span
@@ -1668,8 +1718,7 @@ try {
                                 text-[#756763]
                             "
                         >
-                            Your details
-                        </span>
+                            <T text="Your details" /></span>
 
 
                         <span
@@ -1687,8 +1736,7 @@ try {
                                 text-[#7a1625]
                             "
                         >
-                            Review & offers
-                        </span>
+                            <T text="Review & offers" /></span>
 
                     </div>
 
@@ -1703,8 +1751,7 @@ try {
                             text-[#c88a20]
                         "
                     >
-                        Almost there
-                    </p>
+                        <T text="Almost there" /></p>
 
 
                     <h1
@@ -1717,8 +1764,7 @@ try {
                             sm:text-4xl
                         "
                     >
-                        Review your pickup order
-                    </h1>
+                        <T text="Review your pickup order" /></h1>
 
 
                     <p
@@ -1730,10 +1776,7 @@ try {
                             text-[#756763]
                         "
                     >
-                        Check your pickup time, contact details and items.
-                        Then check eligible offers or enter an exclusive code
-                        without leaving this page.
-                    </p>
+                        <T text={storefrontFeatures?.simplifiedCheckout ? "Check your pickup and items. Add something extra if you like, then continue to payment. We’ll apply your best available offer." : "Check your pickup time, contact details and items. Then check eligible offers or enter an exclusive code without leaving this page."} /></p>
 
                 </div>
 
@@ -1772,8 +1815,7 @@ try {
                                     text-[#c88a20]
                                 "
                             >
-                                Pickup details
-                            </p>
+                                <T text="Pickup details" /></p>
 
 
                             <p
@@ -1841,8 +1883,8 @@ try {
                                 >
                                     {
                                         priorityPickup
-                                            ? "Priority Pickup"
-                                            : "Normal Pickup"
+                                            ? translate("Priority Pickup")
+                                            : translate("Normal Pickup")
                                     }
                                 </span>
 
@@ -1871,9 +1913,7 @@ try {
                                                 text-[#756763]
                                             "
                                         >
-                                            Normal capacity is full
-                                            for this pickup time.
-                                        </p>
+                                            <T text="Normal capacity is full for this pickup time." /></p>
 
 
                                         <p
@@ -1884,7 +1924,7 @@ try {
                                                 text-[#7a1625]
                                             "
                                         >
-                                            Priority charge:{" "}
+                                            <T text="Priority charge:" />{" "}
                                             {
                                                 formatCurrency(
                                                     selectedSlot
@@ -1901,22 +1941,18 @@ try {
                         </div>
 
 
-                        <Link
-                            href="/checkout/pickup"
-                            className="
-                                shrink-0
-                                rounded-lg
-                                px-2
-                                py-1
-                                text-sm
-                                font-semibold
-                                text-[#7a1625]
-                                transition
-                                hover:bg-[#fff0dc]
-                            "
-                        >
-                            Change
-                        </Link>
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            {inPlaceBranchSwitch && !storefrontFeatures?.checkoutExperienceV2 && <BranchSelector compact />}
+                        {storefrontFeatures?.checkoutExperienceV2
+                            ? <button type="button" onClick={() => setAdjustingCheckout(true)}
+                                aria-expanded={adjustingCheckout}
+                                className="min-h-11 rounded-lg px-3 py-2 text-sm font-semibold text-[#7a1625] hover:bg-[#fff0dc]">
+                                <T text="Change time" /></button>
+                            : <Link href="/checkout/pickup"
+                                className="shrink-0 rounded-lg px-2 py-1 text-sm font-semibold text-[#7a1625] transition hover:bg-[#fff0dc]">
+                                {inPlaceBranchSwitch ? translate("Change time") : translate("Change")}
+                            <LinkFeedback /></Link>}
+                        </div>
 
                     </div>
 
@@ -1958,8 +1994,7 @@ try {
                                     text-[#c88a20]
                                 "
                             >
-                                Pickup contact
-                            </p>
+                                <T text="Pickup contact" /></p>
 
 
                             <p
@@ -2000,8 +2035,7 @@ try {
                                 hover:bg-[#fff0dc]
                             "
                         >
-                            Change
-                        </Link>
+                            <T text="Change" /><LinkFeedback /></Link>
 
                     </div>
 
@@ -2047,8 +2081,7 @@ try {
                                     text-[#c88a20]
                                 "
                             >
-                                Your order
-                            </p>
+                                <T text="Your order" /></p>
 
 
                             <p
@@ -2058,14 +2091,13 @@ try {
                                     text-[#756763]
                                 "
                             >
-                                {itemCount} {itemCount === 1 ? "item" : "items"}
+                                {itemCount} {translate(itemCount === 1 ? "item" : "items")}
                             </p>
 
                         </div>
 
 
-                        <Link
-                            href="/cart"
+                        <button type="button" onClick={()=>setAdjustingCheckout(true)}
                             className="
                                 shrink-0
                                 rounded-lg
@@ -2078,8 +2110,7 @@ try {
                                 hover:bg-[#fff0dc]
                             "
                         >
-                            Edit
-                        </Link>
+                            <T text="Edit" /></button>
 
                     </div>
 
@@ -2196,9 +2227,7 @@ try {
                                 }
                                 {" "}
                                 {
-                                    itemCount === 1
-                                        ? "item"
-                                        : "items"
+                                    translate(itemCount === 1 ? "item" : "items")
                                 }
                             </span>
 
@@ -2242,8 +2271,7 @@ try {
                                             text-[#756763]
                                         "
                                     >
-                                        Priority pickup
-                                    </span>
+                                        <T text="Priority pickup" /></span>
 
 
                                     <span
@@ -2286,8 +2314,7 @@ try {
                                     text-[#241715]
                                 "
                             >
-                                Final amount is verified before payment
-                            </p>
+                                <T text="No surprises at payment" /></p>
 
 
                             <p
@@ -2298,10 +2325,7 @@ try {
                                     text-[#756763]
                                 "
                             >
-                                Product prices, 5% GST, pickup charges and
-                                eligible offers are recalculated by Gokul Sweets.
-                                You&apos;ll see the payable amount before paying.
-                            </p>
+                                <T text="See item prices, GST, any pickup charge and your savings together before you pay." /></p>
 
                         </div>
 
@@ -2334,7 +2358,7 @@ try {
                                     text-red-700
                                 "
                             >
-                                Unable to continue
+                                {pickupRecovery ? "Let’s find a better pickup time" : "We couldn’t continue"}
                             </p>
 
 
@@ -2345,7 +2369,7 @@ try {
                                     text-red-600
                                 "
                             >
-                                {orderError}
+                                {pickupRecovery ? "That time no longer gives us enough time to prepare every item. Choose another available time below." : orderError}
                             </p>
 
                         </div>
@@ -2353,24 +2377,59 @@ try {
                     )
                 }
 
+                {(pickupRecovery || editingPickup) && branch && pickupSelection && storefrontFeatures &&
+                    <ReviewPickupRecovery mode={editingPickup ? "all" : "later"} branchId={branch.id} items={items} today={storefrontFeatures.today}
+                        days={storefrontFeatures.futureOrderingDays} rejectedSlotId={pickupSelection.slot.id}
+                        rejectedDate={pickupSelection.date} rejectedTime={pickupSelection.slot.startTime}
+                        onSelected={() => {setOrderError(null); setPickupRecovery(false); setEditingPickup(false); setAcceptedQuote(null);
+                            idempotencyKeyRef.current = null;}} />}
+
+
+                {accessible && !online && <div role="alert" className="mt-4 rounded-xl border border-[#c88a20] bg-[#fff4e5] p-4 text-sm">
+                    <T text="You're offline. Your cart is saved. Reconnect and check your final price again before continuing." /></div>}
 
                 {
                     inventoryIssue
                     && (
                         <ReviewInventoryIssue
                             issue={inventoryIssue}
-                            branchPhone={branch.phone}
+                            branchPhone={branch.phone} onAdjust={()=>setAdjustingCheckout(true)}
                         />
                     )
                 }
 
 
+                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async(signal)=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await refreshCurrentCheckoutQuote(request,number,signal);if(quote)setAcceptedQuote({key:checkoutQuoteKey(request,number),quote});}}/>}
                 {/* Offers + final price */}
+
+                {storefrontFeatures?.simplifiedCheckout && !preparedOrderNumber && <p className="my-4 rounded-xl bg-[#e7f0e9] p-4 text-sm text-[#143936]"><T text="The best available offer is applied automatically. Add a little extra below if you like, then continue to payment."/></p>}
+                {quoteEnabled && !preparedOrderNumber && visibleQuote && (
+                    <div className="mt-5 rounded-2xl border border-[#eadfd6] bg-white p-4" role="status">
+                        <p className="font-bold"><T text="Your price, before offers" /></p>
+                        {quoteExpired && <p className="mt-2 rounded-xl bg-[#fff4e5] p-3 text-sm" role="status">
+                            <T text="This price needs refreshing. Your cart and pickup details are saved." /></p>}
+                        {quoteNotice && <p className="mt-2 rounded-xl bg-[#fff4e5] p-3 text-sm" role="alert">
+                            {quoteNotice.oldTotal === quoteNotice.newTotal
+                                ? "Your price has been refreshed. Please review it once more before continuing."
+                                : `Your total changed from ${formatCurrency(Number(quoteNotice.oldTotal))} to ${formatCurrency(Number(quoteNotice.newTotal))}. Please review the new amount before continuing.`}
+                        </p>}
+                        {visibleQuote.quote.items.map((line, index) => (
+                            <p className="mt-2 text-sm" key={`${line.name}-${index}`}>
+                                {line.name}: ₹{line.total}{" "}<T text="(unit ₹" />{line.unitPrice}<T text=", tax" />{" "}{line.taxRate}%)
+                            </p>
+                        ))}
+                        <p className="mt-3 text-sm"><T text="Items" /> ₹{visibleQuote.quote.subtotal} · <T text="Tax" /> ₹{visibleQuote.quote.taxAmount} · <T text="Pickup charge" /> ₹{visibleQuote.quote.priorityCharge}</p>
+                        {Number(visibleQuote.quote.paymentFee??0)>0&&<p className="mt-2 text-sm"><T text="Online payment fee" /> ({visibleQuote.quote.paymentFeeRate}%) ₹{visibleQuote.quote.paymentFee} · <T text="Includes" /> ₹{visibleQuote.quote.paymentFeeTax} <T text="fee tax" /></p>}
+                        {Number(visibleQuote.quote.convenienceFee ?? 0)>0 && <p className="mt-2 text-sm"><T text="Convenience fee ₹" />{visibleQuote.quote.convenienceFee}{" "}<T text="(includes ₹" />{visibleQuote.quote.convenienceFeeTax}{" "}<T text="tax)" /></p>}
+                        <p className="mt-2 font-bold"><T text="Total before optional offers" /> ₹{visibleQuote.quote.totalAmount}</p>
+                        {!quoteExpired && <p className="mt-2 text-xs"><T text="This price is available until" /> {new Date(visibleQuote.quote.expiresAt).toLocaleTimeString("en-IN", {timeZone: "Asia/Kolkata"})} IST. <Link className="underline" href="/about#cancellation-policy"><T text="See the cancellation policy" /><LinkFeedback /></Link> <T text="before paying." /></p>}
+                    </div>
+                )}
 
                 {
                     preparedOrderNumber
                         ? (
-                            <CheckoutOffersPanel
+                            submitting && storefrontFeatures?.simplifiedCheckout ? <p role="status" className="my-4 rounded-2xl bg-[#e7f0e9] p-5 text-[#143936]"><T text="Finding your best offer and opening payment…" /></p> : <CheckoutOffersPanel key={`${preparedOrderNumber}:${priceRevision}`} reviewRequired={priceRevision>0} onCartMutationBusy={setAddonBusy} onUpdateError={setOrderError} onRefreshRequiredChange={required=>{setRefreshOrderNumber(required?preparedOrderNumber:null);if(!required)setOrderError(null);}}
                                 orderNumber={
                                     preparedOrderNumber
                                 }
@@ -2378,7 +2437,8 @@ try {
                         )
                         : (
                             <div
-                                className="
+                                className={`
+                                    checkout-review-desktop-action
                                     mt-5
                                     rounded-3xl
                                     border
@@ -2386,7 +2446,7 @@ try {
                                     bg-white
                                     p-4
                                     shadow-[0_6px_24px_rgba(60,30,20,0.06)]
-                                "
+                                `}
                             >
 
                                 <div
@@ -2402,8 +2462,7 @@ try {
                                             text-[#241715]
                                         "
                                     >
-                                        Check your final price
-                                    </p>
+                                        <T text="Check your final price" /></p>
 
 
                                     <p
@@ -2414,10 +2473,7 @@ try {
                                             text-[#756763]
                                         "
                                     >
-                                        We&apos;ll reserve your pickup time and confirm
-                                        the latest price. You can find offers or use
-                                        a private code without leaving this page.
-                                    </p>
+                                        <T text="Review your total, then explore any available offers before paying." /></p>
 
                                 </div>
 
@@ -2425,7 +2481,7 @@ try {
                                 <button
                                     type="button"
                                     disabled={
-                                        submitting
+                                        priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)
                                     }
                                     onClick={
                                         handlePlaceOrder
@@ -2456,9 +2512,13 @@ try {
                                     "
                                 >
                                     {
-                                        submitting
-                                            ? "Preparing your order..."
-                                            : "Check Final Price & Offers"
+                                        priceChecking || submitting
+                                            ? translate("Preparing your order...")
+                                            : quoteExpired && visibleQuote
+                                                ? translate("Refresh your total")
+                                            : quoteEnabled && visibleQuote
+                                                ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Accept price and reserve pickup")
+                                                : translate("Check Final Price & Offers")
                                     }
                                 </button>
 
@@ -2488,15 +2548,17 @@ try {
                                         disabled:opacity-50
                                     "
                                 >
-                                    ← Back to Cart
-                                </button>
+                                    <T text="← Back to Cart" /></button>
 
                             </div>
                         )
                 }
 
+                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated||!quote?null:{key:checkoutQuoteKey(request,number),quote});setInventoryIssue(null);setOrderError(null);}}/>}
+                {!preparedOrderNumber && <CheckoutMobileAction label={priceChecking ? translate("Checking your total…") : submitting ? translate("Checking…") : quoteEnabled && visibleQuote ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Review & reserve") : translate("Check price & offers")} amount={visibleQuote ? Number(visibleQuote.quote.totalAmount) : undefined} disabled={priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
             </section>
 
+            </CheckoutExperienceFrame>
         </AppShell>
     );
 }

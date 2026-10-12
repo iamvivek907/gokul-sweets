@@ -1,17 +1,22 @@
 package com.gokulsweets.restaurant.inventory.automation.entity;
 
+import com.gokulsweets.restaurant.observability.MethodTiming;
+
 import jakarta.persistence.*;
+
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/** Persisted inventory availability window state. */
 @Entity
 @Table(name = "inventory_availability_windows")
 @Getter
 @Setter
 public class InventoryAvailabilityWindow {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -38,15 +43,31 @@ public class InventoryAvailabilityWindow {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** Ons create. */
     @PrePersist
     protected void onCreate() {
-        LocalDateTime now = LocalDateTime.now();
-        createdAt = now;
-        updatedAt = now;
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryAvailabilityWindow.class, "onCreate()");
+        try {
+            LocalDateTime now = LocalDateTime.now();
+            createdAt = now;
+            updatedAt = now;
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryAvailabilityWindow.class, "onCreate()");
+        }
     }
 
+    /** Ons update. */
     @PreUpdate
     protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(InventoryAvailabilityWindow.class, "onUpdate()");
+        try {
+            updatedAt = LocalDateTime.now();
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, InventoryAvailabilityWindow.class, "onUpdate()");
+        }
     }
 }

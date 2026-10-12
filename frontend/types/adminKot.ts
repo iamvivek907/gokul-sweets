@@ -33,6 +33,8 @@ export interface AdminKotItem {
     productName: string;
 
     quantity: number;
+    saleMode?: "UNIT" | "WEIGHT" | null;
+    weightGrams?: number | null;
 
     displayOrder: number;
 }
@@ -45,6 +47,7 @@ export interface AdminKot {
     kotNumber: string;
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 
@@ -52,13 +55,17 @@ export interface AdminKot {
 
     branchAddress: string;
 
-    pickupDate: string;
+    pickupDate: string | null;
 
-    pickupStartTime: string;
+    pickupStartTime: string | null;
 
-    pickupEndTime: string;
+    pickupEndTime: string | null;
 
-    pickupType: KotPickupType;
+    pickupType: KotPickupType | null;
+    fulfillmentType: "PICKUP" | "DELIVERY";
+    deliveryDate: string | null;
+    deliveryStartTime: string | null;
+    deliveryEndTime: string | null;
 
     startedByStaffId: number;
 
@@ -85,6 +92,7 @@ export interface AdminKotReprintResponse {
     kotNumber: string;
 
     orderNumber: string;
+    customerOrderNumber?: number | null;
 
     branchId: number;
 

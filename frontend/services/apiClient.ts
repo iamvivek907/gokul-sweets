@@ -1,7 +1,10 @@
+import "@/lib/abortSignalCompatibility";
+import {reportLoadingStage} from "@/lib/customerLoading";
 import {API_BASE_URL} from "@/lib/constants";
+import {retryAfterDelayMs} from "@/lib/paymentPolling";
 
 interface ApiRequestOptions extends RequestInit {
-    cacheMode?: "no-store" | "force-cache";
+    cacheMode?: "no-store" | "force-cache" | "default";
 }
 
 export interface ApiErrorBody {
@@ -19,7 +22,8 @@ export class ApiError extends Error {
         message: string,
         public readonly status: number,
         public readonly code: string,
-        public readonly details: Record<string, unknown>
+        public readonly details: Record<string, unknown>,
+        public readonly retryAfterMs: number | null = null
     ) {
         super(message);
         this.name = "ApiError";
@@ -56,6 +60,8 @@ export async function apiClient<T>(
         requestHeaders.set("Content-Type", "application/json");
     }
 
+    const measured = path.startsWith("/api/menu") && typeof performance !== "undefined";
+    const started = measured ? performance.now() : 0;
     let response: Response;
 
     try {
@@ -85,6 +91,7 @@ export async function apiClient<T>(
         );
     }
 
+    if (measured) reportLoadingStage("MENU_NETWORK", started);
     if (!response.ok) {
         let body: ApiErrorBody = {};
 
@@ -100,7 +107,8 @@ export async function apiClient<T>(
             `Request failed (${response.status}).`,
             response.status,
             body.code ?? "REQUEST_FAILED",
-            body.details ?? {}
+            body.details ?? {},
+            retryAfterDelayMs(response.headers.get("Retry-After"), Date.now())
         );
     }
 
@@ -108,5 +116,8 @@ export async function apiClient<T>(
         return undefined as T;
     }
 
-    return response.json() as Promise<T>;
+    const bodyStarted = measured ? performance.now() : 0;
+    const result = await response.json() as T;
+    if (measured) reportLoadingStage("MENU_BODY", bodyStarted);
+    return result;
 }

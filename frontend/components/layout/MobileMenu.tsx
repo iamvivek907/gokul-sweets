@@ -1,6 +1,10 @@
 "use client";
+import LinkFeedback from "@/components/common/LinkFeedback";
+
+import {T,useTranslation} from "@/lib/language";
 
 import Link from "next/link";
+import {createPortal} from "react-dom";
 
 import {
     useEffect,
@@ -14,6 +18,8 @@ import {
 import {
     useCart
 } from "@/hooks/useCart";
+import {adminFetch} from "@/services/adminApi";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 
 
 /*
@@ -68,8 +74,7 @@ const MENU_ITEMS: MenuItem[] = [
     {
         label: "Profile",
         href: "/profile",
-        description: "Manage your profile",
-        disabled: true
+        description: "Manage your profile"
     },
     {
         label: "About Gokul Sweets",
@@ -80,6 +85,7 @@ const MENU_ITEMS: MenuItem[] = [
 
 
 export default function MobileMenu() {
+    const translate = useTranslation();
 
     const pathname =
         usePathname();
@@ -96,6 +102,18 @@ export default function MobileMenu() {
         setOpen
     ] =
         useState(false);
+    const [staffAccess, setStaffAccess] = useState(false);
+    const features = useStorefrontFeatures();
+    const themed = features?.futuristicStorefrontV2 === true || features?.checkoutExperienceV2 === true;
+
+    useEffect(() => {
+        if (!open) return;
+        const controller = new AbortController();
+        void adminFetch("/api/admin/auth/me", "staff-session", {signal: controller.signal})
+            .then(response => {if (!controller.signal.aborted) setStaffAccess(response.ok);})
+            .catch(() => {if (!controller.signal.aborted) setStaffAccess(false);});
+        return () => controller.abort();
+    }, [open]);
 
 
     /*
@@ -159,6 +177,7 @@ export default function MobileMenu() {
                     setOpen(
                         false
                     );
+                    setStaffAccess(false);
                 }
             }
 
@@ -189,6 +208,7 @@ export default function MobileMenu() {
         setOpen(
             false
         );
+        setStaffAccess(false);
     }
 
 
@@ -198,6 +218,7 @@ export default function MobileMenu() {
             current =>
                 !current
         );
+        setStaffAccess(false);
     }
 
 
@@ -209,7 +230,7 @@ export default function MobileMenu() {
                 aria-label={
                     open
                         ? "Close menu"
-                        : "Open menu"
+                        : translate("Open menu")
                 }
                 aria-expanded={
                     open
@@ -218,7 +239,7 @@ export default function MobileMenu() {
                 onClick={
                     toggleMenu
                 }
-                className="
+                className="customer-menu-trigger
                     relative
                     flex
                     h-11
@@ -244,8 +265,7 @@ export default function MobileMenu() {
                 <span
                     className="sr-only"
                 >
-                    Menu
-                </span>
+                    <T text="Menu" /></span>
 
 
                 <span
@@ -353,6 +373,7 @@ export default function MobileMenu() {
             </button>
 
 
+            {open && createPortal(<div className={themed ? "future-storefront" : undefined}>
             <div
                 aria-hidden="true"
                 onClick={
@@ -381,7 +402,7 @@ export default function MobileMenu() {
                 aria-hidden={
                     !open
                 }
-                className={`
+                className={`customer-mobile-drawer
                     fixed
                     right-0
                     top-0
@@ -430,8 +451,7 @@ export default function MobileMenu() {
                                 text-[#7a1625]
                             "
                         >
-                            Gokul Sweets
-                        </p>
+                            <T text="Gokul Sweets" /></p>
 
 
                         <p
@@ -444,8 +464,7 @@ export default function MobileMenu() {
                                 text-[#c88a20]
                             "
                         >
-                            Tradition tastes better
-                        </p>
+                            <T text="Tradition tastes better" /></p>
 
                     </div>
 
@@ -481,7 +500,9 @@ export default function MobileMenu() {
                 <nav
                     className="
                         flex-1
+                        min-h-0
                         overflow-y-auto
+                        overscroll-contain
                         px-4
                         py-5
                     "
@@ -492,7 +513,7 @@ export default function MobileMenu() {
                     >
 
                         {
-                            MENU_ITEMS.map(
+                            [...MENU_ITEMS, ...(features?.occasionEnquiries ? [{label: translate("Occasions & gifting"), href: "/occasions", description: "Plan bulk sweets and celebration gift boxes"}] : [])].map(
                                 item => {
 
                                     const active =
@@ -574,8 +595,7 @@ export default function MobileMenu() {
                                                         text-[#7a1625]
                                                     "
                                                 >
-                                                    Soon
-                                                </span>
+                                                    <T text="Soon" /></span>
 
                                             </div>
                                         );
@@ -591,6 +611,7 @@ export default function MobileMenu() {
                                             href={
                                                 item.href
                                             }
+                                            aria-current={active ? "page" : undefined}
                                             onClick={
                                                 closeMenu
                                             }
@@ -702,13 +723,18 @@ export default function MobileMenu() {
 
                                             </div>
 
-                                        </Link>
+                                        <LinkFeedback /></Link>
                                     );
                                 }
                             )
                         }
 
                     </div>
+
+                    {staffAccess && <Link href="/admin" onClick={closeMenu}
+                        className="mt-5 flex min-h-14 items-center justify-between rounded-2xl border border-[#d9e5df] bg-[#edf5ef] px-4 py-3 font-bold text-[#143936]">
+                        <span><T text="Staff dashboard" /></span><span aria-hidden="true">›</span>
+                    <LinkFeedback /></Link>}
 
 
                     <div
@@ -731,8 +757,7 @@ export default function MobileMenu() {
                                 text-[#c88a20]
                             "
                         >
-                            Follow us
-                        </p>
+                            <T text="Follow us" /></p>
 
 
                         <p
@@ -743,9 +768,7 @@ export default function MobileMenu() {
                                 text-[#756763]
                             "
                         >
-                            New sweets, festive specials and
-                            shop updates.
-                        </p>
+                            <T text="New sweets, festive specials and shop updates." /></p>
 
 
                         <div
@@ -832,13 +855,12 @@ export default function MobileMenu() {
                             text-[#756763]
                         "
                     >
-                        Online orders are prepared for pickup
-                        from your selected branch.
-                    </p>
+                        <T text="Online orders are prepared for pickup from your selected branch." /></p>
 
                 </div>
 
             </aside>
+            </div>, document.body)}
 
         </>
     );

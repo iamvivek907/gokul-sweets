@@ -1,31 +1,21 @@
 package com.gokulsweets.restaurant.printing.dto;
 
 import com.gokulsweets.restaurant.printing.enums.PrinterStation;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+/**
+ * Immutable print agent claim request data contract.
+ *
+ * @param branchId the branch id
+ * @param agentId the agent id
+ * @param station the station
+ */
 public record PrintAgentClaimRequest(
-
-        @NotNull(
-                message = "Branch ID is required."
-        )
-        Long branchId,
-
-
-        @NotBlank(
-                message = "Agent ID is required."
-        )
-        @Size(
-                max = 120,
-                message = "Agent ID cannot exceed 120 characters."
-        )
-        String agentId,
-
-
-        @NotNull(
-                message = "Printer station is required."
-        )
-        PrinterStation station
-) {
-}
+        @NotNull(message = "Branch ID is required.") Long branchId,
+        @NotBlank(message = "Agent ID is required.")
+                @Size(max = 120, message = "Agent ID cannot exceed 120 characters.")
+                String agentId,
+        @NotNull(message = "Printer station is required.") PrinterStation station) {}

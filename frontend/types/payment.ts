@@ -1,4 +1,4 @@
-export type PaymentProviderType = "RAZORPAY" | "PAYTM";
+export type PaymentProviderType = "RAZORPAY" | "PAYTM" | "PHONEPE";
 
 export type PaymentStatus =
     | "PENDING"
@@ -11,7 +11,12 @@ export type PaymentStatus =
 
 export interface CreatePaymentRequest {
     orderNumber: string;
-    provider: PaymentProviderType;
+    provider?: PaymentProviderType;
+}
+
+export interface PaymentProviderConfigurationResponse {
+    defaultProvider: PaymentProviderType;
+    enabledProviders: PaymentProviderType[];
 }
 
 export interface RazorpayVerificationRequest {

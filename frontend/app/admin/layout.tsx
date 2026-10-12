@@ -1,3 +1,6 @@
+import type {Metadata} from "next";
+export const metadata: Metadata = {title: {absolute: "Admin Portal | Gokul Sweets"}};
+import KitchenAlarm from "@/components/admin/KitchenAlarm";
 import type {
     ReactNode
 } from "react";
@@ -21,6 +24,7 @@ export default function AdminLayout({
 
             <AdminShell>
 
+                <KitchenAlarm />
                 {children}
 
             </AdminShell>

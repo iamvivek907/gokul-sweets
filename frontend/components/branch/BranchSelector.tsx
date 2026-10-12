@@ -1,7 +1,11 @@
 "use client";
+import CustomerIcon from "@/components/customer/CustomerIcon";
+import {T,useTranslation} from "@/lib/language";
 
 import {
     useEffect,
+    useId,
+    useRef,
     useState
 } from "react";
 
@@ -12,19 +16,54 @@ import {
 import {
     useSelectedBranch
 } from "@/hooks/useSelectedBranch";
+import {useCart} from "@/hooks/useCart";
+import {useRouter} from "next/navigation";
+import {createPortal} from "react-dom";
+import {clearStoredCart, getCartSnapshot} from "@/lib/cartStorage";
+import {clearPickupSlot} from "@/lib/checkoutStorage";
 
 import type {
     Branch
 } from "@/types/branch";
 
+function StartFreshDialog({branchName, itemCount, onKeep, onConfirm}: {
+    branchName: string; itemCount: number; onKeep: () => void; onConfirm: () => void;
+}) {
+    const translate = useTranslation();
+    const dialogId = useId();
+    const originalCart = useRef<string | null>(null);
+    const [changed, setChanged] = useState(false);
+    useEffect(() => {
+        const dialog = document.getElementById(dialogId) as HTMLDialogElement | null;
+        originalCart.current = getCartSnapshot();
+        dialog?.showModal();
+        return () => dialog?.close();
+    }, [dialogId]);
+    return <dialog id={dialogId} aria-labelledby={`${dialogId}-title`} onCancel={onKeep} className="m-auto w-[calc(100vw-2rem)] max-w-md rounded-2xl border border-[#d9e5df] bg-white p-5 text-[#172e2c] shadow-xl backdrop:bg-black/60">
+        <h2 id={`${dialogId}-title`} className="text-xl font-bold">Start at {branchName}?</h2>
+        <p className="mt-3 text-sm leading-6">Your current cart has {itemCount} {itemCount === 1 ? translate("item") : "items"} from another branch. Switching will clear that cart and open {branchName} with an empty cart. Your placed orders are unaffected.</p>
+        {changed && <p role="alert" className="mt-3 text-sm text-red-700">Your cart changed. Close this review and choose the branch again.</p>}
+        <div className="mt-5 flex flex-wrap gap-3">
+            <button type="button" onClick={onKeep} className="min-h-11 rounded-xl border px-4 font-semibold">Keep my cart</button>
+            <button type="button" disabled={changed} onClick={() => originalCart.current === getCartSnapshot() ? onConfirm() : setChanged(true)} className="min-h-11 rounded-xl bg-[#143936] px-4 font-semibold text-white disabled:opacity-50">Clear cart and switch</button>
+        </div>
+    </dialog>;
+}
 
-export default function BranchSelector() {
+
+export default function BranchSelector({compact = false, locationControl = false, cardBranch, destination = "menu", actionLabel}: {compact?: boolean; locationControl?: boolean; cardBranch?: Branch; destination?: "menu" | "branchHome" | "occasions"; actionLabel?: string}) {
+    const translate = useTranslation();
+    const router = useRouter();
+    const uniqueId = useId();
+    const popoverId = compact || locationControl || cardBranch ? `branch-selector-${uniqueId.replaceAll(":", "")}` : "branch-selector-popover";
 
     const {
         branch,
         selectBranch
     } =
         useSelectedBranch();
+    const cart = useCart();
+    const [proposedBranch, setProposedBranch] = useState<Branch | null>(null);
 
 
     const [
@@ -60,6 +99,7 @@ export default function BranchSelector() {
 
 
     useEffect(() => {
+        if (cardBranch) return;
 
         const controller =
             new AbortController();
@@ -141,7 +181,7 @@ export default function BranchSelector() {
         };
 
     }, [
-        reloadKey
+        reloadKey, cardBranch
     ]);
 
 
@@ -149,14 +189,26 @@ export default function BranchSelector() {
         selectedBranch: Branch
     ) {
 
+        if (!cart.isEmpty && cart.branchId !== selectedBranch.id) {
+            setProposedBranch(selectedBranch);
+            closePopover();
+            return;
+        }
+
         selectBranch(
             selectedBranch
         );
 
+        closePopover();
+        router.push(destination === "branchHome" ? `/branches/${selectedBranch.id}` : destination === "occasions" ? "/occasions" : "/menu");
+    }
+
+    function closePopover() {
+
 
         const popover =
             document.getElementById(
-                "branch-selector-popover"
+                popoverId
             );
 
 
@@ -172,6 +224,16 @@ export default function BranchSelector() {
                 }
             ).hidePopover();
         }
+    }
+
+    function confirmSwitch() {
+        if (!proposedBranch) return;
+        clearStoredCart();
+        clearPickupSlot();
+        selectBranch(proposedBranch);
+        setProposedBranch(null);
+        closePopover();
+        router.push(destination === "branchHome" ? `/branches/${proposedBranch.id}` : destination === "occasions" ? "/occasions" : "/menu");
     }
 
 
@@ -197,10 +259,18 @@ export default function BranchSelector() {
     return (
         <div>
 
-            <button
+            {proposedBranch && createPortal(<StartFreshDialog branchName={proposedBranch.name} itemCount={cart.itemCount}
+                onKeep={() => setProposedBranch(null)} onConfirm={confirmSwitch} />, document.body)}
+
+            {cardBranch ? <button data-ordering-target={destination === "occasions" ? undefined : "branch"} type="button" disabled={cardBranch.operational===false} className="gokul-branch-card-action"
+                aria-label={cardBranch.operational===false?`${cardBranch.name} · ${translate("Currently not operational")}`:actionLabel ? `${translate(actionLabel)} · ${cardBranch.name}` : destination === "occasions" ? `${translate("Explore this branch")} · ${translate("Bulk order")} · ${cardBranch.name}` : destination === "branchHome" ? `Explore ${cardBranch.name}` : `Explore ${cardBranch.name} menu and pickup choices`}
+                onClick={() => handleSelectBranch(cardBranch)}>
+                <span className="gokul-branch-card-action-label">{cardBranch.operational===false?<T text="Currently not operational"/>:actionLabel ? <T text={actionLabel}/> : destination === "occasions" ? <><span className="desktop-celebration-label"><T text="Explore this branch" /></span><span className="mobile-celebration-label"><T text="Bulk order" /></span></> : <T text="Explore this branch" />}</span>
+            </button> : <button
                 type="button"
-                popoverTarget="branch-selector-popover"
-                className="
+                data-ordering-target="branch"
+                popoverTarget={popoverId}
+                className={locationControl ? "gokul-location-control" : compact ? "min-h-11 font-semibold text-[#7a1625] underline" : `
                     w-full
                     rounded-2xl
                     border
@@ -211,8 +281,14 @@ export default function BranchSelector() {
                     shadow-sm
                     transition
                     active:scale-[0.99]
-                "
+                `}
             >
+
+                {locationControl ? <>
+                    <span className="gokul-location-pin" aria-hidden="true"><CustomerIcon kind="pin"/></span>
+                    <span className="gokul-location-name"><small><T text="PICKUP BRANCH" /></small><strong>{branch?.name ?? "Choose branch"}</strong></span>
+                    <span className="gokul-location-chevron" aria-hidden="true">⌄</span>
+                </> : compact ? translate("Change branch") : <>
 
                 <div
                     className="
@@ -232,8 +308,7 @@ export default function BranchSelector() {
                                 text-[#756763]
                             "
                         >
-                            Pickup from
-                        </p>
+                            <T text="Pickup from" /></p>
 
 
                         <p
@@ -278,18 +353,19 @@ export default function BranchSelector() {
                     >
                         {
                             branch
-                                ? "Change"
+                                ? translate("Change")
                                 : "Select"
                         }
                     </span>
 
                 </div>
 
-            </button>
+                </>}
+            </button>}
 
 
             <div
-                id="branch-selector-popover"
+                id={popoverId}
                 popover="auto"
                 className="
                     fixed
@@ -337,8 +413,7 @@ export default function BranchSelector() {
                             text-[#241715]
                         "
                     >
-                        Select Branch
-                    </h2>
+                        <T text="Select Branch" /></h2>
 
                 </div>
 
@@ -412,8 +487,7 @@ export default function BranchSelector() {
                                     text-white!
                                 "
                             >
-                                Try again
-                            </button>
+                                <T text="Try again" /></button>
 
                         </div>
 
@@ -488,6 +562,7 @@ export default function BranchSelector() {
                                                 item.id
                                             }
                                             type="button"
+                                            disabled={item.operational===false}
                                             onClick={() =>
                                                 handleSelectBranch(
                                                     item
@@ -530,6 +605,7 @@ export default function BranchSelector() {
                                                         {
                                                             item.name
                                                         }
+                                                        {item.operational===false&&<span className="mt-1 block text-xs font-semibold"><T text="Currently not operational"/></span>}
                                                     </p>
 
 

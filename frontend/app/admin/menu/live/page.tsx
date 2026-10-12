@@ -1,4 +1,7 @@
 "use client";
+import {T} from "@/lib/language";
+
+import {preferredAdminBranchId, rememberAdminBranchId} from "@/lib/adminBranchSelection";
 
 import {
     useCallback,
@@ -236,8 +239,7 @@ export default function AdminLiveMenuPage() {
 
                         setSelectedBranchId(
                             current =>
-                                current
-                                ?? allowedBranches[0].id
+                                preferredAdminBranchId(currentProfile.staffId, allowedBranches, current)
                         );
                     }
 
@@ -701,9 +703,7 @@ export default function AdminLiveMenuPage() {
                                 tracking-[0.16em]
                                 text-[#c88a20]
                             "
-                        >
-                            Daily operations
-                        </p>
+                        >{" "}<T text="Daily operations" />{" "}</p>
 
 
                         <h1
@@ -754,9 +754,7 @@ export default function AdminLiveMenuPage() {
                                 font-semibold
                                 text-[#241715]
                             "
-                        >
-                            Branch
-                        </label>
+                        >{" "}<T text="Branch" />{" "}</label>
 
 
                         <select
@@ -783,6 +781,7 @@ export default function AdminLiveMenuPage() {
                                     setSelectedBranchId(
                                         value
                                     );
+                                    if (profile) rememberAdminBranchId(profile.staffId, value);
 
 
                                     setCategoryId(
@@ -826,9 +825,7 @@ export default function AdminLiveMenuPage() {
                                 === 0
                                 && (
 
-                                    <option value="">
-                                        No branch available
-                                    </option>
+                                    <option value="">{" "}<T text="No branch available" />{" "}</option>
 
                                 )
                             }
@@ -1152,9 +1149,7 @@ export default function AdminLiveMenuPage() {
                                 "
                             >
 
-                                <option value="ALL">
-                                    All items
-                                </option>
+                                <option value="ALL">{" "}<T text="All items" />{" "}</option>
 
                                 <option value="AVAILABLE">
                                     Available

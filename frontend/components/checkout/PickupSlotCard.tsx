@@ -1,8 +1,10 @@
 "use client";
+import {T} from "@/lib/language";
 
 import type {
     PickupSlot
 } from "@/types/pickup";
+import {formatBusinessTime} from "@/lib/businessTime";
 
 
 interface PickupSlotCardProps {
@@ -22,34 +24,7 @@ function formatTime(
     value: string
 ): string {
 
-    const [
-        hour,
-        minute
-    ] =
-        value.split(":");
-
-
-    const date =
-        new Date();
-
-
-    date.setHours(
-        Number(hour),
-        Number(minute),
-        0,
-        0
-    );
-
-
-    return new Intl.DateTimeFormat(
-        "en-IN",
-        {
-            hour: "numeric",
-            minute: "2-digit"
-        }
-    ).format(
-        date
-    );
+    return formatBusinessTime(value);
 }
 
 
@@ -203,8 +178,7 @@ export default function PickupSlotCard({
                                         text-white
                                     "
                                 >
-                                    Priority available
-                                </span>
+                                    <T text="Priority available" /></span>
 
                             )
                         }
@@ -249,15 +223,14 @@ export default function PickupSlotCard({
                                         slot.remainingCapacity
                                     }
                                     {" "}
-                                    normal{" "}
+                                    <T text="normal" />{" "}
                                     {
                                         slot.remainingCapacity === 1
                                             ? "slot"
                                             : "slots"
                                     }
                                     {" "}
-                                    remaining
-                                </p>
+                                    <T text="remaining" /></p>
 
 
                                 {
@@ -274,15 +247,14 @@ export default function PickupSlotCard({
                                                 slot.priorityRemainingCapacity
                                             }
                                             {" "}
-                                            priority{" "}
+                                            <T text="priority" />{" "}
                                             {
                                                 slot.priorityRemainingCapacity === 1
                                                     ? "slot"
                                                     : "slots"
                                             }
                                             {" "}
-                                            remaining
-                                        </p>
+                                            <T text="remaining" /></p>
 
                                     )
                                 }
@@ -335,8 +307,7 @@ export default function PickupSlotCard({
                                     text-[#4b7a44]
                                 "
                             >
-                                Normal pickup
-                            </p>
+                                <T text="Normal pickup" /></p>
 
                         )
                     }
