@@ -1,0 +1,81 @@
+name: Tag verified production release
+
+on:
+  workflow_run:
+    workflows: ['Build and verify', 'Verify local print agent']
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
+  actions: read
+
+concurrency:
+  group: production-release-tags
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Confirm this is the current main commit
+        id: candidate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.repos.getBranch({ ...context.repo, branch: 'main' });
+            core.setOutput('current', data.commit.sha === context.payload.workflow_run.head_sha ? 'true' : 'false');
+      - uses: actions/checkout@v4
+        if: steps.candidate.outputs.current == 'true'
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        if: steps.candidate.outputs.current == 'true'
+        with:
+          node-version: '22'
+      - name: Verify release numbering and acceptance rules
+        if: steps.candidate.outputs.current == 'true'
+        run: node --test .github/scripts/test_release-version.cjs
+      - name: Create one tag and GitHub release for the verified commit
+        if: steps.candidate.outputs.current == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { releasePlan, checksReady } = require('./.github/scripts/release-version.cjs');
+            const sha = context.payload.workflow_run.head_sha;
+            const runs = await github.paginate(github.actions.listWorkflowRunsForRepo,
+              { ...context.repo, branch: 'main', event: 'push', head_sha: sha, per_page: 100 });
+            if (!checksReady(runs, sha)) {
+              core.info('Waiting for successful main verification and any applicable printer checks.');
+              return;
+            }
+            const { data: current } = await github.repos.getBranch({ ...context.repo, branch: 'main' });
+            if (current.commit.sha !== sha) { core.info('Main advanced; skip this superseded candidate.'); return; }
+            const tags = await github.paginate(github.repos.listTags, { ...context.repo, per_page: 100 });
+            const plan = releasePlan(tags, sha);
+            if (!plan.existing) {
+              const { data: annotated } = await github.git.createTag({ ...context.repo, tag: plan.tag,
+                message: `Verified production source release ${plan.tag}\nMain commit: ${sha}`,
+                object: sha, type: 'commit' });
+              await github.git.createRef({ ...context.repo, ref: `refs/tags/${plan.tag}`, sha: annotated.sha });
+            }
+            try {
+              await github.repos.getReleaseByTag({ ...context.repo, tag: plan.tag });
+              core.info(`Release ${plan.tag} already exists.`);
+              return;
+            } catch (error) { if (error.status !== 404) throw error; }
+            const { data: notes } = await github.repos.generateReleaseNotes({ ...context.repo,
+              tag_name: plan.tag, target_commitish: sha });
+            const repoUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}`;
+            await github.repos.createRelease({ ...context.repo, tag_name: plan.tag,
+              target_commitish: sha, name: plan.tag, make_latest: 'true',
+              body: `Verified main commit: ${sha}\n\nVerification: ${context.payload.workflow_run.html_url}\n\n` +
+                `This tags the source release; deployment and live acceptance are separate steps.\n\n` +
+                `Further development: ${repoUrl}/compare/${plan.tag}...dev\n\n${notes.body}` });
+            core.notice(`Created ${plan.tag} for ${sha}`);
