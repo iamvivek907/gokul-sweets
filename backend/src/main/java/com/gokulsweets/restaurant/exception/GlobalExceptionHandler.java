@@ -14,11 +14,13 @@ import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.http.converter.HttpMessageNotWritableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -429,10 +431,9 @@ public class GlobalExceptionHandler {
                         "handleUnexpected(Exception,HttpServletRequest)");
         try {
             // A closed response connection cannot receive another JSON error body. Restrict this
-            // path to response serialization failures; upstream/database errors remain failures.
-            if (exception
-                            instanceof
-                            org.springframework.http.converter.HttpMessageNotWritableException
+            // path to response write failures; upstream/database errors remain failures.
+            if ((exception instanceof HttpMessageNotWritableException
+                            || exception instanceof AsyncRequestNotUsableException)
                     && disconnectedClients.checkAndLogClientDisconnectedException(exception))
                 return null;
             log.error(
