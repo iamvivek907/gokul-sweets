@@ -3,7 +3,6 @@ package com.gokulsweets.restaurant.payment.controller;
 import com.gokulsweets.restaurant.customer.identity.VerifiedOrderAccess;
 import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.payment.dto.*;
-import com.gokulsweets.restaurant.payment.provider.PaymentProviderRegistry;
 import com.gokulsweets.restaurant.payment.service.PaymentCheckoutService;
 import com.gokulsweets.restaurant.payment.service.RazorpayVerificationService;
 
@@ -31,7 +30,7 @@ public class PaymentController {
 
     private final RazorpayVerificationService razorpayVerificationService;
 
-    private final PaymentProviderRegistry providerRegistry;
+    private final com.gokulsweets.restaurant.payment.routing.PaymentRoutingService routing;
 
     private final VerifiedOrderAccess orderAccess;
 
@@ -45,10 +44,12 @@ public class PaymentController {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(PaymentController.class, "providers()");
         try {
-            return ResponseEntity.ok(
-                    new PaymentProviderConfigurationResponse(
-                            providerRegistry.defaultProvider(),
-                            providerRegistry.enabledProviders()));
+            var active = routing.activeProvider();
+            return ResponseEntity.ok()
+                    .cacheControl(org.springframework.http.CacheControl.noStore())
+                    .body(
+                            new PaymentProviderConfigurationResponse(
+                                    active, java.util.Set.of(active)));
         } finally {
             MethodTiming.finish(__gokulMethodStartedNanos, PaymentController.class, "providers()");
         }

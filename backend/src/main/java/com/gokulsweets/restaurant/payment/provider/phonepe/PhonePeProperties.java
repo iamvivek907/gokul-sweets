@@ -21,11 +21,11 @@ import org.springframework.validation.annotation.Validated;
 @Setter
 public class PhonePeProperties {
 
-    @NotBlank private String clientId = "";
+    private String clientId = "";
 
-    @NotBlank private String clientSecret = "";
+    private String clientSecret = "";
 
-    @NotBlank private String clientVersion = "";
+    private String clientVersion = "";
 
     @NotBlank private String baseUrl = "";
 
@@ -38,7 +38,7 @@ public class PhonePeProperties {
     @NotBlank
     private String orderStatusPathTemplate = "/checkout/v2/order/{merchantOrderId}/status";
 
-    @NotBlank private String redirectUrl = "";
+    private String redirectUrl = "";
 
     private String webhookUrl = "";
 

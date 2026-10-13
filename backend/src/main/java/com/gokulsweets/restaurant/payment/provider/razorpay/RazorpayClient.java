@@ -73,7 +73,11 @@ public class RazorpayClient {
                         RazorpayClient.class, "createOrder(BigDecimal,String,String,String)");
         try {
             ObjectNode body = objectMapper.createObjectNode();
-            body.put("amount", toSubunits(amount));
+            long subunits = toSubunits(amount);
+            if (subunits < 100)
+                throw new IllegalArgumentException(
+                        "Razorpay order amount must be at least 100 paise.");
+            body.put("amount", subunits);
             body.put("currency", currency);
             body.put("receipt", receipt);
             body.putObject("notes").put("business_order_number", businessOrderNumber);

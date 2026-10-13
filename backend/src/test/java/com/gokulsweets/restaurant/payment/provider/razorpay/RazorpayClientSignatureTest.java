@@ -33,6 +33,15 @@ class RazorpayClientSignatureTest {
     }
 
     @Test
+    void rejectsSubRupeeOrderBeforeCallingGateway() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                        client.createOrder(
+                                new java.math.BigDecimal("0.99"), "INR", "receipt", "order"));
+    }
+
+    @Test
     void acceptsValidCheckoutSignature() {
         String orderId = "order_example";
         String paymentId = "pay_example";

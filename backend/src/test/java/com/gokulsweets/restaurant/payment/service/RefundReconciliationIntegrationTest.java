@@ -73,7 +73,7 @@ class RefundReconciliationIntegrationTest {
                         ref,
                         ref);
         provider = mock(PaymentProvider.class);
-        when(registry.require(PaymentProviderType.PHONEPE)).thenReturn(provider);
+        when(registry.registered(PaymentProviderType.PHONEPE)).thenReturn(provider);
     }
 
     @AfterEach

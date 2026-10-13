@@ -72,6 +72,7 @@ export function getPaymentProviderConfiguration(
         "/api/payments/providers",
         {
             method: "GET",
+            cache: "no-store",
             signal
         }
     );
