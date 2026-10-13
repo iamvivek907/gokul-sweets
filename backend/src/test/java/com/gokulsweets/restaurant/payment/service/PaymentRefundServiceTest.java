@@ -31,7 +31,7 @@ class PaymentRefundServiceTest {
         when(repository.findByIdWithOrder(151L)).thenReturn(Optional.of(payment));
         when(repository.claimRefundCheck(eq(151L), any(), any())).thenReturn(1);
         when(repository.recordRefundSubmissionAttempt(eq(151L), any())).thenReturn(1);
-        when(registry.require(PaymentProviderType.PHONEPE)).thenReturn(provider);
+        when(registry.registered(PaymentProviderType.PHONEPE)).thenReturn(provider);
         return payment;
     }
 

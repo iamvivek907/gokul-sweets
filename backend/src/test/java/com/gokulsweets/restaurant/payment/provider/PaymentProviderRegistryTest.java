@@ -84,4 +84,12 @@ class PaymentProviderRegistryTest {
             }
         };
     }
+
+    @Test
+    void historicalProviderRemainsAvailableAfterNewPaymentEligibilityIsRemoved() {
+        var registry = registry("RAZORPAY", "RAZORPAY");
+        assertThat(registry.registered(PaymentProviderType.PHONEPE)).isNotNull();
+        assertThatThrownBy(() -> registry.require(PaymentProviderType.PHONEPE))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

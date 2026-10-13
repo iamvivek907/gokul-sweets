@@ -88,6 +88,31 @@ public class PaymentProviderRegistry {
     }
 
     /**
+     * Resolves the original provider of a persisted payment regardless of new-payment eligibility.
+     *
+     * @param provider the persisted provider
+     * @return the registered provider adapter
+     */
+    public PaymentProvider registered(PaymentProviderType provider) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        PaymentProviderRegistry.class, "registered(PaymentProviderType)");
+        try {
+
+            PaymentProvider adapter = providers.get(provider);
+            if (adapter == null)
+                throw new IllegalStateException("The original payment provider is unavailable.");
+            return adapter;
+
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    PaymentProviderRegistry.class,
+                    "registered(PaymentProviderType)");
+        }
+    }
+
+    /**
      * Defaults provider.
      *
      * @return the default provider result
