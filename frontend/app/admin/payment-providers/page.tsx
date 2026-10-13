@@ -21,7 +21,8 @@ export default function PaymentProvidersPage() {
     const [loaded, setLoaded] = useState<{identity: string; value: Workspace} | null>(null);
     const [failure, setFailure] = useState<{identity: string; message: string} | null>(null);
     const [attempt, setAttempt] = useState(0);
-    const [busy, setBusy] = useState(false);
+    const [pending, setPending] = useState<{identity: string; controller: AbortController} | null>(null);
+    const busy = pending?.identity === identity;
     const operation = useRef<AbortController | null>(null);
     const data = loaded?.identity === identity ? loaded.value : null;
     const error = failure?.identity === identity ? failure.message : "";
@@ -44,7 +45,7 @@ export default function PaymentProvidersPage() {
         const form = new FormData(event.currentTarget);
         const controller = new AbortController();
         operation.current = controller;
-        setBusy(true);
+        setPending({identity, controller});
         setFailure(null);
         try {
             const value = await adminManagementApi<Workspace>("/api/admin/payment-providers", authorization, {
@@ -59,7 +60,9 @@ export default function PaymentProvidersPage() {
                 setFailure({identity, message: `${error instanceof Error ? error.message : "Unable to confirm the switch."} Refresh to confirm the current provider before trying again.`});
             }
         } finally {
-            if (operation.current === controller) {operation.current = null; setBusy(false);}
+            if (operation.current === controller) operation.current = null;
+            // An aborted request must settle its own busy state without clearing a newer switch.
+            setPending(current => current?.controller === controller ? null : current);
         }
     }
 

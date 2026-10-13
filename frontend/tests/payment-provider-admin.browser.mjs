@@ -8,17 +8,19 @@ const initial=()=>({activeProvider:'PHONEPE',revision:0,providers:[{provider:'PH
 try{
  for(const width of [320,390,1280]){
   const context=await browser.newContext({viewport:{width,height:950},serviceWorkers:'block'}),page=await context.newPage();
-  let state=initial(),mode='success',writes=0;
+  let state=initial(),mode='success',writes=0,currentOwner=owner,releaseSwitch;
+  let startedSwitch;const switchStarted=new Promise(resolve=>{startedSwitch=resolve;});
   await context.route('**/api/**',async route=>{
    const request=route.request(),path=new URL(request.url()).pathname;
    if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
-   if(path==='/api/admin/auth/me')return route.fulfill({json:owner,headers});
+   if(path==='/api/admin/auth/me')return route.fulfill({json:currentOwner,headers});
    if(path==='/api/admin/payment-providers'){
     if(request.method()==='GET')return route.fulfill({json:state,headers});
     writes++;const input=request.postDataJSON();assert.equal(request.headers()['x-staff-csrf'],'test-csrf');assert.equal(input.expectedRevision,state.revision);
     if(mode==='conflict'){state.activeProvider='RAZORPAY';state.revision++;return route.fulfill({status:409,json:{message:'Payment settings changed.'},headers});}
     state={...state,activeProvider:input.provider,revision:state.revision+1,history:[{previousProvider:state.activeProvider,activeProvider:input.provider,revision:state.revision+1,username:'owner',reason:input.reason,changedAt:'2026-10-13T07:00:00Z'},...state.history]};
     if(mode==='lost-ack')return route.abort('failed');
+    if(mode==='held-switch'){const released=new Promise(resolve=>{releaseSwitch=resolve;});startedSwitch();await released;}
     return route.fulfill({json:state,headers});
    }
    return route.fulfill({json:[],headers});
@@ -34,6 +36,23 @@ try{
   mode='lost-ack';await page.getByRole('radio').nth(0).check();await page.getByLabel('Reason for switching').fill('Lost acknowledgement');await page.getByRole('button',{name:'Activate selected provider'}).click();
   await page.getByRole('alert').filter({hasText:'Refresh to confirm'}).waitFor();const written=writes;
   await page.getByRole('button',{name:'Refresh settings'}).click();await active.getByText('PhonePe',{exact:true}).waitFor();assert.equal(writes,written,'refresh must not replay an uncertain mutation');
+  // A second tab changes the signed-in owner while the original mutation is pending.
+  mode='held-switch';await page.getByRole('radio').nth(1).check();await page.getByLabel('Reason for switching').fill('Switch interrupted by account change');
+  await page.getByRole('button',{name:'Activate selected provider'}).click();await switchStarted;
+  assert.equal(await page.getByRole('button',{name:'Updating provider…'}).isDisabled(),true);
+  currentOwner={...owner,staffId:8,username:'other-owner',fullName:'Other Owner'};
+  const identityLoaded=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/admin/auth/me');
+  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await identityLoaded;
+  await active.getByText('Razorpay',{exact:true}).waitFor();
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('button')).some(button=>button.textContent==='Refresh settings'&&!button.disabled));
+  assert.equal(await page.getByRole('button',{name:'Activate selected provider'}).isDisabled(),false);
+  const beforeRefresh=writes;
+  await page.getByRole('button',{name:'Refresh settings'}).click();await active.getByText('Razorpay',{exact:true}).waitFor();
+  assert.equal(writes,beforeRefresh,'account recovery and refresh must not replay the old mutation');
+  releaseSwitch();mode='success';
+  await page.getByRole('radio').nth(0).check();await page.getByLabel('Reason for switching').fill('New owner can switch');
+  await page.getByRole('button',{name:'Activate selected provider'}).click();await active.getByText('PhonePe',{exact:true}).waitFor();
+  assert.equal(writes,beforeRefresh+1);
   state.providers[1]={provider:'RAZORPAY',ready:false,issues:['Configure Razorpay webhook secret.']};
   await page.getByRole('button',{name:'Refresh settings'}).click();await page.getByText('Configure Razorpay webhook secret.').waitFor();assert.equal(await page.getByRole('radio').nth(1).isDisabled(),true);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
