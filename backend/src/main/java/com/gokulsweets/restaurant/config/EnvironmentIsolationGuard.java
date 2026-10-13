@@ -47,7 +47,12 @@ public class EnvironmentIsolationGuard {
                             environment.getProperty("cloudflare.r2.public-url", ""),
                             phonePe.getBaseUrl(),
                             phonePe.getClientId(),
-                            phonePe.getWebhookChecksumKeyId()));
+                            phonePe.getWebhookChecksumKeyId()),
+                    java.util.Arrays.stream(
+                                    environment
+                                            .getProperty("payment.enabled-providers", "PHONEPE")
+                                            .split(","))
+                            .anyMatch(value -> "PHONEPE".equalsIgnoreCase(value.trim())));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, EnvironmentIsolationGuard.class, "check()");
@@ -118,6 +123,25 @@ public class EnvironmentIsolationGuard {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(EnvironmentIsolationGuard.class, "validate(Settings)");
         try {
+            validate(s, true);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    EnvironmentIsolationGuard.class,
+                    "validate(Settings)");
+        }
+    }
+
+    /**
+     * Validates common isolation and only the enabled PhonePe deployment wiring.
+     *
+     * @param s the settings
+     * @param phonePeEnabled whether PhonePe accepts new attempts
+     */
+    static void validate(Settings s, boolean phonePeEnabled) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(EnvironmentIsolationGuard.class, "validate(Settings,boolean)");
+        try {
             String storefront =
                     switch (s.deployment()) {
                         case "DEV" -> "https://dev.gokulsweets.in";
@@ -130,10 +154,12 @@ public class EnvironmentIsolationGuard {
             String api = origin(s.apiOrigin(), "backend API origin", true);
             String redirect =
                     s.redirectBase() == null ? "" : s.redirectBase().replaceAll("/+$", "");
-            if (!redirect.equals(storefront + "/checkout")) {
+            if (phonePeEnabled && !redirect.equals(storefront + "/checkout")) {
                 throw invalid("PhonePe return base must be the declared storefront /checkout");
             }
-            if (!java.util.Objects.equals(s.webhookUrl(), api + "/api/payments/webhooks/phonepe")) {
+            if (phonePeEnabled
+                    && !java.util.Objects.equals(
+                            s.webhookUrl(), api + "/api/payments/webhooks/phonepe")) {
                 throw invalid("PhonePe webhook must target the declared backend API");
             }
             if (s.databaseUrl() == null || !s.databaseUrl().startsWith("jdbc:postgresql://")) {
@@ -145,14 +171,16 @@ public class EnvironmentIsolationGuard {
                 throw invalid("an explicitly separated R2 bucket is required");
             }
             origin(s.imageOrigin(), "R2 public URL", false);
-            if (s.phonePeClientId() == null
-                    || s.phonePeClientId().isBlank()
-                    || s.webhookKeyId() == null
-                    || s.webhookKeyId().isBlank()) {
+            if (phonePeEnabled
+                    && (s.phonePeClientId() == null
+                            || s.phonePeClientId().isBlank()
+                            || s.webhookKeyId() == null
+                            || s.webhookKeyId().isBlank())) {
                 throw invalid(
                         "environment-specific PhonePe client and webhook key IDs are required");
             }
-            if ("PROD".equals(s.deployment())
+            if (phonePeEnabled
+                    && "PROD".equals(s.deployment())
                     && (s.phonePeBase() == null || s.phonePeBase().contains("preprod"))) {
                 throw invalid("production cannot use the PhonePe sandbox");
             }
@@ -160,7 +188,7 @@ public class EnvironmentIsolationGuard {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     EnvironmentIsolationGuard.class,
-                    "validate(Settings)");
+                    "validate(Settings,boolean)");
         }
     }
 

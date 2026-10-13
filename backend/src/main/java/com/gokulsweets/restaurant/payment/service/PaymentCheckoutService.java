@@ -35,6 +35,8 @@ public class PaymentCheckoutService {
 
     private final PaymentProviderRegistry providerRegistry;
 
+    private final com.gokulsweets.restaurant.payment.routing.PaymentRoutingService routing;
+
     private final PaymentAttemptPersistenceService persistenceService;
 
     private final EnhancementProperties features;
@@ -60,7 +62,6 @@ public class PaymentCheckoutService {
                         PaymentCheckoutService.class,
                         "initiatePayment(String,PaymentProviderType)");
         try {
-            PaymentProvider provider = providerRegistry.require(requestedProvider);
             List<Payment> existingPending =
                     paymentRepository.findForOrderAndStatus(orderNumber, PaymentStatus.PENDING);
             if (!existingPending.isEmpty()) {
@@ -77,11 +78,7 @@ public class PaymentCheckoutService {
                             "This payment window expired. Check your order status before starting a"
                                     + " new checkout.");
                 }
-                if (existing.getProvider() != provider.providerType()) {
-                    throw new IllegalStateException(
-                            "A payment attempt is already in progress. Check its status before"
-                                    + " selecting another provider.");
-                }
+                PaymentProvider provider = providerRegistry.registered(existing.getProvider());
                 if (existing.getProviderOrderId() == null) {
                     throw new IllegalStateException(
                             "The previous payment is still being initialized. Please try again"
@@ -95,6 +92,7 @@ public class PaymentCheckoutService {
                         existing.getProvider());
                 return toResponse(existing, null, provider);
             }
+            PaymentProvider provider = routing.forNewPayment();
             Payment payment =
                     paymentService.createPendingPayment(orderNumber, provider.providerType());
             try {
@@ -154,7 +152,7 @@ public class PaymentCheckoutService {
                 log.debug("No payment found for order: orderNumber={}", orderNumber);
                 return null;
             }
-            PaymentProvider provider = providerRegistry.require(payment.getProvider());
+            PaymentProvider provider = providerRegistry.registered(payment.getProvider());
             log.info(
                     "Recovered payment for order: paymentId={}, orderNumber={}, provider={},"
                             + " status={}",
@@ -187,7 +185,7 @@ public class PaymentCheckoutService {
                 MethodTiming.start(PaymentCheckoutService.class, "refreshPayment(Long)");
         try {
             Payment payment = requirePayment(paymentId);
-            PaymentProvider provider = providerRegistry.require(payment.getProvider());
+            PaymentProvider provider = providerRegistry.registered(payment.getProvider());
             /*
              * These statuses are already final from the payment
              * lifecycle perspective and do not need another provider
@@ -257,7 +255,7 @@ public class PaymentCheckoutService {
                 MethodTiming.start(PaymentCheckoutService.class, "responseFor(Long)");
         try {
             Payment payment = requirePayment(paymentId);
-            return toResponse(payment, null, providerRegistry.require(payment.getProvider()));
+            return toResponse(payment, null, providerRegistry.registered(payment.getProvider()));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, PaymentCheckoutService.class, "responseFor(Long)");
@@ -417,7 +415,7 @@ public class PaymentCheckoutService {
                     .map(
                             payment -> {
                                 PaymentProvider provider =
-                                        providerRegistry.require(payment.getProvider());
+                                        providerRegistry.registered(payment.getProvider());
                                 return toResponse(payment, null, provider);
                             })
                     .orElse(null);

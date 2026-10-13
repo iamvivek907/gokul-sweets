@@ -101,7 +101,7 @@ public class PaymentRefundService {
                                                 new IllegalArgumentException(
                                                         "Payment does not exist."));
                 if (payment.getPaymentStatus() != PaymentStatus.REFUND_PENDING) return false;
-                PaymentProvider provider = providerRegistry.require(payment.getProvider());
+                PaymentProvider provider = providerRegistry.registered(payment.getProvider());
                 boolean initiation = payment.getRefundRequestedAt() == null;
                 if (initiation) {
                     // Commit the marker before HTTP. Preserve the pre-marker snapshot so only a
