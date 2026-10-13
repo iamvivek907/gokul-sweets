@@ -5,6 +5,7 @@ import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import com.gokulsweets.restaurant.payment.provider.PaymentProviderRegistry;
 import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeProperties;
 import com.gokulsweets.restaurant.payment.provider.razorpay.RazorpayProperties;
+import com.gokulsweets.restaurant.payment.service.CheckoutUrlVault;
 
 import lombok.RequiredArgsConstructor;
 
@@ -22,6 +23,7 @@ public class PaymentProviderReadiness {
     private final PhonePeProperties phonePe;
     private final RazorpayProperties razorpay;
     private final Environment environment;
+    private final CheckoutUrlVault checkoutUrlVault;
 
     /**
      * Secret-free provider readiness.
@@ -54,6 +56,10 @@ public class PaymentProviderReadiness {
             String api = environment.getProperty("gokul.environment-isolation.api-origin", "");
             String storefront = prod ? "https://gokulsweets.in" : "https://dev.gokulsweets.in";
             if (provider == PaymentProviderType.PHONEPE) {
+                if (!checkoutUrlVault.isConfigured())
+                    issues.add(
+                            "Configure a base64 32-byte PAYMENT_CHECKOUT_ENCRYPTION_KEY (or its"
+                                    + " STAFF_MFA_ENCRYPTION_KEY fallback).");
                 if (blank(phonePe.getClientId())
                         || blank(phonePe.getClientSecret())
                         || blank(phonePe.getClientVersion()))

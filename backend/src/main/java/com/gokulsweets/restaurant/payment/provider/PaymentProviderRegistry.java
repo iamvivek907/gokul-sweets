@@ -46,9 +46,8 @@ public class PaymentProviderRegistry {
         this.providers = Map.copyOf(indexed);
         this.enabledProviders = parseEnabled(enabled);
         this.defaultProvider = parseType(defaultProvider);
-        if (!enabledProviders.contains(this.defaultProvider)) {
-            throw new IllegalStateException("The default payment provider must also be enabled.");
-        }
+        // The bootstrap default may be retired after an owner saves a different route.
+        // Eligibility is checked when routing a new payment, not for historical adapters.
         if (!providers.keySet().containsAll(enabledProviders)) {
             throw new IllegalStateException(
                     "One or more enabled payment providers are not registered.");

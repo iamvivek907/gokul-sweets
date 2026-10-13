@@ -6,14 +6,19 @@ read on every new attempt, and survives restarts. PAYMENT_DEFAULT_PROVIDER is th
 bootstrap route only until an owner saves a switch. PAYMENT_ENABLED_PROVIDERS
 allows configured adapters to become selectable; set PHONEPE,RAZORPAY for both.
 Paytm remains available for historical processing but is not offered as a runtime
-choice until its complete production journey is approved.
+choice until its complete production journey is approved. After saving Razorpay as
+active, PhonePe may be removed from eligibility without changing the old bootstrap
+default. With no saved route, a disabled bootstrap default rejects new payments;
+there is no silent fallback. Confirm the active choice in Admin before retirement.
 
 ## Configuration and ownership
 
 The screen exposes no credentials and checks configuration, not gateway uptime
 or merchant approval. Missing credentials/webhook secrets, incorrect environment
 routes, Razorpay test keys in PROD and non-production PhonePe endpoints block
-activation. Secrets remain in backend deployment settings. Each change requires
+activation. PhonePe also requires a valid effective base64 32-byte checkout encryption
+key. `PAYMENT_CHECKOUT_ENCRYPTION_KEY` falls back to `STAFF_MFA_ENCRYPTION_KEY`
+when unset; an explicitly empty override is invalid. Secrets remain in backend deployment settings. Each change requires
 an active OWNER_ADMIN, the existing session/CSRF protection, a current revision
 and a reason. Conflicting owner edits return 409. Switch and audit commit together;
 history is bounded to twenty entries. If a response is lost, refresh to observe
@@ -78,3 +83,30 @@ Automated fixtures cover routing persistence/concurrency, isolation, checkout
 continuity and refund callback correlation. They do not validate live merchant
 capture configuration, bank processing or uptime. Complete merchant/device tests
 in DEV before production promotion.
+
+## Standard Checkout implementation
+
+This is a Spring Boot/Java backend and Next.js storefront; the existing Java HTTP
+adapter is used instead of introducing a Node.js SDK or duplicate endpoints.
+
+- `POST /api/payments` accepts the business order reference, obtains the active
+  provider and creates a server-priced attempt. Razorpay calls `POST /v1/orders`
+  with amount in paise, INR and a receipt. Amounts below 100 paise are rejected
+  before saving an attempt; client-submitted amounts are never trusted.
+- The response includes `providerOrderId`, `amount`, `currency` and the public
+  `checkoutKeyId`. The browser loads the official `checkout.js` and opens Standard
+  Checkout; dismissal and `payment.failed` use the existing recovery flow.
+- `POST /api/payments/{paymentId}/razorpay/verify` accepts the three Razorpay
+  success fields. The server checks the locally recorded order and HMAC-SHA256
+  signature, then verifies the gateway payment belongs to that order, matches
+  the frozen amount and is captured. A signature alone does not mark it paid.
+- `RAZORPAY_KEY_SECRET` and `RAZORPAY_WEBHOOK_SECRET` stay on the backend. A
+  `NEXT_PUBLIC_RAZORPAY_KEY_ID` variable is unnecessary because the backend
+  returns the public key ID. Never commit a credentials `.env` file.
+
+After rotating any exposed test credentials, configure fresh backend environment
+values, deploy DEV and activate Razorpay in Admin. Place an eligible order, pay
+with Razorpay test mode, and confirm paid status. Also test a declined payment,
+modal dismissal, invalid signature, webhook delivery and an eligible refund.
+Enable automatic capture in the Razorpay dashboard and register the webhook
+above. These merchant tests are required in addition to automated fixtures.

@@ -86,6 +86,16 @@ class PaymentProviderRegistryTest {
     }
 
     @Test
+    void retiredBootstrapDoesNotPreventResolvingPersistedRouteOrHistoricalAdapter() {
+        var registry = registry("RAZORPAY", "PHONEPE");
+        assertThat(registry.require(PaymentProviderType.RAZORPAY).providerType())
+                .isEqualTo(PaymentProviderType.RAZORPAY);
+        assertThat(registry.registered(PaymentProviderType.PHONEPE)).isNotNull();
+        assertThatThrownBy(() -> registry.require(null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void historicalProviderRemainsAvailableAfterNewPaymentEligibilityIsRemoved() {
         var registry = registry("RAZORPAY", "RAZORPAY");
         assertThat(registry.registered(PaymentProviderType.PHONEPE)).isNotNull();

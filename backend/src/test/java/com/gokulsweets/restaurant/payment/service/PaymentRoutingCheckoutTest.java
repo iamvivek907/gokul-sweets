@@ -62,6 +62,14 @@ class PaymentRoutingCheckoutTest {
     }
 
     @Test
+    void readinessFailureDoesNotCreateAttemptCallGatewayOrFailOrder() {
+        when(routing.forNewPayment()).thenThrow(new IllegalStateException("Invalid checkout key"));
+        assertThatThrownBy(() -> checkout.initiatePayment("ORDER", PaymentProviderType.PHONEPE))
+                .isInstanceOf(IllegalStateException.class);
+        verifyNoInteractions(payments, phonepe, razorpay, persistence, statuses);
+    }
+
+    @Test
     void staleBrowserPreferenceCannotCreateAnotherAttemptOnOldProvider() {
         var p = attempt(PaymentProviderType.RAZORPAY);
         when(repository.findForOrderAndStatus("ORDER", PaymentStatus.PENDING))

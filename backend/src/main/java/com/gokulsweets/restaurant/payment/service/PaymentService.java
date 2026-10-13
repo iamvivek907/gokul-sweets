@@ -1,126 +1,6 @@
 package com.gokulsweets.restaurant.payment.service;
 
-import com.gokulsweets.restaurant.observability.MethodTiming;
-import com.gokulsweets.restaurant.order.entity.Order;
-import com.gokulsweets.restaurant.order.enums.OrderStatus;
-import com.gokulsweets.restaurant.order.repository.OrderRepository;
-import com.gokulsweets.restaurant.payment.entity.Payment;
-import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
-import com.gokulsweets.restaurant.payment.enums.PaymentStatus;
-import com.gokulsweets.restaurant.payment.repository.PaymentRepository;
-import com.gokulsweets.restaurant.rebate.RebateApplicationService;
-
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-
-/** Coordinates payment operations. */
-@Service
-@RequiredArgsConstructor
-@Slf4j
-public class PaymentService {
-
-    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Kolkata");
-
-    @Value("${payment.pending-expiry-minutes}")
-    private long paymentExpiryMinutes;
-
-    private final com.gokulsweets.restaurant.loyalty.LoyaltyService loyalty;
-
-    private final PaymentRepository paymentRepository;
-
-    private final OrderRepository orderRepository;
-
-    private final RebateApplicationService rebateApplicationService;
-
-    // =========================================================
-    // CREATE PENDING PAYMENT
-    // =========================================================
-    /**
-     * Creates pending payment.
-     *
-     * @param orderNumber the order number
-     * @param provider the provider
-     * @return the create pending payment result
-     */
-    @Transactional
-    public Payment createPendingPayment(String orderNumber, PaymentProviderType provider) {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(
-                        PaymentService.class, "createPendingPayment(String,PaymentProviderType)");
-        try {
-            log.info(
-                    "Creating payment attempt: orderNumber={}, provider={}", orderNumber, provider);
-            /*
-             * Lock the order row.
-             *
-             * The same pessimistic lock is used by:
-             *
-             * - rebate apply
-             * - rebate remove
-             * - checkout reservation expiry
-             * - cart update
-             *
-             * This prevents the order payable amount or
-             * lifecycle state from changing while a payment
-             * attempt is being created.
-             */
-            Order order =
-                    orderRepository
-                            .findForUpdate(orderNumber)
-                            .orElseThrow(
-                                    () -> {
-                                        log.warn(
-                                                "Payment creation failed because order does not"
-                                                        + " exist: orderNumber={}",
-                                                orderNumber);
-                                        return new IllegalArgumentException(
-                                                "Order does not exist.");
-                                    });
-            /*
-             * The order must still be awaiting payment.
-             */
-            validateOrderForPayment(order);
-            /*
-             * The checkout reservation itself must still
-             * be active.
-             *
-             * The scheduler may run once per minute, so we
-             * cannot rely only on the scheduler to prevent
-             * payment for an already-expired reservation.
-             */
-            validateReservationForPayment(order);
-            /*
-             * Never create another payment if this
-             * order has already been successfully paid.
-             */
-            boolean alreadyPaid =
-                    paymentRepository.existsByOrderIdAndPaymentStatus(
-                            order.getId(), PaymentStatus.PAID);
-            if (alreadyPaid) {
-                log.warn(
-                        "Payment creation rejected because order is already paid: orderId={},"
-                                + " orderNumber={}",
-                        order.getId(),
-                        order.getOrderNumber());
-                throw new IllegalStateException("This order has already been paid.");
-            }
-            /*
-             * Prevent multiple simultaneous payment
-             * attempts for the same order.
-             */
-            boolean pendingPaymentExists =
-                    paymentRepository.existsByOrderIdAndPaymentStatus(
-                            order.getId(), PaymentStatus.PENDING);
-            if (pendingPaymentExists) {
+import com.gokulsweets.restaurant.observability.Method…1246 tokens truncated…   if (pendingPaymentExists) {
                 log.warn(
                         "Payment creation rejected because a pending payment already exists:"
                                 + " orderId={}, orderNumber={}",
@@ -157,6 +37,11 @@ public class PaymentService {
                         order.getId(),
                         paymentAmount);
                 throw new IllegalStateException("Order payable amount must be greater than zero.");
+            }
+            if (provider == PaymentProviderType.RAZORPAY
+                    && paymentAmount.compareTo(BigDecimal.ONE) < 0) {
+                throw new IllegalArgumentException(
+                        "Razorpay order amount must be at least 100 paise.");
             }
             Payment payment = new Payment();
             payment.setOrder(order);

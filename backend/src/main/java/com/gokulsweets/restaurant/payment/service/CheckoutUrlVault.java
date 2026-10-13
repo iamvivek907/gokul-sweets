@@ -53,6 +53,27 @@ public class CheckoutUrlVault {
     }
 
     /**
+     * Checks the effective encryption key without exposing it or encrypting a checkout URL.
+     *
+     * @return whether the resolved configuration contains a base64 32-byte AES key
+     */
+    public boolean isConfigured() {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(CheckoutUrlVault.class, "isConfigured()");
+        try {
+            try {
+                key();
+                return true;
+            } catch (IllegalStateException exception) {
+                return false;
+            }
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, CheckoutUrlVault.class, "isConfigured()");
+        }
+    }
+
+    /**
      * Encrypts a valid HTTPS checkout URL as a versioned AES-GCM payload, returning null for a null
      * URL. URL validation and encryption failures are wrapped in IllegalStateException.
      *

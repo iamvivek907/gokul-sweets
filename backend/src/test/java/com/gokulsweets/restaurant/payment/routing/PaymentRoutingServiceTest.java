@@ -5,11 +5,15 @@ import static org.mockito.Mockito.*;
 
 import com.gokulsweets.restaurant.payment.enums.PaymentProviderType;
 import com.gokulsweets.restaurant.payment.provider.*;
+import com.gokulsweets.restaurant.payment.provider.phonepe.PhonePeProperties;
+import com.gokulsweets.restaurant.payment.provider.razorpay.RazorpayProperties;
+import com.gokulsweets.restaurant.payment.service.CheckoutUrlVault;
 import com.gokulsweets.restaurant.security.StaffAuthorizationService;
 import com.gokulsweets.restaurant.staff.*;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.env.MockEnvironment;
 
 import java.util.List;
 
@@ -46,6 +50,33 @@ class PaymentRoutingServiceTest {
         when(registry.registered(PaymentProviderType.RAZORPAY)).thenReturn(adapter);
         assertThat(routing.forNewPayment()).isSameAs(adapter);
         verify(store, times(2)).read();
+    }
+
+    @Test
+    void persistedRouteSurvivesRetiredBootstrapAndUnsavedBootstrapFailsClosed() {
+        var phonepe = mock(PaymentProvider.class);
+        var razorpay = mock(PaymentProvider.class);
+        when(phonepe.providerType()).thenReturn(PaymentProviderType.PHONEPE);
+        when(razorpay.providerType()).thenReturn(PaymentProviderType.RAZORPAY);
+        var realRegistry =
+                new PaymentProviderRegistry(List.of(phonepe, razorpay), "RAZORPAY", "PHONEPE");
+        var properties = new RazorpayProperties();
+        properties.setKeyId("rzp_test_fixture");
+        properties.setKeySecret("fixture-secret");
+        properties.setWebhookSecret("fixture-webhook");
+        var realReadiness =
+                new PaymentProviderReadiness(
+                        realRegistry,
+                        new PhonePeProperties(),
+                        properties,
+                        new MockEnvironment(),
+                        new CheckoutUrlVault(""));
+        var service = new PaymentRoutingService(store, realRegistry, realReadiness, staff);
+        assertThatThrownBy(service::forNewPayment).isInstanceOf(IllegalStateException.class);
+        when(store.read())
+                .thenReturn(new PaymentRoutingStore.Selection(PaymentProviderType.RAZORPAY, 1));
+        assertThat(service.forNewPayment()).isSameAs(razorpay);
+        assertThat(realRegistry.registered(PaymentProviderType.PHONEPE)).isSameAs(phonepe);
     }
 
     @Test
