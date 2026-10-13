@@ -61,12 +61,13 @@ public class PaymentProviderReadiness {
                 if (blank(phonePe.getWebhookChecksumKeyId())
                         || blank(phonePe.getWebhookChecksumSecret()))
                     issues.add("Configure PhonePe webhook credentials.");
-                if (!phonePe.getRedirectUrl().equals(storefront + "/checkout"))
+                if (!java.util.Objects.equals(phonePe.getRedirectUrl(), storefront + "/checkout"))
                     issues.add("Set PhonePe redirect to this environment's storefront /checkout.");
-                if (!phonePe.getWebhookUrl().equals(api + "/api/payments/webhooks/phonepe"))
+                if (!java.util.Objects.equals(
+                        phonePe.getWebhookUrl(), api + "/api/payments/webhooks/phonepe"))
                     issues.add(
                             "Set PhonePe webhook to this backend's"
-                                + " /api/payments/webhooks/phonepe.");
+                                    + " /api/payments/webhooks/phonepe.");
                 if (prod
                         && (!"https://api.phonepe.com/apis/pg".equals(phonePe.getBaseUrl())
                                 || !"https://api.phonepe.com/apis/identity-manager"
@@ -81,7 +82,9 @@ public class PaymentProviderReadiness {
                     issues.add("Configure Razorpay API credentials.");
                 if (blank(razorpay.getWebhookSecret()))
                     issues.add("Configure Razorpay webhook secret.");
-                if (prod && !razorpay.getKeyId().startsWith("rzp_live_"))
+                if (prod
+                        && (blank(razorpay.getKeyId())
+                                || !razorpay.getKeyId().startsWith("rzp_live_")))
                     issues.add("Production requires a live Razorpay key.");
                 if (!"https://api.razorpay.com".equals(razorpay.getBaseUrl()))
                     issues.add("Use the official Razorpay API endpoint.");

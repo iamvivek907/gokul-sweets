@@ -91,7 +91,7 @@ public class PaymentRoutingService {
             if (!status.ready())
                 throw new IllegalStateException(
                         "The active payment provider is not ready. Please contact the shop or try"
-                            + " again later.");
+                                + " again later.");
             return registry.registered(selected);
 
         } finally {
@@ -194,12 +194,12 @@ public class PaymentRoutingService {
             if (selection.revision() != expectedRevision)
                 throw new IllegalStateException(
                         "Payment settings changed. Refresh and review the active provider before"
-                            + " switching.");
+                                + " switching.");
             if (!readiness.check(selected).ready())
                 throw new IllegalArgumentException(
                         "This provider is not configured for this environment. Resolve its"
-                            + " readiness issues first.");
-            if (active(selection) != selected) {
+                                + " readiness issues first.");
+            if (selection.provider() == null || active(selection) != selected) {
                 store.save(
                         active(selection),
                         selected,

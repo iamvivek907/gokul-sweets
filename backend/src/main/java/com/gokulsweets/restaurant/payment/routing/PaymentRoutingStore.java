@@ -87,7 +87,7 @@ public class PaymentRoutingStore {
 
             return jdbc.queryForObject(
                     "SELECT active_provider, revision FROM payment_provider_routing WHERE singleton"
-                        + " = TRUE"
+                            + " = TRUE"
                             + (lock ? " FOR UPDATE" : ""),
                     (rs, row) ->
                             new Selection(
@@ -125,7 +125,7 @@ public class PaymentRoutingStore {
 
             jdbc.update(
                     "UPDATE payment_provider_routing SET active_provider = ?, revision = ?,"
-                        + " changed_at = CURRENT_TIMESTAMP WHERE singleton = TRUE",
+                            + " changed_at = CURRENT_TIMESTAMP WHERE singleton = TRUE",
                     selected.name(),
                     revision);
             jdbc.update(

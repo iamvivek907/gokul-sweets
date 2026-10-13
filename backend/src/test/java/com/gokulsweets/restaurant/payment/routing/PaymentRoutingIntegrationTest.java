@@ -32,7 +32,7 @@ class PaymentRoutingIntegrationTest {
         jdbc.update("DELETE FROM payment_provider_switch_audit");
         jdbc.update(
                 "UPDATE payment_provider_routing SET active_provider=NULL, revision=0,"
-                    + " changed_at=NULL");
+                        + " changed_at=NULL");
         var actor = new StaffUser();
         var role = new Role();
         role.setName("OWNER_ADMIN");
@@ -49,7 +49,7 @@ class PaymentRoutingIntegrationTest {
         jdbc.update("DELETE FROM payment_provider_switch_audit");
         jdbc.update(
                 "UPDATE payment_provider_routing SET active_provider=NULL, revision=0,"
-                    + " changed_at=NULL");
+                        + " changed_at=NULL");
     }
 
     @Test

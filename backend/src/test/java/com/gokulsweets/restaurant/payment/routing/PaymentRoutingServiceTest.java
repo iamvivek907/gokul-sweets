@@ -71,7 +71,9 @@ class PaymentRoutingServiceTest {
 
     @Test
     void duplicateActivationDoesNotCreateAnotherAuditEntry() {
-        routing.activate(PaymentProviderType.PHONEPE, 0, "already active");
+        when(store.lock())
+                .thenReturn(new PaymentRoutingStore.Selection(PaymentProviderType.PHONEPE, 1));
+        routing.activate(PaymentProviderType.PHONEPE, 1, "already active");
         verify(store, never()).save(any(), any(), anyLong(), any(), anyString());
     }
 
@@ -102,5 +104,17 @@ class PaymentRoutingServiceTest {
         owner.setActive(true);
         assertThatThrownBy(() -> routing.activate(PaymentProviderType.PAYTM, 0, "unsupported"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void explicitlyActivatingBootstrapDefaultPersistsItAcrossEnvironmentDefaultChanges() {
+        routing.activate(PaymentProviderType.PHONEPE, 0, "Confirm bootstrap choice");
+        verify(store)
+                .save(
+                        PaymentProviderType.PHONEPE,
+                        PaymentProviderType.PHONEPE,
+                        1,
+                        owner,
+                        "Confirm bootstrap choice");
     }
 }
