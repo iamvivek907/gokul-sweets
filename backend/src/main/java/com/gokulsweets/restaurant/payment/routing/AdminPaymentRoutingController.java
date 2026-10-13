@@ -65,9 +65,7 @@ public class AdminPaymentRoutingController {
     public ResponseEntity<PaymentRoutingService.Workspace> update(
             @Valid @RequestBody SwitchRequest request) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(
-                        AdminPaymentRoutingController.class,
-                        "update(@Valid @RequestBody SwitchRequest)");
+                MethodTiming.start(AdminPaymentRoutingController.class, "update(SwitchRequest)");
         try {
 
             return ResponseEntity.ok()
@@ -82,7 +80,7 @@ public class AdminPaymentRoutingController {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     AdminPaymentRoutingController.class,
-                    "update(@Valid @RequestBody SwitchRequest)");
+                    "update(SwitchRequest)");
         }
     }
 }
