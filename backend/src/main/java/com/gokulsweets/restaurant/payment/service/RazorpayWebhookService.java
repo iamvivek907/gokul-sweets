@@ -99,7 +99,8 @@ public class RazorpayWebhookService {
         try {
             JsonNode providerPayment = paymentEntity(root);
             Payment payment = findLocalPayment(providerPayment);
-            validateAmount(payment, providerPayment.path("amount").asLong(-1));
+            validateAmount(payment, amount(providerPayment));
+            validateCurrency(payment, providerPayment);
             paymentStatusService.markPaid(payment.getId(), requiredText(providerPayment, "id"));
         } finally {
             MethodTiming.finish(
@@ -159,6 +160,22 @@ public class RazorpayWebhookService {
                         providerRefundId);
                 return;
             }
+            String recorded = payment.getProviderRefundId();
+            if (recorded != null && !recorded.isBlank()) {
+                if (!recorded.equals(providerRefundId)) return;
+            } else {
+                String reference = payment.getRefundReferenceId();
+                if (reference == null
+                        || (!reference.equals(refund.path("receipt").asText(""))
+                                && !reference.equals(
+                                        refund.path("notes").path("refund_reference").asText(""))))
+                    return;
+            }
+            long expected = payment.requestedRefundAmount().movePointRight(2).longValueExact();
+            if (amount(refund) != expected)
+                throw new IllegalStateException(
+                        "Razorpay refund webhook amount does not match the requested refund.");
+            validateCurrency(payment, refund);
             if (succeeded) {
                 paymentStatusService.markRefunded(payment.getId(), providerRefundId);
             } else {
@@ -250,6 +267,52 @@ public class RazorpayWebhookService {
                     __gokulMethodStartedNanos,
                     RazorpayWebhookService.class,
                     "validateAmount(Payment,long)");
+        }
+    }
+
+    /**
+     * Reads a required integer amount without truncation or missing-value defaults.
+     *
+     * @param entity the payment or refund entity
+     * @return the amount in currency subunits
+     */
+    private long amount(JsonNode entity) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(RazorpayWebhookService.class, "amount(JsonNode)");
+        try {
+
+            JsonNode value = entity.path("amount");
+            if (!value.isIntegralNumber() || !value.canConvertToLong() || value.asLong() < 0)
+                throw new IllegalArgumentException("Razorpay webhook amount is invalid.");
+            return value.asLong();
+
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, RazorpayWebhookService.class, "amount(JsonNode)");
+        }
+    }
+
+    /**
+     * Checks that the provider currency matches the persisted payment.
+     *
+     * @param payment the persisted payment
+     * @param entity the payment or refund entity
+     */
+    private void validateCurrency(Payment payment, JsonNode entity) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        RazorpayWebhookService.class, "validateCurrency(Payment,JsonNode)");
+        try {
+
+            if (!payment.getCurrency().equals(requiredText(entity, "currency")))
+                throw new IllegalStateException(
+                        "Razorpay webhook currency does not match the payment.");
+
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    RazorpayWebhookService.class,
+                    "validateCurrency(Payment,JsonNode)");
         }
     }
 

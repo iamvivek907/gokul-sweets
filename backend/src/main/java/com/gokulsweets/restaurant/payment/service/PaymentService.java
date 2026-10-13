@@ -158,6 +158,11 @@ public class PaymentService {
                         paymentAmount);
                 throw new IllegalStateException("Order payable amount must be greater than zero.");
             }
+            if (provider == PaymentProviderType.RAZORPAY
+                    && paymentAmount.compareTo(BigDecimal.ONE) < 0) {
+                throw new IllegalArgumentException(
+                        "Razorpay order amount must be at least 100 paise.");
+            }
             Payment payment = new Payment();
             payment.setOrder(order);
             payment.setProvider(provider);

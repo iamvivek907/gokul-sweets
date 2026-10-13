@@ -46,9 +46,8 @@ public class PaymentProviderRegistry {
         this.providers = Map.copyOf(indexed);
         this.enabledProviders = parseEnabled(enabled);
         this.defaultProvider = parseType(defaultProvider);
-        if (!enabledProviders.contains(this.defaultProvider)) {
-            throw new IllegalStateException("The default payment provider must also be enabled.");
-        }
+        // The bootstrap default may be retired after an owner saves a different route.
+        // Eligibility is checked when routing a new payment, not for historical adapters.
         if (!providers.keySet().containsAll(enabledProviders)) {
             throw new IllegalStateException(
                     "One or more enabled payment providers are not registered.");
@@ -84,6 +83,31 @@ public class PaymentProviderRegistry {
                     __gokulMethodStartedNanos,
                     PaymentProviderRegistry.class,
                     "require(PaymentProviderType)");
+        }
+    }
+
+    /**
+     * Resolves the original provider of a persisted payment regardless of new-payment eligibility.
+     *
+     * @param provider the persisted provider
+     * @return the registered provider adapter
+     */
+    public PaymentProvider registered(PaymentProviderType provider) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        PaymentProviderRegistry.class, "registered(PaymentProviderType)");
+        try {
+
+            PaymentProvider adapter = providers.get(provider);
+            if (adapter == null)
+                throw new IllegalStateException("The original payment provider is unavailable.");
+            return adapter;
+
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    PaymentProviderRegistry.class,
+                    "registered(PaymentProviderType)");
         }
     }
 

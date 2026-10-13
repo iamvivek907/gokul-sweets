@@ -140,4 +140,25 @@ class EnvironmentIsolationGuardTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("sandbox");
     }
+
+    @Test
+    void razorpayOnlyProductionDoesNotRequirePhonepeSecretsOrRoutes() {
+        var settings =
+                new EnvironmentIsolationGuard.Settings(
+                        "PROD",
+                        "https://api.gokulsweets.in",
+                        List.of("https://gokulsweets.in"),
+                        "",
+                        "",
+                        "jdbc:postgresql://db/prod",
+                        "prod-images",
+                        "https://media.gokulsweets.in",
+                        "",
+                        "",
+                        "");
+        assertThatCode(() -> EnvironmentIsolationGuard.validate(settings, false))
+                .doesNotThrowAnyException();
+        assertThatThrownBy(() -> EnvironmentIsolationGuard.validate(settings, true))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }

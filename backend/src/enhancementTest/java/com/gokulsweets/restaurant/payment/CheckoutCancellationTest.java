@@ -26,6 +26,7 @@ class CheckoutCancellationTest {
                     payments,
                     statuses,
                     registry,
+                    mock(com.gokulsweets.restaurant.payment.routing.PaymentRoutingService.class),
                     mock(PaymentAttemptPersistenceService.class),
                     new EnhancementProperties(),
                     mock(CheckoutUrlVault.class));
@@ -40,7 +41,7 @@ class CheckoutCancellationTest {
         order.setOrderNumber("GKS-TEST");
         payment.setOrder(order);
         when(payments.findByIdWithOrder(1L)).thenReturn(Optional.of(payment));
-        when(registry.require(PaymentProviderType.PHONEPE)).thenReturn(provider);
+        when(registry.registered(PaymentProviderType.PHONEPE)).thenReturn(provider);
         return payment;
     }
 

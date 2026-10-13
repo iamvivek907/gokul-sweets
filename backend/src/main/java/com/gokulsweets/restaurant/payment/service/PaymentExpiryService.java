@@ -48,7 +48,7 @@ public class PaymentExpiryService {
             int processed = 0;
             for (Payment payment : candidates) {
                 try {
-                    PaymentProvider provider = providerRegistry.require(payment.getProvider());
+                    PaymentProvider provider = providerRegistry.registered(payment.getProvider());
                     PaymentVerificationResult verification = provider.verifyPayment(payment);
                     switch (verification.paymentStatus()) {
                         case PAID ->
