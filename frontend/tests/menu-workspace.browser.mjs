@@ -111,6 +111,12 @@ try {
       };
       if (req.method() === "OPTIONS")
         return route.fulfill({ status: 204, headers });
+      if (path === "/api/admin/categories" && req.method() === "POST") {
+        const input = req.postDataJSON();
+        assert.equal(input.code, "NEW_CATEGORY");
+        assert.equal(req.headers()["x-staff-csrf"], "test-csrf");
+        return route.fulfill({status: 201, headers, json: {id: 44, ...input, active: true}});
+      }
       if(path==="/api/admin/branches/1/menu-service-windows/1/hours"){
         if(req.method()==="PUT"){
           const body=req.postDataJSON();assert.deepEqual(Object.keys(body).sort(),["endsAt","revision","startsAt"]);
@@ -222,6 +228,7 @@ try {
         if (req.method() === "POST") {
           creates++;
           assert.equal(req.postDataJSON().details.name, "New sweet");
+          assert.equal(req.postDataJSON().details.categoryId, 44);
           assert.deepEqual(req.postDataJSON().branchIds, [1]);
           json = { productId: 99 };
         } else {
@@ -363,6 +370,14 @@ try {
     dialog = page.getByRole("dialog");
     await dialog.getByLabel("Name *", { exact: true }).fill("New sweet");
     await dialog.getByLabel("Product code *", { exact: true }).fill("NEW-1");
+    await dialog.getByRole("button", {name: "+ New category", exact: true}).click();
+    await dialog.getByLabel("Category name", {exact: true}).fill("New category");
+    await dialog.getByLabel("Category code", {exact: true}).fill("new_category");
+    await dialog.getByRole("button", {name: "Create category", exact: true}).click();
+    await dialog.getByRole("option", {name: "New category", exact: true}).waitFor({state: "attached"});
+    assert.equal(await dialog.getByLabel("Category *", {exact: true}).inputValue(), "44");
+    assert.equal(await dialog.getByLabel("Name *", {exact: true}).inputValue(), "New sweet");
+    assert.equal(await dialog.getByLabel("Product code *", {exact: true}).inputValue(), "NEW-1");
     await dialog.getByLabel("Base price").fill("200");
     assert.equal(
       await dialog

@@ -82,6 +82,7 @@
     "tests/printer-setup-navigation.browser.mjs",
     "tests/badge-admin.browser.mjs",
     "tests/native-kitchen-alarm.browser.mjs",
-    "tests/payment-provider-admin.browser.mjs"
+    "tests/payment-provider-admin.browser.mjs",
+    "tests/menu-categories.browser.mjs"
   ]
 }
