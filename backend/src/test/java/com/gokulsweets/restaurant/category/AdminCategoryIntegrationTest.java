@@ -40,7 +40,7 @@ class AdminCategoryIntegrationTest {
         Long product =
                 jdbc.queryForObject(
                         "INSERT INTO products(code,name,category_id,base_price,sale_mode) VALUES"
-                            + " (?,?,?,100,'UNIT') RETURNING id",
+                                + " (?,?,?,100,'UNIT') RETURNING id",
                         Long.class,
                         "PRODUCT_" + UUID.randomUUID(),
                         "Test paratha",

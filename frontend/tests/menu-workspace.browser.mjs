@@ -375,7 +375,7 @@ try {
     await dialog.getByLabel("Category code", {exact: true}).fill("new_category");
     await dialog.getByRole("button", {name: "Create category", exact: true}).click();
     await dialog.getByRole("option", {name: "New category", exact: true}).waitFor({state: "attached"});
-    assert.equal(await dialog.getByLabel("Category *", {exact: true}).inputValue(), "44");
+    assert.equal(await dialog.getByRole("combobox").filter({has: page.getByRole("option", {name: "New category", exact: true})}).inputValue(), "44");
     assert.equal(await dialog.getByLabel("Name *", {exact: true}).inputValue(), "New sweet");
     assert.equal(await dialog.getByLabel("Product code *", {exact: true}).inputValue(), "NEW-1");
     await dialog.getByLabel("Base price").fill("200");
