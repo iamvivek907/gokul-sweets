@@ -6,6 +6,7 @@ import {
   clearWorkspaceDraft,
 } from "@/lib/menuWorkspaceDraft";
 import WorkspaceDialog from "./WorkspaceDialog";
+import MenuCategoryCreate, { type MenuCategory } from "./MenuCategoryCreate";
 import WorkspaceMediaEditor from "./WorkspaceMediaEditor";
 import {
   workspaceRequest,
@@ -34,6 +35,7 @@ export default function WorkspaceProductEditor({
   draftKey,
   onClose: close,
   onSaved: saved,
+  onCategoryCreated,
 }: {
   draftKey: string;
   item: WorkspaceItem | null;
@@ -44,8 +46,11 @@ export default function WorkspaceProductEditor({
   branches: { id: number; name: string }[];
   onClose: () => void;
   onSaved: (notice?: string) => void;
+  onCategoryCreated: (category: MenuCategory) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [categoryBusy, setCategoryBusy] = useState(false);
+  const [showCategoryCreate, setShowCategoryCreate] = useState(false);
   const lock = useRef(false);
   const [error, setError] = useState("");
   const [initialDraft] = useState(() => {
@@ -162,7 +167,7 @@ export default function WorkspaceProductEditor({
       ? "Add product"
       : `${{ details: "Edit details", price: "Edit branch price", availability: "Set availability", photo: "Edit product photo", stock: "Stock details", "service-hours": "Service hours", delete: "Delete from branch" }[mode]} · ${item?.name}`;
   async function save() {
-    if (lock.current) return;
+    if (lock.current || categoryBusy) return;
     lock.current = true;
     setBusy(true);
     setError("");
@@ -353,16 +358,16 @@ export default function WorkspaceProductEditor({
           ? "Shared product · All assigned branches"
           : "Selected branch only"
       }
-      busy={busy}
+      busy={busy || categoryBusy}
       onClose={onClose}
       footer={
         <>
-          <button disabled={busy} onClick={onClose}>
+          <button disabled={busy || categoryBusy} onClick={onClose}>
             Cancel
           </button>
           <button
             className={styles.primary}
-            disabled={busy}
+            disabled={busy || categoryBusy}
             onClick={() => void save()}
           >
             {busy
@@ -427,6 +432,24 @@ export default function WorkspaceProductEditor({
                     ))}
                   </select>
                 </label>
+                <button
+                  type="button"
+                  disabled={categoryBusy}
+                  onClick={() => setShowCategoryCreate(value => !value)}
+                  className="min-h-11 underline"
+                >
+                  {showCategoryCreate ? "Close new category" : "+ New category"}
+                </button>
+                {showCategoryCreate && (
+                  <MenuCategoryCreate
+                    onBusyChange={setCategoryBusy}
+                    onCreated={created => {
+                      onCategoryCreated(created);
+                      setCategory(created.id);
+                      setShowCategoryCreate(false);
+                    }}
+                  />
+                )}
                 <label>
                   Description
                   <textarea

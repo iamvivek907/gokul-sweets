@@ -189,6 +189,11 @@ export default function AdminMenuPage() {
                             <span className="mt-6 block font-semibold" style={{color:"#ffffff"}}>Open workspace →</span>
                         </Link>
 
+                        <Link href="/admin/menu/categories" className="rounded-2xl border border-[#eadfd6] bg-white p-6 text-[#173a37]">
+                            <h2 className="text-xl font-bold">Menu categories</h2>
+                            <p className="mt-3 text-sm">Create shared categories before adding individual products.</p>
+                            <span className="mt-6 block font-semibold">Manage categories →</span>
+                        </Link>
                         {/* Live Menu */}
 
                         <Link
