@@ -40,6 +40,18 @@ try {
     await page.getByRole('alert').filter({hasText:'already exists'}).waitFor();
     assert.equal(await page.getByLabel('Category name',{exact:true}).inputValue(),'Duplicate name');
     assert.equal(categories.length,1);
+    // Valid maximum-length values must wrap instead of widening a staff phone.
+    const longName = 'N'.repeat(100), longCode = 'C'.repeat(80), longDescription = 'D'.repeat(500);
+    await page.getByLabel('Category name',{exact:true}).fill(longName);
+    await page.getByLabel('Category code',{exact:true}).fill(longCode);
+    await page.getByLabel('Description (optional)',{exact:true}).fill(longDescription);
+    await page.getByRole('button',{name:'Create category',exact:true}).click();
+    await page.getByRole('status').filter({hasText:`${longName} created`}).waitFor();
+    const longRow = page.getByRole('listitem').filter({hasText:longCode});
+    await longRow.waitFor();
+    assert.equal(categories.length,2);
+    assert.equal(await longRow.evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+    assert.equal(await page.getByRole('status').filter({hasText:`${longName} created`}).evaluate(el=>el.scrollWidth<=el.clientWidth),true);
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     assert.deepEqual(await page.getByRole('button',{name:'Create category',exact:true}).evaluate(el=>({color:getComputedStyle(el).color,background:getComputedStyle(el).backgroundColor})),{color:'rgb(255, 255, 255)',background:'rgb(122, 22, 37)'});
     allowed=false; const before=reads; await page.reload();

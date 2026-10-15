@@ -51,7 +51,7 @@ export default function MenuCategoriesPage() {
   }
   if (!allowed) return <p>Menu management permission is required.</p>;
   return (
-    <main className="mx-auto max-w-4xl space-y-5 p-4 text-[#173a37]">
+    <main className="mx-auto max-w-4xl space-y-5 p-4 text-[#173a37] [overflow-wrap:anywhere]">
       <Link href="/admin/menu" className="inline-block min-h-11 underline">
         Back to menu management
       </Link>
