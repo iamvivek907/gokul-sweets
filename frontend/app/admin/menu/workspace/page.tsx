@@ -800,6 +800,16 @@ export default function MenuWorkspace() {
           branches={branches}
           onClose={() => setEditor(null)}
           onSaved={reload}
+          onCategoryCreated={created => {
+            // Category creation persists independently of the product draft.
+            // Keep shared options in the workspace when this editor unmounts.
+            setData(current => ({
+              ...current,
+              categories: current.categories.some(option => option.id === created.id)
+                ? current.categories
+                : [...current.categories, { id: created.id, name: created.name }],
+            }));
+          }}
         />
       )}
       {groupEditor && branch && (
