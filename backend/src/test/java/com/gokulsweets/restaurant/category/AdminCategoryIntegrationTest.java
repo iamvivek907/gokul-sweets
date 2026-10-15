@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Locale;
 import java.util.UUID;
 
 @SpringBootTest
@@ -27,11 +28,17 @@ class AdminCategoryIntegrationTest {
     @Test
     void createsAnEmptyCategoryVisibleToExistingPublicAndProductFlows() {
         long products = jdbc.queryForObject("SELECT count(*) FROM products", Long.class);
-        String code = "CATEGORY_" + UUID.randomUUID().toString().replace("-", "");
+        String code =
+                "CATEGORY_"
+                        + UUID.randomUUID().toString().replace("-", "").toUpperCase(Locale.ROOT);
         var created =
                 controller.create(
                         new AdminCategoryController.CreateCategory(
-                                code.toLowerCase(), "New breakfast", "Vegetarian breakfast", 20));
+                                code.toLowerCase(Locale.ROOT),
+                                "New breakfast",
+                                "Vegetarian breakfast",
+                                20));
+        assertThat(created.code()).isEqualTo(code);
         assertThat(repository.findByCode(code)).isPresent();
         assertThat(publicCategories.getActiveCategories())
                 .anySatisfy(category -> assertThat(category.id()).isEqualTo(created.id()));

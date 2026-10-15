@@ -35,6 +35,7 @@ export default function WorkspaceProductEditor({
   draftKey,
   onClose: close,
   onSaved: saved,
+  onCategoryCreated,
 }: {
   draftKey: string;
   item: WorkspaceItem | null;
@@ -45,17 +46,11 @@ export default function WorkspaceProductEditor({
   branches: { id: number; name: string }[];
   onClose: () => void;
   onSaved: (notice?: string) => void;
+  onCategoryCreated: (category: MenuCategory) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [categoryBusy, setCategoryBusy] = useState(false);
   const [showCategoryCreate, setShowCategoryCreate] = useState(false);
-  const [createdCategories, setCreatedCategories] = useState<MenuCategory[]>([]);
-  const categoryOptions = [
-    ...data.categories,
-    ...createdCategories.filter(
-      c => !data.categories.some(existing => existing.id === c.id),
-    ),
-  ];
   const lock = useRef(false);
   const [error, setError] = useState("");
   const [initialDraft] = useState(() => {
@@ -430,7 +425,7 @@ export default function WorkspaceProductEditor({
                     value={category}
                     onChange={(e) => setCategory(Number(e.target.value))}
                   >
-                    {categoryOptions.map((c) => (
+                    {data.categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -449,7 +444,7 @@ export default function WorkspaceProductEditor({
                   <MenuCategoryCreate
                     onBusyChange={setCategoryBusy}
                     onCreated={created => {
-                      setCreatedCategories(current => [...current, created]);
+                      onCategoryCreated(created);
                       setCategory(created.id);
                       setShowCategoryCreate(false);
                     }}

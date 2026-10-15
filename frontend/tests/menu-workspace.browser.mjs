@@ -378,6 +378,16 @@ try {
     assert.equal(await dialog.getByRole("combobox").filter({has: page.getByRole("option", {name: "New category", exact: true})}).inputValue(), "44");
     assert.equal(await dialog.getByLabel("Name *", {exact: true}).inputValue(), "New sweet");
     assert.equal(await dialog.getByLabel("Product code *", {exact: true}).inputValue(), "NEW-1");
+    // Cancelling a product does not undo the already-created shared category.
+    await dialog.getByRole("button", {name: "Cancel", exact: true}).click();
+    await dialog.waitFor({state: "hidden"});
+    await page.getByRole("button", {name: "+ Add product", exact: true}).click();
+    dialog = page.getByRole("dialog");
+    const reopenedCategory = dialog.getByRole("combobox").filter({has: page.getByRole("option", {name: "New category", exact: true})});
+    await reopenedCategory.selectOption("44");
+    assert.equal(await reopenedCategory.inputValue(), "44");
+    await dialog.getByLabel("Name *", {exact: true}).fill("New sweet");
+    await dialog.getByLabel("Product code *", {exact: true}).fill("NEW-1");
     await dialog.getByLabel("Base price").fill("200");
     assert.equal(
       await dialog
