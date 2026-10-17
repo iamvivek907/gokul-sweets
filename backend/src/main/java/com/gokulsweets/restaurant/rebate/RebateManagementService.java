@@ -42,6 +42,8 @@ public class RebateManagementService {
     private final RebateCustomerRepository rebateCustomerRepository;
 
     private final BranchRepository branchRepository;
+    private final com.gokulsweets.restaurant.product.ProductRepository productRepository;
+    private final com.gokulsweets.restaurant.category.CategoryRepository categoryRepository;
 
     private final StaffAuthorizationService staffAuthorizationService;
 
@@ -90,6 +92,7 @@ public class RebateManagementService {
                 rebate.setMinimumOrderAmount(moneyNullable(request.minimumOrderAmount()));
                 rebate.setMaximumDiscountAmount(moneyNullable(request.maximumDiscountAmount()));
             }
+            updateExclusions(rebate, request.excludedProductIds(), request.excludedCategoryIds());
             rebate.setMaxTotalUses(request.maxTotalUses());
             rebate.setMaxUsesPerCustomer(request.maxUsesPerCustomer());
             rebate.setBranch(branch);
@@ -225,6 +228,7 @@ public class RebateManagementService {
                 rebate.setMinimumOrderAmount(moneyNullable(request.minimumOrderAmount()));
                 rebate.setMaximumDiscountAmount(moneyNullable(request.maximumDiscountAmount()));
             }
+            updateExclusions(rebate, request.excludedProductIds(), request.excludedCategoryIds());
             rebate.setMaxTotalUses(request.maxTotalUses());
             rebate.setMaxUsesPerCustomer(request.maxUsesPerCustomer());
             rebate.setBranch(newBranch);
@@ -1015,7 +1019,9 @@ public class RebateManagementService {
                     phones,
                     rebate.getCreatedBy().getFullName(),
                     rebate.getCreatedAt(),
-                    rebate.getUpdatedAt());
+                    rebate.getUpdatedAt(),
+                    Set.copyOf(rebate.getExcludedProductIds()),
+                    Set.copyOf(rebate.getExcludedCategoryIds()));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -1043,6 +1049,40 @@ public class RebateManagementService {
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, RebateManagementService.class, "getRebate(Long)");
+        }
+    }
+
+    /**
+     * Omitted fields preserve existing rules for older clients; empty sets explicitly clear them.
+     */
+    private void updateExclusions(Rebate rebate, Set<Long> products, Set<Long> categories) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        RebateManagementService.class,
+                        "updateExclusions(Rebate,Set<Long>,Set<Long>)");
+        try {
+            if (products != null) {
+                if (products.size() > 500
+                        || products.stream().anyMatch(id -> id == null || id <= 0)
+                        || productRepository.findAllById(products).size() != products.size())
+                    throw new IllegalArgumentException("Choose existing products to exclude.");
+                rebate.getExcludedProductIds().clear();
+                rebate.getExcludedProductIds().addAll(products);
+            }
+            if (categories != null) {
+                if (categories.size() > 500
+                        || categories.stream().anyMatch(id -> id == null || id <= 0)
+                        || categoryRepository.findAllById(categories).size() != categories.size())
+                    throw new IllegalArgumentException("Choose existing categories to exclude.");
+                rebate.getExcludedCategoryIds().clear();
+                rebate.getExcludedCategoryIds().addAll(categories);
+            }
+
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    RebateManagementService.class,
+                    "updateExclusions(Rebate,Set<Long>,Set<Long>)");
         }
     }
 
