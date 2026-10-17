@@ -1,4 +1,5 @@
 "use client";
+import OfferExclusionsPicker from "@/components/admin/OfferExclusionsPicker";
 import {T} from "@/lib/language";
 
 
@@ -16,6 +17,7 @@ interface Offer {
     rebateValue: number | null; minimumOrderAmount: number | null; maximumDiscountAmount: number | null;
     maxTotalUses: number | null; maxUsesPerCustomer: number | null;
     branchId: number | null; branchName: string | null; validFrom: string; validUntil: string; active: boolean;
+    excludedProductIds: number[]; excludedCategoryIds: number[];
     customerPhones: string[]; slabs: {minimumOrderAmount: number; rebateAmount: number}[];
 }
 const empty = {
@@ -23,6 +25,7 @@ const empty = {
     visibility: "PUBLIC" as Offer["visibility"], rebateType: "PERCENTAGE" as RebateType,
     rebateValue: "", minimumOrderAmount: "", maximumDiscountAmount: "", maxTotalUses: "", maxUsesPerCustomer: "",
     branchId: "", validFrom: "", validUntil: "", customerPhones: "",
+    excludedProductIds: [] as number[], excludedCategoryIds: [] as number[],
     slabs: [{minimumOrderAmount: "", rebateAmount: ""}]
 };
 const path = "/api/admin/rebates";
@@ -60,6 +63,7 @@ export default function OffersPage() {
     function edit(offer: Offer) {
         setEditing(offer.id); setMessage(""); setError("");
         setForm({
+            excludedProductIds: offer.excludedProductIds ?? [], excludedCategoryIds: offer.excludedCategoryIds ?? [],
             code: offer.code, name: offer.name, description: offer.description ?? "", scope: offer.scope,
             visibility: offer.visibility, rebateType: offer.rebateType,
             rebateValue: String(offer.rebateValue ?? ""), minimumOrderAmount: String(offer.minimumOrderAmount ?? ""),
@@ -141,6 +145,7 @@ export default function OffersPage() {
                             && <option value={form.branchId}>Existing branch #{form.branchId}</option>}
                     </select>
                 </SettingField>
+                <OfferExclusionsPicker key={`${editing??"new"}:${form.branchId}`} authorization={authorization??""} branchId={form.branchId} value={form} onChange={value=>setForm(current=>({...current,...value}))}/>
                 <SettingField label="Discount type" help="Amounts are INR. Slabs use the highest eligible spend threshold." htmlFor="offer-type">
                     <select id="offer-type" value={form.rebateType} onChange={e => setForm({...form, rebateType: e.target.value as RebateType})} className={inputClass}>
                         <option value="PERCENTAGE">Percentage</option><option value="FIXED_AMOUNT">Fixed amount</option><option value="SLAB">Spend-based slabs</option>
@@ -150,7 +155,7 @@ export default function OffersPage() {
                     <SettingField label={form.rebateType === "PERCENTAGE" ? "Discount (%)" : "Discount (INR)"} help="Positive discount; final checkout enforces eligibility." htmlFor="offer-value">
                         <input id="offer-value" type="number" required min="0.01" max={form.rebateType === "PERCENTAGE" ? 100 : undefined} step="0.01" value={form.rebateValue} onChange={e => setForm({...form, rebateValue: e.target.value})} className={inputClass} />
                     </SettingField>
-                    <SettingField label="Minimum eligible spend (INR)" help="Optional threshold, using the existing checkout discount basis." htmlFor="offer-minimum">
+                    <SettingField label="Minimum eligible spend (INR)" help="Excluded categories and items do not count. With exclusions, the basis is eligible product spend after loyalty savings, before tax and fees." htmlFor="offer-minimum">
                         <input id="offer-minimum" type="number" min="0" step="0.01" value={form.minimumOrderAmount} onChange={e => setForm({...form, minimumOrderAmount: e.target.value})} className={inputClass} />
                     </SettingField>
                     {form.rebateType === "PERCENTAGE" && <SettingField label="Maximum discount (INR)" help="Required cap on percentage offers." htmlFor="offer-cap">
@@ -209,6 +214,7 @@ export default function OffersPage() {
             </div>
             <p className="mt-2 text-sm">{offer.rebateType === "PERCENTAGE" ? `${offer.rebateValue}% off, up to INR ${offer.maximumDiscountAmount}`
                 : offer.rebateType === "FIXED_AMOUNT" ? `INR ${offer.rebateValue} off` : `${offer.slabs.length} spend-based slabs`}</p>
+            <p className="mt-1 text-sm">Exclusions: {offer.excludedCategoryIds?.length??0} categories · {offer.excludedProductIds?.length??0} items</p>
             <p className="mt-1 text-xs text-[#756763]">{offer.validFrom.replace("T", " ")} to {offer.validUntil.replace("T", " ")} (India time). Schedule, spend and usage limits apply.</p>
         </article>)}</div>
     </main>;

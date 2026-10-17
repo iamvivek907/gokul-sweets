@@ -57,4 +57,6 @@ public record RebateResponse(
         Set<String> customerPhones,
         String createdBy,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt) {}
+        LocalDateTime updatedAt,
+        Set<Long> excludedProductIds,
+        Set<Long> excludedCategoryIds) {}

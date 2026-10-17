@@ -1,11 +1,14 @@
 package com.gokulsweets.restaurant.order.service;
 
 import com.gokulsweets.restaurant.branch.Branch;
+import com.gokulsweets.restaurant.category.Category;
 import com.gokulsweets.restaurant.customer.identity.VerifiedOrderOwnership;
 import com.gokulsweets.restaurant.observability.MethodTiming;
 import com.gokulsweets.restaurant.order.dto.CreateOrderRequest;
 import com.gokulsweets.restaurant.order.entity.Order;
+import com.gokulsweets.restaurant.order.entity.OrderItem;
 import com.gokulsweets.restaurant.order.enums.FulfillmentType;
+import com.gokulsweets.restaurant.product.Product;
 import com.gokulsweets.restaurant.rebate.RebateEligibilityService;
 import com.gokulsweets.restaurant.rebate.dto.AvailableRebateResponse;
 
@@ -85,6 +88,23 @@ public class MobileCheckoutPreview {
             order.setPriorityCharge(new BigDecimal(quote.priorityCharge()));
             order.setConvenienceFee(new BigDecimal(quote.convenienceFee()));
             order.setPaymentFeeRate(new BigDecimal(quote.paymentFeeRate()));
+            // Use trusted priced lines, not request quantities or unpriced client metadata.
+            // Totals already include merged quantities/weights and tax; do not multiply again.
+            for (var line : quote.items()) {
+                var product = new Product();
+                product.setId(line.productId());
+                if (line.categoryId() != null) {
+                    var category = new Category();
+                    category.setId(line.categoryId());
+                    product.setCategory(category);
+                }
+                var item = new OrderItem();
+                item.setProduct(product);
+                item.setProductName(line.name());
+                item.setTaxAmount(new BigDecimal(line.taxAmount()));
+                item.setLineTotal(new BigDecimal(line.total()));
+                order.addItem(item);
+            }
             com.gokulsweets.restaurant.loyalty.LoyaltyService.Wallet wallet = null;
             if (loyalty.enabled()) {
                 var subject = ownership.verifiedSubject(request.customerPhone(), token);

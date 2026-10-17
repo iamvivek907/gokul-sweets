@@ -11,6 +11,8 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 
 /** Persisted rebate state. */
 @Entity
@@ -81,6 +83,23 @@ public class Rebate {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    /** Product variants and whole categories excluded from this offer's spend basis. */
+    @ElementCollection
+    @CollectionTable(
+            name = "rebate_excluded_products",
+            joinColumns = @JoinColumn(name = "rebate_id"))
+    @Column(name = "product_id", nullable = false)
+    @org.hibernate.annotations.BatchSize(size = 50)
+    private Set<Long> excludedProductIds = new HashSet<>();
+
+    @ElementCollection
+    @CollectionTable(
+            name = "rebate_excluded_categories",
+            joinColumns = @JoinColumn(name = "rebate_id"))
+    @Column(name = "category_id", nullable = false)
+    @org.hibernate.annotations.BatchSize(size = 50)
+    private Set<Long> excludedCategoryIds = new HashSet<>();
 
     /** Ons create. */
     @PrePersist
