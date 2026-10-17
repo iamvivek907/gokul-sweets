@@ -1,5 +1,7 @@
 # Offer category and item exclusions
 
+Spend guidance reports the additional eligible item subtotal before tax, accounting for how new goods change proportional loyalty allocation. With ₹300 eligible food, ₹100 excluded drinks and ₹40 loyalty savings, the current eligible basis is ₹270. A ₹350 tier needs ₹81.70 more eligible goods; adding ₹80 reaches only ₹348.33. The estimate retains the current loyalty discount, and checkout rechecks actual products/rewards. This applies to both available offers' next tiers and future spend targets.
+
 In **Admin → Storefront → Offers**, create or edit an offer and use **Excluded categories & items**. Exclusions belong to that offer, independently of Gokul rewards. The welcome offer is not created or enabled by this migration.
 
 A category rule covers products currently in that category, including future additions. An item rule covers its exact product variant. Either rule excludes a product; an item selection does not override a category exclusion. Category moves affect future eligibility checks.

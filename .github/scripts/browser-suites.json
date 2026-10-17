@@ -35,7 +35,8 @@
     "tests/premium-menu.browser.mjs",
     "tests/mobile-ordering-polish.browser.mjs",
     "tests/mobile-ordering-guidance.browser.mjs",
-    "tests/mobile-ordering-resilience.browser.mjs"
+    "tests/mobile-ordering-resilience.browser.mjs",
+    "tests/menu-campaigns.browser.mjs"
   ],
   "design": [
     "tests/customer-design.browser.mjs",

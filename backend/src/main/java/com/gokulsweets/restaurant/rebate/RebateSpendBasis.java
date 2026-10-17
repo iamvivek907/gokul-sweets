@@ -77,6 +77,65 @@ final class RebateSpendBasis {
         }
     }
 
+    /**
+     * Finds the smallest additional eligible product subtotal that reaches a tier, assuming the
+     * current loyalty discount is retained. Adding eligible goods changes their share of that
+     * discount, so the net eligibility shortfall is not the amount of goods to add. Checkout
+     * revalidates the actual products, taxes and reward selection.
+     */
+    static BigDecimal additionalSpend(Order order, Rebate rebate, BigDecimal threshold) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        RebateSpendBasis.class, "additionalSpend(Order,Rebate,BigDecimal)");
+        try {
+            BigDecimal goods = BigDecimal.ZERO;
+            BigDecimal included = BigDecimal.ZERO;
+            for (var item : order.getItems()) {
+                BigDecimal subtotal =
+                        zero(item.getLineTotal())
+                                .subtract(zero(item.getTaxAmount()))
+                                .max(BigDecimal.ZERO);
+                goods = goods.add(subtotal);
+                if (includes(rebate, item.getProduct())) included = included.add(subtotal);
+            }
+            BigDecimal discount =
+                    order.isLoyaltyEnrolled()
+                            ? zero(order.getLoyaltyDiscount()).max(BigDecimal.ZERO).min(goods)
+                            : BigDecimal.ZERO;
+            if (eligible(order, rebate).compareTo(threshold) >= 0)
+                return BigDecimal.ZERO.setScale(2);
+            // Even allocating the entire discount to eligible goods cannot require more than this.
+            var high =
+                    threshold
+                            .add(discount)
+                            .subtract(included)
+                            .max(BigDecimal.ZERO)
+                            .movePointRight(2)
+                            .setScale(0, RoundingMode.CEILING)
+                            .toBigIntegerExact();
+            var low = java.math.BigInteger.ZERO;
+            while (low.compareTo(high) < 0) {
+                var mid = low.add(high).shiftRight(1);
+                var addition = new BigDecimal(mid, 2);
+                var total = goods.add(addition);
+                var projected =
+                        total.signum() == 0
+                                ? BigDecimal.ZERO
+                                : included.add(addition)
+                                        .multiply(total.subtract(discount))
+                                        .divide(total, 2, RoundingMode.HALF_UP);
+                if (projected.compareTo(threshold) >= 0) high = mid;
+                else low = mid.add(java.math.BigInteger.ONE);
+            }
+            return new BigDecimal(high, 2);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    RebateSpendBasis.class,
+                    "additionalSpend(Order,Rebate,BigDecimal)");
+        }
+    }
+
     /** Adds customer-facing exclusion terms to the stored offer description. */
     static String description(Rebate rebate) {
         final long __gokulMethodStartedNanos =

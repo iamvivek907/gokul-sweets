@@ -534,7 +534,7 @@ export default function WorkspaceAppearance({
                   )}
                 </div>
                 <p className={styles.notice}>
-                  Marketing content does not change stock, prices, ratings or
+                  Published banners replace the phone menu promotion below Offers &amp; savings across Food, Sweets, Bakery and Snacks. Desktop uses the same published content. Marketing content does not change stock, prices, ratings or
                   offers.
                 </p>
               </section>

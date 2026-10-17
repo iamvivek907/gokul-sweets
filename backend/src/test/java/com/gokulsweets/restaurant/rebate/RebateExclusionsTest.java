@@ -180,6 +180,49 @@ class RebateExclusionsTest {
     }
 
     @Test
+    void loyaltySpendGuidanceReachesTheTierAfterProportionalReallocation() {
+        var o = basket();
+        o.setLoyaltyEnrolled(true);
+        o.setLoyaltyDiscount(n("40"));
+        var r = offer(RebateType.SLAB);
+        var first = new RebateSlab();
+        first.setMinimumOrderAmount(n("200"));
+        first.setRebateAmount(n("10"));
+        var next = new RebateSlab();
+        next.setMinimumOrderAmount(n("350"));
+        next.setRebateAmount(n("20"));
+        when(slabs.findByRebateIdOrderByMinimumOrderAmountAsc(1L)).thenReturn(List.of(first, next));
+        var available = service.previewDraft(o);
+        var needed = available.getFirst().amountNeededForNextSlab();
+        assertThat(needed).isEqualByComparingTo("81.70");
+        assertThat(service.previewSpendTargets(o, available).getFirst().amountNeededForNextSlab())
+                .isEqualByComparingTo(needed);
+        assertThat(
+                        service.findEligibleDraftRebate(o, "FOOD")
+                                .orElseThrow()
+                                .amountNeededForNextSlab())
+                .isEqualByComparingTo(needed);
+        // The old guidance of 80 leaves only 348.33 eligible, even before item tax.
+        var addition = line(30, 1, "80", "4");
+        o.getItems().add(addition);
+        assertThat(RebateSpendBasis.eligible(o, r)).isEqualByComparingTo("348.33");
+        addition.setLineTotal(needed.subtract(n("0.01")).add(n("4")));
+        assertThat(RebateSpendBasis.eligible(o, r)).isLessThan(n("350"));
+        addition.setLineTotal(needed.add(n("4")));
+        assertThat(RebateSpendBasis.eligible(o, r)).isGreaterThanOrEqualTo(n("350"));
+    }
+
+    @Test
+    void additionalSpendHandlesEmptyAndAlreadyQualifiedBaskets() {
+        var o = basket();
+        var r = offer(RebateType.SLAB);
+        assertThat(RebateSpendBasis.additionalSpend(o, r, n("300"))).isEqualByComparingTo("0");
+        assertThat(RebateSpendBasis.additionalSpend(o, r, n("350"))).isEqualByComparingTo("50");
+        o.getItems().clear();
+        assertThat(RebateSpendBasis.additionalSpend(o, r, n("350"))).isEqualByComparingTo("350");
+    }
+
+    @Test
     void weightedLinesUsePricedSubtotalAndCannotGoNegative() {
         var o = basket();
         var r = offer(RebateType.PERCENTAGE);

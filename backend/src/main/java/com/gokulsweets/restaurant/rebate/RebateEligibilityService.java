@@ -255,7 +255,8 @@ public class RebateEligibilityService {
                     continue;
                 }
                 AvailableRebateResponse response =
-                        calculateAvailableRebate(rebate, calculateEligibleAmount(order, rebate));
+                        calculateAvailableRebate(
+                                rebate, calculateEligibleAmount(order, rebate), order);
                 /*
                  * Null means minimum spend/slab threshold
                  * has not been reached.
@@ -351,7 +352,10 @@ public class RebateEligibilityService {
                     var saving = slab.getRebateAmount().min(threshold);
                     if (rebate.getMaximumDiscountAmount() != null)
                         saving = saving.min(rebate.getMaximumDiscountAmount());
-                    var needed = threshold.subtract(eligible);
+                    var needed =
+                            RebateSpendBasis.restricted(rebate)
+                                    ? RebateSpendBasis.additionalSpend(order, rebate, threshold)
+                                    : threshold.subtract(eligible);
                     if (saving.compareTo(baseline) > 0
                             && saving.subtract(baseline).compareTo(needed) < 0) {
                         var target =
@@ -482,23 +486,23 @@ public class RebateEligibilityService {
      * @return the calculate available rebate result
      */
     private AvailableRebateResponse calculateAvailableRebate(
-            Rebate rebate, BigDecimal eligibleAmount) {
+            Rebate rebate, BigDecimal eligibleAmount, Order order) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         RebateEligibilityService.class,
-                        "calculateAvailableRebate(Rebate,BigDecimal)");
+                        "calculateAvailableRebate(Rebate,BigDecimal,Order)");
         try {
             if (eligibleAmount.signum() <= 0) return null;
             return switch (rebate.getRebateType()) {
                 case PERCENTAGE -> calculatePercentage(rebate, eligibleAmount);
                 case FIXED_AMOUNT -> calculateFixed(rebate, eligibleAmount);
-                case SLAB -> calculateSlab(rebate, eligibleAmount);
+                case SLAB -> calculateSlab(rebate, eligibleAmount, order);
             };
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     RebateEligibilityService.class,
-                    "calculateAvailableRebate(Rebate,BigDecimal)");
+                    "calculateAvailableRebate(Rebate,BigDecimal,Order)");
         }
     }
 
@@ -575,10 +579,11 @@ public class RebateEligibilityService {
      * @param eligibleAmount the eligible amount
      * @return the calculate slab result
      */
-    private AvailableRebateResponse calculateSlab(Rebate rebate, BigDecimal eligibleAmount) {
+    private AvailableRebateResponse calculateSlab(
+            Rebate rebate, BigDecimal eligibleAmount, Order order) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
-                        RebateEligibilityService.class, "calculateSlab(Rebate,BigDecimal)");
+                        RebateEligibilityService.class, "calculateSlab(Rebate,BigDecimal,Order)");
         try {
             if (!meetsMinimumAmount(eligibleAmount, rebate.getMinimumOrderAmount())) return null;
             List<RebateSlab> slabs =
@@ -614,10 +619,12 @@ public class RebateEligibilityService {
                 nextMinimum = nextSlab.getMinimumOrderAmount();
                 nextRebate = nextSlab.getRebateAmount();
                 amountNeeded =
-                        nextMinimum
-                                .subtract(eligibleAmount)
-                                .max(BigDecimal.ZERO)
-                                .setScale(2, RoundingMode.HALF_UP);
+                        RebateSpendBasis.restricted(rebate)
+                                ? RebateSpendBasis.additionalSpend(order, rebate, nextMinimum)
+                                : nextMinimum
+                                        .subtract(eligibleAmount)
+                                        .max(BigDecimal.ZERO)
+                                        .setScale(2, RoundingMode.HALF_UP);
             }
             return response(
                     rebate, eligibleAmount, rebateAmount, nextMinimum, nextRebate, amountNeeded);
@@ -625,7 +632,7 @@ public class RebateEligibilityService {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     RebateEligibilityService.class,
-                    "calculateSlab(Rebate,BigDecimal)");
+                    "calculateSlab(Rebate,BigDecimal,Order)");
         }
     }
 
@@ -1011,7 +1018,8 @@ public class RebateEligibilityService {
                 throw new IllegalStateException("Rebate usage limit has been reached.");
             }
             BigDecimal eligibleAmount = calculateEligibleAmount(order, rebate);
-            AvailableRebateResponse response = calculateAvailableRebate(rebate, eligibleAmount);
+            AvailableRebateResponse response =
+                    calculateAvailableRebate(rebate, eligibleAmount, order);
             if (response == null) {
                 throw new IllegalStateException(
                         "Order amount does not meet the minimum requirement for this rebate.");

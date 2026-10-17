@@ -7,7 +7,8 @@ import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
 import {pickupIsFresh} from "@/lib/pickupFreshness";
 import {menuFamily,retailCollections} from "@/lib/menuPresentation";
 import RetailSweetRail from "./RetailSweetRail";
-import MobileMenuHighlights from "./MobileMenuHighlights";
+import MenuCampaignBanners from "./MenuCampaignBanners";
+import {useBranchMenuAppearance} from "@/hooks/useBranchMenuAppearance";
 import MenuCategorySection from "./MenuCategorySection";
 import MenuOffers from "./MenuOffers";
 import FloatingMenuCategories from "./FloatingMenuCategories";
@@ -93,7 +94,6 @@ interface ProductRatingState {
 export default function MenuScreen() {
     const translate = useTranslation();
     const renderStarted = useRef<number | null>(null);
-    const [appearanceState, setAppearanceState] = useState<{branchId:number|null;orders:Record<number,number>}>({branchId:null,orders:{}});
     const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
     const {
@@ -102,8 +102,8 @@ export default function MenuScreen() {
         useSelectedBranch();
 
 
-    const appearanceOrder = appearanceState.branchId === branch?.id ? appearanceState.orders : {};
-    const saveAppearanceOrder = useCallback((orders:Record<number,number>)=>setAppearanceState({branchId:branch?.id??null,orders}),[branch?.id]);
+    const appearance = useBranchMenuAppearance(branch?.id ?? null);
+    const appearanceOrder = Object.fromEntries((appearance?.categories ?? []).map(c => [c.id, c.order]));
 
     const {
         items,
@@ -1229,7 +1229,7 @@ export default function MenuScreen() {
 
                     </div>}
 
-                <BranchMenuAppearance key={branch.id} branchId={branch.id} categories={categories} onSelect={id=>jumpMenuCategory(id)} onOrder={saveAppearanceOrder}/>
+                {!phoneMenu && <BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
 
                 {!phoneMenu && pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
                     <NewBranchItems branch={branch} products={allProducts} portionGroups={phoneMenu?portionGroups:undefined} onSelect={product => {
@@ -1476,7 +1476,7 @@ export default function MenuScreen() {
                                 </div>
 
 
-                                {phoneMenu&&!hasActiveFilters&&!(/sweet|mithai/i.test(activeBrowse?.name??""))&&<MobileMenuHighlights products={allProducts} retail={retailBrowse} onBrowse={browseMenu}/>}
+                                {phoneMenu && <MenuCampaignBanners banners={appearance?.banners ?? []} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact/>}
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? <div>
                                     {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map(group=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{pickupGrid(group.products)}</MenuCategorySection>)}

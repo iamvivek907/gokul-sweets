@@ -66,12 +66,12 @@ public class RebateExclusionCatalogController {
                     branchId == null
                             ? ""
                             : " AND EXISTS (SELECT 1 FROM branch_products bp WHERE"
-                                  + " bp.product_id=p.id AND bp.branch_id=:branch)";
+                                    + " bp.product_id=p.id AND bp.branch_id=:branch)";
             if (branchId != null) params.put("branch", branchId);
             var products =
                     jdbc.query(
                             "SELECT p.id,p.name,p.category_id FROM products p WHERE"
-                                + " position(:search in lower(p.name || ' ' || p.code)) > 0"
+                                    + " position(:search in lower(p.name || ' ' || p.code)) > 0"
                                     + scope
                                     + " ORDER BY lower(p.name),p.id LIMIT 51 OFFSET :offset",
                             params,
@@ -85,7 +85,7 @@ public class RebateExclusionCatalogController {
                             ? List.<Choice>of()
                             : jdbc.query(
                                     "SELECT p.id,p.name,p.category_id FROM products p WHERE p.id IN"
-                                        + " (:selected)"
+                                            + " (:selected)"
                                             + scope
                                             + " ORDER BY lower(p.name),p.id",
                                     withSelected(params, selected),
