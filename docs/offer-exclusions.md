@@ -22,3 +22,5 @@ The same server calculation handles preview, public offer selection, explicit co
 8. Clear both exclusion lists and save. Reopen to confirm they are empty. Test an existing offer with no exclusions for unchanged pricing.
 
 Automated coverage includes price/threshold/fee regressions, explicit-code revalidation, manager access guards, API round-trip validation, PostgreSQL migration/persistence/catalogue scope, and a browser form round-trip at 320/390/1280 px in CI.
+
+Mobile preview builds its unsaved offer draft from the validated quote’s priced lines and category IDs. The adapter regression exercises quote mapping and real rebate eligibility together, including automatic/code selection, weighted and multi-quantity prices, minimums, loyalty allocation and slab guidance.
