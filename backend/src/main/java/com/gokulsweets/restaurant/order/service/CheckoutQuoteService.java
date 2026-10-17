@@ -51,6 +51,7 @@ public class CheckoutQuoteService {
      * @param taxAmount the tax amount
      * @param total the total
      * @param productId the product id
+     * @param categoryId the validated product category used by offer exclusions
      */
     public record Line(
             String name,
@@ -58,7 +59,19 @@ public class CheckoutQuoteService {
             String taxRate,
             String taxAmount,
             String total,
-            long productId) {}
+            long productId,
+            Long categoryId) {
+        /** Source compatibility for quote clients without category-based offer metadata. */
+        public Line(
+                String name,
+                String unitPrice,
+                String taxRate,
+                String taxAmount,
+                String total,
+                long productId) {
+            this(name, unitPrice, taxRate, taxAmount, total, productId, null);
+        }
+    }
 
     /**
      * Immutable quote data contract.
@@ -147,7 +160,10 @@ public class CheckoutQuoteService {
                                                     item.taxRate().toPlainString(),
                                                     item.taxAmount().toPlainString(),
                                                     item.lineTotal().toPlainString(),
-                                                    item.product().getId()))
+                                                    item.product().getId(),
+                                                    item.product().getCategory() == null
+                                                            ? null
+                                                            : item.product().getCategory().getId()))
                             .toList(),
                     amounts.subtotal().toPlainString(),
                     amounts.taxAmount().toPlainString(),

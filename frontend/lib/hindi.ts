@@ -913,6 +913,8 @@ Object.assign(hindi, {
   "1 piece": "1 पीस",
   "Reaches this offer’s spend threshold": "इसे जोड़ने पर छूट मिल सकती है",
   "more to unlock this saving in eligible items —": "और जोड़ने पर यह छूट पा सकते हैं —",
+  "off. Add eligible item value before tax. This estimate uses your current loyalty savings; checkout checks the updated basket.": "की छूट। टैक्स से पहले पात्र सामान की राशि जोड़ें। यह अनुमान आपकी मौजूदा लॉयल्टी बचत पर आधारित है; चेकआउट पर नई टोकरी की दोबारा जाँच होगी।",
+  "Add eligible item value before tax. Estimate uses current loyalty savings; checkout checks the updated basket.": "टैक्स से पहले पात्र सामान की राशि जोड़ें। अनुमान मौजूदा लॉयल्टी बचत पर आधारित है; चेकआउट पर नई टोकरी की दोबारा जाँच होगी।",
   "’s next saving:": " की अगली छूट:",
   "off. The convenience fee doesn’t count.": " की बचत। सुविधा शुल्क इसमें नहीं गिना जाता।",
   "Convenience fee": "सुविधा शुल्क",

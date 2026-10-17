@@ -35,4 +35,37 @@ public record AvailableRebateResponse(
         BigDecimal maximumDiscountAmount,
         BigDecimal nextSlabMinimumOrderAmount,
         BigDecimal nextSlabRebateAmount,
-        BigDecimal amountNeededForNextSlab) {}
+        BigDecimal amountNeededForNextSlab,
+        boolean hasExclusions) {
+    /** Source compatibility for callers constructing offers without exclusions. */
+    public AvailableRebateResponse(
+            Long rebateId,
+            String code,
+            String name,
+            String description,
+            RebateScope scope,
+            RebateType rebateType,
+            BigDecimal rebateAmount,
+            BigDecimal payableAfterRebate,
+            BigDecimal minimumOrderAmount,
+            BigDecimal maximumDiscountAmount,
+            BigDecimal nextSlabMinimumOrderAmount,
+            BigDecimal nextSlabRebateAmount,
+            BigDecimal amountNeededForNextSlab) {
+        this(
+                rebateId,
+                code,
+                name,
+                description,
+                scope,
+                rebateType,
+                rebateAmount,
+                payableAfterRebate,
+                minimumOrderAmount,
+                maximumDiscountAmount,
+                nextSlabMinimumOrderAmount,
+                nextSlabRebateAmount,
+                amountNeededForNextSlab,
+                false);
+    }
+}

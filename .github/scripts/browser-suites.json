@@ -35,7 +35,9 @@
     "tests/premium-menu.browser.mjs",
     "tests/mobile-ordering-polish.browser.mjs",
     "tests/mobile-ordering-guidance.browser.mjs",
-    "tests/mobile-ordering-resilience.browser.mjs"
+    "tests/mobile-ordering-resilience.browser.mjs",
+    "tests/menu-campaigns.browser.mjs",
+    "tests/menu-appearance-hook.browser.mjs"
   ],
   "design": [
     "tests/customer-design.browser.mjs",
@@ -83,6 +85,7 @@
     "tests/badge-admin.browser.mjs",
     "tests/native-kitchen-alarm.browser.mjs",
     "tests/payment-provider-admin.browser.mjs",
-    "tests/menu-categories.browser.mjs"
+    "tests/menu-categories.browser.mjs",
+    "tests/offer-exclusions.browser.mjs"
   ]
 }
