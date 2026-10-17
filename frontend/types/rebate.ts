@@ -15,6 +15,7 @@ export type RebateType =
  * GET /api/orders/{orderNumber}/available-rebates
  */
 export interface AvailableRebateResponse {
+    hasExclusions?: boolean;
 
     rebateId: number;
 
