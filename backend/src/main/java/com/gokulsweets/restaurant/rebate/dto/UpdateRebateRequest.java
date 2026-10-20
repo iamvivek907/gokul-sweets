@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
@@ -51,4 +52,6 @@ public record UpdateRebateRequest(
         @NotNull LocalDateTime validFrom,
         @NotNull LocalDateTime validUntil,
         Set<String> customerPhones,
-        List<@Valid RebateSlabRequest> slabs) {}
+        List<@Valid RebateSlabRequest> slabs,
+        @Size(max = 500) Set<@NotNull @Positive Long> excludedProductIds,
+        @Size(max = 500) Set<@NotNull @Positive Long> excludedCategoryIds) {}

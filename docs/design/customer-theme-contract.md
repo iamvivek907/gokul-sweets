@@ -1,3 +1,7 @@
+## Admin-managed menu promotions (October 17)
+
+The phone promotion below Offers & savings uses published Menu appearance banners across Food, Sweets, Bakery and Snacks. Remove built-in seasonal/snack copy and artwork from that position. One branch-scoped, uncached appearance read serves the phone strip, desktop banners and category order. Preserve admin translations, saved framing, category destinations and server-filtered visibility/schedules. Empty or failed optional campaign reads show no promotion and do not block ordering. Homepage campaigns remain separate.
+
 ## October 8 simpler menu and cart pickup
 
 The customer menu keeps one category list, with all portion sizes together. Phone menu families use one product row per item, including retail sweets and snacks. Photos stay clear; disabled Add controls and one inline reason explain unavailable items. Identical reasons for grouped sizes share one message; do not split categories into available and other sections. Pickup changes with a cart show only times approved for all cart quantities and product booking horizons, then recheck that date before confirmation. If the saved date has no matching times, open the first matching date as a draft. Cancellation, failures and stale responses preserve the cart and saved pickup.

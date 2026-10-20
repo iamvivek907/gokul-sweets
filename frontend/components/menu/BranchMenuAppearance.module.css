@@ -78,3 +78,45 @@
 .banner:not(:has(.frame)) {
   grid-template-columns: 1fr;
 }
+
+/* The phone promotion occupies the same place as the old built-in snack strip. */
+.strips {
+  margin: 12px 0;
+  min-width: 0;
+}
+.strip.banner {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  margin: 0 0 12px;
+  min-width: 0;
+  border: 1px solid #eadfd6;
+}
+.strip .frame {
+  order: 2;
+  min-width: 0;
+  min-height: 156px;
+  aspect-ratio: auto;
+}
+.strip .copy {
+  padding: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.strip .copy h2 {
+  font-size: clamp(18px, 5.2vw, 24px);
+  line-height: 1.2;
+}
+.strip .copy p {
+  font-size: 12px;
+  line-height: 1.45;
+}
+.strip .copy button {
+  max-width: 100%;
+  min-height: 44px;
+  padding: 8px 10px;
+  font-size: 12px;
+  text-align: left;
+  white-space: normal;
+}
+.strip.banner:not(:has(.frame)) {
+  grid-template-columns: 1fr;
+}
