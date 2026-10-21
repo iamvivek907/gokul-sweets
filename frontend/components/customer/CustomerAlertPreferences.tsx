@@ -1,13 +1,16 @@
 "use client";
 
 import {useEffect, useState} from "react";
+import PreferenceChoice from "./PreferenceChoice";
+import {PUSH_REGISTRATION_CHANGED, registerCustomerPush} from "@/lib/customerPushRegistration";
 import {apiClient} from "@/services/apiClient";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
-import {activateChime, applicationServerKey, minuteToTime, timeToMinute, type AlertSettings} from "@/lib/notificationAlerts";
+import {activateChime, minuteToTime, timeToMinute, type AlertSettings} from "@/lib/notificationAlerts";
 const base = "/api/customer/identity";
 
 export default function CustomerAlertPreferences() {
     const features = useStorefrontFeatures();
+    const modern = features?.futuristicStorefrontV2 || features?.checkoutExperienceV2;
     const [settings, setSettings] = useState<AlertSettings | null>(null);
     const [draft, setDraft] = useState<AlertSettings | null>(null);
     const [busy, setBusy] = useState(false);
@@ -28,6 +31,22 @@ export default function CustomerAlertPreferences() {
         }).catch(() => {if (live) setMessage("Alert settings could not load. The notification inbox remains available.");});
         return () => {live = false;};
     }, [features?.notificationAlerts]);
+    useEffect(() => {
+        if (!settings) return;
+        const syncDevice = () => {
+            if ("Notification" in window) setPermission(Notification.permission);
+            try {setPushId(localStorage.getItem(`gokul-push-device:${settings.scopeId}`));}
+            catch {setPushId(null);}
+        };
+        window.addEventListener(PUSH_REGISTRATION_CHANGED, syncDevice);
+        window.addEventListener("focus", syncDevice);
+        window.addEventListener("storage", syncDevice);
+        return () => {
+            window.removeEventListener(PUSH_REGISTRATION_CHANGED, syncDevice);
+            window.removeEventListener("focus", syncDevice);
+            window.removeEventListener("storage", syncDevice);
+        };
+    }, [settings]);
     if (!features?.notificationAlerts) return null;
     async function save() {
         if (!draft) return;
@@ -42,31 +61,13 @@ export default function CustomerAlertPreferences() {
     async function enablePush() {
         if (!settings?.applicationServerKey || !supported) return;
         setBusy(true); setMessage("");
-        let newlyCreated: PushSubscription | null = null;
         try {
-            // Invoke permission before any await so the browser sees the explicit user gesture.
-            const granted = await Notification.requestPermission();
+            const granted = await registerCustomerPush(settings);
             setPermission(granted);
             if (granted !== "granted") {setMessage("Browser alerts are not allowed. New updates will still appear in your inbox."); return;}
-            const registration = await navigator.serviceWorker.register("/sw.js");
-            await navigator.serviceWorker.ready;
-            let subscription = await registration.pushManager.getSubscription();
-            if (!subscription) {
-                subscription = await registration.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: applicationServerKey(settings.applicationServerKey)});
-                newlyCreated = subscription;
-            }
-            const keys = subscription.toJSON().keys;
-            const result = await apiClient<{id: string}>(`${base}/push-subscriptions`, {method: "POST", credentials: "include", body: JSON.stringify({endpoint: subscription.endpoint, publicKey: keys?.p256dh, authSecret: keys?.auth})});
-            setPushId(result.id);
-            try {localStorage.setItem(`gokul-push-device:${settings.scopeId}`, result.id);}
-            catch {
-                await apiClient<void>(`${base}/push-subscriptions/${result.id}`, {method: "DELETE", credentials: "include"});
-                await subscription.unsubscribe(); setPushId(null);
-                setMessage("This browser cannot remember the registration. Push was disabled; use your inbox."); return;
-            }
+            setPushId(localStorage.getItem(`gokul-push-device:${settings.scopeId}`));
             setMessage("This browser is registered. Push delivery depends on browser and device settings; your inbox is the reliable record.");
         } catch {
-            if (newlyCreated) await newlyCreated.unsubscribe().catch(() => false);
             setMessage("Browser registration could not be confirmed. Retry when connected, or use the inbox.");
         } finally {setBusy(false);}
     }
@@ -82,25 +83,28 @@ export default function CustomerAlertPreferences() {
                 const subscription = await registration?.pushManager.getSubscription();
                 if (subscription) await subscription.unsubscribe().catch(() => false);
             }
+            window.dispatchEvent(new CustomEvent(PUSH_REGISTRATION_CHANGED, {detail: {enabled: false}}));
             setMessage("Push disabled for this browser. An already accepted browser notification may still arrive; inbox messages remain available.");
         } catch {setMessage("We could not confirm push was disabled. Retry when connected, or revoke notification permission in browser settings.");}
         finally {setBusy(false);}
     }
-    return <div className="mt-6 rounded-2xl border border-[#eadfd6] p-4" aria-label="Browser alerts and sound">
+    return <div className="permission-surface alert-preferences mt-6 rounded-2xl border border-[#eadfd6] p-4" aria-label="Browser alerts and sound">
+        {modern && <p className="permission-eyebrow">Made for your day</p>}
         <h3 className="font-semibold">Browser alerts and sound</h3>
+        {modern && <div className="permission-summary"><span aria-hidden="true">♪</span><p>Pickup updates, your way. Set the sound. Keep your evenings quiet.</p></div>}
         <p className="mt-2 text-sm leading-6">Both are optional. Push uses standard browser notifications. Custom chimes work only in an open, visible page after you activate sound in that tab; muted devices and autoplay rules may prevent sound.</p>
         <p className="mt-2 text-sm leading-6">On iPhone or iPad, add Gokul Sweets to your Home Screen and open that app before enabling push (iOS/iPadOS 16.4 or later). If push is unsupported, use this inbox.</p>
         {settings && draft && <>
-            <div className="mt-4 flex flex-wrap gap-3">
+            <div className="permission-device-actions mt-4 flex flex-wrap gap-3">
                 <button type="button" disabled={busy || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl border px-4 text-sm disabled:opacity-50">{pushId ? "Check this browser registration" : "Enable push for this browser"}</button>
                 {pushId && <button type="button" disabled={busy} onClick={() => void disablePush()} className="min-h-11 rounded-xl border px-4 text-sm">Disable push for this browser</button>}
             </div>
             {!supported && <p className="mt-2 text-xs">This browser does not support push here. Use the inbox for updates.</p>}
             {!settings.pushConfigured && <p className="mt-2 text-xs">Push is not configured yet. The inbox and optional in-page sound remain available.</p>}
             {permission === "denied" && <p className="mt-2 text-sm">Permission is denied. Change it in browser settings if you want push later.</p>}
-            <label className="mt-4 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.soundEnabled} disabled={busy} onChange={event => setDraft({...draft, soundEnabled: event.target.checked})} />Allow in-page chimes</label>
+            {modern ? <PreferenceChoice title="Allow in-page chimes" detail="A gentle sound while the app is open. Activate sound below to try it." enabled={draft.soundEnabled} disabled={busy} onChange={soundEnabled => setDraft({...draft, soundEnabled})} /> : <label className="mt-4 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.soundEnabled} disabled={busy} onChange={event => setDraft({...draft, soundEnabled: event.target.checked})} />Allow in-page chimes</label>}
             <button type="button" className="min-h-11 text-sm underline" onClick={() => void activateChime().then(() => setMessage("Sound activated in this tab. If you heard nothing, check device volume and browser settings.")).catch(() => setMessage("Sound is blocked or unsupported. Your inbox still works."))}>Activate and test sound in this tab</button>
-            <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.quietHoursEnabled} disabled={busy} onChange={event => setDraft({...draft, quietHoursEnabled: event.target.checked})} />Quiet hours for push and chimes (IST)</label>
+            {modern ? <PreferenceChoice title="Quiet hours for push and chimes (IST)" detail="Your downtime matters. Updates stay in your inbox while alerts take a break." enabled={draft.quietHoursEnabled} disabled={busy} onChange={quietHoursEnabled => setDraft({...draft, quietHoursEnabled})} /> : <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.quietHoursEnabled} disabled={busy} onChange={event => setDraft({...draft, quietHoursEnabled: event.target.checked})} />Quiet hours for push and chimes (IST)</label>}
             <div className="mt-2 flex flex-wrap gap-4 text-sm">
                 <label>Start (IST)<input type="time" aria-label="Quiet hours start (IST)" className="ml-2 rounded-lg border p-2" value={minuteToTime(draft.quietStartMinute)} disabled={busy || !draft.quietHoursEnabled} onChange={event => setDraft({...draft, quietStartMinute: timeToMinute(event.target.value)})} /></label>
                 <label>End (IST)<input type="time" aria-label="Quiet hours end (IST)" className="ml-2 rounded-lg border p-2" value={minuteToTime(draft.quietEndMinute)} disabled={busy || !draft.quietHoursEnabled} onChange={event => setDraft({...draft, quietEndMinute: timeToMinute(event.target.value)})} /></label>

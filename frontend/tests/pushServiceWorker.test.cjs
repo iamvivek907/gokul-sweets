@@ -89,3 +89,33 @@ test('staff push wakes only admin clients without losing notification dedupe on 
     }
     assert.deepEqual(messages,['gokul-staff-alert']);
 });
+test('marketing pushes retain playful copy, deduplicate retries and open only their branch', async () => {
+    const runtime = worker();
+    const pending = [];
+    const payload = {eventId: 'marketing:42', title: 'Chai needs a plus-one ☕', body: 'Explore Gokul snacks.', url: '/branches/1'};
+    for (let i = 0; i < 2; i++) runtime.listeners.push({data: {json: () => payload}, waitUntil(value) {pending.push(value);}});
+    await Promise.all(pending);
+    assert.equal(runtime.shown.length, 1);
+    assert.equal(runtime.shown[0].title, payload.title);
+    assert.equal(runtime.shown[0].data.marketing, true);
+    assert.equal(runtime.shown[0].tag, 'gokul-marketing:42');
+    let clicked;
+    runtime.listeners.notificationclick({notification: {data: runtime.shown[0].data, close() {}}, waitUntil(value) {clicked = value;}});
+    await clicked;
+    assert.deepEqual(runtime.opened, ['https://dev.gokulsweets.in/branches/1']);
+});
+test('marketing IDs cannot collide with order IDs or open unsafe destinations', async () => {
+    const runtime = worker();
+    for (const url of ['https://evil.example', '/admin/orders/1', '//evil.example', '/branches/1?redirect=evil', '/orders/1']) {
+        let pending;
+        runtime.listeners.push({data: {json: () => ({eventId: 'marketing:7', title: 'No', url})}, waitUntil(value) {pending = value;}});
+        await pending;
+    }
+    assert.equal(runtime.shown.length, 0);
+    let pending;
+    runtime.listeners.push({data: {json: () => ({eventId: '7', title: 'Order ready', url: '/orders/7'})}, waitUntil(value) {pending = value;}});
+    await pending;
+    runtime.listeners.push({data: {json: () => ({eventId: 'marketing:7', title: 'Snack time', url: '/branches/1'})}, waitUntil(value) {pending = value;}});
+    await pending;
+    assert.equal(runtime.shown.length, 2);
+});

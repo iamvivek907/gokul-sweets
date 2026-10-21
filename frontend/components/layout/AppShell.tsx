@@ -22,6 +22,8 @@ import CustomerFooter
 import PickupJourneyContext from "./PickupJourneyContext";
 import CustomerBreadcrumbs from "./CustomerBreadcrumbs";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import NotificationOptIn from "@/components/customer/NotificationOptIn";
+import "./customer-permissions.css";
 import CustomerAlertRuntime from "@/components/customer/CustomerAlertRuntime";
 import "./futuristic-storefront.css";
 import "./editorial-storefront.css";
@@ -108,6 +110,7 @@ export default function AppShell({
                 {futuristic && <CustomerBreadcrumbs />}
                 {futuristic && <InstallAppBanner compact />}
                 {tourAllowed && <OrderingTour key={pathname} pathname={pathname} onActivityChange={setOrderingGuideActive} />}
+                {!orderingGuideActive && <NotificationOptIn />}
                 {children}
             </main>
 
