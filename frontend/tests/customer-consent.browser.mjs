@@ -31,7 +31,7 @@ try {
         if (!requests.length) requests.push({id: 1, kind: "EXPORT", receivedAt: "2026-09-27T04:00:00Z"});
         return route.fulfill({json: requests[0]});
     });
-    const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3309";
+    const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
     await page.goto(`${base}/profile/privacy`);
     assert.equal(await page.getByRole("region", {name: "Privacy choices"}).count(), 0,
         "Guests must not see optional consent controls.");

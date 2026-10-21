@@ -236,7 +236,7 @@ public class MarketingPushService {
         JOIN order_items oi ON oi.order_id=o.id JOIN products p ON p.id=oi.product_id JOIN categories c ON c.id=p.category_id
         WHERE own.environment=s.environment AND own.verified_subject_id=s.subject_id AND o.branch_id=:branch
         AND o.order_status IN ('PICKED_UP','DELIVERED') AND o.created_at>=(CAST(:now AS timestamptz) AT TIME ZONE 'Asia/Kolkata')-INTERVAL '90 days'
-        AND p.active AND EXISTS (SELECT 1 FROM branch_products bp WHERE bp.branch_id=:branch AND bp.product_id=p.id AND bp.available AND NOT bp.occasion_only)
+        AND p.active AND c.active AND EXISTS (SELECT 1 FROM branch_products bp WHERE bp.branch_id=:branch AND bp.product_id=p.id AND bp.available AND NOT bp.occasion_only)
         GROUP BY c.id,c.name ORDER BY count(DISTINCT o.id) DESC,max(o.created_at) DESC,c.id LIMIT 1
        ) fav ON TRUE
        WHERE s.environment=:env AND s.revoked_at IS NULL AND pref.offer_inbox_enabled
@@ -296,7 +296,7 @@ ORDER BY s.subscribed_at DESC,s.id LIMIT 50
 SELECT EXISTS(SELECT 1 FROM branches WHERE id=? AND active AND opening_time IS NOT NULL AND closing_time IS NOT NULL AND opening_time<>closing_time
 AND CASE WHEN opening_time<closing_time THEN CAST(? AS time)>=opening_time AND CAST(? AS time)<closing_time
  ELSE CAST(? AS time)>=opening_time OR CAST(? AS time)<closing_time END
-AND EXISTS(SELECT 1 FROM branch_products bp JOIN products p ON p.id=bp.product_id WHERE bp.branch_id=branches.id AND bp.available AND p.active AND NOT bp.occasion_only))
+AND EXISTS(SELECT 1 FROM branch_products bp JOIN products p ON p.id=bp.product_id JOIN categories c ON c.id=p.category_id WHERE bp.branch_id=branches.id AND bp.available AND p.active AND c.active AND NOT bp.occasion_only))
 """,
                             Boolean.class,
                             branch,

@@ -56,7 +56,7 @@ class MarketingPushIntegrationTest {
     final UUID subject = UUID.randomUUID();
     MarketingPushService marketing;
     MarketingPushDispatcher dispatcher;
-    long branch, order;
+    long branch, order, category;
     UUID subscription;
 
     @BeforeEach
@@ -75,7 +75,7 @@ class MarketingPushIntegrationTest {
                                 + " (?,'Marketing test','08:00','21:30') RETURNING id",
                         Long.class,
                         "MKT-" + UUID.randomUUID());
-        long category =
+        category =
                 jdbc.queryForObject(
                         "INSERT INTO categories(code,name) VALUES (?,'Marketing sweets') RETURNING"
                                 + " id",
@@ -241,6 +241,35 @@ class MarketingPushIntegrationTest {
                 order);
         jdbc.update("UPDATE branches SET closing_time='15:00' WHERE id=?", branch);
         assertThat(marketing.evaluate(branch)).isZero();
+    }
+
+    @Test
+    void hiddenCategoriesCannotMakeAnEmptyCatalogueEligible() {
+        jdbc.update("UPDATE categories SET active=false WHERE id=?", category);
+        assertThat(marketing.evaluate(branch)).isZero();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM marketing_push_deliveries WHERE subject_id=?",
+                                Integer.class,
+                                subject))
+                .isZero();
+    }
+
+    @Test
+    void categoryHiddenAfterQueueCancelsDelivery() throws Exception {
+        assertThat(marketing.evaluate(branch)).isEqualTo(1);
+        jdbc.update("UPDATE categories SET active=false WHERE id=?", category);
+        dispatcher.dispatchBatch();
+        assertThat(state()).isEqualTo("SKIPPED");
+        verify(transport, never())
+                .sendMarketing(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString());
     }
 
     @Test
