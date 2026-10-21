@@ -33,3 +33,11 @@ Admin's “Evaluate eligible customers now” runs the same rules as the schedul
 5. Choose a branch language, weekly limit and topics; save. Review message previews. Activate PROD only after delivery tests and CI pass.
 
 Admin endpoints require REBATE_MANAGE and access to the requested branch. Settings use optimistic versions. History contains no customer identifiers, subscriptions or secrets. No campaign is activated and no customer receives a message merely by applying the migration.
+
+### PWA opt-in and customer permission design
+
+Installed/standalone PWAs with notification inbox, alerts and customer appearance enabled show an optional notification card on safe customer routes. The card includes an illustrative pickup notification, Enable notifications and Not now. Guests get a sign-in action first. Unsupported devices, unavailable push configuration and failed optional reads do not block ordering. Checkout, cart, order recovery and staff routes never show it.
+
+Skipping hides the card across client navigation for that visit. A fresh document launch, or returning after at least five minutes in the background, starts a new visit and can show it again. No persistent “never ask” flag is written. Successfully registered browsers remain hidden; a read-only status endpoint confirms a remembered enabled device against the current verified session on return. A new or expired session needs another explicit registration tap; returning never silently renews disabled notifications. Explicitly disabling push suppresses the invitation for the remainder of that visit. Browser denial shows device/site settings guidance, never a repeated native permission call. Native permission requests happen only on a tap; OS/browser dialogs retain their own appearance.
+
+Customer privacy, offer preferences, sound and quiet hours use native, keyboard-accessible On/Off radio cards inside the enabled shared customer theme. Optional choices remain separate and retain their existing server defaults. Enabling device push never grants marketing consent or enables offer messages. Privacy export/deletion-review requests retain the existing manual review workflow; they do not claim immediate deletion. The legacy appearance keeps its checkbox controls when the customer design flag is off.

@@ -15,7 +15,9 @@
     "tests/branch-discovery.browser.mjs",
     "tests/customer-alerts.browser.mjs",
     "tests/storefront-reconnect.browser.mjs",
-    "tests/menu-service-hours.browser.mjs"
+    "tests/menu-service-hours.browser.mjs",
+    "tests/notification-opt-in.browser.mjs",
+    "tests/customer-consent.browser.mjs"
   ],
   "menu": [
     "tests/menu-compact-header.browser.mjs",

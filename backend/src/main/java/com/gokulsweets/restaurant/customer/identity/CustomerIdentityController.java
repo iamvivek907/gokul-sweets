@@ -1265,6 +1265,40 @@ public class CustomerIdentityController {
     }
 
     /**
+     * Reads registration status without enabling or renewing browser notifications.
+     *
+     * @param id the browser registration id
+     * @param request the authenticated customer request
+     * @return whether this exact verified session owns a live registration
+     */
+    @GetMapping("/push-subscriptions/{id}")
+    public ResponseEntity<java.util.Map<String, Boolean>> pushRegistration(
+            @PathVariable UUID id, HttpServletRequest request) {
+        final long started =
+                MethodTiming.start(
+                        CustomerIdentityController.class,
+                        "pushRegistration(UUID,HttpServletRequest)");
+        try {
+            var environment = alertEnvironment();
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(
+                            java.util.Map.of(
+                                    "enabled",
+                                    alerts.registered(
+                                            environment.name(),
+                                            requiredSubject(request, environment),
+                                            cookie(request),
+                                            id)));
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    CustomerIdentityController.class,
+                    "pushRegistration(UUID,HttpServletRequest)");
+        }
+    }
+
+    /**
      * Unsubscribes push.
      *
      * @param id the id

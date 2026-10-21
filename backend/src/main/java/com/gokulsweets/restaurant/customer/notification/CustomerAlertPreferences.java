@@ -339,6 +339,43 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
     }
 
     /**
+     * Reads whether this browser registration is active in the current verified session.
+     *
+     * @param environment the isolated application environment
+     * @param subject the verified customer subject
+     * @param token the current verified session token
+     * @param id the opaque browser registration id
+     * @return true only for a live registration owned by this exact session
+     */
+    @Transactional(readOnly = true)
+    public boolean registered(String environment, UUID subject, String token, UUID id) {
+        final long started =
+                MethodTiming.start(
+                        CustomerAlertPreferences.class, "registered(String,UUID,String,UUID)");
+        try {
+            return Boolean.TRUE.equals(
+                    jdbc.queryForObject(
+                            """
+                            SELECT EXISTS (
+                                SELECT 1 FROM customer_push_subscriptions s
+                                JOIN verified_customer_sessions v ON v.id = s.session_id
+                                WHERE s.id = ? AND s.environment = ? AND s.subject_id = ?
+                                  AND s.revoked_at IS NULL AND v.revoked_at IS NULL
+                                  AND v.expires_at > CURRENT_TIMESTAMP AND v.token_digest = ?
+                            )
+                            """,
+                            Boolean.class,
+                            id,
+                            environment,
+                            subject,
+                            digest(token)));
+        } finally {
+            MethodTiming.finish(
+                    started, CustomerAlertPreferences.class, "registered(String,UUID,String,UUID)");
+        }
+    }
+
+    /**
      * Unsubscribes from customer alert preferences data.
      *
      * <p>Writes {@code customer_push_subscriptions}.

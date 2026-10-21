@@ -299,3 +299,7 @@ Location results must be ignored after the address draft or editing target chang
 ### Bounded order history and review contrast
 
 Verified Orders and Profile history share bounded cursor pages. The URL retains filters and position, and detail/review links return to that exact history route. Render only the current page; return ratings with summaries instead of fetching one review per history card. Keep an h1 on the standalone Orders page, readable short order references, labelled status cues, and a manual refresh for desktop and flag-OFF layouts. Modern hero gradients remain feature-scoped; primary review actions use white text on solid dark maroon, and secondary text/star outlines use dark ink. Verify 320px, 390px and desktop, including a rating edit from page 6 and failure recovery without resetting navigation.
+
+## October 21 customer notification and privacy choices
+
+The enabled shared shell uses compact white permission cards, maroon selected radio choices, a muted example notification and readable green informational summaries. Native On/Off radios retain fieldset legends, keyboard controls, visible focus and at least 44px touch targets. Optional marketing, reminders and area insights remain distinct choices. PWA invitations are inline and dismissible, repeat on a new visit until registration, and never interrupt checkout or order recovery. Browser/OS permission dialogs cannot be restyled. Flag-OFF retains legacy checkbox presentation and existing backend consent rules.

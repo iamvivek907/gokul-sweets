@@ -115,6 +115,38 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
     }
 
     @Test
+    void registrationStatusIsReadOnlyAndBoundToLiveSessionSubjectAndEnvironment() {
+        var registration =
+                preferences.subscribe("DEV", subject, token, input(UUID.randomUUID().toString()));
+        assertThat(preferences.registered("DEV", subject, token, registration.id())).isTrue();
+        assertThat(preferences.registered("PROD", subject, token, registration.id())).isFalse();
+        assertThat(preferences.registered("DEV", UUID.randomUUID(), token, registration.id()))
+                .isFalse();
+        assertThat(preferences.registered("DEV", subject, token, UUID.randomUUID())).isFalse();
+        var next = sessions.issue(ConsentEnvironment.DEV, subject, Instant.now());
+        assertThat(preferences.registered("DEV", subject, next.token(), registration.id()))
+                .isFalse();
+        assertThat(preferences.registered("DEV", subject, token, registration.id())).isTrue();
+        preferences.unsubscribe("DEV", subject, registration.id());
+        assertThat(preferences.registered("DEV", subject, token, registration.id())).isFalse();
+        var second =
+                preferences.subscribe("DEV", subject, token, input("another-" + UUID.randomUUID()));
+        assertThat(preferences.registered("DEV", subject, token, second.id())).isTrue();
+        jdbc.update(
+                "UPDATE verified_customer_sessions SET issued_at = CURRENT_TIMESTAMP - INTERVAL '1"
+                        + " hour', expires_at = CURRENT_TIMESTAMP - INTERVAL '1 minute' WHERE"
+                        + " verified_subject_id = ?",
+                subject);
+        assertThat(preferences.registered("DEV", subject, token, second.id())).isFalse();
+        jdbc.update(
+                "UPDATE verified_customer_sessions SET expires_at = CURRENT_TIMESTAMP + INTERVAL '1"
+                        + " day' WHERE verified_subject_id = ?",
+                subject);
+        sessions.revoke(ConsentEnvironment.DEV, token, Instant.now());
+        assertThat(preferences.registered("DEV", subject, token, second.id())).isFalse();
+    }
+
+    @Test
     void deliveryIsAcceptedOnceAndGoneEndpointIsRevokedWhileReadAndQuietEventsStayInInbox()
             throws Exception {
         preferences.save(
