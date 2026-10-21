@@ -157,7 +157,7 @@ export default function CustomerNotificationInbox() {
                         });
                     }} /> Include optional offers in my inbox when available
             </label>
-            <p id="offer-inbox-help" className="mt-2 text-xs leading-5">Offers are optional and off by default. This preference does not grant marketing consent. Offer notifications are not being sent in this release.</p>
+            <p id="offer-inbox-help" className="mt-2 text-xs leading-5">Offers are optional and off by default. This preference does not grant marketing consent. If your branch enables campaigns, you may receive short promotional pushes. At most one per day and three per week, respecting your quiet hours.</p>
             {!preferences.marketingConsentGranted && <p className="mt-2 text-sm">Marketing consent is currently off. Manage it in <Link href="/profile/privacy" className="underline">Privacy and data choices</Link>.</p>}
             {saved && <p role="status" className="mt-2 text-sm">Notification preference saved.</p>}
         </div>}

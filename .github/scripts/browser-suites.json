@@ -86,6 +86,7 @@
     "tests/native-kitchen-alarm.browser.mjs",
     "tests/payment-provider-admin.browser.mjs",
     "tests/menu-categories.browser.mjs",
-    "tests/offer-exclusions.browser.mjs"
+    "tests/offer-exclusions.browser.mjs",
+    "tests/marketing-push.browser.mjs"
   ]
 }
