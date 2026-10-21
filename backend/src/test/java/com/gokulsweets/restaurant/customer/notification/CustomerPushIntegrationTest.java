@@ -147,6 +147,36 @@ VALUES ('DEV', ?, ?, 'PAYMENT_PAID', 'ORDER', 'TEST-ORDER', 'Payment received', 
     }
 
     @Test
+    void statusFingerprintDetectsChangedEndpointsOrKeysWithoutExposingThem() {
+        var browser = input(UUID.randomUUID().toString());
+        var registration = preferences.subscribe("DEV", subject, token, browser);
+        var status = preferences.registrationStatus("DEV", subject, token, registration.id());
+        var expected =
+                java.util.HexFormat.of()
+                        .formatHex(
+                                CustomerAlertPreferences.digest(
+                                        browser.endpoint()
+                                                + "\n"
+                                                + browser.publicKey()
+                                                + "\n"
+                                                + browser.authSecret()));
+        assertThat(status.enabled()).isTrue();
+        assertThat(status.fingerprint()).isEqualTo(expected);
+        jdbc.update(
+                "UPDATE customer_push_subscriptions SET endpoint=endpoint||'-refreshed' WHERE id=?",
+                registration.id());
+        assertThat(
+                        preferences
+                                .registrationStatus("DEV", subject, token, registration.id())
+                                .fingerprint())
+                .isNotEqualTo(expected);
+        assertThat(
+                        preferences.registrationStatus(
+                                "DEV", UUID.randomUUID(), token, registration.id()))
+                .isEqualTo(new CustomerAlertPreferences.SubscriptionStatus(false, null));
+    }
+
+    @Test
     void deliveryIsAcceptedOnceAndGoneEndpointIsRevokedWhileReadAndQuietEventsStayInInbox()
             throws Exception {
         preferences.save(

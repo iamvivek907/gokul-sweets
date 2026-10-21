@@ -70,7 +70,7 @@ public class MarketingPushService {
             List<Map<String, Object>> recent) {}
 
     /** Internal verified identity and one most recently registered active device. */
-    record Candidate(UUID subject, UUID subscription, String category) {}
+    record Candidate(UUID subject, UUID subscription, String category, Long categoryId) {}
 
     /** Returns the configured environment, failing closed if isolation has no valid environment. */
     public String scope() {
@@ -228,11 +228,11 @@ public class MarketingPushService {
             return new org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate(jdbc)
                     .query(
                             """
-       SELECT s.subject_id,s.id, fav.name FROM customer_push_subscriptions s
+       SELECT s.subject_id,s.id, fav.name, fav.id FROM customer_push_subscriptions s
        JOIN verified_customer_sessions v ON v.id=s.session_id
        JOIN customer_notification_preferences pref ON pref.environment=s.environment AND pref.subject_id=s.subject_id
        LEFT JOIN LATERAL (
-        SELECT c.name FROM verified_order_ownership own JOIN orders o ON o.id=own.order_id
+        SELECT c.id,c.name FROM verified_order_ownership own JOIN orders o ON o.id=own.order_id
         JOIN order_items oi ON oi.order_id=o.id JOIN products p ON p.id=oi.product_id JOIN categories c ON c.id=p.category_id
         WHERE own.environment=s.environment AND own.verified_subject_id=s.subject_id AND o.branch_id=:branch
         AND o.order_status IN ('PICKED_UP','DELIVERED') AND o.created_at>=(CAST(:now AS timestamptz) AT TIME ZONE 'Asia/Kolkata')-INTERVAL '90 days'
@@ -275,7 +275,8 @@ ORDER BY s.subscribed_at DESC,s.id LIMIT 50
                                     new Candidate(
                                             (UUID) rs.getObject(1),
                                             (UUID) rs.getObject(2),
-                                            rs.getString(3)));
+                                            rs.getString(3),
+                                            (Long) rs.getObject(4)));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -382,8 +383,8 @@ AND EXISTS(SELECT 1 FROM branch_products bp JOIN products p ON p.id=bp.product_i
                                     queued +=
                                             jdbc.update(
                                                     """
-INSERT INTO marketing_push_deliveries(environment,branch_id,subject_id,subscription_id,send_date,template_key,topic,title,message,reason,expires_at,created_at,next_attempt_at)
-VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,send_date) DO NOTHING
+INSERT INTO marketing_push_deliveries(environment,branch_id,subject_id,subscription_id,send_date,template_key,topic,title,message,reason,expires_at,created_at,next_attempt_at,promoted_category_id)
+VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,send_date) DO NOTHING
 """,
                                                     scope(),
                                                     branch,
@@ -402,7 +403,10 @@ VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(environment,subject_id,send_date)
                                                                     + " preference",
                                                     Timestamp.from(now.plusSeconds(900)),
                                                     Timestamp.from(now),
-                                                    Timestamp.from(now));
+                                                    Timestamp.from(now),
+                                                    topic.equals(preference)
+                                                            ? candidate.categoryId()
+                                                            : null);
                                 }
                                 return queued;
                             }),

@@ -46,6 +46,7 @@ public class MarketingPushDispatcher {
             String topic,
             int attempts,
             Instant expires,
+            Long category,
             UUID lease) {}
 
     /** Evaluates enabled branches periodically, then dispatches a bounded batch. */
@@ -158,6 +159,7 @@ ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                                             rs.getString("topic"),
                                             rs.getInt("attempts") + 1,
                                             rs.getTimestamp("expires_at").toInstant(),
+                                            (Long) rs.getObject("promoted_category_id"),
                                             UUID.randomUUID()),
                             marketing.scope(),
                             Timestamp.from(now));
@@ -199,6 +201,20 @@ ORDER BY d.id LIMIT 1 FOR UPDATE OF d SKIP LOCKED
                             ConsentEnvironment.valueOf(marketing.scope()),
                             task.subject(),
                             ConsentPurpose.MARKETING)) return false;
+            // Old sweets reservations without a target cannot prove that the promoted category is
+            // live.
+            if ("SWEETS".equals(task.topic()) && task.category() == null) return false;
+            if (task.category() != null
+                    && !Boolean.TRUE.equals(
+                            jdbc.queryForObject(
+                                    """
+SELECT EXISTS (SELECT 1 FROM branch_products bp
+JOIN products p ON p.id=bp.product_id JOIN categories c ON c.id=p.category_id
+WHERE bp.branch_id=? AND c.id=? AND bp.available AND p.active AND c.active AND NOT bp.occasion_only)
+""",
+                                    Boolean.class,
+                                    task.branch(),
+                                    task.category()))) return false;
             int reserved =
                     jdbc.queryForObject(
                             "SELECT count(*) FROM marketing_push_deliveries WHERE environment=? AND"

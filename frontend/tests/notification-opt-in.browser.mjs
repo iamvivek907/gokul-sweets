@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {createHash} from "node:crypto";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
@@ -6,7 +7,7 @@ const browser = await chromium.launch({headless: true, executablePath: process.e
 const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
 let settings = {soundEnabled: false, quietHoursEnabled: false, quietStartMinute: 1320, quietEndMinute: 480,
     scopeId: "test-alert-subject", pushConfigured: true, applicationServerKey: Buffer.concat([Buffer.from([4]), Buffer.alloc(64)]).toString("base64url")};
-let authenticated = true, marketing = false, consentWrites = 0, failSubscription = false, registrationActive = true;
+let authenticated = true, marketing = false, consentWrites = 0, failSubscription = false, registrationActive = true, rotated = false;
 let enabled = true, nextId = 42, revoked = false, subscriptions = 0;
 await context.addInitScript(() => {
     Object.defineProperty(navigator, "standalone", {value: true, configurable: true});
@@ -50,7 +51,7 @@ await context.route("**/api/**", async route => {
     else if (path === "/api/customer/identity/consents/MARKETING") {consentWrites++; marketing = route.request().postDataJSON().granted; json = {granted: marketing, policyVersion: "test", recordedAt: null};}
     else if (path === "/api/customer/identity/privacy-requests") json = [];
     else if (path === "/api/customer/identity/push-subscriptions") {subscriptions++; if (failSubscription) return route.fulfill({status: 503, json: {message: "Retry"}}); json = {id: "browser-registration"};}
-    else if (path === "/api/customer/identity/push-subscriptions/browser-registration") {if (route.request().method() === "GET") json = {enabled: registrationActive}; else {revoked = true; return route.fulfill({status: 204});}}
+    else if (path === "/api/customer/identity/push-subscriptions/browser-registration") {if (route.request().method() === "GET") json = {enabled: registrationActive, fingerprint: createHash("sha256").update(`https://fcm.googleapis.com/fcm/send/${rotated ? "old-device" : "browser-test"}\ntest-key\ntest-auth`).digest("hex")}; else {revoked = true; return route.fulfill({status: 204});}}
     return route.fulfill({json});
 });
 
@@ -118,6 +119,11 @@ try {
     assert.equal(await card.count(), 0, "A confirmed enabled device stays hidden on the next launch");
     assert.equal(await page.evaluate(() => window._permissionRequests), 0);
     assert.equal(subscriptions, 2, "Returning only reads registration status");
+    rotated = true;
+    await page.reload(); await card.waitFor();
+    assert.equal(await page.evaluate(() => window._permissionRequests), 0, "Rotation never requests permission automatically");
+    assert.equal(subscriptions, 2, "Rotation requires an explicit registration action");
+    rotated = false;
     registrationActive = false;
     await page.reload(); await card.waitFor();
     assert.equal(await page.evaluate(() => window._permissionRequests), 0, "Expired sessions require an explicit registration action");

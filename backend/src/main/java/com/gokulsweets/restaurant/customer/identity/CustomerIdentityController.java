@@ -1272,8 +1272,10 @@ public class CustomerIdentityController {
      * @return whether this exact verified session owns a live registration
      */
     @GetMapping("/push-subscriptions/{id}")
-    public ResponseEntity<java.util.Map<String, Boolean>> pushRegistration(
-            @PathVariable UUID id, HttpServletRequest request) {
+    public ResponseEntity<
+                    com.gokulsweets.restaurant.customer.notification.CustomerAlertPreferences
+                            .SubscriptionStatus>
+            pushRegistration(@PathVariable UUID id, HttpServletRequest request) {
         final long started =
                 MethodTiming.start(
                         CustomerIdentityController.class,
@@ -1283,13 +1285,11 @@ public class CustomerIdentityController {
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
                     .body(
-                            java.util.Map.of(
-                                    "enabled",
-                                    alerts.registered(
-                                            environment.name(),
-                                            requiredSubject(request, environment),
-                                            cookie(request),
-                                            id)));
+                            alerts.registrationStatus(
+                                    environment.name(),
+                                    requiredSubject(request, environment),
+                                    cookie(request),
+                                    id));
         } finally {
             MethodTiming.finish(
                     started,

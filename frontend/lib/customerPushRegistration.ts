@@ -40,3 +40,11 @@ export async function confirmCustomerPush(settings: AlertSettings, subscription:
         throw new Error("Push registration cannot be remembered");
     }
 }
+
+/** Same UTF-8 payload and SHA-256 encoding as the read-only server status endpoint. */
+export async function pushSubscriptionFingerprint(subscription: PushSubscription) {
+    const keys = subscription.toJSON().keys;
+    if (!keys?.p256dh || !keys.auth) throw new Error("Push subscription keys unavailable");
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${subscription.endpoint}\n${keys.p256dh}\n${keys.auth}`));
+    return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, "0")).join("");
+}

@@ -273,6 +273,51 @@ class MarketingPushIntegrationTest {
     }
 
     @Test
+    void hiddenRecommendedCategoryWithAnotherVisibleCategoryMustCancelPromotion() throws Exception {
+        long otherCategory =
+                jdbc.queryForObject(
+                        "INSERT INTO categories(code,name) VALUES (?,'Meals') RETURNING id",
+                        Long.class,
+                        "REVIEW-" + UUID.randomUUID());
+        long otherProduct =
+                jdbc.queryForObject(
+                        "INSERT INTO products(code,category_id,name,base_price) VALUES"
+                                + " (?,?,'Meal',100) RETURNING id",
+                        Long.class,
+                        "REVIEW-" + UUID.randomUUID(),
+                        otherCategory);
+        jdbc.update(
+                "INSERT INTO branch_products(branch_id,product_id) VALUES (?,?)",
+                branch,
+                otherProduct);
+        assertThat(marketing.evaluate(branch)).isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT topic FROM marketing_push_deliveries WHERE subject_id=?",
+                                String.class,
+                                subject))
+                .isEqualTo("SWEETS");
+        jdbc.update("UPDATE categories SET active=false WHERE id=?", category);
+        when(transport.sendMarketing(
+                        anyString(),
+                        anyString(),
+                        anyString(),
+                        anyLong(),
+                        anyString(),
+                        anyString(),
+                        anyString()))
+                .thenReturn(201);
+        dispatcher.dispatchBatch();
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT state FROM marketing_push_deliveries WHERE subject_id=?",
+                                String.class,
+                                subject))
+                .as("The promoted sweets category is no longer visible")
+                .isEqualTo("SKIPPED");
+    }
+
+    @Test
     void rollingWeeklyCapAppliesBeforeQueueing() {
         for (int i = 1; i <= 3; i++)
             jdbc.update(
