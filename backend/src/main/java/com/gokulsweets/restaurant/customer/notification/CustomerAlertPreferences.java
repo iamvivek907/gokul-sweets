@@ -83,6 +83,9 @@ public class CustomerAlertPreferences {
      */
     public record SubscriptionResult(UUID id) {}
 
+    /** Current-session registration status and a one-way digest of its browser subscription. */
+    public record SubscriptionStatus(boolean enabled, String fingerprint) {}
+
     /**
      * Returns whether the configured prerequisites for this feature are enabled.
      *
@@ -335,6 +338,80 @@ INSERT INTO customer_push_subscriptions(id, environment, subject_id, session_id,
                     __gokulMethodStartedNanos,
                     CustomerAlertPreferences.class,
                     "subscribe(String,UUID,String,SubscriptionInput)");
+        }
+    }
+
+    /**
+     * Reads whether this browser registration is active in the current verified session.
+     *
+     * @param environment the isolated application environment
+     * @param subject the verified customer subject
+     * @param token the current verified session token
+     * @param id the opaque browser registration id
+     * @return true only for a live registration owned by this exact session
+     */
+    @Transactional(readOnly = true)
+    public boolean registered(String environment, UUID subject, String token, UUID id) {
+        final long started =
+                MethodTiming.start(
+                        CustomerAlertPreferences.class, "registered(String,UUID,String,UUID)");
+        try {
+            return registrationStatus(environment, subject, token, id).enabled();
+        } finally {
+            MethodTiming.finish(
+                    started, CustomerAlertPreferences.class, "registered(String,UUID,String,UUID)");
+        }
+    }
+
+    /**
+     * Reads a fingerprint that lets the browser detect a refreshed endpoint or encryption keys.
+     *
+     * @param environment the application environment
+     * @param subject the verified subject
+     * @param token the live session token
+     * @param id the browser registration id
+     * @return active status and a SHA-256 fingerprint, without exposing endpoint or key material
+     */
+    @Transactional(readOnly = true)
+    public SubscriptionStatus registrationStatus(
+            String environment, UUID subject, String token, UUID id) {
+        final long started =
+                MethodTiming.start(
+                        CustomerAlertPreferences.class,
+                        "registrationStatus(String,UUID,String,UUID)");
+        try {
+            return jdbc
+                    .query(
+                            """
+SELECT s.endpoint,s.public_key,s.auth_secret FROM customer_push_subscriptions s
+JOIN verified_customer_sessions v ON v.id=s.session_id
+WHERE s.id=? AND s.environment=? AND s.subject_id=? AND s.revoked_at IS NULL
+  AND v.environment=s.environment AND v.verified_subject_id=s.subject_id
+  AND v.revoked_at IS NULL AND v.expires_at>CURRENT_TIMESTAMP AND v.token_digest=?
+""",
+                            (rs, row) ->
+                                    new SubscriptionStatus(
+                                            true,
+                                            HexFormat.of()
+                                                    .formatHex(
+                                                            digest(
+                                                                    rs.getString(1)
+                                                                            + "\n"
+                                                                            + rs.getString(2)
+                                                                            + "\n"
+                                                                            + rs.getString(3)))),
+                            id,
+                            environment,
+                            subject,
+                            digest(token))
+                    .stream()
+                    .findFirst()
+                    .orElse(new SubscriptionStatus(false, null));
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    CustomerAlertPreferences.class,
+                    "registrationStatus(String,UUID,String,UUID)");
         }
     }
 

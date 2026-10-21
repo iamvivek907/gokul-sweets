@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
-const browser = await chromium.launch({headless: true});
+const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_PATH});
 const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
 let settings = {soundEnabled: false, quietHoursEnabled: false, quietStartMinute: 1320, quietEndMinute: 480,
     scopeId: "test-alert-subject", pushConfigured: true, applicationServerKey: Buffer.concat([Buffer.from([4]), Buffer.alloc(64)]).toString("base64url")};
@@ -74,7 +74,7 @@ try {
     await page.evaluate(() => {window._blockAudio = false;});
     await page.getByRole("button", {name: "Activate and test sound in this tab"}).click();
     await page.getByText("Sound activated in this tab.", {exact: false}).waitFor();
-    await page.getByRole("checkbox", {name: "Allow in-page chimes"}).check();
+    await page.getByRole("group", {name: "Allow in-page chimes"}).getByRole("radio", {name: "On", exact: true}).click();
     await page.getByRole("button", {name: "Save alert preferences"}).click();
     await page.getByText("Alert preferences saved.", {exact: true}).waitFor();
     await page.waitForFunction(() => Object.keys(localStorage).some(key => key.startsWith("gokul-alert-cursor:")));

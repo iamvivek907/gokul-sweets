@@ -59,6 +59,13 @@ dependencies {
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
 }
 
+// Bound retained Spring application contexts as this integration suite grows.
+// Closed LRU contexts release their pools and web servers instead of exhausting the test JVM.
+tasks.withType(Test).configureEach {
+    maxHeapSize = '768m'
+    systemProperty 'spring.test.context.cache.maxSize', '8'
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
 }

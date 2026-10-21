@@ -534,7 +534,7 @@ export default function WorkspaceAppearance({
                   )}
                 </div>
                 <p className={styles.notice}>
-                  Published banners replace the phone menu promotion below Offers &amp; savings across Food, Sweets, Bakery and Snacks. Desktop uses the same published content. Marketing content does not change stock, prices, ratings or
+                  Published banners replace the phone menu promotion below Offers &amp; savings across Food, Sweets, Bakery and Snacks. Desktop uses the same published content. One category banner can introduce up to eight live categories using the same artwork; publish multiple banners to choose each slide’s artwork, copy and category. Marketing content does not change stock, prices, ratings or
                   offers.
                 </p>
               </section>
