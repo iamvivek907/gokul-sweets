@@ -166,6 +166,30 @@ public class WebPushTransport {
         }
     }
 
+    /** Sends approved marketing copy with a separate service-worker deduplication namespace. */
+    public int sendMarketing(
+            String endpoint,
+            String publicKey,
+            String auth,
+            long eventId,
+            String title,
+            String body,
+            String url)
+            throws Exception {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        WebPushTransport.class,
+                        "sendMarketing(String,String,String,long,String,String,String)");
+        try {
+            return transmit(endpoint, publicKey, auth, "marketing:" + eventId, title, body, url);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    WebPushTransport.class,
+                    "sendMarketing(String,String,String,long,String,String,String)");
+        }
+    }
+
     /**
      * Sends staff.
      *

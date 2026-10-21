@@ -1,4 +1,6 @@
 "use client";
+import PreferenceChoice from "./PreferenceChoice";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import BrandLoading from "@/components/common/BrandLoading";
 import {T} from "@/lib/language";
 
@@ -22,6 +24,8 @@ type Inbox = {messages: Message[]; unreadCount: number; nextBefore: number | nul
 type Preferences = {offerInboxEnabled: boolean; marketingConsentGranted: boolean};
 
 export default function CustomerNotificationInbox() {
+    const features = useStorefrontFeatures();
+    const modern = features?.futuristicStorefrontV2 || features?.checkoutExperienceV2;
     const [search, setSearch] = useState("");
     const [unreadOnly, setUnreadOnly] = useState(false);
     const query = new URLSearchParams({search, unreadOnly: String(unreadOnly)}).toString();
@@ -144,10 +148,15 @@ export default function CustomerNotificationInbox() {
                 setInbox(current => current ? {...older, messages: [...current.messages, ...older.messages.filter(item => !current.messages.some(existing => existing.id === item.id))]} : older);
             })}>Load older messages</button>}
         <details className="mt-6 rounded-2xl border p-4"><summary className="cursor-pointer font-semibold">Notification settings</summary>
-        {preferences && <div className="mt-7 rounded-2xl bg-[#fffaf2] p-4">
+        {preferences && <div className="permission-surface mt-7 rounded-2xl bg-[#fffaf2] p-4">
             <h3 className="font-semibold">Notification preferences</h3>
             <p className="mt-2 text-sm leading-6">Order and payment messages stay in this inbox. Optional browser alerts and sound have separate controls below when available. SMS and email alerts are not enabled here.</p>
-            <label className="mt-3 flex min-h-11 items-center gap-3 text-sm">
+            {modern ? <PreferenceChoice title="Include optional offers in my inbox when available" detail="A little food inspiration, only if you want it." enabled={preferences.offerInboxEnabled} disabled={busy || !preferences.marketingConsentGranted && !preferences.offerInboxEnabled} onChange={enabled => {
+                void perform(async () => {
+                    const choices = await inboxRequest<Preferences>(`${base}/notification-preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({offerInboxEnabled: enabled})});
+                    setPreferences(choices); setSaved("Notification preference saved.");
+                });
+            }} /> : <label className="mt-3 flex min-h-11 items-center gap-3 text-sm">
                 <input type="checkbox" checked={preferences.offerInboxEnabled} disabled={busy || !preferences.marketingConsentGranted && !preferences.offerInboxEnabled}
                     aria-describedby="offer-inbox-help" onChange={event => {
                         const enabled = event.target.checked;
@@ -156,8 +165,8 @@ export default function CustomerNotificationInbox() {
                             setPreferences(choices); setSaved("Notification preference saved.");
                         });
                     }} /> Include optional offers in my inbox when available
-            </label>
-            <p id="offer-inbox-help" className="mt-2 text-xs leading-5">Offers are optional and off by default. This preference does not grant marketing consent. Offer notifications are not being sent in this release.</p>
+            </label>}
+            <p id="offer-inbox-help" className="mt-2 text-xs leading-5">Offers are optional and off by default. This preference does not grant marketing consent. If your branch enables campaigns, you may receive short promotional pushes. At most one per day and three per week, respecting your quiet hours.</p>
             {!preferences.marketingConsentGranted && <p className="mt-2 text-sm">Marketing consent is currently off. Manage it in <Link href="/profile/privacy" className="underline">Privacy and data choices</Link>.</p>}
             {saved && <p role="status" className="mt-2 text-sm">Notification preference saved.</p>}
         </div>}

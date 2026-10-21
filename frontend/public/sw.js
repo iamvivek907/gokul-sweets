@@ -356,7 +356,8 @@ async function networkFirstNavigation(
 }
 
 // Stage-specific push works while the app is closed; custom audio belongs to an explicitly activated page.
-function notificationDestination(value, staff = false) {
+function notificationDestination(value, staff = false, marketing = false) {
+    if (marketing) return typeof value === "string" && /^\/branches\/[1-9][0-9]{0,18}$/.test(value) ? value : "/profile#account-notifications";
     if (staff) return typeof value === "string" && (/^\/admin\/orders\/[A-Za-z0-9_%.-]{1,200}$/.test(value) || /^\/admin\/occasion-enquiries\?branch=[0-9]{1,20}&enquiry=[a-f0-9-]{36}$/.test(value)) ? value : "/admin/staff-notifications";
     return typeof value === "string" && (/^\/orders\/[A-Za-z0-9_%.-]{1,200}(?:#order-review)?$/.test(value) || /^\/occasions(?:#occasion-|\/requests\?enquiry=)[A-Za-z0-9_%.-]{1,200}$/.test(value)) ? value : "/profile#account-notifications";
 }
@@ -364,7 +365,7 @@ let pushSequence = Promise.resolve();
 self.addEventListener("push", event => {
     let payload;
     try {payload = event.data?.json();} catch {return;}
-    if (!payload || !/^(?:staff:)?[0-9]{1,20}$/.test(String(payload.eventId))) return;
+    if (!payload || !/^(?:staff:|marketing:)?[0-9]{1,20}$/.test(String(payload.eventId))) return;
     const eventId = String(payload.eventId);
     pushSequence = pushSequence.catch(() => {}).then(async () => {
         const cache = await caches.open(PUSH_DEDUPE_CACHE);
@@ -373,14 +374,16 @@ self.addEventListener("push", event => {
         const seen = previous ? await previous.json() : [];
         if (Array.isArray(seen) && seen.includes(eventId)) return;
         const staff = eventId.startsWith("staff:");
-        const destination = notificationDestination(payload.url, staff);
+        const marketing = eventId.startsWith("marketing:");
+        const destination = notificationDestination(payload.url, staff, marketing);
+        if (marketing && destination === "/profile#account-notifications") return;
         const custom = destination !== "/profile#account-notifications" && destination !== "/admin/staff-notifications";
         const title = custom && typeof payload.title === "string" ? payload.title.slice(0, 80) : "Gokul Sweets";
         const body = custom && typeof payload.body === "string" ? payload.body.slice(0, 500) : "A new account update is waiting in your notification inbox.";
         await self.registration.showNotification(title, {
             body, silent: false, ...(staff ? {vibrate: [300, 120, 300, 120, 500]} : {}), badge: "/notification-badge.svg",
-            icon: "/icon-192.png", tag: `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: staff, requireInteraction: staff,
-            data: {url: destination, staff}
+            icon: "/icon-192.png", tag: marketing ? `gokul-${eventId}` : `gokul-${staff ? "staff" : "customer"}-${destination.split("#")[0]}`, renotify: staff, requireInteraction: staff,
+            data: {url: destination, staff, marketing}
         });
         if (staff) {
             try {
@@ -400,7 +403,7 @@ self.addEventListener("push", event => {
 self.addEventListener("notificationclick", event => {
     event.notification.close();
     event.waitUntil((async () => {
-        const url = new URL(notificationDestination(event.notification.data?.url, event.notification.data?.staff === true), self.location.origin).href;
+        const url = new URL(notificationDestination(event.notification.data?.url, event.notification.data?.staff === true, event.notification.data?.marketing === true), self.location.origin).href;
         const windows = await self.clients.matchAll({type: "window", includeUncontrolled: true});
         for (const client of windows) {
             const current = new URL(client.url);

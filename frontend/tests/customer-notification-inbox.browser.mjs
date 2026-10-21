@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
-const browser = await chromium.launch({headless: true});
+const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_PATH});
 const context = await browser.newContext({viewport: {width: 390, height: 844}, timezoneId: "America/Los_Angeles"});
 const page = await context.newPage();
 let enabled = true, authenticated = true, failLoad = false, failRead = false, read = false, reads = 0;
@@ -93,7 +93,7 @@ try {
     }
     await page.setViewportSize({width:390,height:844});
     await page.getByText("Notification settings", {exact: true}).click();
-    assert.equal(await page.getByRole("checkbox", {name: "Include optional offers in my inbox when available"}).isDisabled(), true);
+    assert.equal(await page.getByRole("group", {name: "Include optional offers in my inbox when available"}).getByRole("radio", {name: "On", exact: true}).isDisabled(), true);
     const review=page.getByRole("link",{name:"Share an optional review"});
     assert.equal(await review.evaluate(element=>getComputedStyle(element).color),"rgb(255, 255, 255)");
     assert.equal(await review.evaluate(element=>getComputedStyle(element).backgroundColor),"rgb(143, 24, 56)","notification review uses the shared maroon primary action");

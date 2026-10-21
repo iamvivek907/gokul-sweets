@@ -3,7 +3,7 @@ import {createRequire} from "node:module";
 
 const require = createRequire(import.meta.url);
 const {chromium} = require(process.env.PLAYWRIGHT_MODULE ?? "playwright");
-const browser = await chromium.launch({headless: true});
+const browser = await chromium.launch({headless: true, executablePath: process.env.CHROMIUM_PATH});
 const page = await browser.newPage();
 let authenticated = false;
 let consentEnabled = false;
@@ -31,8 +31,8 @@ try {
         if (!requests.length) requests.push({id: 1, kind: "EXPORT", receivedAt: "2026-09-27T04:00:00Z"});
         return route.fulfill({json: requests[0]});
     });
-    const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3309";
-    await page.goto(`${base}/profile`);
+    const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
+    await page.goto(`${base}/profile/privacy`);
     assert.equal(await page.getByRole("region", {name: "Privacy choices"}).count(), 0,
         "Guests must not see optional consent controls.");
 
@@ -47,9 +47,11 @@ try {
     await choices.waitFor();
     const checkbox = choices.getByRole("checkbox", {name: "Offers and news"});
     assert.equal(await checkbox.isChecked(), false);
-    await checkbox.check();
+    await checkbox.click();
+    await page.waitForFunction(() => document.querySelector('input[aria-label="Offers and news"]')?.checked === true);
     assert.equal(marketing, true);
-    await checkbox.uncheck();
+    await checkbox.click();
+    await page.waitForFunction(() => document.querySelector('input[aria-label="Offers and news"]')?.checked === false);
     assert.equal(marketing, false);
     await choices.getByRole("button", {name: "Request data export"}).click();
     await choices.getByRole("button", {name: "Export request received"}).waitFor();
