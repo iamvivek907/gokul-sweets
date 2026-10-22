@@ -15,7 +15,7 @@ test('installer ZIP and tracked payload are identical for LF and Windows CRLF ch
             fs.mkdirSync(agent, {recursive: true});
             fs.mkdirSync(path.join(checkout, 'frontend/lib'), {recursive: true});
             fs.copyFileSync(path.join(__dirname, 'package.cjs'), path.join(agent, 'package.cjs'));
-            for (const name of ['agent.py', 'alarm.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd', 'macos.py', 'install-macos.command']) {
+            for (const name of ['agent.py', 'alarm.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd', 'macos.py', 'install-macos.command', 'disable-alert-macos.command']) {
                 const source = fs.readFileSync(path.join(__dirname, name), 'utf8').replace(/\r\n?/g, '\n');
                 fs.writeFileSync(path.join(agent, name), source.replace(/\n/g, ending));
             }
@@ -25,6 +25,7 @@ test('installer ZIP and tracked payload are identical for LF and Windows CRLF ch
         }
         assert.deepEqual(archives[1], archives[0]);
         assert.deepEqual(payloads[1], payloads[0]);
+        assert.ok(archives[0].includes(Buffer.from('disable-alert-macos.command')));
         assert.ok(archives[0].includes(Buffer.from('@echo off\r\npowershell.exe')));
     } finally {
         fs.rmSync(root, {recursive: true, force: true});

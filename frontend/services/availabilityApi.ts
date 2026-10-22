@@ -17,6 +17,8 @@ export interface ItemAvailability {
 }
 export interface CartAvailability {
     recheckAt?: string | null;
+    observedAt?: string | null;
+    receivedMonotonic?: number;
     fulfilmentType: "PICKUP";
     today: string;
     maximumDate: string;
@@ -61,7 +63,14 @@ export async function checkCartAvailability(
     const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true&compact=true&versioned=true" : ""}`, {
         method: "POST", signal, body: JSON.stringify({startDate, days, items, fulfilmentType: "PICKUP"})
     });
-    return expandMenuPreview(data);
+    return {...expandMenuPreview(data), receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
+}
+
+/** Server-relative boundary; older servers retain the existing periodic refresh fallback. */
+export function menuPreviewDeadline(data: CartAvailability): number | null {
+    if (!data.observedAt || !data.recheckAt || !Number.isFinite(data.receivedMonotonic)) return null;
+    const remaining = Date.parse(data.recheckAt) - Date.parse(data.observedAt);
+    return Number.isFinite(remaining) ? data.receivedMonotonic! + Math.max(0, remaining) : null;
 }
 
 /** Branch capacity only; item validation follows on the selected date. */
@@ -81,7 +90,7 @@ export async function checkMenuAvailability(
     for (let offset = 0; offset < items.length; offset += 200) {
         signal?.throwIfAborted();
         const batches = [items.slice(offset, offset + 100), items.slice(offset + 100, offset + 200)].filter(batch => batch.length);
-        const complete = await Promise.all(batches.map(batch => {
+        const complete = await Promise.all(batches.map(async batch => {
             signal?.throwIfAborted();
             return checkCartAvailability(branchId, startDate, days, batch, signal, true);
         }));
@@ -89,7 +98,10 @@ export async function checkMenuAvailability(
     }
     const first = responses[0];
     const boundaries = responses.map(value => value.recheckAt).filter((value): value is string => !!value).sort((left, right) => Date.parse(left) - Date.parse(right));
-    return {...first, recheckAt: boundaries[0] ?? first.recheckAt, dates: first.dates.map(day => {
+    const timed = responses.filter(value => menuPreviewDeadline(value) !== null)
+        .sort((left, right) => menuPreviewDeadline(left)! - menuPreviewDeadline(right)!)[0];
+    return {...first, recheckAt: timed?.recheckAt ?? boundaries[0] ?? first.recheckAt,
+        observedAt: timed?.observedAt, receivedMonotonic: timed?.receivedMonotonic, dates: first.dates.map(day => {
         const parts = responses.map(response => response.dates.find(value => value.date === day.date));
         return {...day,
             available: parts.every(part => part?.available === true),

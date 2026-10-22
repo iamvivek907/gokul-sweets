@@ -19,6 +19,7 @@ import java.util.Map;
  * @param today original service date
  * @param maximumDate original ordering limit
  * @param dates original dated decisions with indexed slot issues
+ * @param observedAt server time at response construction
  * @param recheckAt next clock-driven decision boundary
  * @param issueCatalog distinct issues in first-occurrence order, scoped to this response only
  */
@@ -28,7 +29,8 @@ public record CompactMenuAvailability(
         LocalDate maximumDate,
         List<Date> dates,
         List<ItemAvailability> issueCatalog,
-        Instant recheckAt) {
+        Instant recheckAt,
+        Instant observedAt) {
 
     /**
      * Encodes the exact full preview with response-local indexes; stock and validation are
@@ -81,7 +83,8 @@ public record CompactMenuAvailability(
                     source.maximumDate(),
                     List.copyOf(dates),
                     List.copyOf(indexes.keySet()),
-                    source.recheckAt());
+                    source.recheckAt(),
+                    Instant.now());
         } finally {
             MethodTiming.finish(
                     started,

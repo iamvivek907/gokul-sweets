@@ -67,3 +67,7 @@ Before enabling production: check direct-SQL ready quantity, held/committed quan
 ### Versioned preview verification
 
 Local validation: 25 targeted backend tests pass, including cache identity/expiry/bounds, fresh version probes, failed-commit publication, legacy/opt-in HTTP routing, preparation/midnight boundaries and existing preview deadlines/coalescing. Java compilation, formatting and timing coverage pass. All 246 frontend Node tests pass in UTC and America/Los_Angeles; TypeScript, ESLint and the production build pass. Browser checks cover unchanged-token request counts, changed stock disabling/re-enabling Add, preserved cart/pickup, and existing future-pickup/service-hour/large-menu regressions. PostgreSQL trigger and repeatable-read concurrency tests are compiled and await CI execution. The final clock-skew browser assertion is checked again on the rebuilt frontend before handoff.
+
+### Preview correctness safeguards
+
+Manual sold-out and missing-dependency closures stay excluded from menu-wide previews; only known temporal closures may reopen for a future pickup. Inventory invalidations coalesce while a preview or soonest-pickup search is running, so continuous stock updates cannot starve completed results. Changing the branch, pickup or cart still cancels obsolete work. Cutoff timers use fresh server observation timestamps and monotonic elapsed time, independent of the customer device wall clock; older servers retain the periodic refresh fallback. Checkout continues validating and reserving stock in PostgreSQL.

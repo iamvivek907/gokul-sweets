@@ -88,7 +88,9 @@ class CompactMenuAvailabilityTest {
     @Test
     void exactIssuesAndDecisionsRoundTripAcrossSlotsAndDates() {
         var source = preview();
+        var beforeEncoding = java.time.Instant.now();
         var encoded = CompactMenuAvailability.from(source);
+        assertThat(encoded.observedAt()).isBetween(beforeEncoding, java.time.Instant.now());
         assertThat(encoded.issueCatalog()).hasSize(2);
         var dates =
                 encoded.dates().stream()

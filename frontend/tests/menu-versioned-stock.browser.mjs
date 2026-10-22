@@ -26,7 +26,7 @@ try {for(const width of [390,1280]) {
   else if(path.endsWith('/availability')){
    checks++;
    const items=[{productId:1,productName:product.name,available,code:available?null:'QUANTITY_TOO_LARGE',reason:available?null:'No online quantity remains.'},{productId:2,productName:other.name,available:true}];
-   json={today,maximumDate:date,recheckAt,dates:[{date,available,items,slots:[{slot,normalAvailable:available,priorityAvailable:false,issues:available?[]:[items[0]]}]}]};
+   json={today,maximumDate:date,recheckAt,observedAt:new Date().toISOString(),dates:[{date,available,items,slots:[{slot,normalAvailable:available,priorityAvailable:false,issues:available?[]:[items[0]]}]}]};
   }
   await route.fulfill({headers,json});
  });

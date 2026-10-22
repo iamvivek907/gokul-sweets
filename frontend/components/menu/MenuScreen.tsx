@@ -1,4 +1,5 @@
 "use client";
+import {datedMenuAvailable} from "@/lib/datedMenuAvailability";
 import MenuToolbar,{measureMenuToolbar} from "./MenuToolbar";
 import {reportLoadingStage} from "@/lib/customerLoading";
 import BrandLoading from "@/components/common/BrandLoading";
@@ -130,7 +131,7 @@ export default function MenuScreen() {
     // hide ready stock for a later pickup; the branch's manual catalog toggle still applies.
     const categories = useMemo(() => mobileFeatures?.smartAvailability
         ? rawCategories.map(category => ({...category, products: category.products.map(product => ({
-            ...product, available: product.catalogAvailable ?? product.available
+            ...product, available: datedMenuAvailable(product)
         }))})) : rawCategories, [rawCategories, mobileFeatures?.smartAvailability]);
     useEffect(() => {
         if (!categories.length || renderStarted.current === null) return;
