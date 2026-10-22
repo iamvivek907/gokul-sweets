@@ -520,6 +520,46 @@ SELECT * FROM customer_notification_events WHERE environment = ? AND subject_id 
         }
     }
 
+    /** Minimal notification metadata for the bell and sound runtime; no message bodies. */
+    public record Summary(List<Signal> messages, long unreadCount) {}
+
+    /** Existing cursor and sound eligibility fields, without order identifiers or content. */
+    public record Signal(long id, java.time.Instant createdAt, java.time.Instant readAt) {}
+
+    /** Read one consistent polling snapshot with two indexed queries instead of the full page. */
+    @Transactional(
+            readOnly = true,
+            isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
+    public Summary summary(String environment, UUID subject) {
+        long started = MethodTiming.start(CustomerNotificationInbox.class, "summary(String,UUID)");
+        try {
+            var messages =
+                    jdbc.query(
+                            "SELECT id,created_at,read_at FROM customer_notification_events WHERE"
+                                    + " environment=? AND subject_id=? ORDER BY id DESC LIMIT 30",
+                            (rs, row) ->
+                                    new Signal(
+                                            rs.getLong("id"),
+                                            rs.getTimestamp("created_at").toInstant(),
+                                            rs.getTimestamp("read_at") == null
+                                                    ? null
+                                                    : rs.getTimestamp("read_at").toInstant()),
+                            environment,
+                            subject);
+            Long unread =
+                    jdbc.queryForObject(
+                            "SELECT COUNT(DISTINCT (target_type,target_id)) FROM"
+                                    + " customer_notification_events WHERE environment=? AND"
+                                    + " subject_id=? AND read_at IS NULL",
+                            Long.class,
+                            environment,
+                            subject);
+            return new Summary(messages, unread == null ? 0 : unread);
+        } finally {
+            MethodTiming.finish(started, CustomerNotificationInbox.class, "summary(String,UUID)");
+        }
+    }
+
     /**
      * Marks read.
      *

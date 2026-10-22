@@ -14,7 +14,7 @@ Any pending/unknown delivery state or active delivery lease protects the entire 
 
 ## Operational limits
 
-Each run removes at most 500 customer events and 500 staff events, plus their children. Preview counts refer to the next bounded batch and can change before execution. A large backlog drains over successive daily/manual runs. Only the latest result is stored; no growing run-history table is introduced. Existing inventory-task and expired-security-bucket maintenance remains separate.
+Each run removes at most 5,000 customer events and 5,000 staff events by default (`GOKUL_CLEANUP_BATCH_LIMIT`, clamped to 100–10,000), plus their children. Preview counts refer to the next bounded batch and can change before execution. A large backlog drains over successive daily/manual runs. Only the latest result is stored; no growing run-history table is introduced. Existing inventory-task and expired-security-bucket maintenance remains separate.
 
 A minute poll catches up on the current IST day if the server starts after the configured time. It does not wake a sleeping hosting instance or replay every missed day. Failed daily runs do not retry every minute; use manual retry or wait for the next day. Dedicated import workers skip scheduling.
 

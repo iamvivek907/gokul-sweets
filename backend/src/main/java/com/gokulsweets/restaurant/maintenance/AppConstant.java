@@ -9,8 +9,8 @@ public final class AppConstant {
     /** Creates a app constant instance. */
     private AppConstant() {}
 
-    /** Original DataCleanupService.LIMIT value; unchanged during extraction. */
-    public static final int DATA_CLEANUP_SERVICE_LIMIT = 500;
+    /** Default per-kind notification cleanup ceiling; runtime configuration may lower it. */
+    public static final int DATA_CLEANUP_SERVICE_LIMIT = 5000;
 
     /** Original DataCleanupService.CUSTOMER value; unchanged during extraction. */
     public static final String DATA_CLEANUP_SERVICE_CUSTOMER =

@@ -21,7 +21,8 @@ try{for(const width of [320,390,1280]){
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,smartAvailability:true,today,futureOrderingDays:7};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/menu')json=[{id:1,name:'Breakfast',products:[product]}];
+  else if(path==='/api/menu')json={revision:'ready-future',serviceWindowsEnabled:true,observedAt:new Date().toISOString(),items:[{productId:1,available:false,serviceAvailability:{available:false,code:'SERVICE_WINDOW',message:'Available tomorrow morning',nextChangeAt:null}},{productId:2,available:false}]};
+  else if(path==='/api/menu/catalog/1/ready-future')json={revision:'ready-future',categories:[{id:1,name:'Breakfast',products:[product,{...product,id:2,name:'Disabled Paratha',available:false}]}]};
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/pickup-discovery')){
@@ -48,6 +49,7 @@ try{for(const width of [320,390,1280]){
  const pickup=page.getByRole('region',{name:'Menu pickup time'}),add=page.getByRole('button',{name:'Add Aloo Paratha to cart'});
  const saved=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')));
  await page.goto(`${base}/menu`);await pickup.getByText(/Tomorrow, .*8:00/).waitFor();await add.waitFor();await page.waitForFunction(()=>!document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled);
+ assert.equal(await page.getByRole('button',{name:'Add Disabled Paratha to cart',exact:true}).isEnabled(),false,'manual catalog closure remains authoritative');
  assert.equal((await saved()).slot.branchId,branch.id,'new branch receives its own verified pickup');assert.equal((await saved()).date,tomorrow);assert.equal((await saved()).pickupType,'NORMAL');assert.equal(checks.includes(today),false,'closed slots are skipped before item queries');
  await mkdir(screenshots,{recursive:true});await page.screenshot({path:`${screenshots}/soonest-tomorrow-${width}.png`,fullPage:true});
  // Returning customers may retain a date without ever confirming a time.

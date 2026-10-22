@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -103,6 +104,7 @@ public class CartAvailabilityService {
                         CartAvailabilityService.class,
                         "check(Long,LocalDate,int,List<CreateOrderItemRequest>,boolean)");
         try {
+            Instant evaluatedAt = inventoryClock.instant();
             LocalDate today = LocalDate.now(inventoryClock);
             if (startDate.isBefore(today)
                     || startDate.isAfter(today.plusDays(features.getFutureOrderingDays()))) {
@@ -281,7 +283,31 @@ public class CartAvailabilityService {
                         new DateAvailability(
                                 date, available, slots, dateItems, dateReason, plannedProduction));
             }
-            return new Availability("PICKUP", today, maximumDate, dates);
+            if (!menuPreview) return new Availability("PICKUP", today, maximumDate, dates);
+            Instant recheckAt =
+                    today.plusDays(1).atStartOfDay(inventoryClock.getZone()).toInstant();
+            for (var slots : slotsByDate.values()) {
+                for (var slot : slots) {
+                    Instant start =
+                            slot.getSlotDate()
+                                    .atTime(slot.getStartTime())
+                                    .atZone(inventoryClock.getZone())
+                                    .toInstant();
+                    if (!start.isBefore(evaluatedAt) && start.isBefore(recheckAt))
+                        recheckAt = start;
+                    for (var policy : policies.values()) {
+                        Instant cutoff =
+                                slot.getSlotDate()
+                                        .atTime(slot.getStartTime())
+                                        .minusMinutes(policy.getProductionLeadMinutes())
+                                        .atZone(inventoryClock.getZone())
+                                        .toInstant();
+                        if (!cutoff.isBefore(evaluatedAt) && cutoff.isBefore(recheckAt))
+                            recheckAt = cutoff;
+                    }
+                }
+            }
+            return new Availability("PICKUP", today, maximumDate, dates, recheckAt);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -485,12 +511,25 @@ public class CartAvailabilityService {
      * @param today the today
      * @param maximumDate the maximum date
      * @param dates the dates
+     * @param recheckAt next clock-driven decision boundary, if known
      */
     public record Availability(
             String fulfilmentType,
             LocalDate today,
             LocalDate maximumDate,
-            List<DateAvailability> dates) {}
+            List<DateAvailability> dates,
+            @com.fasterxml.jackson.annotation.JsonInclude(
+                            com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                    Instant recheckAt) {
+        /** Preserves the existing construction contract for callers without boundary metadata. */
+        public Availability(
+                String fulfilmentType,
+                LocalDate today,
+                LocalDate maximumDate,
+                List<DateAvailability> dates) {
+            this(fulfilmentType, today, maximumDate, dates, null);
+        }
+    }
 
     /**
      * Immutable item availability data contract.

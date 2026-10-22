@@ -3,6 +3,7 @@
 import {useEffect} from "react";
 import {apiClient, ApiError} from "@/services/apiClient";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {subscribeNotificationTick} from "@/services/customerNotificationPolling";
 import {readCustomerInbox} from "@/services/customerInbox";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import {API_BASE_URL} from "@/lib/constants";
@@ -47,7 +48,7 @@ export default function CustomerAlertRuntime() {
         const identityChanged = () => {pending?.abort(); pending = null; paused = false; initial = true; void poll();};
         const refresh = () => {void poll();};
         void poll();
-        const timer = window.setInterval(refresh, 30_000);
+        const stopTick = subscribeNotificationTick(refresh);
         const stopIdentity = subscribeCustomerIdentityChanges(identityChanged, {revalidateOnResume: false});
         window.addEventListener("gokul-alert-preferences-changed", refresh);
         const resume = () => {if (document.visibilityState === "visible") {paused = false; void poll();}};
@@ -57,7 +58,7 @@ export default function CustomerAlertRuntime() {
         window.addEventListener("online", resume);
         document.addEventListener("visibilitychange", resume);
         return () => {
-            active = false; pending?.abort(); window.clearInterval(timer);
+            active = false; pending?.abort(); stopTick();
             stopIdentity();
             window.removeEventListener("gokul-alert-preferences-changed", refresh);
             window.removeEventListener("focus", resume);
