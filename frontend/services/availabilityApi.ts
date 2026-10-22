@@ -88,7 +88,7 @@ export async function checkMenuAvailability(
         responses.push(...complete);
     }
     const first = responses[0];
-    const boundaries = responses.map(value => value.recheckAt).filter((value): value is string => !!value).sort();
+    const boundaries = responses.map(value => value.recheckAt).filter((value): value is string => !!value).sort((left, right) => Date.parse(left) - Date.parse(right));
     return {...first, recheckAt: boundaries[0] ?? first.recheckAt, dates: first.dates.map(day => {
         const parts = responses.map(response => response.dates.find(value => value.date === day.date));
         return {...day,

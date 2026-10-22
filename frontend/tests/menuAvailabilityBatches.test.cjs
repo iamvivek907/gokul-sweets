@@ -24,6 +24,6 @@ test('invalid compact issue indexes reject the entire preview before another bat
  }
 });
 
-test('merged preview expires at the earliest batch boundary',async()=>{const f=fixture((body,n)=>({...response(body),recheckAt:n===2?'2026-10-08T10:00:00Z':'2026-10-08T11:00:00Z'}));const data=await f.checkMenuAvailability(1,'2026-10-08',1,items);assert.equal(data.recheckAt,'2026-10-08T10:00:00Z');});
+test('merged preview expires at the earliest batch boundary',async()=>{const f=fixture((body,n)=>({...response(body),recheckAt:n===2?'2026-10-08T10:00:00Z':'2026-10-08T10:00:00.100Z'}));const data=await f.checkMenuAvailability(1,'2026-10-08',1,items);assert.equal(data.recheckAt,'2026-10-08T10:00:00Z');});
 
 test('at most two requests run together and no partial wave is published',async()=>{let active=0,peak=0;const releases=[];const f=fixture(body=>{active++;peak=Math.max(peak,active);return new Promise(resolve=>releases.push(()=>{active--;resolve(response(body))}))});let done=false;const pending=f.checkMenuAvailability(1,'2026-10-08',1,items).then(data=>{done=true;return data});await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,2);assert.equal(done,false);releases.shift()();await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,2);releases.shift()();await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,3);releases.shift()();const data=await pending;assert.equal(peak,2);assert.equal(data.dates[0].items.length,215)});
