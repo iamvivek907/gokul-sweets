@@ -9,7 +9,7 @@ function crc32(data) {
     }
     return (crc ^ 0xffffffff) >>> 0;
 }
-const entries = ['agent.py', 'alarm.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd', 'macos.py', 'install-macos.command'];
+const entries = ['agent.py', 'alarm.py', 'background.py', 'requirements.txt', 'install.ps1', 'install.cmd', 'macos.py', 'install-macos.command', 'disable-alert-macos.command'];
 let offset = 0;
 const files = [], directory = [];
 for (const file of entries) {

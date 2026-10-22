@@ -31,6 +31,8 @@ import java.util.*;
 @Slf4j
 public class InventoryCentreJobs {
 
+    private final org.springframework.context.ApplicationEventPublisher events;
+
     private final JdbcTemplate jdbc;
 
     private final ObjectMapper mapper;
@@ -405,6 +407,7 @@ public class InventoryCentreJobs {
             jdbc.batchUpdate(
                     "INSERT INTO inventory_centre_tasks(job_id,product_id,payload) VALUES (?,?,?)",
                     taskRows);
+            events.publishEvent(new InventoryWorkQueued());
             log.info(
                     "Inventory centre queued: jobId={}, branchId={}, actorId={}, items={},"
                             + " itemDates={}",

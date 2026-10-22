@@ -51,8 +51,8 @@ public class AnalyticsRefreshService {
             if (!Boolean.TRUE.equals(locked)) return;
             var source =
                     jdbcTemplate.queryForMap(
-                            "SELECT COALESCE(MAX(id),0) AS n, MAX(updated_at) AS latest FROM"
-                                    + " orders");
+                            "SELECT (SELECT COALESCE(MAX(id),0) FROM orders) AS n,"
+                                    + " (SELECT MAX(updated_at) FROM orders) AS latest");
             var checkpoint =
                     jdbcTemplate.queryForList(
                             "SELECT highest_order_id, latest_order_update, business_date FROM"

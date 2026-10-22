@@ -13,6 +13,7 @@ function bell() {
     let cleanup, identityChange;
     class ApiError extends Error {constructor(status) {super('Rejected'); this.status = status;}}
     const modules = {
+        '@/services/customerNotificationPolling': {subscribeNotificationTick: callback => {timers.push(callback); return () => {};}},
         react: {useEffect: effect => {cleanup = effect();}, useState: () => [null, value => counts.push(value)]},
         'react/jsx-runtime': {jsx: () => null, jsxs: () => null},
         '@/hooks/useStorefrontFeatures': {useStorefrontFeatures: () => ({notificationInbox: true})},

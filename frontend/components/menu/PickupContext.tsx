@@ -1,4 +1,6 @@
 "use client";
+import {createMenuPreviewRefresh} from "@/lib/menuPreviewRefresh";
+import {watchMenuState} from "@/services/menuStateWatch";
 import {reportLoadingStage} from "@/lib/customerLoading";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -7,12 +9,12 @@ import {T,useTranslation} from "@/lib/language";
 import Link from "next/link";
 import {usePickupClock} from "@/hooks/usePickupClock";
 import {indiaToday,pickupIsFresh,validPickupDate} from "@/lib/pickupFreshness";
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {useCart} from "@/hooks/useCart";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {savePickupIntent, usePickupIntent} from "@/hooks/usePickupIntent";
-import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, type CartAvailability} from "@/services/availabilityApi";
+import {availabilityItems, checkCartAvailability, checkMenuAvailability, discoverPickupDates, menuPreviewDeadline, type CartAvailability} from "@/services/availabilityApi";
 import CartSwitchDialog from "@/components/cart/CartSwitchDialog";
 import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/checkoutStorage";
 import {getCartSnapshot} from "@/lib/cartStorage";
@@ -31,6 +33,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const cart = useCart();
     const intent = usePickupIntent(branch?.id);
     const [revision, setRevision] = useState(0);
+    const refresh = useMemo(() => createMenuPreviewRefresh(() => setRevision(value => value + 1)), []);
     const [result, setResult] = useState<{key: string; scope: string; data?: CartAvailability; error?: string} | null>(null);
     const amounts = new Map((cart.branchId === branch?.id ? availabilityItems(cart.items) : []).map(item => [item.productId, item]));
     // Always include the real cart, even when search/category filters hide its products.
@@ -59,6 +62,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
             verifiedDefault.current=null;let active=true;queueMicrotask(()=>{if(active)setResult({key,scope,data:warm.data});});return()=>{active=false;};
         }
         const controller = new AbortController();
+        const release = refresh.acquire();
         const timer = window.setTimeout(() => {
             const started = performance.now();
             void (menuPreview ? checkMenuAvailability : checkCartAvailability)(branch.id, requestDate, 1, JSON.parse(itemsJson),
@@ -72,18 +76,45 @@ export function useDateAvailability(products?: MenuProduct[]) {
                 .catch(error => {if (!controller.signal.aborted) {
                     console.warn("Date availability check failed.", error);
                     setResult({key, scope, error: "We couldn't check this pickup. Your cart is saved. Try again."});
-                }});
+                }}).finally(() => release());
         }, 150);
-        return () => {controller.abort(); window.clearTimeout(timer);};
-    }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview,menuRevision]);
+        return () => {controller.abort(); window.clearTimeout(timer); release(false);};
+    }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview,menuRevision,refresh]);
     // Recheck slot capacity, cutoff and preparation as time passes, without changing the pickup.
     useEffect(() => {
         if (!menuPreview || !features?.smartAvailability) return;
-        const refresh = () => {if (navigator.onLine && document.visibilityState === "visible") setRevision(value => value + 1);};
-        const timer = window.setInterval(refresh, 60000);
-        window.addEventListener("online", refresh); document.addEventListener("visibilitychange", refresh);
-        return () => {clearInterval(timer); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh);};
-    }, [menuPreview, features?.smartAvailability]);
+        const resume = () => {if (navigator.onLine && document.visibilityState === "visible") refresh.request();};
+        const timer = window.setInterval(resume, 60000);
+        window.addEventListener("online", resume); document.addEventListener("visibilitychange", resume);
+        return () => {clearInterval(timer); window.removeEventListener("online", resume); document.removeEventListener("visibilitychange", resume);};
+    }, [menuPreview, features?.smartAvailability, refresh]);
+    const branchId = branch?.id;
+    const hasRequested = requested.length > 0;
+    useEffect(() => {
+        if (!menuPreview || !features?.smartAvailability || !branchId || !requestDate || !validDate || !hasRequested) return;
+        const controller = new AbortController();
+        watchMenuState(branchId, requestDate, refresh.request, controller.signal);
+        return () => controller.abort();
+    }, [menuPreview, features?.smartAvailability, branchId, requestDate, validDate, hasRequested, refresh]);
+    // Server time boundaries are independent of stock mutations. Never reuse a preview past one.
+    const refreshedBoundary = useRef<string | null>(null);
+    const recheckAt = result?.key === key ? result.data?.recheckAt : undefined;
+    const deadline = result?.key === key && result.data ? menuPreviewDeadline(result.data) : null;
+    useEffect(() => {
+        if (!menuPreview || !recheckAt || deadline === null) return;
+        const boundaryKey = JSON.stringify([branchId, requestDate, recheckAt]);
+        if (refreshedBoundary.current === boundaryKey) return;
+        const remaining = deadline - performance.now();
+        if (!Number.isFinite(remaining)) return;
+        const timer = setTimeout(() => {
+            if (navigator.onLine && document.visibilityState === "visible") {
+                // A fast device clock or a late response must not create a refresh loop.
+                refreshedBoundary.current = boundaryKey;
+                refresh.request();
+            }
+        }, Math.max(100, Math.min(remaining + 50, 2147483647)));
+        return () => clearTimeout(timer);
+    }, [menuPreview, recheckAt, deadline, branchId, requestDate, refresh]);
     const data = result?.key === key ? result.data : undefined;
     const preview = data ?? (menuPreview && result?.scope === scope ? result.data : undefined);
     const day = preview?.dates[0];
@@ -118,6 +149,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
         const before = [getStoredBranchSnapshot(),getPickupSlotSnapshot(),getCartSnapshot(),localStorage.getItem("gokul-pickup-intent"),getMenuPickupModeSnapshot()];
         const controller = new AbortController();
         const signal = AbortSignal.any([controller.signal,AbortSignal.timeout(30000)]);
+        const release = refresh.acquire();
         const timer = window.setTimeout(() => {
             setAutomaticResult({key:autoKey});
             void discoverPickupDates(branch.id,today,features.futureOrderingDays+1,signal)
@@ -131,18 +163,18 @@ export function useDateAvailability(products?: MenuProduct[]) {
                     if (controller.signal.aborted) return;
                     const after = [getStoredBranchSnapshot(),getPickupSlotSnapshot(),getCartSnapshot(),localStorage.getItem("gokul-pickup-intent"),getMenuPickupModeSnapshot()];
                     if (pending() || before.some((value,index)=>value!==after[index]) || businessDayBefore!==indiaToday()) return;
-                    if (first && !pickupIsFresh(first,new Date())) {setRevision(value=>value+1);return;}
+                    if (first && !pickupIsFresh(first,new Date())) {refresh.request();return;}
                     setAutomaticResult({key:autoKey,empty:!first});
                     if (first) {savePickupIntent(branch.id,first.date,true);savePickupSlot(first,!actualCart.length);}
-                }).catch(()=>{if (!controller.signal.aborted) setAutomaticResult({key:autoKey,error:"We couldn’t find the soonest pickup. Try again or choose a time."});});
+                }).catch(()=>{if (!controller.signal.aborted) setAutomaticResult({key:autoKey,error:"We couldn’t find the soonest pickup. Try again or choose a time."});}).finally(() => release());
         },0);
-        return ()=>{controller.abort();clearTimeout(timer);};
-    },[needsAutomatic,autoKey,branch,features?.smartAvailability,features?.futureOrderingDays,today,itemsJson,candidates.length,cart.branchId,cart.items,menuRevision]);
+        return ()=>{controller.abort();clearTimeout(timer);release(false);};
+    },[needsAutomatic,autoKey,branch,features?.smartAvailability,features?.futureOrderingDays,today,itemsJson,candidates.length,cart.branchId,cart.items,menuRevision,refresh]);
     const automaticState = automaticResult?.key===autoKey ? automaticResult : null;
     const noPickupMessage = automaticState?.empty ? "No verified normal pickup is available in the booking window. Choose a date to explore other times." : null;
     const pickupRequired = menuPreview && !!features?.smartAvailability && (!intent.selection || !validDate);
     return {features, today, branch, intent, data, items, selectionUnavailable: selectionUnavailable || !!intent.selection && !validDate, error: result?.key === key ? result.error : null,
-        noPickupMessage, pickupRequired, choosing, setChoosing, findingSoonest: needsAutomatic && !automaticState?.empty && !automaticState?.error, automaticError: automaticState?.error, hasItems: requested.length > 0, retry: () => setRevision(value => value + 1)};
+        noPickupMessage, pickupRequired, choosing, setChoosing, findingSoonest: needsAutomatic && !automaticState?.empty && !automaticState?.error, automaticError: automaticState?.error, hasItems: requested.length > 0, retry: refresh.request};
 }
 
 export default function PickupContext({check, cart = false}: {check: ReturnType<typeof useDateAvailability>; cart?: boolean}) {

@@ -21,6 +21,9 @@ export interface MenuProduct {
 
     available: boolean;
 
+    /** Branch catalog toggle, independent of the current service hour. */
+    catalogAvailable?: boolean;
+
     /** Absent only for older API responses; never infer a dietary label. */
     vegetarian?: boolean;
 

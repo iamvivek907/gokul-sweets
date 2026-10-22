@@ -5,6 +5,7 @@ import com.gokulsweets.restaurant.order.service.CartAvailabilityService;
 import com.gokulsweets.restaurant.order.service.CartAvailabilityService.ItemAvailability;
 import com.gokulsweets.restaurant.pickup.dto.PickupSlotResponse;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -18,6 +19,8 @@ import java.util.Map;
  * @param today original service date
  * @param maximumDate original ordering limit
  * @param dates original dated decisions with indexed slot issues
+ * @param observedAt server time at response construction
+ * @param recheckAt next clock-driven decision boundary
  * @param issueCatalog distinct issues in first-occurrence order, scoped to this response only
  */
 public record CompactMenuAvailability(
@@ -25,7 +28,9 @@ public record CompactMenuAvailability(
         LocalDate today,
         LocalDate maximumDate,
         List<Date> dates,
-        List<ItemAvailability> issueCatalog) {
+        List<ItemAvailability> issueCatalog,
+        Instant recheckAt,
+        Instant observedAt) {
 
     /**
      * Encodes the exact full preview with response-local indexes; stock and validation are
@@ -77,7 +82,9 @@ public record CompactMenuAvailability(
                     source.today(),
                     source.maximumDate(),
                     List.copyOf(dates),
-                    List.copyOf(indexes.keySet()));
+                    List.copyOf(indexes.keySet()),
+                    source.recheckAt(),
+                    Instant.now());
         } finally {
             MethodTiming.finish(
                     started,

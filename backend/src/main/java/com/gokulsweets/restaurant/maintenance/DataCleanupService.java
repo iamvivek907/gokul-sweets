@@ -33,6 +33,9 @@ public class DataCleanupService {
 
     static final int LIMIT = AppConstant.DATA_CLEANUP_SERVICE_LIMIT;
 
+    @org.springframework.beans.factory.annotation.Value("${gokul.cleanup.batch-limit:5000}")
+    private int configuredBatchLimit = LIMIT;
+
     private final JdbcTemplate jdbc;
 
     private final NamedParameterJdbcTemplate named;
@@ -50,6 +53,16 @@ public class DataCleanupService {
     static final String CUSTOMER = AppConstant.DATA_CLEANUP_SERVICE_CUSTOMER;
 
     static final String STAFF = AppConstant.DATA_CLEANUP_SERVICE_STAFF;
+
+    /** Keep preview and deletion limits identical, bounded to protect database transactions. */
+    private int batchLimit() {
+        long started = MethodTiming.start(DataCleanupService.class, "batchLimit()");
+        try {
+            return Math.max(100, Math.min(10000, configuredBatchLimit));
+        } finally {
+            MethodTiming.finish(started, DataCleanupService.class, "batchLimit()");
+        }
+    }
 
     /**
      * Creates a data cleanup service instance.
@@ -197,7 +210,7 @@ public class DataCleanupService {
                                 rs.getString("last_trigger"),
                                 rs.getString("last_error"),
                                 counts,
-                                LIMIT,
+                                batchLimit(),
                                 rs.getTimestamp("lease_until") != null
                                         && rs.getTimestamp("lease_until")
                                                 .toInstant()
@@ -335,7 +348,7 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
                                 config.revision(),
                                 ((Timestamp) params.get("cutoff")).toInstant(),
                                 counts,
-                                LIMIT);
+                                batchLimit());
                     });
         } finally {
             MethodTiming.finish(__gokulMethodStartedNanos, DataCleanupService.class, "preview()");
@@ -385,7 +398,7 @@ UPDATE data_cleanup_settings SET enabled=?,daily_time=?,retention_days=?,revisio
                     "SELECT e.id "
                             + predicate
                             + " ORDER BY e.created_at,e.id LIMIT "
-                            + LIMIT
+                            + batchLimit()
                             + (lock ? " FOR UPDATE OF e,o SKIP LOCKED" : ""),
                     (params),
                     (rs, n) -> rs.getLong(1));

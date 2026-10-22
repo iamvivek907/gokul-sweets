@@ -46,12 +46,14 @@ jobs:
         run: ./print-agent/test_upgrade.ps1
       - name: Check macOS installer shell syntax
         if: runner.os != 'Windows'
-        run: bash -n print-agent/install-macos.command
+        run: |
+          bash -n print-agent/install-macos.command
+          bash -n print-agent/disable-alert-macos.command
       - name: Validate downloadable package
         run: |
           node --test print-agent/package.test.cjs
           node print-agent/package.cjs
-          python -c "import zipfile; z=zipfile.ZipFile('print-agent/dist/gokul-print-agent.zip'); assert z.testzip() is None; assert (z.getinfo('install-macos.command').external_attr >> 16) & 0o111; assert set(z.namelist()) == {'agent.py','alarm.py','background.py','install.cmd','install.ps1','requirements.txt','macos.py','install-macos.command'}"
+          python -c "import zipfile; z=zipfile.ZipFile('print-agent/dist/gokul-print-agent.zip'); assert z.testzip() is None; assert all((z.getinfo(name).external_attr >> 16) & 0o111 for name in ['install-macos.command','disable-alert-macos.command']); assert set(z.namelist()) == {'agent.py','alarm.py','background.py','install.cmd','install.ps1','requirements.txt','macos.py','install-macos.command','disable-alert-macos.command'}"
 
       - name: Verify committed download matches installer sources
         run: git diff --exit-code -- frontend/lib/generatedPrintInstaller.ts
