@@ -16,6 +16,7 @@ export interface ItemAvailability {
     availableQuantity: number | null; available: boolean; code: string | null; reason: string | null; expectedReadyAt: string | null;
 }
 export interface CartAvailability {
+    recheckAt?: string | null;
     fulfilmentType: "PICKUP";
     today: string;
     maximumDate: string;
@@ -57,7 +58,7 @@ export async function checkCartAvailability(
     branchId: number, startDate: string, days: number,
     items: ReturnType<typeof availabilityItems>, signal?: AbortSignal, menuPreview = false
 ) {
-    const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true&compact=true" : ""}`, {
+    const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true&compact=true&versioned=true" : ""}`, {
         method: "POST", signal, body: JSON.stringify({startDate, days, items, fulfilmentType: "PICKUP"})
     });
     return expandMenuPreview(data);
@@ -69,7 +70,7 @@ export function discoverPickupDates(branchId:number,startDate:string,days:number
 }
 
 /** Check the full menu without exceeding the endpoint's 100-item request limit.
- * Sequential batches bound backend work; publish only a complete successful preview.
+ * At most two batches run together; publish only a complete successful preview.
  * Cart checks continue to use a single authoritative request.
  */
 export async function checkMenuAvailability(
@@ -77,12 +78,18 @@ export async function checkMenuAvailability(
     items: ReturnType<typeof availabilityItems>, signal?: AbortSignal
 ): Promise<CartAvailability> {
     const responses: CartAvailability[] = [];
-    for (let offset = 0; offset < items.length; offset += 100) {
+    for (let offset = 0; offset < items.length; offset += 200) {
         signal?.throwIfAborted();
-        responses.push(await checkCartAvailability(branchId, startDate, days, items.slice(offset, offset + 100), signal, true));
+        const batches = [items.slice(offset, offset + 100), items.slice(offset + 100, offset + 200)].filter(batch => batch.length);
+        const complete = await Promise.all(batches.map(batch => {
+            signal?.throwIfAborted();
+            return checkCartAvailability(branchId, startDate, days, batch, signal, true);
+        }));
+        responses.push(...complete);
     }
     const first = responses[0];
-    return {...first, dates: first.dates.map(day => {
+    const boundaries = responses.map(value => value.recheckAt).filter((value): value is string => !!value).sort();
+    return {...first, recheckAt: boundaries[0] ?? first.recheckAt, dates: first.dates.map(day => {
         const parts = responses.map(response => response.dates.find(value => value.date === day.date));
         return {...day,
             available: parts.every(part => part?.available === true),

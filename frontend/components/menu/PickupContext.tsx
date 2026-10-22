@@ -1,4 +1,5 @@
 "use client";
+import {watchMenuState} from "@/services/menuStateWatch";
 import {reportLoadingStage} from "@/lib/customerLoading";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -84,6 +85,32 @@ export function useDateAvailability(products?: MenuProduct[]) {
         window.addEventListener("online", refresh); document.addEventListener("visibilitychange", refresh);
         return () => {clearInterval(timer); window.removeEventListener("online", refresh); document.removeEventListener("visibilitychange", refresh);};
     }, [menuPreview, features?.smartAvailability]);
+    const branchId = branch?.id;
+    const hasRequested = requested.length > 0;
+    useEffect(() => {
+        if (!menuPreview || !features?.smartAvailability || !branchId || !requestDate || !validDate || !hasRequested) return;
+        const controller = new AbortController();
+        watchMenuState(branchId, requestDate, () => setRevision(value => value + 1), controller.signal);
+        return () => controller.abort();
+    }, [menuPreview, features?.smartAvailability, branchId, requestDate, validDate, hasRequested]);
+    // Server time boundaries are independent of stock mutations. Never reuse a preview past one.
+    const refreshedBoundary = useRef<string | null>(null);
+    const recheckAt = result?.key === key ? result.data?.recheckAt : undefined;
+    useEffect(() => {
+        if (!menuPreview || !recheckAt) return;
+        const boundaryKey = JSON.stringify([branchId, requestDate, recheckAt]);
+        if (refreshedBoundary.current === boundaryKey) return;
+        const remaining = Date.parse(recheckAt) - Date.now();
+        if (!Number.isFinite(remaining)) return;
+        const timer = setTimeout(() => {
+            if (navigator.onLine && document.visibilityState === "visible") {
+                // A fast device clock or a late response must not create a refresh loop.
+                refreshedBoundary.current = boundaryKey;
+                setRevision(value => value + 1);
+            }
+        }, Math.max(100, Math.min(remaining + 50, 2147483647)));
+        return () => clearTimeout(timer);
+    }, [menuPreview, recheckAt, branchId, requestDate]);
     const data = result?.key === key ? result.data : undefined;
     const preview = data ?? (menuPreview && result?.scope === scope ? result.data : undefined);
     const day = preview?.dates[0];
