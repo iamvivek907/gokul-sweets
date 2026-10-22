@@ -94,7 +94,9 @@ class MarketingPushIntegrationTest {
                 "INSERT INTO verified_customer_subjects(id,environment,verified_phone) VALUES"
                         + " (?,'DEV','+919876543210')",
                 subject);
-        sessions.issue(ConsentEnvironment.DEV, subject, Instant.now());
+        // Both issuance and expiry belong to the fixture clock. Issuance at wall-clock
+        // time makes the expired-session case violate expires_at > issued_at on later days.
+        sessions.issue(ConsentEnvironment.DEV, subject, now.minus(Duration.ofDays(1)));
         long session =
                 jdbc.queryForObject(
                         "SELECT id FROM verified_customer_sessions WHERE verified_subject_id=?"

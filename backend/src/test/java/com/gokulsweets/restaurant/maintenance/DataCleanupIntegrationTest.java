@@ -194,11 +194,11 @@ class DataCleanupIntegrationTest {
                 "INSERT INTO"
                     + " customer_notification_events(environment,target_type,target_id,kind,created_at,read_at)"
                     + " SELECT 'DEV','ORDER','completed','PREPARING',TIMESTAMPTZ"
-                    + " '2026-01-01',TIMESTAMPTZ '2026-01-01' FROM generate_series(1,501)");
+                    + " '2026-01-01',TIMESTAMPTZ '2026-01-01' FROM generate_series(1,5001)");
         cleanup.scheduledRun();
         assertThat(cleanup.view().status()).isEqualTo("NEVER");
-        assertThat(cleanup.preview().eligible()).containsEntry("customerNotifications", 500L);
-        assertThat(cleanup.run(1L, 1L).deleted()).containsEntry("customerNotifications", 500L);
+        assertThat(cleanup.preview().eligible()).containsEntry("customerNotifications", 5000L);
+        assertThat(cleanup.run(1L, 1L).deleted()).containsEntry("customerNotifications", 5000L);
         assertThat(cleanup.run(1L, 1L).deleted()).containsEntry("customerNotifications", 1L);
     }
 

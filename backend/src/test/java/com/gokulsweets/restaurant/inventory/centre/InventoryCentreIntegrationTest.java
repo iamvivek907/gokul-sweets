@@ -282,7 +282,13 @@ class InventoryCentreIntegrationTest {
                 Clock.fixed(
                         today.plusDays(1).atStartOfDay(inventoryClock.getZone()).toInstant(),
                         inventoryClock.getZone());
-        var replay = new InventoryCentreJobs(jdbc, mapper, authorization, nextDay);
+        var replay =
+                new InventoryCentreJobs(
+                        mock(org.springframework.context.ApplicationEventPublisher.class),
+                        jdbc,
+                        mapper,
+                        authorization,
+                        nextDay);
         var tx = new org.springframework.transaction.support.TransactionTemplate(manager);
         assertThat(tx.execute(status -> replay.submit(branch, input)).get("succeeded"))
                 .isEqualTo(1);

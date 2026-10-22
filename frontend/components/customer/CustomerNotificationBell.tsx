@@ -4,6 +4,7 @@ import CustomerNotificationLink from "./CustomerNotificationLink";
 import {useEffect, useState} from "react";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {ApiError} from "@/services/apiClient";
+import {subscribeNotificationTick} from "@/services/customerNotificationPolling";
 import {readCustomerInbox} from "@/services/customerInbox";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import NotificationIcon from "@/components/customer/NotificationIcon";
@@ -31,7 +32,7 @@ export default function CustomerNotificationBell() {
             } finally {if (pending === controller) pending = null;}
         };
         void refresh();
-        const timer = window.setInterval(() => void refresh(), 30000);
+        const stopTick = subscribeNotificationTick(() => void refresh());
         const identityChanged = () => {
             pending?.abort(); pending = null; paused = false; setCount(null); void refresh();
         };
@@ -44,7 +45,7 @@ export default function CustomerNotificationBell() {
         window.addEventListener("pageshow", pageshow);
         window.addEventListener("online", resume);
         document.addEventListener("visibilitychange", resume);
-        return () => {active = false; pending?.abort(); window.clearInterval(timer);
+        return () => {active = false; pending?.abort(); stopTick();
             stopIdentity();
             window.removeEventListener("gokul-inbox-changed", inboxChanged);
             window.removeEventListener("focus", resume);

@@ -110,6 +110,18 @@ class CartAvailabilityServiceTest {
         assertThat(service.check(branchId, date, 1, request).dates().getFirst().plannedProduction())
                 .isTrue();
 
+        assertThat(service.check(branchId, date, 1, request, true).recheckAt())
+                .isEqualTo(Instant.parse("2026-09-29T18:30:00Z"));
+        assertThat(service.check(branchId, date, 1, request).recheckAt()).isNull();
+        // The earliest preparation cutoff, even before a slot starts, ends preview reuse.
+        firstPolicy.setProductionLeadMinutes(721);
+        assertThat(service.check(branchId, date, 1, request, true).recheckAt())
+                .isEqualTo(beforeMidnight.instant());
+        firstPolicy.setProductionLeadMinutes(720);
+        assertThat(service.check(branchId, date, 1, request, true).recheckAt())
+                .isEqualTo(Instant.parse("2026-09-29T18:30:00Z"));
+        firstPolicy.setProductionLeadMinutes(0);
+
         secondAllocation.setStatus(InventoryAllocationStatus.DRAFT);
         secondAllocation.setForecastQuantity(BigDecimal.valueOf(1000));
         assertThat(service.check(branchId, date, 1, request).dates().getFirst().plannedProduction())

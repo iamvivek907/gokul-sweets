@@ -144,6 +144,10 @@ class CustomerIdentityControllerTest {
         verify(notifications, never()).page(anyString(), any(), any(), anyBoolean(), anyString());
         when(notifications.enabled()).thenReturn(true);
         controller.notifications(null, false, "", trusted);
+        controller.notificationSummary(trusted);
+        verify(notifications).summary("DEV", subject);
+        assertThatThrownBy(() -> controller.notificationSummary(request()))
+                .isInstanceOf(ResponseStatusException.class);
         verify(notifications).page("DEV", subject, null, false, "");
         controller.readNotification(42, trusted);
         verify(notifications).markRead("DEV", subject, 42);
