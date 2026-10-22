@@ -131,13 +131,18 @@ VALUES(?,?,'READY','PIECE',10,10,now(),now()) RETURNING id
                                             + " id=?",
                                     allocation);
                             jdbc.update(
-                                    "INSERT INTO branch_pickup_settings(branch_id) VALUES(?)",
+                                    "INSERT INTO"
+                                        + " branch_pickup_settings(branch_id,opening_time,closing_time)"
+                                        + " VALUES(?,'09:00','21:30')",
                                     branch);
                             assertThat(versions.read(branch, date)).isNotEqualTo(before);
                             status.setRollbackOnly();
                         });
         assertThat(versions.read(branch, date)).isEqualTo(before);
-        jdbc.update("INSERT INTO branch_pickup_settings(branch_id) VALUES(?)", branch);
+        jdbc.update(
+                "INSERT INTO branch_pickup_settings(branch_id,opening_time,closing_time)"
+                        + " VALUES(?,'09:00','21:30')",
+                branch);
         assertThat(versions.read(branch, date)).isNotEqualTo(before);
     }
 
