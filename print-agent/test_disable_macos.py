@@ -6,6 +6,7 @@ import tempfile
 import unittest
 
 
+@unittest.skipIf(os.name == "nt", "macOS shell control requires Unix paths and executable fixtures")
 class DisableMacAlarmTest(unittest.TestCase):
     def run_control(self, installed=True, mode='running', platform='Darwin'):
         with tempfile.TemporaryDirectory() as folder:
