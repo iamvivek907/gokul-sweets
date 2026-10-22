@@ -36,3 +36,9 @@ test('slow catalog loading does not extend the live service decision receipt tim
  assert.equal(menu[0].products[0].serviceAvailability.evaluatedAt,"2026-10-06T04:29:59.750Z","cached status uses the current server observation time");
  assert.equal(menu[0].products[0].serviceAvailability.receivedMonotonic,0,'service timing starts at availability receipt, before catalog delivery');
 });
+
+test('current service closure retains the independent catalog toggle for dated pickup checks',async()=>{
+ const f=setup();await f.api.getMenu(1);f.sold();const menu=await f.api.refreshMenuAvailability(1);
+ assert.equal(menu[0].products[0].available,false);
+ assert.equal(menu[0].products[0].catalogAvailable,true,'a closed current service window must not suppress future pickup discovery');
+});

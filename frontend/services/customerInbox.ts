@@ -27,7 +27,7 @@ export function readCustomerInbox(signal: AbortSignal): Promise<CustomerInbox> {
     if (!pending) {
         const controller = new AbortController();
         const read: Read = {controller, consumers: 0, promise: Promise.resolve({unreadCount: 0, messages: []})};
-        read.promise = apiClient<CustomerInbox>("/api/customer/identity/notifications", {
+        read.promise = apiClient<CustomerInbox>("/api/customer/identity/notifications?summary=true", {
             credentials: "include", cache: "no-store",
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(8000)])
         }).then(value => {controller.signal.throwIfAborted(); return value;})

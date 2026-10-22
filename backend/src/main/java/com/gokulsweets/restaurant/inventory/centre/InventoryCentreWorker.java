@@ -30,6 +30,14 @@ import java.util.*;
         matchIfMissing = true)
 public class InventoryCentreWorker {
 
+    @org.springframework.beans.factory.annotation.Value("${inventory.centre.idle-max-ms:60000}")
+    private long idleMaxMillis = 60000;
+
+    private long idleMillis = 2000;
+    private volatile long nextScheduledPoll;
+    private final java.util.concurrent.atomic.AtomicLong wakeVersion =
+            new java.util.concurrent.atomic.AtomicLong();
+
     private final JdbcTemplate jdbc;
 
     private final PlatformTransactionManager manager;
@@ -57,9 +65,58 @@ public class InventoryCentreWorker {
     @Scheduled(
             fixedDelayString = "${inventory.centre.poll-ms:2000}",
             initialDelayString = "${inventory.centre.poll-ms:2000}")
+    public void scheduledBatch() {
+        long started = MethodTiming.start(InventoryCentreWorker.class, "scheduledBatch()");
+        try {
+            long now = System.nanoTime();
+            if (nextScheduledPoll != 0 && now - nextScheduledPoll < 0) return;
+            long version = wakeVersion.get();
+            int processed = drainBatch();
+            idleMillis =
+                    processed > 0 ? 2000 : Math.min(Math.max(2000, idleMaxMillis), idleMillis * 2);
+            synchronized (wakeVersion) {
+                nextScheduledPoll =
+                        version == wakeVersion.get()
+                                ? System.nanoTime()
+                                        + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(
+                                                idleMillis)
+                                : 0;
+            }
+        } finally {
+            MethodTiming.finish(started, InventoryCentreWorker.class, "scheduledBatch()");
+        }
+    }
+
+    /** New committed tasks retain the normal two-second local dispatch latency. */
+    @org.springframework.transaction.event.TransactionalEventListener(fallbackExecution = true)
+    public void wake(InventoryWorkQueued event) {
+        long started = MethodTiming.start(InventoryCentreWorker.class, "wake(InventoryWorkQueued)");
+        try {
+            synchronized (wakeVersion) {
+                wakeVersion.incrementAndGet();
+                nextScheduledPoll = 0;
+            }
+        } finally {
+            MethodTiming.finish(started, InventoryCentreWorker.class, "wake(InventoryWorkQueued)");
+        }
+    }
+
+    /** Explicit recovery processes immediately regardless of idle backoff. */
     public void runBatch() {
+        long started = MethodTiming.start(InventoryCentreWorker.class, "runBatch()");
+        try {
+            drainBatch();
+        } finally {
+            MethodTiming.finish(started, InventoryCentreWorker.class, "runBatch()");
+        }
+    }
+
+    /**
+     * Claims at most five tasks with the existing leases, permissions and transaction boundaries.
+     */
+    private int drainBatch() {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(InventoryCentreWorker.class, "runBatch()");
+                MethodTiming.start(InventoryCentreWorker.class, "drainBatch()");
         try {
             long start = System.nanoTime();
             int processed = 0;
@@ -203,9 +260,10 @@ public class InventoryCentreWorker {
                         "Inventory backend batch completed: items={}, elapsedMs={}",
                         processed,
                         (System.nanoTime() - start) / 1000000);
+            return processed;
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos, InventoryCentreWorker.class, "runBatch()");
+                    __gokulMethodStartedNanos, InventoryCentreWorker.class, "drainBatch()");
         }
     }
 

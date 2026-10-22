@@ -70,6 +70,13 @@ class CustomerNotificationInboxIntegrationTest {
         inbox.orderReady(fixture.id());
         var page = inbox.page("DEV", subject, null);
         assertThat(page.messages()).hasSize(1);
+        var summary = inbox.summary("DEV", subject);
+        assertThat(summary.unreadCount()).isEqualTo(page.unreadCount());
+        assertThat(summary.messages())
+                .extracting(CustomerNotificationInbox.Signal::id)
+                .containsExactly(page.messages().getFirst().id());
+        assertThat(inbox.summary("PROD", subject).messages()).isEmpty();
+        assertThat(inbox.summary("DEV", UUID.randomUUID()).messages()).isEmpty();
         assertThat(page.messages().getFirst().kind()).isEqualTo("READY_FOR_PICKUP");
         assertThat(page.messages().getFirst().targetId()).isEqualTo(fixture.number());
         assertThat(page.messages().getFirst().deliveryState()).isEqualTo("AVAILABLE");

@@ -93,6 +93,7 @@ interface ProductRatingState {
 
 export default function MenuScreen() {
     const translate = useTranslation();
+    const mobileFeatures=useStorefrontFeatures();
     const renderStarted = useRef<number | null>(null);
     const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
@@ -119,12 +120,18 @@ export default function MenuScreen() {
 
 
     const [
-        categories,
+        rawCategories,
         setCategories
     ] =
         useState<MenuCategory[]>(
             []
         );
+    // Dated availability owns service-hour decisions. A closed current window must not
+    // hide ready stock for a later pickup; the branch's manual catalog toggle still applies.
+    const categories = useMemo(() => mobileFeatures?.smartAvailability
+        ? rawCategories.map(category => ({...category, products: category.products.map(product => ({
+            ...product, available: product.catalogAvailable ?? product.available
+        }))})) : rawCategories, [rawCategories, mobileFeatures?.smartAvailability]);
     useEffect(() => {
         if (!categories.length || renderStarted.current === null) return;
         const started = renderStarted.current;
@@ -133,7 +140,7 @@ export default function MenuScreen() {
         const frame = requestAnimationFrame(() => {paint = requestAnimationFrame(() => reportLoadingStage("MENU_RENDER", started));});
         return () => {cancelAnimationFrame(frame); cancelAnimationFrame(paint);};
     }, [categories]);
-    useMenuServiceRefresh(branch?.id,categories,setCategories);
+    useMenuServiceRefresh(branch?.id,rawCategories,setCategories);
 
 
     const [
@@ -708,7 +715,6 @@ export default function MenuScreen() {
 
 
     const phone=usePhoneViewport();
-    const mobileFeatures=useStorefrontFeatures();
     const phoneMenu=phone===true&&(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true;
     const [browseCategory,setBrowseCategory]=useState<{branchId:number;id:number}|null|undefined>(undefined);
     const initialCategoryId=browseCategory===undefined?(effectiveCategoryId??undefined):undefined;

@@ -943,6 +943,33 @@ public class CustomerIdentityController {
     }
 
     /**
+     * Minimal authenticated polling response; full history remains on the existing inbox endpoint.
+     */
+    @GetMapping(value = "/notifications", params = "summary=true")
+    public ResponseEntity<
+                    com.gokulsweets.restaurant.customer.notification.CustomerNotificationInbox
+                            .Summary>
+            notificationSummary(HttpServletRequest request) {
+        long started =
+                MethodTiming.start(
+                        CustomerIdentityController.class,
+                        "notificationSummary(HttpServletRequest)");
+        try {
+            var environment = notificationEnvironment();
+            return ResponseEntity.ok()
+                    .cacheControl(CacheControl.noStore())
+                    .body(
+                            notifications.summary(
+                                    environment.name(), requiredSubject(request, environment)));
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    CustomerIdentityController.class,
+                    "notificationSummary(HttpServletRequest)");
+        }
+    }
+
+    /**
      * Handles {@code GET /api/customer/identity/notifications} for customer identity.
      *
      * @param before the before supplied to this method

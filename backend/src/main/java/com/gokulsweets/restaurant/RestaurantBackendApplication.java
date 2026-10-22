@@ -4,13 +4,11 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.util.TimeZone;
 
 /** Backend restaurant backend application contract and implementation. */
 @SpringBootApplication
-@EnableScheduling
 public class RestaurantBackendApplication {
 
     /**

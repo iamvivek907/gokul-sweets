@@ -21,7 +21,7 @@ test('bell and sound share an overlapping inbox request, with no retained privat
     const f = fixture(), a = new AbortController(), b = new AbortController();
     const first = f.api.readCustomerInbox(a.signal), second = f.api.readCustomerInbox(b.signal);
     assert.equal(f.requests.length, 1);
-    assert.equal(f.requests[0].path, '/api/customer/identity/notifications');
+    assert.equal(f.requests[0].path, '/api/customer/identity/notifications?summary=true');
     f.requests[0].resolve({unreadCount: 2, messages: []});
     assert.equal((await first).unreadCount, 2); await second;
     const fresh = f.api.readCustomerInbox(a.signal);
