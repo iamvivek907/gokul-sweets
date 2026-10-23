@@ -65,7 +65,7 @@ try {for(const width of [320,390,640,1280]) {
  await carousel.getByRole('button',{name:'Show banner 1',exact:true}).click();
  await carousel.getByRole('button',{name:'Explore sweets',exact:true}).waitFor();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- if(process.env.SCREENSHOT_DIR){if(width<=640)await page.getByRole('button',{name:'All',exact:true}).click();if(width<=640)await page.evaluate(()=>window.scrollTo(0,0));else await heading.scrollIntoViewIfNeeded();await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/diwali-menu-${width}.jpg`,fullPage:false,quality:85});}
+ if(process.env.SCREENSHOT_DIR){if(width<=640)await page.getByRole('button',{name:'All',exact:true}).click();if(width<=640)await page.evaluate(()=>window.scrollTo({top:0,behavior:"instant"}));else await heading.scrollIntoViewIfNeeded();await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/diwali-menu-${width}.jpg`,fullPage:false,quality:85});}
  await page.getByRole('button',{name:'Language / भाषा',exact:true}).click();
  await page.getByRole('group',{name:'Language / भाषा',exact:true}).getByRole('button',{name:/हिन्दी/}).click();
  await page.getByRole('heading',{name:'दीवाली की मिठास',exact:true}).waitFor();
@@ -81,6 +81,7 @@ try {for(const width of [320,390,640,1280]) {
  banners=[{...banner,mediaUrl:'/campaign-animation.webm',mediaType:'video/webm',posterUrl:'/arrival-mithai.webp',frame:{x:90,y:80,zoom:250,fit:'COVER'}},{...banner,key:'still',titleEn:'Sweet celebrations'}];
  await page.emulateMedia({reducedMotion:'no-preference'});await load();
  const video=page.locator('[aria-label="Published menu banners"] video');
+ await page.getByRole('region',{name:'Published menu banners',exact:true}).evaluate(node=>node.scrollIntoView({block:'center',behavior:'instant'}));
  const pause=page.getByRole('button',{name:'Pause banner animation',exact:true});
  await pause.waitFor();await pause.scrollIntoViewIfNeeded();
  assert.equal(await video.evaluate(v=>v.controls),false,'decorative playback does not expose covered native controls');

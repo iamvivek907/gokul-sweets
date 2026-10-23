@@ -1,8 +1,8 @@
 "use client";
+import BrandLoading from "@/components/common/BrandLoading";
 import {datedMenuAvailable} from "@/lib/datedMenuAvailability";
 import MenuToolbar,{measureMenuToolbar} from "./MenuToolbar";
 import {reportLoadingStage} from "@/lib/customerLoading";
-import BrandLoading from "@/components/common/BrandLoading";
 import dynamic from "next/dynamic";
 import {getPickupSlotSnapshot} from "@/lib/checkoutStorage";
 import {pickupIsFresh} from "@/lib/pickupFreshness";
@@ -22,6 +22,8 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {apiClient} from "@/services/apiClient";
 import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
+import {progressiveBatches} from "@/lib/progressiveBatches";
+import {readMenuBrowse,writeMenuBrowse,browserMenuStorage,type MenuBrowseState} from "@/lib/menuBrowseState";
 import {matchesMenuSearch} from "@/lib/menuSearch";
 import MobileMenuFilters from "./MobileMenuFilters";
 import {T,useTranslation} from "@/lib/language";
@@ -97,6 +99,8 @@ export default function MenuScreen() {
     const translate = useTranslation();
     const mobileFeatures=useStorefrontFeatures();
     const renderStarted = useRef<number | null>(null);
+    const lastCatalog=useRef<{branchId:number;categories:MenuCategory[]}|null>(null);
+    const [refreshError,setRefreshError]=useState<string|null>(null);
     const [branchTab, setBranchTab] = useState<"menu" | "details">("menu");
 
     const {
@@ -315,6 +319,7 @@ export default function MenuScreen() {
                             catalog => {
                                 if (controller.signal.aborted) return;
                                 renderStarted.current = performance.now();
+                                lastCatalog.current={branchId:selectedBranch.id,categories:catalog};
                                 setCategories(catalog);
                                 setLoadedBranchId(selectedBranch.id);
                                 setLoading(false);
@@ -331,15 +336,12 @@ export default function MenuScreen() {
 
 
                     renderStarted.current = performance.now();
+                    lastCatalog.current={branchId:selectedBranch.id,categories:result};setRefreshError(null);
                     setCategories(
                         result
                     );
 
-                    setSelectedCategoryId(Number(new URLSearchParams(window.location.search).get("category")) || null);
-
-                    setSearch(
-                        ""
-                    );
+                    // Filters belong to the browsing session, not to a catalog refresh.
 
                     setError(
                         null
@@ -404,86 +406,17 @@ export default function MenuScreen() {
                         );
 
 
-                    void Promise.all(
-                        ratingBatches.map(
-                            batch =>
-                                getProductRatingSummaries(
-                                    batch,
-                                    controller.signal
-                                )
-                        )
-                    )
-                        .then(
-                            batchResults => {
-
-                                if (
-                                    controller.signal.aborted
-                                ) {
-                                    return;
-                                }
-
-
-                                const summaries =
-                                    batchResults.flat();
-
-
-                                setRatingState(
-                                    {
-                                        branchId:
-                                            selectedBranch.id,
-
-                                        summaries:
-                                            summaries.reduce<
-                                                Record<
-                                                    number,
-                                                    ProductRatingSummary
-                                                >
-                                            >(
-                                                (
-                                                    indexed,
-                                                    summary
-                                                ) => {
-
-                                                    indexed[
-                                                        summary.productId
-                                                    ] =
-                                                        summary;
-
-                                                    return indexed;
-                                                },
-                                                {}
-                                            )
-                                    }
-                                );
-                            }
-                        )
-                        .catch(
-                            exception => {
-
-                                if (
-                                    controller.signal.aborted
-                                ) {
-                                    return;
-                                }
-
-
-                                console.error(
-                                    "Unable to load product ratings:",
-                                    exception
-                                );
-
-
-                                setRatingState(
-                                    {
-                                        branchId:
-                                            selectedBranch.id,
-
-                                        summaries:
-                                            {}
-                                    }
-                                );
-                            }
-                        );
+                    void progressiveBatches(ratingBatches,batch=>getProductRatingSummaries(batch,AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])),(summaries,batch)=>{
+                        setRatingState(previous=>{
+                            const next={...(previous?.branchId===selectedBranch.id?previous.summaries:{})};
+                            // A successful batch is authoritative even when products have no published reviews.
+                            for(const productId of batch)delete next[productId];
+                            for(const summary of summaries)next[summary.productId]=summary;
+                            return {branchId:selectedBranch.id,summaries:next};
+                        });
+                    },controller.signal).then(()=>{
+                        if(!controller.signal.aborted)setRatingState(previous=>previous?.branchId===selectedBranch.id?previous:{branchId:selectedBranch.id,summaries:{}});
+                    });
 
                 } catch (exception) {
 
@@ -501,11 +434,10 @@ export default function MenuScreen() {
                     );
 
 
-                    setCategories(
-                        []
-                    );
-
-
+                    if(lastCatalog.current?.branchId===selectedBranch.id&&lastCatalog.current.categories.length){
+                        setCategories(lastCatalog.current.categories);setError(null);setRefreshError("The menu could not refresh. Your cart is saved. Prices and availability will be checked before ordering.");setLoadedBranchId(selectedBranch.id);setLoading(false);return;
+                    }
+                    setCategories([]);
                     setError(
                         exception instanceof Error
                             ? exception.message
@@ -726,6 +658,44 @@ export default function MenuScreen() {
     const [mobileCategories,setMobileCategories]=useState<number[]|null>(null);
     const [maximumPrice,setMaximumPrice]=useState<number|null>(null);
     const [portionsOnly,setPortionsOnly]=useState(false);
+    const [restoreScroll,setRestoreScroll]=useState<{branchId:number;y:number}|null>(null);
+    const [restoredBrowse,setRestoredBrowse]=useState<number|null>(null);
+    const savedBrowse=useRef<{branchId:number;value:MenuBrowseState}|null>(null);
+    useEffect(()=>{
+        if(!branch||loadedBranchId!==branch.id||restoredBrowse===branch.id)return;
+        const saved=readMenuBrowse(browserMenuStorage(),branch.id);
+        const explicit=new URLSearchParams(location.search).get("category");
+        const destination=explicit?Number(explicit):saved?.categoryId??null;
+        const ids=new Set(categories.map(category=>category.id));
+        // Restore UI preferences only. Cart, stock and pickup remain independently authoritative.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setSearch(explicit?"":saved?.search??"");
+        setSelectedCategoryId(destination&&ids.has(destination)?destination:null);
+        setMobileCategories(explicit?(destination&&ids.has(destination)?[destination]:[]):saved?.categories?.filter(id=>ids.has(id))??null);
+        setMaximumPrice(explicit?null:saved?.maximum??null);setPortionsOnly(!explicit&&!!saved?.portions);
+        setBrowseCategory(!explicit&&saved?(saved.browseId&&ids.has(saved.browseId)?{branchId:branch.id,id:saved.browseId}:null):undefined);
+        setRestoredBrowse(branch.id);
+        setRestoreScroll({branchId:branch.id,y:!explicit&&saved?saved.scrollY:0});
+    },[branch,loadedBranchId,categories,restoredBrowse]);
+    useEffect(()=>{
+        if(!restoreScroll||restoreScroll.branchId!==loadedBranchId)return;
+        let second=0,cancelled=false;const cancel=()=>{cancelled=true;};
+        const events=["pointerdown","keydown","wheel","touchstart"];
+        events.forEach(event=>window.addEventListener(event,cancel,{capture:true,passive:true}));
+        const first=requestAnimationFrame(()=>{second=requestAnimationFrame(()=>{if(!cancelled)window.scrollTo({top:restoreScroll.y,behavior:"instant"});});});
+        return()=>{cancelAnimationFrame(first);cancelAnimationFrame(second);events.forEach(event=>window.removeEventListener(event,cancel,true));};
+    },[restoreScroll,loadedBranchId]);
+    useEffect(()=>{
+        if(branch&&restoredBrowse===branch.id)savedBrowse.current={branchId:branch.id,value:{savedAt:Date.now(),search,categoryId:selectedCategoryId,categories:mobileCategories,maximum:maximumPrice,portions:portionsOnly,browseId:browseCategory?.branchId===branch.id?browseCategory.id:null,scrollY:window.scrollY}};
+    },[branch,restoredBrowse,search,selectedCategoryId,mobileCategories,maximumPrice,portionsOnly,browseCategory]);
+    useEffect(()=>{
+        if(!branch||restoredBrowse!==branch.id)return;
+        const id=branch.id;let y=readMenuBrowse(browserMenuStorage(),id)?.scrollY??window.scrollY;
+        const save=()=>{const current=savedBrowse.current;if(current?.branchId===id)writeMenuBrowse(browserMenuStorage(),id,{...current.value,savedAt:Date.now(),scrollY:y});};
+        const scroll=()=>{y=window.scrollY;};
+        window.addEventListener("scroll",scroll,{passive:true});window.addEventListener("pagehide",save);
+        return()=>{save();window.removeEventListener("scroll",scroll);window.removeEventListener("pagehide",save);};
+    },[branch,restoredBrowse]);
     const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
     const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
     useEffect(()=>{if(!phoneMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[phoneMenu,branch]);
@@ -934,13 +904,7 @@ export default function MenuScreen() {
 
     function retryMenu() {
 
-        setLoading(
-            true
-        );
-
-        setLoadedBranchId(
-            null
-        );
+        if(!categories.length)setLoading(true);
 
         setError(
             null
@@ -1077,7 +1041,7 @@ export default function MenuScreen() {
     }
 
 
-    if (isLoading) return <BrandLoading className="customer-menu-loading" />;
+    if (isLoading) return <section className="menu-loading-shell" aria-label={translate("Loading menu")}><h1><T text="Your branch menu"/></h1><BrandLoading compact className="customer-menu-loading" label="Loading menu" detail="Loading dishes. Your cart and pickup are saved."/><ProductSkeletonGrid/></section>;
 
     return (
         <>
@@ -1284,6 +1248,7 @@ export default function MenuScreen() {
                 </header>
 
 
+                {refreshError&&<aside className="menu-refresh-notice" role="status"><T text={refreshError}/><button type="button" onClick={retryMenu}><T text="Try again"/></button></aside>}
                 <MenuToolbar enabled={phoneMenu}>
                 {mobileFeatures?.smartAvailability&&<MobileMenuPickup compactHeader={phoneMenu} key={branch.id} branchId={branch.id} products={allProducts} today={pickupCheck.today} days={mobileFeatures.futureOrderingDays??30} selection={pickupCheck.intent.selection} date={pickupCheck.intent.date} expired={pickupCheck.intent.expired} selectionUnavailable={pickupCheck.selectionUnavailable} noPickupMessage={pickupCheck.noPickupMessage} availabilityError={pickupCheck.automaticError??pickupCheck.error} onRetry={pickupCheck.retry} automatic={pickupCheck.intent.automatic} findingSoonest={pickupCheck.findingSoonest} onChoosingChange={pickupCheck.setChoosing}/>}
 

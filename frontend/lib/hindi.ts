@@ -1062,6 +1062,20 @@ export const hindi: Record<string,string> = {
   "before paying.": "भुगतान करने से पहले।",
   "Tax": "कर",
   "Pickup charge": "पिकअप शुल्क",
+  "Verification took too long. Close the verification window and try again. Your cart is saved.": "सत्यापन में अधिक समय लगा। सत्यापन विंडो बंद करके फिर प्रयास करें। आपका कार्ट सुरक्षित है।",
+  "Thank you for choosing Gokul": "गोकुल को चुनने के लिए धन्यवाद",
+  "Follow us for fresh arrivals and festive favourites.": "नए व्यंजन और त्योहारों की पसंद के लिए हमसे जुड़ें।",
+  "Your branch menu": "आपकी शाखा का मेन्यू",
+  "Loading dishes. Your cart and pickup are saved.": "व्यंजन लोड हो रहे हैं। आपका कार्ट और पिकअप सुरक्षित हैं।",
+  "The menu could not refresh. Your cart is saved. Prices and availability will be checked before ordering.": "मेन्यू रीफ़्रेश नहीं हो सका। आपका कार्ट सुरक्षित है। ऑर्डर से पहले कीमत और उपलब्धता जाँची जाएगी।",
+  "Your pickup plan": "आपकी पिकअप योजना",
+  "Edit items": "आइटम बदलें",
+  "You’re connected again": "आप फिर से ऑनलाइन हैं",
+  "You’re offline": "आप ऑफलाइन हैं",
+  "Your saved cart is kept. Retry the page to check the latest menu and pickup times.": "आपका कार्ट सुरक्षित है। नया मेन्यू और पिकअप समय जाँचने के लिए पेज फिर खोलें।",
+  "Your cart is saved on this device. Reconnect to check current stock, place an order or pay.": "आपका कार्ट इस डिवाइस पर सुरक्षित है। उपलब्ध स्टॉक जाँचने, ऑर्डर देने या भुगतान करने के लिए इंटरनेट से जुड़ें।",
+  "Contact your selected branch": "अपनी चुनी हुई शाखा से संपर्क करें",
+  "Loading menu": "मेन्यू लोड हो रहा है",
 };
 
 Object.assign(hindi, {

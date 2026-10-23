@@ -1,4 +1,5 @@
 "use client";
+import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {pwaInstall} from "@/lib/pwaInstall";
@@ -27,23 +28,22 @@ export type PhoneVerificationAction = {start: () => void; available: boolean};
 
 export type CustomerSession = {authenticated: boolean; phone?: string; name?: string};
 
+let widgetLoad:Promise<Msg91Window>|null=null;
 async function loadWidget(): Promise<Msg91Window> {
-    const sdk = window as Msg91Window;
-    if (sdk.initSendOTP) return sdk;
-    await new Promise<void>((resolve, reject) => {
-        const existing = document.querySelector<HTMLScriptElement>(`script[src="${scriptUrl}"]`);
-        const script = existing ?? document.createElement("script");
-        const timeout = window.setTimeout(() => reject(new Error("Widget unavailable")), 10000);
-        script.addEventListener("load", () => {window.clearTimeout(timeout); resolve();}, {once: true});
-        script.addEventListener("error", () => {window.clearTimeout(timeout); reject(new Error("Widget unavailable"));}, {once: true});
-        if (!existing) {
-            script.src = scriptUrl;
-            script.async = true;
-            document.head.appendChild(script);
-        }
-    });
-    if (!sdk.initSendOTP) throw new Error("Widget unavailable");
-    return sdk;
+    const sdk=window as Msg91Window;
+    if(sdk.initSendOTP)return sdk;
+    if(widgetLoad)return widgetLoad;
+    widgetLoad=new Promise<Msg91Window>((resolve,reject)=>{
+        const existing=document.querySelector<HTMLScriptElement>(`script[src="${scriptUrl}"]`);
+        const script=existing??document.createElement("script");
+        const cleanup=()=>{clearTimeout(timer);script.removeEventListener("load",loaded);script.removeEventListener("error",failed);};
+        const failed=()=>{cleanup();script.remove();reject(new Error("Widget unavailable"));};
+        const loaded=()=>{if(!sdk.initSendOTP){failed();return;}cleanup();resolve(sdk);};
+        const timer=setTimeout(failed,10000);
+        script.addEventListener("load",loaded,{once:true});script.addEventListener("error",failed,{once:true});
+        if(!existing){script.src=scriptUrl;script.async=true;document.head.appendChild(script);}
+    }).catch(error=>{widgetLoad=null;throw error;});
+    return widgetLoad;
 }
 
 export default function CustomerIdentityPanel({mode = "profile", onSessionChange, onGuestCheckoutChange,sessionRevision=0,verificationRef,onVerificationBusyChange}: {
@@ -55,6 +55,8 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     onGuestCheckoutChange?: (allowed: boolean) => void;
 }) {
     const translate = useTranslation();
+    const {branch}=useSelectedBranch();
+    const branchHelp=branch?.phone?<a className="verification-branch-help" href={`tel:${branch.phone.replace(/[^+\d]/g,"")}`}><T text="Call branch"/> · {branch.name}</a>:null;
     const [availability, setAvailability] = useState<"loading" | "ready" | "disabled" | "error">(
         "loading");
     const [session, setSession] = useState<CustomerSession>({authenticated: false});
@@ -68,6 +70,9 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
     const [nameDraft, setNameDraft] = useState("");
     const [nameError, setNameError] = useState<string | null>(null);
     const alive = useRef(true);
+    const verification = useRef<AbortController|null>(null);
+    const verificationTimer = useRef<ReturnType<typeof setTimeout>|null>(null);
+    useEffect(() => () => {verification.current?.abort();if(verificationTimer.current)clearTimeout(verificationTimer.current);}, []);
     const exchanging = useRef(false);
 
     useEffect(() => {
@@ -125,62 +130,78 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
                 ? "We could not check verification right now. Please try again later. You can still place a pickup order as a guest."
                 : "SMS sign-in is not enabled for this storefront yet. You can still place a pickup order as a guest."}
         </p>
-        <button type="button" className="mt-3 min-h-11 underline" onClick={() => setRevision(value => value + 1)}><T text="Try again" /></button>
+        <button type="button" className="mt-3 min-h-11 underline" onClick={() => setRevision(value => value + 1)}><T text="Try again" /></button>{branchHelp}
     </section>;
 
     async function start() {
         if (busy || !widgetId || !widgetToken) return;
+        const attempt = new AbortController();
+        verification.current?.abort();verification.current=attempt;
+        if(verificationTimer.current)clearTimeout(verificationTimer.current);
+        const current=()=>alive.current&&verification.current===attempt&&!attempt.signal.aborted;
+        const finish=()=>{if(verification.current!==attempt)return;if(verificationTimer.current)clearTimeout(verificationTimer.current);verificationTimer.current=null;if(current())setBusy(false);attempt.abort();};
+        verificationTimer.current=setTimeout(()=>{
+            if(!current())return;
+            attempt.abort();exchanging.current=false;setBusy(false);
+            setError("Verification took too long. Close the verification window and try again. Your cart is saved.");
+        },120000);
+        const signal=AbortSignal.any([attempt.signal,AbortSignal.timeout(15000)]);
         setBusy(true);
         setError(null);
         try {
+            // A previous exchange may have completed after a lost response. Reuse that session.
+            const recovered=await apiClient<CustomerSession>("/api/customer/identity/me",{credentials:"include",signal});
+            if(!current())return;
+            if(recovered.authenticated&&recovered.phone){setSession(recovered);setNameDraft(recovered.name??"");onSessionChange?.(recovered);notifyCustomerIdentityChanged();finish();return;}
             await apiClient<void>("/api/customer/identity/start", {
-                method: "POST", credentials: "include"
+                method: "POST", credentials: "include",signal
             });
             const sdk = await loadWidget();
+            if(!current())return;
             sdk.initSendOTP?.({
                 widgetId,
                 tokenAuth: widgetToken,
                 success: result => {
-                    if (exchanging.current) return;
+                    if (!current() || exchanging.current) return;
                     const accessToken = proofFromWidget(result);
                     if (!accessToken) {
-                        if (alive.current) {setError("Verification could not be completed. Please try again."); setBusy(false);}
+                        if (current()) {setError("Verification could not be completed. Please try again."); finish();}
                         return;
                     }
                     exchanging.current = true;
                     void (async () => {
                         try {
                             await apiClient<CustomerSession>("/api/customer/identity/exchange", {
-                                method: "POST", credentials: "include", body: JSON.stringify({accessToken})
+                                method: "POST", credentials: "include", signal:AbortSignal.any([attempt.signal,AbortSignal.timeout(15000)]), body: JSON.stringify({accessToken})
                             });
                             const signedIn = await apiClient<CustomerSession>(
-                                "/api/customer/identity/me", {credentials: "include"});
+                                "/api/customer/identity/me", {credentials: "include",signal:AbortSignal.any([attempt.signal,AbortSignal.timeout(15000)])});
                             if (!signedIn.authenticated || !signedIn.phone) {
                                 throw new Error("Customer session was not established");
                             }
-                            if (alive.current) {
+                            if (current()) {
                                 setSession(signedIn);
                                 onSessionChange?.(signedIn);
                                 setNameDraft(signedIn.name ?? "");
                                 notifyCustomerIdentityChanged();
                             }
                         } catch (failure) {
-                            if (alive.current) setError(failure instanceof ApiError && failure.status === 429
+                            if (current()) setError(failure instanceof ApiError && failure.status === 429
                                 ? "Too many sign-in attempts. Please wait up to an hour before trying a new OTP."
                                 : "The OTP was accepted, but sign-in could not be completed. Please try again.");
                         } finally {
-                            exchanging.current = false;
-                            if (alive.current) setBusy(false);
+                            if(verification.current===attempt){exchanging.current = false;finish();}
                         }
                     })();
                 },
-                failure: () => {if (alive.current && !exchanging.current) {setError("Verification was cancelled or failed."); setBusy(false);}}
+                failure: () => {if (current() && !exchanging.current) {setError("Verification was cancelled or failed."); finish();}}
             });
         } catch (failure) {
+            if(!current())return;
             setError(failure instanceof ApiError && failure.status === 429
                 ? "Too many verification attempts. Please wait up to an hour before trying again."
                 : guestAllowed ? "Verification is unavailable right now. You can continue as a guest." : translate("Verification is unavailable right now. Your cart is saved; try again."));
-            setBusy(false);
+            finish();
         }
     }
 
@@ -231,14 +252,14 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         <h2 className="text-xl font-bold"><T text="Verify your phone to continue" /></h2>
         <p className="mt-2 text-sm leading-6"><T text="Your cart stays saved. Sign in once to fill your contact details and keep your orders together." /></p>
         <button type="button" disabled={busy} onClick={() => {void start();}} className="mt-4 min-h-12 w-full rounded-xl bg-[#143936] px-5 font-bold text-white disabled:opacity-50">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>
-        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}{branchHelp}</p>}
     </section>;
 
     if (mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" data-verified={session.authenticated} aria-label={translate("Phone verification")}>
         <h2><T text={session.authenticated ? "Phone verified" : "Verify your phone"} /></h2>
         <p>{session.authenticated ? session.phone : translate("Verify your phone to place orders and see your pickup code.")}</p>
         {!session.authenticated && <p role="status"><T text={busy ? "Verifying your phone…" : "Use the button below to verify your phone and continue."}/></p>}
-        {error && <p role="alert">{translate(error)}</p>}
+        {error && <p role="alert">{translate(error)}{branchHelp}</p>}
     </section>;
 
     if (mode === "checkout") return <>
@@ -258,7 +279,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
                 <button ref={promptButton} type="button" disabled={busy} onClick={() => {void start();}}
                     className="mt-6 min-h-12 w-full rounded-xl bg-[#7a1625] px-5 font-semibold text-white disabled:opacity-50"><T text={busy ? "Please wait…" : "Verify with SMS"}/></button>
                 <button type="button" onClick={() => setPromptDismissed(true)} className="mt-3 min-h-11 w-full rounded-xl border border-[#eadfd6] font-semibold text-[#241715]"><T text="Continue as guest" /></button>
-                {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}</p>}
+                {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}{branchHelp}</p>}
             </div>
         </div>}
     </>;
@@ -289,6 +310,6 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
             className="mt-4 min-h-11 rounded-full bg-[#7a1625] px-6 py-2 text-sm font-semibold text-white disabled:opacity-50">
             <T text={busy ? "Please wait…" : session.authenticated ? "Sign out" : "Verify with SMS"}/>
         </button>
-        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}{branchHelp}</p>}
     </section><LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={logout} />{session.authenticated && <Link href="/profile/privacy" className="mt-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#e8d7c9] bg-white px-5 text-sm font-semibold text-[#7a1625]"><T text="Privacy and data choices"/> <span aria-hidden="true">→</span></Link>}</>;
 }

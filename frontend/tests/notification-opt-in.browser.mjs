@@ -65,6 +65,9 @@ async function fits(width) {
 try {
     await page.goto(`${base}/profile`);
     await card.waitFor();
+    await page.evaluate(()=>{const dialog=document.createElement('dialog');dialog.id='journey-task';dialog.textContent='Finish this task';document.body.appendChild(dialog);dialog.showModal();});
+    await card.waitFor({state:'hidden'});assert.equal(await page.evaluate(()=>window._permissionRequests),0);
+    await page.evaluate(()=>document.getElementById('journey-task').remove());await card.waitFor();
     assert.equal(await page.evaluate(() => window._permissionRequests), 0, "Never prompt automatically");
     await fits(320); await fits(390); await fits(1280);
     await page.setViewportSize({width: 390, height: 844});

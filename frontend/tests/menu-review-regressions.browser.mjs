@@ -23,7 +23,7 @@ try{for(const width of [320,390,640]){
   else if(path==='/api/menu/portion-groups')json={groups:[{key:'dahi',title:'Dahi',choices:dairy.map(p=>({productId:p.id,label:p.name.replace('Dahi ', '')}))}]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/availability')){
-   const body=route.request().postDataJSON();assert.ok(body.items.length<=100);assert.equal(body.days,1);assert.equal(url.searchParams.get('menuPreview'),'true');requests.push(body.items);
+   const body=route.request().postDataJSON();assert.ok(body.items.length<=100);if(url.searchParams.get('menuPreview')==='true'){assert.equal(body.days,1);requests.push(body.items);}else{assert.equal(body.days,31);assert.ok(body.items.some(item=>item.productId===113),'direct recovery checks the chosen unavailable item');}
    if(fail&&body.items.some(p=>p.productId===113))return route.fulfill({status:503,json:{message:'Unavailable'},headers});
    const blocked=id=>id===113||(id>=114&&(mode==='date'||mode==='slot'||(mode==='partial'&&id===115)));
    const items=body.items.map(p=>({productId:p.productId,available:mode==='slot'?true:!blocked(p.productId),code:blocked(p.productId)?'NO_INVENTORY':null}));
@@ -33,7 +33,7 @@ try{for(const width of [320,390,640]){
   return route.fulfill({json,headers});
  });
  await context.addInitScript(({branch,date,slot})=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{branch,date,slot});
- const load=async()=>{await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('#gokul-product-113').waitFor();};
+ const load=async()=>{await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('.menu-search input').fill('');await page.locator('#gokul-product-113').waitFor();};
  await load();
  await page.waitForFunction(()=>document.querySelector('#gokul-product-113 button[aria-label="Add Unavailable meal to cart"]')?.disabled===true);
  assert.deepEqual([...new Set(requests.flatMap(items=>items.map(p=>p.productId)))].sort((a,b)=>a-b),Array.from({length:115},(_,i)=>i+1),'full catalogue checked, including Snacks after 112 sweets');
@@ -43,9 +43,12 @@ try{for(const width of [320,390,640]){
  await page.locator('.menu-compact-header').waitFor();
  assert.equal(await toolbar.evaluate(n=>getComputedStyle(n).position),'relative');
  assert.ok((await toolbar.boundingBox()).y<0,'search and category tiles do not cover products');
- const blocked=page.locator('#gokul-product-113'),change=blocked.getByRole('button',{name:'Change pickup date',exact:true});await change.scrollIntoViewIfNeeded();await page.waitForTimeout(150);await change.click();
- await page.waitForFunction(()=>document.querySelector('.mobile-menu-sticky-tools')?.getAttribute('data-pickup-attention')==='true');
- await page.evaluate(()=>window.scrollBy(0,10));await page.waitForFunction(()=>!document.querySelector('.mobile-menu-sticky-tools[data-pickup-attention]'));
+ const blocked=page.locator('#gokul-product-113'),change=blocked.getByRole('button',{name:'Choose another pickup',exact:true});await change.scrollIntoViewIfNeeded();
+ const savedPickup=await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),savedCart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+ await change.click();const pickupDialog=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});await pickupDialog.waitFor();
+ await pickupDialog.getByRole('button',{name:'Cancel',exact:true}).click();await pickupDialog.waitFor({state:'hidden'});
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),savedPickup,'opening and cancelling recovery must preserve pickup');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),savedCart,'pickup recovery must preserve cart');
  assert.equal(await blocked.getByRole('button',{name:'Add Unavailable meal to cart',exact:true}).isDisabled(),true);
  // Rated sweet and snack rows keep their own badge below their own price.
  for(const id of [1,113]){

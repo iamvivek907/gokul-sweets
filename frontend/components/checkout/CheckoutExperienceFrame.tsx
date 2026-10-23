@@ -1,4 +1,5 @@
 "use client";
+import CheckoutPlanSummary from "./CheckoutPlanSummary";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
 import {T,useTranslation} from "@/lib/language";
@@ -63,6 +64,6 @@ export default function CheckoutExperienceFrame({
                         className={activeStage === key ? "current" : ""}>{index + 1} {translate(label)}</span>;
             })}
         </nav>
-        <div className="checkout-experience-content">{children}</div>
+        <div className={`checkout-experience-workspace ${["pickup","details","review"].includes(stage)?"has-plan":""}`}><div className="checkout-experience-content">{children}</div>{["pickup","details","review"].includes(stage)&&<CheckoutPlanSummary/>}</div>
     </div>;
 }
