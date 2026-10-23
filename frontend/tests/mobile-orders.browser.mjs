@@ -1,3 +1,4 @@
+import {recoveryContext,recoveryFailure} from './recoveryEvidence.mjs';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {execFileSync} from 'node:child_process';
@@ -10,7 +11,7 @@ try {
  for (const [width,enabled,paymentStatus,fulfillment='PICKUP',legacyNavigation=false,stalled=false,stalledRefresh=false,completed=false] of [[390,true,'PAID','PICKUP',false,false,false,true],[390,true,'PAID'],[640,true,'PAID'],[1280,true,'PAID'],[390,false,'PAID'],[390,true,'FAILED'],[390,true,'PENDING'],[640,true,'PENDING'],[1280,true,'PENDING'],[390,false,'PENDING'],[390,true,'PENDING','DELIVERY'],[390,true,'PAID','DELIVERY'],[390,true,'FAILED','DELIVERY'],[390,true,'PENDING','PICKUP',true],[390,true,'PENDING','PICKUP',true,true],[390,true,'PENDING','PICKUP',true,false,true]]) {
   if(process.env.ORDERS_ONLY_RATED&&!completed)continue;
   if(process.env.ORDERS_ONLY_PENDING && !(width===390&&enabled&&paymentStatus==='PENDING'&&fulfillment==='PICKUP'))continue;
-  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
+  const context=await recoveryContext(browser,{viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
   if(legacyNavigation)await context.addInitScript(()=>Object.defineProperty(window,'navigation',{value:undefined}));
   const order={orderNumber:'TEST-ORDER',customerOrderNumber:paymentStatus==='PAID'?1:null,branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:completed?'PICKED_UP':paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   // Customer responses may have no branch address; both forms must still download a paid invoice.
@@ -193,4 +194,7 @@ try {
   }
   await context.close();console.log(`Order browser: ${width} enabled=${enabled} ${paymentStatus} passed`);
  }
+} catch(error) {
+ for(const context of browser.contexts())for(const page of context.pages())console.error('Order recovery failure',JSON.stringify({url:page.url(),alerts:await page.locator('[role=alert]').allTextContents(),dialogs:await page.getByRole('dialog').allTextContents()}));
+ await recoveryFailure(browser,'mobile-orders');throw error;
 } finally {await browser.close();}

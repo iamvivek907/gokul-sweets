@@ -1,5 +1,7 @@
 ## Customer ease and recovery (October 23)
 
+Payment navigation protection is registered before the pending-payment UI can paint, including legacy Back. Cancellation remains an explicit navigation-triggered, server-checked action; unresolved cancellation keeps the customer on the payment page. Browser failures retain recovery traces.
+
 The consolidated phone checkout names its next action: phone verification, branch confirmation, pickup selection/confirmation, checking the total, then payment. The branch acknowledgement appears before items. Clear cart requires confirmation; item removals (including the minus button at the final unit or minimum weight) offer an eight-second Undo, including the last item. Undo and weight edits reject changed cart, branch, pickup or reservation/checkout state. Editing a weight reuses the quantity sheet with an Update quantity action. Availability and accepted-price checks remain authoritative.
 
 Fresh checkout documents without usable settings show a branded retry/menu/orders recovery surface. Error and missing-page fallbacks keep saved state. Menu search recognizes a small set of common spellings and Hindi food terms locally and matches category words. Active category, price and size filters can be removed individually. Unavailable items can open the existing pickup chooser directly; the prospective item is checked alongside actual cart amounts. No item is added or pickup saved by opening the chooser.
