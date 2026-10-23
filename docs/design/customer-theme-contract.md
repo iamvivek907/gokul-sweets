@@ -1,3 +1,13 @@
+## Smoother ordering and visual refinement (October 23)
+
+Pinch zoom remains intentionally disabled. The enabled customer shell uses warm neutral reading surfaces, existing maroon primary actions and emerald quantity/availability controls. Diwali campaign content, saved crops, carousel controls and reduced-motion behavior remain admin-owned. Phone campaign spacing, category imagery and support typography are more compact/readable; long campaign copy may grow naturally rather than being clipped. The floating Categories action stays above the measured cart dock in the left lane, clear of right-hand Add/quantity controls.
+
+Verification attempts have a two-minute lifetime and bounded session/start/exchange reads. Only the current non-aborted attempt may accept SDK callbacks. A retry checks for an already-established session before requesting another OTP. Optional install/notification invitations yield to native/custom modal tasks, active verification and ordering guidance. Social follow links are an inline thank-you only after server-confirmed paid order details, never a timed overlay during browsing.
+
+Branch-specific menu browsing preferences (search, category/family, price/size filters and scroll) are session-only with a thirty-minute expiry. They do not restore or mutate cart, pickup, identity or reservations. An explicit category URL takes precedence. A same-branch catalog-refresh failure retains the last loaded dishes and shows a retry notice; purchase and checkout checks remain authoritative. Initial loading uses stable product skeletons rather than replacing already-loaded menu content.
+
+Checkout policies remain fully available behind a disclosure. Desktop pickup/details/review share a contextual cart/branch/pickup side summary; no browsing-cart summary is shown for a pending order or on reserved payment stages. Existing route sequencing and authoritative acceptance checks remain. Offline recovery explains the saved-cart state, retries the original document when connectivity returns and offers branch help.
+
 ## Customer ease and recovery (October 23)
 
 The shared payment Back dispatcher is installed synchronously through Next client instrumentation before router hydration; Window listener registration order matters even for capture listeners. The active payment guard is registered before the pending-payment UI can paint, including legacy Back. Cancellation remains an explicit navigation-triggered, server-checked action; unresolved cancellation keeps the customer on the payment page. Browser failures retain recovery traces.

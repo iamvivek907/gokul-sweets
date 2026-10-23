@@ -230,3 +230,5 @@ html:lang(hi) button{height:auto}
 @media(prefers-reduced-motion:reduce){.navigation-feedback .navigation-progress{animation:none;width:100%}}
 
 html:lang(hi) :is(h1,h2,h3){line-height:1.4;font-weight:700}html:lang(hi) .language-trigger{line-height:1.2}
+
+.offline-branch-help{max-width:40rem;margin:0 auto 2rem;padding:0 24px;text-align:center;color:#665c56;font-size:15px;line-height:1.6}.offline-branch-help a{display:inline-flex;align-items:center;min-height:44px;color:#8f1838;font-weight:700;text-decoration:underline}

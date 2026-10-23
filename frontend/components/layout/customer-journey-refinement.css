@@ -1,0 +1,30 @@
+/* Gokul ordering surfaces: maroon actions, neutral reading surfaces, semantic status colours. */
+.future-storefront[data-customer-design=reference]{--customer-ink:#332821;--customer-muted:#665c56;--customer-line:#e8ded6;--customer-lavender:#f8f3ef;--customer-peach:#fff0e3;--customer-mint:#edf6f0}
+.future-storefront[data-customer-design=reference] .gokul-menu-tools input{background:#f8f5f2!important;border-color:#e8ded6!important;color:#332821!important;font-size:16px}
+.future-storefront[data-customer-design=reference] .mobile-branch-review{background:#fffaf5!important}
+.future-storefront[data-customer-design=reference] .checkout-policy{margin-top:12px;font-size:14px;line-height:1.6}
+.future-storefront[data-customer-design=reference] .checkout-policy summary{min-height:44px;display:list-item;cursor:pointer;font-weight:700;color:#8f1838;padding:12px 0}
+.future-storefront[data-customer-design=reference] .menu-refresh-notice{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:14px;margin:12px;border:1px solid #dfc48d;border-radius:14px;background:#fff7e5;font-size:14px;line-height:1.5}
+.future-storefront[data-customer-design=reference] .menu-refresh-notice button{min-height:44px;padding:8px;font-weight:700;text-decoration:underline}
+.future-storefront[data-customer-design=reference] .menu-loading-shell{max-width:1180px;margin:auto;padding:24px 16px}
+.future-storefront[data-customer-design=reference] .menu-loading-shell h1{font-size:24px;font-weight:750}.future-storefront[data-customer-design=reference] .menu-loading-shell>p{margin:12px 0 24px;color:#665c56;line-height:1.6}
+.future-storefront[data-customer-design=reference] .customer-social-thanks{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;max-width:760px;margin:16px auto 32px;padding:20px;border:1px solid #e8ded6;border-radius:18px;background:#fffaf5;font-size:14px;line-height:1.6}
+.future-storefront[data-customer-design=reference] .customer-social-thanks>div:last-child{display:flex;gap:16px}.future-storefront[data-customer-design=reference] .customer-social-thanks a{display:inline-flex;align-items:center;min-height:44px;color:#8f1838;font-weight:700}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card{border-radius:18px!important}.future-storefront[data-customer-design=reference] .gokul-menu-product-card .pickup-attention-action{min-height:44px;font-size:13px;line-height:1.5;font-weight:650;color:#8f1838}
+.future-storefront[data-customer-design=reference] .checkout-plan-summary{display:none}
+@media(min-width:1024px){
+ .future-storefront[data-customer-design=reference] .checkout-experience-workspace.has-plan:has(.checkout-plan-summary){display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:24px;align-items:start;padding-right:24px}
+ .future-storefront[data-customer-design=reference] .checkout-plan-summary{display:block;position:sticky;top:100px;margin:24px 0;padding:22px;border:1px solid #e8ded6;border-radius:20px;background:#fffaf5;color:#332821;font-size:14px;line-height:1.6}
+ .future-storefront[data-customer-design=reference] .checkout-plan-summary h2{font-size:18px;font-weight:750;margin-bottom:12px}.future-storefront[data-customer-design=reference] .checkout-plan-summary dl{margin:16px 0}.future-storefront[data-customer-design=reference] .checkout-plan-summary dl>div{display:flex;justify-content:space-between;gap:12px}.future-storefront[data-customer-design=reference] .checkout-plan-summary a{display:inline-flex;align-items:center;min-height:44px;margin-right:14px;color:#8f1838;font-weight:700;text-decoration:underline}.future-storefront[data-customer-design=reference] .checkout-plan-summary small{display:block;color:#665c56;font-size:13px}
+}
+@media(max-width:640px){
+ .future-storefront[data-premium-menu=true] .ordering-tour-invite{margin:4px 12px;padding:0 10px;min-height:44px;font-size:13px;border:0}.future-storefront[data-premium-menu=true] .ordering-tour-invite>button:not(.ordering-tour-skip){background:#f8f3ef;color:#8f1838}
+ .future-storefront[data-premium-menu=true] .mobile-menu-pickup{margin-top:8px;margin-bottom:10px;min-height:64px!important;padding:8px 12px!important;border-radius:16px!important}
+ .future-storefront[data-premium-menu=true] .menu-illustrated-categories{padding-top:4px;gap:8px}.future-storefront[data-premium-menu=true] .menu-category-tile{min-height:68px;gap:4px}.future-storefront[data-premium-menu=true] .menu-category-tile>span{width:46px;height:46px}.future-storefront[data-premium-menu=true] .menu-category-tile strong{font-size:12px}
+ .future-storefront[data-premium-menu=true] .menu-compact-pickup small{font-size:12px}.future-storefront[data-premium-menu=true] .menu-browse-chips{margin-top:4px}
+ .future-storefront[data-premium-menu=true] .menu-floating-category-trigger{left:12px;right:auto}
+ .future-storefront[data-premium-menu=true] .gokul-floating-cart{border-radius:16px}.future-storefront[data-premium-menu=true] .menu-availability-note{font-size:13px;line-height:1.55}
+ .future-storefront[data-customer-design=reference] .customer-social-thanks{margin:16px 12px 28px}
+}
+
+.future-storefront[data-customer-design=reference] .verification-branch-help{display:inline-flex;align-items:center;min-height:44px;margin-left:12px;font-size:14px;font-weight:700;text-decoration:underline;color:#8f1838}

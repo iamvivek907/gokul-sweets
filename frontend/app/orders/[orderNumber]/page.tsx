@@ -405,14 +405,14 @@ export default function OrderDetailPage() {
         !!order.pickupDate && !!order.pickupEndTime &&
         parseBusinessTimestamp(`${order.pickupDate}T${order.pickupEndTime}`).getTime() <= currentOrder.checkedAt;
 
-    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell showSocialPopup={false}>
+    if (phone && features?.simplifiedCheckout && features.checkoutExperienceV2 && features.acceptedCheckoutQuote) return <AppShell orderConfirmed={order.paymentStatus==="PAID"}>
         <NotificationReadOnOpen orderNumber={orderNumber} />
         {currentOrder.refreshError && <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">{currentOrder.refreshError} <button type="button" disabled={refreshing} onClick={() => void handleRefresh()}><T text="Try again" /></button></p>}
         <MobileOrderDetail order={order} status={status} onRefresh={() => void handleRefresh()} trackingEnabled={trackingEnabled} pastPickupWindow={pastPickupWindow} />
     </AppShell>;
 
     return (
-        <AppShell>
+        <AppShell orderConfirmed={order?.paymentStatus==="PAID"}>
             <NotificationReadOnOpen orderNumber={orderNumber} />
             {currentOrder.refreshError && <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm">{currentOrder.refreshError} <button type="button" disabled={refreshing} onClick={() => void handleRefresh()}><T text="Try again" /></button></p>}
             {order.paymentStatus==="PAID" && order.fulfillmentType!=="DELIVERY" && ["CONFIRMED","PREPARING","READY_FOR_PICKUP","PICKUP_WINDOW_EXPIRED"].includes(order.orderStatus) && <div className="mx-auto w-full max-w-3xl px-4 sm:px-6"><PickupCodeCard orderNumber={orderNumber}/></div>}
