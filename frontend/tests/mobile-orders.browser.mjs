@@ -12,6 +12,12 @@ try {
   if(process.env.ORDERS_ONLY_RATED&&!completed)continue;
   if(process.env.ORDERS_ONLY_PENDING && !(width===390&&enabled&&paymentStatus==='PENDING'&&fulfillment==='PICKUP'))continue;
   const context=await recoveryContext(browser,{viewport:{width,height:900},serviceWorkers:'block',acceptDownloads:true}),page=await context.newPage();
+  // At Window, registration order wins even for capture listeners. The payment
+  // dispatcher must run before Next can restore a cached route and clean up its guard.
+  await context.addInitScript(()=>{
+   const add=window.addEventListener.bind(window);window.__popstateRegistration=[];
+   window.addEventListener=function(type,listener,options){if(type==='popstate')window.__popstateRegistration.push(options===true||!!options?.capture);return add(type,listener,options);};
+  });
   if(legacyNavigation)await context.addInitScript(()=>Object.defineProperty(window,'navigation',{value:undefined}));
   const order={orderNumber:'TEST-ORDER',customerOrderNumber:paymentStatus==='PAID'?1:null,branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:completed?'PICKED_UP':paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   // Customer responses may have no branch address; both forms must still download a paid invoice.
@@ -149,6 +155,7 @@ try {
   assert.equal(cancels,0);
   if(paymentStatus==='PENDING'){
    const paymentPath='/checkout/payment/TEST-ORDER';
+   assert.equal(await page.evaluate(()=>window.__popstateRegistration[0]),true,'payment Back dispatcher registers before the router');
    if(compact){
     // Start the timeout assertion at the cancellation request, after back-navigation recovery.
     const cancellationStarted=stalled?page.waitForRequest(request=>new URL(request.url()).pathname==='/api/payments/10/cancel-checkout'&&request.method()==='POST',{timeout:20000}):null;

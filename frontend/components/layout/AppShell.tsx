@@ -2,7 +2,6 @@
 import ActiveOrderShortcut from "@/components/customer/ActiveOrderShortcut";
 import BadgeCelebration from "@/components/customer/BadgeCelebration";
 import "@/components/customer/badges.css";
-import "@/lib/paymentNavigation";
 
 import {usePathname} from "next/navigation";
 import {useEffect, useState, type ReactNode} from "react";

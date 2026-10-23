@@ -20,3 +20,10 @@ test('unresolved payment holds legacy Back as soon as its UI can paint',()=>{
 test('inactive payment does not install a blocking Back guard',()=>{
  const h=harness(false);h.paint();assert.equal(h.back().held,false);assert.equal(h.back().destination,null);h.cleanup();
 });
+
+test('client bootstrap synchronously installs the dispatcher before router hydration',()=>{
+ let loaded=false;
+ const compiled=ts.transpileModule(fs.readFileSync('instrumentation-client.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+ vm.runInNewContext(compiled,{exports:{},require:name=>{assert.equal(name,'./lib/paymentNavigation');loaded=true;}});
+ assert.equal(loaded,true);
+});
