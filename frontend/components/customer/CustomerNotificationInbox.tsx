@@ -74,29 +74,29 @@ export default function CustomerNotificationInbox() {
         .map(target => ({target, events: inbox!.messages.filter(item => `${item.targetType}:${item.targetId}` === target)
             .sort((a, b) => b.id - a.id)}));
     if (unavailable) return <section className="rounded-3xl border border-[#eadfd6] bg-white p-6">
-        <h2 className="text-xl font-semibold"><T text="Notification inbox" /></h2><p className="mt-2 text-sm">The inbox is not available yet. Check Order history for current updates.</p></section>;
+        <h2 className="text-xl font-semibold"><T text="Notification inbox" /></h2><p className="mt-2 text-sm"><T text="The inbox is not available yet. Check Order history for current updates."/></p></section>;
     if (!inbox && !error) return <BrandLoading className="customer-inbox-loading" label="Loading your inbox…" />;
     return <section className="customer-notification-inbox rounded-3xl border border-[#eadfd6] bg-white p-6 sm:p-8" aria-label="Notification inbox">
         <div className="notification-toolbar flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-xl font-semibold"><span className="sr-only"><T text="Notification inbox" /></span>{" "}{inbox && <span className="text-sm font-normal">{inbox.unreadCount} unread</span>}</h2>
+            <h2 className="text-xl font-semibold"><span className="sr-only"><T text="Notification inbox" /></span>{" "}{inbox && <span className="text-sm font-normal">{inbox.unreadCount} <T text="unread"/></span>}</h2>
             <div className="notification-toolbar-actions flex flex-wrap gap-2"><button type="button" disabled={busy || !inbox?.unreadCount} onClick={() => void perform(async () => {
                 const throughId = inbox?.readThrough || Math.max(0, ...(inbox?.messages.map(item => item.id) ?? []));
                 await inboxRequest<void>(`${base}/notifications/read-all`, {method: "PUT", credentials: "include", body: JSON.stringify({throughId})});
                 await load();
-            })} className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50">Mark all read</button>
-            <details className="notification-tools"><summary className="min-h-11 cursor-pointer rounded-xl border px-4 py-3 text-sm font-semibold">More options</summary><button type="button" disabled={busy} onClick={() => void perform(() => load())}
-                className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50">Refresh inbox</button>
-            <p className="notification-help mt-2 text-sm leading-6 text-[#756763]">Opening an order marks its existing updates read. Completed orders clear automatically. Routine unread updates expire after seven days; payment and refund exceptions remain. Times are in IST.</p></details></div>
+            })} className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50"><T text="Mark all read"/></button>
+            <details className="notification-tools"><summary className="min-h-11 cursor-pointer rounded-xl border px-4 py-3 text-sm font-semibold"><T text="More options"/></summary><button type="button" disabled={busy} onClick={() => void perform(() => load())}
+                className="min-h-11 rounded-xl border px-4 text-sm font-semibold disabled:opacity-50"><T text="Refresh inbox"/></button>
+            <p className="notification-help mt-2 text-sm leading-6 text-[#756763]"><T text="Opening an order marks its existing updates read. Completed orders clear automatically. Routine unread updates expire after seven days; payment and refund exceptions remain. Times are in IST."/></p></details></div>
         </div>
         {error && <p role="alert" className="mt-4 rounded-xl border border-[#c76752] p-3 text-sm">{error} <button type="button" disabled={busy} onClick={()=>void perform(()=>load())} className="min-h-11 px-3 font-semibold underline"><T text="Try again"/></button></p>}
-        {!inbox && !error && <p role="status" className="mt-4">Loading your inbox…</p>}
+        {!inbox && !error && <p role="status" className="mt-4"><T text="Loading your inbox…"/></p>}
         {inbox?.messages.length === 0 && <p className="mt-5 rounded-xl bg-[#fffaf2] p-4 text-sm">{search || unreadOnly ? "No updates match this view. Try All updates or another search." : "You’re all caught up. Your order updates will appear here."}</p>}
         <div className="notification-filters mt-5 space-y-3">
             <div className="notification-view-switch flex gap-2" aria-label="Filter notifications">
-                <button type="button" disabled={busy} aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)} className="min-h-11 flex-1 rounded-xl border px-3 text-sm font-semibold">All updates</button>
-                <button type="button" disabled={busy} aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)} className="min-h-11 flex-1 rounded-xl border px-3 text-sm font-semibold">Unread</button>
+                <button type="button" disabled={busy} aria-pressed={!unreadOnly} onClick={() => setUnreadOnly(false)} className="min-h-11 flex-1 rounded-xl border px-3 text-sm font-semibold"><T text="All updates"/></button>
+                <button type="button" disabled={busy} aria-pressed={unreadOnly} onClick={() => setUnreadOnly(true)} className="min-h-11 flex-1 rounded-xl border px-3 text-sm font-semibold"><T text="Unread"/></button>
             </div>
-            <label className="block text-sm"><span className="sr-only">Search all updates</span><input type="search" disabled={busy} maxLength={100} value={search} onChange={event => setSearch(event.target.value)} placeholder="Search order or update" className="min-h-11 w-full rounded-xl border px-3" /></label>
+            <label className="block text-sm"><span className="sr-only"><T text="Search all updates"/></span><input type="search" disabled={busy} maxLength={100} value={search} onChange={event => setSearch(event.target.value)} placeholder="Search order or update" className="min-h-11 w-full rounded-xl border px-3" /></label>
         </div>
         <div className="notification-timeline mt-5 space-y-6">
             {[true, false].map(unread => {
@@ -123,18 +123,18 @@ export default function CustomerNotificationInbox() {
                                 <div className="notification-actions mt-3 flex flex-wrap items-center gap-3">
                                     <Link onClick={() => void acknowledgeTarget(item)} className="flex min-h-11 items-center text-sm font-semibold underline" href={item.targetType === "ORDER" ? `/orders/${encodeURIComponent(item.targetId)}` : `/occasions/requests?enquiry=${encodeURIComponent(item.targetId)}`}>
                                         {item.targetType === "ORDER" ? "View order" : "View bulk request"}</Link>
-                                    {["PICKED_UP", "DELIVERED"].includes(item.kind) && <Link href={`/orders/${encodeURIComponent(item.targetId)}#order-review`} onClick={() => void acknowledgeTarget(item)} className="notification-review-action flex min-h-11 items-center rounded-full bg-[#143936] px-4 text-sm font-semibold text-white">Share an optional review</Link>}
+                                    {["PICKED_UP", "DELIVERED"].includes(item.kind) && <Link href={`/orders/${encodeURIComponent(item.targetId)}#order-review`} onClick={() => void acknowledgeTarget(item)} className="notification-review-action flex min-h-11 items-center rounded-full bg-[#143936] px-4 text-sm font-semibold text-white"><T text="Share an optional review"/></Link>}
                                     {!item.readAt && <button type="button" disabled={busy} className="min-h-11 text-sm underline disabled:opacity-50" onClick={() => void perform(async () => {
                                         await inboxRequest<void>(`${base}/notifications/${item.id}/read`, {method: "PUT", credentials: "include"}); await load();
-                                    })}>Mark as read</button>}
+                                    })}><T text="Mark as read"/></button>}
                                 </div>
                             </article>
                             {events.length > 1 && <details className="notification-earlier border-t px-4 py-3">
-                                <summary className="cursor-pointer text-sm font-semibold">Earlier updates · {events.length - 1}</summary>
+                                <summary className="cursor-pointer text-sm font-semibold"><T text="Earlier updates ·"/> {events.length - 1}</summary>
                                 <ol className="mt-3 space-y-3">{events.slice(1).map(event => <li key={event.id} className="border-l-2 border-[#dfc4ab] pl-3">
                                     <p className="text-sm font-semibold">{event.title} · {event.readAt ? "Read" : "Unread"}</p><p className="text-sm">{event.message}</p>
                                     <time dateTime={event.createdAt} className="text-xs">{formatBusinessTimestamp(event.createdAt, {day: "numeric", month: "short", hour: "numeric", minute: "2-digit"})} IST</time>
-                                    {!event.readAt && <button disabled={busy} type="button" className="ml-3 min-h-11 text-sm underline" onClick={() => void perform(async () => {await inboxRequest<void>(`${base}/notifications/${event.id}/read`, {method: "PUT", credentials: "include"}); await load();})}>Mark as read</button>}
+                                    {!event.readAt && <button disabled={busy} type="button" className="ml-3 min-h-11 text-sm underline" onClick={() => void perform(async () => {await inboxRequest<void>(`${base}/notifications/${event.id}/read`, {method: "PUT", credentials: "include"}); await load();})}><T text="Mark as read"/></button>}
                                 </li>)}</ol>
                             </details>}
                         </li>;
@@ -146,11 +146,11 @@ export default function CustomerNotificationInbox() {
             onClick={() => void perform(async () => {
                 const older = await inboxRequest<Inbox>(`${base}/notifications?${query}&before=${inbox.nextBefore}`, {credentials: "include"});
                 setInbox(current => current ? {...older, messages: [...current.messages, ...older.messages.filter(item => !current.messages.some(existing => existing.id === item.id))]} : older);
-            })}>Load older messages</button>}
-        <details className="mt-6 rounded-2xl border p-4"><summary className="cursor-pointer font-semibold">Notification settings</summary>
+            })}><T text="Load older messages"/></button>}
+        <details className="mt-6 rounded-2xl border p-4"><summary className="cursor-pointer font-semibold"><T text="Notification settings"/></summary>
         {preferences && <div className="permission-surface mt-7 rounded-2xl bg-[#fffaf2] p-4">
-            <h3 className="font-semibold">Notification preferences</h3>
-            <p className="mt-2 text-sm leading-6">Order and payment messages stay in this inbox. Optional browser alerts and sound have separate controls below when available. SMS and email alerts are not enabled here.</p>
+            <h3 className="font-semibold"><T text="Notification preferences"/></h3>
+            <p className="mt-2 text-sm leading-6"><T text="Order and payment messages stay in this inbox. Optional browser alerts and sound have separate controls below when available. SMS and email alerts are not enabled here."/></p>
             {modern ? <PreferenceChoice title="Include optional offers in my inbox when available" detail="A little food inspiration, only if you want it." enabled={preferences.offerInboxEnabled} disabled={busy || !preferences.marketingConsentGranted && !preferences.offerInboxEnabled} onChange={enabled => {
                 void perform(async () => {
                     const choices = await inboxRequest<Preferences>(`${base}/notification-preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({offerInboxEnabled: enabled})});
@@ -164,11 +164,10 @@ export default function CustomerNotificationInbox() {
                             const choices = await inboxRequest<Preferences>(`${base}/notification-preferences`, {method: "PUT", credentials: "include", body: JSON.stringify({offerInboxEnabled: enabled})});
                             setPreferences(choices); setSaved("Notification preference saved.");
                         });
-                    }} /> Include optional offers in my inbox when available
-            </label>}
-            <p id="offer-inbox-help" className="mt-2 text-xs leading-5">Offers are optional and off by default. This preference does not grant marketing consent. If your branch enables campaigns, you may receive short promotional pushes. At most one per day and three per week, respecting your quiet hours.</p>
-            {!preferences.marketingConsentGranted && <p className="mt-2 text-sm">Marketing consent is currently off. Manage it in <Link href="/profile/privacy" className="underline">Privacy and data choices</Link>.</p>}
-            {saved && <p role="status" className="mt-2 text-sm">Notification preference saved.</p>}
+                    }} /> <T text="Include optional offers in my inbox when available"/> </label>}
+            <p id="offer-inbox-help" className="mt-2 text-xs leading-5"><T text="Offers are optional and off by default. This preference does not grant marketing consent. If your branch enables campaigns, you may receive short promotional pushes. At most one per day and three per week, respecting your quiet hours."/></p>
+            {!preferences.marketingConsentGranted && <p className="mt-2 text-sm"><T text="Marketing consent is currently off. Manage it in"/> <Link href="/profile/privacy" className="underline"><T text="Privacy and data choices"/></Link>.</p>}
+            {saved && <p role="status" className="mt-2 text-sm"><T text="Notification preference saved."/></p>}
         </div>}
         <CustomerAlertPreferences /></details>
     </section>;

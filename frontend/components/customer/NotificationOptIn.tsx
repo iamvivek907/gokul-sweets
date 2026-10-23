@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 import Link from "next/link";
 import {useEffect, useState} from "react";
 import {usePathname} from "next/navigation";
@@ -83,14 +84,14 @@ export default function NotificationOptIn() {
     }
     if (!allowed || !visible || dismissed) return null;
     return <section className="notification-opt-in permission-surface" aria-label="Enable app notifications">
-        <div className="permission-hero"><span className="permission-symbol" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M12 2V1" /></svg></span><div><p className="permission-eyebrow">A little heads-up</p><h2>Your order’s ready. Your phone should know.</h2></div></div>
-        <p>Get pickup updates without keeping the app open. You’re always in control.</p>
-        <div className="permission-preview" aria-label="Example notification"><span className="permission-app-mark" aria-hidden="true">G</span><div><small>GOKUL SWEETS · EXAMPLE</small><strong>Good food. Zero guesswork.</strong><p>Your order is ready for pickup. See you soon!</p></div></div>
+        <div className="permission-hero"><span className="permission-symbol" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4M12 2V1" /></svg></span><div><p className="permission-eyebrow"><T text="A little heads-up"/></p><h2><T text="Your order’s ready. Your phone should know."/></h2></div></div>
+        <p><T text="Get pickup updates without keeping the app open. You’re always in control."/></p>
+        <div className="permission-preview" aria-label="Example notification"><span className="permission-app-mark" aria-hidden="true">G</span><div><small><T text="GOKUL SWEETS · EXAMPLE"/></small><strong><T text="Good food. Zero guesswork."/></strong><p><T text="Your order is ready for pickup. See you soon!"/></p></div></div>
         <div className="permission-actions">
-            {guest ? <Link href="/profile">Sign in to enable notifications</Link> : <button type="button" disabled={busy} onClick={() => void enable()}>{busy ? "Enabling…" : permission === "denied" ? "Show me how" : "Enable notifications"}</button>}
-            <button type="button" className="permission-secondary" disabled={busy} onClick={() => {dismissed = true; setVisible(false);}}>Not now</button>
+            {guest ? <Link href="/profile"><T text="Sign in to enable notifications"/></Link> : <button type="button" disabled={busy} onClick={() => void enable()}><T text={busy ? "Enabling…" : permission === "denied" ? "Show me how" : "Enable notifications"}/></button>}
+            <button type="button" className="permission-secondary" disabled={busy} onClick={() => {dismissed = true; setVisible(false);}}><T text="Not now"/></button>
         </div>
-        <small>Optional. Offer alerts have their own choice in <Link href="/profile/privacy">Privacy and data</Link>. We’ll remind you on your next visit if you skip.</small>
-        {message && <p role="status" className="permission-feedback">{message}</p>}
+        <small><T text="Optional. Offer alerts have their own choice in"/> <Link href="/profile/privacy"><T text="Privacy and data"/></Link><T text=". We’ll remind you on your next visit if you skip."/></small>
+        {message && <p role="status" className="permission-feedback"><T text={message}/></p>}
     </section>;
 }
