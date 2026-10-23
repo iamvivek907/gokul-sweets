@@ -89,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     # Hosted APT mirrors can consume ~14 minutes in setup; retain a separate
     # test deadline so setup latency cannot cancel otherwise passing suites.
-    timeout-minutes: 30
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -126,7 +126,8 @@ jobs:
           node "$browser_runner/node_modules/playwright/cli.js" install --with-deps chromium
           echo "PLAYWRIGHT_MODULE=$browser_runner/node_modules/playwright" >> "$GITHUB_ENV"
       - name: Browser regressions with per-script timings
-        timeout-minutes: 12
+        # The full menu suite previously passed in 13m09s; allow normal runner variance.
+        timeout-minutes: 20
         env:
           BROWSER_RECOVERY_REPEATS: '2'
           BROWSER_SUITE: ${{ matrix.suite }}
