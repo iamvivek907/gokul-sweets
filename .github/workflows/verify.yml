@@ -87,7 +87,9 @@ jobs:
   frontend-browser:
     needs: frontend-build
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Hosted APT mirrors can consume ~14 minutes in setup; retain a separate
+    # test deadline so setup latency cannot cancel otherwise passing suites.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -117,12 +119,14 @@ jobs:
             sudo apt-get install -y poppler-utils
           fi
       - name: Install browser regression runner
+        timeout-minutes: 15
         run: |
           browser_runner="$RUNNER_TEMP/gokul-browser-runner"
           npm install --prefix "$browser_runner" --no-save --package-lock=false playwright@1.56.1
           node "$browser_runner/node_modules/playwright/cli.js" install --with-deps chromium
           echo "PLAYWRIGHT_MODULE=$browser_runner/node_modules/playwright" >> "$GITHUB_ENV"
       - name: Browser regressions with per-script timings
+        timeout-minutes: 12
         env:
           BROWSER_RECOVERY_REPEATS: '2'
           BROWSER_SUITE: ${{ matrix.suite }}
