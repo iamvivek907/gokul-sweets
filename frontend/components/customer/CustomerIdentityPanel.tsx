@@ -231,7 +231,7 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         <h2 className="text-xl font-bold"><T text="Verify your phone to continue" /></h2>
         <p className="mt-2 text-sm leading-6"><T text="Your cart stays saved. Sign in once to fill your contact details and keep your orders together." /></p>
         <button type="button" disabled={busy} onClick={() => {void start();}} className="mt-4 min-h-12 w-full rounded-xl bg-[#143936] px-5 font-bold text-white disabled:opacity-50">{busy ? translate("Please wait…") : translate("Verify with SMS")}</button>
-        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
+        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}</p>}
     </section>;
 
     if (mode === "mobileCheckout") return <section className="mobile-checkout-section mobile-phone-entry" data-verified={session.authenticated} aria-label={translate("Phone verification")}>
@@ -243,35 +243,34 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
 
     if (mode === "checkout") return <>
         {session.authenticated ? <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-[#f4faf4] p-4" aria-label="Verified pickup contact">
-            <div><p className="text-sm font-semibold text-[#245b38]">Signed in · phone verified</p>
-                <p className="mt-1 text-xs text-[#465a4a]">Your account details are filled in below.</p></div>
+            <div><p className="text-sm font-semibold text-[#245b38]"><T text="Signed in · phone verified"/></p>
+                <p className="mt-1 text-xs text-[#465a4a]"><T text="Your account details are filled in below."/></p></div>
             <Link href="/profile" className="text-sm font-semibold text-[#7a1625] underline"><T text="Account" /></Link>
         </div> : <div className="mb-5 rounded-2xl border border-[#eadfd6] p-4">
-            <p className="text-sm font-semibold text-[#241715]">Checking out as a guest?</p>
-            <p className="mt-1 text-xs text-[#756763]">Sign in to fill your verified number automatically.</p>
-            <button type="button" onClick={() => setPromptDismissed(false)} className="mt-2 text-sm font-semibold text-[#7a1625] underline">Sign in with SMS</button>
+            <p className="text-sm font-semibold text-[#241715]"><T text="Checking out as a guest?"/></p>
+            <p className="mt-1 text-xs text-[#756763]"><T text="Sign in to fill your verified number automatically."/></p>
+            <button type="button" onClick={() => setPromptDismissed(false)} className="mt-2 text-sm font-semibold text-[#7a1625] underline"><T text="Sign in with SMS"/></button>
         </div>}
         {!session.authenticated && !promptDismissed && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onMouseDown={event => {if (event.target === event.currentTarget) setPromptDismissed(true);}}>
             <div role="dialog" aria-modal="true" aria-labelledby="checkout-signin-title" className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
-                <h2 id="checkout-signin-title" className="text-2xl font-bold text-[#241715]">Sign in for a faster checkout</h2>
-                <p className="mt-2 text-sm leading-6 text-[#756763]">Verify your number to fill your pickup details. You can also continue as a guest.</p>
+                <h2 id="checkout-signin-title" className="text-2xl font-bold text-[#241715]"><T text="Sign in for a faster checkout"/></h2>
+                <p className="mt-2 text-sm leading-6 text-[#756763]"><T text="Verify your number to fill your pickup details. You can also continue as a guest."/></p>
                 <button ref={promptButton} type="button" disabled={busy} onClick={() => {void start();}}
-                    className="mt-6 min-h-12 w-full rounded-xl bg-[#7a1625] px-5 font-semibold text-white disabled:opacity-50">{busy ? "Please wait…" : "Verify with SMS"}</button>
+                    className="mt-6 min-h-12 w-full rounded-xl bg-[#7a1625] px-5 font-semibold text-white disabled:opacity-50"><T text={busy ? "Please wait…" : "Verify with SMS"}/></button>
                 <button type="button" onClick={() => setPromptDismissed(true)} className="mt-3 min-h-11 w-full rounded-xl border border-[#eadfd6] font-semibold text-[#241715]"><T text="Continue as guest" /></button>
-                {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
+                {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}</p>}
             </div>
         </div>}
     </>;
 
     return <><section className="mt-6 rounded-3xl border border-[#e8d7c9] bg-white p-5 shadow-sm sm:p-6" aria-label={translate("Phone verification")}>
         <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]"><T text="Your account" /></p>
-        <h2 className="mt-2 text-xl font-semibold text-[#241715]">{session.authenticated ? "Account details" : "Verify your phone"}</h2>
+        <h2 className="mt-2 text-xl font-semibold text-[#241715]"><T text={session.authenticated ? "Account details" : "Verify your phone"}/></h2>
         <p className="mt-2 text-sm leading-6 text-[#756763]">
             {session.authenticated ? "Update the name shown on your account or manage your sign-in."
-                : guestAllowed ? "Optional verification helps secure your account. You can still place a pickup order as a guest." : translate("Verify your phone to place orders and see your pickup code.")}
+                : guestAllowed ? translate("Optional verification helps secure your account. You can still place a pickup order as a guest.") : translate("Verify your phone to place orders and see your pickup code.")}
         </p>
-        {session.authenticated && session.phone && <p className="mt-2 text-sm font-semibold text-[#241715]">
-            Verified phone: <span className="select-text">{session.phone}</span>
+        {session.authenticated && session.phone && <p className="mt-2 text-sm font-semibold text-[#241715]"> <T text="Verified phone:"/> <span className="select-text">{session.phone}</span>
         </p>}
         {session.authenticated && <div className="mt-4">
             <label htmlFor="customer-display-name" className="block text-sm font-semibold text-[#241715]"><T text="Your name" /></label>
@@ -288,8 +287,8 @@ export default function CustomerIdentityPanel({mode = "profile", onSessionChange
         </div>}
         <button type="button" disabled={busy} onClick={() => {if (session.authenticated) setLogoutOpen(true); else void start();}}
             className="mt-4 min-h-11 rounded-full bg-[#7a1625] px-6 py-2 text-sm font-semibold text-white disabled:opacity-50">
-            {busy ? "Please wait…" : session.authenticated ? "Sign out" : "Verify with SMS"}
+            <T text={busy ? "Please wait…" : session.authenticated ? "Sign out" : "Verify with SMS"}/>
         </button>
-        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{error}</p>}
-    </section><LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={logout} />{session.authenticated && <Link href="/profile/privacy" className="mt-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#e8d7c9] bg-white px-5 text-sm font-semibold text-[#7a1625]">Privacy and data choices <span aria-hidden="true">→</span></Link>}</>;
+        {error && <p role="alert" className="mt-3 text-sm text-[#9e2732]">{translate(error)}</p>}
+    </section><LogoutConfirmation open={logoutOpen} onClose={() => setLogoutOpen(false)} onConfirm={logout} />{session.authenticated && <Link href="/profile/privacy" className="mt-4 flex min-h-12 items-center justify-between rounded-2xl border border-[#e8d7c9] bg-white px-5 text-sm font-semibold text-[#7a1625]"><T text="Privacy and data choices"/> <span aria-hidden="true">→</span></Link>}</>;
 }

@@ -69,7 +69,7 @@ try{for(const scenario of ['switch','reward-first','offer-failure','reward-failu
   await page.getByRole('button',{name:'Add one Fresh sweets'}).click();await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
   if(!await page.getByRole('button',{name:/₹5 sweet saving/}).isVisible())await page.locator('.checkout-reward-options summary').click();await page.getByRole('button',{name:/₹5 sweet saving/}).click();await page.getByRole('button',{name:'Remove reward'}).waitFor();
   await page.getByRole('button',{name:'Remove one Fresh sweets'}).click();
-  await page.getByRole('region',{name:'Reward recovery'}).waitFor();assert.equal(await page.getByRole('button',{name:'Pay now',exact:true}).isDisabled(),true);
+  await page.getByRole('region',{name:'Reward recovery'}).waitFor();assert.equal(await page.getByRole('button',{name:'Checking total…',exact:true}).isDisabled(),true);
   await page.getByRole('region',{name:'Reward recovery'}).getByRole('button',{name:'Remove reward'}).click();
   await page.waitForFunction(()=>!document.querySelector('.mobile-checkout-pay button')?.disabled);
   assert.equal(previews.at(-1).rewardCode,undefined);assert.equal(await page.getByRole('region',{name:'Reward recovery'}).count(),0);

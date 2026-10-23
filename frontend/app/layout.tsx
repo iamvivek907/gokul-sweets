@@ -4,6 +4,7 @@ import type {
 } from "next";
 
 import "./globals.css";
+import "@/components/layout/customer-ease.css";
 import "@/components/common/brand-experience.css";
 
 import AppProviders

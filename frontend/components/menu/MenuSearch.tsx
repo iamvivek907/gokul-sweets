@@ -1,5 +1,5 @@
 "use client";
-import {T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 
 interface MenuSearchProps {
@@ -20,6 +20,7 @@ export default function MenuSearch({
     onChange
 }: MenuSearchProps) {
 
+    const t=useTranslation();
     return (
         <div
             className="menu-search
@@ -46,7 +47,7 @@ export default function MenuSearch({
             {refined && <label htmlFor="gokul-menu-search" className="mb-2 block text-sm font-semibold text-[#241715]"><T text="Find a favourite" /></label>}
             <input
                 id="gokul-menu-search"
-                aria-label={refined ? undefined : "Search the menu"}
+                aria-label={refined ? undefined : t("Search the menu")}
                 type="search"
                 value={value}
                 onChange={
@@ -55,7 +56,7 @@ export default function MenuSearch({
                             event.target.value
                         )
                 }
-                placeholder={premium ? "Search your favourites" : "Search sweets, snacks & meals"}
+                placeholder={t(premium ? "Search your favourites" : "Search sweets, snacks & meals")}
                 className="
                     min-h-13
                     w-full

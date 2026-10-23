@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {useEffect, useState} from "react";
 import PreferenceChoice from "./PreferenceChoice";
@@ -89,29 +90,29 @@ export default function CustomerAlertPreferences() {
         finally {setBusy(false);}
     }
     return <div className="permission-surface alert-preferences mt-6 rounded-2xl border border-[#eadfd6] p-4" aria-label="Browser alerts and sound">
-        {modern && <p className="permission-eyebrow">Made for your day</p>}
-        <h3 className="font-semibold">Browser alerts and sound</h3>
-        {modern && <div className="permission-summary"><span aria-hidden="true">♪</span><p>Pickup updates, your way. Set the sound. Keep your evenings quiet.</p></div>}
-        <p className="mt-2 text-sm leading-6">Both are optional. Push uses standard browser notifications. Custom chimes work only in an open, visible page after you activate sound in that tab; muted devices and autoplay rules may prevent sound.</p>
-        <p className="mt-2 text-sm leading-6">On iPhone or iPad, add Gokul Sweets to your Home Screen and open that app before enabling push (iOS/iPadOS 16.4 or later). If push is unsupported, use this inbox.</p>
+        {modern && <p className="permission-eyebrow"><T text="Made for your day"/></p>}
+        <h3 className="font-semibold"><T text="Browser alerts and sound"/></h3>
+        {modern && <div className="permission-summary"><span aria-hidden="true">♪</span><p><T text="Pickup updates, your way. Set the sound. Keep your evenings quiet."/></p></div>}
+        <p className="mt-2 text-sm leading-6"><T text="Both are optional. Push uses standard browser notifications. Custom chimes work only in an open, visible page after you activate sound in that tab; muted devices and autoplay rules may prevent sound."/></p>
+        <p className="mt-2 text-sm leading-6"><T text="On iPhone or iPad, add Gokul Sweets to your Home Screen and open that app before enabling push (iOS/iPadOS 16.4 or later). If push is unsupported, use this inbox."/></p>
         {settings && draft && <>
             <div className="permission-device-actions mt-4 flex flex-wrap gap-3">
-                <button type="button" disabled={busy || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl border px-4 text-sm disabled:opacity-50">{pushId ? "Check this browser registration" : "Enable push for this browser"}</button>
-                {pushId && <button type="button" disabled={busy} onClick={() => void disablePush()} className="min-h-11 rounded-xl border px-4 text-sm">Disable push for this browser</button>}
+                <button type="button" disabled={busy || !supported || !settings.pushConfigured || permission === "denied"} onClick={() => void enablePush()} className="min-h-11 rounded-xl border px-4 text-sm disabled:opacity-50"><T text={pushId ? "Check this browser registration" : "Enable push for this browser"}/></button>
+                {pushId && <button type="button" disabled={busy} onClick={() => void disablePush()} className="min-h-11 rounded-xl border px-4 text-sm"><T text="Disable push for this browser"/></button>}
             </div>
-            {!supported && <p className="mt-2 text-xs">This browser does not support push here. Use the inbox for updates.</p>}
-            {!settings.pushConfigured && <p className="mt-2 text-xs">Push is not configured yet. The inbox and optional in-page sound remain available.</p>}
-            {permission === "denied" && <p className="mt-2 text-sm">Permission is denied. Change it in browser settings if you want push later.</p>}
-            {modern ? <PreferenceChoice title="Allow in-page chimes" detail="A gentle sound while the app is open. Activate sound below to try it." enabled={draft.soundEnabled} disabled={busy} onChange={soundEnabled => setDraft({...draft, soundEnabled})} /> : <label className="mt-4 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.soundEnabled} disabled={busy} onChange={event => setDraft({...draft, soundEnabled: event.target.checked})} />Allow in-page chimes</label>}
-            <button type="button" className="min-h-11 text-sm underline" onClick={() => void activateChime().then(() => setMessage("Sound activated in this tab. If you heard nothing, check device volume and browser settings.")).catch(() => setMessage("Sound is blocked or unsupported. Your inbox still works."))}>Activate and test sound in this tab</button>
-            {modern ? <PreferenceChoice title="Quiet hours for push and chimes (IST)" detail="Your downtime matters. Updates stay in your inbox while alerts take a break." enabled={draft.quietHoursEnabled} disabled={busy} onChange={quietHoursEnabled => setDraft({...draft, quietHoursEnabled})} /> : <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.quietHoursEnabled} disabled={busy} onChange={event => setDraft({...draft, quietHoursEnabled: event.target.checked})} />Quiet hours for push and chimes (IST)</label>}
+            {!supported && <p className="mt-2 text-xs"><T text="This browser does not support push here. Use the inbox for updates."/></p>}
+            {!settings.pushConfigured && <p className="mt-2 text-xs"><T text="Push is not configured yet. The inbox and optional in-page sound remain available."/></p>}
+            {permission === "denied" && <p className="mt-2 text-sm"><T text="Permission is denied. Change it in browser settings if you want push later."/></p>}
+            {modern ? <PreferenceChoice title="Allow in-page chimes" detail="A gentle sound while the app is open. Activate sound below to try it." enabled={draft.soundEnabled} disabled={busy} onChange={soundEnabled => setDraft({...draft, soundEnabled})} /> : <label className="mt-4 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.soundEnabled} disabled={busy} onChange={event => setDraft({...draft, soundEnabled: event.target.checked})} /><T text="Allow in-page chimes"/></label>}
+            <button type="button" className="min-h-11 text-sm underline" onClick={() => void activateChime().then(() => setMessage("Sound activated in this tab. If you heard nothing, check device volume and browser settings.")).catch(() => setMessage("Sound is blocked or unsupported. Your inbox still works."))}><T text="Activate and test sound in this tab"/></button>
+            {modern ? <PreferenceChoice title="Quiet hours for push and chimes (IST)" detail="Your downtime matters. Updates stay in your inbox while alerts take a break." enabled={draft.quietHoursEnabled} disabled={busy} onChange={quietHoursEnabled => setDraft({...draft, quietHoursEnabled})} /> : <label className="mt-3 flex min-h-11 items-center gap-3 text-sm"><input type="checkbox" checked={draft.quietHoursEnabled} disabled={busy} onChange={event => setDraft({...draft, quietHoursEnabled: event.target.checked})} /><T text="Quiet hours for push and chimes (IST)"/></label>}
             <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                <label>Start (IST)<input type="time" aria-label="Quiet hours start (IST)" className="ml-2 rounded-lg border p-2" value={minuteToTime(draft.quietStartMinute)} disabled={busy || !draft.quietHoursEnabled} onChange={event => setDraft({...draft, quietStartMinute: timeToMinute(event.target.value)})} /></label>
-                <label>End (IST)<input type="time" aria-label="Quiet hours end (IST)" className="ml-2 rounded-lg border p-2" value={minuteToTime(draft.quietEndMinute)} disabled={busy || !draft.quietHoursEnabled} onChange={event => setDraft({...draft, quietEndMinute: timeToMinute(event.target.value)})} /></label>
+                <label><T text="Start (IST)"/><input type="time" aria-label="Quiet hours start (IST)" className="ml-2 rounded-lg border p-2" value={minuteToTime(draft.quietStartMinute)} disabled={busy || !draft.quietHoursEnabled} onChange={event => setDraft({...draft, quietStartMinute: timeToMinute(event.target.value)})} /></label>
+                <label><T text="End (IST)"/><input type="time" aria-label="Quiet hours end (IST)" className="ml-2 rounded-lg border p-2" value={minuteToTime(draft.quietEndMinute)} disabled={busy || !draft.quietHoursEnabled} onChange={event => setDraft({...draft, quietEndMinute: timeToMinute(event.target.value)})} /></label>
             </div>
-            <p className="mt-2 text-xs leading-5">Quiet hours default to 10 pm–8 am IST. Updates stay in the inbox without a later burst of alerts. Save to apply changes across your account.</p>
-            <button type="button" disabled={busy} onClick={() => void save()} className="mt-3 min-h-11 rounded-xl border px-4 text-sm font-semibold">Save alert preferences</button>
+            <p className="mt-2 text-xs leading-5"><T text="Quiet hours default to 10 pm–8 am IST. Updates stay in the inbox without a later burst of alerts. Save to apply changes across your account."/></p>
+            <button type="button" disabled={busy} onClick={() => void save()} className="mt-3 min-h-11 rounded-xl border px-4 text-sm font-semibold"><T text="Save alert preferences"/></button>
         </>}
-        {message && <p role="status" className="mt-3 text-sm">{message}</p>}
+        {message && <p role="status" className="mt-3 text-sm"><T text={message}/></p>}
     </div>;
 }
