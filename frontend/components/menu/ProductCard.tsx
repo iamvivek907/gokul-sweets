@@ -19,6 +19,7 @@ interface ProductCardProps {
     priceFrom?: boolean;
     unavailableForPickup?: boolean;
     pickupMessage?: string;
+    pickupChecking?: boolean;
     product: MenuProduct;
     ratingSummary: ProductRatingSummary | null;
     ratingLoading: boolean;
@@ -76,6 +77,7 @@ export default function ProductCard({
     priceFrom = false,
     unavailableForPickup = false,
     pickupMessage,
+    pickupChecking = false,
     product,
     ratingSummary,
     ratingLoading,
@@ -110,7 +112,7 @@ export default function ProductCard({
 
     return (
         <article
-            onPointerDownCapture={event=>{if(unavailableForPickup&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
+            onPointerDownCapture={event=>{if(unavailableForPickup&&!pickupChecking&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
             className={`
                 gokul-product-card group
                 ${refined ? "gokul-menu-product-card" : ""}
@@ -289,14 +291,13 @@ export default function ProductCard({
                 }
 
 
-                {!isAvailable && (refined ? !unavailableForPickup : !!product.serviceAvailability?.message) && (
-                    <p className="menu-availability-note my-1 text-xs leading-5 text-[#a94d39]" role="status">
-                        <T text={refined && product.serviceAvailability?.code === "SOLD_OUT"
-                            ? "Sold out" : product.serviceAvailability?.message ?? "Unavailable"}/>
-                    </p>
+                {(refined ? (!purchaseControl && (!isAvailable || unavailableForPickup)) : (!isAvailable && !!product.serviceAvailability?.message)) && (
+                    <p className="menu-availability-note my-1 text-xs leading-5 text-[#a94d39]" role="status"><span>
+                        <T text={!isAvailable ? (refined && product.serviceAvailability?.code === "SOLD_OUT" ? "Sold out" : product.serviceAvailability?.message ?? "Unavailable") : pickupMessage ?? "Not at this time"}/>
+                    </span></p>
                 )}
 
-                {refined&&unavailableForPickup&&product.available&&!purchaseControl&&pickupMessage!=="Checking pickup"&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(product.id)}><T text="Choose another pickup"/></button>}
+                {refined&&unavailableForPickup&&product.available&&!purchaseControl&&!pickupChecking&&pickupMessage!=="Checking pickup"&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(product.id)}><T text="Choose another pickup"/></button>}
                 {/* Rating */}
 
                 <div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">

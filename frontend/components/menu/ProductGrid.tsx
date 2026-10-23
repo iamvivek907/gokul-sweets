@@ -146,7 +146,8 @@ export default function ProductGrid({
                                 premium={portionGroups!==undefined}
                                 refined={refined}
                                 unavailableForPickup={unavailable}
-                                pickupMessage={pickupChecking ? "Checking pickup" : describePickupAvailability(pickup, false)}
+                                pickupMessage={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}
+                                pickupChecking={pickupChecking}
                                 product={product}
                                 ratingSummary={ratingSummaries[product.id] ?? null}
                                 ratingLoading={ratingsLoading}
