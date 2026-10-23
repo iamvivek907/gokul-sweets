@@ -61,6 +61,8 @@ Pickup-card rules from seven stylesheet layers now have a single owner, `menu-pi
 
 The phone Diwali carousel uses one artwork surface, a stronger gradient behind text, editorial headline, category badge, cream action and integrated translucent controls. Published copy/media/crop and category destinations remain authoritative. Desktop and legacy banner presentation remain separate. Dot/arrow/keyboard navigation and reduced motion are retained. Rapid repeated arrow taps advance from the requested target; a programmed smooth scroll only activates its destination after arrival, avoiding mid-transition focus/selection races. Pointer/wheel interaction restores manual scrolling.
 
+Modern video backgrounds expose a 44px Play/Pause button outside the saved crop and carousel navigation, with English/Hindi accessible labels and keyboard activation. They do not expose native playback chrome behind overlaid content. Only the active slide mounts its video; reduced motion keeps the poster. Legacy banners retain native video controls. The campaign browser suite exercises real VP9 playback, touch hit testing with a 250% admin crop, pause/resume, slide changes, reduced motion and legacy controls at phone and desktop widths.
+
 ## Validation and rollout status
 
 New image-cache tests cover expiry, offline fallback, entry/byte/item bounds, concurrent writes, quota and partial-metadata failures, upgrade cleanup and API bypass. Existing push/installation tests retain their contracts. Backend tests cover all scheduler configurations together, process roles, invalid configuration, cache-mode headers and bounded metric tags. The diagnostics script has read-only request-contract tests in CI.

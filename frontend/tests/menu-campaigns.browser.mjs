@@ -9,13 +9,14 @@ const banner={key:'festival',titleEn:'Celebrate Diwali',titleHi:'दीवाल
 const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH});
 try {for(const width of [320,390,640,1280]) {
  const context=await browser.newContext({viewport:{width,height:960},serviceWorkers:'block',reducedMotion:width===390?'no-preference':'reduce'}),page=await context.newPage();page.setDefaultTimeout(15000);
- let banners=[banner],reads=0,failed=false;const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let banners=[banner],reads=0,failed=false,modern=true;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/campaign-diwali.png',async route=>process.env.CAMPAIGN_IMAGE?route.fulfill({contentType:'image/png',body:await readFile(process.env.CAMPAIGN_IMAGE)}):route.fulfill({status:302,headers:{location:'/arrival-mithai.webp'}}));
+ await context.route('**/campaign-animation.webm',async route=>route.fulfill({contentType:'video/webm',body:await readFile(new URL('./fixtures/media/menu-animation.webm',import.meta.url))}));
  await context.route('**/api/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname;let json=[];
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
-  if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,checkoutExperienceV2:true,contextualStorefrontV2:true,pickupAddOns:true,smartAvailability:false,reviews:true,today:'2026-10-17',futureOrderingDays:7};
+  if(path==='/api/storefront/features')json={futuristicStorefrontV2:modern,checkoutExperienceV2:modern,contextualStorefrontV2:true,pickupAddOns:true,smartAvailability:false,reviews:true,today:'2026-10-17',futureOrderingDays:7};
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
   else if(path==='/api/menu')json=categories;
   else if(path==='/api/menu/portion-groups')json={groups:[]};
@@ -76,6 +77,29 @@ try {for(const width of [320,390,640,1280]) {
  await page.getByRole('heading',{name:'Diwali meal plans',exact:true}).waitFor();
  await page.getByRole('button',{name:'Explore meals',exact:true}).click();
  await page.getByRole('heading',{name:'Food favourite',exact:true}).waitFor();
+ // Video playback is controlled outside both the cropped artwork and carousel navigation.
+ banners=[{...banner,mediaUrl:'/campaign-animation.webm',mediaType:'video/webm',posterUrl:'/arrival-mithai.webp',frame:{x:90,y:80,zoom:250,fit:'COVER'}},{...banner,key:'still',titleEn:'Sweet celebrations'}];
+ await page.emulateMedia({reducedMotion:'no-preference'});await load();
+ const video=page.locator('[aria-label="Published menu banners"] video');
+ const pause=page.getByRole('button',{name:'Pause banner animation',exact:true});
+ await pause.waitFor();await pause.scrollIntoViewIfNeeded();
+ assert.equal(await video.evaluate(v=>v.controls),false,'decorative playback does not expose covered native controls');
+ assert.equal(await video.evaluate(v=>v.style.transform),'scale(2.5)','admin crop is preserved');
+ assert.equal(await pause.evaluate(button=>{const b=button.getBoundingClientRect();return b.width>=44&&b.height>=44&&document.elementFromPoint(b.x+b.width/2,b.y+b.height/2)?.closest("button")===button;}),true,'playback control is touch-sized and unobstructed');
+ await pause.click();await page.waitForFunction(()=>document.querySelector('[aria-label="Published menu banners"] video')?.paused===true);
+ const play=page.getByRole('button',{name:'Play banner animation',exact:true});await play.focus();await page.keyboard.press('Space');
+ await pause.waitFor();assert.equal(await video.evaluate(v=>v.paused),false,'keyboard resumes real playback');
+ await pause.focus();await page.keyboard.press('Enter');await play.waitFor();assert.equal(await video.evaluate(v=>v.paused),true);
+ await page.getByRole('button',{name:'Next banner',exact:true}).click();await page.getByRole('heading',{name:'Sweet celebrations',exact:true}).waitFor();
+ assert.equal(await video.count(),0,'inactive videos are removed');assert.equal(await page.getByRole('button',{name:/banner animation/}).count(),0);
+ await page.getByRole('button',{name:'Previous banner',exact:true}).click();await pause.waitFor();
+ await page.emulateMedia({reducedMotion:'reduce'});await video.waitFor({state:'detached'});
+ assert.equal(await page.getByRole('button',{name:/banner animation/}).count(),0,'reduced motion uses the poster');
+ assert.ok(await page.locator('[aria-label="Published menu banners"] img').count()>0);
+ modern=false;await page.emulateMedia({reducedMotion:'no-preference'});await load();await video.waitFor();
+ assert.equal(await video.evaluate(v=>v.controls),true,'legacy presentation retains native playback controls');
+ assert.equal(await page.getByRole('button',{name:/banner animation/}).count(),0);
+ modern=true;
  // An admin replacement becomes visible after reload without a frontend deployment.
  banners=[{...banner,titleEn:'Winter sweets',categoryId:999}];await load();await page.getByRole('heading',{name:'Winter sweets',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Explore sweets',exact:true}).count(),0,'unknown category has no dead CTA');
  // A publish with no active banners (hidden, expired or removed) does not restore built-in artwork.
