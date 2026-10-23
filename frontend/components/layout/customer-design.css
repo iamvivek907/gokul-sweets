@@ -332,8 +332,6 @@
 @media(max-width:640px){
  .future-storefront[data-customer-design=reference] .mobile-menu-sticky-tools{position:relative;order:-4!important;background:#fff;padding:4px 0 6px}
  .future-storefront[data-customer-design=reference] .mobile-menu-sticky-tools .gokul-menu-tools{margin-top:6px!important;padding:8px 10px!important;border-radius:14px!important}
- .future-storefront[data-customer-design=reference] .mobile-menu-sticky-tools .mobile-menu-pickup{margin-top:0!important;margin-bottom:0!important}
- .future-storefront[data-customer-design=reference] .mobile-menu-sticky-tools[data-pickup-attention=true] .mobile-menu-pickup{outline:3px solid #d49a27;outline-offset:-2px;background:#fff5db!important}
  .future-storefront[data-customer-design=reference] .pickup-attention-message{position:absolute;top:100%;left:0;right:0;background:#fff5db;box-shadow:0 4px 8px #80581712;font-size:12px;font-weight:650;color:#805817;padding:5px 8px}
  .future-storefront .pickup-attention-action{font-size:11px;color:#8f1838;background:transparent;border:0;text-decoration:underline;padding:4px 8px;min-height:44px}
 }

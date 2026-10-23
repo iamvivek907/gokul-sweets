@@ -5,13 +5,11 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 
 import java.time.Clock;
 
 /** Backend inventory configuration contract and implementation. */
 @Configuration
-@EnableScheduling
 public class InventoryConfiguration {
 
     /**

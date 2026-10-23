@@ -106,10 +106,6 @@
  .future-storefront[data-customer-route="/menu"] .menu-products-first:not(.branch-details-active)>.gokul-branch-gallery,.future-storefront[data-customer-route="/menu"] .menu-products-first>header{display:none}
  .future-storefront[data-customer-route="/menu"] .menu-products-first{display:flex;flex-direction:column}
  .future-storefront[data-customer-route="/menu"] .menu-products-first>.gokul-menu-tools{order:-3;margin:8px 0 0;padding:10px;border-radius:14px;box-shadow:none}
- .future-storefront[data-customer-route="/menu"] .menu-products-first>.mobile-menu-pickup{order:-2;margin:8px 0;padding:10px 12px;border-radius:14px;min-height:0}
- .future-storefront[data-customer-route="/menu"] .mobile-menu-pickup>div>span,.future-storefront[data-customer-route="/menu"] .mobile-menu-pickup>p:not([role]){display:none}
- .future-storefront[data-customer-route="/menu"] .mobile-menu-pickup>div>strong{font-size:12px;line-height:18px}
- .future-storefront[data-customer-route="/menu"] .mobile-menu-pickup>button{min-height:44px;padding:6px 10px;font-size:12px}
  .future-storefront[data-customer-route="/menu"] #gokul-menu-items{margin-top:12px;scroll-margin-top:120px}
  .future-storefront[data-customer-route="/menu"] .mobile-menu-highlights{display:block;margin:20px 0;padding:12px}
  .future-storefront[data-customer-route="/menu"] .mobile-menu-highlights>header{margin-bottom:12px}
@@ -492,10 +488,6 @@
  .future-storefront[data-customer-route="/menu"] .mobile-items-categories button:first-child{color:#fff!important;font-weight:700}
  .future-storefront[data-customer-route="/menu"] .mobile-items-categories button:is(:hover,:focus-visible){background:#22262e!important}
  .future-storefront[data-customer-route="/menu"] .mobile-items-categories button span{display:block;min-width:28px;min-height:0;text-align:right;background:transparent;color:inherit;font-size:16px;border-radius:0}
-}
-
-@media(max-width:640px){
- .future-storefront[data-customer-route="/menu"] .mobile-menu-pickup>p[role="status"]{flex-basis:100%;margin:4px 0 0;font-size:12px;line-height:1.5;color:#59676a}
 }
 
 /* Preserve the cart anchor while a saved pickup is checked in the background. */

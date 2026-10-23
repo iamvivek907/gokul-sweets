@@ -379,12 +379,6 @@
 @media(max-width:640px){
  .future-storefront .mobile-selected-weight-price{display:block;font-size:.75rem;color:#226643;font-weight:700;margin:6px 0}
  .future-storefront .mobile-menu-legacy-pickup{display:none}
- .future-storefront .mobile-menu-pickup{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;border:1px solid #d7e2d8;border-radius:16px;background:#edf4ee;padding:12px;margin:12px 0}
- .future-storefront .mobile-menu-pickup>div{flex:1;min-width:140px}
- .future-storefront .mobile-menu-pickup span{font-size:.625rem;font-weight:750;letter-spacing:.08em;color:#536b63;display:block}
- .future-storefront .mobile-menu-pickup strong{display:block;margin-top:4px;font-size:.8125rem;line-height:1.5}
- .future-storefront .mobile-menu-pickup button{min-height:44px;padding:10px 12px;border-radius:12px;background:#143936;color:#fffaf2;font-size:.75rem;font-weight:700;flex:none}
- .future-storefront .mobile-menu-pickup>p{flex:0 0 100%;font-size:.75rem;line-height:1.5;color:#536b63}
  .future-storefront .gokul-product-card.gokul-menu-product-card{min-height:160px;border-color:#dfe6dc;background:#fff;box-shadow:0 3px 12px #09272508!important}
  .future-storefront .gokul-product-card.gokul-menu-product-card>.product-card-image{height:112px;margin-bottom:36px}
  .future-storefront .gokul-menu-product-card .product-card-controls{box-shadow:0 3px 8px #09272512;border-radius:12px;background:#fffaf2}

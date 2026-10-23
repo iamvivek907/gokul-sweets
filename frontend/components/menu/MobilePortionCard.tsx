@@ -1,4 +1,5 @@
 "use client";
+import {requestMenuPickup} from "@/lib/menuPickupRecovery";
 import {useState} from "react";
 import {GroupDietaryLabel} from "./DietaryLabel";
 import ProductCard from "./ProductCard";
@@ -33,7 +34,7 @@ export default function MobilePortionCard({group,products,quantities,onAdd,onInc
   <div className="menu-group-caption"><span>{count>0?`${count} · ${money(total)}`:<><T text="From"/> {money(minimum)}</>}</span><button type="button" disabled={availableSizes===0&&count===0} onClick={()=>setOpen(true)}><T text={count>0?"Manage sizes":labels.join(" / ")}/><span aria-hidden="true"> ›</span></button></div>
   {serviceNotes.map(note=><p key={note.reason} role="status" className="menu-availability-note"><strong>{note.labels}:</strong>{" "}<T text={note.reason}/></p>)}
   {!serviceNotes.length&&availableSizes===0&&<p role="status" className="menu-availability-note"><T text={status}/></p>}
-  {unavailableForPickup&&!pickupChecking&&<button type="button" className="pickup-attention-action" onClick={()=>window.dispatchEvent(new Event("gokul-pickup-attention"))}><T text="Change pickup date"/></button>}
+  {unavailableForPickup&&!pickupChecking&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(products.find(p=>p.available)!.id)}><T text="Choose another pickup"/></button>}
   {open&&<MenuVariantPicker group={group} products={products} quantities={quantities} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} onClose={()=>setOpen(false)}/>}
  </div>;
 }

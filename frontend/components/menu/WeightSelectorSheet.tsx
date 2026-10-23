@@ -19,6 +19,7 @@ type WeightInputUnit =
 
 
 interface WeightSelectorSheetProps {
+    editing?: boolean;
     product: MenuProduct | null;
     currentWeightGrams?: number | null;
     onClose: () => void;
@@ -27,6 +28,7 @@ interface WeightSelectorSheetProps {
 
 
 interface WeightSelectorDialogProps {
+    editing?: boolean;
     product: MenuProduct;
     initialWeightGrams: number;
     onClose: () => void;
@@ -160,6 +162,7 @@ function parseWeightInput(
 function WeightSelectorDialog({
     product,
     initialWeightGrams,
+    editing = false,
     onClose,
     onConfirm
 }: WeightSelectorDialogProps) {
@@ -848,8 +851,8 @@ function WeightSelectorDialog({
                     >
                         {
                             validWeight === null
-                                ? "Check quantity"
-                                : `Add ${formatWeight(validWeight)}`
+                                ? <T text="Check quantity"/>
+                                : editing ? <T text="Update quantity"/> : <><T text="Add"/> {formatWeight(validWeight)}</>
                         }
                     </button>
 
@@ -871,6 +874,7 @@ function WeightSelectorDialog({
 export default function WeightSelectorSheet({
     product,
     currentWeightGrams,
+    editing = false,
     onClose,
     onConfirm
 }: WeightSelectorSheetProps) {
@@ -896,6 +900,7 @@ export default function WeightSelectorSheet({
     return (
         <WeightSelectorDialog
             key={`${product.id}-${initialWeightGrams}`}
+            editing={editing}
             product={
                 product
             }

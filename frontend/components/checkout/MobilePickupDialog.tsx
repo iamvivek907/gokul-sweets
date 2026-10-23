@@ -9,8 +9,8 @@ import type {PickupSelection} from "@/types/pickup";
 const dateLabel=(date:string,locale:"en"|"hi",today:string)=>{const named=new Intl.DateTimeFormat(locale==="hi"?"hi-IN":"en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric",timeZone:"Asia/Kolkata"}).format(new Date(`${date}T12:00:00+05:30`));const tomorrow=indiaToday(new Date(Date.parse(`${today}T12:00:00+05:30`)+86400000));return `${date===today?`${translate("Today",locale)} · `:date===tomorrow?`${translate("Tomorrow",locale)} · `:""}${named}`;};
 const money=(amount:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(amount);
 
-export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,loading=false,initialDate,restoreFocus,today=indiaToday()}:{
- loading?:boolean;restoreFocus?:HTMLElement|null;today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
+export default function MobilePickupDialog({dates,options,chosen,disabled,onClose,onConfirm,advisory=false,loading=false,initialDate,restoreFocus,checkingItem,today=indiaToday()}:{
+ checkingItem?:string;loading?:boolean;restoreFocus?:HTMLElement|null;today?:string;initialDate?:string;advisory?:boolean;dates:CartAvailability["dates"];options:PickupSelection[];chosen:PickupSelection|null;disabled:boolean;
  onClose:()=>void;onConfirm:(selection:PickupSelection)=>Promise<boolean>;
 }){
  const locale=useLanguage();
@@ -58,6 +58,7 @@ export default function MobilePickupDialog({dates,options,chosen,disabled,onClos
   <div className="mobile-pickup-dialog-body">
    <p><T text={advisory?"Choose a time, then confirm. Your cart is kept.":"Choose a date, then tap a pickup time. Nothing changes until you confirm."} /></p>
    {loading?<p role="status"><T text="Checking times…"/></p>:<>
+   {checkingItem&&<p className="menu-pickup-context"><T text="Pickup times include your cart and"/> <strong>{checkingItem}</strong>. <T text="No item is added until you choose Add."/></p>}
    <div className="mobile-pickup-dates" role="group" aria-label="Pickup dates">{dates.map(day=><button type="button" key={day.date} disabled={disabled||checking} aria-label={day.date} aria-pressed={date===day.date} onClick={()=>{setDate(day.date);setSelection(null);setError("");}}><strong>{dateLabel(day.date,locale,today)}</strong><small><T text={options.some(option=>option.date===day.date)?"Times available":"No matching time"} /></small></button>)}</div>
    <h3>{date?dateLabel(date,locale,today):""} · <T text="Pickup times" /></h3>
    <div className="mobile-pickup-times gokul-pickup-times" role="group" aria-label="Pickup times">{times.map(option=><button className="gokul-pickup-time" type="button" key={`${option.slot.id}:${option.pickupType}`} disabled={disabled||checking} aria-pressed={selected?.slot.id===option.slot.id&&selected.pickupType===option.pickupType} onClick={()=>{setSelection(option);setError("");}}><strong>{option.slot.startTime.slice(0,5)}–{option.slot.endTime.slice(0,5)}</strong><span>{option.pickupType==="NORMAL"?<T text="Standard" />:<><T text="Priority" /> · +{money(option.slot.priorityCharge)}</>}</span></button>)}</div>

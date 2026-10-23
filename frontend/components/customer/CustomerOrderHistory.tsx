@@ -1,4 +1,5 @@
 "use client";
+import {T,useTranslation} from "@/lib/language";
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -23,6 +24,7 @@ type Props = {
 };
 export default function CustomerOrderHistory(props: Props) { return <Suspense fallback={<BrandLoading label="Loading your orders…"/>}><History {...props}/></Suspense>; }
 function History({ phone, branchId, branchName }: Props) {
+    const t=useTranslation();
     const search = useSearchParams(), path = usePathname(), router = useRouter(), features = useStorefrontFeatures(), compact = usePhoneViewport() === true;
     const scope = branchId == null ? "all" : String(branchId), matches = search.get("scope") == null || search.get("scope") === scope;
     const status = matches ? search.get("status") ?? "ALL" : "ALL", query = matches ? search.get("q") ?? "" : "", from = matches ? search.get("from") ?? "" : "", to = matches ? search.get("to") ?? "" : "";
@@ -100,28 +102,28 @@ function History({ phone, branchId, branchName }: Props) {
     const Heading = path === "/orders" ? "h1" : "h2";
     const returnTo = `${path === "/profile" ? "/profile/orders" : path}?${historyParams()}`;
     return <div className={styles.history} data-modern={features?.futuristicStorefrontV2 || features?.checkoutExperienceV2 ? "true" : undefined}>
-  <header className={styles.hero}><div><span>Your Gokul moments</span><Heading>Every order. Easy to find.</Heading><p>{branchName ?? "All your branches, together."}</p></div><CustomerIcon kind="receipt"/></header>
+  <header className={styles.hero}><div><span><T text="Your Gokul moments"/></span><Heading><T text="Every order. Easy to find."/></Heading><p>{branchName ?? <T text="All your branches, together."/>}</p></div><CustomerIcon kind="receipt"/></header>
   {path === "/orders" && <OrderRewardGuidance/>}
   <form className={styles.search} onSubmit={event => {
       event.preventDefault();
       // Read the submitted field, including input events not yet committed to React state.
       const submitted = new FormData(event.currentTarget).get("q");
       navigate({ q: typeof submitted === "string" ? submitted.trim() || null : null }, true);
-  }}><CustomerIcon kind="receipt"/><input name="q" aria-label="Search order history" maxLength={100} placeholder="Order number or dish name" key={query} defaultValue={query}/><button type="submit">Search</button></form>
-  <div className={styles.filters} aria-label="Order status">{[["ALL", "All"], ["ACTIVE", "Active"], ["COMPLETED", "Completed"], ["ISSUES", "Cancelled / Failed"]].map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => navigate({ status: value }, true)}>{label}</button>)}</div>
-  <div className={styles.dates}><label>From<input type="date" value={from} max={to || undefined} onChange={event => navigate({ from: event.target.value || null }, true)}/></label><label>To<input type="date" value={to} min={from || undefined} onChange={event => navigate({ to: event.target.value || null }, true)}/></label></div>
-  {error && <div className={styles.error} role="alert"><p>{error}</p><button type="button" onClick={() => setRevision(value => value + 1)}>Retry</button><button type="button" onClick={() => navigate({}, true)}>Latest orders</button></div>}
+  }}><CustomerIcon kind="receipt"/><input name="q" aria-label="Search order history" maxLength={100} placeholder={t("Order number or dish name")} key={query} defaultValue={query}/><button type="submit"><T text="Search"/></button></form>
+  <div className={styles.filters} aria-label="Order status">{[["ALL", "All"], ["ACTIVE", "Active"], ["COMPLETED", "Completed"], ["ISSUES", "Cancelled / Failed"]].map(([value, label]) => <button key={value} type="button" aria-pressed={status === value} onClick={() => navigate({ status: value }, true)}><T text={label}/></button>)}</div>
+  <div className={styles.dates}><label><T text="From"/><input type="date" value={from} max={to || undefined} onChange={event => navigate({ from: event.target.value || null }, true)}/></label><label><T text="To"/><input type="date" value={to} min={from || undefined} onChange={event => navigate({ to: event.target.value || null }, true)}/></label></div>
+  {error && <div className={styles.error} role="alert"><p><T text={error}/></p><button type="button" onClick={() => setRevision(value => value + 1)}><T text="Retry"/></button><button type="button" onClick={() => navigate({}, true)}><T text="Latest orders"/></button></div>}
   {!current && !error && <BrandLoading label="Loading your orders…"/>}
-  {current && <><div className={styles.heading}><strong>Page {page}</strong><span aria-live="polite">{busy ? "Updating…" : `${current.orders.length} orders shown`}</span>{(!compact || !features?.simplifiedCheckout) && <button type="button" disabled={busy} onClick={() => setRevision(value => value + 1)}>Refresh</button>}</div><div className={styles.cards}>{current.orders.map(order => {
+  {current && <><div className={styles.heading}><strong><T text="Page"/> {page}</strong><span aria-live="polite">{busy ? <T text="Updating…"/> : <>{current.orders.length} <T text="orders shown"/></>}</span>{(!compact || !features?.simplifiedCheckout) && <button type="button" disabled={busy} onClick={() => setRevision(value => value + 1)}><T text="Refresh"/></button>}</div><div className={styles.cards}>{current.orders.map(order => {
                 const presentation = getOrderStatusPresentation(order.orderStatus, order.fulfillmentType);
                 const href = `/orders/${encodeURIComponent(order.orderNumber)}?from=${encodeURIComponent(returnTo)}`;
                 return <article key={order.orderNumber} className={`profile-order-card ${styles.order}`} data-status={order.orderStatus}>
-   <div className={styles.top}><strong>{order.customerOrderNumber ? `Order ${orderDisplayNumber(order)}` : `Reference …${order.orderNumber.slice(-6)}`}</strong><span data-tone={presentation.tone}>{presentation.label}</span></div><p>{order.branchName}</p><div className={styles.meta}><span>{formatOrderDate(order.createdAt.slice(0, 10))} · {order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}</span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
+   <div className={styles.top}><strong>{order.customerOrderNumber ? `${t("Order")} ${orderDisplayNumber(order)}` : `${t("Reference")} …${order.orderNumber.slice(-6)}`}</strong><span data-tone={presentation.tone}><T text={presentation.label}/></span></div><p>{order.branchName}</p><div className={styles.meta}><span>{formatOrderDate(order.createdAt.slice(0, 10))} · <T text={order.fulfillmentType === "DELIVERY" ? "Delivery" : "Pickup"}/></span><strong>{formatOrderCurrency(order.totalAmount)}</strong></div>
    {["PICKED_UP", "DELIVERED"].includes(order.orderStatus) && <OrderRatingLink orderNumber={order.orderNumber} rating={order.reviewRating ?? null} returnTo={returnTo}/>}
-   <div className={styles.actions}><Link href={href} className={styles.primary}>View Order</Link><button type="button" onClick={() => setReorder(order)}>Reorder</button></div>
+   <div className={styles.actions}><Link href={href} className={styles.primary}><T text="View Order"/></Link><button type="button" onClick={() => setReorder(order)}><T text="Reorder"/></button></div>
   </article>;
-            })}</div>{!current.orders.length && <div className={styles.empty}><p>No matching orders. Try a different branch, status, date or search.</p>{!error && (page > 1 || before || after) && <button type="button" disabled={busy} onClick={() => navigate({}, true)}>Latest orders</button>}</div>}
-  <nav className={styles.pagination} aria-label="Order history pages"><button type="button" disabled={busy || !current.previousAfter} onClick={() => navigate({ before: null, after: current.previousAfter ?? null, historyPage: String(Math.max(1, page - 1)) })}>Previous</button><span>Page {page}</span><button type="button" disabled={busy || !current.nextBefore} onClick={() => navigate({ after: null, before: current.nextBefore, historyPage: String(page + 1) })}>Next</button></nav></>}
+            })}</div>{!current.orders.length && <div className={styles.empty}><p><T text="No matching orders. Try a different branch, status, date or search."/></p>{!error && (page > 1 || before || after) && <button type="button" disabled={busy} onClick={() => navigate({}, true)}><T text="Latest orders"/></button>}</div>}
+  <nav className={styles.pagination} aria-label="Order history pages"><button type="button" disabled={busy || !current.previousAfter} onClick={() => navigate({ before: null, after: current.previousAfter ?? null, historyPage: String(Math.max(1, page - 1)) })}><T text="Previous"/></button><span><T text="Page"/> {page}</span><button type="button" disabled={busy || !current.nextBefore} onClick={() => navigate({ after: null, before: current.nextBefore, historyPage: String(page + 1) })}><T text="Next"/></button></nav></>}
   {reorder && features && <ReorderDialog key={`${phone}:${reorder.orderNumber}`} order={reorder} phone={phone} features={features} compact={compact} onClose={closeReorder}/>}
  </div>;
 }
