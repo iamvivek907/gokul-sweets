@@ -7,7 +7,7 @@ const browser = await chromium.launch({headless: true});
 const context = await browser.newContext();
 const page = await context.newPage();
 let authenticated = true;
-const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3309";
+const base = process.env.BROWSER_BASE ?? "http://127.0.0.1:3311";
 const headers = {"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Methods":"GET,POST,OPTIONS","Access-Control-Allow-Headers":"content-type"};
 
 const summary = (orderNumber, createdAt) => ({
