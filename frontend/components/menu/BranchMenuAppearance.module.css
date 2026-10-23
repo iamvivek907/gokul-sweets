@@ -171,3 +171,13 @@
  :global(.future-storefront[data-premium-menu=true]) .arrows button:disabled{opacity:.35}
  :global(.future-storefront[data-premium-menu=true]) .carousel :is(button,[tabindex]):focus-visible{outline:3px solid #ffe0a7;outline-offset:-3px}
 }
+
+/* Compact festive artwork keeps the first dishes within easier reach. Text may grow naturally. */
+@media(max-width:640px){
+ :global(.future-storefront[data-premium-menu=true]) .slide.banner{min-height:190px}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy{width:88%;padding:14px 18px 48px}
+ :global(.future-storefront[data-premium-menu=true]) .slide .eyebrow{font-size:10px;margin-bottom:5px}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy h2{font-size:24px;line-height:1.15}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy p{font-size:13px;line-height:1.45;margin:6px 0 10px}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy button{font-size:13px;min-height:44px;padding:9px 14px}
+}

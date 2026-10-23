@@ -1,4 +1,5 @@
 "use client";
+import {usePromptGate} from "@/hooks/usePromptGate";
 import {useEffect, useId, useRef} from "react";
 import {usePathname} from "next/navigation";
 import {usePwaInstall} from "@/hooks/usePwaInstall";
@@ -13,7 +14,8 @@ export default function MobileInstallAppBanner() {
     const dialog = useRef<HTMLDialogElement>(null);
     const titleId = useId();
     const allowedRoute = pathname === "/" || pathname === "/profile" || /^\/branches\/[0-9]+$/.test(pathname);
-    const visible = allowedRoute && pwa.isMobile && !pwa.isInstalled && (pwa.canInstall || pwa.isPromptInProgress || !!pwa.error);
+    const promptAllowed=usePromptGate(true);
+    const visible = (promptAllowed||guideOpen) && allowedRoute && pwa.isMobile && !pwa.isInstalled && (pwa.canInstall || pwa.isPromptInProgress || !!pwa.error);
     useEffect(() => {if (visible) recordBannerView();}, [visible, recordBannerView]);
     useEffect(() => {
         const element = dialog.current;

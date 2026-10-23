@@ -19,6 +19,7 @@ interface Preferences {
 }
 export interface PwaInstallState {
     ready: boolean;
+    promotionBlocked: boolean;
     isStandalone: boolean;
     isIOS: boolean;
     isMobile: boolean;
@@ -29,7 +30,7 @@ export interface PwaInstallState {
     installationState: "unavailable" | "available" | "prompting" | "accepted" | "installed" | "cooldown";
     error: string;
 }
-const initial: PwaInstallState = {ready: false, isStandalone: false, isIOS: false, isMobile: false,
+const initial: PwaInstallState = {ready: false, promotionBlocked:false, isStandalone: false, isIOS: false, isMobile: false,
     isInstallPromptAvailable: false, canInstall: false, isPromptInProgress: false, guideOpen: false,
     installationState: "unavailable", error: ""};
 const emptyPreferences = (): Preferences => ({installBannerDismissedAt: 0, installPromptLastShownAt: 0,
@@ -73,7 +74,7 @@ export function createPwaInstallStore() {
         const cooling = cooldownUntil > now();
         const available = blockers.size === 0 && !isStandalone && !installed && !accepted && !cooling && (isIOS || deferred !== null);
         if (isStandalone || installed || accepted || cooling || blockers.size > 0) guideOpen = false;
-        const next: PwaInstallState = {ready: true, isStandalone, isIOS, isMobile: browser.matchMedia("(max-width: 640px)").matches,
+        const next: PwaInstallState = {ready: true, promotionBlocked:blockers.size>0, isStandalone, isIOS, isMobile: browser.matchMedia("(max-width: 640px)").matches,
             isInstallPromptAvailable: deferred !== null && !prompting && !installed && !isStandalone,
             canInstall: available && !prompting, isPromptInProgress: prompting, guideOpen,
             installationState: isStandalone || installed ? "installed" : accepted ? "accepted" : prompting ? "prompting" : cooling ? "cooldown" : available ? "available" : "unavailable", error};
