@@ -146,6 +146,19 @@ export default function MobileCheckout(){
   setSelection({branchId:cart.branchId,ids:selected.filter(id=>!remove.has(id))});
  }
 
+ function decreaseItem(productId:number){
+  if(editingLocked||getPendingOrderSnapshot()||sessionStorage.getItem(ATTEMPT))return;
+  const current=parseCart(getCartSnapshot());
+  if(current.branchId!==cart.branchId)return;
+  const item=current.items.find(value=>value.product.id===productId);
+  if(!item)return;
+  const minimum=item.product.minimumWeightGrams??250;
+  const nextWeight=(item.weightGrams??minimum)-(item.product.weightStepGrams??50);
+  if(item.product.saleMode==="WEIGHT"?nextWeight<minimum:item.quantity<=1){removeItems([productId]);return;}
+  setUndo(null);
+  saveCart({...current,items:current.items.map(value=>value.product.id!==productId?value:item.product.saleMode==="WEIGHT"?{...value,weightGrams:nextWeight}:{...value,quantity:value.quantity-1})});
+ }
+
  async function confirmPickup(selection:PickupSelection):Promise<boolean>{
   if(editingLocked||pickupCheck.current||!branch)return false;
   const savedCart=getCartSnapshot(),savedBranch=getStoredBranchSnapshot();
@@ -285,7 +298,7 @@ export default function MobileCheckout(){
    {selecting&&<div className="mobile-cart-selection"><label><input type="checkbox" disabled={editingLocked} checked={!cart.isEmpty&&selected.length===cart.items.length} onChange={e=>setSelection({branchId:cart.branchId,ids:e.target.checked?cart.items.map(item=>item.product.id):[]})}/><T text="Select all" /></label><button type="button" disabled={editingLocked||!selected.length} onClick={()=>removeItems(selected)}><T text="Remove selected" /> ({selected.length})</button></div>}
    {cart.items.map(item=><article className="mobile-cart-row" key={item.product.id}>
     <div className="mobile-cart-item"><div className="mobile-cart-item-title">{selecting&&<label className="mobile-cart-item-select"><input type="checkbox" aria-label={`Select ${item.product.name}`} disabled={editingLocked} checked={selected.includes(item.product.id)} onChange={e=>setSelection({branchId:cart.branchId,ids:e.target.checked?[...selected,item.product.id]:selected.filter(id=>id!==item.product.id)})}/></label>}<strong>{item.product.name}</strong></div><div className="mobile-cart-item-meta"><p>{item.product.saleMode==="WEIGHT"?`${formatWeight(item.weightGrams??0)} · ${money(item.product.price*(item.weightGrams??0)/1000)}`:money(item.product.price*item.quantity)}</p><button className="mobile-remove-item" type="button" disabled={editingLocked} aria-label={`Remove ${item.product.name} from cart`} onClick={()=>removeItems([item.product.id])}><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg><T text="Remove" /></button></div></div>
-    <div className="mobile-quantity"><button type="button" disabled={editingLocked} aria-label={`Remove one ${item.product.name}`} onClick={()=>cart.decreaseQuantity(item.product.id)}>−</button><span>{item.product.saleMode==="WEIGHT"?<button type="button" disabled={editingLocked} className="cart-weight-edit" aria-label={`${translate("Edit weight",locale)}: ${item.product.name}`} onClick={()=>setWeightEdit({item,cart:getCartSnapshot(),branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot()})}>{formatWeight(item.weightGrams??0)} <span aria-hidden="true">✎</span></button>:item.quantity}</span><button type="button" disabled={editingLocked} aria-label={`Add one ${item.product.name}`} onClick={()=>cart.increaseQuantity(item.product.id)}>+</button></div>
+    <div className="mobile-quantity"><button type="button" disabled={editingLocked} aria-label={`Remove one ${item.product.name}`} onClick={()=>decreaseItem(item.product.id)}>−</button><span>{item.product.saleMode==="WEIGHT"?<button type="button" disabled={editingLocked} className="cart-weight-edit" aria-label={`${translate("Edit weight",locale)}: ${item.product.name}`} onClick={()=>setWeightEdit({item,cart:getCartSnapshot(),branch:getStoredBranchSnapshot(),pickup:getPickupSlotSnapshot()})}>{formatWeight(item.weightGrams??0)} <span aria-hidden="true">✎</span></button>:item.quantity}</span><button type="button" disabled={editingLocked} aria-label={`Add one ${item.product.name}`} onClick={()=>cart.increaseQuantity(item.product.id)}>+</button></div>
    </article>)}
   </section>
   {features?.pickupAddOns&&branch&&!pending&&!attempt&&<PickupAddOns compact branchId={branch.id} date={chosen?.date??startDate} disabled={busy||addOnBusy||pickupValidating||!chosen||!validAvailability} offers={[...(preview?.offers??[]),...(preview?.spendTargets??[])]} onAdded={()=>{}} onBusy={setAddOnBusy}/>}

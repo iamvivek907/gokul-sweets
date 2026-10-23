@@ -149,9 +149,11 @@ try {
   if(paymentStatus==='PENDING'){
    const paymentPath='/checkout/payment/TEST-ORDER';
    if(compact){
+    // Start the timeout assertion at the cancellation request, after back-navigation recovery.
+    const cancellationStarted=stalled?page.waitForRequest(request=>new URL(request.url()).pathname==='/api/payments/10/cancel-checkout'&&request.method()==='POST',{timeout:20000}):null;
     if(width===390&&fulfillment==='PICKUP')await page.evaluate(()=>history.back());else await page.locator('a[href="/orders"]:visible').first().click();
     if(stalled){
-     const leave=page.getByRole('dialog');await leave.getByRole('alert').filter({hasText:'We haven’t confirmed whether cancellation completed'}).waitFor({timeout:20000});
+     await cancellationStarted;const leave=page.getByRole('dialog');await leave.getByRole('alert').filter({hasText:'We haven’t confirmed whether cancellation completed'}).waitFor({timeout:25000});
      assert.equal(new URL(page.url()).pathname,paymentPath);assert.equal(cancels,1);
      assert.equal(await leave.getByRole('button',{name:'Stay on payment',exact:true}).isEnabled(),true);
      stallCancellation=false;cancelError=false;await leave.getByRole('button',{name:'Retry payment check',exact:true}).click();await page.waitForURL(url=>url.pathname==='/orders/TEST-ORDER');

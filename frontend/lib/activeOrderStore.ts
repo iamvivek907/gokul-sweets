@@ -6,25 +6,40 @@ import type {CustomerOrderSummaryResponse} from "@/types/order";
 type Snapshot={order:CustomerOrderSummaryResponse|null;stale:boolean};
 const empty:Snapshot={order:null,stale:false};
 let snapshot=empty,controller:AbortController|null=null,timer:ReturnType<typeof setTimeout>|null=null,generation=0;
+// This contains no customer data and survives route remounts/visibility changes.
+let failures=0,retryNotBefore=0;
 const listeners=new Set<()=>void>();
 let cleanup:(()=>void)|null=null;
 const active=new Set(["PENDING_PAYMENT","CONFIRMED","PREPARING","READY_FOR_PICKUP","READY_FOR_DELIVERY","OUT_FOR_DELIVERY"]);
 function publish(value:Snapshot){snapshot=value;listeners.forEach(listener=>listener());}
 function stop(){generation++;controller?.abort();controller=null;if(timer)clearTimeout(timer);timer=null;}
 function visible(){return document.visibilityState==="visible"&&navigator.onLine;}
+function schedule(delay:number){
+ if(timer)clearTimeout(timer);
+ timer=null;
+ if(listeners.size&&visible())timer=setTimeout(()=>{timer=null;void refresh();},delay);
+}
 async function refresh(){
  if(controller||!listeners.size||!visible())return;
+ if(Date.now()<retryNotBefore){schedule(retryNotBefore-Date.now());return;}
  const request=new AbortController(),revision=generation;controller=request;
  try{
   const result=await getVerifiedOrderPage(null,AbortSignal.any([request.signal,AbortSignal.timeout(8000)]),{limit:"1",status:"ACTIVE"});
   if(revision!==generation||request.signal.aborted)return;
+  failures=0;retryNotBefore=0;
   publish({order:result.orders.find(order=>active.has(order.orderStatus))??null,stale:false});
  }catch(error){
   if(revision!==generation||request.signal.aborted)return;
-  if(error instanceof ApiError&&[401,403,404].includes(error.status))publish(empty);
-  else if(snapshot.order)publish({...snapshot,stale:true});
+  if(error instanceof ApiError&&[401,403,404].includes(error.status)){failures=0;retryNotBefore=0;publish(empty);}
+  else{
+   failures=Math.min(failures+1,4);
+   const backoff=Math.min(120000,30000*2**(failures-1));
+   const serverDelay=error instanceof ApiError&&Number.isFinite(error.retryAfterMs)?Math.max(0,error.retryAfterMs??0):0;
+   retryNotBefore=Date.now()+Math.max(backoff,serverDelay);
+   if(snapshot.order)publish({...snapshot,stale:true});
+  }
  }finally{
-  if(controller===request){controller=null;if(listeners.size&&visible())timer=setTimeout(()=>{timer=null;void refresh();},snapshot.order?15000:60000);}
+  if(controller===request){controller=null;schedule(Math.max(0,retryNotBefore-Date.now())||(snapshot.order?15000:60000));}
  }
 }
 /** Only one summary read per visible interval; memory is cleared on logout and last unmount. */
