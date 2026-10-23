@@ -57,20 +57,34 @@ function CampaignCarousel({slides, reduced, locale, compact, render}: {
 }) {
     const viewport = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState(0);
+    const pendingTarget = useRef<number | null>(null);
     const go = (index: number) => {
+        index = Math.max(0, Math.min(slides.length - 1, index));
         const target = viewport.current?.children[index] as HTMLElement | undefined;
+        pendingTarget.current = index;
         if (target && viewport.current) viewport.current.scrollTo({left: target.offsetLeft - (viewport.current.children[0] as HTMLElement).offsetLeft, behavior: reduced ? "instant" : "smooth"});
     };
     return <section className={`${styles.carousel} ${compact ? styles.compactCarousel : ""}`} aria-label="Published menu banners" aria-roledescription={locale === "hi" ? "कैरसेल" : "carousel"}>
         <div ref={viewport} className={styles.viewport} tabIndex={slides.length > 1 ? 0 : undefined} aria-label={locale === "hi" ? "श्रेणियाँ देखने के लिए स्वाइप करें" : "Swipe to explore categories"}
-            onKeyDown={event => {if (event.target !== event.currentTarget) return; if (event.key === "ArrowRight") {event.preventDefault(); go(Math.min(active + 1, slides.length - 1));} if (event.key === "ArrowLeft") {event.preventDefault(); go(Math.max(active - 1, 0));}}}
-            onScroll={event => {const node = event.currentTarget; const index = Math.round(node.scrollLeft / Math.max(node.clientWidth, 1)); setActive(Math.max(0, Math.min(slides.length - 1, index)));}}>
+            onKeyDown={event => {if (event.target !== event.currentTarget) return; if (event.key === "ArrowRight") {event.preventDefault(); go(Math.min((pendingTarget.current ?? active) + 1, slides.length - 1));} if (event.key === "ArrowLeft") {event.preventDefault(); go(Math.max((pendingTarget.current ?? active) - 1, 0));}}}
+            onPointerDown={() => {pendingTarget.current = null;}} onWheel={() => {pendingTarget.current = null;}}
+            onScroll={event => {
+                const node = event.currentTarget;
+                if (pendingTarget.current !== null) {
+                    const target = node.children[pendingTarget.current] as HTMLElement | undefined;
+                    const first = node.children[0] as HTMLElement | undefined;
+                    if (target && first && Math.abs(node.scrollLeft - (target.offsetLeft - first.offsetLeft)) >= 2) return;
+                    pendingTarget.current = null;
+                }
+                const index = Math.round(node.scrollLeft / Math.max(node.clientWidth, 1));
+                setActive(Math.max(0, Math.min(slides.length - 1, index)));
+            }}>
             {slides.map((slide, index) => <article key={slide.key} className={`${styles.banner} ${styles.slide}`} role="group" aria-roledescription={locale === "hi" ? "स्लाइड" : "slide"} aria-label={`${index + 1} / ${slides.length}`} aria-hidden={index !== active} inert={index !== active}>{render(slide, index === active)}</article>)}
         </div>
         {slides.length > 1 && <div className={styles.carouselNavigation}>
             <span className={styles.hint}>{locale === "hi" ? "हर खुशी का स्वाद" : "A little more to celebrate"}</span>
             <div className={styles.dots} aria-label={locale === "hi" ? "बैनर चुनें" : "Choose a banner"}>{slides.map((slide,index) => <button key={slide.key} type="button" aria-label={`${locale === "hi" ? "बैनर" : "Show banner"} ${index + 1}`} aria-current={index === active ? "true" : undefined} onClick={() => go(index)}><span /></button>)}</div>
-            <div className={styles.arrows}><button type="button" aria-label={locale === "hi" ? "पिछला बैनर" : "Previous banner"} disabled={active === 0} onClick={() => go(active - 1)}>←</button><button type="button" aria-label={locale === "hi" ? "अगला बैनर" : "Next banner"} disabled={active === slides.length - 1} onClick={() => go(active + 1)}>→</button></div>
+            <div className={styles.arrows}><button type="button" aria-label={locale === "hi" ? "पिछला बैनर" : "Previous banner"} disabled={active === 0} onClick={() => go((pendingTarget.current ?? active) - 1)}>←</button><button type="button" aria-label={locale === "hi" ? "अगला बैनर" : "Next banner"} disabled={active === slides.length - 1} onClick={() => go((pendingTarget.current ?? active) + 1)}>→</button></div>
             <span className={styles.srOnly} aria-live="polite">{active + 1} / {slides.length}</span>
         </div>}
     </section>;

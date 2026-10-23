@@ -93,9 +93,17 @@ public class VersionedMenuPreview {
                                                 && hit.version().equals(version)
                                                 && !now.isBefore(hit.evaluatedAt())
                                                 && now.isBefore(hit.expiresAt())) {
+                                            io.micrometer.core.instrument.Metrics.counter(
+                                                            "gokul.menu.preview.lookups",
+                                                            "outcome",
+                                                            "hit")
+                                                    .increment();
                                             return hit;
                                         }
                                     }
+                                    io.micrometer.core.instrument.Metrics.counter(
+                                                    "gokul.menu.preview.lookups", "outcome", "miss")
+                                            .increment();
                                     Instant evaluatedAt = clock.instant();
                                     var result = service.check(branchId, date, 1, items, true);
                                     Instant expires = evaluatedAt.plusSeconds(300);

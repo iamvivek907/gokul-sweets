@@ -1,5 +1,5 @@
 const VERSION =
-    "v2";
+    "v3";
 
 const PUSH_DEDUPE_CACHE = "gokul-push-dedupe-v1";
 
@@ -11,6 +11,15 @@ const PAGE_CACHE =
 
 const IMAGE_CACHE =
     `gokul-images-${VERSION}`;
+
+// Bound persistent public image storage independently from pages and push deduplication.
+const IMAGE_META_CACHE = `gokul-image-meta-${VERSION}`;
+const IMAGE_MAX_ENTRIES = 120;
+const IMAGE_MAX_BYTES = 24 * 1024 * 1024;
+const IMAGE_MAX_ITEM_BYTES = 2 * 1024 * 1024;
+const IMAGE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+let imageWrites = Promise.resolve();
+let pendingImageWrites = 0;
 
 const OFFLINE_URL =
     "/offline";
@@ -52,6 +61,7 @@ self.addEventListener(
             STATIC_CACHE,
             PAGE_CACHE,
             IMAGE_CACHE,
+            IMAGE_META_CACHE,
             PUSH_DEDUPE_CACHE
         ];
 
@@ -125,10 +135,7 @@ self.addEventListener(
         ) {
 
             event.respondWith(
-                cacheFirst(
-                    request,
-                    IMAGE_CACHE
-                )
+                boundedImage(request, event)
             );
 
             return;
@@ -182,48 +189,87 @@ self.addEventListener(
 );
 
 
-async function cacheFirst(
-    request,
-    cacheName
-) {
-
-    const cache =
-        await caches.open(
-            cacheName
-        );
-
-
-    const cached =
-        await cache.match(
-            request
-        );
-
-
-    if (cached) {
-        return cached;
+/** Cache storage failures never prevent a successful network image from rendering. */
+async function boundedImage(request, event) {
+    let cache, metadata, cached;
+    try {
+        [cache, metadata] = await Promise.all([caches.open(IMAGE_CACHE), caches.open(IMAGE_META_CACHE)]);
+        const [found, stored] = await Promise.all([cache.match(request), metadata.match(request)]);
+        cached = found;
+        const record = stored ? await stored.json() : null;
+        const age = record ? Date.now() - record.storedAt : -1;
+        if (cached && record && Number.isFinite(age) && age >= 0 && age < IMAGE_MAX_AGE_MS) return cached;
+    } catch {
+        return fetch(request);
     }
-
-
-    const response =
-        await fetch(
-            request
-        );
-
-
-    if (
-        response.ok
-    ) {
-
-        await cache.put(
-            request,
-            response.clone()
-        );
+    let response;
+    try {response = await fetch(request);} catch (error) {
+        // Expired public artwork remains available offline; refresh it once the network returns.
+        if (cached) return cached;
+        throw error;
     }
-
-
+    if (response.ok && response.type !== "opaque" && pendingImageWrites < 4
+        && !(Number(response.headers.get("content-length")) > IMAGE_MAX_ITEM_BYTES)) {
+        pendingImageWrites++;
+        const copy = response.clone();
+        // Serialize storage changes so simultaneous image loads cannot exceed either bound.
+        imageWrites = imageWrites.then(() => storeImage(request, copy, cache, metadata))
+            .catch(() => {}).finally(() => {pendingImageWrites--;});
+        event.waitUntil(imageWrites);
+    }
     return response;
 }
 
+async function storeImage(request, response, cache, metadata) {
+    const advertised = Number(response.headers.get("content-length"));
+    if (Number.isFinite(advertised) && advertised > IMAGE_MAX_ITEM_BYTES) return;
+    if (!response.body) return;
+    const reader = response.body.getReader(), parts = [];
+    let size = 0;
+    for (;;) {
+        const {done, value} = await reader.read();
+        if (done) break;
+        size += value.byteLength;
+        if (size > IMAGE_MAX_ITEM_BYTES) {void reader.cancel().catch(() => {}); return;}
+        parts.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let offset = 0;
+    for (const part of parts) {bytes.set(part, offset); offset += part.byteLength;}
+    try {
+        const headers = new Headers(response.headers);
+        headers.delete("content-encoding");
+        headers.delete("content-length");
+        await cache.put(request, new Response(bytes, {status: response.status, statusText: response.statusText, headers}));
+        await metadata.put(request, new Response(JSON.stringify({storedAt: Date.now(), size})));
+        await trimImages(cache, metadata);
+    } catch {
+        // Roll back partial writes, then let subsequent requests use the network normally.
+        await Promise.allSettled([cache.delete(request), metadata.delete(request)]);
+    }
+}
+
+async function trimImages(cache, metadata) {
+    const records = [], now = Date.now();
+    for (const key of await cache.keys()) {
+        let record;
+        try {record = await (await metadata.match(key))?.json();} catch {record = null;}
+        if (!record || !Number.isFinite(record.storedAt) || !Number.isFinite(record.size)
+            || record.size < 0 || record.size > IMAGE_MAX_ITEM_BYTES || now < record.storedAt
+            || now - record.storedAt >= IMAGE_MAX_AGE_MS) {
+            await Promise.all([cache.delete(key), metadata.delete(key)]);
+        } else records.push({key, ...record});
+    }
+    records.sort((left, right) => left.storedAt - right.storedAt);
+    let bytes = records.reduce((sum, record) => sum + record.size, 0);
+    while (records.length > IMAGE_MAX_ENTRIES || bytes > IMAGE_MAX_BYTES) {
+        const removed = records.shift();
+        bytes -= removed.size;
+        await Promise.all([cache.delete(removed.key), metadata.delete(removed.key)]);
+    }
+    const retained = new Set((await cache.keys()).map(key => key.url));
+    for (const key of await metadata.keys()) if (!retained.has(key.url)) await metadata.delete(key);
+}
 
 async function staleWhileRevalidate(
     request,

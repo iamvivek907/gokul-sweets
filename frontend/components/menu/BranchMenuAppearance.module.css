@@ -152,11 +152,21 @@
 :global(.future-storefront) .arrows{flex-shrink:0}
 :global(.future-storefront) .arrows button{min-width:44px}
 
-/* Bring food closer to the first screen while retaining published artwork and crop. */
+/* Festive phone carousel: artwork, copy and controls share one composed surface. */
 @media(max-width:640px){
- :global(.future-storefront[data-premium-menu=true]) .slide.banner{min-height:184px}
- :global(.future-storefront[data-premium-menu=true]) .slide .copy{padding:18px 20px;width:80%}
- :global(.future-storefront[data-premium-menu=true]) .slide .copy h2{font-size:24px;line-height:1.15}
- :global(.future-storefront[data-premium-menu=true]) .slide .copy p{margin:8px 0;font-size:12px;line-height:1.5}
- :global(.future-storefront[data-premium-menu=true]) .carousel{margin-top:12px}
+ :global(.future-storefront[data-premium-menu=true]) .carousel{position:relative;margin-top:12px;border-radius:22px;border:1px solid #ead8ce;background:#321820;box-shadow:0 8px 22px #4921320c}
+ :global(.future-storefront[data-premium-menu=true]) .slide.banner{min-height:236px;align-items:center}
+ :global(.future-storefront[data-premium-menu=true]) .slide::after{background:linear-gradient(90deg,#25111ce8 0%,#301725bf 45%,#30172520 100%),linear-gradient(0deg,#23101be6 0%,transparent 40%)}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy{width:87%;padding:20px 20px 65px}
+ :global(.future-storefront[data-premium-menu=true]) .slide .eyebrow{padding:3px 9px;border:1px solid #f5d9a638;border-radius:999px;background:#30172570;font-size:9px;letter-spacing:.15em;margin-bottom:9px;color:#ffe3b3}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy h2{font-family:Georgia,"Times New Roman",serif;font-size:28px;line-height:1.13;font-weight:700;letter-spacing:-.035em;max-width:16ch}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy p{margin:8px 0 13px;font-size:12px;line-height:1.5;max-width:27ch;color:#fff2e9}
+ :global(.future-storefront[data-premium-menu=true]) .slide .copy button{border:1px solid #fff0d1;background:#fff6e8;color:#711633;box-shadow:0 3px 12px #12050c20;padding:9px 13px;gap:14px;font-size:11px;min-height:44px}
+ :global(.future-storefront[data-premium-menu=true]) .carouselNavigation{position:absolute;bottom:0;left:0;right:0;z-index:1;min-height:52px;padding:0 12px;gap:8px;background:linear-gradient(0deg,#24111bdb,#24111b66);border-top:1px solid #ffe8ca1a}
+ :global(.future-storefront[data-premium-menu=true]) .dots span{background:#ffffff66;width:5px;height:5px}
+ :global(.future-storefront[data-premium-menu=true]) .dots [aria-current=true] span{width:22px;background:#ffe0a7}
+ :global(.future-storefront[data-premium-menu=true]) .arrows{gap:4px}
+ :global(.future-storefront[data-premium-menu=true]) .arrows button{border:1px solid #ffe5bd38;color:#fff0d9;background:#ffffff0a;border-radius:50%;font-size:18px}
+ :global(.future-storefront[data-premium-menu=true]) .arrows button:disabled{opacity:.35}
+ :global(.future-storefront[data-premium-menu=true]) .carousel :is(button,[tabindex]):focus-visible{outline:3px solid #ffe0a7;outline-offset:-3px}
 }

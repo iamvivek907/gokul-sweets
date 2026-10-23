@@ -71,3 +71,7 @@ Local validation: 25 targeted backend tests pass, including cache identity/expir
 ### Preview correctness safeguards
 
 Manual sold-out and missing-dependency closures stay excluded from menu-wide previews; only known temporal closures may reopen for a future pickup. Inventory invalidations coalesce while a preview or soonest-pickup search is running, so continuous stock updates cannot starve completed results. Changing the branch, pickup or cart still cancels obsolete work. Cutoff timers use fresh server observation timestamps and monotonic elapsed time, independent of the customer device wall clock; older servers retain the periodic refresh fallback. Checkout continues validating and reserving stock in PostgreSQL.
+
+## Follow-up: measured caching and optional worker roles
+
+See [cache verification and worker separation](cache-workers-and-menu.md) for the 23 October production observation, bounded read-only probe, cache-mode response header and private lookup metrics. Versioned-preview rollout remains explicitly opt-in. Worker roles now share one scheduling registration owner; legacy configuration classes no longer bypass the global switch. Combined remains the default.

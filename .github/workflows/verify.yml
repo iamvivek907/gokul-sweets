@@ -33,6 +33,8 @@ jobs:
           fetch-depth: 0
       - name: Verify CI selection rules
         run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+      - name: Verify bounded read-only menu diagnostics
+        run: python3 -m unittest discover -s scripts -p 'test_measure_menu_reads.py'
       - name: Verify production release numbering and acceptance rules
         run: node --test .github/scripts/test_release-version.cjs
       - name: Detect frontend inputs

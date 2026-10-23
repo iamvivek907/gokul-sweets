@@ -132,7 +132,7 @@ Do not assume JSONB inherently reduces database storage: payload size, compressi
 
 ## What this change implements
 
-The menu presentation change groups pickup warnings into a compact status card, avoids repeating the expired-selection warning, clarifies the pickup action, gives category photos a consistent circular treatment and reduces the mobile campaign height while preserving the published Diwali media, copy, crop and category destinations. Data, pricing, stock checks, cart/pickup persistence, checkout and the architecture opportunities above are not changed by this presentation work.
+The menu presentation change groups pickup warnings into a compact status card, avoids repeating the expired-selection warning, clarifies the pickup action, gives category photos a consistent circular treatment and reduces the mobile campaign height while preserving the published Diwali media, copy, crop and category destinations. Data, pricing, stock checks, cart/pickup persistence and checkout retain their existing authority. The runtime follow-up below implements the image-cache bounds, optional worker roles, cache diagnostics and pickup-CSS ownership improvements; deploying new worker processes or activating production preview caching remains an operational step.
 
 ### Presentation validation
 
@@ -142,3 +142,7 @@ Local production build, TypeScript, ESLint and all 252 frontend unit tests pass.
 - [Selected pickup, 390px](../qa/menu-presentation/mobile-selected.png)
 
 Full PR CI is pending. No production changes or live stock mutations have been performed.
+
+## Follow-up implementation in the same DEV PR
+
+The requested follow-up adds bounded PWA image storage, read-only production measurement and cache diagnostics, optional API/worker roles with one scheduling registration point, consolidated pickup CSS, and the refined Diwali carousel. [Operational details and measured evidence](../operations/cache-workers-and-menu.md) distinguish implemented code from deployment actions still needed. The public catalog cache was observed; versioned-preview activation was not confirmed. The source default remains OFF, and production environment values have not been changed.

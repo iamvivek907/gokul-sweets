@@ -43,6 +43,14 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   for(const warning of await card.locator('.menu-pickup-notices>p').all())assert.ok((await warning.boundingBox()).height>0,'warnings remain visible');
  }
  await page.getByRole('heading',{name:'Celebrate Diwali',exact:true}).waitFor();
+ if(enabled&&width<=640){
+  const carousel=page.getByRole('region',{name:'Published menu banners',exact:true});
+  const action=await carousel.getByRole('button',{name:'Explore sweets',exact:true}).boundingBox();
+  const next=await carousel.getByRole('button',{name:'Next banner',exact:true}).boundingBox();
+  assert.ok(action.y+action.height<=next.y,'integrated carousel controls do not overlap the category action');
+  assert.ok((await carousel.boundingBox()).height<300,'short festive copy keeps the phone carousel compact');
+ }
+
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
  await mkdir(screens,{recursive:true});await page.screenshot({path:`${screens}/menu-presentation-${width}-${expired?'expired':'selected'}-${enabled}.png`});

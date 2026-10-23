@@ -37,6 +37,13 @@ try {for(const width of [320,390,640,1280]) {
   assert.ok(rect.y>=items.y&&rect.y+rect.height<items.y+items.height,'banner occupies the product discovery strip');
   await page.getByRole('button',{name:'Explore sweets',exact:true}).click();await page.getByRole('heading',{name:'Sweets favourite',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Browse Sweets',exact:true}).getAttribute('aria-current'),'true');
  }
+ // Rapid taps advance from the requested target while a smooth transition is still in flight.
+ const rapid=page.getByRole('region',{name:'Published menu banners',exact:true});
+ await rapid.getByRole('button',{name:'Next banner',exact:true}).click();
+ await rapid.getByRole('button',{name:'Next banner',exact:true}).click();
+ await rapid.getByRole('button',{name:'Explore bakery',exact:true}).waitFor();
+ await rapid.getByRole('button',{name:'Show banner 1',exact:true}).click();
+ await rapid.getByRole('button',{name:'Explore sweets',exact:true}).waitFor();
  // The same artwork now offers separate live category slides in one contained viewport.
  const carousel=page.getByRole('region',{name:'Published menu banners',exact:true});
  await carousel.getByRole('button',{name:'Show banner 2',exact:true}).click();

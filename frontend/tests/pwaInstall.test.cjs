@@ -69,11 +69,12 @@ test('all declared install and push icons exist at their advertised PNG sizes',(
 });
 
 test('existing image caches do not hide the versioned corrected install assets',async()=>{
- const handlers=new Map(),cached=new Map([['https://shop.example/icons/icon-192.png',new Response('old-icon')]]),requests=[];
- const cache={async match(request){return cached.get(request.url);},async put(request,response){cached.set(request.url,response);}};
- vm.runInNewContext(fs.readFileSync('public/sw.js','utf8'),{self:{location:{origin:'https://shop.example'},addEventListener(name,fn){handlers.set(name,fn);}},URL,Request,Response,caches:{async open(){return cache;}},async fetch(request){requests.push(request.url);return new Response('corrected-icon');}});
- let result;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/icons/icon-192.png?v=20261007g2',destination:'image'},respondWith(promise){result=promise;}});
- assert.equal(await (await result).text(),'corrected-icon');assert.deepEqual(requests,['https://shop.example/icons/icon-192.png?v=20261007g2']);
+ const handlers=new Map(),cached=new Map([['https://shop.example/icons/icon-192.png',new Response('old-icon')]]),requests=[],stores=new Map(),jobs=[];
+ const cache=name=>{if(!stores.has(name))stores.set(name,new Map());const entries=stores.get(name);return {async match(request){return entries.get(request.url)?.clone();},async put(request,response){entries.set(request.url,response.clone());},async delete(request){return entries.delete(request.url);},async keys(){return [...entries.keys()].map(url=>new Request(url));}};};
+ vm.runInNewContext(fs.readFileSync('public/sw.js','utf8'),{self:{location:{origin:'https://shop.example'},addEventListener(name,fn){handlers.set(name,fn);}},URL,Request,Response,Headers,caches:{async open(name){return cache(name);}},async fetch(request){requests.push(request.url);return new Response('corrected-icon');}});
+ let result;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/icons/icon-192.png?v=20261007g2',destination:'image'},respondWith(promise){result=promise;},waitUntil(promise){jobs.push(promise);}});
+ assert.equal(await (await result).text(),'corrected-icon');await Promise.all(jobs);assert.deepEqual(requests,['https://shop.example/icons/icon-192.png?v=20261007g2']);
  assert.equal(await cached.get('https://shop.example/icons/icon-192.png').text(),'old-icon');
+ assert.equal(await stores.get('gokul-images-v3').get('https://shop.example/icons/icon-192.png?v=20261007g2').clone().text(),'corrected-icon');
  let intercepted=false;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/api/orders/1',destination:''},respondWith(){intercepted=true;}});assert.equal(intercepted,false);
 });

@@ -42,8 +42,6 @@ body:has(.future-storefront[data-customer-route]){background:#fff}
 .future-storefront[data-customer-route] .mobile-menu-highlights header>span{display:none}
 .future-storefront[data-customer-route] .mobile-menu-highlights h2{font-size:13px!important;margin:0}
 .future-storefront[data-customer-route] .mobile-menu-highlights>.mobile-menu-suggestions-open{width:auto;margin:0;font-size:11px;background:transparent;border:0;color:#087f42}
-.future-storefront[data-customer-route] .mobile-menu-pickup{margin:8px 0;padding:8px 12px;background:#f6f7f9;border:0;border-radius:12px}
-.future-storefront[data-customer-route] .mobile-menu-pickup button{background:#fff;color:#087f42;border:1px solid #e0e4e9;border-radius:10px}
 .future-storefront[data-customer-route] .gokul-menu-category-section{margin:16px 0}
 .future-storefront[data-customer-route] .gokul-menu-product-grid{gap:0}
 .future-storefront[data-customer-route] .gokul-product-card.gokul-menu-product-card{min-height:182px;border:0;border-bottom:1px solid #eceef1;border-radius:0;background:#fff;box-shadow:none!important}

@@ -17,7 +17,8 @@
     "tests/storefront-reconnect.browser.mjs",
     "tests/menu-service-hours.browser.mjs",
     "tests/notification-opt-in.browser.mjs",
-    "tests/customer-consent.browser.mjs"
+    "tests/customer-consent.browser.mjs",
+    "tests/pwa-image-cache.browser.mjs"
   ],
   "menu": [
     "tests/menu-compact-header.browser.mjs",
