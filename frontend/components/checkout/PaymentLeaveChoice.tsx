@@ -1,13 +1,14 @@
 "use client";
 import {guardPaymentBack} from "@/lib/paymentNavigation";
 import {T,useTranslation} from "@/lib/language";
-import {useEffect,useRef,useState} from "react";
+import {useEffect,useLayoutEffect,useRef,useState} from "react";
 import {usePathname,useRouter} from "next/navigation";
 /** Intercept deliberate storefront navigation while money/reservations are unresolved. */
 export default function PaymentLeaveChoice({active,busy,error,onCancel,autoCancel=false,canStayWhileBusy=false}:{active:boolean;busy:boolean;error?:string|null;autoCancel?:boolean;canStayWhileBusy?:boolean;onCancel:(destination?:string)=>Promise<void>}) {
     const translate = useTranslation();
  const router=useRouter(),pathname=usePathname();const allowed=useRef(false),started=useRef(false);const [destination,setDestination]=useState<string|null>(null);
- useEffect(()=>{
+ // The visible payment page must already own Back before the browser can paint.
+ useLayoutEffect(()=>{
   if(!active)return;
   const requestLeave=(next:string)=>{started.current=false;setDestination(next);};
   const click=(event:MouseEvent)=>{

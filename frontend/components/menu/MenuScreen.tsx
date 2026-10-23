@@ -22,6 +22,7 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {usePhoneViewport} from "@/hooks/usePhoneViewport";
 import {apiClient} from "@/services/apiClient";
 import {matchesMobileFilters,mobileMenuRows,type PortionGroup} from "@/lib/mobileMenu";
+import {matchesMenuSearch} from "@/lib/menuSearch";
 import MobileMenuFilters from "./MobileMenuFilters";
 import {T,useTranslation} from "@/lib/language";
 import {groupMenuProducts} from "@/lib/menuGroups";
@@ -750,19 +751,7 @@ export default function MenuScreen() {
 
 
                         const searchMatch =
-                            !query
-                            ||
-                            product.name
-                                .toLowerCase()
-                                .includes(
-                                    query
-                                )
-                            ||
-                            product.description
-                                ?.toLowerCase()
-                                .includes(
-                                    query
-                                );
+                            matchesMenuSearch(product,query);
 
 
                         return (

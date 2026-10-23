@@ -46,3 +46,9 @@ test('menu pickup recovery instructions are available in Hindi',()=>{
   assert.equal(translate(text,'en'),text);
  }
 });
+
+test('customer recovery, checkout, filters and permission guidance translate without renaming dishes',()=>{
+ for(const text of ['Your checkout is saved','Verify phone to continue','Confirm pickup branch','Confirm pickup time','Clear your cart?','Keep my items','Undo','Edit weight','Update quantity','Choose another pickup','View pickup code','Active filters','No limit','Your app. Your choices.','Your order’s ready. Your phone should know.','Your choice could not be saved. Please try again.'])assert.notEqual(translate(text,'hi'),text,text);
+ assert.equal(translate('Paneer Burger Half','hi'),'Paneer Burger Half');
+ assert.equal(translate('Kaju Katli','hi'),'Kaju Katli');
+});

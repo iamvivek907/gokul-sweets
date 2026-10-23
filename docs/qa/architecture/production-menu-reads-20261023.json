@@ -1,0 +1,68 @@
+{
+  "observedAt": "2026-10-23T07:55:14.408577+00:00",
+  "origin": "https://api.gokulsweets.in",
+  "branchId": 1,
+  "date": "2026-10-23",
+  "effectivePreviewCache": "unverified (version endpoint unavailable)",
+  "smartAvailability": true,
+  "sampleProducts": 7,
+  "records": [
+    {
+      "request": "features",
+      "status": 200,
+      "elapsedMs": 4732,
+      "bytes": 1010,
+      "cacheMode": null,
+      "cacheControl": "no-cache, no-store, max-age=0, must-revalidate"
+    },
+    {
+      "request": "menu-state",
+      "status": 404,
+      "elapsedMs": 5420,
+      "bytes": 0,
+      "cacheMode": null,
+      "cacheControl": "no-cache, no-store, max-age=0, must-revalidate"
+    },
+    {
+      "request": "catalog availability",
+      "status": 200,
+      "elapsedMs": 6372,
+      "bytes": 23234,
+      "cacheMode": null,
+      "cacheControl": "no-store"
+    },
+    {
+      "request": "versioned catalog",
+      "status": 200,
+      "elapsedMs": 5487,
+      "bytes": 49249,
+      "cacheMode": null,
+      "cacheControl": "max-age=31536000, public, immutable"
+    },
+    {
+      "request": "unchanged preview 1",
+      "status": 200,
+      "elapsedMs": 10329,
+      "bytes": 15763,
+      "cacheMode": null,
+      "cacheControl": "no-store"
+    },
+    {
+      "request": "unchanged preview 2",
+      "status": 200,
+      "elapsedMs": 7516,
+      "bytes": 15763,
+      "cacheMode": null,
+      "cacheControl": "no-store"
+    },
+    {
+      "request": "unchanged preview 3",
+      "status": 200,
+      "elapsedMs": 10335,
+      "bytes": 15763,
+      "cacheMode": null,
+      "cacheControl": "no-store"
+    }
+  ],
+  "interpretation": "Sample API latency only; not a browser page-load benchmark or proof of cache hit rate. Compare private cache lookup metrics and database statement counts."
+}

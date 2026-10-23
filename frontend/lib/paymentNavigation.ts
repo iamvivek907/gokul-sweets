@@ -1,4 +1,4 @@
-/** Installed by the customer shell before router effects, so legacy Back can be guarded. */
+/** Installed synchronously by instrumentation-client before the router registers Back. */
 const confirmedCheckouts=new Map<string,()=>void>();
 let backGuard:((event:PopStateEvent)=>void)|null=null;
 if(typeof window!=="undefined")window.addEventListener("popstate",event=>{

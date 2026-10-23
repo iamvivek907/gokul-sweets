@@ -1,4 +1,5 @@
 "use client";
+import {T} from "@/lib/language";
 
 import {useCallback, useEffect, useState} from "react";
 import PreferenceChoice from "./PreferenceChoice";
@@ -80,39 +81,39 @@ export default function ConsentPreferences() {
         }
     }
 
-    if (!choices) return error ? <p role="alert" className="mt-6 rounded-2xl border border-[#eadfd6] bg-white p-5 text-sm text-[#9e2732]">{error}</p> : <p role="status" className="mt-6 text-sm text-[#756763]">Loading choices…</p>;
+    if (!choices) return error ? <p role="alert" className="mt-6 rounded-2xl border border-[#eadfd6] bg-white p-5 text-sm text-[#9e2732]"><T text={error}/></p> : <p role="status" className="mt-6 text-sm text-[#756763]"><T text="Loading choices…"/></p>;
     return <section className="permission-surface privacy-preferences mt-8 rounded-3xl border border-[#e8d7c9] bg-white p-6 shadow-sm sm:p-8" aria-label="Privacy choices">
-        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">{modern ? "Your comfort zone" : "01 · Preferences"}</p>
-        <h2 className="mt-2 text-2xl font-semibold text-[#241715]">{modern ? "Your app. Your choices." : "Optional communications and insights"}</h2>
-        {modern && <div className="permission-summary"><span aria-hidden="true">✓</span><p>Order updates stay in your inbox. Everything below is your choice.</p></div>}
-        <p className="mt-2 text-sm leading-6 text-[#756763]">These are optional. Pickup and order updates work without them. You can change your choices anytime.</p>
+        <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]"><T text={modern ? "Your comfort zone" : "01 · Preferences"}/></p>
+        <h2 className="mt-2 text-2xl font-semibold text-[#241715]"><T text={modern ? "Your app. Your choices." : "Optional communications and insights"}/></h2>
+        {modern && <div className="permission-summary"><span aria-hidden="true">✓</span><p><T text="Order updates stay in your inbox. Everything below is your choice."/></p></div>}
+        <p className="mt-2 text-sm leading-6 text-[#756763]"><T text="These are optional. Pickup and order updates work without them. You can change your choices anytime."/></p>
         <div className="mt-6 space-y-5">
             {purposes.map(({id, title, detail}) => modern ? <PreferenceChoice key={id} title={title} detail={detail} enabled={choices[id]?.granted ?? false} disabled={pending !== null} saving={pending === id} onChange={granted => {void choose(id, granted);}} /> : <div key={id} className="flex items-start justify-between gap-4 border-t border-[#eadfd6] pt-4">
-                <div><p className="font-semibold text-[#241715]">{title}</p><p className="mt-1 text-sm text-[#756763]">{detail}</p></div>
+                <div><p className="font-semibold text-[#241715]"><T text={title}/></p><p className="mt-1 text-sm text-[#756763]"><T text={detail}/></p></div>
                 <label className="flex shrink-0 items-center gap-2 text-sm text-[#241715]">
                     <input type="checkbox" checked={choices[id]?.granted ?? false} disabled={pending !== null}
                         onChange={event => {void choose(id, event.target.checked);}}
                         className="h-5 w-5 accent-[#7a1625]" aria-label={title} />
-                    {pending === id ? "Saving" : choices[id]?.granted ? "On" : "Off"}
+                    <T text={pending === id ? "Saving" : choices[id]?.granted ? "On" : "Off"}/>
                 </label>
             </div>)}
         </div>
         {requests && <div className="mt-10 border-t border-[#eadfd6] pt-8">
-            <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]">{modern ? "Your data, in your hands" : "02 · Data requests"}</p>
-            <h3 className="mt-2 text-2xl font-semibold text-[#241715]">Get a copy or ask for a review</h3>
-            <p className="mt-1 text-sm text-[#756763]">Request an export of your account data, or ask us to review deletion of your account data. These requests are handled manually; requesting deletion does not erase your account or financial order records immediately.</p>
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-[#a56e2e]"><T text={modern ? "Your data, in your hands" : "02 · Data requests"}/></p>
+            <h3 className="mt-2 text-2xl font-semibold text-[#241715]"><T text="Get a copy or ask for a review"/></h3>
+            <p className="mt-1 text-sm text-[#756763]"><T text="Request an export of your account data, or ask us to review deletion of your account data. These requests are handled manually; requesting deletion does not erase your account or financial order records immediately."/></p>
             <div className="permission-data-actions mt-5 flex flex-wrap gap-3">
                 {(["EXPORT", "DELETION_REVIEW"] as const).map(kind => {
                     const existing = requests.find(item => item.kind === kind);
                     return <button key={kind} type="button" disabled={Boolean(existing) || requesting !== null}
                         onClick={() => {void requestPrivacyReview(kind);}}
                         className="min-h-11 rounded-xl border border-[#eadfd6] px-4 text-sm font-semibold text-[#7a1625] disabled:opacity-60">
-                        {existing ? `${kind === "EXPORT" ? "Export" : "Deletion review"} request received`
-                            : requesting === kind ? "Submitting…" : kind === "EXPORT" ? "Request data export" : "Ask for deletion review"}
+                        <T text={existing ? (kind === "EXPORT" ? "Export request received" : "Deletion review request received")
+                            : requesting === kind ? "Submitting…" : kind === "EXPORT" ? "Request data export" : "Ask for deletion review"}/>
                     </button>;
                 })}
             </div>
         </div>}
-        {error && <p role="alert" className="mt-4 text-sm text-[#9e2732]">{error}</p>}
+        {error && <p role="alert" className="mt-4 text-sm text-[#9e2732]"><T text={error}/></p>}
     </section>;
 }

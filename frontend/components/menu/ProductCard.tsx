@@ -1,4 +1,5 @@
 "use client";
+import {requestMenuPickup} from "@/lib/menuPickupRecovery";
 import {T} from "@/lib/language";
 
 import Image from "next/image";
@@ -295,6 +296,7 @@ export default function ProductCard({
                     </p>
                 )}
 
+                {refined&&unavailableForPickup&&product.available&&!purchaseControl&&pickupMessage!=="Checking pickup"&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(product.id)}><T text="Choose another pickup"/></button>}
                 {/* Rating */}
 
                 <div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">

@@ -17,10 +17,12 @@
     "tests/storefront-reconnect.browser.mjs",
     "tests/menu-service-hours.browser.mjs",
     "tests/notification-opt-in.browser.mjs",
-    "tests/customer-consent.browser.mjs"
+    "tests/customer-consent.browser.mjs",
+    "tests/pwa-image-cache.browser.mjs"
   ],
   "menu": [
     "tests/menu-compact-header.browser.mjs",
+    "tests/menu-presentation.browser.mjs",
     "tests/menu-cart-pickup.browser.mjs",
     "tests/menu-picker-pickup-guard.browser.mjs",
     "tests/menu-soonest-pickup.browser.mjs",
@@ -43,7 +45,8 @@
     "tests/mobile-ordering-guidance.browser.mjs",
     "tests/mobile-ordering-resilience.browser.mjs",
     "tests/menu-campaigns.browser.mjs",
-    "tests/menu-appearance-hook.browser.mjs"
+    "tests/menu-appearance-hook.browser.mjs",
+    "tests/customer-ease.browser.mjs"
   ],
   "design": [
     "tests/customer-design.browser.mjs",
@@ -68,7 +71,8 @@
     "tests/profile-reorder.browser.mjs",
     "tests/history-rating.browser.mjs",
     "tests/pwa-install.browser.mjs",
-    "tests/badge-experience.browser.mjs"
+    "tests/badge-experience.browser.mjs",
+    "tests/customer-identity-recovery.browser.mjs"
   ],
   "staff-bulk": [
     "tests/product-dietary.browser.mjs",
