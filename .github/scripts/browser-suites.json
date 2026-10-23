@@ -72,7 +72,8 @@
     "tests/history-rating.browser.mjs",
     "tests/pwa-install.browser.mjs",
     "tests/badge-experience.browser.mjs",
-    "tests/customer-identity-recovery.browser.mjs"
+    "tests/customer-identity-recovery.browser.mjs",
+    "tests/identity-journey-recovery.browser.mjs"
   ],
   "staff-bulk": [
     "tests/product-dietary.browser.mjs",

@@ -38,7 +38,7 @@ try{
    await route.fulfill({headers,json});
   });
   await context.addInitScript(({branch,original,products})=>{
-   localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-ordering-tour:v1','seen');localStorage.setItem('gokul-social-follow-popup-seen','true');
+   if(!sessionStorage.getItem('customer-ease-initialized')){localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));sessionStorage.setItem('customer-ease-initialized','true');}localStorage.setItem('gokul-ordering-tour:v1','seen');localStorage.setItem('gokul-social-follow-popup-seen','true');
    if(!localStorage.getItem('gokul-cart'))localStorage.setItem('gokul-cart',JSON.stringify({branchId:1,items:[{product:products[0],quantity:1,weightGrams:null}]}));
    if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify(original));
   },{branch,original,products});
@@ -67,12 +67,33 @@ try{
   }
   assert.ok(activeReads<=2,'active order must not trigger repeated reads for menu interaction');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await input.fill('panner');
+  const savedCart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+  await page.goto(`${base}/about`);await page.goto(`${base}/menu`);
+  await page.waitForFunction(()=>document.querySelector('#gokul-menu-search')?.value==='panner');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),savedCart);
+  // A new branch must not inherit the old branch's search/filter preferences.
+  await page.evaluate(branch=>localStorage.setItem('gokul-selected-branch',JSON.stringify(branch)),orderBranch);
+  await page.goto(`${base}/menu`);await page.waitForFunction(()=>document.querySelector('#gokul-menu-search')?.value==='');
+  await page.evaluate(branch=>localStorage.setItem('gokul-selected-branch',JSON.stringify(branch)),branch);
+  await page.goto(`${base}/menu`);await page.waitForFunction(()=>document.querySelector('#gokul-menu-search')?.value==='panner');
+  if(width===1280){
+   const cartBefore=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+   await page.goto(`${base}/checkout/pickup`);const plan=page.getByRole('complementary',{name:'Your pickup plan',exact:true});await plan.waitFor();
+   await plan.getByRole('link',{name:'Edit items',exact:true}).waitFor();assert.equal(await plan.getByRole('link',{name:'Call branch',exact:true}).getAttribute('href'),'tel:1111111111');
+   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cartBefore);
+   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/desktop-pickup-plan.png`});
+   await page.goto(`${base}/menu`);await page.waitForFunction(()=>document.querySelector('#gokul-menu-search')?.value==='panner');
+  }
   await input.fill('');await page.evaluate(()=>scrollTo({top:0,behavior:'instant'}));
   if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/customer-ease-menu-${width}.png`});}
   if(width===390){
    failSettings=true;await page.evaluate(()=>sessionStorage.removeItem('gokul-storefront-settings'));await page.goto(`${base}/checkout/mobile`);await page.getByRole('heading',{name:'Your checkout is saved',exact:true}).waitFor();
    const cart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));failSettings=false;await page.getByRole('button',{name:'Try again',exact:true}).click();await page.getByRole('heading',{name:'Your order',exact:true}).waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart);
   }
+  await page.goto(`${base}/offline`);await context.setOffline(true);
+  await page.getByRole('heading',{name:'You’re offline',exact:true}).waitFor();assert.equal(await page.getByRole('button',{name:'Try again',exact:true}).isDisabled(),true);
+  await context.setOffline(false);await page.getByRole('heading',{name:'You’re connected again',exact:true}).waitFor();
   await page.goto(`${base}/missing-customer-page`);await page.getByRole('heading',{name:'This page has moved',exact:true}).waitFor();await page.getByRole('link',{name:'Back to menu',exact:true}).waitFor();
   assert.deepEqual(errors,[]);await context.close();console.log(`Customer recovery, search, filters, pickup and order shortcut ${width}px passed`);
  }

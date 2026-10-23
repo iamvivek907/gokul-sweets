@@ -102,7 +102,11 @@ try{
  // Standalone launches, desktop breakpoint and flag OFF retain their presentation.
  for(const config of [{ios:true,standalone:true},{standalone:true},{width:641,ios:true},{width:1280},{themed:false,ios:true}]){const h=await setup(config);await h.page.locator('.account-hub').waitFor();await emit(h.page);assert.equal(await card(h.page).count(),0);await h.context.close();}
  // Home/branch placements only; no promotion on checkout, payment or order routes.
- const routes=await setup({ios:true});for(const path of ['/', '/branches/1']){await routes.page.goto(`${base}${path}`);await card(routes.page).getByRole('button',{name:'Install App',exact:true}).waitFor();}
+ const routes=await setup({ios:true});for(const path of ['/', '/branches/1']){
+  await routes.page.goto(`${base}${path}`);await routes.page.waitForFunction(()=>document.querySelector('.ordering-tour-invite,.pwa-install-card'));
+  if(await routes.page.locator('.ordering-tour-invite').count()){assert.equal(await card(routes.page).count(),0,'the first-visit guide takes priority over install promotion');await routes.page.getByRole('button',{name:'Dismiss ordering guide',exact:true}).click();}
+  await card(routes.page).getByRole('button',{name:'Install App',exact:true}).waitFor();
+ }
  for(const path of ['/checkout/mobile','/checkout/payment/TEST-PENDING','/orders/TEST-PENDING']){await routes.page.goto(`${base}${path}`);await routes.page.locator('.customer-site-header').waitFor();assert.equal(await card(routes.page).count(),0);assert.equal(await routes.page.locator('.pwa-install-guide[open]').count(),0);}
  await routes.context.close();console.log('PWA route, desktop, flag-OFF and standalone safety passed');
  // Active provider verification suppresses installation without changing login.

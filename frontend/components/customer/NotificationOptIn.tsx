@@ -1,4 +1,5 @@
 "use client";
+import {usePromptGate} from "@/hooks/usePromptGate";
 import {T} from "@/lib/language";
 import Link from "next/link";
 import {useEffect, useState} from "react";
@@ -20,7 +21,8 @@ export default function NotificationOptIn() {
     const [permission, setPermission] = useState<NotificationPermission>("default");
     const [busy, setBusy] = useState(false), [message, setMessage] = useState("");
     const [revision, setRevision] = useState(0);
-    const allowed = Boolean(features?.notificationAlerts && features?.notificationInbox &&
+    const promptAllowed=usePromptGate();
+    const allowed = Boolean(promptAllowed && features?.notificationAlerts && features?.notificationInbox &&
         (features?.futuristicStorefrontV2 || features?.checkoutExperienceV2) && pwa.isStandalone &&
         !/^\/(cart|checkout|orders|admin|staff)(\/|$)/.test(path));
     useEffect(() => {

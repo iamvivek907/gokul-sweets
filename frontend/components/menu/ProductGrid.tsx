@@ -146,7 +146,7 @@ export default function ProductGrid({
                                 premium={portionGroups!==undefined}
                                 refined={refined}
                                 unavailableForPickup={unavailable}
-                                pickupMessage={pickupChecking ? "Checking pickup" : "Not at this time"}
+                                pickupMessage={pickupChecking ? "Checking pickup" : describePickupAvailability(pickup, false)}
                                 product={product}
                                 ratingSummary={ratingSummaries[product.id] ?? null}
                                 ratingLoading={ratingsLoading}
@@ -156,7 +156,7 @@ export default function ProductGrid({
                                 onDecrease={onDecrease}
                                 onAdd={onAdd}
                             />
-                            {unavailable && (
+                            {unavailable && !refined && (
                                 <p role="status" className="menu-availability-note">
                                     <T text={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}/>{!pickupChecking&&pickup?.available===false&&<button type="button" className="pickup-attention-action" onClick={()=>window.dispatchEvent(new Event("gokul-pickup-attention"))}><T text="Change pickup date"/></button>}
                                 </p>

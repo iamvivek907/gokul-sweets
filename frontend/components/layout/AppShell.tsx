@@ -41,6 +41,7 @@ import MobileEdgeBack from "./MobileEdgeBack";
 import OrderingTour from "@/components/customer/OrderingTour";
 import {OPEN_ORDERING_TOUR, getWalkthroughSnapshot, stopWalkthrough} from "@/lib/orderingTour";
 import "./ordering-tour.css";
+import "./customer-journey-refinement.css";
 
 
 interface AppShellProps {
@@ -49,6 +50,7 @@ interface AppShellProps {
     showSocialPopup?: boolean;
     showConnectionNotice?: boolean;
     editorial?: boolean;
+    orderConfirmed?: boolean;
 }
 
 
@@ -56,6 +58,7 @@ export default function AppShell({
     children,
     showSocialPopup = true,
     showConnectionNotice = true,
+    orderConfirmed = false,
     editorial = false
 }: AppShellProps) {
     const pathname = usePathname();
@@ -118,7 +121,7 @@ export default function AppShell({
 
             <CustomerFooter onHowToOrder={tourAllowed ? () => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR)) : undefined} />
 
-            {showSocialPopup && !orderingGuideActive && <SocialFollowPopup />}
+            {showSocialPopup && !orderingGuideActive && <SocialFollowPopup eligible={orderConfirmed} />}
             </BranchOperationalGuard>
 
             <BottomNavigation />
