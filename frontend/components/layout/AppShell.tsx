@@ -36,6 +36,7 @@ import "./profile-history-polish.css";
 import "./menu-premium.css";
 import "./customer-design.css";
 import "./menu-pickup.css";
+import "./menu-mobile-presentation.css";
 import MobileEdgeBack from "./MobileEdgeBack";
 import OrderingTour from "@/components/customer/OrderingTour";
 import {OPEN_ORDERING_TOUR, getWalkthroughSnapshot, stopWalkthrough} from "@/lib/orderingTour";

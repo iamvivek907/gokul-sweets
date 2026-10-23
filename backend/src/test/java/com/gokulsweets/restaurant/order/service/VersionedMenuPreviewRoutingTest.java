@@ -46,7 +46,11 @@ class VersionedMenuPreviewRoutingTest {
                                     .contentType("application/json")
                                     .content(body))
                     .andExpect(status().isOk())
-                    .andExpect(header().string("Cache-Control", "no-store"));
+                    .andExpect(header().string("Cache-Control", "no-store"))
+                    .andExpect(
+                            header().string(
+                                            "X-Gokul-Menu-Preview-Cache",
+                                            enabled ? "enabled" : "disabled"));
             if (enabled) verify(previews).check(eq(1L), eq(date), anyList());
             else {
                 verify(legacy).check(eq(1L), eq(date), anyList());

@@ -17,10 +17,12 @@
     "tests/storefront-reconnect.browser.mjs",
     "tests/menu-service-hours.browser.mjs",
     "tests/notification-opt-in.browser.mjs",
-    "tests/customer-consent.browser.mjs"
+    "tests/customer-consent.browser.mjs",
+    "tests/pwa-image-cache.browser.mjs"
   ],
   "menu": [
     "tests/menu-compact-header.browser.mjs",
+    "tests/menu-presentation.browser.mjs",
     "tests/menu-cart-pickup.browser.mjs",
     "tests/menu-picker-pickup-guard.browser.mjs",
     "tests/menu-soonest-pickup.browser.mjs",

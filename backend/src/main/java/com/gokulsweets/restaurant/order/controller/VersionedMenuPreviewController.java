@@ -56,6 +56,7 @@ public class VersionedMenuPreviewController {
                             : legacy.check(branchId, request.startDate(), request.items());
             return ResponseEntity.ok()
                     .cacheControl(CacheControl.noStore())
+                    .header("X-Gokul-Menu-Preview-Cache", enabled ? "enabled" : "disabled")
                     .body(CompactMenuAvailability.from(result));
         } finally {
             MethodTiming.finish(

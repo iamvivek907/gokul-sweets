@@ -58,6 +58,33 @@ class VersionedMenuPreviewTest {
     }
 
     @Test
+    void cacheLookupMetricsDistinguishReuseWithoutCustomerOrProductTags() {
+        var registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        io.micrometer.core.instrument.Metrics.addRegistry(registry);
+        try {
+            cache.check(1, date, items);
+            cache.check(1, date, items);
+            assertThat(
+                            registry.get("gokul.menu.preview.lookups")
+                                    .tag("outcome", "hit")
+                                    .counter()
+                                    .count())
+                    .isEqualTo(1);
+            assertThat(
+                            registry.get("gokul.menu.preview.lookups")
+                                    .tag("outcome", "miss")
+                                    .counter()
+                                    .count())
+                    .isEqualTo(1);
+            assertThat(registry.getMeters())
+                    .allSatisfy(meter -> assertThat(meter.getId().getTags()).hasSize(1));
+        } finally {
+            io.micrometer.core.instrument.Metrics.removeRegistry(registry);
+            registry.close();
+        }
+    }
+
+    @Test
     void committedChangeNeverReusesPreviousStock() {
         var first = cache.check(1, date, items);
         when(versions.read(1, date)).thenReturn("v2");

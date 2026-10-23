@@ -34,11 +34,9 @@ export default function MenuCampaignBanners({banners, categories, onSelect, comp
         }
     }
     const content = (slide: Slide, playing = true) => <>
-        {slide.banner.mediaUrl && <div className={styles.frame}>
-            {slide.banner.mediaType?.startsWith("video/") && !reduced && playing
-                ? <video key={slide.banner.mediaUrl} src={slide.banner.mediaUrl} poster={slide.banner.posterUrl ?? undefined} muted autoPlay loop playsInline controls style={campaignFrameStyle(slide.banner.frame)} />
-                : <img key={slide.banner.mediaUrl} src={slide.banner.mediaType?.startsWith("video/") ? (slide.banner.posterUrl ?? "") : slide.banner.mediaUrl} alt="" loading="lazy" draggable={false} style={campaignFrameStyle(slide.banner.frame)} onError={e => {e.currentTarget.hidden = true;}} />}
-        </div>}
+        {slide.banner.mediaUrl && (slide.banner.mediaType?.startsWith("video/") && !reduced && playing
+            ? <CampaignVideo key={slide.banner.mediaUrl} banner={slide.banner} modern={!!modern} locale={locale} />
+            : <div className={styles.frame}><img key={slide.banner.mediaUrl} src={slide.banner.mediaType?.startsWith("video/") ? (slide.banner.posterUrl ?? "") : slide.banner.mediaUrl} alt="" loading="lazy" draggable={false} style={campaignFrameStyle(slide.banner.frame)} onError={e => {e.currentTarget.hidden = true;}} /></div>)}
         <div className={styles.copy}>
             {modern && slide.category && <span className={styles.eyebrow}>{translate(slide.category.name, locale)}</span>}
             <h2>{locale === "hi" && slide.banner.titleHi ? slide.banner.titleHi : slide.banner.titleEn}</h2>
@@ -52,25 +50,59 @@ export default function MenuCampaignBanners({banners, categories, onSelect, comp
     return <CampaignCarousel key={slides.map(s => s.key).join("|")} slides={slides} reduced={reduced} locale={locale} compact={compact} render={content} />;
 }
 
+/** Background animation controls sit outside saved media transforms and the slide navigation. */
+function CampaignVideo({banner, modern, locale}: {banner: MenuBanner; modern: boolean; locale: "en" | "hi"}) {
+    const video = useRef<HTMLVideoElement>(null);
+    const [paused, setPaused] = useState(true);
+    const [failed, setFailed] = useState(false);
+    const label = paused
+        ? locale === "hi" ? "बैनर ऐनिमेशन चलाएँ" : "Play banner animation"
+        : locale === "hi" ? "बैनर ऐनिमेशन रोकें" : "Pause banner animation";
+    return <>
+        <div className={styles.frame}><video ref={video} src={banner.mediaUrl!} poster={banner.posterUrl ?? undefined} muted autoPlay loop playsInline controls={!modern}
+            onPlay={() => setPaused(false)} onPause={() => setPaused(true)} onError={() => setFailed(true)} style={campaignFrameStyle(banner.frame)} /></div>
+        {modern && !failed && <button type="button" className={styles.videoToggle} aria-label={label} title={label} onClick={() => {
+            const media = video.current;
+            if (!media) return;
+            if (media.paused) void media.play().catch(() => { /* A blocked play remains available for a later user gesture. */ });
+            else media.pause();
+        }}><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">{paused ? <path d="m8 5 11 7-11 7z" /> : <path d="M6 5h4v14H6zm8 0h4v14h-4z" />}</svg></button>}
+    </>;
+}
+
 function CampaignCarousel({slides, reduced, locale, compact, render}: {
     slides: Slide[]; reduced: boolean; locale: "en" | "hi"; compact: boolean; render: (slide: Slide, playing: boolean) => React.ReactNode;
 }) {
     const viewport = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState(0);
+    const pendingTarget = useRef<number | null>(null);
     const go = (index: number) => {
+        index = Math.max(0, Math.min(slides.length - 1, index));
         const target = viewport.current?.children[index] as HTMLElement | undefined;
+        pendingTarget.current = index;
         if (target && viewport.current) viewport.current.scrollTo({left: target.offsetLeft - (viewport.current.children[0] as HTMLElement).offsetLeft, behavior: reduced ? "instant" : "smooth"});
     };
     return <section className={`${styles.carousel} ${compact ? styles.compactCarousel : ""}`} aria-label="Published menu banners" aria-roledescription={locale === "hi" ? "कैरसेल" : "carousel"}>
         <div ref={viewport} className={styles.viewport} tabIndex={slides.length > 1 ? 0 : undefined} aria-label={locale === "hi" ? "श्रेणियाँ देखने के लिए स्वाइप करें" : "Swipe to explore categories"}
-            onKeyDown={event => {if (event.target !== event.currentTarget) return; if (event.key === "ArrowRight") {event.preventDefault(); go(Math.min(active + 1, slides.length - 1));} if (event.key === "ArrowLeft") {event.preventDefault(); go(Math.max(active - 1, 0));}}}
-            onScroll={event => {const node = event.currentTarget; const index = Math.round(node.scrollLeft / Math.max(node.clientWidth, 1)); setActive(Math.max(0, Math.min(slides.length - 1, index)));}}>
+            onKeyDown={event => {if (event.target !== event.currentTarget) return; if (event.key === "ArrowRight") {event.preventDefault(); go(Math.min((pendingTarget.current ?? active) + 1, slides.length - 1));} if (event.key === "ArrowLeft") {event.preventDefault(); go(Math.max((pendingTarget.current ?? active) - 1, 0));}}}
+            onPointerDown={() => {pendingTarget.current = null;}} onWheel={() => {pendingTarget.current = null;}}
+            onScroll={event => {
+                const node = event.currentTarget;
+                if (pendingTarget.current !== null) {
+                    const target = node.children[pendingTarget.current] as HTMLElement | undefined;
+                    const first = node.children[0] as HTMLElement | undefined;
+                    if (target && first && Math.abs(node.scrollLeft - (target.offsetLeft - first.offsetLeft)) >= 2) return;
+                    pendingTarget.current = null;
+                }
+                const index = Math.round(node.scrollLeft / Math.max(node.clientWidth, 1));
+                setActive(Math.max(0, Math.min(slides.length - 1, index)));
+            }}>
             {slides.map((slide, index) => <article key={slide.key} className={`${styles.banner} ${styles.slide}`} role="group" aria-roledescription={locale === "hi" ? "स्लाइड" : "slide"} aria-label={`${index + 1} / ${slides.length}`} aria-hidden={index !== active} inert={index !== active}>{render(slide, index === active)}</article>)}
         </div>
         {slides.length > 1 && <div className={styles.carouselNavigation}>
             <span className={styles.hint}>{locale === "hi" ? "हर खुशी का स्वाद" : "A little more to celebrate"}</span>
             <div className={styles.dots} aria-label={locale === "hi" ? "बैनर चुनें" : "Choose a banner"}>{slides.map((slide,index) => <button key={slide.key} type="button" aria-label={`${locale === "hi" ? "बैनर" : "Show banner"} ${index + 1}`} aria-current={index === active ? "true" : undefined} onClick={() => go(index)}><span /></button>)}</div>
-            <div className={styles.arrows}><button type="button" aria-label={locale === "hi" ? "पिछला बैनर" : "Previous banner"} disabled={active === 0} onClick={() => go(active - 1)}>←</button><button type="button" aria-label={locale === "hi" ? "अगला बैनर" : "Next banner"} disabled={active === slides.length - 1} onClick={() => go(active + 1)}>→</button></div>
+            <div className={styles.arrows}><button type="button" aria-label={locale === "hi" ? "पिछला बैनर" : "Previous banner"} disabled={active === 0} onClick={() => go((pendingTarget.current ?? active) - 1)}>←</button><button type="button" aria-label={locale === "hi" ? "अगला बैनर" : "Next banner"} disabled={active === slides.length - 1} onClick={() => go((pendingTarget.current ?? active) + 1)}>→</button></div>
             <span className={styles.srOnly} aria-live="polite">{active + 1} / {slides.length}</span>
         </div>}
     </section>;
