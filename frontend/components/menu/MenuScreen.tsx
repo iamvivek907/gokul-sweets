@@ -406,8 +406,14 @@ export default function MenuScreen() {
                         );
 
 
-                    void progressiveBatches(ratingBatches,batch=>getProductRatingSummaries(batch,AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])),summaries=>{
-                        setRatingState(previous=>({branchId:selectedBranch.id,summaries:{...(previous?.branchId===selectedBranch.id?previous.summaries:{}),...Object.fromEntries(summaries.map(summary=>[summary.productId,summary]))}}));
+                    void progressiveBatches(ratingBatches,batch=>getProductRatingSummaries(batch,AbortSignal.any([controller.signal,AbortSignal.timeout(8000)])),(summaries,batch)=>{
+                        setRatingState(previous=>{
+                            const next={...(previous?.branchId===selectedBranch.id?previous.summaries:{})};
+                            // A successful batch is authoritative even when products have no published reviews.
+                            for(const productId of batch)delete next[productId];
+                            for(const summary of summaries)next[summary.productId]=summary;
+                            return {branchId:selectedBranch.id,summaries:next};
+                        });
                     },controller.signal).then(()=>{
                         if(!controller.signal.aborted)setRatingState(previous=>previous?.branchId===selectedBranch.id?previous:{branchId:selectedBranch.id,summaries:{}});
                     });

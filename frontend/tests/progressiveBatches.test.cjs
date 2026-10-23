@@ -12,3 +12,11 @@ test('cancellation ignores late data and does not start queued reads',async()=>{
  const complete=api.progressiveBatches([1,2,3],()=>new Promise(resolve=>waiting.push(resolve)),value=>seen.push(value),controller.signal);
  controller.abort();waiting.forEach(resolve=>resolve('old branch'));await complete;assert.equal(waiting.length,2);assert.deepEqual(seen,[]);
 });
+test('successful empty responses identify their requested batch while failed batches do not publish',async()=>{
+ const waiting=[],seen=[],controller=new AbortController();
+ const batches=[[1,2],[3],[4]];
+ const complete=api.progressiveBatches(batches,batch=>new Promise((resolve,reject)=>waiting.push({batch,resolve,reject})),(value,batch)=>seen.push({value,batch}),controller.signal);
+ waiting[1].resolve([]);await flush();assert.deepEqual(seen,[{value:[],batch:batches[1]}]);
+ waiting[0].reject(Error('temporary outage'));waiting[2].resolve([{productId:4}]);await complete;
+ assert.deepEqual(seen,[{value:[],batch:batches[1]},{value:[{productId:4}],batch:batches[2]}]);
+});
