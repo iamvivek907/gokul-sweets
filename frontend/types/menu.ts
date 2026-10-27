@@ -17,6 +17,8 @@ export interface MenuProduct {
 
     price: number;
 
+    comparisonPrice?: number | null;
+
     imageUrl: string | null;
 
     available: boolean;

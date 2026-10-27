@@ -75,7 +75,8 @@ public class MenuService {
                                                                                             .serviceAvailability(),
                                                                                     live
                                                                                             .observedAt()),
-                                                                            p.vegetarian());
+                                                                            p.vegetarian(),
+                                                                            p.comparisonPrice());
                                                                 })
                                                         .toList()))
                         .filter(c -> !c.products().isEmpty())

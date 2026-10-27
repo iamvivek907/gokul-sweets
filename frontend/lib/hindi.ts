@@ -995,6 +995,8 @@ export const hindi: Record<string,string> = {
   "Great value": "कीमत के हिसाब से बेहतरीन",
   "Quick pickup": "जल्दी पिकअप",
   "Wonderful service": "बेहतरीन सेवा",
+  "Regular price": "सामान्य कीमत",
+  "Selling price": "विक्रय कीमत",
   "No ratings yet": "अभी कोई रेटिंग नहीं",
   "/kg": "/किलो",
   "From": "से",

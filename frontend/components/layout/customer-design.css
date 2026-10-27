@@ -372,3 +372,6 @@
 .future-storefront[data-customer-design=reference] .product-image-fallback{color:#752343;background:#fff1e8}
 .future-storefront[data-customer-design=reference] .mobile-checkout-section{overflow-wrap:anywhere}
 .future-storefront[data-customer-design=reference] :is(.mobile-checkout-section,.mobile-bill-dialog) :is(button,a,input,select,textarea):focus-visible{outline:3px solid #8f1838;outline-offset:3px}
+
+.future-storefront[data-customer-design=reference] .menu-comparison-price{display:block;color:#726a6e;font-size:.8em;font-weight:500;text-decoration-thickness:1px}
+.future-storefront[data-customer-design=reference] .menu-sale-price{display:inline-block;background:#ffdc31;color:#241715;padding:2px 5px;border-radius:3px;font-weight:800;line-height:1.25}

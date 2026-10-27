@@ -81,7 +81,13 @@ public class MenuWorkspaceService {
             @NotNull @Min(0) Long version,
             Boolean available,
             @DecimalMin("0.01") BigDecimal priceOverride,
-            Boolean clearPriceOverride) {}
+            Boolean clearPriceOverride,
+            @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal comparisonPrice,
+            Boolean clearComparisonPrice) {
+        public BranchEdit(Long version, Boolean available, BigDecimal priceOverride, Boolean clearPriceOverride) {
+            this(version, available, priceOverride, clearPriceOverride, null, false);
+        }
+    }
 
     /**
      * Immutable option data contract.
@@ -259,7 +265,7 @@ public class MenuWorkspaceService {
                                 + " \"categoryId\",c.name AS \"categoryName\",p.base_price AS"
                                 + " \"basePrice\",bp.price_override AS"
                                 + " \"priceOverride\",COALESCE(bp.price_override,p.base_price) AS"
-                                + " \"effectivePrice\",bp.available,p.active,p.vegetarian,p.sale_mode"
+                                + " \"effectivePrice\",bp.comparison_price AS \"comparisonPrice\",bp.available,p.active,p.vegetarian,p.sale_mode"
                                 + " AS \"saleMode\",p.minimum_weight_grams AS"
                                 + " \"minimumWeightGrams\",p.weight_step_grams AS"
                                 + " \"weightStepGrams\",p.tax_category_id AS"
@@ -573,13 +579,25 @@ public class MenuWorkspaceService {
                         HttpStatus.NOT_FOUND, "Product not assigned to branch.");
             var old = rows.getFirst();
             if (((Number) old.get("workspace_version")).longValue() != d.version()) conflict();
+            if (Boolean.TRUE.equals(d.clearComparisonPrice()) && d.comparisonPrice() != null)
+                throw new IllegalArgumentException("Clear and comparison price cannot be combined.");
+            if (d.comparisonPrice() != null) {
+                if (d.comparisonPrice().scale() > 2 || d.comparisonPrice().precision() - d.comparisonPrice().scale() > 10 || d.comparisonPrice().signum() <= 0)
+                    throw new IllegalArgumentException("Comparison price must be positive with at most two decimal places.");
+                BigDecimal base = jdbc.queryForObject("SELECT base_price FROM products WHERE id=?", BigDecimal.class, id);
+                BigDecimal effective = Boolean.TRUE.equals(d.clearPriceOverride()) ? base : d.priceOverride() != null ? d.priceOverride() : old.get("price_override") != null ? (BigDecimal) old.get("price_override") : base;
+                if (effective == null || d.comparisonPrice().compareTo(effective) <= 0)
+                    throw new IllegalArgumentException("Comparison price must exceed the selling price.");
+            }
             jdbc.update(
                     "UPDATE branch_products SET available=COALESCE(?,available),price_override=CASE"
-                        + " WHEN ? THEN NULL ELSE COALESCE(?,price_override) END,updated_at=now()"
+                        + " WHEN ? THEN NULL ELSE COALESCE(?,price_override) END,comparison_price=CASE WHEN ? THEN NULL ELSE COALESCE(?,comparison_price) END,updated_at=now()"
                         + " WHERE branch_id=? AND product_id=?",
                     d.available(),
                     Boolean.TRUE.equals(d.clearPriceOverride()),
                     d.priceOverride(),
+                    Boolean.TRUE.equals(d.clearComparisonPrice()),
+                    d.comparisonPrice(),
                     branch,
                     id);
             audit(branch, id, "BRANCH_UPDATE", old, d);
