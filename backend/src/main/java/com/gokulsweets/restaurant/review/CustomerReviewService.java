@@ -175,7 +175,8 @@ public class CustomerReviewService {
                         CustomerReviewService.class, "summarizeProducts(ProductSummaryRequest)");
         try {
             LinkedHashSet<Long> productIds = new LinkedHashSet<>(request.productIds());
-            // Keep precision for count-weighted size groups; clients round only the displayed score.
+            // Keep precision for count-weighted size groups; clients round only the displayed
+            // score.
             return reviewItemRepository
                     .summarizeProducts(productIds, ReviewStatus.PUBLISHED)
                     .stream()
