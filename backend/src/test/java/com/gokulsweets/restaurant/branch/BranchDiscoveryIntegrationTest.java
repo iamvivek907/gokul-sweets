@@ -201,6 +201,11 @@ class BranchDiscoveryIntegrationTest {
                 "Another branch must not affect these ratings.",
                 "PICKED_UP");
         var result = discovery.get(b);
+        assertThat(discovery.reviews(b, null).reviews())
+                .extracting(BranchDiscoveryService.PublicReview::comment)
+                .containsExactlyInAnyOrder(
+                        "Fresh and carefully packed for our pickup.",
+                        "The overall pickup experience was reasonable.");
         assertThat(result.overallExperience().average()).isEqualTo(4);
         assertThat(result.overallExperience().count()).isEqualTo(2);
         assertThat(result.overallExperience().distribution()).containsExactly(0L, 0L, 1L, 0L, 1L);
@@ -223,6 +228,7 @@ class BranchDiscoveryIntegrationTest {
         long b = branch();
         assertThat(discovery.get(b).overallExperience().count()).isZero();
         assertThat(discovery.get(b).topRatedItems()).isEmpty();
+        assertThat(discovery.reviews(b, null).reviews()).isEmpty();
         long p = product(b, "Occasion exclusive", true, true);
         review(
                 b,
@@ -239,8 +245,83 @@ class BranchDiscoveryIntegrationTest {
     }
 
     @Test
+    void recentCommentsAreBoundedAndExcludePrivateContactAndUnpublishedOrders() {
+        long b = branch(), s = slot(b), p = product(b, "Sweet", true, false);
+        for (int i = 0; i < 7; i++)
+            review(
+                    b,
+                    s,
+                    p,
+                    5,
+                    5,
+                    "PUBLISHED",
+                    "A pleasant completed order number " + i,
+                    "PICKED_UP");
+        review(
+                b,
+                s,
+                p,
+                2,
+                2,
+                "PUBLISHED",
+                "Please contact me on 9876543210 about this",
+                "PICKED_UP");
+        review(
+                b,
+                s,
+                p,
+                2,
+                2,
+                "PUBLISHED",
+                "Write to test@example.com about this order",
+                "PICKED_UP");
+        review(b, s, p, 2, 2, "PUBLISHED", "Nice", "PICKED_UP");
+        var comments = discovery.reviews(b, null).reviews();
+        assertThat(comments).hasSize(7);
+        assertThat(comments)
+                .allSatisfy(
+                        comment -> {
+                            assertThat(comment.comment())
+                                    .doesNotContain("9876543210", "example.com");
+                            assertThat(comment.overallRating()).isEqualTo(5);
+                        });
+    }
+
+    @Test
+    void publicReviewPagesUseBoundedCursorAndExplicitNameChoice() {
+        long b = branch(), s = slot(b), p = product(b, "Sweet", true, false);
+        for (int i = 0; i < 25; i++)
+            review(b, s, p, 5, 5, "PUBLISHED", "A lovely review of order number " + i, "PICKED_UP");
+        jdbc.update(
+                "UPDATE reviews SET show_customer_name=true WHERE id=(SELECT MAX(id) FROM reviews"
+                        + " WHERE branch_id=?)",
+                b);
+        var first = discovery.reviews(b, null);
+        assertThat(first.reviews()).hasSize(20);
+        assertThat(first.reviews().getFirst().displayName()).isEqualTo("Private");
+        assertThat(first.reviews().get(1).displayName()).isEqualTo("Customer");
+        assertThat(first.nextBefore()).isNotNull();
+        var second = discovery.reviews(b, first.nextBefore());
+        assertThat(second.reviews()).hasSize(5);
+        assertThat(second.nextBefore()).isNull();
+        assertThat(second.reviews())
+                .extracting(BranchDiscoveryService.PublicReview::comment)
+                .doesNotContainAnyElementsOf(
+                        first.reviews().stream()
+                                .map(BranchDiscoveryService.PublicReview::comment)
+                                .toList());
+        assertThatThrownBy(() -> discovery.reviews(b, 0L))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(BranchDiscoveryService.publicName(true, "Riya Chaurasiya")).isEqualTo("Riya");
+        assertThat(BranchDiscoveryService.publicName(false, "Riya Chaurasiya"))
+                .isEqualTo("Customer");
+        assertThat(BranchDiscoveryService.publicName(true, "9876543210")).isEqualTo("Customer");
+    }
+
+    @Test
     void shortOrContactBearingCommentsAreNotPublishedAsQuotes() {
         assertThat(BranchDiscoveryService.publicComment("Nice")).isNull();
+        assertThat(BranchDiscoveryService.publicComment("Quick pickup")).isEqualTo("Quick pickup");
         assertThat(
                         BranchDiscoveryService.publicComment(
                                 "Contact me at name@example.com for more information"))

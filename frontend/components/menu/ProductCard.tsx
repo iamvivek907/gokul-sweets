@@ -178,7 +178,7 @@ export default function ProductCard({
                             />
                         )
                         : (
-                            <div className="product-image-fallback
+                            <div aria-hidden="true" className="product-image-fallback
                                 flex
                                 h-full
                                 items-center
@@ -379,7 +379,7 @@ export default function ProductCard({
                                         </span>
 
                                         <span>
-                                            <T text="New · No ratings yet" /></span>
+                                            <T text="No ratings yet" /></span>
                                     </div>
                                 )
                     }
@@ -410,7 +410,8 @@ export default function ProductCard({
                         sm:text-base
                     ">
                         {premium&&(isWeighted||priceFrom)&&<><T text="From"/> </>}
-                        {formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}
+                        {(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price&&<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{formatCurrency(premium&&isWeighted?product.comparisonPrice*(product.minimumWeightGrams??250)/1000:product.comparisonPrice,true,true)}</s><span className="sr-only"> <T text="Selling price"/> </span></>}
+                        <span className={(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price?"menu-sale-price":undefined}>{formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}</span>
                         {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
 
                         {

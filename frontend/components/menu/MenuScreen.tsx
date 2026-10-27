@@ -660,6 +660,8 @@ export default function MenuScreen() {
     const [portionsOnly,setPortionsOnly]=useState(false);
     const [restoreScroll,setRestoreScroll]=useState<{branchId:number;y:number}|null>(null);
     const [restoredBrowse,setRestoredBrowse]=useState<number|null>(null);
+    // Keep a search entered before saved browsing state finishes restoring.
+    const searchEditedBranch=useRef<number|null>(null);
     const savedBrowse=useRef<{branchId:number;value:MenuBrowseState}|null>(null);
     useEffect(()=>{
         if(!branch||loadedBranchId!==branch.id||restoredBrowse===branch.id)return;
@@ -668,8 +670,9 @@ export default function MenuScreen() {
         const destination=explicit?Number(explicit):saved?.categoryId??null;
         const ids=new Set(categories.map(category=>category.id));
         // Restore UI preferences only. Cart, stock and pickup remain independently authoritative.
+        if(searchEditedBranch.current!==branch.id)setSearch(explicit?"":saved?.search??"");
+        searchEditedBranch.current=null;
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSearch(explicit?"":saved?.search??"");
         setSelectedCategoryId(destination&&ids.has(destination)?destination:null);
         setMobileCategories(explicit?(destination&&ids.has(destination)?[destination]:[]):saved?.categories?.filter(id=>ids.has(id))??null);
         setMaximumPrice(explicit?null:saved?.maximum??null);setPortionsOnly(!explicit&&!!saved?.portions);
@@ -1271,9 +1274,10 @@ export default function MenuScreen() {
                         value={
                             search
                         }
-                        onChange={
-                            setSearch
-                        }
+                        onChange={value => {
+                            if(restoredBrowse!==branch.id)searchEditedBranch.current=branch.id;
+                            setSearch(value);
+                        }}
                     />
 
 

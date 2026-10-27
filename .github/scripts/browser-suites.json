@@ -18,7 +18,9 @@
     "tests/menu-service-hours.browser.mjs",
     "tests/notification-opt-in.browser.mjs",
     "tests/customer-consent.browser.mjs",
-    "tests/pwa-image-cache.browser.mjs"
+    "tests/pwa-image-cache.browser.mjs",
+    "tests/return-review.browser.mjs",
+    "tests/branch-loading-reviews.browser.mjs"
   ],
   "menu": [
     "tests/menu-compact-header.browser.mjs",

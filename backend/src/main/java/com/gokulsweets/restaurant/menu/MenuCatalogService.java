@@ -212,7 +212,7 @@ public class MenuCatalogService {
 SELECT c.id AS category_id,c.name AS category_name,c.description AS category_description,
        c.display_order AS category_order,p.id,p.name,p.description,
        COALESCE(bp.price_override,p.base_price) AS price,p.image_url,bp.available,
-       p.sale_mode,p.minimum_weight_grams,p.weight_step_grams,p.vegetarian
+       p.sale_mode,p.minimum_weight_grams,p.weight_step_grams,p.vegetarian,bp.comparison_price
 FROM branch_products bp JOIN products p ON p.id=bp.product_id
 JOIN categories c ON c.id=p.category_id
 WHERE bp.branch_id=? AND p.active AND c.active AND NOT bp.occasion_only
@@ -249,7 +249,8 @@ ORDER BY c.display_order,bp.display_order,p.name
                                                         r.getObject(
                                                                 "weight_step_grams", Integer.class),
                                                         null,
-                                                        r.getBoolean("vegetarian")));
+                                                        r.getBoolean("vegetarian"),
+                                                        r.getBigDecimal("comparison_price")));
                             },
                     branchId);
             return new Catalog(
