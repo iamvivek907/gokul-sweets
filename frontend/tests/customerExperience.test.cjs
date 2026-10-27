@@ -1,6 +1,26 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 function load(path){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,Intl,URL,Number,JSON});return exports;}
 const presentation=load('lib/menuPresentationDetails.ts'),seo=load('lib/branchSeo.ts'),{safeVital}=load('lib/vitals.ts');
+test('group ratings are weighted by review count and independent of photo, order and availability',()=>{
+ const products=[{id:10,imageUrl:null,available:false},{id:11,imageUrl:'/full.webp',available:true}];
+ const ratings={10:{productId:10,averageRating:5,ratingCount:100},11:{productId:11,averageRating:1,ratingCount:1},12:{productId:12,averageRating:1,ratingCount:900}};
+ const result=presentation.groupedRatingSummary(products,ratings);
+ assert.equal(result.ratingCount,101);assert.equal(result.averageRating,501/101);
+ const changed=presentation.groupedRatingSummary([{...products[1],imageUrl:null,available:false},{...products[0],imageUrl:'/half.webp',available:true}],ratings);
+ assert.equal(changed.ratingCount,result.ratingCount);assert.equal(changed.averageRating,result.averageRating);
+ assert.equal(presentation.groupedRatingSummary([...products,products[0]],ratings).ratingCount,101);
+ const precise=presentation.groupedRatingSummary(products,{10:{productId:10,averageRating:10/3,ratingCount:3},11:{productId:11,averageRating:5,ratingCount:1}});
+ assert.equal(precise.averageRating,3.75);assert.equal(precise.averageRating.toFixed(1),'3.8');
+});
+test('group ratings tolerate unrated sizes and exclude malformed or unrelated summaries',()=>{
+ const products=[{id:10},{id:11}];
+ for(const ratings of [{},{10:{productId:10,averageRating:0,ratingCount:0}},{10:{productId:11,averageRating:5,ratingCount:1}}])assert.equal(presentation.groupedRatingSummary(products,ratings),null);
+ assert.equal(presentation.groupedRatingSummary([],{}),null);
+ for(const invalid of [{averageRating:NaN},{averageRating:Infinity},{averageRating:0},{averageRating:6},{ratingCount:0},{ratingCount:-1},{ratingCount:1.5},{ratingCount:NaN},{ratingCount:Infinity}]){
+  const result=presentation.groupedRatingSummary(products,{10:{productId:10,averageRating:4,ratingCount:2},11:{productId:11,averageRating:5,ratingCount:1,...invalid}});
+  assert.equal(result.ratingCount,2);assert.equal(result.averageRating,4);
+ }
+});
 test('prices retain paise and only valid higher comparison prices claim a reduction',()=>{
  assert.equal(presentation.menuMoney(15),'₹15');assert.equal(presentation.menuMoney(15.5),'₹15.5');assert.equal(presentation.menuMoney(1234.56),'₹1,234.56');
  for(const value of [null,undefined,0,10,15,NaN,Infinity,'30'])assert.equal(presentation.comparisonPrice({price:15,comparisonPrice:value}),null);

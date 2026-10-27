@@ -24,7 +24,7 @@ interface ProductCardProps {
     pickupMessage?: string;
     pickupChecking?: boolean;
     product: MenuProduct;
-    ratingSummary: ProductRatingSummary | null;
+    ratingSummary: Pick<ProductRatingSummary, "averageRating" | "ratingCount"> | null;
     ratingLoading: boolean;
     quantity: number;
     weightGrams: number | null;

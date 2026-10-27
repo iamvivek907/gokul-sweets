@@ -1,3 +1,7 @@
+## Grouped menu ratings (October 27)
+
+Grouped dishes display a rating-count-weighted score across their member sizes and the total number of item ratings. Photo selection, size ordering and current pickup availability never select or filter the score. Product summaries retain their average precision until display; unrated sizes add no votes. The existing bounded summary reads remain shared by phone and desktop.
+
 ## Clear branch and pickup recovery (October 27)
 
 The modern phone menu keeps branch and pickup status ahead of search and category shortcuts. The compact category row reduces vertical space while keeping existing category navigation and measured header behavior. A checked empty normal-pickup window explains the next action and offers the selected branch telephone when configured; the pickup dialog offers the same help without changing the cart or saved pickup. A branch-detail read failure provides retry and all-branches navigation. Unknown or failed availability never becomes a promise of a pickup time, and priority-only availability remains distinct from normal pickup. Legacy presentation and backend ordering checks remain authoritative.

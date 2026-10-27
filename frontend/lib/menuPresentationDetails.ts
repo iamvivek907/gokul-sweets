@@ -1,4 +1,22 @@
 import type {MenuProduct} from "@/types/menu";
+import type {ProductRatingSummary} from "@/types/review";
+
+/** Group scores count each size's item ratings, independently of its photo or pickup availability. */
+export function groupedRatingSummary(
+    products: ReadonlyArray<Pick<MenuProduct, "id">>,
+    ratings: Readonly<Record<number, ProductRatingSummary>>,
+): Pick<ProductRatingSummary, "averageRating" | "ratingCount"> | null {
+    let ratingCount = 0;
+    let ratingTotal = 0;
+    for (const id of new Set(products.map(product => product.id))) {
+        const summary = ratings[id];
+        if (!summary || summary.productId !== id || !Number.isSafeInteger(summary.ratingCount) || summary.ratingCount <= 0
+            || !Number.isFinite(summary.averageRating) || summary.averageRating < 1 || summary.averageRating > 5) continue;
+        ratingCount += summary.ratingCount;
+        ratingTotal += summary.averageRating * summary.ratingCount;
+    }
+    return ratingCount > 0 ? {averageRating: ratingTotal / ratingCount, ratingCount} : null;
+}
 
 /** Public menu amounts retain paise without adding .00 to every whole price. */
 export function menuMoney(amount: number): string {
