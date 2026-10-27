@@ -73,7 +73,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
  }
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
- await mkdir(screens,{recursive:true});await page.screenshot({path:`${screens}/menu-presentation-${width}-${expired?'expired':'selected'}-${enabled}.png`});
+ await mkdir(screens,{recursive:true});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${screens}/menu-presentation-${width}-${expired?'expired':'selected'}-${enabled}.png`});
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),before);
  assert.deepEqual(errors,[]);await context.close();console.log(`Menu presentation ${width}px expired=${expired} enabled=${enabled} passed`);
 }}finally{await Promise.all([browser.close(),classicBrowser.close()]);}

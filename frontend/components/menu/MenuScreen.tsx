@@ -649,7 +649,8 @@ export default function MenuScreen() {
 
 
     const phone=usePhoneViewport();
-    const phoneMenu=phone===true&&(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true;
+    const groupedMenu=mobileFeatures?.contextualStorefrontV2===true&&(mobileFeatures.futuristicStorefrontV2===true||mobileFeatures.checkoutExperienceV2===true);
+    const phoneMenu=phone===true&&groupedMenu;
     const [browseCategory,setBrowseCategory]=useState<{branchId:number;id:number}|null|undefined>(undefined);
     const initialCategoryId=browseCategory===undefined?(effectiveCategoryId??undefined):undefined;
     const activeBrowseId=phoneMenu?(browseCategory?.branchId===branch?.id?browseCategory?.id:initialCategoryId):undefined;
@@ -701,7 +702,7 @@ export default function MenuScreen() {
     },[branch,restoredBrowse]);
     const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
     const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
-    useEffect(()=>{if(!pickupCheck.features?.contextualStorefrontV2||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[pickupCheck.features?.contextualStorefrontV2,branch]);
+    useEffect(()=>{if(!groupedMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[groupedMenu,branch]);
     const filteredProducts =
         useMemo(
             () => {
@@ -785,7 +786,7 @@ export default function MenuScreen() {
     const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
     const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
     const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
-        portionGroups={pickupCheck.features?.contextualStorefrontV2?portionGroups:undefined} catalogProducts={allProducts} compactGroups={phoneMenu}
+        portionGroups={groupedMenu?portionGroups:undefined} catalogProducts={allProducts} compactGroups={phoneMenu}
         refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
         pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
         ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
@@ -1440,7 +1441,7 @@ export default function MenuScreen() {
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={retailBrowse?null:pairing}
-                                    portionGroups={pickupCheck.features?.contextualStorefrontV2?portionGroups:undefined}
+                                    portionGroups={groupedMenu?portionGroups:undefined}
                                     catalogProducts={allProducts} compactGroups={phoneMenu}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
@@ -1570,7 +1571,7 @@ export default function MenuScreen() {
                 </div>
 
                 {!phoneMenu && pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
-                    <NewBranchItems branch={branch} products={allProducts} portionGroups={portionGroups} onSelect={product => {
+                    <NewBranchItems branch={branch} products={allProducts} portionGroups={groupedMenu?portionGroups:undefined} onSelect={product => {
                         setSearch("");
                         setSelectedCategoryId(product.categoryId);
                         if(phoneMenu){setMobileCategories([product.categoryId]);setMaximumPrice(null);setPortionsOnly(false);}

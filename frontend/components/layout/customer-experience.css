@@ -55,3 +55,21 @@
 @media(prefers-reduced-motion:reduce){
 .future-storefront[data-customer-design=reference] *,.future-storefront[data-customer-design=reference] *::before,.future-storefront[data-customer-design=reference] *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+.future-storefront[data-customer-design=reference] .product-card-image>.product-image-fallback::before{content:none}
+
+/* The desktop menu identity is a compact introduction, not a second landing hero. */
+.future-storefront[data-customer-design=reference] .menu-order-header{display:block;padding:0;margin:12px 0;background:linear-gradient(110deg,#fff4e9,#f7f1ff);border:1px solid var(--customer-line)}
+.future-storefront[data-customer-design=reference] .menu-order-header .gokul-branch-intro{grid-row:auto;padding:14px 20px}
+.future-storefront[data-customer-design=reference] .menu-order-header .gokul-branch-intro>p:not(.gokul-overline){display:none}
+.future-storefront[data-customer-design=reference] .menu-order-header .gokul-branch-meta{margin-top:4px;font-size:.875rem}
+.future-storefront[data-customer-design=reference] .menu-order-header .gokul-branch-menu-cta{display:none}
+.future-storefront[data-customer-design=reference] .menu-order-header .gokul-branch-tabs{padding:0 16px;gap:24px;border-top:1px solid #e9e2eb}
+.future-storefront[data-customer-design=reference] .menu-order-header .gokul-branch-tabs :is(a,button){min-height:44px}
+.future-storefront[data-customer-design=reference] .gokul-editorial-menu>header{margin:0;padding:0}
+@media(min-width:1024px){
+.future-storefront[data-customer-design=reference] .gokul-editorial-menu:has(>[aria-label="Branch menu highlights"]){display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);column-gap:20px;align-items:start}
+.future-storefront[data-customer-design=reference] .gokul-editorial-menu:has(>[aria-label="Branch menu highlights"])>*{grid-column:1/-1;min-width:0}
+.future-storefront[data-customer-design=reference] .gokul-editorial-menu:has(>[aria-label="Branch menu highlights"])>[data-menu-toolbar]{grid-column:1}
+.future-storefront[data-customer-design=reference] .gokul-editorial-menu>[aria-label="Branch menu highlights"]{grid-column:2}
+}

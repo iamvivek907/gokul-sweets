@@ -52,17 +52,16 @@ export default function OccasionsPage() {
     const [notes, setNotes] = useState("");
     const [busy, setBusy] = useState(false);
     const [message, setMessage] = useState("");
-    const [catalogueError,setCatalogueError]=useState(false),[catalogueRetry,setCatalogueRetry]=useState(0);
+    const [catalogueError,setCatalogueError]=useState<{branchId:number;retry:number}|null>(null),[catalogueRetry,setCatalogueRetry]=useState(0);
 
     useEffect(()=>{const query=new URLSearchParams(window.location.search);if(query.has("enquiry")||window.location.hash.startsWith("#occasion-")&&window.location.hash!=="#occasion-plan"){if(!query.has("enquiry"))query.set("enquiry",window.location.hash.slice(10));router.replace(`/occasions/requests?${query}`);}},[router]);
 
     useEffect(() => {
         if (!branch || !features?.occasionEnquiries) return;
         const controller = new AbortController();
-        setCatalogueError(false);
         apiClient<OccasionCatalogue>(`/api/branches/${branch.id}/occasion-catalogue`, {signal: AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])}).then(catalogue => {
-            if (!controller.signal.aborted) {setCatalogueBranchId(branch.id);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setGroups([]);}
-        }).catch(() => {if (!controller.signal.aborted) setCatalogueError(true);});
+            if (!controller.signal.aborted) {setCatalogueError(null);setCatalogueBranchId(branch.id);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setGroups([]);}
+        }).catch(() => {if (!controller.signal.aborted) setCatalogueError({branchId:branch.id,retry:catalogueRetry});});
         return () => controller.abort();
     }, [branch, features?.occasionEnquiries,catalogueRetry]);
 
@@ -118,7 +117,7 @@ export default function OccasionsPage() {
                 {!branch ? <p className="mt-8 rounded-xl bg-white p-6">Choose a branch first. <Link href="/branches" className="underline">Explore branches</Link>.</p> : <>
                     <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline"><T text="Change branch" /></Link></p>
                     <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel key={sessionVersion} mode="occasion" onSessionChange={setSession} /></div>
-                    {catalogueBranchId!==branch.id?(catalogueError?<div role="alert" className="occasion-catalogue-error"><p><T text="The occasion collection could not load. Please try again."/></p><button type="button" onClick={()=>setCatalogueRetry(n=>n+1)}><T text="Retry occasion collection"/></button></div>:<BrandLoading compact label="Loading this branch’s occasion collection…" />):<form id="occasion-plan" onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
+                    {catalogueBranchId!==branch.id?(catalogueError?.branchId===branch.id&&catalogueError.retry===catalogueRetry?<div role="alert" className="occasion-catalogue-error"><p><T text="The occasion collection could not load. Please try again."/></p><button type="button" onClick={()=>setCatalogueRetry(n=>n+1)}><T text="Retry occasion collection"/></button></div>:<BrandLoading compact label="Loading this branch’s occasion collection…" />):<form id="occasion-plan" onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
                         <nav className="occasion-stages" aria-label="Celebration planning steps"><a href="#plan-date"><T text="1 · Plan"/></a><a href="#plan-food"><T text="2 · Food"/></a><a href="#plan-packing"><T text="3 · Packing"/></a><a href="#plan-review"><T text="4 · Review"/></a></nav>
                         <div className="occasion-selection-dock" aria-label="Current celebration estimate"><span>{chosen.length} <T text="items"/> · <strong>{money(foodEstimate+packingEstimate)}</strong> <small><T text={incompletePrice?"Partial estimate":"Indicative total"}/></small></span><a href="#plan-review"><T text="Review selection →"/></a></div>
                         <section id="plan-date" className="occasion-stage"><h2 className="text-xl font-bold"><T text="01 · Plan your celebration"/></h2><p className="text-sm">Choose bulk quantities and optional packing groups. Our branch reviews production, box fit and pricing before you pay.</p>
