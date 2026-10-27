@@ -1,4 +1,5 @@
 export const hindi: Record<string,string> = {
+ "Standard pickup is unavailable for the checked dates. Check other pickup options or call the branch; the shop may still be open.":"जाँची गई तारीखों पर सामान्य पिकअप उपलब्ध नहीं है। अन्य पिकअप विकल्प देखें या शाखा को कॉल करें; दुकान खुली हो सकती है।",
  "From our customers":"हमारे ग्राहकों की राय",
  "What guests are saying":"ग्राहक क्या कह रहे हैं",
  "Loading customer reviews…":"ग्राहकों की राय खुल रही है…",

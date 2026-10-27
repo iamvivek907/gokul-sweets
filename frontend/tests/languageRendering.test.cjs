@@ -62,3 +62,9 @@ test('review controls, dynamic feelings, validation and product details have Hin
   assert.notEqual(translate(text,'hi'),text,text);assert.match(translate(text,'hi'),/[\u0900-\u097F]/);assert.equal(translate(text,'en'),text);
  }
 });
+
+
+test('no-standard-pickup guidance translates without claiming priority is unavailable',()=>{
+ const text="Standard pickup is unavailable for the checked dates. Check other pickup options or call the branch; the shop may still be open.";
+ assert.equal(translate(text,'en'),text);assert.notEqual(translate(text,'hi'),text);assert.match(translate(text,'hi'),/सामान्य पिकअप/);
+});

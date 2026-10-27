@@ -6,7 +6,7 @@ import {useCallback, useEffect, useRef} from "react";
 import {useReportWebVitals} from "next/web-vitals";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {API_BASE_URL} from "@/lib/constants";
-import {safeVital, type VitalPayload} from "@/lib/vitals";
+import {cartHasIncreased, safeVital, type VitalPayload} from "@/lib/vitals";
 
 export default function StorefrontVitals() {
     const path=usePathname();
@@ -54,11 +54,14 @@ export default function StorefrontVitals() {
         if(path.startsWith("/checkout"))funnel("FUNNEL_CHECKOUT");
     },[path,enabled,funnel]);
     useEffect(()=>{
-        let previous=parseCart(getCartSnapshot()).items.reduce((sum,item)=>sum+item.quantity,0);
+        if(enabled!==true||!state.current.sample)return;
+        const read=()=>{try{return parseCart(getCartSnapshot());}catch{return null;}};
+        let previous=read();
+        if(!previous)return;
         return subscribeToCart(()=>{
-            const count=parseCart(getCartSnapshot()).items.reduce((sum,item)=>sum+item.quantity,0);
-            if(enabled===true&&location.pathname==="/menu"&&count>previous)funnel("FUNNEL_ADD");
-            previous=count;
+            const current=read();
+            if(current&&previous&&location.pathname==="/menu"&&cartHasIncreased(previous,current))funnel("FUNNEL_ADD");
+            previous=current;
         });
     },[enabled,funnel]);
     useEffect(()=>{
