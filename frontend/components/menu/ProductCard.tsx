@@ -3,7 +3,7 @@ import {requestMenuPickup} from "@/lib/menuPickupRecovery";
 import {T,useTranslation} from "@/lib/language";
 import ProductDetailsSheet from "./ProductDetailsSheet";
 import FoodPlaceholder from "./FoodPlaceholder";
-import {menuMoney,menuDescription} from "@/lib/menuPresentationDetails";
+import {menuMoney,menuDescription,comparisonPrice} from "@/lib/menuPresentationDetails";
 
 import Image from "next/image";
 import DietaryLabel from "./DietaryLabel";
@@ -93,6 +93,7 @@ export default function ProductCard({
 }: ProductCardProps) {
     const t=useTranslation();
     const [showDetails,setShowDetails]=useState(false);
+    const previous=comparisonPrice(product);
     const description=refined?menuDescription(product):product.description;
     const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
@@ -419,8 +420,8 @@ export default function ProductCard({
                         sm:text-base
                     ">
                         {(priceFrom||premium&&isWeighted)&&<><T text="From"/> </>}
-                        {(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price&&<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{formatCurrency(premium&&isWeighted?product.comparisonPrice*(product.minimumWeightGrams??250)/1000:product.comparisonPrice,true,true)}</s><span className="sr-only"> <T text="Selling price"/> </span></>}
-                        <span className={(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price?"menu-sale-price":undefined}>{formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}</span>
+                        {(premium||refined)&&!priceFrom&&previous!==null&&<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{formatCurrency(premium&&isWeighted?previous*(product.minimumWeightGrams??250)/1000:previous,true,true)}</s><span className="sr-only"> <T text="Selling price"/> </span></>}
+                        <span className={(premium||refined)&&!priceFrom&&previous!==null?"menu-sale-price":undefined}>{formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}</span>
                         {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
 
                         {
