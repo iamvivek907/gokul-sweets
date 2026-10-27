@@ -36,6 +36,8 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
  if(width<=640){
   await page.locator('.gokul-mobile-launch[open]').waitFor();
   const logo=page.locator('.gokul-mobile-launch .brand-loading-wordmark');
+  assert.equal(await page.locator('.gokul-launch-food svg').count(),3,'launch cycles through food illustrations');
+  if(width===640)assert.equal(await page.locator('.launch-sweet').evaluate(n=>getComputedStyle(n).animationName),'none','reduced motion keeps a static illustration');
   assert.equal(await logo.evaluate(n=>getComputedStyle(n).color),'rgb(152, 12, 49)');
   if(width===640)assert.equal(await logo.locator('strong').evaluate(n=>getComputedStyle(n).animationName),'none');
  }
