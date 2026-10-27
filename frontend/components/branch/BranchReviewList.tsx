@@ -15,9 +15,10 @@ export default function BranchReviewList({branchId}:{branchId:number}) {
    .finally(()=>{if(!controller.signal.aborted)setBusy(false);});
   return()=>controller.abort();
  },[branchId,before,retry]);
+ const nextBefore=page?.nextBefore ?? null;
  return <section className={styles.reviews} aria-label="Customer reviews"><p className="gokul-overline">From our customers</p><h2>What guests are saying</h2>
  {busy?<p role="status">Loading customer reviews…</p>:error?<div role="alert"><p>Reviews could not be loaded.</p><button type="button" onClick={()=>setRetry(n=>n+1)}>Try again</button></div>:<>
  {page?.reviews.length ? <div>{page.reviews.map((review,index)=><figure key={index}><div aria-label={`${review.overallRating} out of 5 stars`}>{"★".repeat(review.overallRating)}{"☆".repeat(5-review.overallRating)}</div><blockquote>{review.comment}</blockquote><figcaption>{review.displayName} · Completed order</figcaption></figure>)}</div>:<p>{before===null&&!page?.nextBefore?"No published comments yet.":"No comments to show on this page."}</p>}
- <nav aria-label="Customer review pages">{before!==null&&<button type="button" onClick={()=>setBefore(null)}>Latest reviews</button>}{page?.nextBefore!=null&&<button type="button" onClick={()=>setBefore(page.nextBefore)}>More reviews</button>}</nav></>}
+ <nav aria-label="Customer review pages">{before!==null&&<button type="button" onClick={()=>setBefore(null)}>Latest reviews</button>}{nextBefore!==null&&<button type="button" onClick={()=>setBefore(nextBefore)}>More reviews</button>}</nav></>}
  </section>;
 }

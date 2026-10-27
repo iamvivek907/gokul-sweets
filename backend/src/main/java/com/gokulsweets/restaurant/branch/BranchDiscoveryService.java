@@ -81,7 +81,7 @@ public class BranchDiscoveryService {
     public record PublicReviewPage(List<PublicReview> reviews, Long nextBefore) {}
     private record ReviewRow(long id, String comment, int rating, boolean showName, String customerName) {}
 
-    /** Read at most 21 indexed rows per request, even when comments are filtered out. */
+    /** Fetch at most 21 matching rows per request; contact filtering occurs after the query. */
     @Transactional(readOnly = true)
     public PublicReviewPage reviews(long branchId, Long before) {
         if (before != null && before <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid review cursor.");

@@ -18,8 +18,8 @@ export default function ReturnReviewPrompt() {
     useEffect(() => {
         let hiddenAt = 0;
         const resume = () => {
-            if (document.visibilityState === "hidden") {hiddenAt = Date.now(); setOrder(null);}
-            else if (hiddenAt && Date.now() - hiddenAt > 60000) {hiddenAt = 0; setRevision(n => n + 1);}
+            if (document.visibilityState === "hidden") {hiddenAt = Date.now();}
+            else if (hiddenAt && Date.now() - hiddenAt > 60000) {hiddenAt = 0; setOrder(null); setRevision(n => n + 1);}
         };
         document.addEventListener("visibilitychange", resume);
         return () => document.removeEventListener("visibilitychange", resume);

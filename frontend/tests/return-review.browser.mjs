@@ -53,6 +53,9 @@ try {
   assert.equal(t.writes[0].body.showCustomerName,true);assert.equal(t.writes[0].number,'LATEST');assert.equal(t.writes[0].body.comment,'Price felt too high. Please improve the value');
   t.allowSave();await sheet.getByRole('button',{name:'Submit Review'}).click();await sheet.getByText('Thank you for your valuable feedback!').waitFor();
   assert.equal(t.writes[1].body.overallRating,1);assert.equal(new URL(t.page.url()).pathname,'/');
+  await sheet.getByRole('button',{name:'Edit my feedback'}).click();
+  await stars.getByRole('button',{name:'2 stars',exact:true}).click();
+  assert.equal(await sheet.getByLabel('Tell us more (optional)').inputValue(),'Price felt too high. Please improve the value');
   assert.equal(t.historyCalls[0].limit,'1');assert.equal(t.historyCalls[0].status,'COMPLETED');assert.ok(t.reviewReads.every(n=>n==='LATEST'));
   assert.equal(await t.page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
   await sheet.getByRole('button',{name:'Close review'}).click();await sheet.waitFor({state:'hidden'});await t.context.close();

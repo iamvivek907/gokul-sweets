@@ -45,6 +45,8 @@ export default function OrderReviewCard({ orderNumber, prompt = false }: {
         return; setSaving(true); setSaved(false); setError(null); try {
         const review = await saveReview(orderNumber, { overallRating, comment: combinedComment || null, showCustomerName, itemRatings: Object.entries(itemRatings).map(([productId, rating]) => ({ productId: Number(productId), rating })) });
         setContext(current => current ? { ...current, review } : current);
+        setComment(review.comment ?? "");
+        setSuggestions([]);
         setSaved(true);
         setEditing(false);
         window.dispatchEvent(new CustomEvent("gokul-order-review-updated", { detail: { orderNumber, rating: review.overallRating } }));
