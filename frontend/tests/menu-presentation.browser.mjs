@@ -33,6 +33,11 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
  await page.goto(`${base}/menu`);await page.locator('#gokul-product-1').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const card=page.getByRole('region',{name:'Menu pickup time',exact:true});
  await card.waitFor();
+ if(enabled){
+  assert.equal(await page.locator('#gokul-product-1 .menu-comparison-price').innerText(),'₹30');
+  assert.equal(await page.locator('#gokul-product-1 .menu-sale-price').innerText(),width<=640?'₹15':'₹15.00');
+  assert.equal(await page.locator('#gokul-product-2 .menu-comparison-price').count(),0);
+ }
  if(enabled&&width<=640){
   assert.equal(await page.locator('#gokul-product-1 .menu-comparison-price').innerText(),'₹30');
   assert.equal(await page.locator('#gokul-product-1 .menu-sale-price').innerText(),'₹15');

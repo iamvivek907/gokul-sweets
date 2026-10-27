@@ -410,8 +410,8 @@ export default function ProductCard({
                         sm:text-base
                     ">
                         {premium&&(isWeighted||priceFrom)&&<><T text="From"/> </>}
-                        {premium&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price&&<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{formatCurrency(isWeighted?product.comparisonPrice*(product.minimumWeightGrams??250)/1000:product.comparisonPrice,true,true)}</s><span className="sr-only"> <T text="Selling price"/> </span></>}
-                        <span className={premium&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price?"menu-sale-price":undefined}>{formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}</span>
+                        {(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price&&<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{formatCurrency(premium&&isWeighted?product.comparisonPrice*(product.minimumWeightGrams??250)/1000:product.comparisonPrice,true,true)}</s><span className="sr-only"> <T text="Selling price"/> </span></>}
+                        <span className={(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price?"menu-sale-price":undefined}>{formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}</span>
                         {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
 
                         {
