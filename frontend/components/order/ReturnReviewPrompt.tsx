@@ -10,7 +10,8 @@ import styles from "./ReturnReviewPrompt.module.css";
 /** A single latest completed order is considered per opening or long resume. */
 export default function ReturnReviewPrompt() {
     const path = usePathname();
-    const pathRef = useRef(path); pathRef.current = path;
+    const pathRef = useRef(path);
+    useEffect(() => {pathRef.current = path;}, [path]);
     const dialog = useRef<HTMLDialogElement>(null);
     const [order, setOrder] = useState<{orderNumber:string;branchName:string}|null>(null);
     const [revision, setRevision] = useState(0);
@@ -57,7 +58,12 @@ export default function ReturnReviewPrompt() {
         else if (!order && surface.open) surface.close();
         return () => {if (surface.open) surface.close();};
     }, [order]);
-    useEffect(() => {if (!/^\/(?:|branches(?:\/.*)?|menu)$/.test(path)) setOrder(null);}, [path]);
+    useEffect(() => {
+        if (/^\/(?:|branches(?:\/.*)?|menu)$/.test(path)) return;
+        let active = true;
+        void Promise.resolve().then(() => {if (active) setOrder(null);});
+        return () => {active = false;};
+    }, [path]);
     return <dialog ref={dialog} className={styles.dialog} aria-label="Rate your last order" onCancel={() => setOrder(null)}>
         {order && <div className={styles.content}>
             <button className={styles.close} type="button" onClick={() => setOrder(null)} aria-label="Close review">×</button>

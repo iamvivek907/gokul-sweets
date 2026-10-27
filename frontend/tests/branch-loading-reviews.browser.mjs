@@ -5,12 +5,12 @@ const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BA
 const branch={id:1,name:'Test branch',active:true,operational:true,pickupAvailable:true,address:'Test road'};
 try {for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
- let release;const gate=new Promise(resolve=>release=resolve);let fail=true,reads=0;
+ let release;const gate=new Promise(resolve=>release=resolve);let fail=true;
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true'};
  await context.route('**/api/**',async route=>{
   const path=new URL(route.request().url()).pathname;let json=[];
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,preHomeIntentGateway:true,branchExperience:true};
-  else if(path==='/api/branches') {reads++;if(fail)await gate;if(fail)return route.fulfill({status:503,headers,json:{message:'unavailable'}});json=[branch];}
+  else if(path==='/api/branches') {if(fail)await gate;if(fail)return route.fulfill({status:503,headers,json:{message:'unavailable'}});json=[branch];}
   else if(path==='/api/branches/1')json=branch;
   else if(path==='/api/branches/1/discovery')json={offerings:[],overallExperience:{average:4,count:1},topRatedItems:[]};
   else if(path==='/api/branches/1/discovery/reviews')json=new URL(route.request().url()).searchParams.has('before')

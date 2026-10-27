@@ -77,59 +77,79 @@ public class BranchDiscoveryService {
             Rating overallExperience,
             List<RatedItem> topRatedItems) {}
 
+    /** A public review with an optional customer display name. */
     public record PublicReview(String comment, int overallRating, String displayName) {}
 
+    /** A bounded page of public reviews and its next cursor. */
     public record PublicReviewPage(List<PublicReview> reviews, Long nextBefore) {}
 
+    /** Internal row used to filter a bounded review page. */
     private record ReviewRow(
             long id, String comment, int rating, boolean showName, String customerName) {}
 
     /** Fetch at most 21 matching rows per request; contact filtering occurs after the query. */
     @Transactional(readOnly = true)
     public PublicReviewPage reviews(long branchId, Long before) {
-        if (before != null && before <= 0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid review cursor.");
-        if (branches.findByIdAndActiveTrue(branchId).isEmpty())
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found.");
-        var rows =
-                jdbc.query(
-                        """
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BranchDiscoveryService.class, "reviews(long,Long)");
+        try {
+            if (before != null && before <= 0)
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid review cursor.");
+            if (branches.findByIdAndActiveTrue(branchId).isEmpty())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found.");
+            var rows =
+                    jdbc.query(
+                            """
 SELECT r.id,r.comment,r.overall_rating,r.show_customer_name,o.customer_name
 FROM reviews r JOIN orders o ON o.id=r.order_id
 WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND r.id < ?
 AND o.order_status IN ('PICKED_UP','DELIVERED') AND r.comment IS NOT NULL
 ORDER BY r.id DESC LIMIT 21
 """,
-                        (rs, n) ->
-                                new ReviewRow(
-                                        rs.getLong(1),
-                                        rs.getString(2),
-                                        rs.getInt(3),
-                                        rs.getBoolean(4),
-                                        rs.getString(5)),
-                        branchId,
-                        before == null ? Long.MAX_VALUE : before);
-        var scanned = rows.stream().limit(20).toList();
-        var visible =
-                scanned.stream()
-                        .filter(r -> publicComment(r.comment()) != null)
-                        .map(
-                                r ->
-                                        new PublicReview(
-                                                publicComment(r.comment()),
-                                                r.rating(),
-                                                publicName(r.showName(), r.customerName())))
-                        .toList();
-        return new PublicReviewPage(visible, rows.size() > 20 ? scanned.getLast().id() : null);
+                            (rs, n) ->
+                                    new ReviewRow(
+                                            rs.getLong(1),
+                                            rs.getString(2),
+                                            rs.getInt(3),
+                                            rs.getBoolean(4),
+                                            rs.getString(5)),
+                            branchId,
+                            before == null ? Long.MAX_VALUE : before);
+            var scanned = rows.stream().limit(20).toList();
+            var visible =
+                    scanned.stream()
+                            .filter(r -> publicComment(r.comment()) != null)
+                            .map(
+                                    r ->
+                                            new PublicReview(
+                                                    publicComment(r.comment()),
+                                                    r.rating(),
+                                                    publicName(r.showName(), r.customerName())))
+                            .toList();
+            return new PublicReviewPage(visible, rows.size() > 20 ? scanned.getLast().id() : null);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos, BranchDiscoveryService.class, "reviews(long,Long)");
+        }
     }
 
+    /** Returns a safe first name only when the customer opted in. */
     static String publicName(boolean optedIn, String customerName) {
-        if (!optedIn || customerName == null) return "Customer";
-        String[] parts = customerName.trim().split("\\s+");
-        String first = parts[0];
-        return first.length() <= 40 && first.matches("[\\p{L}\\p{M}]+(?:['’-][\\p{L}\\p{M}]+)*")
-                ? first
-                : "Customer";
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BranchDiscoveryService.class, "publicName(boolean,String)");
+        try {
+            if (!optedIn || customerName == null) return "Customer";
+            String[] parts = customerName.trim().split("\\s+");
+            String first = parts[0];
+            return first.length() <= 40 && first.matches("[\\p{L}\\p{M}]+(?:['’-][\\p{L}\\p{M}]+)*")
+                    ? first
+                    : "Customer";
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BranchDiscoveryService.class,
+                    "publicName(boolean,String)");
+        }
     }
 
     private static final Pattern PRIVATE_CONTACT =
@@ -147,7 +167,7 @@ ORDER BY r.id DESC LIMIT 21
         try {
             if (comment == null) return null;
             String clean = comment.replaceAll("\\s+", " ").trim();
-            return clean.length() < 20 || PRIVATE_CONTACT.matcher(clean).find() ? null : clean;
+            return clean.length() < 8 || PRIVATE_CONTACT.matcher(clean).find() ? null : clean;
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

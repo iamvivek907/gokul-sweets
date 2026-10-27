@@ -275,7 +275,7 @@ class BranchDiscoveryIntegrationTest {
                 "PUBLISHED",
                 "Write to test@example.com about this order",
                 "PICKED_UP");
-        review(b, s, p, 2, 2, "PUBLISHED", "Too short", "PICKED_UP");
+        review(b, s, p, 2, 2, "PUBLISHED", "Nice", "PICKED_UP");
         var comments = discovery.reviews(b, null).reviews();
         assertThat(comments).hasSize(7);
         assertThat(comments)
@@ -321,6 +321,7 @@ class BranchDiscoveryIntegrationTest {
     @Test
     void shortOrContactBearingCommentsAreNotPublishedAsQuotes() {
         assertThat(BranchDiscoveryService.publicComment("Nice")).isNull();
+        assertThat(BranchDiscoveryService.publicComment("Quick pickup")).isEqualTo("Quick pickup");
         assertThat(
                         BranchDiscoveryService.publicComment(
                                 "Contact me at name@example.com for more information"))

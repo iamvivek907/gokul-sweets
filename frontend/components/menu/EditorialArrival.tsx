@@ -37,7 +37,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
 
     useEffect(() => {
         const controller = new AbortController();
-        setBranchState("loading");
+        void Promise.resolve().then(() => { if (!controller.signal.aborted) setBranchState("loading"); });
         getActiveBranches(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(list => {
             if (controller.signal.aborted) return;
             const active = list.filter(item => item.active !== false);
