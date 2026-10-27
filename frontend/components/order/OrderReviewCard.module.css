@@ -5,3 +5,9 @@
 .suggestions button[aria-pressed=true]{background:#8f1838;color:#fff;border-color:#8f1838}.suggestions button:focus-visible{outline:3px solid #a75676;outline-offset:2px}
 
 .nameChoice{display:flex!important;align-items:center;gap:10px;margin:14px 0;line-height:1.5}.nameChoice input{width:20px;height:20px;flex:none;accent-color:#8f1838}
+
+/* Keep rating controls usable with enlarged text and narrow displays. */
+.stars{flex-wrap:wrap}
+.review summary{min-height:44px;padding:10px 0;line-height:1.5}
+.review summary:focus-visible,.review textarea:focus-visible,.review input:focus-visible,.review .primary:focus-visible,.secondary:focus-visible{outline:3px solid #8f1838;outline-offset:3px}
+@media (max-width:360px){.review{padding:16px}.stars{gap:0}.review .star{min-width:44px}}

@@ -178,7 +178,7 @@ export default function ProductCard({
                             />
                         )
                         : (
-                            <div className="product-image-fallback
+                            <div aria-hidden="true" className="product-image-fallback
                                 flex
                                 h-full
                                 items-center
@@ -379,7 +379,7 @@ export default function ProductCard({
                                         </span>
 
                                         <span>
-                                            <T text="New · No ratings yet" /></span>
+                                            <T text="No ratings yet" /></span>
                                     </div>
                                 )
                     }

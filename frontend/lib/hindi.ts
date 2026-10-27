@@ -959,7 +959,7 @@ export const hindi: Record<string,string> = {
   "Review these items for your pickup": "पिकअप के लिए इन वस्तुओं को जाँचें",
   "Edit quantities or remove items below, or keep your cart and find another pickup.": "नीचे मात्रा बदलें या वस्तुएँ हटाएँ, या कार्ट रखकर दूसरा पिकअप चुनें।",
   "Find a time for all items": "सभी वस्तुओं के लिए समय ढूँढें",
-  "New · No ratings yet": "नया · अभी कोई रेटिंग नहीं",
+  "No ratings yet": "अभी कोई रेटिंग नहीं",
   "/kg": "/किलो",
   "From": "से",
   "for": "के लिए",
