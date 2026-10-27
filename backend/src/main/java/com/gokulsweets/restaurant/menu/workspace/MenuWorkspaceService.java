@@ -85,7 +85,10 @@ public class MenuWorkspaceService {
             @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal comparisonPrice,
             Boolean clearComparisonPrice) {
         public BranchEdit(
-                Long version, Boolean available, BigDecimal priceOverride, Boolean clearPriceOverride) {
+                Long version,
+                Boolean available,
+                BigDecimal priceOverride,
+                Boolean clearPriceOverride) {
             this(version, available, priceOverride, clearPriceOverride, null, false);
         }
     }
@@ -266,7 +269,8 @@ public class MenuWorkspaceService {
                                 + " \"categoryId\",c.name AS \"categoryName\",p.base_price AS"
                                 + " \"basePrice\",bp.price_override AS"
                                 + " \"priceOverride\",COALESCE(bp.price_override,p.base_price) AS"
-                                + " \"effectivePrice\",bp.comparison_price AS \"comparisonPrice\",bp.available,p.active,p.vegetarian,p.sale_mode"
+                                + " \"effectivePrice\",bp.comparison_price AS"
+                                + " \"comparisonPrice\",bp.available,p.active,p.vegetarian,p.sale_mode"
                                 + " AS \"saleMode\",p.minimum_weight_grams AS"
                                 + " \"minimumWeightGrams\",p.weight_step_grams AS"
                                 + " \"weightStepGrams\",p.tax_category_id AS"
@@ -606,8 +610,10 @@ public class MenuWorkspaceService {
             }
             jdbc.update(
                     "UPDATE branch_products SET available=COALESCE(?,available),price_override=CASE"
-                        + " WHEN ? THEN NULL ELSE COALESCE(?,price_override) END,comparison_price=CASE WHEN ? THEN NULL ELSE COALESCE(?,comparison_price) END,updated_at=now()"
-                        + " WHERE branch_id=? AND product_id=?",
+                        + " WHEN ? THEN NULL ELSE COALESCE(?,price_override)"
+                        + " END,comparison_price=CASE WHEN ? THEN NULL ELSE"
+                        + " COALESCE(?,comparison_price) END,updated_at=now() WHERE branch_id=? AND"
+                        + " product_id=?",
                     d.available(),
                     Boolean.TRUE.equals(d.clearPriceOverride()),
                     d.priceOverride(),

@@ -393,7 +393,8 @@ class MenuWorkspaceIntegrationTest {
                         0L, null, new BigDecimal("80"), false, new BigDecimal("120"), false));
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT comparison_price FROM branch_products WHERE branch_id=? AND product_id=?",
+                                "SELECT comparison_price FROM branch_products WHERE branch_id=? AND"
+                                    + " product_id=?",
                                 BigDecimal.class,
                                 b,
                                 id))
@@ -404,7 +405,12 @@ class MenuWorkspaceIntegrationTest {
                                         b,
                                         id,
                                         new MenuWorkspaceService.BranchEdit(
-                                                1L, null, null, false, new BigDecimal("80"), false)))
+                                                1L,
+                                                null,
+                                                null,
+                                                false,
+                                                new BigDecimal("80"),
+                                                false)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(
                         () ->
@@ -418,7 +424,8 @@ class MenuWorkspaceIntegrationTest {
                 b, id, new MenuWorkspaceService.BranchEdit(1L, null, null, false, null, true));
         assertThat(
                         jdbc.queryForObject(
-                                "SELECT comparison_price FROM branch_products WHERE branch_id=? AND product_id=?",
+                                "SELECT comparison_price FROM branch_products WHERE branch_id=? AND"
+                                    + " product_id=?",
                                 BigDecimal.class,
                                 b,
                                 id))
