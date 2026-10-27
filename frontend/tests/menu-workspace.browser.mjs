@@ -20,7 +20,7 @@ try {
     });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
-    let imageCalls = 0;
+    let imageCalls = 0, capacityCalls=0, capacityState="empty";
     let hours={enabled:true,revision:0,item:{branchProductId:1,startsAt:"08:00:00",endsAt:"09:30:00",weekdays:31,soldOut:true,requiresBranchProductId:2}};
     let deleteCalls = 0, deleted = false;
     let paginationDeletion = false, deletedLast = false;
@@ -111,6 +111,11 @@ try {
       };
       if (req.method() === "OPTIONS")
         return route.fulfill({ status: 204, headers });
+      if(path.endsWith("/pickup-discovery")){
+        capacityCalls++;assert.equal(req.method(),"GET");assert.equal(url.searchParams.get("days"),"8");
+        if(capacityState==="error")return route.fulfill({status:503,headers,json:{message:"Unavailable"}});
+        return route.fulfill({headers,json:{dates:[{slots:capacityState==="ready"?[{normalAvailable:true}]:[]}]}});
+      }
       if (path === "/api/admin/categories" && req.method() === "POST") {
         const input = req.postDataJSON();
         assert.equal(input.code, "NEW_CATEGORY");
@@ -284,6 +289,13 @@ try {
       path: `${shots}/overview-${width}.png`,
       fullPage: true,
     });
+    assert.equal(capacityCalls,0,"readiness does not poll or add a background request");
+    const readiness=page.locator("details").filter({has:page.getByText("Can customers order from this branch?",{exact:true})});
+    await readiness.locator("summary").click();await readiness.getByRole("button",{name:"Check pickup capacity",exact:true}).click();
+    await readiness.getByRole("status").filter({hasText:"No standard pickup capacity"}).waitFor();
+    capacityState="error";await readiness.getByRole("button",{name:"Check pickup capacity",exact:true}).click();await readiness.getByRole("status").filter({hasText:"could not be checked"}).waitFor();
+    capacityState="ready";await readiness.getByRole("button",{name:"Check pickup capacity",exact:true}).click();await readiness.getByRole("status").filter({hasText:"Standard pickup capacity was found"}).waitFor();assert.equal(capacityCalls,3);
+    await readiness.locator("summary").click();
     const first = page.locator("article").filter({
       has: page.getByRole("heading", { name: "Kaju Katli", exact: true }),
     });

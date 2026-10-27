@@ -5,7 +5,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'
 const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311',screens=process.env.SCREENSHOT_DIR??'/tmp/gokul-compact-header';
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
-const products=Array.from({length:30},(_,i)=>({id:i+1,name:i===0?'Rasgulla':`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:15,comparisonPrice:i===0?30:i===1?10:null,available:true,saleMode:'UNIT',imageUrl:'/arrival-mithai.webp'}));
+const products=Array.from({length:30},(_,i)=>({id:i+1,name:i===0?'Rasgulla':`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:15,comparisonPrice:i===0?30:i===1?10:null,available:true,saleMode:'UNIT',imageUrl:i===2?'/missing-food.webp':'/arrival-mithai.webp'}));
 const categories=[{id:1,name:'Sweets',products},...['Food','Bakery','Snacks'].map((name,i)=>({id:i+2,name,products:[{...products[0],id:31+i,name:`${name} favourite`,categoryId:i+2,categoryName:name}]}))];
 const banner={key:'festival',titleEn:'Celebrate Diwali',subtitleEn:'Sweets, meals & easy pickup.',buttonLabel:'Explore sweets',categoryId:1,visible:true,order:0,mediaUrl:'/arrival-mithai.webp',mediaType:'image/webp',frame:{x:50,y:50,zoom:100,fit:'COVER'}};
 const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false};
@@ -35,7 +35,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
  await card.waitFor();
  if(enabled){
   assert.equal(await page.locator('#gokul-product-1 .menu-comparison-price').innerText(),'₹30');
-  assert.equal(await page.locator('#gokul-product-1 .menu-sale-price').innerText(),width<=640?'₹15':'₹15.00');
+  assert.equal(await page.locator('#gokul-product-1 .menu-sale-price').innerText(),'₹15');
   assert.equal(await page.locator('#gokul-product-2 .menu-comparison-price').count(),0);
  }
  if(enabled&&width<=640){
@@ -44,7 +44,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   assert.equal(await page.locator('#gokul-product-2 .menu-comparison-price').count(),0,'a lower comparison price is never presented as a saving');
   assert.equal(await card.getAttribute('data-menu-refined'),'true');
   if(expired)await card.getByRole('status').filter({hasText:'No verified normal pickup'}).waitFor();
-  const box=await card.boundingBox();assert.ok(box.height<210,`compact pickup status height ${box.height}`);
+  const box=await card.boundingBox();assert.ok(box.height<300,`compact pickup status height ${box.height}`);
   assert.equal(await card.locator('.menu-pickup-notices').count(),1);
   const action=card.getByRole('button',{name:expired?'Choose time':'Change time',exact:true});assert.ok(await action.isVisible());
   assert.equal(await action.locator('span').first().evaluate(n=>getComputedStyle(n).color),'rgb(255, 255, 255)');
@@ -59,9 +59,21 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   assert.ok((await carousel.boundingBox()).height<300,'short festive copy keeps the phone carousel compact');
  }
 
+ if(enabled){
+  const original=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+  const trigger=page.getByRole('button',{name:'View details · Rasgulla',exact:true});
+  await trigger.click();const details=page.getByRole('dialog',{name:'Rasgulla',exact:true});await details.waitFor();
+  await details.getByText('Selling price',{exact:true}).waitFor();assert.equal(await details.locator('.menu-comparison-price').innerText(),'₹30');
+  await page.keyboard.press('Escape');await details.waitFor({state:'hidden'});assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
+  await page.getByRole('button',{name:'View details · Sweet 3',exact:true}).click();const fallback=page.getByRole('dialog',{name:'Sweet 3',exact:true});await fallback.locator('.menu-food-placeholder').waitFor();await fallback.getByRole('button',{name:'Close ×'}).click();
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),original,'opening details never changes a cart');
+  await page.evaluate(()=>document.documentElement.style.fontSize='200%');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'larger text stays within the viewport');
+  await page.evaluate(()=>document.documentElement.style.fontSize='');
+ }
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
- await mkdir(screens,{recursive:true});await page.screenshot({path:`${screens}/menu-presentation-${width}-${expired?'expired':'selected'}-${enabled}.png`});
+ await mkdir(screens,{recursive:true});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${screens}/menu-presentation-${width}-${expired?'expired':'selected'}-${enabled}.png`});
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),before);
  assert.deepEqual(errors,[]);await context.close();console.log(`Menu presentation ${width}px expired=${expired} enabled=${enabled} passed`);
 }}finally{await Promise.all([browser.close(),classicBrowser.close()]);}

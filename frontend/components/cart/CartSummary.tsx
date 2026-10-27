@@ -47,7 +47,7 @@ export default function CartSummary({
     return (
         <div
             className="
-                w-full
+                cart-estimate w-full
                 min-w-0
                 rounded-3xl
                 border

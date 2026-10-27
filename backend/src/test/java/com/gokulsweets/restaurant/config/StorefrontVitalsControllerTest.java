@@ -76,4 +76,28 @@ class StorefrontVitalsControllerTest {
                                 .value())
                 .isEqualTo(400);
     }
+
+    @Test
+    void funnelCountersRejectIdentifiersAndNonUnitValues() {
+        features.setAccessibleOrderingV2(true);
+        var names =
+                new String[] {
+                    "FUNNEL_MENU",
+                    "FUNNEL_ADD",
+                    "FUNNEL_CHECKOUT",
+                    "FUNNEL_PAYMENT",
+                    "FUNNEL_PAID",
+                    "FUNNEL_FAILED",
+                    "FUNNEL_EXPIRED"
+                };
+        for (var name : names) {
+            var accepted = new StorefrontVitalsController.Vital(name, 1, "measured", "checkout");
+            assertThat(controller.receive(accepted).getStatusCode().value()).isEqualTo(204);
+            var invalid = new StorefrontVitalsController.Vital(name, 2, "measured", "checkout");
+            assertThat(controller.receive(invalid).getStatusCode().value()).isEqualTo(400);
+        }
+        var privatePage =
+                new StorefrontVitalsController.Vital("FUNNEL_PAID", 1, "measured", "/orders/123");
+        assertThat(controller.receive(privatePage).getStatusCode().value()).isEqualTo(400);
+    }
 }

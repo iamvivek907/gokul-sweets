@@ -22,5 +22,5 @@ export default function MenuToolbar({enabled,children}:{enabled:boolean;children
   window.addEventListener('gokul-pickup-attention',show);window.addEventListener('scroll',clear,{passive:true,capture:true});window.addEventListener('wheel',clear,{passive:true});window.addEventListener('touchmove',clear,{passive:true});
   return()=>{window.removeEventListener('gokul-pickup-attention',show);window.removeEventListener('scroll',clear,true);window.removeEventListener('wheel',clear);window.removeEventListener('touchmove',clear);};
  },[enabled]);
- return <div ref={ref} className={enabled?'mobile-menu-sticky-tools':undefined} data-pickup-attention={enabled&&attention?'true':undefined}>{children}{enabled&&attention&&<p className="pickup-attention-message" role="status">Choose another pickup date or time for this item.</p>}</div>;
+ return <div ref={ref} data-menu-toolbar="true" className={enabled?'mobile-menu-sticky-tools':undefined} data-pickup-attention={enabled&&attention?'true':undefined}>{children}{enabled&&attention&&<p className="pickup-attention-message" role="status">Choose another pickup date or time for this item.</p>}</div>;
 }

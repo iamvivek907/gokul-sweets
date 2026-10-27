@@ -94,7 +94,7 @@ export default function CustomerAccountHub({session, onSessionChange, initialSec
     function showSection(section: AccountSection) {
         setActiveSection(section);
         setMessage("");
-        window.requestAnimationFrame(() => document.getElementById("account-content")?.scrollIntoView({block: "start", behavior: "smooth"}));
+        window.requestAnimationFrame(() => document.getElementById("account-content")?.scrollIntoView({block: "start", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"}));
     }
 
     async function saveDetails() {

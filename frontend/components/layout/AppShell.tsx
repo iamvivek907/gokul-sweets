@@ -42,6 +42,7 @@ import OrderingTour from "@/components/customer/OrderingTour";
 import {OPEN_ORDERING_TOUR, getWalkthroughSnapshot, stopWalkthrough} from "@/lib/orderingTour";
 import "./ordering-tour.css";
 import "./customer-journey-refinement.css";
+import "./customer-experience.css";
 
 
 interface AppShellProps {

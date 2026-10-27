@@ -56,3 +56,15 @@ test('customer recovery, checkout, filters and permission guidance translate wit
 test('review suggestion translations cover every rating sentiment',()=>{
  for(const text of ['Taste needs improvement','Price felt too high','Taste could be better','Taste was okay','Tasty food','Loved the taste','Wonderful service']){assert.notEqual(translate(text,'hi'),text);assert.equal(translate(text,'en'),text);}
 });
+
+test('review controls, dynamic feelings, validation and product details have Hindi copy',()=>{
+ for(const text of ['star','stars','out of 5 stars','Overall order rating','Dish rating','Choose your stars','Could be better','Fair','Good','Really enjoyed it','Loved it!','Feedback suggestions','Tell us more (optional)','Show my first name with my published review','Submit Review','Update Review','Saving…','Unable to load the review form. Please try again.','Your feedback could not be confirmed. Keep your choices and try again.','Close review','Maybe later','View details','Selling price','Minimum weight']){
+  assert.notEqual(translate(text,'hi'),text,text);assert.match(translate(text,'hi'),/[\u0900-\u097F]/);assert.equal(translate(text,'en'),text);
+ }
+});
+
+
+test('no-standard-pickup guidance translates without claiming priority is unavailable',()=>{
+ const text="Standard pickup is unavailable for the checked dates. Check other pickup options or call the branch; the shop may still be open.";
+ assert.equal(translate(text,'en'),text);assert.notEqual(translate(text,'hi'),text);assert.match(translate(text,'hi'),/सामान्य पिकअप/);
+});

@@ -649,7 +649,8 @@ export default function MenuScreen() {
 
 
     const phone=usePhoneViewport();
-    const phoneMenu=phone===true&&(mobileFeatures?.futuristicStorefrontV2===true||mobileFeatures?.checkoutExperienceV2===true)&&mobileFeatures?.contextualStorefrontV2===true;
+    const groupedMenu=mobileFeatures?.contextualStorefrontV2===true&&(mobileFeatures.futuristicStorefrontV2===true||mobileFeatures.checkoutExperienceV2===true);
+    const phoneMenu=phone===true&&groupedMenu;
     const [browseCategory,setBrowseCategory]=useState<{branchId:number;id:number}|null|undefined>(undefined);
     const initialCategoryId=browseCategory===undefined?(effectiveCategoryId??undefined):undefined;
     const activeBrowseId=phoneMenu?(browseCategory?.branchId===branch?.id?browseCategory?.id:initialCategoryId):undefined;
@@ -701,7 +702,7 @@ export default function MenuScreen() {
     },[branch,restoredBrowse]);
     const [portionSnapshot,setPortionSnapshot]=useState<{branchId:number;groups:PortionGroup[]}|null>(null);
     const portionGroups=useMemo(()=>portionSnapshot?.branchId===branch?.id?portionSnapshot?.groups??[]:[],[portionSnapshot,branch?.id]);
-    useEffect(()=>{if(!phoneMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[phoneMenu,branch]);
+    useEffect(()=>{if(!groupedMenu||!branch)return;const controller=new AbortController();void apiClient<{groups:PortionGroup[]}>(`/api/menu/portion-groups?branchId=${branch.id}`,{signal:controller.signal}).then(value=>{if(!controller.signal.aborted)setPortionSnapshot({branchId:branch.id,groups:value.groups??[]});}).catch(()=>{});return()=>controller.abort();},[groupedMenu,branch]);
     const filteredProducts =
         useMemo(
             () => {
@@ -785,7 +786,7 @@ export default function MenuScreen() {
     const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
     const guardedIncrease = (id:number) => {if(pickupAllows(id))increaseQuantity(id);};
     const pickupGrid = (products:MenuProduct[]) => <ProductGrid pairingSeed={pairingSeed} pairing={retailBrowse?null:pairing}
-        portionGroups={phoneMenu?portionGroups:undefined} catalogProducts={phoneMenu?allProducts:undefined}
+        portionGroups={groupedMenu?portionGroups:undefined} catalogProducts={allProducts} compactGroups={phoneMenu}
         refined={pickupCheck.features?.contextualStorefrontV2 === true} pickupItems={pickupCheck.items}
         pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage} dateAware={!!pickupCheck.features?.smartAvailability} products={products}
         ratingSummaries={ratingSummaries} ratingsLoading={ratingsLoading} quantities={productQuantities} weights={productWeights}
@@ -1192,18 +1193,8 @@ export default function MenuScreen() {
 
                     </div>}
 
-                {!phoneMenu && <BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
 
-                {!phoneMenu && pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
-                    <NewBranchItems branch={branch} products={allProducts} portionGroups={phoneMenu?portionGroups:undefined} onSelect={product => {
-                        setSearch("");
-                        setSelectedCategoryId(product.categoryId);
-                        if(phoneMenu){setMobileCategories([product.categoryId]);setMaximumPrice(null);setPortionsOnly(false);}
-                        const group=phoneMenu?portionGroups.find(g=>g.choices.some(c=>c.productId===product.id)):null;
-                        const target=group?.choices.find(c=>allProducts.some(p=>p.id===c.productId))?.productId??product.id;
-                        requestAnimationFrame(() =>
-                            document.getElementById(`gokul-product-${target}`)?.scrollIntoView({behavior: "smooth", block: "center"}));
-                    }} />}
+
 
                     {!pickupCheck.features?.contextualStorefrontV2 && !isLoading
                         &&
@@ -1308,6 +1299,7 @@ export default function MenuScreen() {
 
                 </div>
                 </MenuToolbar>
+                {!phoneMenu && <BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
 
 
                 {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
@@ -1449,8 +1441,8 @@ export default function MenuScreen() {
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
                                     pairing={retailBrowse?null:pairing}
-                                    portionGroups={phoneMenu?portionGroups:undefined}
-                                    catalogProducts={phoneMenu?allProducts:undefined}
+                                    portionGroups={groupedMenu?portionGroups:undefined}
+                                    catalogProducts={allProducts} compactGroups={phoneMenu}
                                     refined={pickupCheck.features?.contextualStorefrontV2 === true}
                                     pickupItems={pickupCheck.items}
                                     pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}
@@ -1577,6 +1569,17 @@ export default function MenuScreen() {
                         )}
 
                 </div>
+
+                {!phoneMenu && pickupCheck.features?.contextualStorefrontV2 && !isLoading && !error &&
+                    <NewBranchItems branch={branch} products={allProducts} portionGroups={groupedMenu?portionGroups:undefined} onSelect={product => {
+                        setSearch("");
+                        setSelectedCategoryId(product.categoryId);
+                        if(phoneMenu){setMobileCategories([product.categoryId]);setMaximumPrice(null);setPortionsOnly(false);}
+                        const group=portionGroups.find(g=>g.choices.some(c=>c.productId===product.id));
+                        const target=group?.choices.find(c=>allProducts.some(p=>p.id===c.productId))?.productId??product.id;
+                        requestAnimationFrame(() =>
+                            document.getElementById(`gokul-product-${target}`)?.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "center"}));
+                    }} />}
 
             </section>
 
