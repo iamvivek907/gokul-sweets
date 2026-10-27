@@ -366,3 +366,9 @@
 /* Press feedback changes paint only: no movement of sticky controls or menu rows. */
 .future-storefront[data-customer-design=reference] :is(button,a[href]):not(:disabled):not([aria-disabled=true]){touch-action:manipulation}
 .future-storefront[data-customer-design=reference] :is(button,a[href]):not(:disabled):not([aria-disabled=true]):active{filter:brightness(.92);box-shadow:inset 0 0 0 2px #14393618}
+
+/* Consistent reading and focus treatment for customer ordering surfaces. */
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-card-copy{min-width:0;overflow-wrap:anywhere}
+.future-storefront[data-customer-design=reference] .product-image-fallback{color:#752343;background:#fff1e8}
+.future-storefront[data-customer-design=reference] .mobile-checkout-section{overflow-wrap:anywhere}
+.future-storefront[data-customer-design=reference] :is(.mobile-checkout-section,.mobile-bill-dialog) :is(button,a,input,select,textarea):focus-visible{outline:3px solid #8f1838;outline-offset:3px}

@@ -78,7 +78,7 @@ export default function CartSummary({
                     text-[#241715]
                 "
             >
-                {refined ? "Your cart estimate" : "Order Summary"}
+                <T text={refined ? "Your cart estimate" : "Order Summary"} />
             </h2>
 
 
@@ -137,7 +137,7 @@ export default function CartSummary({
                             text-[#241715]
                         "
                     >
-                        {refined ? "Items subtotal · estimate" : "Cart subtotal"}
+                        <T text={refined ? "Items subtotal · estimate" : "Cart subtotal"} />
                     </span>
 
 
@@ -172,7 +172,7 @@ export default function CartSummary({
                         text-[#241715]
                     "
                 >
-                    {refined ? "See every charge before payment" : "Final payable amount comes later"}
+                    <T text={refined ? "See every charge before payment" : "Final payable amount comes later"} />
                 </p>
 
 
