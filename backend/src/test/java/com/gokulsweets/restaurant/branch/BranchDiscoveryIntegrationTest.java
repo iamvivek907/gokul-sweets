@@ -201,6 +201,8 @@ class BranchDiscoveryIntegrationTest {
                 "Another branch must not affect these ratings.",
                 "PICKED_UP");
         var result = discovery.get(b);
+        assertThat(result.recentReviews()).extracting(BranchDiscoveryService.Excerpt::comment)
+                .containsExactlyInAnyOrder("Fresh and carefully packed for our pickup.", "The overall pickup experience was reasonable.");
         assertThat(result.overallExperience().average()).isEqualTo(4);
         assertThat(result.overallExperience().count()).isEqualTo(2);
         assertThat(result.overallExperience().distribution()).containsExactly(0L, 0L, 1L, 0L, 1L);
@@ -223,6 +225,7 @@ class BranchDiscoveryIntegrationTest {
         long b = branch();
         assertThat(discovery.get(b).overallExperience().count()).isZero();
         assertThat(discovery.get(b).topRatedItems()).isEmpty();
+        assertThat(discovery.get(b).recentReviews()).isEmpty();
         long p = product(b, "Occasion exclusive", true, true);
         review(
                 b,
@@ -236,6 +239,22 @@ class BranchDiscoveryIntegrationTest {
         assertThat(discovery.get(b).topRatedItems()).isEmpty();
         jdbc.update("UPDATE branches SET active=false WHERE id=?", b);
         assertThatThrownBy(() -> discovery.get(b)).isInstanceOf(ResponseStatusException.class);
+    }
+
+
+    @Test
+    void recentCommentsAreBoundedAndExcludePrivateContactAndUnpublishedOrders() {
+        long b = branch(), s = slot(b), p = product(b, "Sweet", true, false);
+        for (int i = 0; i < 7; i++) review(b, s, p, 5, 5, "PUBLISHED", "A pleasant completed order number " + i, "DELIVERED");
+        review(b, s, p, 2, 2, "PUBLISHED", "Please contact me on 9876543210 about this", "PICKED_UP");
+        review(b, s, p, 2, 2, "PUBLISHED", "Write to test@example.com about this order", "PICKED_UP");
+        review(b, s, p, 2, 2, "PUBLISHED", "Too short", "PICKED_UP");
+        var comments = discovery.get(b).recentReviews();
+        assertThat(comments).hasSize(5);
+        assertThat(comments).allSatisfy(comment -> {
+            assertThat(comment.comment()).doesNotContain("9876543210", "example.com");
+            assertThat(comment.overallRating()).isEqualTo(5);
+        });
     }
 
     @Test
