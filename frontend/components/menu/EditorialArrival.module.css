@@ -100,3 +100,5 @@
 :global(.future-storefront[data-customer-design=reference]) .heroCopy,:global(.future-storefront[data-customer-design=reference]) .logo{color:#fffaf0}
 :global(.future-storefront[data-customer-design=reference]) .actions a:last-child{background:#ffffff14;color:#fff;border:1px solid #ffffffb3;border-radius:12px}
 @media(max-width:640px){:global(.future-storefront[data-customer-design=reference]) .scrim{background:linear-gradient(180deg,#10101580,#10101573 30%,#101015cc 100%)}}
+
+.branchLoading{min-height:280px;max-width:500px;margin:16px auto;color:#615468}.branchSkeleton{height:220px;border-radius:18px;background:linear-gradient(110deg,#f3ecec 25%,#fff8f5 50%,#f3ecec 75%);background-size:200% 100%;animation:branchShimmer 1.5s infinite}.branchSkeleton span{display:block}.branchLoading p{padding:12px;font-weight:600}.branchFallback button{min-height:44px;padding:8px 20px;border:1px solid currentColor;border-radius:10px;margin-top:12px}@keyframes branchShimmer{to{background-position:-200% 0}}@media(prefers-reduced-motion:reduce){.branchSkeleton{animation:none}}

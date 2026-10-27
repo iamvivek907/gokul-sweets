@@ -20,6 +20,22 @@ public class BranchDiscoveryController {
      * @param branchId the branch id supplied to this method
      * @return the value of {@code discovery.get(branchId)}
      */
+    @GetMapping("/reviews")
+    public BranchDiscoveryService.PublicReviewPage reviews(
+            @PathVariable long branchId, @RequestParam(required = false) Long before) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BranchDiscoveryController.class, "reviews(long,Long)");
+        try {
+            return discovery.reviews(branchId, before);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    BranchDiscoveryController.class,
+                    "reviews(long,Long)");
+        }
+    }
+
+    /** Returns the published discovery summary for a branch. */
     @GetMapping
     public BranchDiscoveryService.Discovery get(@PathVariable long branchId) {
         final long __gokulMethodStartedNanos =

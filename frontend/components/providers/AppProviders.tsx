@@ -1,4 +1,5 @@
 "use client";
+import ReturnReviewPrompt from "@/components/order/ReturnReviewPrompt";
 import PwaInstallRuntime from "@/components/pwa/PwaInstallRuntime";
 import MobileBrandLaunch from "@/components/common/MobileBrandLaunch";
 import NavigationFeedback from "@/components/common/NavigationFeedback";
@@ -30,6 +31,7 @@ export default function AppProviders({
         <>
             <LanguageRuntime />
             <MobileBrandLaunch />
+            <ReturnReviewPrompt />
             <NavigationFeedback />
             <ServiceWorkerRegistration />
             <PwaInstallRuntime />

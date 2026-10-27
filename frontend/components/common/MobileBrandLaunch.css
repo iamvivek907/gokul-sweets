@@ -14,3 +14,5 @@
 
 .gokul-mobile-boot{display:none}
 @media(max-width:640px){.gokul-mobile-boot{display:flex;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;flex-direction:column;background:radial-gradient(ellipse at 50% 38%,#fff0e8 0,white 60%);color:#980c31;pointer-events:none}.gokul-mobile-boot p{margin-top:20px;font-size:12px;color:#596579;text-transform:uppercase;letter-spacing:.08em}}
+
+@media(max-width:640px){.gokul-launch-food{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:20px;color:#b45b70;font-size:20px}.gokul-launch-food span:nth-child(2){display:grid;place-items:center;width:46px;height:46px;border:1.5px solid #b45b70;border-radius:50%;font-size:27px;animation:food-bob 1.2s ease-in-out infinite alternate}.gokul-launch-food span:first-child,.gokul-launch-food span:last-child{animation:food-sparkle 1.2s ease-in-out infinite alternate}@keyframes food-bob{to{transform:translateY(-6px) rotate(8deg)}}@keyframes food-sparkle{to{opacity:.35;transform:scale(.7)}}}@media(prefers-reduced-motion:reduce){.gokul-launch-food span{animation:none!important}}
