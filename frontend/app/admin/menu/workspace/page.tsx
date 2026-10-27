@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import BranchOrderingReadiness from "@/components/admin/BranchOrderingReadiness";
 import DietaryLabel from "@/components/menu/DietaryLabel";
 import {
   readWorkspaceDraft,
@@ -385,6 +386,7 @@ export default function MenuWorkspace() {
           + Add product
         </button>
       </div>
+      {branch&&<BranchOrderingReadiness key={branch} branchId={branch}/>}
       <div className={styles.toolbar}>
         <label>
           Branch{" "}

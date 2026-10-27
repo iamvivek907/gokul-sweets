@@ -1,5 +1,7 @@
 "use client";
 
+import {usePathname} from "next/navigation";
+import {getCartSnapshot,parseCart,subscribeToCart} from "@/lib/cartStorage";
 import {useCallback, useEffect, useRef} from "react";
 import {useReportWebVitals} from "next/web-vitals";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -7,6 +9,8 @@ import {API_BASE_URL} from "@/lib/constants";
 import {safeVital, type VitalPayload} from "@/lib/vitals";
 
 export default function StorefrontVitals() {
+    const path=usePathname();
+    const seen=useRef(new Set<string>());
     const enabled = useStorefrontFeatures()?.accessibleOrderingV2;
     const state = useRef<{enabled: boolean | undefined; sample: boolean; queue: VitalPayload[]}>(
         {enabled: undefined, sample: false, queue: []});
@@ -37,8 +41,34 @@ export default function StorefrontVitals() {
             stageCounts.current.set(payload.name, count + 1);
         }
         if (state.current.enabled) send(payload);
-        else if (state.current.enabled === undefined && state.current.queue.length < 12) state.current.queue.push(payload);
+        else if (state.current.enabled === undefined && state.current.queue.length < 24) state.current.queue.push(payload);
     }, [send]);
+    // Coarse events are deduplicated per document. No customer, order or branch identifiers.
+    const funnel=useCallback((name:string)=>{
+        if(!safeVital(name,1,"measured",location.pathname)||seen.current.has(name))return;
+        seen.current.add(name);report({name,value:1,rating:"measured"});
+    },[report]);
+    useEffect(()=>{
+        if(enabled!==true)return;
+        if(path==="/menu")funnel("FUNNEL_MENU");
+        if(path.startsWith("/checkout"))funnel("FUNNEL_CHECKOUT");
+    },[path,enabled,funnel]);
+    useEffect(()=>{
+        let previous=parseCart(getCartSnapshot()).items.reduce((sum,item)=>sum+item.quantity,0);
+        return subscribeToCart(()=>{
+            const count=parseCart(getCartSnapshot()).items.reduce((sum,item)=>sum+item.quantity,0);
+            if(enabled===true&&location.pathname==="/menu"&&count>previous)funnel("FUNNEL_ADD");
+            previous=count;
+        });
+    },[enabled,funnel]);
+    useEffect(()=>{
+        const handle=(event:Event)=>{
+            const name=(event as CustomEvent<unknown>).detail;
+            if(typeof name==="string"&&["FUNNEL_PAYMENT","FUNNEL_PAID","FUNNEL_FAILED","FUNNEL_EXPIRED"].includes(name))funnel(name);
+        };
+        window.addEventListener("gokul-payment-funnel",handle);
+        return()=>window.removeEventListener("gokul-payment-funnel",handle);
+    },[funnel]);
     useEffect(() => {
         const stage = (event: Event) => {
             const detail = (event as CustomEvent<{name: string; value: number; rating: string}>).detail;

@@ -40,10 +40,10 @@ try{for(const width of [320,390,640]){
  const dialog=page.getByRole('dialog',{name:'Paratha',exact:true});
  const half=dialog.locator('article').filter({has:page.getByRole('heading',{name:'Half',exact:true})});
  const full=dialog.locator('article').filter({has:page.getByRole('heading',{name:'Full',exact:true})});
- assert.equal(await half.locator('.menu-comparison-price').innerText(),'₹80.00');
- assert.equal(await half.locator('.menu-sale-price').innerText(),'₹50.00');
+ assert.equal(await half.locator('.menu-comparison-price').innerText(),'₹80');
+ assert.equal(await half.locator('.menu-sale-price').innerText(),'₹50');
  assert.equal(await full.locator('.menu-comparison-price').count(),0);
- assert.equal(await full.locator('strong').innerText(),'₹90.00');
+ assert.equal(await full.locator('strong').innerText(),'₹90');
  assert.equal(await dialog.getByRole('button',{name:'Add Paratha Full to cart',exact:true}).isEnabled(),true);
  await page.clock.fastForward(31000);
  await page.waitForFunction(date=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))?.date===date,later);

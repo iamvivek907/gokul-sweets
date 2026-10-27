@@ -1,6 +1,9 @@
 "use client";
 import {requestMenuPickup} from "@/lib/menuPickupRecovery";
-import {T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
+import ProductDetailsSheet from "./ProductDetailsSheet";
+import FoodPlaceholder from "./FoodPlaceholder";
+import {menuMoney,menuDescription} from "@/lib/menuPresentationDetails";
 
 import Image from "next/image";
 import DietaryLabel from "./DietaryLabel";
@@ -33,6 +36,7 @@ interface ProductCardProps {
 
 function formatCurrency(amount: number, exact = false, compact = false): string {
 
+    if(exact || compact)return menuMoney(amount);
     return new Intl.NumberFormat(
         "en-IN",
         {
@@ -87,6 +91,9 @@ export default function ProductCard({
     onDecrease,
     onAdd
 }: ProductCardProps) {
+    const t=useTranslation();
+    const [showDetails,setShowDetails]=useState(false);
+    const description=refined?menuDescription(product):product.description;
     const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
 
     const isAvailable =
@@ -111,6 +118,7 @@ export default function ProductCard({
 
 
     return (
+        <>
         <article
             onPointerDownCapture={event=>{if(unavailableForPickup&&!pickupChecking&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
             className={`
@@ -186,7 +194,7 @@ export default function ProductCard({
                                 text-3xl
                                 sm:text-4xl
                             ">
-                                🍬
+                                {refined?<FoodPlaceholder/>:"🍬"}
                             </div>
                         )
                 }
@@ -270,8 +278,8 @@ export default function ProductCard({
 
 
                 {
-                    product.description
-                    && (!refined || product.description.trim().toLowerCase() !== product.name.trim().toLowerCase())
+                    description
+                    && (!refined || description.trim().toLowerCase() !== product.name.trim().toLowerCase())
                     && (
                         <p className="product-card-description
                             mt-1
@@ -284,7 +292,7 @@ export default function ProductCard({
                             sm:leading-5
                         ">
                             {
-                                product.description
+                                description
                             }
                         </p>
                     )
@@ -298,9 +306,10 @@ export default function ProductCard({
                 )}
 
                 {refined&&unavailableForPickup&&product.available&&!purchaseControl&&!pickupChecking&&pickupMessage!=="Checking pickup"&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(product.id)}><T text="Choose another pickup"/></button>}
+                {refined&&!priceFrom&&<button type="button" className="menu-details-trigger" aria-label={`${t("View details")} · ${product.name}`} onClick={()=>setShowDetails(true)}><T text="View details"/><span aria-hidden="true"> ↗</span></button>}
                 {/* Rating */}
 
-                <div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">
+                {(!refined||ratingLoading||!!ratingSummary?.ratingCount)&&<div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">
 
                     {
                         ratingLoading
@@ -379,12 +388,12 @@ export default function ProductCard({
                                         </span>
 
                                         <span>
-                                            <T text="No ratings yet" /></span>
+                                            <span className={refined?"sr-only":undefined}><T text="No ratings yet" /></span></span>
                                     </div>
                                 )
                     }
 
-                </div>
+                </div>}
 
 
                 {refined&&isWeighted&&isInCart&&<p className="mobile-selected-weight-price">{selectionLabel} · {formatCurrency(product.price*(weightGrams??0)/1000,true)}</p>}
@@ -409,7 +418,7 @@ export default function ProductCard({
 
                         sm:text-base
                     ">
-                        {premium&&(isWeighted||priceFrom)&&<><T text="From"/> </>}
+                        {(priceFrom||premium&&isWeighted)&&<><T text="From"/> </>}
                         {(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price&&<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{formatCurrency(premium&&isWeighted?product.comparisonPrice*(product.minimumWeightGrams??250)/1000:product.comparisonPrice,true,true)}</s><span className="sr-only"> <T text="Selling price"/> </span></>}
                         <span className={(premium||refined)&&!priceFrom&&typeof product.comparisonPrice === "number"&&Number.isFinite(product.comparisonPrice)&&product.comparisonPrice>product.price?"menu-sale-price":undefined}>{formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}</span>
                         {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
@@ -689,5 +698,7 @@ export default function ProductCard({
             </div>
 
         </article>
+        {showDetails&&<ProductDetailsSheet key={product.id} product={product} onClose={()=>setShowDetails(false)}/>}
+        </>
     );
 }

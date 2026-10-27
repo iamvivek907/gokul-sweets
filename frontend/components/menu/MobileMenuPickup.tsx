@@ -109,7 +109,7 @@ export default function MobileMenuPickup({compactHeader=false,branchId,products,
  const notices = <>
  {expired&&<p className="menu-pickup-conflict" role="status"><T text="Your previous pickup has passed. Choose a new time; your cart is saved."/></p>}
  {!expired&&selectionUnavailable&&<p className="menu-pickup-conflict" role="status"><T text="Your saved pickup time no longer fits your cart. Adjust items or choose another time. Your cart is saved."/></p>}
- {noPickupMessage&&<p className="menu-pickup-conflict" role="status"><T text={noPickupMessage}/>{branchPhone&&<> <a className="pickup-call-branch" href={`tel:${branchPhone}`}><T text="Call branch" /></a></>}</p>}
+ {noPickupMessage&&<p className="menu-pickup-conflict" role="status"><T text={noPickupMessage}/><span className="pickup-unavailable-help"><T text="Online pickup is unavailable for the checked dates. The shop may still be open; call the branch for help."/></span>{branchPhone&&<> <a className="pickup-call-branch" href={`tel:${branchPhone}`}><T text="Call branch" /></a></>}</p>}
  {availabilityError&&<p role="alert"><T text={availabilityError}/> <button type="button" onClick={onRetry}><T text="Retry availability"/></button></p>}
  {error&&<p role="alert"><T text={error}/></p>}
 </>;
