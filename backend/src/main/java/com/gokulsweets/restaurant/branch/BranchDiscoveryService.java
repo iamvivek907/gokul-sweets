@@ -75,8 +75,37 @@ public class BranchDiscoveryService {
     public record Discovery(
             List<BranchOfferingsService.Offering> offerings,
             Rating overallExperience,
-            List<RatedItem> topRatedItems,
-            List<Excerpt> recentReviews) {}
+            List<RatedItem> topRatedItems) {}
+
+    public record PublicReview(String comment, int overallRating, String displayName) {}
+    public record PublicReviewPage(List<PublicReview> reviews, Long nextBefore) {}
+    private record ReviewRow(long id, String comment, int rating, boolean showName, String customerName) {}
+
+    /** Read at most 21 indexed rows per request, even when comments are filtered out. */
+    @Transactional(readOnly = true)
+    public PublicReviewPage reviews(long branchId, Long before) {
+        if (before != null && before <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid review cursor.");
+        if (branches.findByIdAndActiveTrue(branchId).isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found.");
+        var rows = jdbc.query("""
+SELECT r.id,r.comment,r.overall_rating,r.show_customer_name,o.customer_name
+FROM reviews r JOIN orders o ON o.id=r.order_id
+WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND r.id < ?
+AND o.order_status IN ('PICKED_UP','DELIVERED') AND r.comment IS NOT NULL
+ORDER BY r.id DESC LIMIT 21
+""", (rs, n) -> new ReviewRow(rs.getLong(1),rs.getString(2),rs.getInt(3),rs.getBoolean(4),rs.getString(5)),
+                branchId, before == null ? Long.MAX_VALUE : before);
+        var scanned = rows.stream().limit(20).toList();
+        var visible = scanned.stream().filter(r -> publicComment(r.comment()) != null)
+                .map(r -> new PublicReview(publicComment(r.comment()), r.rating(), publicName(r.showName(), r.customerName()))).toList();
+        return new PublicReviewPage(visible, rows.size() > 20 ? scanned.getLast().id() : null);
+    }
+
+    static String publicName(boolean optedIn, String customerName) {
+        if (!optedIn || customerName == null) return "Customer";
+        String[] parts = customerName.trim().split("\\s+");
+        String first = parts[0];
+        return first.length() <= 40 && first.matches("[\\p{L}\\p{M}]+(?:['’-][\\p{L}\\p{M}]+)*") ? first : "Customer";
+    }
 
     private static final Pattern PRIVATE_CONTACT =
             Pattern.compile("(?i)[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}|(?:\\+?\\d[\\d ()-]{7,}\\d)");
@@ -225,15 +254,7 @@ AND LENGTH(TRIM(r.comment))>=20 ORDER BY r.created_at DESC,r.id DESC LIMIT 20
                                                 excerpt);
                                     })
                             .toList();
-            var recentReviews = jdbc.query(
-                    """
-SELECT r.comment,r.overall_rating FROM reviews r JOIN orders o ON o.id=r.order_id
-WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND o.order_status IN ('PICKED_UP','DELIVERED')
-AND LENGTH(TRIM(r.comment))>=20 ORDER BY r.created_at DESC,r.id DESC LIMIT 50
-""", (rs, n) -> new Excerpt(rs.getString(1), rs.getInt(2)), id).stream()
-                    .filter(e -> publicComment(e.comment()) != null)
-                    .limit(5).map(e -> new Excerpt(publicComment(e.comment()), e.overallRating())).toList();
-            return new Discovery(offerings.published(id), rating, top, recentReviews);
+            return new Discovery(offerings.published(id), rating, top);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, BranchDiscoveryService.class, "get(long)");

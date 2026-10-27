@@ -47,9 +47,10 @@ try {
   await choices.getByRole('button',{name:'Taste needs improvement'}).click();
   assert.equal(await choices.getByRole('button',{name:'Taste needs improvement'}).getAttribute('aria-pressed'),'false');
   await sheet.getByLabel('Tell us more (optional)').fill('Please improve the value');
+  await sheet.getByLabel('Show my first name with my published review').check();
   await sheet.getByRole('button',{name:'Submit Review'}).click();await sheet.getByRole('alert').filter({hasText:'could not be confirmed'}).waitFor();
   assert.equal(await sheet.getByLabel('Tell us more (optional)').inputValue(),'Please improve the value');
-  assert.equal(t.writes[0].number,'LATEST');assert.equal(t.writes[0].body.comment,'Price felt too high. Please improve the value');
+  assert.equal(t.writes[0].body.showCustomerName,true);assert.equal(t.writes[0].number,'LATEST');assert.equal(t.writes[0].body.comment,'Price felt too high. Please improve the value');
   t.allowSave();await sheet.getByRole('button',{name:'Submit Review'}).click();await sheet.getByText('Thank you for your valuable feedback!').waitFor();
   assert.equal(t.writes[1].body.overallRating,1);assert.equal(new URL(t.page.url()).pathname,'/');
   assert.equal(t.historyCalls[0].limit,'1');assert.equal(t.historyCalls[0].status,'COMPLETED');assert.ok(t.reviewReads.every(n=>n==='LATEST'));
@@ -69,7 +70,7 @@ try {
   await suggestions.getByRole('button',{name:'Loved the taste'}).click();await suggestions.getByRole('button',{name:'Quick pickup'}).click();
   await sheet.getByLabel('Tell us more (optional)').fill('x'.repeat(1000));assert.equal(await sheet.getByRole('button',{name:'Submit Review'}).isDisabled(),true);
   await sheet.getByLabel('Tell us more (optional)').fill('');await sheet.getByRole('button',{name:'Submit Review'}).click();await sheet.getByText('Thank you for your valuable feedback!').waitFor();
-  assert.equal(t.writes[0].body.comment,'Loved the taste. Quick pickup');assert.equal(t.writes[0].body.overallRating,5);
+  assert.equal(t.writes[0].body.showCustomerName,false);assert.equal(t.writes[0].body.comment,'Loved the taste. Quick pickup');assert.equal(t.writes[0].body.overallRating,5);
   await t.context.close();
  }
  // A reviewed latest order never causes a prompt for an older unreviewed order.

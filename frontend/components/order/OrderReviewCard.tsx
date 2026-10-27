@@ -30,6 +30,7 @@ export default function OrderReviewCard({ orderNumber, prompt = false }: {
 }) {
     const [context, setContext] = useState<ReviewContext | null>(null), [overallRating, setOverallRating] = useState(0), [comment, setComment] = useState(""), [itemRatings, setItemRatings] = useState<Record<number, number>>({}), [error, setError] = useState<string | null>(null), [saving, setSaving] = useState(false), [saved, setSaved] = useState(false), [editing, setEditing] = useState(true), [retry, setRetry] = useState(0);
     const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [showCustomerName, setShowCustomerName] = useState(false);
     const commentId = useId();
     const combinedComment = [...suggestions, comment.trim()].filter(Boolean).join(". ");
     function changeRating(rating: number) {
@@ -38,11 +39,11 @@ export default function OrderReviewCard({ orderNumber, prompt = false }: {
     }
     const fetchContext = useCallback((signal?: AbortSignal) => getReviewContext(orderNumber, signal), [orderNumber]);
     useEffect(() => { const controller = new AbortController(); void fetchContext(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(response => { if (controller.signal.aborted)
-        return; setContext(response); setOverallRating(response.review?.overallRating ?? 0); setComment(response.review?.comment ?? ""); setItemRatings(Object.fromEntries((response.review?.itemRatings ?? []).map(item => [item.productId, item.rating]))); setEditing(!response.review); setError(null); }).catch(() => { if (!controller.signal.aborted)
+        return; setContext(response); setShowCustomerName(response.review?.showCustomerName ?? false); setOverallRating(response.review?.overallRating ?? 0); setComment(response.review?.comment ?? ""); setItemRatings(Object.fromEntries((response.review?.itemRatings ?? []).map(item => [item.productId, item.rating]))); setEditing(!response.review); setError(null); }).catch(() => { if (!controller.signal.aborted)
         setError("Unable to load the review form. Please try again."); }); return () => controller.abort(); }, [fetchContext, retry]);
     async function handleSubmit() { if (saving || overallRating === 0 || combinedComment.length > 1000)
         return; setSaving(true); setSaved(false); setError(null); try {
-        const review = await saveReview(orderNumber, { overallRating, comment: combinedComment || null, itemRatings: Object.entries(itemRatings).map(([productId, rating]) => ({ productId: Number(productId), rating })) });
+        const review = await saveReview(orderNumber, { overallRating, comment: combinedComment || null, showCustomerName, itemRatings: Object.entries(itemRatings).map(([productId, rating]) => ({ productId: Number(productId), rating })) });
         setContext(current => current ? { ...current, review } : current);
         setSaved(true);
         setEditing(false);
@@ -66,6 +67,7 @@ export default function OrderReviewCard({ orderNumber, prompt = false }: {
  <details open={prompt || undefined}><summary>Add a detailed review</summary><p>Choose one or more suggestions to include with your message. Changing your stars clears the selected suggestions. Published comments may be shown to other customers; please avoid personal details.</p>
  {overallRating > 0 ? <div className={styles.suggestions} role="group" aria-label="Feedback suggestions">{suggestionsByRating[overallRating].map(text => <button type="button" key={text} disabled={saving} aria-pressed={suggestions.includes(text)} onClick={() => setSuggestions(current => current.includes(text) ? current.filter(item => item !== text) : [...current, text])}>{text}</button>)}</div> : <p>Choose your stars to see suggestions.</p>}
  <label htmlFor={commentId}>Tell us more (optional)</label><textarea id={commentId} maxLength={1000} disabled={saving} value={comment} onChange={event => setComment(event.target.value)} placeholder="What did you enjoy? What could we do better?"/><p aria-live="polite">{combinedComment.length}/1000 characters including suggestions{combinedComment.length > 1000 ? " · Please shorten your feedback." : ""}</p></details>
+ <label className={styles.nameChoice}><input type="checkbox" checked={showCustomerName} disabled={saving} onChange={event => setShowCustomerName(event.target.checked)} /> Show my first name with my published review</label>
  <button type="button" className={styles.primary} disabled={saving || overallRating === 0 || combinedComment.length > 1000} onClick={() => void handleSubmit()}>{saving ? "Saving…" : context.review ? "Update Review" : "Submit Review"}</button></>}
  {error && <p className={styles.error} role="alert">{error}</p>}{context.review?.status === "HIDDEN" && <p>This review is currently being checked by our team.</p>}
  </section>;

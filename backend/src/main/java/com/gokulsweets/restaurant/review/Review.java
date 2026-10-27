@@ -38,6 +38,9 @@ public class Review {
     @Column(length = 1000)
     private String comment;
 
+    @Column(name = "show_customer_name", nullable = false)
+    private boolean showCustomerName = false;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "review_status", nullable = false, length = 20)
     private ReviewStatus reviewStatus = ReviewStatus.PUBLISHED;

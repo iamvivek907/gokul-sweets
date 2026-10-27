@@ -34,7 +34,12 @@ public final class ReviewDtos {
     public record UpsertReviewRequest(
             @NotNull @Min(1) @Max(5) Integer overallRating,
             @Size(max = 1000) String comment,
-            @Size(max = 100) List<@Valid ItemRatingRequest> itemRatings) {}
+            @Size(max = 100) List<@Valid ItemRatingRequest> itemRatings,
+            Boolean showCustomerName) {
+        public UpsertReviewRequest(Integer overallRating, String comment, List<ItemRatingRequest> itemRatings) {
+            this(overallRating, comment, itemRatings, null);
+        }
+    }
 
     /**
      * Immutable review item response data contract.
@@ -65,7 +70,8 @@ public final class ReviewDtos {
             ReviewStatus status,
             List<ReviewItemResponse> itemRatings,
             LocalDateTime createdAt,
-            LocalDateTime updatedAt) {}
+            LocalDateTime updatedAt,
+            boolean showCustomerName) {}
 
     /**
      * Immutable reviewable product response data contract.

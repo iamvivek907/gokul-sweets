@@ -3,3 +3,5 @@
 .suggestions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.suggestions button{min-height:44px;padding:8px 12px;border:1px solid #d9ccd9;border-radius:999px;color:#752343;background:#fff;font-size:13px}
 
 .suggestions button[aria-pressed=true]{background:#8f1838;color:#fff;border-color:#8f1838}.suggestions button:focus-visible{outline:3px solid #a75676;outline-offset:2px}
+
+.nameChoice{display:flex!important;align-items:center;gap:10px;margin:14px 0;line-height:1.5}.nameChoice input{width:20px;height:20px;flex:none;accent-color:#8f1838}
