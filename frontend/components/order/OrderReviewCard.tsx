@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState, useId } from "react";
 import { getReviewContext, saveReview } from "@/services/reviewApi";
 import type { ReviewContext } from "@/types/review";
-import { T } from "@/lib/language";
+import { T, useTranslation } from "@/lib/language";
 import styles from "./OrderReviewCard.module.css";
 const suggestionsByRating: Record<number, string[]> = {
     1: ["Taste needs improvement", "Food was not fresh", "Portion was too small", "Price felt too high", "Pickup took too long", "Order was incorrect"],
@@ -32,7 +32,8 @@ export default function OrderReviewCard({ orderNumber, prompt = false }: {
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [showCustomerName, setShowCustomerName] = useState(false);
     const commentId = useId();
-    const combinedComment = [...suggestions, comment.trim()].filter(Boolean).join(". ");
+    const translate = useTranslation();
+    const combinedComment = [...suggestions.map(translate), comment.trim()].filter(Boolean).join(". ");
     function changeRating(rating: number) {
         if (rating !== overallRating) setSuggestions([]);
         setOverallRating(rating);
@@ -67,7 +68,7 @@ export default function OrderReviewCard({ orderNumber, prompt = false }: {
  <div className={styles.overall}><h3>Overall experience *</h3><StarPicker value={overallRating} onChange={changeRating} label="Overall order rating" disabled={saving}/><span className={styles.feeling} aria-live="polite">{["Choose your stars", "Could be better", "Fair", "Good", "Really enjoyed it", "Loved it!"][overallRating]}</span></div>
  {context.products.length > 0 && <details><summary>Rate your ordered dishes (optional)</summary>{context.products.map(product => <div key={product.productId} className={styles.product}><h3>{product.productName}</h3><StarPicker value={itemRatings[product.productId] ?? 0} onChange={rating => setItemRatings(current => ({ ...current, [product.productId]: rating }))} label={`${product.productName} rating`} disabled={saving}/>{itemRatings[product.productId] && <button type="button" className={styles.secondary} disabled={saving} onClick={() => setItemRatings(current => { const next = { ...current }; delete next[product.productId]; return next; })}>Clear dish rating</button>}</div>)}</details>}
  <details open={prompt || undefined}><summary>Add a detailed review</summary><p>Choose one or more suggestions to include with your message. Changing your stars clears the selected suggestions. Published comments may be shown to other customers; please avoid personal details.</p>
- {overallRating > 0 ? <div className={styles.suggestions} role="group" aria-label="Feedback suggestions">{suggestionsByRating[overallRating].map(text => <button type="button" key={text} disabled={saving} aria-pressed={suggestions.includes(text)} onClick={() => setSuggestions(current => current.includes(text) ? current.filter(item => item !== text) : [...current, text])}>{text}</button>)}</div> : <p>Choose your stars to see suggestions.</p>}
+ {overallRating > 0 ? <div className={styles.suggestions} role="group" aria-label="Feedback suggestions">{suggestionsByRating[overallRating].map(text => <button type="button" key={text} disabled={saving} aria-pressed={suggestions.includes(text)} onClick={() => setSuggestions(current => current.includes(text) ? current.filter(item => item !== text) : [...current, text])}><T text={text}/></button>)}</div> : <p>Choose your stars to see suggestions.</p>}
  <label htmlFor={commentId}>Tell us more (optional)</label><textarea id={commentId} maxLength={1000} disabled={saving} value={comment} onChange={event => setComment(event.target.value)} placeholder="What did you enjoy? What could we do better?"/><p aria-live="polite">{combinedComment.length}/1000 characters including suggestions{combinedComment.length > 1000 ? " · Please shorten your feedback." : ""}</p></details>
  <label className={styles.nameChoice}><input type="checkbox" checked={showCustomerName} disabled={saving} onChange={event => setShowCustomerName(event.target.checked)} /> Show my first name with my published review</label>
  <button type="button" className={styles.primary} disabled={saving || overallRating === 0 || combinedComment.length > 1000} onClick={() => void handleSubmit()}>{saving ? "Saving…" : context.review ? "Update Review" : "Submit Review"}</button></>}
