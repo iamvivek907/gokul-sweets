@@ -6,7 +6,7 @@ const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const screenshots=process.env.SCREENSHOT_DIR??'/tmp/gokul-pickup-default';
 const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date());
 const yesterday=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.parse(`${today}T12:00:00+05:30`)-86400000));
-const branch={id:1,name:'Gokul Tamkuhi Road',active:true,operational:true,pickupAvailable:true};
+const branch={id:1,name:'Gokul Tamkuhi Road',active:true,operational:true,pickupAvailable:true,phone:'9956860613'};
 const product=(id,name,categoryId,categoryName)=>({id,name,categoryId,categoryName,price:80,available:true,saleMode:'UNIT',imageUrl:'/arrival-mithai.webp'});
 const products=[product(1,'Veg Chowmein',1,'Food'),product(2,'Aloo Paratha',2,'Breakfast'),product(3,'Gulab Jamun',3,'Sweets')];
 const slot=(id,time,date=today)=>({id,branchId:1,slotDate:date,startTime:time,endTime:time==='08:00:00'?'08:30:00':'11:30:00',active:true,capacity:10,bookedCount:0,remainingCapacity:10,priorityEnabled:false,priorityRemainingCapacity:0,priorityCharge:20});
@@ -25,7 +25,7 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
   else if(path==='/api/menu')json=[{id:1,name:'Food',products:[products[0]]},{id:2,name:'Breakfast',products:[products[1]]},{id:3,name:'Sweets',products:[products[2]]}].map(c=>({...c,products:c.products.map(p=>({...p,availabilityRevision:revision}))}));
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
-  else if(path.endsWith('/pickup-discovery'))json={today,maximumDate:today,dates:[{date:today,available:true,slots:[{slot:breakfast,normalAvailable:true,issues:[]},{slot:lunch,normalAvailable:true,issues:[]}]}]};
+  else if(path.endsWith('/pickup-discovery'))json={today,maximumDate:today,dates:[{date:today,available:true,slots:mode==='closed'?[]:[{slot:breakfast,normalAvailable:true,issues:[]},{slot:lunch,normalAvailable:true,issues:[]}]}]};
   else if(path.endsWith('/availability')){
    checks++;if(mode==='outage')return route.fulfill({status:503,headers,json:{message:'Unavailable'}});
    const body=request.postDataJSON(),date=body.startDate;
@@ -45,6 +45,11 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
  const load=async()=>{await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});};
  const pickup=page.getByRole('region',{name:'Menu pickup time'});
  await load();await pickup.getByText(/Today, .* · 8:00/).waitFor();
+ assert.equal(await pickup.getByText('Gokul Tamkuhi Road',{exact:false}).count()>0,true);
+ if(width<=640){
+  const positions=await page.evaluate(()=>{const pickup=document.querySelector('.mobile-menu-pickup').getBoundingClientRect();const search=document.querySelector('#gokul-menu-search').getBoundingClientRect();const categories=document.querySelector('.menu-illustrated-categories').getBoundingClientRect();return {pickup:pickup.top,search:search.top,categories:categories.top};});
+  assert.ok(positions.pickup<positions.search && positions.search<positions.categories,'pickup, search and categories are in the mobile reading order');
+ }
  const breakfastSection=page.locator('#gokul-menu-items');
  assert.equal(await breakfastSection.getByRole('heading',{name:'Aloo Paratha',exact:true}).count(),1,'All is the default, even though Food is first in the catalog');
  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
@@ -76,7 +81,14 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
  // Closed day: no automatic tomorrow. Priority-only times must not incur an automatic fee.
  for(const state of ['closed','priority','outage']){
   mode=state;await page.evaluate(()=>{localStorage.removeItem('gokul-menu-pickup-mode:v1');localStorage.removeItem('gokul-pickup-intent');localStorage.removeItem('gokul-selected-pickup-slot');localStorage.removeItem('gokul-cart');});await load();
-  if(state==='closed')await pickup.getByText(/No verified normal pickup/).waitFor();
+  if(state==='closed'){
+   await pickup.getByText(/No verified normal pickup/).waitFor();
+   assert.equal(await pickup.getByRole('link',{name:'Call branch'}).getAttribute('href'),'tel:9956860613');
+   await pickup.getByRole('button',{name:'Choose time'}).click();
+   const dialog=page.getByRole('dialog',{name:'Choose pickup date & time'});await dialog.getByRole('link',{name:'Call branch'}).waitFor();
+   assert.equal(await dialog.getByRole('link',{name:'Call branch'}).getAttribute('href'),'tel:9956860613');
+   await dialog.getByRole('button',{name:'Close pickup selector'}).click();
+  }
   if(state==='priority')await pickup.getByText(/No verified normal pickup/).waitFor();
   if(state==='outage')await pickup.getByRole('button',{name:'Retry availability'}).waitFor();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);

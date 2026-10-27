@@ -10,3 +10,12 @@
  .future-storefront[data-premium-menu=true] .menu-browse-chips {margin-top:8px;gap:8px}
  .future-storefront[data-premium-menu=true] :is(button,input,a):focus-visible {outline:3px solid #18745c;outline-offset:2px}
 }
+
+@media (max-width:640px) {
+ .future-storefront[data-premium-menu=true] .menu-illustrated-categories {gap:8px;padding:4px 0 2px}
+ .future-storefront[data-premium-menu=true] .menu-category-tile {min-height:72px}
+ .future-storefront[data-premium-menu=true] .menu-category-tile>span {width:48px;height:48px}
+ .future-storefront[data-premium-menu=true] .mobile-menu-pickup > div:not(.menu-pickup-notices) {min-width:0}
+ .future-storefront[data-premium-menu=true] .mobile-menu-pickup > div > span {overflow-wrap:anywhere}
+ .future-storefront[data-premium-menu=true] .pickup-call-branch,.mobile-pickup-dialog .pickup-call-branch {display:inline-flex;align-items:center;min-height:44px;color:#8f1838;font-weight:700;text-decoration:underline}
+}
