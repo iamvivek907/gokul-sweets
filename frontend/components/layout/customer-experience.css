@@ -23,7 +23,10 @@
 .future-storefront[data-customer-design=reference] .menu-details-facts dd{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0}
 .future-storefront[data-customer-design=reference] .menu-details-help{padding:16px;border-radius:16px;background:var(--customer-lavender);line-height:1.6;font-size:.875rem}
 .future-storefront[data-customer-design=reference] .menu-variant-details summary{min-height:44px;cursor:pointer;color:#8f1838;padding-block:10px}
-.future-storefront[data-customer-design=reference] .desktop-portion-card{min-width:0;height:100%}
+.future-storefront[data-customer-design=reference] .desktop-portion-card{display:flex;flex-direction:column;min-width:0;height:100%}
+.future-storefront[data-customer-design=reference] .desktop-portion-card>.gokul-menu-product-card{height:auto;flex:1}
+.future-storefront[data-customer-design=reference] .desktop-portion-card .menu-group-caption{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:8px 12px;font-size:.8125rem}
+.future-storefront[data-customer-design=reference] .desktop-portion-card .menu-group-caption button{min-height:44px;color:#8f1838;font-weight:700;text-align:left}
 .future-storefront[data-customer-design=reference] .desktop-portion-card .menu-group-control{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:48px;border:1px solid #087f55;border-radius:12px;background:white;color:#087f55;padding:8px 14px;font-weight:750;width:100%;height:auto}
 .future-storefront[data-customer-design=reference] .desktop-portion-card .menu-group-control small{font-weight:500;white-space:normal;line-height:1.5}
 .future-storefront[data-customer-design=reference] .occasion-hero{padding-block:24px}
