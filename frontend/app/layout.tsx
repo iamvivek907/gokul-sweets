@@ -21,6 +21,10 @@ export const metadata: Metadata = {
         template: `%s | ${APP_NAME}`
     },
     description: APP_DESCRIPTION,
+    metadataBase: new URL("https://gokulsweets.in"),
+    openGraph: {type: "website", siteName: APP_NAME, title: "Gokul Sweets | Fresh Sweets, Snacks & Meals", description: APP_DESCRIPTION},
+    twitter: {card: "summary", title: "Gokul Sweets | Fresh Sweets, Snacks & Meals", description: APP_DESCRIPTION},
+    ...(process.env.NEXT_PUBLIC_API_URL?.includes("api-dev.gokulsweets.in") ? {robots: {index: false, follow: false}} : {}),
     applicationName: "Gokul",
     appleWebApp: {
         capable: true,
