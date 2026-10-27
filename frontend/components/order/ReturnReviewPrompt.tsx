@@ -4,11 +4,13 @@ import {usePathname} from "next/navigation";
 import {getVerifiedOrderPage} from "@/services/orderApi";
 import {getReviewContext} from "@/services/reviewApi";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
+import {T,useTranslation} from "@/lib/language";
 import OrderReviewCard from "./OrderReviewCard";
 import styles from "./ReturnReviewPrompt.module.css";
 
 /** A single latest completed order is considered per opening or long resume. */
 export default function ReturnReviewPrompt() {
+    const translate=useTranslation();
     const path = usePathname();
     const pathRef = useRef(path);
     useEffect(() => {pathRef.current = path;}, [path]);
@@ -64,15 +66,15 @@ export default function ReturnReviewPrompt() {
         void Promise.resolve().then(() => {if (active) setOrder(null);});
         return () => {active = false;};
     }, [path]);
-    return <dialog ref={dialog} className={styles.dialog} aria-label="Rate your last order" onCancel={() => setOrder(null)}>
+    return <dialog ref={dialog} className={styles.dialog} aria-label={translate("Rate your last order")} onCancel={() => setOrder(null)}>
         {order && <div className={styles.content}>
-            <button className={styles.close} type="button" onClick={() => setOrder(null)} aria-label="Close review">×</button>
+            <button className={styles.close} type="button" onClick={() => setOrder(null)} aria-label={translate("Close review")}>×</button>
             <div className={styles.art} aria-hidden="true"><span>✦</span><span>♨</span><span>✧</span></div>
-            <p className={styles.kicker}>A little note from Gokul</p>
-            <h2>How was your last treat?</h2>
-            <p>Your order from {order.branchName} is ready for your thoughts. A few stars can make our day.</p>
+            <p className={styles.kicker}><T text="A little note from Gokul"/></p>
+            <h2><T text="How was your last treat?"/></h2>
+            <p><T text="Tell us about your last order from"/> {order.branchName}. <T text="A few stars can make our day."/></p>
             <OrderReviewCard orderNumber={order.orderNumber} prompt />
-            <button className={styles.later} type="button" onClick={() => setOrder(null)}>Maybe later</button>
+            <button className={styles.later} type="button" onClick={() => setOrder(null)}><T text="Maybe later"/></button>
         </div>}
     </dialog>;
 }

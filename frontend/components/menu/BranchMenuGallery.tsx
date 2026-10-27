@@ -27,13 +27,13 @@ export default function BranchMenuGallery({branch, products, activeTab, onTabCha
     const photos = products.filter(product => product.available && product.imageUrl && !failed.includes(product.imageUrl))
         .filter((product, index, list) => list.findIndex(candidate => candidate.imageUrl === product.imageUrl) === index).slice(0, 3);
 
-    return <div className="gokul-branch-gallery" data-branch-tab={activeTab}>
+    return <div className="gokul-branch-gallery menu-order-header" data-branch-tab={activeTab}>
         <div className="gokul-branch-intro">
-            <p className="gokul-overline">Gokul Sweets &amp; Restaurants / Pickup menu</p>
+            <p className="gokul-overline"><T text="Your pickup menu"/></p>
             <h1>{branch.name}</h1>
-            <p><T text="Fresh sweets, snacks and meals from your chosen branch. Browse the live menu and choose a pickup time at checkout." /></p>
+            <p><T text="Choose your pickup, find a favourite and make it yours." /></p>
             <div className="gokul-branch-meta"><span>{[branch.address, branch.city].filter(Boolean).join(", ") || "Your selected pickup branch"}</span>
-                <a href="#gokul-menu-items" className="gokul-branch-menu-cta"><T text="Browse menu" /></a></div>
+                <a href="#gokul-menu-search" className="gokul-branch-menu-cta"><T text="Browse menu" /></a></div>
         </div>
         {activeTab === "menu" && (photos.length ? <div className="gokul-gallery-photos" aria-label="Food from this branch's menu">
             {photos.map((product, index) => <div key={product.id} className={`gokul-gallery-tile gokul-gallery-tile-${index}`}>

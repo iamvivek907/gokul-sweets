@@ -30,7 +30,14 @@ public class StorefrontVitalsController {
                     "MENU_BODY",
                     "MENU_PREVIEW",
                     "MENU_RENDER",
-                    "MENU_IMAGE");
+                    "MENU_IMAGE",
+                    "FUNNEL_MENU",
+                    "FUNNEL_ADD",
+                    "FUNNEL_CHECKOUT",
+                    "FUNNEL_PAYMENT",
+                    "FUNNEL_PAID",
+                    "FUNNEL_FAILED",
+                    "FUNNEL_EXPIRED");
 
     private static final Set<String> RATINGS = Set.of("good", "needs-improvement", "poor");
 
@@ -55,9 +62,10 @@ public class StorefrontVitalsController {
                     || metric.rating() == null
                     || metric.page() == null
                     || !METRICS.contains(metric.name())
-                    || !(metric.name().startsWith("MENU_")
+                    || !(metric.name().startsWith("MENU_") || metric.name().startsWith("FUNNEL_")
                             ? "measured".equals(metric.rating())
                             : RATINGS.contains(metric.rating()))
+                    || (metric.name().startsWith("FUNNEL_") && metric.value() != 1)
                     || !PAGES.contains(metric.page())
                     || metric.value() < 0
                     || metric.value() > 120_000

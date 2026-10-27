@@ -42,7 +42,7 @@ export default function NewBranchItems({branch, products, onSelect,portionGroups
     if (!shownItems.length) return null;
 
     function move(direction: number) {
-        row.current?.scrollBy({left: direction * Math.max(220, row.current.clientWidth * .72), behavior: "smooth"});
+        row.current?.scrollBy({left: direction * Math.max(220, row.current.clientWidth * .72), behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
     }
 
     return <section className={styles.banner} aria-labelledby="new-branch-items-title">

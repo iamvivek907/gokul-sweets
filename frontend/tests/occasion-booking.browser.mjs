@@ -4,7 +4,7 @@ const require=createRequire(import.meta.url);
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE??"playwright");
 const browser=await chromium.launch({headless:true});
 const context=await browser.newContext({viewport:{width:390,height:844}});
-let authenticated=true, submitted=null, requests=0, expireNext=false;const history=[];
+let authenticated=true, submitted=null, requests=0, expireNext=false,catalogueFails=true;const history=[];
 const branch={id:1,code:"TEST",name:"Celebration branch",active:true,pickupAvailable:true};
 const sweets=[{id:1,name:"Kaju Barfi",description:"Made fresh for your celebration",saleMode:"WEIGHT",occasionOnly:true,published:true,leadDays:3,pieceGrams:null,categoryName:"Sweets"},{id:2,name:"Peda",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null,categoryName:"Sweets"},{id:3,name:"Laddoo",saleMode:"UNIT",occasionOnly:false,published:true,leadDays:1,pieceGrams:null,categoryName:"Sweets"}];
 sweets.push({id:4,name:"Paneer",saleMode:"WEIGHT",occasionOnly:false,published:true,leadDays:2,categoryName:"Paneer"});
@@ -19,6 +19,7 @@ await context.route("**/api/**",async route=>{
  if(path==="/api/storefront/features")json={occasionEnquiries:true,occasionPayments:true,futuristicStorefrontV2:true,today:"2026-09-30"};
  else if(path==="/api/storefront/customer-identity")json={enabled:true};
  else if(path==="/api/customer/identity/me")json={authenticated,phone:"+919876543210",name:"Celebration customer"};
+ else if(path==="/api/branches/1/occasion-catalogue"&&catalogueFails)return route.fulfill({status:503,json:{message:"Unavailable"}});
  else if(path==="/api/branches/1/occasion-catalogue")json={sweets,boxes:[box,...weightBoxes],branding:{headline:"Celebrate beautifully with Gokul",description:"A thoughtful selection for your guests",imageUrl:null,published:true}};
  else if(path==="/api/branches/1")json=branch;
  else if(path==="/api/branches")json=[branch];
@@ -34,12 +35,17 @@ try {
  await page.goto(`${base}/occasions`);
  await page.getByLabel("Verified occasion contact").waitFor();
  assert.equal(await page.getByRole("button",{name:"Sign out",exact:true}).count(),0);
+ await page.getByRole("alert").filter({hasText:"occasion collection could not load"}).waitFor();catalogueFails=false;await page.getByRole("button",{name:"Retry occasion collection",exact:true}).click();
  await page.getByRole("heading",{name:"Celebrate beautifully with Gokul"}).waitFor();
+ assert.equal(await page.getByRole("navigation",{name:"Celebration planning steps"}).getByRole("link").count(),4);
+ await page.getByRole("link",{name:"2 · Food",exact:true}).click();assert.match(page.url(),/#plan-food$/);
+
  await page.getByRole("button",{name:/Date in India/}).click();
  assert.equal(await page.getByRole("button",{name:"Previous month"}).isDisabled(),true);
  await page.getByRole("button",{name:/10 October/}).click();
  await page.getByLabel("Kaju Barfi unit").selectOption("PIECE");
  await page.getByLabel("Kaju Barfi quantity").fill("1000");
+ await page.getByLabel("Current celebration estimate").getByText("1 items",{exact:false}).waitFor();
  await page.evaluate(()=>document.fonts.ready);
  const [quantityBox,unitBox]=await page.evaluate(()=>["Kaju Barfi quantity","Kaju Barfi unit"].map(name=>{const element=document.querySelector(`[aria-label="${name}"]`),r=element.getBoundingClientRect();return {y:r.y,height:r.height};}));
  if(process.env.ALERT_SCREENSHOT_DIR)await page.locator(".occasion-product").first().screenshot({path:`${process.env.ALERT_SCREENSHOT_DIR}/quantity-alignment.png`});

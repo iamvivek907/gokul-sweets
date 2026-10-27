@@ -24,6 +24,7 @@ interface ProductGridProps {
     pairingSeed?:number;
     pairing?:ReactNode;
     portionGroups?: PortionGroup[];
+    compactGroups?: boolean;
     catalogProducts?: MenuProduct[];
     refined?: boolean;
     pickupItems?: ItemAvailability[];
@@ -61,6 +62,7 @@ export default function ProductGrid({
     pairingSeed,
     pairing,
     portionGroups,
+    compactGroups=true,
     catalogProducts,
     refined = false,
     products,
@@ -131,7 +133,10 @@ export default function ProductGrid({
             <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 ${refined ? "gokul-menu-product-grid" : ""}`}>
                 {mobileMenuRows(products,portionGroups??[],catalogProducts??products).map(row => {
                     const product=row.product;
-                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`}><MobilePortionCard group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
+                    if(row.group&&row.products)return <Fragment key={row.group.key}><div id={`gokul-product-${product.id}`} className="relative min-w-0 scroll-mt-24">
+                        {/* Every size remains a link destination at the shared card's position. */}
+                        {Array.from(new Set(row.products.map(option=>option.id))).filter(id=>id!==product.id).map(id=><span key={id} id={`gokul-product-${id}`} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-px w-px scroll-mt-24"/>)}
+                        <MobilePortionCard compact={compactGroups} group={row.group} products={row.products} quantities={quantities} onAdd={onAdd} onIncrease={onIncrease} onDecrease={onDecrease} ratings={ratingSummaries} loading={ratingsLoading} pickupItems={pickupItems} dateAware={dateAware} pickupChecking={pickupChecking} pickupStatusMessage={pickupStatusMessage}/></div>{pairing&&row.products.some(p=>p.id===pairingSeed)&&<div className="menu-grid-pairing">{pairing}</div>}</Fragment>;
                     const pickup = pickupItems?.find(item => item.productId === product.id);
                     const unavailable = !!dateAware && (pickupChecking || pickup?.available !== true);
                     return (
@@ -143,7 +148,7 @@ export default function ProductGrid({
                                 </span>
                             )}
                             <ProductCard
-                                premium={portionGroups!==undefined}
+                                premium={portionGroups!==undefined&&compactGroups}
                                 refined={refined}
                                 unavailableForPickup={unavailable}
                                 pickupMessage={pickupChecking ? pickupStatusMessage ?? "Checking pickup" : describePickupAvailability(pickup, false)}

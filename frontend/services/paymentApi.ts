@@ -8,6 +8,15 @@ import type {
 } from "@/types/payment";
 
 
+function recordPayment<T extends PaymentResponse>(payment:T):T {
+    try {
+        const status=payment.paymentStatus;
+        const name=status==="PAID"?"FUNNEL_PAID":status==="FAILED"?"FUNNEL_FAILED":status==="EXPIRED"?"FUNNEL_EXPIRED":null;
+        if(name&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("gokul-payment-funnel",{detail:name}));
+    }catch{/* Optional telemetry must never change payment recovery. */}
+    return payment;
+}
+
 /*
  * =========================================================
  * PAYMENT LOOKUP RESPONSE
@@ -45,7 +54,7 @@ export function createPayment(
     request: CreatePaymentRequest,
     signal?: AbortSignal
 ): Promise<PaymentResponse> {
-
+    try{if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("gokul-payment-funnel",{detail:"FUNNEL_PAYMENT"}));}catch{}
     return apiClient<PaymentResponse>(
         "/api/payments",
         {
@@ -54,7 +63,7 @@ export function createPayment(
             credentials: "include",
             signal
         }
-    );
+    ).then(recordPayment);
 }
 
 
@@ -106,7 +115,7 @@ export function getPaymentForOrder(
             credentials: "include",
             signal
         }
-    );
+    ).then(result=>{if(result.payment)recordPayment(result.payment);return result;});
 }
 
 
@@ -128,7 +137,7 @@ export function refreshPayment(
             credentials: "include",
             signal
         }
-    );
+    ).then(recordPayment);
 }
 
 
@@ -152,7 +161,7 @@ export function verifyRazorpayPayment(
             credentials: "include",
             signal
         }
-    );
+    ).then(recordPayment);
 }
 
 export function cancelPaymentCheckout(paymentId:number, signal?:AbortSignal): Promise<PaymentResponse> {

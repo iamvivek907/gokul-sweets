@@ -16,8 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -177,6 +175,8 @@ public class CustomerReviewService {
                         CustomerReviewService.class, "summarizeProducts(ProductSummaryRequest)");
         try {
             LinkedHashSet<Long> productIds = new LinkedHashSet<>(request.productIds());
+            // Keep precision for count-weighted size groups; clients round only the displayed
+            // score.
             return reviewItemRepository
                     .summarizeProducts(productIds, ReviewStatus.PUBLISHED)
                     .stream()
@@ -184,9 +184,7 @@ public class CustomerReviewService {
                             summary ->
                                     new ProductRatingSummaryResponse(
                                             summary.getProductId(),
-                                            BigDecimal.valueOf(summary.getAverageRating())
-                                                    .setScale(1, RoundingMode.HALF_UP)
-                                                    .doubleValue(),
+                                            summary.getAverageRating(),
                                             summary.getRatingCount()))
                     .toList();
         } finally {

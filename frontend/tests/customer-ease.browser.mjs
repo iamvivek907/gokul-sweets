@@ -49,7 +49,7 @@ try{
   assert.match(await active.getByRole('link',{name:'Directions',exact:true}).getAttribute('href'),/Order%20road/);
   assert.match(await active.getByRole('link',{name:'View pickup code',exact:true}).getAttribute('href'),/#pickup-code$/);
   assert.equal(await active.getByText('PRIVATE-ORDER',{exact:true}).count(),0);
-  const input=page.locator('#gokul-menu-search');await input.fill('panner');await page.getByRole('heading',{name:width===390?'Paneer Burger':'Paneer Burger Half',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Fresh Peda',exact:true}).count(),0);
+  const input=page.locator('#gokul-menu-search');await input.fill('panner');await page.getByRole('heading',{name:'Paneer Burger',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Fresh Peda',exact:true}).count(),0);
   if(width===390){
    await page.locator('.menu-browse-chips').getByRole('button',{name:'Browse all item categories',exact:true}).click();
    const filters=page.getByRole('dialog',{name:'Filter menu',exact:true});await filters.getByLabel('Maximum price',{exact:true}).fill('100');await filters.getByRole('button',{name:'Show items',exact:true}).click();

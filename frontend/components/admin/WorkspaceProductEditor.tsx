@@ -459,10 +459,12 @@ export default function WorkspaceProductEditor({
                 <label>
                   Description
                   <textarea
+                    aria-describedby="product-description-help"
                     maxLength={500}
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                   />
+                  <small id="product-description-help">Help customers choose: describe taste, preparation and the actual serving or weight. Only include verified ingredients or dietary information. This appears in product details on the menu.</small>
                 </label>
                 <label>
                   Sale unit

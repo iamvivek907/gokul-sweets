@@ -25,7 +25,7 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
   else if(path==='/api/menu')json=[{id:1,name:'Food',products:[products[0]]},{id:2,name:'Breakfast',products:[products[1]]},{id:3,name:'Sweets',products:[products[2]]}].map(c=>({...c,products:c.products.map(p=>({...p,availabilityRevision:revision}))}));
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
-  else if(path.endsWith('/pickup-discovery'))json={today,maximumDate:today,dates:[{date:today,available:true,slots:mode==='closed'?[]:[{slot:breakfast,normalAvailable:true,issues:[]},{slot:lunch,normalAvailable:true,issues:[]}]}]};
+  else if(path.endsWith('/pickup-discovery'))json={today,maximumDate:today,dates:[{date:today,available:true,slots:mode==='closed'?[]:[breakfast,lunch].map(base=>({slot:mode==='priority'?{...base,remainingCapacity:0,priorityEnabled:true,priorityRemainingCapacity:3}:base,normalAvailable:mode!=='priority',priorityAvailable:mode==='priority',issues:[]}))}]};
   else if(path.endsWith('/availability')){
    checks++;if(mode==='outage')return route.fulfill({status:503,headers,json:{message:'Unavailable'}});
    const body=request.postDataJSON(),date=body.startDate;
@@ -89,8 +89,18 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
    assert.equal(await dialog.getByRole('link',{name:'Call branch'}).getAttribute('href'),'tel:9956860613');
    await dialog.getByRole('button',{name:'Close pickup selector'}).click();
   }
-  if(state==='priority')await pickup.getByText(/No verified normal pickup/).waitFor();
-  if(state==='outage')await pickup.getByRole('button',{name:'Retry availability'}).waitFor();
+  if(state==='priority'){
+   await pickup.getByText(/No verified normal pickup/).waitFor();
+   await pickup.getByText("Standard pickup is unavailable for the checked dates. Check other pickup options or call the branch; the shop may still be open.",{exact:true}).waitFor();
+   assert.equal(await pickup.getByText(/^Online pickup is unavailable/).count(),0);
+   await pickup.getByRole('button',{name:'Choose time',exact:true}).click();
+   const priority=page.getByRole('dialog',{name:'Choose pickup date & time'});
+   await priority.getByRole('button',{name:/Priority/}).first().waitFor();
+   assert.equal(await priority.getByRole('button',{name:/Priority/}).first().isEnabled(),true);
+   assert.equal(await priority.getByRole('button',{name:/Standard/}).count(),0);
+   await priority.getByRole('button',{name:'Close pickup selector'}).click();
+  }
+  if(state==='outage'){await pickup.getByRole('button',{name:'Retry availability'}).waitFor();assert.equal(await pickup.locator('.pickup-unavailable-help').count(),0,'an unknown result must not claim pickup is unavailable');}
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),null);
   assert.equal(await page.getByRole('button',{name:'Add Aloo Paratha to cart'}).isDisabled(),true);
  }
