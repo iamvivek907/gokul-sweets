@@ -75,7 +75,8 @@ public class BranchDiscoveryService {
     public record Discovery(
             List<BranchOfferingsService.Offering> offerings,
             Rating overallExperience,
-            List<RatedItem> topRatedItems) {}
+            List<RatedItem> topRatedItems,
+            List<Excerpt> recentReviews) {}
 
     private static final Pattern PRIVATE_CONTACT =
             Pattern.compile("(?i)[\\w.+-]+@[\\w.-]+\\.[a-z]{2,}|(?:\\+?\\d[\\d ()-]{7,}\\d)");
@@ -224,7 +225,15 @@ AND LENGTH(TRIM(r.comment))>=20 ORDER BY r.created_at DESC,r.id DESC LIMIT 20
                                                 excerpt);
                                     })
                             .toList();
-            return new Discovery(offerings.published(id), rating, top);
+            var recentReviews = jdbc.query(
+                    """
+SELECT r.comment,r.overall_rating FROM reviews r JOIN orders o ON o.id=r.order_id
+WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND o.order_status IN ('PICKED_UP','DELIVERED')
+AND LENGTH(TRIM(r.comment))>=20 ORDER BY r.created_at DESC,r.id DESC LIMIT 50
+""", (rs, n) -> new Excerpt(rs.getString(1), rs.getInt(2)), id).stream()
+                    .filter(e -> publicComment(e.comment()) != null)
+                    .limit(5).map(e -> new Excerpt(publicComment(e.comment()), e.overallRating())).toList();
+            return new Discovery(offerings.published(id), rating, top, recentReviews);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, BranchDiscoveryService.class, "get(long)");

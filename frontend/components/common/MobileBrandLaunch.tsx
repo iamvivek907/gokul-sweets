@@ -57,6 +57,7 @@ export default function MobileBrandLaunch() {
         <div className="gokul-mobile-launch-copy">
             <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>
             <p><T text="Fresh for your moments" /></p>
+            <div className="gokul-launch-food" aria-hidden="true"><span>✦</span><span>♨</span><span>✧</span></div>
         </div>
     </dialog></>;
 }
