@@ -21,7 +21,8 @@ public class BranchDiscoveryController {
      * @return the value of {@code discovery.get(branchId)}
      */
     @GetMapping("/reviews")
-    public BranchDiscoveryService.PublicReviewPage reviews(@PathVariable long branchId, @RequestParam(required = false) Long before) {
+    public BranchDiscoveryService.PublicReviewPage reviews(
+            @PathVariable long branchId, @RequestParam(required = false) Long before) {
         return discovery.reviews(branchId, before);
     }
 

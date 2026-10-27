@@ -78,25 +78,48 @@ public class BranchDiscoveryService {
             List<RatedItem> topRatedItems) {}
 
     public record PublicReview(String comment, int overallRating, String displayName) {}
+
     public record PublicReviewPage(List<PublicReview> reviews, Long nextBefore) {}
-    private record ReviewRow(long id, String comment, int rating, boolean showName, String customerName) {}
+
+    private record ReviewRow(
+            long id, String comment, int rating, boolean showName, String customerName) {}
 
     /** Fetch at most 21 matching rows per request; contact filtering occurs after the query. */
     @Transactional(readOnly = true)
     public PublicReviewPage reviews(long branchId, Long before) {
-        if (before != null && before <= 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid review cursor.");
-        if (branches.findByIdAndActiveTrue(branchId).isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found.");
-        var rows = jdbc.query("""
+        if (before != null && before <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid review cursor.");
+        if (branches.findByIdAndActiveTrue(branchId).isEmpty())
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found.");
+        var rows =
+                jdbc.query(
+                        """
 SELECT r.id,r.comment,r.overall_rating,r.show_customer_name,o.customer_name
 FROM reviews r JOIN orders o ON o.id=r.order_id
 WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND r.id < ?
 AND o.order_status IN ('PICKED_UP','DELIVERED') AND r.comment IS NOT NULL
 ORDER BY r.id DESC LIMIT 21
-""", (rs, n) -> new ReviewRow(rs.getLong(1),rs.getString(2),rs.getInt(3),rs.getBoolean(4),rs.getString(5)),
-                branchId, before == null ? Long.MAX_VALUE : before);
+""",
+                        (rs, n) ->
+                                new ReviewRow(
+                                        rs.getLong(1),
+                                        rs.getString(2),
+                                        rs.getInt(3),
+                                        rs.getBoolean(4),
+                                        rs.getString(5)),
+                        branchId,
+                        before == null ? Long.MAX_VALUE : before);
         var scanned = rows.stream().limit(20).toList();
-        var visible = scanned.stream().filter(r -> publicComment(r.comment()) != null)
-                .map(r -> new PublicReview(publicComment(r.comment()), r.rating(), publicName(r.showName(), r.customerName()))).toList();
+        var visible =
+                scanned.stream()
+                        .filter(r -> publicComment(r.comment()) != null)
+                        .map(
+                                r ->
+                                        new PublicReview(
+                                                publicComment(r.comment()),
+                                                r.rating(),
+                                                publicName(r.showName(), r.customerName())))
+                        .toList();
         return new PublicReviewPage(visible, rows.size() > 20 ? scanned.getLast().id() : null);
     }
 
@@ -104,7 +127,9 @@ ORDER BY r.id DESC LIMIT 21
         if (!optedIn || customerName == null) return "Customer";
         String[] parts = customerName.trim().split("\\s+");
         String first = parts[0];
-        return first.length() <= 40 && first.matches("[\\p{L}\\p{M}]+(?:['’-][\\p{L}\\p{M}]+)*") ? first : "Customer";
+        return first.length() <= 40 && first.matches("[\\p{L}\\p{M}]+(?:['’-][\\p{L}\\p{M}]+)*")
+                ? first
+                : "Customer";
     }
 
     private static final Pattern PRIVATE_CONTACT =

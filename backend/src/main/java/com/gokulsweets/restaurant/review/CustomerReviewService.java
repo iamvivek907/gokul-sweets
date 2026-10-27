@@ -124,7 +124,8 @@ public class CustomerReviewService {
                                     });
             review.setOverallRating(request.overallRating());
             review.setComment(normalizeComment(request.comment()));
-            if (request.showCustomerName() != null) review.setShowCustomerName(request.showCustomerName());
+            if (request.showCustomerName() != null)
+                review.setShowCustomerName(request.showCustomerName());
             Map<Long, ReviewItem> existingItems =
                     review.getItems().stream()
                             .collect(

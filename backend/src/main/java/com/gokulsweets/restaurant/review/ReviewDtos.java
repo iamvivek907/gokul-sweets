@@ -36,7 +36,8 @@ public final class ReviewDtos {
             @Size(max = 1000) String comment,
             @Size(max = 100) List<@Valid ItemRatingRequest> itemRatings,
             Boolean showCustomerName) {
-        public UpsertReviewRequest(Integer overallRating, String comment, List<ItemRatingRequest> itemRatings) {
+        public UpsertReviewRequest(
+                Integer overallRating, String comment, List<ItemRatingRequest> itemRatings) {
             this(overallRating, comment, itemRatings, null);
         }
     }
