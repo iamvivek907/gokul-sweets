@@ -34,7 +34,8 @@ public record MenuProductResponse(
         Integer minimumWeightGrams,
         Integer weightStepGrams,
         com.gokulsweets.restaurant.menu.MenuServiceWindows.Status serviceAvailability,
-        boolean vegetarian) {
+        boolean vegetarian,
+        BigDecimal comparisonPrice) {
 
     /**
      * Creates a menu product response instance.
@@ -76,6 +77,7 @@ public record MenuProductResponse(
                 minimumWeightGrams,
                 weightStepGrams,
                 null,
-                true);
+                true,
+                null);
     }
 }

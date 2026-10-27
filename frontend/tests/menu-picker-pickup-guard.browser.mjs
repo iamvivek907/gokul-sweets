@@ -4,7 +4,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'
 const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Gokul Test',active:true,operational:true,pickupAvailable:true};
-const products=['Half Paratha','Full Paratha','Breakfast'].map((name,index)=>({id:index+1,name,categoryId:1,categoryName:'Food',price:50+index*40,available:true,saleMode:'UNIT',imageUrl:null}));
+const products=['Half Paratha','Full Paratha','Breakfast'].map((name,index)=>({id:index+1,name,categoryId:1,categoryName:'Food',price:50+index*40,comparisonPrice:index===0?80:index===1?80:null,available:true,saleMode:'UNIT',imageUrl:null}));
 const group={key:'paratha',title:'Paratha',choices:[{productId:1,label:'Half'},{productId:2,label:'Full'}]};
 const later=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.parse(`${date}T12:00:00+05:30`)+86400000));
 const slot={id:1,branchId:1,slotDate:date,startTime:'08:00:00',endTime:'08:30:00',active:true,remainingCapacity:20,priorityEnabled:false};
@@ -38,6 +38,12 @@ try{for(const width of [320,390,640]){
  await page.waitForFunction(()=>document.querySelector('button[aria-label="Choose options for Paratha"]')?.disabled===false);
  await card.getByRole('button',{name:'Choose options for Paratha',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Paratha',exact:true});
+ const half=dialog.locator('article').filter({has:page.getByRole('heading',{name:'Half',exact:true})});
+ const full=dialog.locator('article').filter({has:page.getByRole('heading',{name:'Full',exact:true})});
+ assert.equal(await half.locator('.menu-comparison-price').innerText(),'₹80.00');
+ assert.equal(await half.locator('.menu-sale-price').innerText(),'₹50.00');
+ assert.equal(await full.locator('.menu-comparison-price').count(),0);
+ assert.equal(await full.locator('strong').innerText(),'₹90.00');
  assert.equal(await dialog.getByRole('button',{name:'Add Paratha Full to cart',exact:true}).isEnabled(),true);
  await page.clock.fastForward(31000);
  await page.waitForFunction(date=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot'))?.date===date,later);

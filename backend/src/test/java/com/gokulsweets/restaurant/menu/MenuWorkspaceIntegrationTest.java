@@ -384,6 +384,55 @@ class MenuWorkspaceIntegrationTest {
     }
 
     @Test
+    void comparisonPriceIsOptionalValidatedAndVersioned() {
+        long b = branch(), c = category(), id = product(b, c);
+        workspace.editBranch(
+                b,
+                id,
+                new MenuWorkspaceService.BranchEdit(
+                        0L, null, new BigDecimal("80"), false, new BigDecimal("120"), false));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT comparison_price FROM branch_products WHERE branch_id=? AND"
+                                        + " product_id=?",
+                                BigDecimal.class,
+                                b,
+                                id))
+                .isEqualByComparingTo("120");
+        assertThatThrownBy(
+                        () ->
+                                workspace.editBranch(
+                                        b,
+                                        id,
+                                        new MenuWorkspaceService.BranchEdit(
+                                                1L,
+                                                null,
+                                                null,
+                                                false,
+                                                new BigDecimal("80"),
+                                                false)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(
+                        () ->
+                                workspace.editBranch(
+                                        b,
+                                        id,
+                                        new MenuWorkspaceService.BranchEdit(
+                                                0L, null, null, false, null, true)))
+                .isInstanceOf(ResponseStatusException.class);
+        workspace.editBranch(
+                b, id, new MenuWorkspaceService.BranchEdit(1L, null, null, false, null, true));
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT comparison_price FROM branch_products WHERE branch_id=? AND"
+                                        + " product_id=?",
+                                BigDecimal.class,
+                                b,
+                                id))
+                .isNull();
+    }
+
+    @Test
     void allWritersAdvanceVersionAndStaleUpdateCannotOverwrite() {
         long b = branch(), c = category(), id = product(b, c);
         workspace.editBranch(b, id, new MenuWorkspaceService.BranchEdit(0L, true, null, false));

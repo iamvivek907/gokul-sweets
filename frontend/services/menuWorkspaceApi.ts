@@ -13,6 +13,7 @@ export type WorkspaceItem = {
   categoryName: string;
   basePrice: number;
   priceOverride: number | null;
+  comparisonPrice?: number | null;
   effectivePrice: number;
   available: boolean;
   active: boolean;
