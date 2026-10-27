@@ -256,7 +256,7 @@ class BranchDiscoveryIntegrationTest {
                     5,
                     "PUBLISHED",
                     "A pleasant completed order number " + i,
-                    "DELIVERED");
+                    "PICKED_UP");
         review(
                 b,
                 s,
