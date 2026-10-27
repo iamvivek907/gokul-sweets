@@ -30,7 +30,21 @@ try{for(const width of [320,390,640,1024]){
  assert.match(await page.locator('#gokul-product-1').innerText(),/Rasgulla/);
  assert.equal(await page.locator('#gokul-product-1').getByRole('button',{name:'Add Rasgulla to cart',exact:true}).isDisabled(),true,'display-only catalog cannot enable ordering before live checks');
  releaseInitial();await page.locator('#gokul-product-1').getByRole('button',{name:'Add Rasgulla to cart',exact:true}).waitFor();await page.waitForFunction(()=>!document.querySelector('#gokul-product-1 button[data-ordering-target="add"]')?.disabled);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
- if(width>640){assert.equal(await page.locator('.menu-editorial-feature').count(),0);assert.equal(await page.locator('.mobile-portion-card').count(),0);assert.equal(await page.getByRole('heading',{name:'Dahi 400 g',exact:true}).count(),1);assert.equal(await page.locator('.customer-bottom-navigation a').count(),5);assert.equal(await page.locator('.customer-bottom-navigation').getAttribute('data-reference-menu'),null);await context.close();console.log('Premium menu desktop preserved');continue;}
+ if(width>640){
+  assert.equal(await page.locator('.menu-editorial-feature').count(),0);
+  assert.equal(await page.locator('.mobile-portion-card').count(),0);
+  const desktop=page.locator('.desktop-portion-card');await desktop.waitFor();
+  assert.equal(await desktop.getByRole('heading',{name:'Dahi',exact:true}).count(),1);
+  assert.equal(await page.getByRole('heading',{name:'Dahi 400 g',exact:true}).count(),0);
+  await desktop.getByRole('button',{name:'Choose options for Dahi',exact:true}).click();
+  const sizes=page.getByRole('dialog',{name:'Dahi',exact:true});
+  for(const label of ['200 g pack','400 g pack','1 kg pack','5 kg pack'])await sizes.getByRole('heading',{name:label,exact:true}).waitFor();
+  assert.equal(await sizes.getByRole('button',{name:'Add Dahi 400 g pack to cart',exact:true}).isEnabled(),true);
+  await sizes.getByRole('button',{name:'Done',exact:true}).click();
+  assert.equal(await page.locator('.customer-bottom-navigation a').count(),5);
+  assert.equal(await page.locator('.customer-bottom-navigation').getAttribute('data-reference-menu'),null);
+  await context.close();console.log('Premium menu desktop shares SKU size choices');continue;
+ }
  await page.getByRole('heading',{name:'Festival favourites',exact:true}).waitFor();assert.equal(await page.locator('.menu-category-tile').count(),2);assert.equal(await page.locator('.customer-notification-bell').isVisible(),true);assert.equal(await page.locator('.customer-account-link').isVisible(),true);
  const brand=await page.locator('.reference-wordmark').boundingBox();
 
