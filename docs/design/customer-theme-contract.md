@@ -1,3 +1,7 @@
+## Clear branch and pickup recovery (October 27)
+
+The modern phone menu keeps branch and pickup status ahead of search and category shortcuts. The compact category row reduces vertical space while keeping existing category navigation and measured header behavior. A checked empty normal-pickup window explains the next action and offers the selected branch telephone when configured; the pickup dialog offers the same help without changing the cart or saved pickup. A branch-detail read failure provides retry and all-branches navigation. Unknown or failed availability never becomes a promise of a pickup time, and priority-only availability remains distinct from normal pickup. Legacy presentation and backend ordering checks remain authoritative.
+
 ## Smoother ordering and visual refinement (October 23)
 
 Pinch zoom remains intentionally disabled. The enabled customer shell uses warm neutral reading surfaces, existing maroon primary actions and emerald quantity/availability controls. Diwali campaign content, saved crops, carousel controls and reduced-motion behavior remain admin-owned. Phone campaign spacing, category imagery and support typography are more compact/readable; long campaign copy may grow naturally rather than being clipped. The floating Categories action stays above the measured cart dock in the left lane, clear of right-hand Add/quantity controls.
