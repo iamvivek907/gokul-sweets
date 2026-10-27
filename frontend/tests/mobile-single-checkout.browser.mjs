@@ -7,7 +7,7 @@ const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new
 const branch={id:1,code:'TEST',name:'Test Gokul branch',active:true,address:'Test address',city:'Test city',phone:'9876543210',pickupAvailable:true};
 const half={id:10,name:'Paneer meal Half',categoryId:1,categoryName:'Meals',description:'Serves one person.',price:100,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},full={...half,id:11,name:'Paneer meal Full',price:180,imageUrl:'/arrival-mithai.webp',description:'Serves two people.'},drink={...half,id:12,name:'Fresh drink',categoryId:2,categoryName:'Drinks',price:40};
 const baseSlot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,capacity:50,remainingCapacity:50,priorityEnabled:true,priorityCharge:25};
-try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','ratings-phone','ratings-desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','minus-unit','minus-weight','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority','menu-pickup-date-only','menu-pickup-no-selection','menu-pickup-expired'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
+try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','ratings-phone','ratings-desktop','anchors-phone','anchors-desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','minus-unit','minus-weight','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority','menu-pickup-date-only','menu-pickup-no-selection','menu-pickup-expired'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
  console.log('Scenario:',scenario);
  const pickupRegression=scenario.startsWith('menu-pickup-');
  const slot=pickupRegression?{...baseSlot,startTime:'20:30:00',endTime:'21:00:00'}:baseSlot;
@@ -15,7 +15,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  const emptyDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+3*86400000));
  const ratingScenario=scenario.startsWith('ratings-');
  let fullHasPhoto=true;
- const width=(scenario==='desktop'||scenario==='ratings-desktop')?1280:scenario==='boundary'?640:390;
+ const width=(scenario==='desktop'||scenario==='ratings-desktop'||scenario==='anchors-desktop')?1280:scenario==='boundary'?640:390;
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
  const handoffEvents=[];page.on("console",message=>{if(message.text().startsWith("GOKUL_HANDOFF:"))handoffEvents.push(JSON.parse(message.text().slice(14)));});
  const errors=[];page.on("pageerror",e=>errors.push(e.message));page.on("console",m=>{if(m.type()==="error"&&/hydration|hydrated/i.test(m.text()))errors.push(m.text());});
@@ -84,6 +84,21 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  if(scenario==='menu-pickup-date-only')await context.addInitScript(({date})=>{if(!localStorage.getItem('gokul-pickup-intent'))localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));},{date});
  if(scenario==='stored-priority')await context.addInitScript(({date,slot})=>localStorage.setItem("gokul-selected-pickup-slot",JSON.stringify({date,slot,pickupType:"PRIORITY"})),{date,slot});
  await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('.gokul-menu-product-card').first().waitFor();
+ if(scenario.startsWith('anchors-')){
+  const card=page.locator(width>640?'.desktop-portion-card':'.mobile-portion-card');await card.waitFor();
+  // Extra preceding content makes native fragment scrolling observable on both viewports.
+  await page.locator('#gokul-product-10').evaluate(node=>{const spacer=document.createElement('div');spacer.style.height='1600px';node.parentElement.before(spacer);});
+  for(const id of [10,11]){
+   assert.equal(await page.locator(`#gokul-product-${id}`).count(),1,'each SKU must have exactly one destination');
+   await page.evaluate(id=>{window.scrollTo({top:0,behavior:'instant'});const link=document.createElement('a');link.href=`#gokul-product-${id}`;link.textContent=`Find size ${id}`;link.dataset.testProductLink='true';Object.assign(link.style,{position:'fixed',top:'120px',left:'0',zIndex:'2147483647',background:'white',padding:'8px'});document.body.append(link);},id);
+   await page.locator('[data-test-product-link]').click();
+   await page.waitForFunction(()=>window.scrollY>500);
+   const gap=await page.evaluate(id=>Math.abs(document.getElementById(`gokul-product-${id}`).getBoundingClientRect().top-document.getElementById('gokul-product-10').getBoundingClientRect().top),id);
+   assert.ok(gap<=1,'every size anchor must resolve to the shared card position');
+   await page.locator('[data-test-product-link]').evaluate(node=>node.remove());
+  }
+  assert.equal(errors.length,0,errors.join('\n'));await context.close();continue;
+ }
  if(ratingScenario){
   const card=page.locator(width>640?'.desktop-portion-card':'.mobile-portion-card');
   const score=card.getByLabel('5.0 out of 5 from 101 ratings',{exact:true});
