@@ -394,7 +394,7 @@ class MenuWorkspaceIntegrationTest {
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT comparison_price FROM branch_products WHERE branch_id=? AND"
-                                    + " product_id=?",
+                                        + " product_id=?",
                                 BigDecimal.class,
                                 b,
                                 id))
@@ -425,7 +425,7 @@ class MenuWorkspaceIntegrationTest {
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT comparison_price FROM branch_products WHERE branch_id=? AND"
-                                    + " product_id=?",
+                                        + " product_id=?",
                                 BigDecimal.class,
                                 b,
                                 id))
