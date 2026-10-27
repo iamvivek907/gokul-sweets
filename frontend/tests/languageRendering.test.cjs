@@ -52,3 +52,7 @@ test('customer recovery, checkout, filters and permission guidance translate wit
  assert.equal(translate('Paneer Burger Half','hi'),'Paneer Burger Half');
  assert.equal(translate('Kaju Katli','hi'),'Kaju Katli');
 });
+
+test('review suggestion translations cover every rating sentiment',()=>{
+ for(const text of ['Taste needs improvement','Price felt too high','Taste could be better','Taste was okay','Tasty food','Loved the taste','Wonderful service']){assert.notEqual(translate(text,'hi'),text);assert.equal(translate(text,'en'),text);}
+});

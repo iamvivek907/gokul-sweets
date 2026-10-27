@@ -65,6 +65,7 @@ export default function WorkspaceProductEditor({
       description: item?.description ?? "",
       price: String(item?.basePrice ?? ""),
       override: item?.priceOverride == null ? "" : String(item.priceOverride),
+      comparison: item?.comparisonPrice == null ? "" : String(item.comparisonPrice),
       sale: item?.saleMode ?? "UNIT",
       minimum: item?.minimumWeightGrams ?? 250,
       step: item?.weightStepGrams ?? 250,
@@ -88,6 +89,7 @@ export default function WorkspaceProductEditor({
   const [description, setDescription] = useState(initialDraft.description);
   const [price, setPrice] = useState(initialDraft.price);
   const [override, setOverride] = useState(initialDraft.override);
+  const [comparison, setComparison] = useState(initialDraft.comparison);
   const [sale, setSale] = useState(initialDraft.sale);
   const [minimum, setMinimum] = useState(initialDraft.minimum);
   const [step, setStep] = useState(initialDraft.step);
@@ -114,6 +116,7 @@ export default function WorkspaceProductEditor({
       description,
       price,
       override,
+      comparison,
       sale,
       minimum,
       step,
@@ -138,6 +141,7 @@ export default function WorkspaceProductEditor({
     description,
     price,
     override,
+    comparison,
     sale,
     minimum,
     step,
@@ -243,6 +247,8 @@ export default function WorkspaceProductEditor({
               ? {
                   priceOverride: override === "" ? null : Number(override),
                   clearPriceOverride: override === "",
+                  comparisonPrice: comparison === "" ? null : Number(comparison),
+                  clearComparisonPrice: comparison === "",
                 }
               : { available, clearPriceOverride: false }),
           }),
@@ -566,6 +572,10 @@ export default function WorkspaceProductEditor({
                 />
               </label>
               <p>Effective price: ₹{override || item?.basePrice}</p>
+              <label>Comparison price · optional, per {item?.saleMode === "WEIGHT" ? "kg" : "piece"}
+                <input type="number" min={0.01} step={0.01} value={comparison} onChange={e => setComparison(e.target.value)} />
+              </label>
+              <p>Shown crossed out only when higher than the selling price. Leave blank to remove it.</p>
               <button onClick={() => setOverride("")}>
                 Reset to base price
               </button>

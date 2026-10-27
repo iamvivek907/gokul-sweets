@@ -28,13 +28,14 @@ export default function BranchHomePage() {
     const branch = loadedBranch?.id === id ? loadedBranch : null;
     const [tab, setTab] = useState<"home" | "details">("home");
     const [error, setError] = useState("");
+    const [retry, setRetry] = useState(0);
     useEffect(() => {
         if (!Number.isSafeInteger(id) || id < 1) return;
         const controller = new AbortController();
-        checkOperationalBranch(id).then(data => {if (!controller.signal.aborted) setBranch(data);})
+        checkOperationalBranch(id, retry > 0).then(data => {if (!controller.signal.aborted) {setBranch(data); setError("");}})
             .catch(() => {if (!controller.signal.aborted) setError("This branch is unavailable right now.");});
         return () => controller.abort();
-    }, [id]);
+    }, [id, retry]);
     if (branch && modern) return <AppShell editorial showSocialPopup={false}>
         <BranchOverview key={branch.id} branch={branch} selected={selected?.id === branch.id} occasionEnquiries={occasionEnquiries} />
     </AppShell>;
@@ -42,7 +43,7 @@ export default function BranchHomePage() {
         <article className="branch-home mx-auto max-w-6xl px-4 py-8 text-[#173a37] sm:px-6">
 
             {!branch && !error && <BrandLoading label="Loading branch…" />}
-            {(error || !Number.isSafeInteger(id) || id < 1) && <p role="alert" className="mt-10">{error || "Branch not found."}</p>}
+            {(error || !Number.isSafeInteger(id) || id < 1) && <div role="alert" className="mt-10 rounded-2xl border border-[#eadfd6] bg-white p-5"><p>{error || "Branch not found."}</p><div className="mt-3 flex flex-wrap gap-3">{error && <button type="button" className="min-h-11 rounded-xl border border-[#8f1838] px-4 font-semibold text-[#8f1838]" onClick={() => {setError(""); setRetry(n => n + 1);}}><T text="Try again" /></button>}<Link className="inline-flex min-h-11 items-center underline" href="/branches"><T text="All branches" /></Link></div></div>}
             {branch && <>
                 <header className="branch-home-hero">
                     <div className="branch-home-heading"><MobilePageBack href="/branches" label="All branches" className="branch-home-back"/><div><p className="gokul-overline">Your Gokul branch</p><h1>{branch.name}</h1></div></div>

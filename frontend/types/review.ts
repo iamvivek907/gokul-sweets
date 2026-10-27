@@ -12,6 +12,7 @@ export interface CustomerReview {
     overallRating: number;
     comment: string | null;
     status: ReviewStatus;
+    showCustomerName?: boolean;
     itemRatings: ReviewItemRating[];
     createdAt: string;
     updatedAt: string;
@@ -32,6 +33,7 @@ export interface ReviewContext {
 export interface UpsertReviewRequest {
     overallRating: number;
     comment: string | null;
+    showCustomerName?: boolean;
     itemRatings: Array<{
         productId: number;
         rating: number;

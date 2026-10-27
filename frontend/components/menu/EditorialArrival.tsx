@@ -27,6 +27,8 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
 
     const {branch} = useSelectedBranch();
     const [branches, setBranches] = useState<Branch[]>([]);
+    const [branchState, setBranchState] = useState<"loading" | "ready" | "error">("loading");
+    const [branchRetry, setBranchRetry] = useState(0);
     const [campaigns, setCampaigns] = useState<HomepageCampaign[]>([]);
     const [branchPhotos, setBranchPhotos] = useState<Record<number, string>>({});
     const [failed, setFailed] = useState<number[]>([]);
@@ -35,10 +37,12 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
 
     useEffect(() => {
         const controller = new AbortController();
-        getActiveBranches(controller.signal).then(list => {
+        void Promise.resolve().then(() => { if (!controller.signal.aborted) setBranchState("loading"); });
+        getActiveBranches(AbortSignal.any([controller.signal, AbortSignal.timeout(10000)])).then(list => {
             if (controller.signal.aborted) return;
             const active = list.filter(item => item.active !== false);
             setBranches(active);
+            setBranchState("ready");
             if (!campaignsEnabled || branchExperience) return;
             // A branch-specific published poster can illustrate its own card; never imply an unconfigured capability.
             void Promise.all(active.map(async item => {
@@ -58,10 +62,10 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 )));
             });
         }).catch(error => {
-            if (!controller.signal.aborted) console.warn("Branch discovery unavailable.", error);
+            if (!controller.signal.aborted) { console.warn("Branch discovery unavailable.", error); setBranchState("error"); }
         });
         return () => controller.abort();
-    }, [campaignsEnabled, branchExperience]);
+    }, [campaignsEnabled, branchExperience, branchRetry]);
 
     useEffect(() => {
         if (!campaignsEnabled) return;
@@ -153,7 +157,9 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                     <BranchSelector cardBranch={item} destination={branchExperience ? "branchHome" : "menu"} />
                 </article>)}
             </div>
-            {!branches.length && <p className={styles.branchFallback}><T text="Branch details will appear here when available. You can still explore the menu." /></p>}
+            {branchState === "loading" && <div className={styles.branchLoading} role="status"><div aria-hidden="true" className={styles.branchSkeleton}><span /><span /><span /></div><p>Loading branches…</p></div>}
+            {branchState === "error" && <div className={styles.branchFallback} role="alert"><p>Could not load branches. Please try again.</p><button type="button" onClick={() => setBranchRetry(n => n + 1)}>Retry</button></div>}
+            {branchState === "ready" && !branches.length && <p className={styles.branchFallback}><T text="Branch details will appear here when available. You can still explore the menu." /></p>}
         </section>
     </div>;
 }

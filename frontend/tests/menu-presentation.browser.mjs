@@ -5,7 +5,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'
 const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311',screens=process.env.SCREENSHOT_DIR??'/tmp/gokul-compact-header';
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
-const products=Array.from({length:30},(_,i)=>({id:i+1,name:i===0?'Rasgulla':`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:15,available:true,saleMode:'UNIT',imageUrl:'/arrival-mithai.webp'}));
+const products=Array.from({length:30},(_,i)=>({id:i+1,name:i===0?'Rasgulla':`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:15,comparisonPrice:i===0?30:i===1?10:null,available:true,saleMode:'UNIT',imageUrl:'/arrival-mithai.webp'}));
 const categories=[{id:1,name:'Sweets',products},...['Food','Bakery','Snacks'].map((name,i)=>({id:i+2,name,products:[{...products[0],id:31+i,name:`${name} favourite`,categoryId:i+2,categoryName:name}]}))];
 const banner={key:'festival',titleEn:'Celebrate Diwali',subtitleEn:'Sweets, meals & easy pickup.',buttonLabel:'Explore sweets',categoryId:1,visible:true,order:0,mediaUrl:'/arrival-mithai.webp',mediaType:'image/webp',frame:{x:50,y:50,zoom:100,fit:'COVER'}};
 const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false};
@@ -33,7 +33,15 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
  await page.goto(`${base}/menu`);await page.locator('#gokul-product-1').waitFor();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  const card=page.getByRole('region',{name:'Menu pickup time',exact:true});
  await card.waitFor();
+ if(enabled){
+  assert.equal(await page.locator('#gokul-product-1 .menu-comparison-price').innerText(),'₹30');
+  assert.equal(await page.locator('#gokul-product-1 .menu-sale-price').innerText(),width<=640?'₹15':'₹15.00');
+  assert.equal(await page.locator('#gokul-product-2 .menu-comparison-price').count(),0);
+ }
  if(enabled&&width<=640){
+  assert.equal(await page.locator('#gokul-product-1 .menu-comparison-price').innerText(),'₹30');
+  assert.equal(await page.locator('#gokul-product-1 .menu-sale-price').innerText(),'₹15');
+  assert.equal(await page.locator('#gokul-product-2 .menu-comparison-price').count(),0,'a lower comparison price is never presented as a saving');
   assert.equal(await card.getAttribute('data-menu-refined'),'true');
   if(expired)await card.getByRole('status').filter({hasText:'No verified normal pickup'}).waitFor();
   const box=await card.boundingBox();assert.ok(box.height<210,`compact pickup status height ${box.height}`);
