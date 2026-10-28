@@ -657,7 +657,7 @@ export default function MenuScreen() {
     const phoneMenu=phone===true&&groupedMenu;
     const favourites=useMenuFavourites(branch?.id);
     const [savedOnly,setSavedOnly]=useState(false);
-    function changeSavedFilter(value:boolean){setSavedOnly(value);const url=new URL(location.href);if(value)url.searchParams.set("saved","1");else url.searchParams.delete("saved");history.replaceState(history.state,"",url);if(value){setSearch("");setSelectedCategoryId(null);setMobileCategories([]);setBrowseCategory(null);setMaximumPrice(null);setPortionsOnly(false);}}
+    function changeSavedFilter(value:boolean){setSavedOnly(value);const url=new URL(location.href);if(value){url.searchParams.set("saved","1");url.searchParams.delete("category");}else url.searchParams.delete("saved");if(url.href!==location.href)history.replaceState(history.state,"",url);if(value){setSearch("");setSelectedCategoryId(null);setMobileCategories([]);setBrowseCategory(null);setMaximumPrice(null);setPortionsOnly(false);}}
 
     const [browseCategory,setBrowseCategory]=useState<{branchId:number;id:number}|null|undefined>(undefined);
     const initialCategoryId=browseCategory===undefined?(effectiveCategoryId??undefined):undefined;
@@ -675,9 +675,10 @@ export default function MenuScreen() {
     useEffect(()=>{
         if(!branch||loadedBranchId!==branch.id||restoredBrowse===branch.id)return;
         const saved=readMenuBrowse(browserMenuStorage(),branch.id);
-        const explicit=new URLSearchParams(location.search).get("category");
-        queueMicrotask(()=>setSavedOnly(new URLSearchParams(location.search).get("saved")==="1"));
-        const destination=explicit?Number(explicit):saved?.categoryId??null;
+        const parameters=new URLSearchParams(location.search),wantsSaved=parameters.get("saved")==="1";
+        const explicit=wantsSaved?"saved":parameters.get("category");
+        queueMicrotask(()=>setSavedOnly(wantsSaved));
+        const destination=wantsSaved?null:explicit?Number(explicit):saved?.categoryId??null;
         const ids=new Set(categories.map(category=>category.id));
         // Restore UI preferences only. Cart, stock and pickup remain independently authoritative.
         if(searchEditedBranch.current!==branch.id)setSearch(explicit?"":saved?.search??"");
@@ -786,6 +787,7 @@ export default function MenuScreen() {
     },[phoneMenu,browseScroll,branch?.id,filteredProducts]);
 
     const hasActiveFilters =
+        (groupedMenu&&savedOnly) ||
         search.trim().length > 0
         ||
         (phoneMenu ? (!!(mobileCategories??(effectiveCategoryId===null?[]:[effectiveCategoryId])).length || maximumPrice!==null || portionsOnly) : effectiveCategoryId !== null);
@@ -934,6 +936,7 @@ export default function MenuScreen() {
 
 
     function clearFilters() {
+        changeSavedFilter(false);
         setBrowseCategory(null);setBrowseScroll(null);setMobileCategories([]); setMaximumPrice(null); setPortionsOnly(false);
 
         setSearch(
@@ -1082,7 +1085,7 @@ export default function MenuScreen() {
 
                 {pickupCheck.features?.contextualStorefrontV2 && <BranchMenuGallery branch={branch} products={allProducts} activeTab={branchTab} onTabChange={setBranchTab} />}
 
-                <header
+                {!pickupCheck.features?.contextualStorefrontV2&&<header
                     className="
                         overflow-hidden
                         rounded-3xl
@@ -1252,7 +1255,7 @@ export default function MenuScreen() {
                             </div>
                         )}
 
-                </header>
+                </header>}
 
 
                 {refreshError&&<aside className="menu-refresh-notice" role="status"><T text={refreshError}/><button type="button" onClick={retryMenu}><T text="Try again"/></button></aside>}
@@ -1314,7 +1317,7 @@ export default function MenuScreen() {
 
                 </div>
                 </MenuToolbar>
-                {!phoneMenu && <BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
+                {!phoneMenu && !groupedMenu && <BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
 
 
                 {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
@@ -1373,7 +1376,7 @@ export default function MenuScreen() {
                             <>
 
                                 <div
-                                    className="menu-result-heading
+                                    data-filtered={hasActiveFilters} className="menu-result-heading
                                         mb-4
                                         flex
                                         items-end
@@ -1451,7 +1454,7 @@ export default function MenuScreen() {
                                 
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? <div>
-                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{phoneMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{phoneMenu && <MenuCampaignBanners banners={appearance?.banners ?? []} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact/>}{pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
+                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{phoneMenu?<MenuCampaignBanners banners={appearance?.banners ?? []} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact/>:<BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}{pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
                                 </div> : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}

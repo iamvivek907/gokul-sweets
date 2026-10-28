@@ -1,26 +1,274 @@
 "use client";
 import "./MenuContentDetails.css";
 import Image from "next/image";
-import {useEffect,useRef,useState} from "react";
-import {adminFetch} from "@/services/adminApi";
-import {readWorkspaceDraft,writeWorkspaceDraft,clearWorkspaceDraft} from "@/lib/menuWorkspaceDraft";
-import {emptyMenuDetails,dishPhotoPosition,isMenuDetails,type MenuDetails} from "@/types/menuDetails";
-export default function MenuDishDetailsEditor({branchId,productId,imageUrl,onBusyChange}:{branchId:number;productId:number;imageUrl:string|null;onBusyChange:(busy:boolean)=>void}){
- const [value,setValue]=useState<MenuDetails>(emptyMenuDetails(productId)),[loaded,setLoaded]=useState(false),[busy,setBusy]=useState(false),[retry,setRetry]=useState(0),[message,setMessage]=useState("");
- const lock=useRef(false),request=useRef<AbortController|null>(null),alive=useRef(true);
- const key=`dish-facts:${branchId}:${productId}`,path=`/api/admin/branches/${branchId}/menu/products/${productId}/details`;
- useEffect(()=>{alive.current=true;return()=>{alive.current=false;request.current?.abort();onBusyChange(false);};},[onBusyChange]);
- useEffect(()=>{const controller=new AbortController();void adminFetch(path,"",{signal:AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])}).then(async response=>{if(!response.ok)throw Error("Dish information could not be loaded.");const current:unknown=await response.json();if(!isMenuDetails(current)||current.productId!==productId)throw Error("Invalid dish information.");if(!controller.signal.aborted){const draft=readWorkspaceDraft<MenuDetails>(key),valid=isMenuDetails(draft)&&draft.productId===productId;setValue(valid?draft:current);setLoaded(true);setMessage(valid&&draft.version!==current.version?"Your draft uses an older version. Reload saved details before saving.":"");}}).catch(error=>{if(!controller.signal.aborted)setMessage(error.message);});return()=>controller.abort();},[path,key,productId,retry]);
- function update(change:Partial<MenuDetails>){setValue(previous=>{const next={...previous,...change};writeWorkspaceDraft(key,next);return next;});}
- async function save(){if(lock.current||!loaded)return;lock.current=true;setBusy(true);onBusyChange(true);setMessage("");const controller=new AbortController();request.current=controller;
-  try{const body={servingInfo:value.servingInfo?.trim()||null,ingredients:value.ingredients?.trim()||null,allergens:value.allergens?.trim()||null,spiceLevel:value.spiceLevel,photoFocusX:value.photoFocusX,photoFocusY:value.photoFocusY,chefPick:value.chefPick,version:value.version};const response=await adminFetch(path,"",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:AbortSignal.any([controller.signal,AbortSignal.timeout(12000)])});if(!response.ok)throw Error(response.status===409?"Dish details changed. Reload saved details before saving.":response.status===403?"You do not have permission to edit this branch.":"Dish information could not be saved. Your draft is kept.");const saved:unknown=await response.json();if(!isMenuDetails(saved)||saved.productId!==productId)throw Error("Invalid saved dish information. Reload to check the saved version.");if(alive.current){setValue(saved);clearWorkspaceDraft(key);setMessage("Dish information saved.");}}
-  catch(error){if(alive.current)setMessage(error instanceof Error?error.message:"Dish information could not be saved. Your draft is kept.");}
-  finally{lock.current=false;if(alive.current){setBusy(false);onBusyChange(false);}}
- }
- return <details className="admin-dish-details"><summary>Dish information, photo crop & chef’s pick</summary><p>Enter confirmed information for this branch and size. Leave unknown facts blank. Save these details before closing.</p>
- <fieldset disabled={!loaded||busy}><label>Serving information<input maxLength={120} value={value.servingInfo??""} onChange={e=>update({servingInfo:e.target.value})} placeholder="For example: serves 2; 4 pieces"/></label><label>Ingredients<textarea maxLength={600} value={value.ingredients??""} onChange={e=>update({ingredients:e.target.value})}/></label><label>Allergen information<textarea maxLength={300} value={value.allergens??""} onChange={e=>update({allergens:e.target.value})} placeholder="Only confirmed ingredients or cross-contact information"/></label><label>Spice level<select aria-label="Spice level" value={value.spiceLevel??""} onChange={e=>update({spiceLevel:(e.target.value||null) as MenuDetails["spiceLevel"]})}><option value="">Not specified</option><option value="MILD">Mild</option><option value="MEDIUM">Medium</option><option value="HOT">Hot</option></select></label>
- <label><input type="checkbox" checked={value.chefPick} onChange={e=>update({chefPick:e.target.checked})}/> Feature as an owner-selected chef’s pick</label>
- {imageUrl&&<><div className="admin-dish-preview">{[{label:"Phone crop",width:136,height:136},{label:"Desktop crop",width:280,height:210}].map(size=><figure key={size.label}><Image unoptimized src={imageUrl} alt={size.label} width={size.width} height={size.height} style={{width:size.width,height:size.height,objectFit:"cover",objectPosition:dishPhotoPosition(value)}}/><figcaption>{size.label}</figcaption></figure>)}</div><label>Photo focus · horizontal {value.photoFocusX}%<input type="range" min={0} max={100} value={value.photoFocusX} onChange={e=>update({photoFocusX:Number(e.target.value)})}/></label><label>Photo focus · vertical {value.photoFocusY}%<input type="range" min={0} max={100} value={value.photoFocusY} onChange={e=>update({photoFocusY:Number(e.target.value)})}/></label></>}
- <button type="button" disabled={busy||!loaded} onClick={()=>void save()}>{busy?"Saving dish information…":"Save dish information"}</button></fieldset>
- <button type="button" disabled={busy} onClick={()=>{clearWorkspaceDraft(key);setLoaded(false);setRetry(n=>n+1);}}>Reload saved details</button>{message&&<p role="status">{message}</p>}</details>;
+import { useEffect, useRef, useState } from "react";
+import { adminFetch } from "@/services/adminApi";
+import {
+  readWorkspaceDraft,
+  writeWorkspaceDraft,
+  clearWorkspaceDraft,
+} from "@/lib/menuWorkspaceDraft";
+import {
+  emptyMenuDetails,
+  dishPhotoPosition,
+  isMenuDetails,
+  type MenuDetails,
+} from "@/types/menuDetails";
+export default function MenuDishDetailsEditor({
+  branchId,
+  productId,
+  imageUrl,
+  onBusyChange,
+}: {
+  branchId: number;
+  productId: number;
+  imageUrl: string | null;
+  onBusyChange: (busy: boolean) => void;
+}) {
+  const [value, setValue] = useState<MenuDetails>(emptyMenuDetails(productId)),
+    [loaded, setLoaded] = useState(false),
+    [busy, setBusy] = useState(false),
+    [retry, setRetry] = useState(0),
+    [message, setMessage] = useState("");
+  const lock = useRef(false),
+    request = useRef<AbortController | null>(null),
+    alive = useRef(true);
+  const key = `dish-facts:${branchId}:${productId}`,
+    path = `/api/admin/branches/${branchId}/menu/products/${productId}/details`;
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      request.current?.abort();
+      onBusyChange(false);
+    };
+  }, [onBusyChange]);
+  useEffect(() => {
+    const controller = new AbortController();
+    void adminFetch(path, "", {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw Error("Dish information could not be loaded.");
+        const current: unknown = await response.json();
+        if (!isMenuDetails(current) || current.productId !== productId)
+          throw Error("Invalid dish information.");
+        if (!controller.signal.aborted) {
+          const draft = readWorkspaceDraft<MenuDetails>(key),
+            valid = isMenuDetails(draft) && draft.productId === productId;
+          setValue(valid ? draft : current);
+          setLoaded(true);
+          setMessage(
+            valid && draft.version !== current.version
+              ? "Your draft uses an older version. Reload saved details before saving."
+              : "",
+          );
+        }
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setMessage(error.message);
+      });
+    return () => controller.abort();
+  }, [path, key, productId, retry]);
+  function update(change: Partial<MenuDetails>) {
+    setValue((previous) => {
+      const next = { ...previous, ...change };
+      writeWorkspaceDraft(key, next);
+      return next;
+    });
+  }
+  async function save() {
+    if (lock.current || !loaded) return;
+    lock.current = true;
+    setBusy(true);
+    onBusyChange(true);
+    setMessage("");
+    const controller = new AbortController();
+    request.current = controller;
+    try {
+      const body = {
+        servingInfo: value.servingInfo?.trim() || null,
+        ingredients: value.ingredients?.trim() || null,
+        allergens: value.allergens?.trim() || null,
+        spiceLevel: value.spiceLevel,
+        photoFocusX: value.photoFocusX,
+        photoFocusY: value.photoFocusY,
+        chefPick: value.chefPick,
+        version: value.version,
+      };
+      const response = await adminFetch(path, "", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.any([
+          controller.signal,
+          AbortSignal.timeout(12000),
+        ]),
+      });
+      if (!response.ok)
+        throw Error(
+          response.status === 409
+            ? "Dish details changed. Reload saved details before saving."
+            : response.status === 403
+              ? "You do not have permission to edit this branch."
+              : "Dish information could not be saved. Your draft is kept.",
+        );
+      const saved: unknown = await response.json();
+      if (!isMenuDetails(saved) || saved.productId !== productId)
+        throw Error(
+          "Invalid saved dish information. Reload to check the saved version.",
+        );
+      if (alive.current) {
+        setValue(saved);
+        clearWorkspaceDraft(key);
+        setMessage("Dish information saved.");
+      }
+    } catch (error) {
+      if (alive.current)
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "Dish information could not be saved. Your draft is kept.",
+        );
+    } finally {
+      lock.current = false;
+      if (alive.current) {
+        setBusy(false);
+        onBusyChange(false);
+      }
+    }
+  }
+  return (
+    <details className="admin-dish-details">
+      <summary>Dish information, photo crop & chef’s pick</summary>
+      <p>
+        Enter confirmed information for this branch and size. Leave unknown
+        facts blank. Save these details before closing.
+      </p>
+      <fieldset disabled={!loaded || busy}>
+        <label>
+          Serving information
+          <input
+            maxLength={120}
+            value={value.servingInfo ?? ""}
+            onChange={(e) => update({ servingInfo: e.target.value })}
+            placeholder="For example: serves 2; 4 pieces"
+          />
+        </label>
+        <label>
+          Ingredients
+          <textarea
+            maxLength={600}
+            value={value.ingredients ?? ""}
+            onChange={(e) => update({ ingredients: e.target.value })}
+          />
+        </label>
+        <label>
+          Allergen information
+          <textarea
+            maxLength={300}
+            value={value.allergens ?? ""}
+            onChange={(e) => update({ allergens: e.target.value })}
+            placeholder="Only confirmed ingredients or cross-contact information"
+          />
+        </label>
+        <label>
+          Spice level
+          <select
+            aria-label="Spice level"
+            value={value.spiceLevel ?? ""}
+            onChange={(e) =>
+              update({
+                spiceLevel: (e.target.value ||
+                  null) as MenuDetails["spiceLevel"],
+              })
+            }
+          >
+            <option value="">Not specified</option>
+            <option value="MILD">Mild</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HOT">Hot</option>
+          </select>
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={value.chefPick}
+            onChange={(e) => update({ chefPick: e.target.checked })}
+          />{" "}
+          Feature as an owner-selected chef’s pick
+        </label>
+        {imageUrl && (
+          <>
+            <div className="admin-dish-preview">
+              {[
+                { label: "Phone crop", width: 136, height: 136 },
+                { label: "Desktop crop", width: 280, height: 210 },
+              ].map((size) => (
+                <figure key={size.label}>
+                  <Image
+                    unoptimized
+                    src={imageUrl}
+                    alt={size.label}
+                    width={size.width}
+                    height={size.height}
+                    style={{
+                      width: size.width,
+                      height: size.height,
+                      objectFit: "cover",
+                      objectPosition: dishPhotoPosition(value),
+                    }}
+                  />
+                  <figcaption>{size.label}</figcaption>
+                </figure>
+              ))}
+            </div>
+            <label>
+              Photo focus · horizontal {value.photoFocusX}%
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={value.photoFocusX}
+                onChange={(e) =>
+                  update({ photoFocusX: Number(e.target.value) })
+                }
+              />
+            </label>
+            <label>
+              Photo focus · vertical {value.photoFocusY}%
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={value.photoFocusY}
+                onChange={(e) =>
+                  update({ photoFocusY: Number(e.target.value) })
+                }
+              />
+            </label>
+          </>
+        )}
+        <button
+          type="button"
+          disabled={busy || !loaded}
+          onClick={() => void save()}
+        >
+          {busy ? "Saving dish information…" : "Save dish information"}
+        </button>
+      </fieldset>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          clearWorkspaceDraft(key);
+          setLoaded(false);
+          setRetry((n) => n + 1);
+        }}
+      >
+        Reload saved details
+      </button>
+      {message && <p role="status">{message}</p>}
+    </details>
+  );
 }

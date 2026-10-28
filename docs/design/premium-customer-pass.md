@@ -7,7 +7,7 @@ owner-requested fixed pinch-zoom setting remain authoritative.
 | Priority | Audit item | Implementation and validation |
 | --- | --- | --- |
 | P1 | Reliable opening | Keep cached home settings during refresh failures; bounded eight-second refresh; preconnect to API origin; sampled settings timings. |
-| P1 | Food above the fold | Put authored phone campaigns after four complete dish cards; keep size families intact; compact branch introduction. Narrow-screen browser geometry assertion. |
+| P1 | Food above the fold | Put authored customer campaigns after four complete dish cards; keep size families intact; compact branch introduction. Phone and desktop browser geometry assertions. |
 | P1 | Calmer checkout | Compact verified identity presentation, preserve verification and pickup guards; omit settled empty add-ons; readable optional cards. Existing checkout suites remain required. |
 | P2 | Useful dish information | Owner-authored serving, ingredients, allergens, spice level and content checklist; bounded fields and branch authorization. No fabricated food facts. |
 | P2 | Consistent food imagery | Branch/SKU focal point with phone/desktop admin previews; apply to dish cards/details/collections; responsive image delivery. |
@@ -39,3 +39,14 @@ never fills missing facts automatically. Performance percentiles are bucket uppe
 bounds from sampled client documents on the current backend instance, reset at restart,
 not an all-instance analytics history. Physical-device and live payment-provider
 acceptance are distinct from the browser fixtures and must not be claimed by CI.
+
+## Review and validation record
+
+The local production frontend build, lint, TypeScript and 304 Node regressions in
+UTC and America/Los_Angeles pass. The initial PR CI run passed the backend integration
+suite, frontend build, visual-system and staff/admin suites, both deployment workloads
+and Render startup. The final revision additionally fixes search-suggestion dismissal
+moving a tap target, explicit saved navigation retaining conflicting browse filters,
+and desktop food placement. The affected browser journeys are rerun before the final
+full CI run. The mobile collection assertion now checks one entry per grouped dish
+rather than expecting the newly added collection to be absent.

@@ -1537,3 +1537,5 @@ Object.assign(hindi,{
  "Current prices and pickup availability are checked before you add.":"जोड़ने से पहले मौजूदा कीमत और पिकअप की उपलब्धता जाँची जाती है।",
  "Menu collections":"मेन्यू संग्रह","Fresh from":"ताज़ा व्यंजन ·","Browse new items":"नए व्यंजन देखें","Previous new items":"पिछले नए व्यंजन","Next new items":"अगले नए व्यंजन","Continue with Gokul":"गोकुल के साथ आगे बढ़ें"
 });
+
+Object.assign(hindi,{"Dish rating":"व्यंजन की रेटिंग","Customer review pages":"ग्राहकों की राय के पृष्ठ","Latest on the menu":"मेन्यू में नए व्यंजन","Explore the menu":"मेन्यू देखें","Explore menu":"मेन्यू देखें"});
