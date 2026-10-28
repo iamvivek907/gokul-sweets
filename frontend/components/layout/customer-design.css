@@ -1,9 +1,10 @@
 /* The menu's palette is the customer-wide design system. Staff and flag-OFF
    surfaces do not receive data-customer-design. Status colours remain semantic. */
 .future-storefront[data-customer-design=reference] {
- --customer-ink:#0c1029; --customer-muted:#596579; --customer-brand:#980c31;
- --customer-action:#8f1838; --customer-green:#087f55; --customer-line:#e9e3ec;
- --customer-lavender:#f1ecfa; --customer-peach:#ffe1d2; --customer-mint:#e1f3e8;
+ --customer-ink:#29242b; --customer-muted:#625b65; --customer-brand:#980c31;
+ --customer-action:#8f1838; --customer-green:#087f55; --customer-line:#e9e2eb;
+ --customer-lavender:#f4efff; --customer-peach:#fff1e5; --customer-mint:#eaf7ef;
+ --customer-control:44px; --customer-metadata:13px; --customer-card-radius:16px; --customer-space:12px;
  --journey-deep:var(--customer-action); --journey-teal:var(--customer-green);
  --journey-cream:#fff; --journey-coral:var(--customer-action);
  --journey-ink:var(--customer-ink); --journey-muted:var(--customer-muted);

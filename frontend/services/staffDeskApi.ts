@@ -44,6 +44,7 @@ export type DeskRow = {
     orderNumber: string;
     customerOrderNumber?: number | null;
     customerName: string;
+    customerPhone?: string | null;
     fulfillmentType: string;
     orderStatus: string;
     bucket: string;

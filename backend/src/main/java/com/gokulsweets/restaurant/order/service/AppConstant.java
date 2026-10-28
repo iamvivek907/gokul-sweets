@@ -42,7 +42,7 @@ public final class AppConstant {
     public static final String KITCHEN_PLANNING_SERVICE_BASE =
             """
 WITH timed AS (
-  SELECT o.id,o.order_number,o.customer_order_number,o.customer_name,o.fulfillment_type,o.order_status,
+  SELECT o.id,o.order_number,o.customer_order_number,o.customer_name,o.customer_phone,o.fulfillment_type,o.order_status,
    (o.fulfillment_type<>'DELIVERY' AND EXISTS(SELECT 1 FROM order_items i WHERE i.order_id=o.id)
      AND NOT EXISTS(SELECT 1 FROM order_items i LEFT JOIN branch_products bp ON bp.branch_id=o.branch_id AND bp.product_id=i.product_id
         WHERE i.order_id=o.id AND NOT COALESCE(bp.early_preparation_allowed,FALSE))) early_preparation,
