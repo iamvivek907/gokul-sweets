@@ -387,9 +387,21 @@ try {
     await page
       .getByRole("listbox", { name: "Recent searches", exact: true })
       .waitFor();
-    await page
-      .getByRole("button", { name: "Clear recent searches", exact: true })
-      .click();
+    await search.press("Tab");
+    const clearHistory = page.getByRole("button", {
+      name: "Clear recent searches",
+      exact: true,
+    });
+    assert.equal(
+      await clearHistory.evaluate((n) => n === document.activeElement),
+      true,
+    );
+    await clearHistory.press("Enter");
+    assert.equal(
+      await search.evaluate((n) => n === document.activeElement),
+      true,
+      "clearing history returns keyboard focus to search",
+    );
     await search.fill("समोसा");
     await first.waitFor();
     await search.fill("");
@@ -511,6 +523,11 @@ try {
       name: "Paneer Samosa",
       exact: true,
     });
+    assert.equal(
+      await detailsSheet.getByText("Regular price", { exact: true }).count(),
+      1,
+      "comparison prices have an explicit screen-reader label",
+    );
     await detailsSheet
       .getByText(
         "Extra dish details are temporarily unavailable. Check with the branch about ingredients and allergies.",

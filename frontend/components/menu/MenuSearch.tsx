@@ -252,6 +252,9 @@ export default function MenuSearch({
                   if (clearRecentSearches(localStorage, branchId))
                     window.dispatchEvent(new Event(MENU_PREFERENCE_EVENT));
                 } catch {}
+                surface.current
+                  ?.querySelector("input")
+                  ?.focus({ preventScroll: true });
                 setFocused(false);
               }}
             >
