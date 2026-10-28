@@ -446,9 +446,7 @@ try {
     await grouped
       .getByRole("button", { name: "Unsave Dahi · all sizes", exact: true })
       .waitFor();
-    await grouped
-      .getByRole("button", { name: "Choose options for Dahi", exact: true })
-      .click();
+    await grouped.getByRole("button", {name:"View details · Dahi",exact:true}).click();
     const picker = page.getByRole("dialog", { name: "Dahi", exact: true });
     await picker
       .getByRole("button", { name: "Unsave Dahi small", exact: true })

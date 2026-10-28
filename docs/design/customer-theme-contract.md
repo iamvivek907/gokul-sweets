@@ -373,3 +373,12 @@ preserves branch, search and status while returning to the first cursor page.
 Optional coin guidance follows the order list instead of displacing it.
 Desktop branch discovery separates photos from copy and centres one branch or a
 two-column multi-branch gallery; existing mobile cards remain unchanged.
+
+## Compact dish cards (October 28)
+
+Modern menu cards open details from a full-card native button, with independent Save,
+review and ordering controls above it. Grouped cards open their existing size picker.
+Do not nest interactive elements or make sold-out dishes impossible to inspect. On
+phones use the same photo/action lane for grouped and single dishes, compact natural
+copy height, 44px ordering targets and restrained emerald/cream surfaces. Hindi
+starting prices place the amount before “से”. Legacy storefront remains unchanged.

@@ -1,0 +1,25 @@
+/* Card actions are siblings: opening details never activates Add, Save or reviews. */
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card {isolation:isolate;position:relative}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .menu-card-open {position:absolute!important;inset:0!important;width:100%;height:100%;padding:0;min-height:0;border:0;border-radius:inherit;background:transparent;z-index:1;cursor:pointer}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card :is(.product-card-controls,.menu-save-dish,.product-card-rating,.menu-group-caption,.pickup-attention-action) {z-index:2}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card :is(.product-card-rating,.menu-group-caption,.pickup-attention-action) {position:relative}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-card-controls {border-radius:12px!important;box-shadow:0 4px 10px #087f5526,inset 0 1px 0 #fff!important}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card :is(button.product-card-controls,.product-card-controls>button) {background:linear-gradient(180deg,#fff,#e7fff1)!important;color:#087745!important;border:1px solid #0b9660!important;border-radius:12px!important;font-weight:800;min-height:44px!important}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card :is(button.product-card-controls,.product-card-controls>button):disabled {background:#f1f3f2!important;color:#69736d!important;border-color:#cdd5d0!important;box-shadow:none!important}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .menu-group-caption {position:relative;inset:auto;padding:0;gap:6px;justify-content:flex-start;font-size:12px}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .menu-group-caption button {min-height:44px;padding:4px 0;text-align:left;color:#7d2945;font-size:12px}
+@media(max-width:640px) {
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-product-card.gokul-menu-product-card {display:grid!important;grid-template-columns:minmax(0,1fr) 42%;align-items:start;min-height:188px!important;height:auto!important;padding:12px 10px 16px!important;margin:0 0 12px;border:1px solid #f0e4df!important;border-radius:20px!important;background:linear-gradient(125deg,#fff 55%,#fff8f0)!important;box-shadow:0 4px 14px #7b3d2010!important}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card>.product-card-image {grid-column:2;grid-row:1;width:100%!important;height:122px!important;min-height:0!important;aspect-ratio:auto;margin:0 0 54px!important;border-radius:16px!important}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-copy {grid-column:1;grid-row:1;min-height:0!important;padding:2px 12px 0 0!important;gap:3px}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-copy h3 {min-height:0!important;font-size:17px!important;line-height:1.35;margin:0!important}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-purchase {order:0;min-height:0!important;margin:5px 0 0!important;padding:0!important;gap:4px;align-items:flex-start;justify-content:flex-start}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-controls {position:absolute!important;top:140px!important;bottom:auto!important;right:calc(10px + 3%)!important;width:36%!important;height:44px!important;min-height:44px!important;margin:0!important;padding:0}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-controls [role=group],.future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-controls [role=group] button {height:44px!important;min-height:44px!important}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .menu-product-caption {position:static!important;inset:auto!important;white-space:normal;width:auto;text-align:left;font-size:11px}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .menu-availability-note {order:3;font-size:12px;line-height:1.4;margin:5px 0!important;padding:5px 7px!important;border:0;background:#fff0e2;border-radius:8px}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-description {order:1;max-width:none;margin:3px 0!important}
+ .future-storefront[data-customer-design=reference][data-premium-menu=true] .mobile-portion-card>.menu-availability-note {font-size:12px;line-height:1.4;margin:0 0 8px;padding:6px 10px}
+}
+
+@media(max-width:640px){.future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-copy>p.truncate{display:none}}

@@ -5,7 +5,7 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'
 const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311',screens=process.env.SCREENSHOT_DIR??'/tmp/gokul-compact-header';
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
-const products=Array.from({length:30},(_,i)=>({id:i+1,name:i===0?'Rasgulla':`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:15,comparisonPrice:i===0?30:i===1?10:null,available:true,saleMode:'UNIT',imageUrl:i===2?'/missing-food.webp':'/arrival-mithai.webp'}));
+const products=Array.from({length:30},(_,i)=>({id:i+1,name:i===0?'Rasgulla':`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:15,comparisonPrice:i===0?30:i===1?10:null,available:true,saleMode:i===3?'WEIGHT':'UNIT',minimumWeightGrams:250,imageUrl:i===2?'/missing-food.webp':'/arrival-mithai.webp'}));
 const categories=[{id:1,name:'Sweets',products},...['Food','Bakery','Snacks'].map((name,i)=>({id:i+2,name,products:[{...products[0],id:31+i,name:`${name} favourite`,categoryId:i+2,categoryName:name}]}))];
 const banner={key:'festival',titleEn:'Celebrate Diwali',subtitleEn:'Sweets, meals & easy pickup.',buttonLabel:'Explore sweets',categoryId:1,visible:true,order:0,mediaUrl:'/arrival-mithai.webp',mediaType:'image/webp',frame:{x:50,y:50,zoom:100,fit:'COVER'}};
 const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:20,priorityEnabled:false};
@@ -61,6 +61,16 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
 
  if(enabled){
   const original=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+  const dish=page.locator('#gokul-product-1 .gokul-menu-product-card');
+  assert.equal(await dish.locator('.menu-card-open span').evaluate(n=>getComputedStyle(n).position),'absolute','details label is accessible without a visible link');
+  if(width<=640){
+   const geometry=await dish.evaluate(n=>{const card=n.getBoundingClientRect(),photo=n.querySelector('.product-card-image').getBoundingClientRect(),add=n.querySelector('.product-card-controls').getBoundingClientRect(),price=n.querySelector('.product-card-purchase').getBoundingClientRect();return {height:card.height,gap:add.top-photo.bottom,control:add.height,price:price.height};});
+   assert.ok(geometry.height<310,`compact dish height ${geometry.height}`);
+   assert.ok(geometry.gap>=0&&geometry.gap<20,'Add sits directly below the photo');
+   assert.ok(geometry.control>=44,'Add retains a 44px touch target');
+   assert.ok(geometry.price<100,'price block does not reserve empty space');
+  }
+
   const trigger=page.getByRole('button',{name:'View details · Rasgulla',exact:true});
   await trigger.click();const details=page.getByRole('dialog',{name:'Rasgulla',exact:true});await details.waitFor();
   if(width>640){
@@ -89,5 +99,12 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
  const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
  await mkdir(screens,{recursive:true});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${screens}/menu-presentation-${width}-${expired?'expired':'selected'}-${enabled}.png`});
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),before);
+ if(enabled&&width===390&&!expired){
+  await page.getByRole('button',{name:'Language / भाषा',exact:true}).click();
+  await page.getByRole('button',{name:/हिन्दी.*अपनी भाषा/}).click();
+  const starting=page.locator('#gokul-product-4 .product-card-purchase>span').first();
+  assert.match(await starting.innerText(),/₹[\d.]+ से/,'Hindi puts the starting amount before से');
+  assert.doesNotMatch(await starting.innerText(),/^से/);
+ }
  assert.deepEqual(errors,[]);await context.close();console.log(`Menu presentation ${width}px expired=${expired} enabled=${enabled} passed`);
 }}finally{await Promise.all([browser.close(),classicBrowser.close()]);}
