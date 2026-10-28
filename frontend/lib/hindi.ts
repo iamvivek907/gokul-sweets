@@ -1539,3 +1539,5 @@ Object.assign(hindi,{
 });
 
 Object.assign(hindi,{"Dish rating":"व्यंजन की रेटिंग","Customer review pages":"ग्राहकों की राय के पृष्ठ","Latest on the menu":"मेन्यू में नए व्यंजन","Explore the menu":"मेन्यू देखें","Explore menu":"मेन्यू देखें"});
+
+Object.assign(hindi,{"Customer contact":"ग्राहक का संपर्क","Call customer":"ग्राहक को कॉल करें","Phone unavailable":"फ़ोन नंबर उपलब्ध नहीं है"});

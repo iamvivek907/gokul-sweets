@@ -88,6 +88,7 @@ export default function MenuExperience({
       (values) => {
         for (const value of values)
           if (all.includes(value.productId)) gathered[value.productId] = value;
+        setSnapshot({ key, details: { ...gathered }, failedIds: [...failedIds] });
       },
       controller.signal,
     ).then(() => {

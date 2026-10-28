@@ -5733,7 +5733,7 @@ function OrderDetailDrawer({
                                                 </p>
 
 
-                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction orderNumber={order.orderNumber} customerOrderNumber={order.customerOrderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
+                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction customerName={order.customerName} customerPhone={order.customerPhone} orderNumber={order.orderNumber} customerOrderNumber={order.customerOrderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
                                                 <button
                                                     type="button"
                                                     disabled={

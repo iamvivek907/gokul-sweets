@@ -90,6 +90,12 @@ class KitchenPlanningIntegrationTest {
         assertThat(queue(LocalDate.of(2026, 10, 1), LocalTime.of(18, 0), 1)).hasSize(3);
         assertThat(queueCount(LocalDate.of(2026, 10, 1), LocalTime.of(18, 0))).isEqualTo(23);
         assertThat(first.total()).isEqualTo(23);
+        assertThat(first.orders())
+                .allSatisfy(
+                        row -> {
+                            assertThat(row.customerName()).isEqualTo("Test");
+                            assertThat(row.customerPhone()).isEqualTo("9876543210");
+                        });
         assertThat(first.orders()).hasSize(20);
         assertThat(first.slots()).hasSize(1);
         assertThat(first.slots().getFirst().total()).isEqualTo(25);
