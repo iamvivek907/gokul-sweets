@@ -23,3 +23,15 @@
 }
 
 @media(max-width:640px){.future-storefront[data-customer-design=reference][data-premium-menu=true] .gokul-menu-product-card .product-card-copy>p.truncate{display:none}}
+/* Crisp food imagery and strong price/action hierarchy, without decorative motion. */
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-card-image {box-shadow:inset 0 0 0 1px #4120180a,0 3px 10px #4120180a}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-card-purchase>span:first-child {font-weight:750;color:#292323;letter-spacing:-.015em}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .menu-sale-price {border-radius:5px;padding:3px 6px;background:#ffdf33;color:#211b0c;box-shadow:0 2px 0 #d8b723}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card .product-rating-summary {background:#e5f7ec;border-radius:6px;padding:3px 6px;color:#087745}
+.future-storefront[data-customer-design=reference] .gokul-menu-product-card :is(button.product-card-controls,.product-card-controls>button):enabled:hover {background:linear-gradient(180deg,#f5fff9,#d1f9e3)!important;box-shadow:0 5px 12px #087f5533}
+.future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-hint {margin:0 0 16px;color:#665b63;font-size:14px;line-height:1.5}
+.future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-show-results {display:block;min-height:48px;width:100%;margin-top:20px;padding:12px;border-radius:14px;background:#951436;color:#fff;font-weight:750}
+.future-storefront[data-customer-design=reference] .menu-search-dialog .menu-search-suggestions {max-height:40dvh;overflow-y:auto}
+@media(max-width:640px){
+ .future-storefront[data-customer-design=reference] .menu-search-dialog {height:auto;max-height:85dvh;padding-bottom:env(safe-area-inset-bottom)}
+}

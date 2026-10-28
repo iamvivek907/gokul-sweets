@@ -382,3 +382,9 @@ Do not nest interactive elements or make sold-out dishes impossible to inspect. 
 phones use the same photo/action lane for grouped and single dishes, compact natural
 copy height, 44px ordering targets and restrained emerald/cream surfaces. Hindi
 starting prices place the amount before “से”. Legacy storefront remains unchanged.
+
+The compact header search opens a modal draft without scrolling the background or
+changing the active menu filter. Close/Escape discard the draft and restore the
+original browsing position and trigger focus. Only explicit submission or choosing
+a suggestion applies the filter and reveals matching dishes. Draft typing does
+not persist recent searches. Keep branch, pickup and cart unchanged.
