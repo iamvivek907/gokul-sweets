@@ -73,7 +73,27 @@ try{for(const [width,enabled,expired=false,reduced=true,classic=false] of [[320,
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),saved);
   assert.equal(await page.locator('.menu-compact-pickup').evaluate(n=>document.activeElement===n),true);
  }
- await page.locator('.menu-compact-search').click();await page.waitForFunction(()=>document.activeElement?.id==='gokul-menu-search');await page.locator('#gokul-menu-search').fill('Rasgulla');await page.locator('#gokul-product-1').waitFor();assert.equal(await page.locator('#gokul-product-2').count(),0,'compact search uses the existing menu filter');await page.locator('#gokul-menu-search').fill('');
+ const searchScroll=await page.evaluate(()=>scrollY);
+ const dishPositionBefore=await page.locator('#gokul-product-10').evaluate(n=>n.getBoundingClientRect().y);
+ const cartBeforeSearch=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+ await page.locator('.menu-compact-search').click();
+ const searchDialog=page.getByRole('dialog',{name:'Search the menu',exact:true});await searchDialog.waitFor();
+ assert.ok(Math.abs((await page.locator('#gokul-product-10').evaluate(n=>n.getBoundingClientRect().y))-dishPositionBefore)<2,'opening search does not move the dishes behind it');
+ const searchInput=searchDialog.locator('input[type=search]');await searchInput.focus();await searchInput.fill('Rasgulla');
+ await page.screenshot({path:`${screens}/search-panel-${width}.png`});
+ assert.equal(await page.locator('#gokul-menu-search').inputValue(),'','draft search does not filter the menu behind the dialog');
+ assert.equal(await page.locator('#gokul-product-2').count(),1,'opening and drafting search retains existing menu items');
+ await searchDialog.getByRole('button',{name:'Close ×',exact:true}).click();await searchDialog.waitFor({state:'hidden'});
+ assert.ok(Math.abs((await page.evaluate(()=>scrollY))-searchScroll)<2,'cancelling search returns to exactly the browsing position');
+ await page.waitForFunction(()=>document.activeElement===document.querySelector('.menu-compact-search'));
+ await page.locator('.menu-compact-search').click();await searchDialog.waitFor();await searchInput.fill('Rasgulla');await searchInput.press('Escape');
+ await searchDialog.waitFor({state:'hidden'});
+ assert.ok(Math.abs((await page.evaluate(()=>scrollY))-searchScroll)<2,'Escape preserves browsing position');
+ await page.locator('.menu-compact-search').click();await searchDialog.waitFor();await searchInput.fill('Rasgulla');
+ await searchDialog.getByRole('button',{name:'Show results',exact:true}).click();await searchDialog.waitFor({state:'hidden'});
+ await page.locator('#gokul-product-1').waitFor();assert.equal(await page.locator('#gokul-product-2').count(),0,'explicit submit applies the existing menu filter');
+ assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cartBeforeSearch,'search never changes the cart');
+ await page.locator('#gokul-menu-search').fill('');
  await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.waitForFunction(()=>!document.querySelector('.customer-site-header[data-menu-compact]'));await page.locator('.menu-compact-header').waitFor({state:'hidden'});assert.equal(await page.locator('.menu-compact-header').evaluate(n=>n.inert),true);assert.equal(await header.locator('[data-header-content]').evaluate(n=>getComputedStyle(n).opacity),'1');assert.equal(await header.locator('[data-header-content]').evaluate(n=>n.inert),false);assert.equal(await header.locator('[data-header-content]').getAttribute('aria-hidden'),null);
  await page.screenshot({path:`${screens}/expanded-pickup-${width}.png`});
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);assert.deepEqual(errors,[]);await context.close();console.log(`Compact pickup transition, stable scroll, original picker/search and restoration passed ${width}px`);

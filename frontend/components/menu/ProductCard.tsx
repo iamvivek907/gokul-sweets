@@ -2,8 +2,9 @@
 import {useMenuExperience,SaveDish,DishReviewAction} from "./MenuExperience";
 import {dishPhotoPosition} from "@/types/menuDetails";
 import {requestMenuPickup} from "@/lib/menuPickupRecovery";
-import {T,useTranslation} from "@/lib/language";
+import {T,useTranslation,useLanguage} from "@/lib/language";
 import ProductDetailsSheet from "./ProductDetailsSheet";
+import styles from "./ProductCard.module.css";
 import FoodPlaceholder from "./FoodPlaceholder";
 import {menuMoney,menuDescription,comparisonPrice} from "@/lib/menuPresentationDetails";
 
@@ -16,6 +17,7 @@ import type { ProductRatingSummary } from "@/types/review";
 
 
 interface ProductCardProps {
+ onOpenDetails?:()=>void;
  groupProductIds?:number[];
     dietaryLabel?: ReactNode;
     portionOptions?: ReactNode;
@@ -94,8 +96,10 @@ export default function ProductCard({
     onDecrease,
     onAdd,
     groupProductIds,
+    onOpenDetails,
 }: ProductCardProps) {
     const t=useTranslation();
+    const locale=useLanguage();
     const {details}=useMenuExperience();
     const memberIds=groupProductIds??[product.id];
     const [showDetails,setShowDetails]=useState(false);
@@ -130,6 +134,7 @@ export default function ProductCard({
             onPointerDownCapture={event=>{if(unavailableForPickup&&!pickupChecking&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
             className={`
                 gokul-product-card group
+                ${refined ? styles.card : ""}
                 ${refined ? "gokul-menu-product-card" : ""}
                 flex
                 min-h-32
@@ -150,6 +155,7 @@ export default function ProductCard({
         >
 
 
+            {refined&&<button type="button" className={`${styles.open} menu-details-trigger menu-card-open`} aria-label={`${t("View details")} · ${product.name}`} onClick={()=>onOpenDetails?onOpenDetails():setShowDetails(true)}><span className="sr-only">{t("View details")} · {product.name}</span></button>}
             {/* ============================================================ */}
             {/* Product Image                                                 */}
 
@@ -317,7 +323,6 @@ export default function ProductCard({
                 )}
 
                 {refined&&unavailableForPickup&&product.available&&!purchaseControl&&!pickupChecking&&pickupMessage!=="Checking pickup"&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(product.id)}><T text="Choose another pickup"/></button>}
-                {refined&&!priceFrom&&<button type="button" className="menu-details-trigger" aria-label={`${t("View details")} · ${product.name}`} onClick={()=>setShowDetails(true)}><T text="View details"/><span aria-hidden="true"> ↗</span></button>}
                 {/* Rating */}
 
                 {(!refined||ratingLoading||!!ratingSummary?.ratingCount)&&<div data-has-rating={!!ratingSummary?.ratingCount} className="product-card-rating mt-1.5 flex min-h-5 items-center">
@@ -429,9 +434,10 @@ export default function ProductCard({
 
                         sm:text-base
                     ">
-                        {(priceFrom||premium&&isWeighted)&&<><T text="From"/> </>}
+                        {(priceFrom||premium&&isWeighted)&&locale!=="hi"&&<><T text="From"/> </>}
                         {(premium||refined)&&!priceFrom&&previous!==null&&<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{formatCurrency(premium&&isWeighted?previous*(product.minimumWeightGrams??250)/1000:previous,true,true)}</s><span className="sr-only"> <T text="Selling price"/> </span></>}
                         <span className={(premium||refined)&&!priceFrom&&previous!==null?"menu-sale-price":undefined}>{formatCurrency(premium&&isWeighted?product.price*(product.minimumWeightGrams??250)/1000:product.price,refined,premium)}</span>
+                        {(priceFrom||premium&&isWeighted)&&locale==="hi"&&<> से</>}
                         {premium&&!isWeighted&&!priceFrom&&/sweet|mithai|मिठाई/i.test(product.categoryName)&&<span className="menu-unit-price-suffix"> <T text="/ piece"/></span>}
 
                         {
@@ -451,7 +457,7 @@ export default function ProductCard({
                     </span>
 
                     {refined && isWeighted && !premium && <span className="text-[10px] text-[#665550]" aria-label="Minimum weight">
-                        <T text="From" />{" "}{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)} <T text="for" />{" "}{formatWeight(product.minimumWeightGrams ?? 250)}
+                        {locale!=="hi"&&<><T text="From" /> </>}{formatCurrency(product.price * (product.minimumWeightGrams ?? 250) / 1000, true)}{locale==="hi"&&" से"} <T text="for" />{" "}{formatWeight(product.minimumWeightGrams ?? 250)}
                     </span>}
 
 
