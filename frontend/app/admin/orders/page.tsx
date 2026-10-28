@@ -4,6 +4,7 @@ import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T} from "@/lib/language";
 
 
+import PickupCustomerContact from "@/components/admin/PickupCustomerContact";
 import PickupHandoverAction from "@/components/admin/PickupHandoverAction";
 import {formatWeight} from "@/lib/orderQuantity";
 
@@ -5887,31 +5888,12 @@ function OrderDetailDrawer({
                                     title="Customer"
                                 >
 
-                                    <div
-                                        className="
-                                            grid
-                                            gap-3
-
-                                            sm:grid-cols-2
-                                        "
-                                    >
-
-                                        <DetailValue
-                                            label="Customer name"
-                                            value={
-                                                order.customerName
-                                            }
-                                        />
-
-
-                                        <DetailValue
-                                            label="Phone"
-                                            value={
-                                                order.customerPhone
-                                            }
-                                        />
-
-                                    </div>
+                                    <PickupCustomerContact
+                                        customerName={order.customerName}
+                                        customerPhone={order.customerPhone}
+                                        status={order.orderStatus}
+                                        fulfillment={order.fulfillmentType}
+                                    />
 
                                 </DetailSection>
 
