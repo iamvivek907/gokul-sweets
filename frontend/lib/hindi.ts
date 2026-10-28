@@ -1543,3 +1543,5 @@ Object.assign(hindi,{"Dish rating":"व्यंजन की रेटिंग
 Object.assign(hindi,{"Customer contact":"ग्राहक का संपर्क","Call customer":"ग्राहक को कॉल करें","Phone unavailable":"फ़ोन नंबर उपलब्ध नहीं है"});
 
 Object.assign(hindi,{"Selected pickup branch":"चुनी हुई पिकअप शाखा"});
+
+Object.assign(hindi,{"Date range":"तारीख़ की सीमा","Applied":"लागू","Clear dates":"तारीख़ें हटाएँ","Clear start date":"आरंभ तारीख़ हटाएँ","Clear end date":"अंतिम तारीख़ हटाएँ"});
