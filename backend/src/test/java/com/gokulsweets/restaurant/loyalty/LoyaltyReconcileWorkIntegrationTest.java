@@ -164,4 +164,28 @@ class LoyaltyReconcileWorkIntegrationTest {
         jdbc.update("DELETE FROM orders WHERE id=1");
         assertThat(worker().claim()).isEmpty();
     }
+
+    @Test
+    void upgradeBackfillFindsExistingWorkWithoutReplayingSettledRewards() throws Exception {
+        jdbc.execute(
+                "INSERT INTO orders VALUES"
+                    + " (1,true,'PICKED_UP'),(2,true,'PICKED_UP'),(3,false,'CANCELLED'),(4,false,'PICKED_UP'),(5,true,'CANCELLED'),(6,true,'CANCELLED')");
+        jdbc.execute("INSERT INTO verified_order_ownership SELECT id FROM orders");
+        jdbc.execute("INSERT INTO payments VALUES (1,1,'PAID'),(2,2,'PAID'),(4,4,'PAID')");
+        jdbc.execute("INSERT INTO loyalty_holds VALUES (3,'RESERVED')");
+        jdbc.execute(
+                "INSERT INTO loyalty_account_ledger VALUES"
+                        + " (1,'EARNED'),(5,'EARNED'),(6,'EARNED'),(6,'REVERSED')");
+        jdbc.execute("DELETE FROM loyalty_reconcile_work");
+        String migration =
+                Files.readString(
+                        Path.of(
+                                "src/main/resources/db/migration/V143__loyalty_pending_work_backfill.sql"));
+        jdbc.execute(migration);
+        assertThat(
+                        jdbc.queryForList(
+                                "SELECT order_id FROM loyalty_reconcile_work ORDER BY order_id",
+                                Long.class))
+                .containsExactly(2L, 3L, 5L);
+    }
 }

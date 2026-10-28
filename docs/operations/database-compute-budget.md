@@ -15,6 +15,9 @@ Do not disable those schedules to make a live-order deployment fit Free.
   does not hold queue locks while acquiring order locks. Versioned acknowledgements
   cannot delete later changes. Failed work retries with bounded delay; expired leases
   recover after five minutes. Empty polls back off from 15 to at most 60 seconds.
+- The migration performs one reconciliation-candidate backfill so pre-existing missed
+  rewards/holds do not wait behind the historical cursor. This is a one-time historical
+  read during deployment; schedule migration appropriately for very large histories.
 - Historical repair examines at most 1000 order IDs every five minutes using a persisted,
   wrapping cursor. It never runs the old predicate over unbounded order history every
   15 seconds. A complete historical pass takes proportionally longer as history grows.

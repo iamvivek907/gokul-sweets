@@ -8,14 +8,21 @@ import os
 import statistics
 import time
 import urllib.request
-from zoneinfo import ZoneInfo
 
 BASE = 'http://127.0.0.1:10000'
 ITEMS, MENU_ITEMS, MENU_BATCHES = [], [], []
-TODAY = datetime.datetime.now(ZoneInfo('Asia/Kolkata')).date()
+SERVICE_DATE = None  # Explicit seed anchor, assigned by main; never captured from the wall clock.
 PREVIEW_DEADLINE_SECONDS = 8
 VARIED_USERS = tuple(int(value) for value in os.environ.get('GOKUL_CI_VARIED_USERS', '10,100').split(','))
 PREVIEW_USERS = tuple(int(value) for value in os.environ.get('GOKUL_CI_PREVIEW_USERS', '100,500').split(','))
+
+
+def fixture_service_date():
+    """Use the database seed's date, including when the workload crosses IST midnight."""
+    value = os.environ.get('GOKUL_CI_SERVICE_DATE')
+    if not value:
+        raise ValueError('Set GOKUL_CI_SERVICE_DATE to the seeded inventory gap date')
+    return datetime.date.fromisoformat(value)
 
 
 def load_fixture():
@@ -67,17 +74,17 @@ async def request(user, iteration):
         headers = {'Cookie': 'gokul_staff=memory_ci_' + str(user % 100 + 1).zfill(33)}
     elif iteration % 3 == 1:
         path = '/api/branches/10001/inventory/check'
-        payload = dict(serviceDate=TODAY.isoformat(), items=ITEMS)
+        payload = dict(serviceDate=SERVICE_DATE.isoformat(), items=ITEMS)
     elif iteration % 3 == 2:
         path = '/api/branches/10001/availability'
-        payload = dict(startDate=(TODAY + datetime.timedelta(days=1)).isoformat(), days=7, items=ITEMS)
+        payload = dict(startDate=(SERVICE_DATE + datetime.timedelta(days=1)).isoformat(), days=7, items=ITEMS)
     else:
         path = '/api/menu?branchId=10001&view=availability'
     data = await http_json(path, payload, headers)
     if not staff and payload is None and len(data.get('items', [])) != 379:
         raise ValueError('Incomplete menu availability')
     if path.endswith('/inventory/check'):
-        expected = (TODAY + datetime.timedelta(days=1)).isoformat()
+        expected = (SERVICE_DATE + datetime.timedelta(days=1)).isoformat()
         actual = data.get('suggestedServiceDate', data.get('suggestedDate'))
         if actual != expected:
             raise ValueError(f'Incorrect inventory date suggestion: expected {expected}, got {actual}; orderable={data.get("orderable")}')
@@ -86,14 +93,14 @@ async def request(user, iteration):
 
 
 async def discovery(user, iteration):
-    result = await http_json('/api/branches/10001/pickup-discovery?startDate=' + TODAY.isoformat() + '&days=31')
+    result = await http_json('/api/branches/10001/pickup-discovery?startDate=' + SERVICE_DATE.isoformat() + '&days=31')
     if not result.get('dates') or any(day.get('items') for day in result['dates']):
         raise ValueError('Expected lightweight dates without item inventory matrix')
 
 
 async def menu_preview_batches(user, iteration, varied=False):
     """Match the browser's full-menu, selected-date preview and sequential 100-item batches."""
-    date = (TODAY + datetime.timedelta(days=1 + user % 7 if varied else 1)).isoformat()
+    date = (SERVICE_DATE + datetime.timedelta(days=1 + user % 7 if varied else 1)).isoformat()
     for original in MENU_BATCHES:
         batch = [dict(item, quantity=user + 1 if index == 0 else 1) for index, item in enumerate(original)] if varied else original
         result = await http_json('/api/branches/10001/availability?menuPreview=true&compact=true',
@@ -128,7 +135,7 @@ async def varied_preview(user, iteration):
 
 
 async def varied_cart(user, iteration):
-    date = (TODAY + datetime.timedelta(days=1 + (user + iteration) % 7)).isoformat()
+    date = (SERVICE_DATE + datetime.timedelta(days=1 + (user + iteration) % 7)).isoformat()
     # Different subsets and quantities prevent identical-request coordination.
     offset = (user * 13 + iteration) % max(1, len(MENU_ITEMS) - 5)
     items = [dict(item, quantity=1 + user + index) for index, item in enumerate(MENU_ITEMS[offset:offset + 1 + user % 5])]
@@ -188,6 +195,8 @@ async def stage(users, action, rounds, scenario):
 
 
 async def main():
+    global SERVICE_DATE
+    SERVICE_DATE = fixture_service_date()
     load_fixture()
     failed = False
     for users in (1, 10, 50, 100, 500, 1000):

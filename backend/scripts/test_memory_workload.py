@@ -1,6 +1,7 @@
 """Complete-preview deadline regressions without live service or database traffic."""
 import asyncio
 import contextlib
+import datetime
 import importlib.util
 import io
 import json
@@ -16,6 +17,9 @@ spec.loader.exec_module(workload)
 
 class PreviewDeadlineTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
+        date_patch = patch.object(workload, "SERVICE_DATE", datetime.date(2026, 10, 30))
+        date_patch.start()
+        self.addCleanup(date_patch.stop)
         for name, value in [('PREVIEW_DEADLINE_SECONDS', .2),
                             ('MENU_BATCHES', [[dict(productId=i, quantity=1)] for i in (1, 2, 3)])]:
             replacement = patch.object(workload, name, value)
@@ -63,11 +67,12 @@ class PreviewDeadlineTest(unittest.IsolatedAsyncioTestCase):
             with self.assertRaises(TimeoutError):
                 await workload.menu_preview(0, 0)
 
-
-if __name__ == '__main__':
-    unittest.main()
-
 class VariedScopeTest(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        date_patch = patch.object(workload, "SERVICE_DATE", datetime.date(2026, 10, 30))
+        date_patch.start()
+        self.addCleanup(date_patch.stop)
+
     async def test_unique_quantities_dates_and_all_batches(self):
         calls = []
         async def response(path, body):
@@ -90,3 +95,39 @@ class VariedScopeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(report['completed'], 0)
         with patch.object(workload, 'varied_preview', AsyncMock(side_effect=ValueError('wrong scope'))), contextlib.redirect_stdout(io.StringIO()):
             self.assertTrue(await workload.stage(1, workload.varied_preview, 1, 'varied-capacity'))
+
+
+class FixtureDateTest(unittest.TestCase):
+    def test_explicit_seed_date_survives_a_midnight_rollover(self):
+        with patch.dict(workload.os.environ, {"GOKUL_CI_SERVICE_DATE": "2026-10-30"}):
+            self.assertEqual(workload.fixture_service_date(), datetime.date(2026, 10, 30))
+            # No process-start or runner-local date is used as the fixture's identity.
+            with patch.object(workload.datetime, "datetime", Mock(side_effect=AssertionError("wall clock read"))):
+                self.assertEqual(workload.fixture_service_date(), datetime.date(2026, 10, 30))
+
+    def test_missing_or_invalid_seed_dates_fail_before_traffic(self):
+        with patch.dict(workload.os.environ, {}, clear=True):
+            with self.assertRaisesRegex(ValueError, "GOKUL_CI_SERVICE_DATE"):
+                workload.fixture_service_date()
+        with patch.dict(workload.os.environ, {"GOKUL_CI_SERVICE_DATE": "not-a-date"}):
+            with self.assertRaises(ValueError):
+                workload.fixture_service_date()
+
+
+class AnchoredRequestsTest(unittest.IsolatedAsyncioTestCase):
+    async def test_inventory_gap_and_suggestion_use_the_seed_anchor(self):
+        anchor = datetime.date(2026, 10, 30)
+        api = AsyncMock(return_value={"suggestedServiceDate": "2026-10-31", "orderable": False})
+        with patch.object(workload, "SERVICE_DATE", anchor), patch.object(workload, "http_json", api):
+            await workload.request(1, 1)
+        self.assertEqual(api.await_args.args[1]["serviceDate"], "2026-10-30")
+
+    async def test_discovery_uses_the_same_anchor(self):
+        api = AsyncMock(return_value={"dates": [{"date": "2026-10-30"}]})
+        with patch.object(workload, "SERVICE_DATE", datetime.date(2026, 10, 30)), patch.object(workload, "http_json", api):
+            await workload.discovery(0, 0)
+        self.assertIn("startDate=2026-10-30&days=31", api.await_args.args[0])
+
+
+if __name__ == '__main__':
+    unittest.main()
