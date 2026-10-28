@@ -6,8 +6,9 @@ import styles from "./BranchMenuAppearance.module.css";
 export default function BranchMenuAppearance({
   config,
   categories,
-  onSelect,
+  onSelect,position,onPositionChange,
 }: {
+  position?:number;onPositionChange?:(index:number)=>void;
   config: AppearanceConfig | null;
   categories: { id: number; name: string }[];
   onSelect: (id: number) => void;
@@ -15,7 +16,7 @@ export default function BranchMenuAppearance({
   if (!config || (!config.banners.length && !config.categories.length)) return null;
   return (
     <section className={styles.appearance} aria-label="Branch menu highlights">
-      <MenuCampaignBanners banners={config.banners} categories={categories} onSelect={onSelect} />
+      <MenuCampaignBanners position={position} onPositionChange={onPositionChange} banners={config.banners} categories={categories} onSelect={onSelect} />
       {config.categories.length > 0 && (
         <div className={styles.categories}>
           {[...config.categories]

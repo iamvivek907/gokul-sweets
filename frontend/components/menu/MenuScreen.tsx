@@ -655,6 +655,9 @@ export default function MenuScreen() {
     const phone=usePhoneViewport();
     const groupedMenu=mobileFeatures?.contextualStorefrontV2===true&&(mobileFeatures.futuristicStorefrontV2===true||mobileFeatures.checkoutExperienceV2===true);
     const phoneMenu=phone===true&&groupedMenu;
+    const [campaignPosition,setCampaignPosition]=useState<{key:string;index:number}|null>(null);
+    const campaignKey=JSON.stringify([branch?.id,appearance?.banners,categories.map(category=>category.id)]);
+    const campaignControls={position:campaignPosition?.key===campaignKey?campaignPosition.index:0,onPositionChange:(index:number)=>setCampaignPosition(previous=>previous?.key===campaignKey&&previous.index===index?previous:{key:campaignKey,index})};
     const favourites=useMenuFavourites(branch?.id);
     const [savedOnly,setSavedOnly]=useState(false);
     function changeSavedFilter(value:boolean){setSavedOnly(value);const url=new URL(location.href);if(value){url.searchParams.set("saved","1");url.searchParams.delete("category");}else url.searchParams.delete("saved");if(url.href!==location.href)history.replaceState(history.state,"",url);if(value){setSearch("");setSelectedCategoryId(null);setMobileCategories([]);setBrowseCategory(null);setMaximumPrice(null);setPortionsOnly(false);}}
@@ -1317,7 +1320,7 @@ export default function MenuScreen() {
 
                 </div>
                 </MenuToolbar>
-                {!phoneMenu && !groupedMenu && <BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
+                {!phoneMenu && !groupedMenu && <BranchMenuAppearance {...campaignControls} config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}
 
 
                 {phoneMenu&&mobileFeatures?.pickupAddOns&&<MenuOffers branchId={branch.id} onTarget={onMenuTarget}/>}
@@ -1454,7 +1457,7 @@ export default function MenuScreen() {
 
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? <div>
-                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{phoneMenu?<MenuCampaignBanners banners={appearance?.banners ?? []} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact/>:<BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}{pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
+                                    {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{phoneMenu?<MenuCampaignBanners {...campaignControls} banners={appearance?.banners ?? []} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact/>:<BranchMenuAppearance {...campaignControls} config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}{pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}
                                 </div> : (
                                 <ProductGrid
                                     pairingSeed={pairingSeed}
