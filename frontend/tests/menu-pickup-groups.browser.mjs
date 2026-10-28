@@ -35,7 +35,7 @@ try{for(const family of ['Food','Sweets']){for(const width of [320,390,640]){
  await card.getByText('Half service starts at 11 AM.',{exact:false}).waitFor();
  await card.getByText('Full service starts at noon.',{exact:false}).waitFor();
  assert.equal(await card.getByRole('button',{name:'Choose options for Paratha',exact:true}).isDisabled(),true);
- assert.equal(await card.getByRole('button',{name:'Choose options for Paratha',exact:true}).evaluate(node=>getComputedStyle(node).color),'rgb(102, 112, 106)','disabled Add is visibly grey');
+ assert.equal(await card.getByRole('button',{name:'Choose options for Paratha',exact:true}).evaluate(node=>getComputedStyle(node).color),'rgb(105, 115, 109)','disabled Add uses the muted disabled token');
  assert.equal(await page.locator('.mobile-portion-card').count(),1);
  assert.equal(await page.getByRole('region',{name:'Other menu items'}).count(),0);
  assert.equal(await page.locator('.gokul-menu-product-grid').first().evaluate(node=>getComputedStyle(node).gridTemplateColumns.split(' ').length),1,'each phone family has one product column');

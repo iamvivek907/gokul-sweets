@@ -3,7 +3,7 @@ const React=require('react'),{renderToStaticMarkup}=require('react-dom/server');
 const presentation={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/menuPresentationDetails.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:presentation,Intl});
 const exportsOfCard={};
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('components/menu/MobilePortionCard.tsx','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{
- exports:exportsOfCard,Intl,require:id=>id==='react'?React:id==='react/jsx-runtime'?require(id):id==='@/lib/menuPresentationDetails'?presentation:id==='@/lib/language'?{T:({text})=>text}:id.endsWith('ProductCard')?{default:({product,purchaseControl})=>React.createElement('article',null,product.description,purchaseControl)}:{default:()=>null}
+ exports:exportsOfCard,Intl,require:id=>id==='react'?React:id==='react/jsx-runtime'?require(id):id==='@/lib/menuPresentationDetails'?presentation:id==='@/lib/language'?{T:({text})=>text}:id.endsWith('ProductCard')?{default:({product,purchaseControl,portionOptions})=>React.createElement('article',null,product.description,portionOptions,purchaseControl)}:{default:()=>null}
 });
 const group={key:'paratha',title:'Paratha',choices:[{productId:1,label:'Half'},{productId:2,label:'Full'}]};
 const products=[{id:1,name:'Half Paratha',price:50,available:true},{id:2,name:'Full Paratha',price:90,available:true}];

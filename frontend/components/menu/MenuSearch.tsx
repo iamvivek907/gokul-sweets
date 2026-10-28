@@ -6,6 +6,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import { T, useTranslation } from "@/lib/language";
 import { menuSearchSuggestions, matchesMenuSearch } from "@/lib/menuSearch";
 import {
@@ -33,6 +34,9 @@ const subscribe = (changed: () => void) => {
   };
 };
 interface MenuSearchProps {
+  detached?: boolean;
+  onSubmit?: (value:string)=>void;
+  onDismiss?: ()=>void;
   enhanced?: boolean;
   refined?: boolean;
   premium?: boolean;
@@ -42,6 +46,9 @@ interface MenuSearchProps {
   branchId?: number;
 }
 export default function MenuSearch({
+  detached = false,
+  onSubmit,
+  onDismiss,
   enhanced = false,
   refined = false,
   premium = false,
@@ -56,6 +63,16 @@ export default function MenuSearch({
     raw = useSyncExternalStore(subscribe, read, server);
   const [focused, setFocused] = useState(false),
     [active, setActive] = useState(-1);
+  const [overlay,setOverlay]=useState(false),[draft,setDraft]=useState(value);
+  const [searchTrigger,setSearchTrigger]=useState<HTMLElement|null>(null);
+  const inputId=detached ? `menu-search-${listId}` : "gokul-menu-search";
+  useEffect(()=>{
+    if(detached){const frame=requestAnimationFrame(()=>document.getElementById(inputId)?.focus({preventScroll:true}));return()=>cancelAnimationFrame(frame);}
+    if(!premium)return;
+    const open=(event:Event)=>{setSearchTrigger((event as CustomEvent<HTMLElement>).detail??document.activeElement as HTMLElement|null);setDraft(value);setOverlay(true);};
+    window.addEventListener('gokul-menu-search-open',open);
+    return()=>window.removeEventListener('gokul-menu-search-open',open);
+  },[detached,premium,value,inputId]);
   const surface = useRef<HTMLDivElement>(null),
     pointerActive = useRef(false);
   useEffect(() => {
@@ -81,6 +98,12 @@ export default function MenuSearch({
       document.removeEventListener("pointercancel", cancel, true);
     };
   }, []);
+  function submitOverlay(text:string){
+    onChange(text);
+    setOverlay(false);
+    // Opening/cancelling preserves the position; explicit submission reveals the results.
+    requestAnimationFrame(()=>document.getElementById("gokul-menu-items")?.scrollIntoView({block:"start",behavior:"instant"}));
+  }
   const history = recentSearches(raw, branchId),
     recent = !value.trim() && history.length > 0;
   const options =
@@ -99,12 +122,14 @@ export default function MenuSearch({
   }
   function choose(text: string) {
     onChange(text);
+    onSubmit?.(text);
     remember(text);
     setFocused(false);
     setActive(-1);
   }
   useEffect(() => {
     if (
+      detached ||
       !enabled ||
       !branchId ||
       value.trim().length < 2 ||
@@ -118,12 +143,13 @@ export default function MenuSearch({
       } catch {}
     }, 800);
     return () => clearTimeout(timer);
-  }, [value, branchId, products, enabled]);
+  }, [value, branchId, products, enabled, detached]);
   return (
+    <>
     <div ref={surface} className="menu-search relative w-full">
       {refined && (
         <label
-          htmlFor="gokul-menu-search"
+          htmlFor={inputId}
           className="mb-2 block text-sm font-semibold text-[#241715]"
         >
           <T text="Find a favourite" />
@@ -149,7 +175,7 @@ export default function MenuSearch({
           </svg>
         </span>
         <input
-          id="gokul-menu-search"
+          id={inputId}
           aria-label={refined ? undefined : t("Search the menu")}
           type="search"
           role={enabled ? "combobox" : undefined}
@@ -181,6 +207,7 @@ export default function MenuSearch({
           }}
           onKeyDown={(event) => {
             if (event.key === "Escape") {
+              if(onDismiss){event.preventDefault();event.stopPropagation();onDismiss();}
               setFocused(false);
               setActive(-1);
             } else if (
@@ -203,6 +230,7 @@ export default function MenuSearch({
               if (expanded && activeIndex >= 0) choose(options[activeIndex]);
               else {
                 remember(value);
+                onSubmit?.(value);
                 setFocused(false);
               }
             }
@@ -264,5 +292,11 @@ export default function MenuSearch({
         </div>
       )}
     </div>
+    {overlay&&<MenuDiscoverySheet returnFocusId="gokul-menu-header-search" restoreFocus={searchTrigger} title="Search the menu" className="menu-search-dialog" onClose={()=>setOverlay(false)}>
+      <p className="menu-search-hint"><T text="Find a dish without losing your place."/></p>
+      <MenuSearch detached enhanced={enhanced} refined={refined} premium={premium} value={draft} onChange={setDraft} products={products} branchId={branchId} onSubmit={submitOverlay} onDismiss={()=>setOverlay(false)}/>
+      <button type="button" className="menu-search-show-results" onClick={()=>submitOverlay(draft)}><T text="Show results"/></button>
+    </MenuDiscoverySheet>}
+    </>
   );
 }

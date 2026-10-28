@@ -43,6 +43,7 @@ import {OPEN_ORDERING_TOUR, getWalkthroughSnapshot, stopWalkthrough} from "@/lib
 import "./ordering-tour.css";
 import "./customer-journey-refinement.css";
 import "./customer-experience.css";
+import "./menu-card-refinement.css";
 
 
 interface AppShellProps {
