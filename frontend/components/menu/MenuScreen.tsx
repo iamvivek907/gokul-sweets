@@ -1451,7 +1451,7 @@ export default function MenuScreen() {
                                 </div>
 
 
-                                
+
                                 {phoneMenu&&retailBrowse&&<h3 className="menu-retail-collection-title"><T text="Everyday favourites"/></h3>}
                                 {pickupCheck.features?.contextualStorefrontV2 ? <div>
                                     {(phoneMenu&&retailBrowse?retailCollections(categories,filteredProducts):groupMenuProducts(categories,filteredProducts)).sort((a,b)=>(appearanceOrder[a.id]??10000)-(appearanceOrder[b.id]??10000)).map((group,index)=><MenuCategorySection key={phoneMenu?`${group.id}:${activeBrowse?.id??"all"}:${retailBrowse?"retail":"menu"}`:group.id} id={group.id} name={group.name} displayName={phoneMenu&&activeBrowse&&menuFamily(activeBrowse.name)==="Sweets"&&group.id===activeBrowse.id?"Sweets you’ll love":undefined} count={phoneMenu?mobileMenuRows(group.products,portionGroups).length:group.products.length} description={group.description} collapsible={phoneMenu}>{groupedMenu&&index===0?<>{pickupGrid(splitMenuLead(group.products,portionGroups).lead)}{phoneMenu?<MenuCampaignBanners banners={appearance?.banners ?? []} categories={categories} onSelect={id => {jumpMenuCategory(id);setBrowseCategory({branchId:branch.id,id});}} compact/>:<BranchMenuAppearance config={appearance} categories={categories} onSelect={id=>jumpMenuCategory(id)}/>}{pickupGrid(splitMenuLead(group.products,portionGroups).rest)}</>:pickupGrid(group.products)}</MenuCategorySection>)}

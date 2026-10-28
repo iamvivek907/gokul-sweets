@@ -149,10 +149,10 @@ export default function ProductCard({
             `}
         >
 
-            
+
             {/* ============================================================ */}
             {/* Product Image                                                 */}
-            
+
             {/* ============================================================ */}
 
             <div
@@ -241,7 +241,7 @@ export default function ProductCard({
             </div>
 
 
-            
+
             {/* ============================================================ */}
             {/* Product Details                                               */}
             <SaveDish productIds={memberIds} name={product.name}/>
