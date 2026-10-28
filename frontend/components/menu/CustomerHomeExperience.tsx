@@ -100,7 +100,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
         setFailedMedia(current => [...current, `${campaign.id}:${campaign.updatedAt}`]);
     }
 
-    return <AppShell editorial showSocialPopup={false}><HomeQuickActions/>
+    return <AppShell editorial showSocialPopup={false}>
         <div className={`gokul-editorial-home ${styles.home} ${features.futuristicStorefrontV2 || features.checkoutExperienceV2 ? styles.future : ""}`}>
         <div className={styles.location}><span className={styles.eyebrow}><T text="Good taste starts here" /></span><BranchSelector /></div>
         <section className={styles.hero}>
@@ -131,6 +131,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
                     </div>}
                 </div> : <div className={styles.wordmark} aria-hidden="true"><span>A little</span><strong>sweet.<br />A little<br /><em>savoury.</em></strong><span>A whole lot of Gokul.</span></div>}
         </section>
+        <HomeQuickActions/>
         <nav aria-label="Ordering steps" className={styles.steps}>
             <span><b>01</b> <T text="Find your favourites" /></span><span><b>02</b> <T text="Pick your time" /></span><span><b>03</b> <T text="Collect & enjoy" /></span>
         </nav>

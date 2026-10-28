@@ -352,3 +352,14 @@ The enabled shared shell uses compact white permission cards, maroon selected ra
 ## October 21 festive category carousel
 
 The owner replaces the single Diwali menu promotion with one contained, manually swiped banner carousel. In the enabled customer shell, one published banner with a valid category action reuses its saved artwork and translated copy for up to eight distinct live branch category destinations, starting with its configured action. Two or more published banners retain their authored ordering, copy and destinations. Missing or invalid destinations do not synthesize promotions. Native horizontal scroll snap, arrows, reachable dot controls, keyboard navigation, inactive-slide focus isolation and reduced-motion support keep navigation predictable without automatic movement or page-wide horizontal scrolling. Desktop and mobile share the component; legacy presentation stays stacked. Published media, schedules and branch scope remain authoritative.
+
+## October 28 returning-visitor branch context and order filters
+
+Keep the editorial homepage hero first. Returning-visitor actions follow the hero
+as one compact selected-branch panel, with a clear menu/cart destination and the
+shared cart-safe branch switcher. Multiple configured branches do not produce
+multiple return panels or merge branch menus. The branch gallery remains the
+first-visit chooser. Home shortcuts retain saved-dish and guarded reorder access.
+Order-history date controls use bounded grid columns and border-box sizing, with
+one column on very narrow phones; native date editors must remain inside their
+labels. Search retains the shared surface without a nested white input block.
