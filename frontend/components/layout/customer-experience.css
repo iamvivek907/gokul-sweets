@@ -100,11 +100,6 @@
 .future-storefront[data-customer-design="reference"] .menu-dish-review p,.future-storefront[data-customer-design="reference"] .menu-dish-review li{font-size:var(--customer-metadata,13px);color:#625c63;margin:4px 0}
 .future-storefront[data-customer-design="reference"] .menu-dish-review blockquote{margin-top:10px;line-height:1.6;color:#242126}
 .future-storefront[data-customer-design="reference"] .menu-dish-reviews nav{display:flex;gap:12px;margin-top:16px}
-.future-storefront[data-customer-design="reference"] .home-quick-actions{display:flex;flex-wrap:wrap;gap:16px;border:1px solid #e9e1e5;background:#fff;border-radius:20px;padding:20px;margin:16px auto;max-width:1160px}
-.future-storefront[data-customer-design="reference"] .home-quick-actions>div,.future-storefront[data-customer-design="reference"] .home-quick-actions>a{flex:1;min-width:180px}
-.future-storefront[data-customer-design="reference"] .home-quick-actions h2{font-size:20px;font-weight:750}
-.future-storefront[data-customer-design="reference"] .home-quick-actions p,.future-storefront[data-customer-design="reference"] .home-quick-actions small{font-size:var(--customer-metadata,13px);color:#625c63;display:block;line-height:1.5}
-.future-storefront[data-customer-design="reference"] .home-quick-actions button,.future-storefront[data-customer-design="reference"] .home-continue{display:inline-flex;align-items:center;min-height:var(--customer-control,44px);color:#980c31;font-weight:700}
 .future-storefront[data-customer-design="reference"] .product-rating-summary span{font-size:var(--customer-metadata,13px)}
 @media(max-width:640px){
  .future-storefront[data-customer-design="reference"] .mobile-phone-entry[data-verified="true"]{padding:10px 12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}

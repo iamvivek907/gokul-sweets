@@ -1,6 +1,5 @@
 "use client";
 
-import HomeQuickActions from "@/components/customer/HomeQuickActions";
 import type {ReactNode} from "react";
 import AppShell from "@/components/layout/AppShell";
 import StorefrontWelcome from "@/components/common/StorefrontWelcome";
@@ -16,7 +15,6 @@ export default function HomeEntry({children}: {children: ReactNode}) {
     if (!shouldShowIntentGateway(features.preHomeIntentGateway, false)) return <>{children}</>;
 
     return <AppShell editorial showSocialPopup={false}>
-        <HomeQuickActions/>
         <EditorialArrival campaignsEnabled={features.homepageCampaigns} branchExperience={features.branchExperience}
             occasionEnquiries={features.occasionEnquiries}
             accessible={features.accessibleOrderingV2} />

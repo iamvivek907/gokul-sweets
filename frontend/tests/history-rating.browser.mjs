@@ -30,6 +30,19 @@ try{for(const width of [320,390,1280]){
   return route.fulfill({json});
  });
  await page.goto(`${base}/orders`);await page.locator('.profile-order-card').first().waitFor();
+
+ const dateFields=page.locator('input[type="date"]');
+ async function checkFilters(){
+  const a=await dateFields.nth(0).boundingBox(),b=await dateFields.nth(1).boundingBox();
+  assert.ok(a.x>=0&&b.x>=0&&a.x+a.width<=width&&b.x+b.width<=width,'native date fields stay inside viewport');
+  assert.ok(a.y+a.height<=b.y||b.y+b.height<=a.y||a.x+a.width+8<=b.x,'date fields retain a visible gap');
+  for(const field of await dateFields.all())assert.equal(await field.evaluate(node=>node.getBoundingClientRect().width<=node.parentElement.getBoundingClientRect().width+1),true,'date input stays within its label');
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ }
+ await checkFilters();
+ await page.addStyleTag({content:'input,button,label{font-size:20px!important}'});await checkFilters();
+ const searchInput=page.getByLabel('Search order history',{exact:true});
+ assert.equal(await searchInput.evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0)');
  const nav=page.getByRole('navigation',{name:'Order history pages'});
  for(let n=2;n<=6;n++){await nav.getByRole('button',{name:'Next',exact:true}).click();await nav.getByText(`Page ${n}`,{exact:true}).waitFor();await page.locator('.profile-order-card').first().waitFor();}
  assert.equal(await page.locator('.profile-order-card').count(),12);assert.equal(bulk,0);assert.equal(reviewReads,0,'history has no per-card review reads');
