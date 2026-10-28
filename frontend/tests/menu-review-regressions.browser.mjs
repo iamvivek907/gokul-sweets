@@ -57,7 +57,7 @@ try{for(const width of [320,390,640]){
    const rect=selector=>{const r=node.querySelector(selector).getBoundingClientRect();return {top:r.top,bottom:r.bottom,left:r.left,right:r.right};};
    return {rating:rect('.product-rating-summary'),price:rect('.product-card-purchase'),copy:rect('.product-card-copy'),position:getComputedStyle(node.querySelector('.product-card-rating')).position};
   });
-  assert.equal(geometry.position,'static',`item ${id} rating stays in the text flow at ${width}px`);
+  assert.ok(['static','relative'].includes(geometry.position),`item ${id} rating stays in the text flow at ${width}px`);
   assert.ok(geometry.rating.top>=geometry.price.bottom-1,`item ${id} rating sits below its price at ${width}px`);
   assert.ok(geometry.rating.left>=geometry.copy.left-1&&geometry.rating.right<=geometry.copy.right+1,`item ${id} rating stays in its own text column`);
  }
