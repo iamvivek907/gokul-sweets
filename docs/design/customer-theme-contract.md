@@ -363,3 +363,13 @@ first-visit chooser. Home shortcuts retain saved-dish and guarded reorder access
 Order-history date controls use bounded grid columns and border-box sizing, with
 one column on very narrow phones; native date editors must remain inside their
 labels. Search retains the shared surface without a nested white input block.
+
+## Compact Orders and desktop discovery follow-up
+
+On phones, order history prioritises the actual order cards: use a compact heading,
+a single scrollable row of status choices and a collapsible date-range control.
+Date filters provide explicit start/end and whole-range clear actions; clearing
+preserves branch, search and status while returning to the first cursor page.
+Optional coin guidance follows the order list instead of displacing it.
+Desktop branch discovery separates photos from copy and centres one branch or a
+two-column multi-branch gallery; existing mobile cards remain unchanged.

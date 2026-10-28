@@ -31,9 +31,12 @@ try{for(const width of [320,390,1280]){
  });
  await page.goto(`${base}/orders`);await page.locator('.profile-order-card').first().waitFor();
 
+ const firstOrder=await page.locator('.profile-order-card').first().boundingBox();if(width<=640)assert.ok(firstOrder.y<600,'real orders appear without scrolling past a promotional header and expanded filters');
+ await page.getByText('Date range',{exact:true}).click();
  const dateFields=page.locator('input[type="date"]');
  async function checkFilters(){
-  const a=await dateFields.nth(0).boundingBox(),b=await dateFields.nth(1).boundingBox();
+  // Measure in one browser task so viewport scrolling cannot mix two frames.
+  const [a,b]=await dateFields.evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().toJSON()));
   assert.ok(a.x>=0&&b.x>=0&&a.x+a.width<=width&&b.x+b.width<=width,'native date fields stay inside viewport');
   assert.ok(a.y+a.height<=b.y||b.y+b.height<=a.y||a.x+a.width+8<=b.x,'date fields retain a visible gap');
   for(const field of await dateFields.all())assert.equal(await field.evaluate(node=>node.getBoundingClientRect().width<=node.parentElement.getBoundingClientRect().width+1),true,'date input stays within its label');
@@ -43,6 +46,16 @@ try{for(const width of [320,390,1280]){
  await page.addStyleTag({content:'input,button,label{font-size:20px!important}'});await checkFilters();
  const searchInput=page.getByLabel('Search order history',{exact:true});
  assert.equal(await searchInput.evaluate(node=>getComputedStyle(node).backgroundColor),'rgba(0, 0, 0, 0)');
+
+ await page.getByLabel('From',{exact:true}).fill('2026-10-01');await page.waitForURL(/from=2026-10-01/);
+ await page.getByLabel('To',{exact:true}).fill('2026-10-12');await page.waitForURL(/to=2026-10-12/);await checkFilters();
+ await page.getByRole('button',{name:'Clear start date',exact:true}).click();await page.waitForURL(url=>!url.searchParams.has('from'));
+ assert.equal(await page.getByLabel('To',{exact:true}).inputValue(),'2026-10-12');
+ await page.getByRole('button',{name:'Clear dates',exact:true}).click();await page.waitForURL(url=>!url.searchParams.has('from')&&!url.searchParams.has('to'));
+ assert.equal(new URL(page.url()).searchParams.get('historyPage'),'1');
+ await page.getByText('Date range',{exact:true}).click();await page.getByLabel('To',{exact:true}).fill('2026-10-12');await page.waitForURL(/to=2026-10-12/);
+ await page.getByRole('button',{name:'Clear end date',exact:true}).click();await page.waitForURL(url=>!url.searchParams.has('to'));
+ await page.locator('.profile-order-card').first().waitFor();
  const nav=page.getByRole('navigation',{name:'Order history pages'});
  for(let n=2;n<=6;n++){await nav.getByRole('button',{name:'Next',exact:true}).click();await nav.getByText(`Page ${n}`,{exact:true}).waitFor();await page.locator('.profile-order-card').first().waitFor();}
  assert.equal(await page.locator('.profile-order-card').count(),12);assert.equal(bulk,0);assert.equal(reviewReads,0,'history has no per-card review reads');
@@ -77,5 +90,8 @@ try{for(const width of [320,390,1280]){
  await page.locator('.profile-order-card').first().waitFor();
  const recovered=new URL(page.url()).searchParams;
  assert.equal(recovered.get('status'),'ACTIVE');assert.equal(recovered.get('q'),'peda');assert.equal(recovered.get('from'),'2026-10-01');assert.equal(recovered.get('to'),'2026-10-12');assert.equal(recovered.has('before'),false);assert.equal(recovered.has('after'),false);
+ await page.getByRole('button',{name:'Clear dates',exact:true}).click();
+ await page.waitForURL(url=>!url.searchParams.has('from')&&!url.searchParams.has('to'));
+ const cleared=new URL(page.url()).searchParams;assert.equal(cleared.get('status'),'ACTIVE');assert.equal(cleared.get('q'),'peda');assert.equal(cleared.get('scope'),'1');assert.equal(cleared.get('historyPage'),'1');assert.equal(cleared.has('before'),false);assert.equal(cleared.has('after'),false);
  console.log(`History/rating retention ${width}px passed`);await context.close();
 }}finally{await browser.close();}
