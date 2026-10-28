@@ -1,3 +1,20 @@
+## October 28 customer discovery and food-first ordering
+
+The customer-experience audit in [premium-customer-pass.md](premium-customer-pass.md)
+supersedes earlier placement instructions: authored menu campaigns follow the first
+four complete dish cards on phone and desktop. Keep size families together. Search
+suggestions retain layout until an outside tap identifies its click target; keyboard
+focus leaving the search still dismisses them. Explicit Saved navigation clears stale
+browsing filters and never restores or replaces cart/pickup data.
+
+Owner-authored branch/SKU food facts, chef picks and photo focus are optional; never
+invent ingredient, allergen, popularity or serving claims. Published dish comments
+use bounded cursor pages, actual dish-star filters and consent-safe customer names.
+Favourites and recent queries stay bounded and device/branch scoped. Home reorder
+continues through the existing guarded dialog. Keep launch motion and pinch-zoom
+settings unchanged. Anonymous performance reports are sampled, bounded and explicitly
+scoped to the current backend instance.
+
 ## Grouped menu ratings (October 27)
 
 Grouped dishes display a rating-count-weighted score across their member sizes and the total number of item ratings. Photo selection, size ordering and current pickup availability never select or filter the score. Product summaries retain their average precision until display; unrated sizes add no votes. The existing bounded summary reads remain shared by phone and desktop.

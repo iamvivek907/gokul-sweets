@@ -138,3 +138,5 @@
 .future-storefront[data-customer-design=reference] .gokul-menu-tools{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:end}
 .future-storefront[data-customer-design=reference] .gokul-menu-tools>.mt-4{grid-column:1/-1;margin-top:8px}
 }
+/* Keep pickup status and Save as separate readable targets over desktop photos. */
+.future-storefront[data-customer-design=reference] .menu-availability-chip{left:10px;right:auto;max-width:calc(100% - 64px)}

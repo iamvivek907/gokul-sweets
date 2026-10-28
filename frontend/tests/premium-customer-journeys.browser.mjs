@@ -357,11 +357,26 @@ try {
     await first.waitFor();
     await page.getByRole("button", { name: "Saved", exact: true }).click();
     const search = page.locator("#gokul-menu-search");
-    if(width<=640){
-      await search.fill("Paneer");await page.getByRole("listbox",{name:"Menu suggestions",exact:true}).waitFor();
-      await page.getByRole("button",{name:"Browse all item categories",exact:true}).click();
-      await page.getByRole("dialog",{name:"Filter menu",exact:true}).waitFor();await page.keyboard.press("Escape");
-      assert.equal(await search.inputValue(),"Paneer","tapping another control from search suggestions must retain the action and query");
+    if (width <= 640) {
+      await search.fill("Paneer");
+      await page
+        .getByRole("listbox", { name: "Menu suggestions", exact: true })
+        .waitFor();
+      await page
+        .getByRole("button", {
+          name: "Browse all item categories",
+          exact: true,
+        })
+        .click();
+      await page
+        .getByRole("dialog", { name: "Filter menu", exact: true })
+        .waitFor();
+      await page.keyboard.press("Escape");
+      assert.equal(
+        await search.inputValue(),
+        "Paneer",
+        "tapping another control from search suggestions must retain the action and query",
+      );
     }
     await search.fill("pnaeer");
     await search.press("ArrowDown");
@@ -438,6 +453,21 @@ try {
         "25% 75%",
     );
     assert.ok(factCalls <= 3, "facts are shared by cards and filters");
+    for (const chip of await page.locator(".menu-availability-chip").all()) {
+      if (!(await chip.isVisible())) continue;
+      const savedButton = chip.locator("..").locator(".menu-save-dish button");
+      if (!(await savedButton.count())) continue;
+      const badge = await chip.boundingBox(),
+        save = await savedButton.boundingBox();
+      assert.ok(
+        badge.x + badge.width <= save.x ||
+          save.x + save.width <= badge.x ||
+          badge.y + badge.height <= save.y ||
+          save.y + save.height <= badge.y,
+        "pickup badge and saved-dish action must not overlap",
+      );
+    }
+
     assert.equal(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth,
