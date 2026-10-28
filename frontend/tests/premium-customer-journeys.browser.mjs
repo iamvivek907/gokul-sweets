@@ -130,7 +130,7 @@ try {
           futureOrderingDays: 30,
         };
       else if (path === "/api/branches")
-        json = [branch, { ...branch, id: 2, name: "Second branch" }];
+        json = [branch, { ...branch, id: 2, name: "Second branch" }, { ...branch, id: 3, name: "Third branch", operational: false }, { ...branch, id: 4, name: "Fourth branch" }];
       else if (/^\/api\/branches\/\d+$/.test(path))
         json = { ...branch, id: Number(path.split("/").pop()) };
       else if (path === "/api/menu/catalog")
@@ -493,6 +493,42 @@ try {
         path: `${process.env.SCREENSHOT_DIR}/premium-menu-${width}.png`,
       });
     }
+    await page.goto(`${base}/`);
+    const homePanel = page.getByRole("region", { name: "Continue with Gokul", exact: true });
+    await homePanel.waitFor();
+    assert.equal(await homePanel.count(), 1, "one selected branch, not one panel per configured branch");
+    await homePanel.getByText("Selected pickup branch", { exact: true }).waitFor();
+    assert.equal(await homePanel.getByRole("link", { name: "View menu", exact: true }).getAttribute("href"), "/menu");
+    assert.equal(await homePanel.getByText("Continue browsing", { exact: true }).count(), 0);
+    const heroBottom = await page.locator("#gokul-arrival-title").evaluate(node => node.closest("section").getBoundingClientRect().bottom);
+    const homeBounds = await homePanel.boundingBox();
+    assert.ok(homeBounds.y >= heroBottom - 1, "returning-visitor actions follow the hero");
+    assert.ok(homeBounds.x >= 15 && homeBounds.x + homeBounds.width <= width - 15);
+    await homePanel.getByRole("button", { name: "Change branch", exact: true }).click();
+    const branchPicker = page.locator("[popover]:popover-open");
+    await branchPicker.getByRole("button", { name: /Fourth branch/ }).waitFor();
+    assert.equal(await branchPicker.getByRole("button", { name: /Third branch/ }).isDisabled(), true);
+    await page.keyboard.press("Escape");
+    // Switching with a cart must still require the existing explicit confirmation.
+    await page.evaluate(product => { localStorage.setItem("gokul-cart", JSON.stringify({branchId:1,items:[{product,quantity:1,weightGrams:null}]}));window.dispatchEvent(new CustomEvent("gokul-cart-change")); }, products[0]);
+    await homePanel.getByRole("link", { name: "Review saved cart", exact: true }).waitFor();
+    await homePanel.getByRole("button", { name: "Change branch", exact: true }).click();
+    await branchPicker.getByRole("button", { name: /Fourth branch/ }).click();
+    const switchReview = page.getByRole("dialog", { name: "Start at Fourth branch?", exact: true });
+    await switchReview.waitFor();
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("gokul-selected-branch")).id), 1);
+    await switchReview.getByRole("button", { name: "Keep my cart", exact: true }).click();
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("gokul-cart")).items.length), 1);
+    await page.evaluate(() => {localStorage.removeItem("gokul-cart");window.dispatchEvent(new CustomEvent("gokul-cart-change"));});
+    await homePanel.getByRole("button", { name: "Change branch", exact: true }).click();
+    await branchPicker.getByRole("button", { name: /Fourth branch/ }).click();
+    await page.waitForURL("**/menu");
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("gokul-selected-branch")).id), 4);
+    // Restore the original branch through the same guarded control for the remaining journey.
+    await page.goto(`${base}/`);
+    await homePanel.getByRole("button", { name: "Change branch", exact: true }).click();
+    await branchPicker.getByRole("button", { name: /^Test branch/ }).click();
+    await page.waitForURL("**/menu");
     await page.goto(`${base}/`);
     await page
       .getByRole("button", { name: "Review and order again", exact: true })

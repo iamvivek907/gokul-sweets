@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import BranchSelector from "@/components/branch/BranchSelector";
+import styles from "./HomeQuickActions.module.css";
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { useSelectedBranch } from "@/hooks/useSelectedBranch";
@@ -92,18 +94,22 @@ export default function HomeQuickActions() {
       : null;
   return (
     <section
-      className="home-quick-actions"
+      className={`home-quick-actions ${styles.panel}`}
       aria-label={t("Continue with Gokul")}
     >
-      <div>
-        <p>
-          <T text="Your Gokul branch" />
-        </p>
-        <h2>{branch.name}</h2>
-        <Link className="home-continue" href={cart.isEmpty ? "/menu" : "/cart"}>
-          <T text={cart.isEmpty ? "Continue browsing" : "Review saved cart"} />
-          <span aria-hidden="true"> →</span>
-        </Link>
+      <div className={styles.branch}>
+        <div className={styles.identity}>
+          <p><T text="Selected pickup branch" /></p>
+          <h2>{branch.name}</h2>
+          {branch.city && <small>{branch.city}</small>}
+        </div>
+        <div className={styles.actions}>
+          <Link className={`home-continue ${styles.primary}`} href={cart.isEmpty ? "/menu" : "/cart"}>
+            <T text={cart.isEmpty ? "View menu" : "Review saved cart"} />
+            <span aria-hidden="true">→</span>
+          </Link>
+          <div className={styles.switch}><BranchSelector compact /></div>
+        </div>
       </div>
       {saved.ids.length > 0 && (
         <Link href="/menu?saved=1">

@@ -7,6 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {usePathname} from "next/navigation";
 import {useEffect, useState, type MouseEvent} from "react";
+import HomeQuickActions from "@/components/customer/HomeQuickActions";
 import BranchSelector from "@/components/branch/BranchSelector";
 import CampaignMedia from "@/components/menu/CampaignMedia";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
@@ -133,6 +134,7 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                 <span className={styles.scrollCueIcon} aria-hidden="true"><span /></span>
             </a>
         </section>
+        <HomeQuickActions/>
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
                 <span><T text="OUR BRANCHES" /></span><h2><span className="arrival-desktop-copy"><T text="Your next visit starts here." /></span><span className="arrival-mobile-copy"><T text="Choose where you’ll collect"/></span></h2>
