@@ -12,7 +12,7 @@ const slot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00
 const isPickerRequest=request=>request.method()!=='OPTIONS'&&(new URL(request.url()).pathname.endsWith('/pickup-discovery')||(new URL(request.url()).pathname.endsWith('/availability')&&!request.url().includes('menuPreview=true')));
 const browser=await chromium.launch({headless:true});
 const classicBrowser=await chromium.launch({headless:true,ignoreDefaultArgs:['--hide-scrollbars']});
-try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,false],[390,true,true,true,false],[640,true,true,true,false],[390,true,false,true,false],[1280,true,false,true,false],[390,false,false,true,false]]){
+try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,false],[390,true,true,true,false],[640,true,true,true,false],[390,true,false,true,false],[1280,true,false,true,false],[1440,true,false,true,false],[390,false,false,true,false]]){
  const context=await (classic?classicBrowser:browser).newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:reduced?'reduce':'no-preference'}),page=await context.newPage();page.setDefaultTimeout(15000);let discoveryFails=false,previewFails=false,pickerGate=null;const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type'};
  await context.route('**/api/**',async route=>{
@@ -63,6 +63,20 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   const original=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
   const trigger=page.getByRole('button',{name:'View details · Rasgulla',exact:true});
   await trigger.click();const details=page.getByRole('dialog',{name:'Rasgulla',exact:true});await details.waitFor();
+  if(width>640){
+   const box=await details.boundingBox();
+   assert.ok(box.width<=640&&box.x>=24&&box.y>=24,'desktop popup is bounded and inside the viewport');
+   assert.ok(Math.abs(box.x+box.width/2-width/2)<=2,'desktop popup is horizontally centred');
+   assert.ok(Math.abs(box.y+box.height/2-450)<=2,'desktop popup is vertically centred');
+   const photo=await details.locator('.menu-details-photo').boundingBox();assert.ok(photo.height<=301&&photo.width<box.width,'photo is bounded inside padded content');
+   const close=details.getByRole('button',{name:'Close ×',exact:true});assert.ok((await close.boundingBox()).height>=44);
+   await page.setViewportSize({width,height:540});
+   assert.ok((await details.boundingBox()).height<=486+1,'short desktops keep the popup inside the viewport');
+   await details.locator('.menu-details-help').scrollIntoViewIfNeeded();
+   const closeBox=await close.boundingBox();assert.ok(closeBox.y>=0&&closeBox.y+closeBox.height<=540,'close stays visible while reading scrolled content');
+   await page.screenshot({path:`${screens}/desktop-details-${width}.png`});
+   await page.setViewportSize({width,height:900});
+  }
   await details.getByRole('term').filter({hasText:/^Selling price$/}).waitFor();assert.equal(await details.locator('.menu-comparison-price').innerText(),'₹30');
   await page.keyboard.press('Escape');await details.waitFor({state:'hidden'});assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
   await page.getByRole('button',{name:'View details · Sweet 3',exact:true}).click();const fallback=page.getByRole('dialog',{name:'Sweet 3',exact:true});await fallback.locator('.menu-food-placeholder').waitFor();await fallback.getByRole('button',{name:'Close ×'}).click();

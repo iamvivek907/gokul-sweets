@@ -1,0 +1,13 @@
+/* Phone sheets retain their existing layout; wide screens use a centred modal. */
+@media(min-width:641px){
+.dialog{position:fixed;inset:0;margin:auto;box-sizing:border-box;width:calc(100vw - 64px);max-width:640px;height:auto;max-height:min(780px,90dvh);padding:0;overflow-y:auto;overscroll-behavior:contain;border:1px solid #e6dce2;border-radius:24px;background:#fff;color:#291c25;box-shadow:0 24px 90px #1b102b40}
+.dialog::backdrop{background:#17101c80}
+.dialog>header{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 24px;border-bottom:1px solid #eee5e9;background:#fff}
+.dialog>header h2{min-width:0;margin:0;font-size:21px;font-weight:750;line-height:1.35;overflow-wrap:anywhere}
+.dialog>header button{flex-shrink:0;min-height:44px;padding:8px 14px;border:1px solid #ead7df;border-radius:12px;background:#fcebf0;color:#8f1838;font-size:14px;font-weight:700;cursor:pointer}
+.dialog>header button:focus-visible{outline:3px solid #8f1838;outline-offset:3px}
+.dialog :global(.mobile-menu-suggestion-body){min-width:0;padding:20px 24px 24px;overflow-wrap:anywhere;font-size:15px;line-height:1.6}
+.dialog :global(.menu-details-photo){position:relative;width:100%;aspect-ratio:16/10;max-height:300px;overflow:hidden;border-radius:16px;background:#fff1e5;margin:0 0 20px}
+.dialog :global(.menu-details-photo) img{object-fit:cover}
+.dialog :global(.menu-food-placeholder){width:100%;height:100%;object-fit:contain}
+}

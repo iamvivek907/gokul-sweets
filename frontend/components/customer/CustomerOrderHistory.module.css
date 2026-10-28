@@ -9,3 +9,16 @@
 .dates input::-webkit-datetime-edit{min-width:0;padding:0}
 .history[data-modern=true] .search input{background:transparent!important;padding:0;box-shadow:none;border-radius:0}
 @media(max-width:360px){.dates{grid-template-columns:minmax(0,1fr)}}
+
+.dateTools{position:relative;display:block;margin:0 0 12px}.dateDisclosure{width:100%;min-width:0}.dateDisclosure summary{padding-right:128px;display:flex;align-items:center;gap:8px;min-height:44px;font-size:13px;font-weight:650;color:#752343;cursor:pointer;list-style:none}.dateDisclosure summary::-webkit-details-marker{display:none}.dateDisclosure summary:before{content:'+';font-size:20px;line-height:1}.dateDisclosure[open] summary:before{content:'−'}.dateDisclosure summary span{font-size:11px;padding:3px 7px;border-radius:8px;background:#f8e9ef}.dateDisclosure summary:focus-visible{outline:3px solid #a75676;outline-offset:2px}.dateDisclosure .dates{margin:8px 0 4px}.dateField{min-width:0}.dateField>button{display:block;min-height:44px;margin-top:4px;padding:6px 0;border:0;background:transparent;text-decoration:underline}.history .clearDates{position:absolute;top:0;right:0;border:0;background:transparent;padding:10px 4px;text-decoration:underline}
+@media(max-width:640px){
+ .history[data-modern=true] .hero{padding:0;border:0;border-radius:0;background:transparent;margin-bottom:12px}
+ .history[data-modern=true] .hero>div{min-width:0}.history[data-modern=true] .hero>div>span,.history[data-modern=true] .hero>svg{display:none}
+ .history[data-modern=true] .hero :is(h1,h2){font-size:21px;line-height:1.25;letter-spacing:-.4px;margin:0 0 4px}
+ .history[data-modern=true] .hero p{font-size:12px;line-height:1.4;margin:0}
+ .history[data-modern=true] .filters{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;padding:2px 2px 6px;margin-bottom:6px;scrollbar-width:thin}
+ .history[data-modern=true] .filters button{flex:0 0 auto;width:auto;white-space:nowrap;padding:8px 12px;font-size:12px;min-height:44px}
+ .history[data-modern=true] .search{padding:4px 8px;min-height:52px;margin-bottom:8px}.history[data-modern=true] .search button{padding:8px 10px}
+ .history .dateDisclosure .dates{grid-template-columns:minmax(0,1fr);gap:10px}.history .dateField input{width:100%;max-width:100%;box-sizing:border-box;min-inline-size:0}
+ .history[data-modern=true] .heading{margin:8px 0 12px}
+}
