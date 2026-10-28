@@ -4,6 +4,7 @@ import {dishPhotoPosition} from "@/types/menuDetails";
 import {requestMenuPickup} from "@/lib/menuPickupRecovery";
 import {T,useTranslation,useLanguage} from "@/lib/language";
 import ProductDetailsSheet from "./ProductDetailsSheet";
+import styles from "./ProductCard.module.css";
 import FoodPlaceholder from "./FoodPlaceholder";
 import {menuMoney,menuDescription,comparisonPrice} from "@/lib/menuPresentationDetails";
 
@@ -133,6 +134,7 @@ export default function ProductCard({
             onPointerDownCapture={event=>{if(unavailableForPickup&&!pickupChecking&&pickupMessage!=="Checking pickup"&&product.serviceAvailability?.code!=="CHECKING"&&event.target instanceof Element&&event.target.closest("button:disabled"))window.dispatchEvent(new Event("gokul-pickup-attention"));}}
             className={`
                 gokul-product-card group
+                ${refined ? styles.card : ""}
                 ${refined ? "gokul-menu-product-card" : ""}
                 flex
                 min-h-32
@@ -153,7 +155,7 @@ export default function ProductCard({
         >
 
 
-            {refined&&<button type="button" className="menu-details-trigger menu-card-open" aria-label={`${t("View details")} · ${product.name}`} onClick={()=>onOpenDetails?onOpenDetails():setShowDetails(true)}><span className="sr-only">{t("View details")} · {product.name}</span></button>}
+            {refined&&<button type="button" className={`${styles.open} menu-details-trigger menu-card-open`} aria-label={`${t("View details")} · ${product.name}`} onClick={()=>onOpenDetails?onOpenDetails():setShowDetails(true)}><span className="sr-only">{t("View details")} · {product.name}</span></button>}
             {/* ============================================================ */}
             {/* Product Image                                                 */}
 

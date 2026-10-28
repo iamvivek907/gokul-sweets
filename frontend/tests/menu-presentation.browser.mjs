@@ -95,6 +95,16 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'larger text stays within the viewport');
   await page.evaluate(()=>document.documentElement.style.fontSize='');
  }
+ if(!enabled){
+  const legacyCard=page.locator('#gokul-product-1 .gokul-menu-product-card');
+  const trigger=legacyCard.getByRole('button',{name:'View details · Rasgulla',exact:true});
+  const bounds=await trigger.boundingBox(),cardBounds=await legacyCard.boundingBox();
+  assert.ok(bounds.width>=cardBounds.width-2&&bounds.height>=cardBounds.height-2,'flag-OFF details target covers the card');
+  const cart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+  await trigger.click();const popup=page.getByRole('dialog',{name:'Rasgulla',exact:true});await popup.waitFor();
+  await popup.getByRole('button',{name:'Close ×',exact:true}).click();await popup.waitFor({state:'hidden'});
+  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart,'flag-OFF details do not modify ordering');
+ }
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
  const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
  await mkdir(screens,{recursive:true});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:`${screens}/menu-presentation-${width}-${expired?'expired':'selected'}-${enabled}.png`});
