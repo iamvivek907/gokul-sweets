@@ -1,4 +1,6 @@
 "use client";
+import {useMenuExperience,SaveDish,DishReviewAction} from "./MenuExperience";
+import {dishPhotoPosition} from "@/types/menuDetails";
 import {requestMenuPickup} from "@/lib/menuPickupRecovery";
 import {T,useTranslation} from "@/lib/language";
 import ProductDetailsSheet from "./ProductDetailsSheet";
@@ -14,6 +16,7 @@ import type { ProductRatingSummary } from "@/types/review";
 
 
 interface ProductCardProps {
+ groupProductIds?:number[];
     dietaryLabel?: ReactNode;
     portionOptions?: ReactNode;
     purchaseControl?: ReactNode;
@@ -89,9 +92,12 @@ export default function ProductCard({
     weightGrams,
     onIncrease,
     onDecrease,
-    onAdd
+    onAdd,
+    groupProductIds,
 }: ProductCardProps) {
     const t=useTranslation();
+    const {details}=useMenuExperience();
+    const memberIds=groupProductIds??[product.id];
     const [showDetails,setShowDetails]=useState(false);
     const previous=comparisonPrice(product);
     const description=refined?menuDescription(product):product.description;
@@ -143,8 +149,10 @@ export default function ProductCard({
             `}
         >
 
+            
             {/* ============================================================ */}
             {/* Product Image                                                 */}
+            
             {/* ============================================================ */}
 
             <div
@@ -165,7 +173,7 @@ export default function ProductCard({
                 {
                     product.imageUrl && (!refined || failedImageUrl !== product.imageUrl)
                         ? (
-                            <Image
+                            <Image style={{objectPosition:dishPhotoPosition(details[product.id])}}
                                 src={
                                     product.imageUrl
                                 }
@@ -233,8 +241,10 @@ export default function ProductCard({
             </div>
 
 
+            
             {/* ============================================================ */}
             {/* Product Details                                               */}
+            <SaveDish productIds={memberIds} name={product.name}/>
             {/* ============================================================ */}
 
             <div className="product-card-copy
@@ -330,7 +340,7 @@ export default function ProductCard({
                               &&
                               ratingSummary.ratingCount > 0
                                 ? (
-                                    <div
+                                    <DishReviewAction productIds={memberIds} name={product.name} summaryLabel={`${ratingSummary.averageRating.toFixed(1)} ${t("out of 5 from")} ${ratingSummary.ratingCount} ${t("ratings")}`}><div
                                         aria-label={`${ratingSummary.averageRating.toFixed(1)} out of 5 from ${ratingSummary.ratingCount} ratings`}
                                         className="product-rating-summary
                                             flex
@@ -367,7 +377,7 @@ export default function ProductCard({
                                                 ratingSummary.ratingCount
                                             })
                                         </span>
-                                    </div>
+                                    </div></DishReviewAction>
                                 )
                                 : (
                                     <div className="

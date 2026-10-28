@@ -6,7 +6,8 @@ import org.junit.jupiter.api.Test;
 
 class StorefrontVitalsControllerTest {
     private final EnhancementProperties features = new EnhancementProperties();
-    private final StorefrontVitalsController controller = new StorefrontVitalsController(features);
+    private final StorefrontVitalsController controller =
+            new StorefrontVitalsController(features, new StorefrontPerformance());
 
     @Test
     void disabledDoesNotRecordAndMalformedOrHugeMetricsAreRejected() {

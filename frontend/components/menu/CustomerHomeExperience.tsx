@@ -1,4 +1,5 @@
 "use client";
+import HomeQuickActions from "@/components/customer/HomeQuickActions";
 import DietaryLabel from "./DietaryLabel";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -99,7 +100,7 @@ function Storefront({features}: {features: StorefrontFeatures}) {
         setFailedMedia(current => [...current, `${campaign.id}:${campaign.updatedAt}`]);
     }
 
-    return <AppShell editorial showSocialPopup={false}>
+    return <AppShell editorial showSocialPopup={false}><HomeQuickActions/>
         <div className={`gokul-editorial-home ${styles.home} ${features.futuristicStorefrontV2 || features.checkoutExperienceV2 ? styles.future : ""}`}>
         <div className={styles.location}><span className={styles.eyebrow}><T text="Good taste starts here" /></span><BranchSelector /></div>
         <section className={styles.hero}>

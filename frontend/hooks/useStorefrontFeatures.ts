@@ -84,7 +84,7 @@ async function refresh(force = false) {
     lastAttemptAt = Date.now();
     pending = (async () => {
         try {
-            const features = await apiClient<StorefrontFeatures>("/api/storefront/features", {signal: AbortSignal.timeout(5000)});
+            const features = await apiClient<StorefrontFeatures>("/api/storefront/features", {signal: AbortSignal.timeout(8000)});
             state = {features: JSON.stringify(features) === JSON.stringify(state.features) ? state.features : features,
                 error: null, checkedAt: Date.now()};
             try {sessionStorage.setItem(cacheKey, JSON.stringify(state));}
@@ -95,6 +95,7 @@ async function refresh(force = false) {
             state = {...state, error: "We couldn't refresh ordering settings. Your cart is saved.",
                 features: state.features};
         } finally {
+            try{window.dispatchEvent(new CustomEvent("gokul-loading-stage",{detail:{name:"SETTINGS_LOAD",value:Date.now()-lastAttemptAt,rating:"measured"}}));}catch{}
             pending = null; notify();
             scheduleRefresh();
         }

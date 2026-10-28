@@ -63,7 +63,8 @@
     "tests/mobile-single-checkout.browser.mjs",
     "tests/review-quote-race.browser.mjs",
     "tests/compact-mobile-checkout.browser.mjs",
-    "tests/cart-settings-recovery.browser.mjs"
+    "tests/cart-settings-recovery.browser.mjs",
+    "tests/premium-customer-journeys.browser.mjs"
   ],
   "account-checkout": [
     "tests/simple-checkout-kitchen.browser.mjs",
@@ -101,6 +102,7 @@
     "tests/payment-provider-admin.browser.mjs",
     "tests/menu-categories.browser.mjs",
     "tests/offer-exclusions.browser.mjs",
-    "tests/marketing-push.browser.mjs"
+    "tests/marketing-push.browser.mjs",
+    "tests/premium-menu-admin.browser.mjs"
   ]
 }

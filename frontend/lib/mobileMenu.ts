@@ -14,3 +14,9 @@ export function mobileMenuRows(products:MenuProduct[],groups:PortionGroup[],cata
 export function matchesMobileFilters(product:MenuProduct,categories:number[]|null,maximum:number|null,portionsOnly:boolean,groups:PortionGroup[]){
  return (!categories?.length||categories.includes(product.categoryId))&&(maximum===null||product.price<=maximum)&&(!portionsOnly||groups.some(g=>g.choices.some(c=>c.productId===product.id)));
 }
+
+/** Keep complete size groups together when introducing campaigns after leading dishes. */
+export function splitMenuLead(products:MenuProduct[],groups:PortionGroup[],count=4):{lead:MenuProduct[];rest:MenuProduct[]}{
+ const selected=new Set(mobileMenuRows(products,groups).slice(0,count).flatMap(row=>row.products?.map(p=>p.id)??[row.product.id]));
+ return {lead:products.filter(p=>selected.has(p.id)),rest:products.filter(p=>!selected.has(p.id))};
+}
