@@ -63,7 +63,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   const original=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
   const trigger=page.getByRole('button',{name:'View details · Rasgulla',exact:true});
   await trigger.click();const details=page.getByRole('dialog',{name:'Rasgulla',exact:true});await details.waitFor();
-  await details.getByText('Selling price',{exact:true}).waitFor();assert.equal(await details.locator('.menu-comparison-price').innerText(),'₹30');
+  await details.getByRole('term').filter({hasText:/^Selling price$/}).waitFor();assert.equal(await details.locator('.menu-comparison-price').innerText(),'₹30');
   await page.keyboard.press('Escape');await details.waitFor({state:'hidden'});assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
   await page.getByRole('button',{name:'View details · Sweet 3',exact:true}).click();const fallback=page.getByRole('dialog',{name:'Sweet 3',exact:true});await fallback.locator('.menu-food-placeholder').waitFor();await fallback.getByRole('button',{name:'Close ×'}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),original,'opening details never changes a cart');
