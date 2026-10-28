@@ -12,6 +12,9 @@ function groupOptions(products,highlightIds){
  const component=load('components/menu/NewBranchItems.tsx',{
   react:{useState:initial=>[state++===0?{branchId:1,ids:highlightIds}:initial,()=>{}],useEffect:()=>{},useRef:()=>({current:null})},
   'react/jsx-runtime':jsx,'next/image':{default:()=>null},
+  './MenuExperience':{useMenuExperience:()=>({enabled:false,details:{}})},
+  '@/lib/language':{T:({text})=>text,useTranslation:()=>text=>text},
+  '@/types/menuDetails':{dishPhotoPosition:()=> '50% 50%'},
   './DietaryLabel':{default:()=>null,GroupDietaryLabel},
   '@/lib/mobileMenu':mobile,'@/services/apiClient':{apiClient:()=>Promise.resolve({})},
   './NewBranchItems.module.css':{default:{}}

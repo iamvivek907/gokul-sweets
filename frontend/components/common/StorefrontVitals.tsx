@@ -35,7 +35,7 @@ export default function StorefrontVitals() {
     const report = useCallback((metric: {name: string; value: number; rating: string}) => {
         const payload = safeVital(metric.name, metric.value, metric.rating, location.pathname);
         if (!payload || !state.current.sample) return;
-        if (payload.name.startsWith("MENU_")) {
+        if (payload.name.startsWith("MENU_") || ["IMAGE_LOAD","SETTINGS_LOAD"].includes(payload.name)) {
             const count = stageCounts.current.get(payload.name) ?? 0;
             if (count >= 12) return;
             stageCounts.current.set(payload.name, count + 1);
@@ -84,11 +84,11 @@ export default function StorefrontVitals() {
         if (!enabled || !state.current.sample || typeof PerformanceObserver === "undefined") return;
         let images = 0;
         const observer = new PerformanceObserver(list => {
-            if (!location.pathname.startsWith("/menu")) return;
+
             for (const entry of list.getEntries()) {
                 if ((entry as PerformanceResourceTiming).initiatorType === "img" && images < 12) {
                     images++;
-                    report({name: "MENU_IMAGE", value: entry.duration, rating: "measured"});
+                    report({name: location.pathname.startsWith("/menu")?"MENU_IMAGE":"IMAGE_LOAD", value: entry.duration, rating: "measured"});
                 }
             }
         });

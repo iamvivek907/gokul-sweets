@@ -111,7 +111,9 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  const portion=page.locator('.mobile-portion-card');await portion.waitFor();assert.equal(await portion.getByText('Serves two people.',{exact:true}).count(),0,'variant serving details belong in the picker');
  const recoveredDefault=['menu-pickup-date-only','menu-pickup-no-selection'].includes(scenario);
  if(recoveredDefault)await page.waitForFunction(date=>{try{return JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date===date;}catch{return false;}},secondDate);
- assert.equal(await page.getByRole('button',{name:'View Paneer meal on the menu',exact:true}).count(),0);
+ const collectionMeal=page.getByRole('button',{name:'View Paneer meal on the menu',exact:true});
+ if(!pickupRegression&&scenario!=='priority-only')await collectionMeal.waitFor();
+ assert.ok(await collectionMeal.count()<=1,'curated collections contain one entry per grouped dish');
  assert.equal(await page.getByRole('button',{name:'View Paneer meal Full on the menu',exact:true}).count(),0);
  if(!pickupRegression){await page.getByLabel('Find a favourite',{exact:true}).fill('Paneer meal');
  await portion.waitFor();await page.locator('#gokul-menu-items').getByRole('button',{name:'Clear filters',exact:true}).click();assert.equal(await page.locator('.gokul-menu-product-card').count(),2);}

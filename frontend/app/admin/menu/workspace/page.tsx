@@ -1,4 +1,6 @@
 "use client";
+import MenuContentQuality from "@/components/admin/MenuContentQuality";
+import StorefrontExperienceReport from "@/components/admin/StorefrontExperienceReport";
 import Image from "next/image";
 import BranchOrderingReadiness from "@/components/admin/BranchOrderingReadiness";
 import DietaryLabel from "@/components/menu/DietaryLabel";
@@ -386,6 +388,8 @@ export default function MenuWorkspace() {
           + Add product
         </button>
       </div>
+      {branch&&tab==="items"&&<MenuContentQuality items={data.content} onEdit={item=>setEditor({item,mode:"details"})}/>}
+      {branch&&<StorefrontExperienceReport/>}
       {branch&&<BranchOrderingReadiness key={branch} branchId={branch}/>}
       <div className={styles.toolbar}>
         <label>

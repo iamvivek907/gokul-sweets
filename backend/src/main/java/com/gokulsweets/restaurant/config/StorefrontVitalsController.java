@@ -31,6 +31,8 @@ public class StorefrontVitalsController {
                     "MENU_PREVIEW",
                     "MENU_RENDER",
                     "MENU_IMAGE",
+                    "IMAGE_LOAD",
+                    "SETTINGS_LOAD",
                     "FUNNEL_MENU",
                     "FUNNEL_ADD",
                     "FUNNEL_CHECKOUT",
@@ -41,9 +43,21 @@ public class StorefrontVitalsController {
 
     private static final Set<String> RATINGS = Set.of("good", "needs-improvement", "poor");
 
-    private static final Set<String> PAGES = Set.of("home", "menu", "cart", "checkout", "other");
+    private static final Set<String> PAGES =
+            Set.of(
+                    "home",
+                    "menu",
+                    "cart",
+                    "checkout",
+                    "branches",
+                    "orders",
+                    "profile",
+                    "occasions",
+                    "notifications",
+                    "other");
 
     private final EnhancementProperties features;
+    private final StorefrontPerformance performance;
 
     /**
      * Handles {@code POST /api/storefront/vitals} for storefront vitals.
@@ -62,7 +76,10 @@ public class StorefrontVitalsController {
                     || metric.rating() == null
                     || metric.page() == null
                     || !METRICS.contains(metric.name())
-                    || !(metric.name().startsWith("MENU_") || metric.name().startsWith("FUNNEL_")
+                    || !(metric.name().startsWith("MENU_")
+                                    || metric.name().startsWith("FUNNEL_")
+                                    || metric.name().equals("IMAGE_LOAD")
+                                    || metric.name().equals("SETTINGS_LOAD")
                             ? "measured".equals(metric.rating())
                             : RATINGS.contains(metric.rating()))
                     || (metric.name().startsWith("FUNNEL_") && metric.value() != 1)
@@ -70,6 +87,7 @@ public class StorefrontVitalsController {
                     || metric.value() < 0
                     || metric.value() > 120_000
                     || !Double.isFinite(metric.value())) return ResponseEntity.badRequest().build();
+            performance.record(metric);
             log.info(
                     "storefront_vital name={} page={} rating={} value={}",
                     metric.name(),

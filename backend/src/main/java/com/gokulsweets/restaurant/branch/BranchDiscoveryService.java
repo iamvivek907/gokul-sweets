@@ -133,6 +133,113 @@ ORDER BY r.id DESC LIMIT 21
         }
     }
 
+    /** Actual dish score, independent of overall experience. */
+    public record DishRating(long productId, String productName, int rating) {}
+
+    /** Published order feedback with consent-safe display name. */
+    public record DishReview(
+            String comment, int overallRating, String displayName, List<DishRating> itemRatings) {}
+
+    /** At most twenty comments and a decreasing ID cursor. */
+    public record DishReviewPage(List<DishReview> reviews, Long nextBefore) {}
+
+    /** Internal batched dish score row. */
+    private record ScoredReview(long reviewId, DishRating item) {}
+
+    /** Reads bounded published dish reviews with two queries per page. */
+    @Transactional(readOnly = true)
+    public DishReviewPage dishReviews(
+            long branchId, List<Long> productIds, Long before, Integer stars) {
+        long started =
+                MethodTiming.start(
+                        BranchDiscoveryService.class, "dishReviews(long,List<Long>,Long,Integer)");
+        try {
+            if (productIds == null
+                    || productIds.isEmpty()
+                    || productIds.size() > 20
+                    || productIds.stream().anyMatch(id -> id == null || id <= 0)
+                    || before != null && before <= 0
+                    || stars != null && (stars < 1 || stars > 5))
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Invalid dish review filter.");
+            if (branches.findByIdAndActiveTrue(branchId).isEmpty())
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found.");
+            var ids = productIds.stream().distinct().toList();
+            String marks = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
+            var args = new java.util.ArrayList<Object>();
+            args.add(branchId);
+            args.add(before == null ? Long.MAX_VALUE : before);
+            args.addAll(ids);
+            if (stars != null) args.add(stars);
+            var rows =
+                    jdbc.query(
+                            "SELECT"
+                                + " r.id,r.comment,r.overall_rating,r.show_customer_name,o.customer_name"
+                                + " FROM reviews r JOIN orders o ON o.id=r.order_id WHERE"
+                                + " r.branch_id=? AND r.id<? AND r.review_status='PUBLISHED' AND"
+                                + " o.order_status IN ('PICKED_UP','DELIVERED') AND r.comment IS"
+                                + " NOT NULL AND EXISTS (SELECT 1 FROM review_items ri WHERE"
+                                + " ri.review_id=r.id AND ri.product_id IN ("
+                                    + marks
+                                    + ")"
+                                    + (stars == null ? "" : " AND ri.rating=?")
+                                    + ") ORDER BY r.id DESC LIMIT 21",
+                            (rs, n) ->
+                                    new ReviewRow(
+                                            rs.getLong(1),
+                                            rs.getString(2),
+                                            rs.getInt(3),
+                                            rs.getBoolean(4),
+                                            rs.getString(5)),
+                            args.toArray());
+            var scanned = rows.stream().limit(20).toList();
+            if (scanned.isEmpty()) return new DishReviewPage(List.of(), null);
+            var scoreArgs = new java.util.ArrayList<Object>();
+            scanned.forEach(row -> scoreArgs.add(row.id()));
+            scoreArgs.addAll(ids);
+            var scores =
+                    jdbc.query(
+                            "SELECT review_id,product_id,product_name,rating FROM review_items"
+                                    + " WHERE review_id IN ("
+                                    + String.join(
+                                            ",", java.util.Collections.nCopies(scanned.size(), "?"))
+                                    + ") AND product_id IN ("
+                                    + marks
+                                    + ") ORDER BY product_id",
+                            (rs, n) ->
+                                    new ScoredReview(
+                                            rs.getLong(1),
+                                            new DishRating(
+                                                    rs.getLong(2), rs.getString(3), rs.getInt(4))),
+                            scoreArgs.toArray());
+            var byReview =
+                    scores.stream()
+                            .collect(
+                                    java.util.stream.Collectors.groupingBy(
+                                            ScoredReview::reviewId,
+                                            java.util.stream.Collectors.mapping(
+                                                    ScoredReview::item,
+                                                    java.util.stream.Collectors.toList())));
+            var visible =
+                    scanned.stream()
+                            .filter(row -> publicComment(row.comment()) != null)
+                            .map(
+                                    row ->
+                                            new DishReview(
+                                                    publicComment(row.comment()),
+                                                    row.rating(),
+                                                    publicName(row.showName(), row.customerName()),
+                                                    byReview.getOrDefault(row.id(), List.of())))
+                            .toList();
+            return new DishReviewPage(visible, rows.size() > 20 ? scanned.getLast().id() : null);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    BranchDiscoveryService.class,
+                    "dishReviews(long,List<Long>,Long,Integer)");
+        }
+    }
+
     /** Returns a safe first name only when the customer opted in. */
     static String publicName(boolean optedIn, String customerName) {
         final long __gokulMethodStartedNanos =

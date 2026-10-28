@@ -4,6 +4,7 @@ import {orderDisplayNumber} from "@/lib/orderDisplayNumber";
 import {T} from "@/lib/language";
 
 
+import PickupCustomerContact from "@/components/admin/PickupCustomerContact";
 import PickupHandoverAction from "@/components/admin/PickupHandoverAction";
 import {formatWeight} from "@/lib/orderQuantity";
 
@@ -5733,7 +5734,7 @@ function OrderDetailDrawer({
                                                 </p>
 
 
-                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction orderNumber={order.orderNumber} customerOrderNumber={order.customerOrderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
+                                                {nextStatus==="PICKED_UP" ? <div className="mt-4"><PickupHandoverAction customerName={order.customerName} customerPhone={order.customerPhone} orderNumber={order.orderNumber} customerOrderNumber={order.customerOrderNumber} authorization={authorization} disabled={actionLoading||refreshing} onCompleted={onRefresh}/></div> : (
                                                 <button
                                                     type="button"
                                                     disabled={
@@ -5887,31 +5888,12 @@ function OrderDetailDrawer({
                                     title="Customer"
                                 >
 
-                                    <div
-                                        className="
-                                            grid
-                                            gap-3
-
-                                            sm:grid-cols-2
-                                        "
-                                    >
-
-                                        <DetailValue
-                                            label="Customer name"
-                                            value={
-                                                order.customerName
-                                            }
-                                        />
-
-
-                                        <DetailValue
-                                            label="Phone"
-                                            value={
-                                                order.customerPhone
-                                            }
-                                        />
-
-                                    </div>
+                                    <PickupCustomerContact
+                                        customerName={order.customerName}
+                                        customerPhone={order.customerPhone}
+                                        status={order.orderStatus}
+                                        fulfillment={order.fulfillmentType}
+                                    />
 
                                 </DetailSection>
 

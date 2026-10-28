@@ -1,4 +1,5 @@
 "use client";
+import MenuDishDetailsEditor from "./MenuDishDetailsEditor";
 import { useEffect, useRef, useState } from "react";
 import {
   readWorkspaceDraft,
@@ -740,6 +741,7 @@ export default function WorkspaceProductEditor({
           )}
         </div>
       </fieldset>
+      {item&&(mode==="details"||mode==="photo")&&<MenuDishDetailsEditor key={`${branch}:${item.productId}`} branchId={branch} productId={item.productId} imageUrl={item.imageUrl} onBusyChange={setBusy}/>}
       {error && (
         <p role="alert" className={styles.error}>
           {error}

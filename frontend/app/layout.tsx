@@ -11,6 +11,7 @@ import AppProviders
     from "@/components/providers/AppProviders";
 
 import {
+    API_BASE_URL,
     APP_DESCRIPTION,
     APP_NAME
 } from "@/lib/constants";
@@ -54,6 +55,7 @@ export default function RootLayout({
             lang="en"
             data-scroll-behavior="smooth"
         >
+            <head>{API_BASE_URL.startsWith("https://")&&<link rel="preconnect" href={new URL(API_BASE_URL).origin} crossOrigin="anonymous"/>}</head>
             <body>
                 <AppProviders>
                     {children}

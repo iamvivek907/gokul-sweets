@@ -22,9 +22,86 @@ import java.util.UUID;
 @Transactional
 class BranchDiscoveryIntegrationTest {
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.gokulsweets.restaurant.menu.MenuDetailsService details;
     @Autowired BranchOfferingsService offerings;
     @Autowired BranchDiscoveryService discovery;
     @MockitoBean StaffAuthorizationService staff;
+
+    @Test
+    void ownerFactsAreBranchScopedVersionedAndDoNotChangeOrderingData() {
+        long b = branch(), other = branch(), p = product(b, "Facts dish", true, false);
+        var initial = details.adminRead(b, p);
+        assertThat(initial.version()).isZero();
+        var edit =
+                new com.gokulsweets.restaurant.menu.MenuDetailsService.Update(
+                        "2 pieces", "Milk", "Contains milk", "MILD", 25, 75, true, 0);
+        var saved = details.save(b, p, edit);
+        assertThat(saved.version()).isEqualTo(1);
+        assertThat(saved.photoFocusY()).isEqualTo(75);
+        assertThat(details.read(b, List.of(p, p))).containsExactly(saved);
+        assertThat(details.read(other, List.of(p))).isEmpty();
+        assertThatThrownBy(() -> details.save(b, p, edit))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("409");
+        assertThatThrownBy(() -> details.adminRead(other, p))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("404");
+        assertThatThrownBy(() -> details.read(b, List.of()))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> details.read(b, java.util.Collections.nCopies(101, p)))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> details.read(b, List.of(-1L)))
+                .isInstanceOf(ResponseStatusException.class);
+        jdbc.update("UPDATE products SET active=false WHERE id=?", p);
+        assertThat(details.read(b, List.of(p))).isEmpty();
+        assertThat(details.adminRead(b, p)).isEqualTo(saved);
+        doThrow(new AccessDeniedException("denied")).when(staff).requireBranchAccess(b);
+        assertThatThrownBy(() -> details.save(b, p, edit))
+                .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void dishReviewPagesUseActualDishScoresPublishedCompletedOrdersAndBoundedCursors() {
+        long b = branch(),
+                other = branch(),
+                p = product(b, "Reviewed dish", true, false),
+                slot = slot(b);
+        for (int i = 0; i < 22; i++)
+            review(b, slot, p, 5, 1, "PUBLISHED", "A carefully prepared meal " + i, "PICKED_UP");
+        review(b, slot, p, 1, 5, "HIDDEN", "Not published feedback", "PICKED_UP");
+        review(b, slot, p, 1, 5, "PUBLISHED", "Not completed feedback", "CONFIRMED");
+        review(b, slot, p, 1, 5, "PUBLISHED", "Contact 9876543210 please", "PICKED_UP");
+        var first = discovery.dishReviews(b, List.of(p), null, 1);
+        assertThat(first.reviews()).hasSize(20);
+        assertThat(first.nextBefore()).isNotNull();
+        assertThat(first.reviews())
+                .allSatisfy(
+                        r -> {
+                            assertThat(r.overallRating()).isEqualTo(5);
+                            assertThat(r.displayName()).isEqualTo("Customer");
+                            assertThat(r.itemRatings()).hasSize(1);
+                            assertThat(r.itemRatings().getFirst().rating()).isEqualTo(1);
+                        });
+        var second = discovery.dishReviews(b, List.of(p), first.nextBefore(), 1);
+        assertThat(second.reviews()).hasSize(2);
+        assertThat(second.nextBefore()).isNull();
+        assertThat(discovery.dishReviews(other, List.of(p), null, null).reviews()).isEmpty();
+        assertThat(discovery.dishReviews(b, List.of(p), null, 5).reviews()).isEmpty();
+        for (int stars : List.of(0, 6))
+            assertThatThrownBy(() -> discovery.dishReviews(b, List.of(p), null, stars))
+                    .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> discovery.dishReviews(b, List.of(p), 0L, null))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> discovery.dishReviews(b, List.of(), null, null))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(
+                        () ->
+                                discovery.dishReviews(
+                                        b, java.util.Collections.nCopies(21, p), null, null))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThat(BranchDiscoveryService.publicName(true, "Meera Sharma")).isEqualTo("Meera");
+        assertThat(BranchDiscoveryService.publicName(false, "Meera Sharma")).isEqualTo("Customer");
+    }
 
     String key() {
         return UUID.randomUUID().toString();

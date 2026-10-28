@@ -1,6 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Managed media uses the saved crop and public URL. */
 "use client";
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useLayoutEffect, useRef, useState} from "react";
 import {useLanguage, translate} from "@/lib/language";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {campaignFrameStyle} from "@/lib/campaignFraming";
@@ -8,11 +8,11 @@ import type {MenuBanner} from "@/components/admin/WorkspaceAppearance";
 import styles from "./BranchMenuAppearance.module.css";
 
 type Category = {id: number; name: string};
-type Props = {banners: MenuBanner[]; categories: Category[]; onSelect: (id: number) => void; compact?: boolean};
+type Props = {banners: MenuBanner[]; categories: Category[]; onSelect: (id: number) => void; compact?: boolean;position?:number;onPositionChange?:(index:number)=>void};
 type Slide = {banner: MenuBanner; category: Category | undefined; generated: boolean; key: string};
 
 /** Published artwork and copy remain authoritative; a single campaign can introduce live categories. */
-export default function MenuCampaignBanners({banners, categories, onSelect, compact = false}: Props) {
+export default function MenuCampaignBanners({banners, categories, onSelect, compact = false,position=0,onPositionChange}: Props) {
     const locale = useLanguage(), features = useStorefrontFeatures();
     const [reduced, setReduced] = useState(true);
     useEffect(() => {
@@ -47,7 +47,7 @@ export default function MenuCampaignBanners({banners, categories, onSelect, comp
     if (!modern) return <div className={compact ? styles.strips : undefined} aria-label="Published menu banners">
         {slides.map(slide => <article key={slide.key} className={`${styles.banner} ${compact ? styles.strip : ""}`}>{content(slide)}</article>)}
     </div>;
-    return <CampaignCarousel key={slides.map(s => s.key).join("|")} slides={slides} reduced={reduced} locale={locale} compact={compact} render={content} />;
+    return <CampaignCarousel key={slides.map(s => s.key).join("|")} position={position} onPositionChange={onPositionChange} slides={slides} reduced={reduced} locale={locale} compact={compact} render={content} />;
 }
 
 /** Background animation controls sit outside saved media transforms and the slide navigation. */
@@ -70,11 +70,19 @@ function CampaignVideo({banner, modern, locale}: {banner: MenuBanner; modern: bo
     </>;
 }
 
-function CampaignCarousel({slides, reduced, locale, compact, render}: {
+function CampaignCarousel({slides, reduced, locale, compact, render,position,onPositionChange}: {
+    position:number;onPositionChange?:(index:number)=>void;
     slides: Slide[]; reduced: boolean; locale: "en" | "hi"; compact: boolean; render: (slide: Slide, playing: boolean) => React.ReactNode;
 }) {
     const viewport = useRef<HTMLDivElement>(null);
-    const [active, setActive] = useState(0);
+    const [initialPosition]=useState(()=>Math.max(0,Math.min(slides.length-1,position)));
+    const [active, setActive] = useState(initialPosition);
+    // Category filtering can remount this discovery slot. Restore the branch/content position
+    // before paint, without replaying an entrance scroll or resetting the selected slide.
+    useLayoutEffect(()=>{
+        const node=viewport.current,target=node?.children[initialPosition] as HTMLElement|undefined,first=node?.children[0] as HTMLElement|undefined;
+        if(node&&target&&first)node.scrollTo({left:target.offsetLeft-first.offsetLeft,behavior:"instant"});
+    },[initialPosition]);
     const pendingTarget = useRef<number | null>(null);
     const go = (index: number) => {
         index = Math.max(0, Math.min(slides.length - 1, index));
@@ -95,7 +103,7 @@ function CampaignCarousel({slides, reduced, locale, compact, render}: {
                     pendingTarget.current = null;
                 }
                 const index = Math.round(node.scrollLeft / Math.max(node.clientWidth, 1));
-                setActive(Math.max(0, Math.min(slides.length - 1, index)));
+                const next=Math.max(0, Math.min(slides.length - 1, index));setActive(next);onPositionChange?.(next);
             }}>
             {slides.map((slide, index) => <article key={slide.key} className={`${styles.banner} ${styles.slide}`} role="group" aria-roledescription={locale === "hi" ? "स्लाइड" : "slide"} aria-label={`${index + 1} / ${slides.length}`} aria-hidden={index !== active} inert={index !== active}>{render(slide, index === active)}</article>)}
         </div>

@@ -47,4 +47,25 @@ public class BranchDiscoveryController {
                     __gokulMethodStartedNanos, BranchDiscoveryController.class, "get(long)");
         }
     }
+
+    /** Reads one public dish-review page. */
+    @GetMapping("/dish-reviews")
+    public BranchDiscoveryService.DishReviewPage dishReviews(
+            @PathVariable long branchId,
+            @RequestParam java.util.List<Long> productIds,
+            @RequestParam(required = false) Long before,
+            @RequestParam(required = false) Integer stars) {
+        long started =
+                MethodTiming.start(
+                        BranchDiscoveryController.class,
+                        "dishReviews(long,java.util.List<Long>,Long,Integer)");
+        try {
+            return discovery.dishReviews(branchId, productIds, before, stars);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    BranchDiscoveryController.class,
+                    "dishReviews(long,java.util.List<Long>,Long,Integer)");
+        }
+    }
 }

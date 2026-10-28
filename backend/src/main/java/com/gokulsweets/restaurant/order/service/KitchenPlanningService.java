@@ -65,6 +65,7 @@ public class KitchenPlanningService {
      * @param orderNumber the order number
      * @param customerOrderNumber the customer order number
      * @param customerName the customer name
+     * @param customerPhone authorized pickup contact number
      * @param fulfillmentType the fulfillment type
      * @param orderStatus the order status
      * @param bucket the bucket
@@ -79,6 +80,7 @@ public class KitchenPlanningService {
             String orderNumber,
             Long customerOrderNumber,
             String customerName,
+            String customerPhone,
             String fulfillmentType,
             String orderStatus,
             String bucket,
@@ -271,8 +273,9 @@ FROM planned
                     jdbc.query(
                             BASE
                                     + "SELECT"
-                                    + " order_number,customer_name,fulfillment_type,order_status,bucket,service_date,starts_at,ends_at,preparation_at,customer_order_number,early_preparation"
-                                    + " FROM planned"
+                                    + " order_number,customer_name,fulfillment_type,order_status,bucket,service_date,starts_at,ends_at,preparation_at,customer_order_number,early_preparation,CASE"
+                                    + " WHEN fulfillment_type='PICKUP' THEN customer_phone END"
+                                    + " customer_phone FROM planned"
                                     + scope
                                     + " ORDER BY service_date,starts_at,id LIMIT ? OFFSET ?",
                             (rs, n) ->
@@ -280,6 +283,7 @@ FROM planned
                                             rs.getString(1),
                                             rs.getObject(10, Long.class),
                                             rs.getString(2),
+                                            rs.getString(12),
                                             rs.getString(3),
                                             rs.getString(4),
                                             rs.getString(5),
@@ -321,6 +325,7 @@ FROM planned
                                                         r.orderNumber(),
                                                         r.customerOrderNumber(),
                                                         r.customerName(),
+                                                        r.customerPhone(),
                                                         r.fulfillmentType(),
                                                         r.orderStatus(),
                                                         r.bucket(),

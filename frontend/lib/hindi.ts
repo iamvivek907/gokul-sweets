@@ -1514,3 +1514,30 @@ Object.assign(hindi, {
 Object.assign(hindi,{"✓ Name saved":"✓ नाम सेव है","○ Your name":"○ आपका नाम","✓ Address saved":"✓ पता सेव है","○ Your places":"○ आपके पते","✓ Linked to your verified phone":"✓ आपके सत्यापित फ़ोन से जुड़ा है"});
 
 Object.assign(hindi,{"Your address changed while location was loading. Your entered details were kept. Request location again if needed.":"लोकेशन लोड होते समय आपका पता बदल गया। आपके दर्ज किए विवरण सुरक्षित हैं। ज़रूरत हो तो लोकेशन फिर से माँगें।"});
+
+Object.assign(hindi,{
+ "Saved":"सेव","Saved dishes":"सेव किए व्यंजन","Saved on this device for this branch":"इस शाखा के लिए इस डिवाइस पर सेव है",
+ "Save":"सेव करें","Unsave":"सेव से हटाएँ","all sizes":"सभी आकार","All sizes":"सभी आकार",
+ "You can save up to 50 dishes per branch.":"हर शाखा के लिए अधिकतम 50 व्यंजन सेव कर सकते हैं।",
+ "Favourites could not be saved on this device.":"इस डिवाइस पर पसंदीदा व्यंजन सेव नहीं हो सके।",
+ "Clear saved dishes":"सेव किए व्यंजन हटाएँ","Clear saved dishes?":"सेव किए व्यंजन हटाएँ?",
+ "Remove saved dishes from this branch on this device?":"इस डिवाइस पर इस शाखा के सेव किए व्यंजन हटाएँ?",
+ "Keep saved dishes":"सेव किए व्यंजन रखें","Some saved dishes are no longer on this menu.":"कुछ सेव किए व्यंजन अब इस मेन्यू में नहीं हैं।",
+ "Recent searches":"हाल की खोज","Menu suggestions":"मेन्यू के सुझाव","Clear recent searches":"हाल की खोज हटाएँ",
+ "Read reviews":"राय पढ़ें","out of 5 from":"पाँच में से, कुल","ratings":"रेटिंग",
+ "Serving information":"परोसने की जानकारी","Ingredients":"सामग्री","Allergen information":"एलर्जी से जुड़ी जानकारी",
+ "Spice level":"मिर्च-मसाले का स्तर","Mild":"हल्का","Medium":"मध्यम","Hot":"तीखा",
+ "Extra dish details are temporarily unavailable. Check with the branch about ingredients and allergies.":"व्यंजन की अतिरिक्त जानकारी अभी उपलब्ध नहीं है। सामग्री और एलर्जी के बारे में शाखा से पूछें।",
+ "Chef’s pick":"शेफ़ की पसंद","Chef’s picks":"शेफ़ की पसंद","Branch favourites":"शाखा के पसंदीदा व्यंजन","New arrivals":"नए व्यंजन",
+ "Published feedback from completed orders. Dish stars and overall experience are shown separately.":"पूरे हुए ऑर्डर की प्रकाशित राय। व्यंजन की रेटिंग और पूरा अनुभव अलग दिखाए गए हैं।",
+ "Size":"आकार","All ratings":"सभी रेटिंग","Overall experience":"पूरा अनुभव",
+ "No published comments match this dish and filter yet.":"इस व्यंजन और फ़िल्टर के लिए अभी कोई लिखित राय प्रकाशित नहीं है।",
+ "Your Gokul branch":"आपकी गोकुल शाखा","Continue browsing":"मेन्यू देखना जारी रखें","Review saved cart":"सेव किए कार्ट को देखें",
+ "Your last completed order":"आपका पिछला पूरा हुआ ऑर्डर","Review and order again":"देखें और फिर ऑर्डर करें",
+ "Current prices and pickup availability are checked before you add.":"जोड़ने से पहले मौजूदा कीमत और पिकअप की उपलब्धता जाँची जाती है।",
+ "Menu collections":"मेन्यू संग्रह","Fresh from":"ताज़ा व्यंजन ·","Browse new items":"नए व्यंजन देखें","Previous new items":"पिछले नए व्यंजन","Next new items":"अगले नए व्यंजन","Continue with Gokul":"गोकुल के साथ आगे बढ़ें"
+});
+
+Object.assign(hindi,{"Dish rating":"व्यंजन की रेटिंग","Customer review pages":"ग्राहकों की राय के पृष्ठ","Latest on the menu":"मेन्यू में नए व्यंजन","Explore the menu":"मेन्यू देखें","Explore menu":"मेन्यू देखें"});
+
+Object.assign(hindi,{"Customer contact":"ग्राहक का संपर्क","Call customer":"ग्राहक को कॉल करें","Phone unavailable":"फ़ोन नंबर उपलब्ध नहीं है"});
