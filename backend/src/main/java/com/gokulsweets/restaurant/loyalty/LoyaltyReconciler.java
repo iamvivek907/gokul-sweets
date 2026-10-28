@@ -9,54 +9,58 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/** Repairs interrupted lifecycle callbacks. Enrolment snapshot excludes historical/guest orders. */
+/** Bounded durable reconciliation, plus slower repair and account-expiry maintenance. */
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class LoyaltyReconciler {
-
     @org.springframework.beans.factory.annotation.Value("${gokul.jobs.worker-enabled:false}")
     private boolean dedicatedImportWorker;
 
     private final JdbcTemplate jdbc;
-
     private final LoyaltyService loyalty;
+    private final LoyaltyReconcileWork work;
 
-    /**
-     * Reconciles loyalty reconciler data.
-     *
-     * <p>Reads {@code loyalty_accounts}, {@code loyalty_holds}, {@code loyalty_ledger}, {@code
-     * loyalty_lots}, {@code orders}, {@code payments}, {@code verified_order_ownership}.
-     */
+    /** Processes committed work; each order's existing reconciliation remains idempotent. */
     @Scheduled(fixedDelayString = "${gokul.loyalty.reconcile-delay-ms:15000}")
     public void reconcile() {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(LoyaltyReconciler.class, "reconcile()");
+        long started = MethodTiming.start(LoyaltyReconciler.class, "reconcile()");
         try {
             if (dedicatedImportWorker) return;
-            var ids =
-                    jdbc.queryForList(
-                            """
-SELECT o.id FROM orders o WHERE
- (EXISTS(SELECT 1 FROM loyalty_holds h WHERE h.order_id=o.id AND h.state<>'RELEASED') AND
-  (o.order_status IN ('CANCELLED','PAYMENT_FAILED') OR EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND
-    (p.payment_status='REFUNDED' OR (p.payment_status='PAID' AND EXISTS(SELECT 1 FROM loyalty_holds h WHERE h.order_id=o.id AND h.state='RESERVED'))))))
- OR (o.loyalty_enrolled AND EXISTS(SELECT 1 FROM verified_order_ownership own WHERE own.order_id=o.id) AND
-   ((o.order_status IN ('PICKED_UP','DELIVERED') AND EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='PAID') AND
-     NOT EXISTS(SELECT 1 FROM loyalty_account_ledger l WHERE l.order_id=o.id AND l.kind='EARNED')) OR
-    ((o.order_status='CANCELLED' OR EXISTS(SELECT 1 FROM payments p WHERE p.order_id=o.id AND p.payment_status='REFUNDED')) AND
-      EXISTS(SELECT 1 FROM loyalty_account_ledger l WHERE l.order_id=o.id AND l.kind IN ('EARNED','WELCOME')) AND
-      NOT EXISTS(SELECT 1 FROM loyalty_account_ledger l WHERE l.order_id=o.id AND l.kind='REVERSED'))))
-ORDER BY o.id LIMIT 500
-""",
-                            Long.class);
-            for (long id : ids) {
+            for (var item : work.claim()) {
                 try {
-                    loyalty.reconcile(id);
+                    loyalty.reconcile(item.orderId());
+                    work.complete(item);
                 } catch (RuntimeException failure) {
-                    log.error("Loyalty order reconciliation failed: orderId={}", id, failure);
+                    work.failed(item);
+                    log.error(
+                            "Loyalty queued reconciliation failed: orderId={}",
+                            item.orderId(),
+                            failure);
                 }
             }
+        } finally {
+            MethodTiming.finish(started, LoyaltyReconciler.class, "reconcile()");
+        }
+    }
+
+    /** Checks a bounded historical slice so legacy records also receive repair coverage. */
+    @Scheduled(fixedDelayString = "${gokul.loyalty.repair-delay-ms:300000}")
+    public void repair() {
+        long started = MethodTiming.start(LoyaltyReconciler.class, "repair()");
+        try {
+            if (!dedicatedImportWorker) work.repair();
+        } finally {
+            MethodTiming.finish(started, LoyaltyReconciler.class, "repair()");
+        }
+    }
+
+    /** Expires stored balances; wallet reads still enforce expiry synchronously. */
+    @Scheduled(fixedDelayString = "${gokul.loyalty.expiry-delay-ms:300000}")
+    public void expire() {
+        long started = MethodTiming.start(LoyaltyReconciler.class, "expire()");
+        try {
+            if (dedicatedImportWorker) return;
             var expiring =
                     jdbc.queryForList(
                             "SELECT DISTINCT l.environment,l.subject_id FROM loyalty_lots p JOIN"
@@ -81,7 +85,7 @@ ORDER BY o.id LIMIT 500
                 }
             }
         } finally {
-            MethodTiming.finish(__gokulMethodStartedNanos, LoyaltyReconciler.class, "reconcile()");
+            MethodTiming.finish(started, LoyaltyReconciler.class, "expire()");
         }
     }
 }

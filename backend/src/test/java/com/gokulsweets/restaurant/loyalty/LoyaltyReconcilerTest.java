@@ -15,10 +15,12 @@ class LoyaltyReconcilerTest {
     void oneBrokenOrderOrAccountDoesNotStarveTheRestOfTheBatch() {
         var jdbc = mock(JdbcTemplate.class);
         var loyalty = mock(LoyaltyService.class);
+        var work = mock(LoyaltyReconcileWork.class);
+        var firstItem = new LoyaltyReconcileWork.Item(1, 1, UUID.randomUUID());
+        var secondItem = new LoyaltyReconcileWork.Item(2, 1, UUID.randomUUID());
+        when(work.claim()).thenReturn(List.of(firstItem, secondItem));
         var first = UUID.randomUUID();
         var second = UUID.randomUUID();
-        when(jdbc.queryForList(contains("SELECT o.id"), eq(Long.class)))
-                .thenReturn(List.of(1L, 2L));
         when(jdbc.queryForList(startsWith("SELECT DISTINCT")))
                 .thenReturn(
                         List.of(
@@ -28,7 +30,11 @@ class LoyaltyReconcilerTest {
         doThrow(new IllegalStateException("Malformed account"))
                 .when(loyalty)
                 .expireAccount("DEV", first);
-        new LoyaltyReconciler(jdbc, loyalty).reconcile();
+        var reconciler = new LoyaltyReconciler(jdbc, loyalty, work);
+        reconciler.reconcile();
+        reconciler.expire();
+        verify(work).failed(firstItem);
+        verify(work).complete(secondItem);
         verify(loyalty).reconcile(2L);
         verify(loyalty).expireAccount("DEV", second);
     }

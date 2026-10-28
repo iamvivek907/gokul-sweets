@@ -348,9 +348,11 @@ jobs:
           SELECT id,'DAILY_PRODUCTION','PIECE',true,30,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP FROM branch_products WHERE branch_id=10001;
           -- Align fixture service dates with the application's inventory clock, not UTC.
           SET TIME ZONE 'Asia/Kolkata';
+          -- Leave a stable, future inventory gap; test execution may cross IST midnight.
+          SELECT (CURRENT_DATE+2)::text AS fixture_date \gset
           INSERT INTO inventory_daily_allocations(branch_product_id,service_date,status,inventory_unit,approved_quantity,created_at,updated_at)
-          SELECT b.id,CURRENT_DATE+n,'APPROVED','PIECE',1000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
-          FROM branch_products b CROSS JOIN generate_series(1,30) n WHERE b.branch_id=10001;
+          SELECT b.id,:'fixture_date'::date+n,'APPROVED','PIECE',1000,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP
+          FROM branch_products b CROSS JOIN generate_series(1,28) n WHERE b.branch_id=10001;
           INSERT INTO staff_users(id,username,password_hash,full_name,role_id)
           SELECT 10000+n,'memory_ci_'||n,'disabled-ci-only','Memory staff '||n,r.id
           FROM generate_series(1,100) n CROSS JOIN roles r WHERE r.name='KITCHEN_STAFF';
@@ -375,7 +377,8 @@ jobs:
                   if [ "$(docker inspect --format '{{.State.Running}}' gokul-render-smoke)" != true ]; then exit 1; fi
                   sleep 5
                 done
-                python3 backend/scripts/memory-workload.py
+                GOKUL_CI_SERVICE_DATE=$(docker exec '${{ job.services.postgres.id }}' psql -U gokul_test -d restaurant_test -At -c "SELECT MIN(a.service_date)-1 FROM inventory_daily_allocations a JOIN branch_products b ON b.id=a.branch_product_id WHERE b.branch_id=10001") \
+                  python3 backend/scripts/memory-workload.py
                 echo 'Checking growing-history query plans on disposable temporary tables'
                 docker exec -i '${{ job.services.postgres.id }}' \
                   psql -U gokul_test -d restaurant_test -v ON_ERROR_STOP=1 < backend/scripts/growth-query-plans.sql
