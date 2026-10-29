@@ -59,7 +59,8 @@ public class MealService {
                                             List.of(
                                                     mapper.readValue(
                                                             rs.getString("groups"),
-                                                            Group[].class))))
+                                                            Group[].class))),
+                            branchId)
                     .stream()
                     .limit(32)
                     .toList();

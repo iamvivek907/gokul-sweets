@@ -1,4 +1,5 @@
 "use client";
+import MealCartSummary from "@/components/meal/MealCartSummary";
 import {availabilityItems} from "@/services/availabilityApi";
 import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
@@ -2105,6 +2106,7 @@ try {
                         "
                     >
 
+                        <MealCartSummary disabled={submitting||!!pendingOrder}/>
                         {
                             items.map(
                                 item => (

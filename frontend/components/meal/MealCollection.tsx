@@ -28,7 +28,7 @@ export default function MealCollection({branchId,products,smartAvailability}:{br
  function open(meal:MealDefinition){const draft=drafts.current.get(meal.id);setSelected(draft?.version===meal.version?draft.selected:[]);setQuantity(draft?.version===meal.version?draft.quantity:1);setReplaceId(undefined);setError('');setActive(meal);}
  function choose(group:MealDefinition['groups'][number],key:string){setError('');setSelected(previous=>{let next=previous.filter(x=>x!==key);if(!previous.includes(key)){if(group.maximum===1)next=next.filter(x=>!group.options.some(o=>o.key===x));if(group.options.filter(o=>next.includes(o.key)).length>=group.maximum)return previous;next.push(key);}else if(group.minimum===1&&group.maximum===1)return previous;drafts.current.set(active!.id,{version:active!.version,selected:next,quantity});return next;});}
  async function submit(close:()=>void){
-  if(!active||busy)return;menuTapFeedback();setBusy(true);setError('');const c=new AbortController();controller.current=c;
+  if(!active||busy)return;menuTapFeedback();setBusy(true);setError('');const c=new AbortController();controller.current=c;let committed=false;
   try{if(getPendingOrderSnapshot()||sessionStorage.getItem('gokul-mobile-order-attempt'))throw Error('Finish or recover your current checkout before adding a meal.');
    const before=getCartSnapshot(),branchBefore=getStoredBranchSnapshot(),pickupBefore=getPickupSlotSnapshot();const current=parseCart(before);
    if(JSON.parse(branchBefore||'null')?.id!==branchId)throw Error('Your branch changed. Reopen the meal.');
@@ -45,8 +45,8 @@ export default function MealCollection({branchId,products,smartAvailability}:{br
    }
    if(c.signal.aborted)return;
    if(before!==getCartSnapshot()||branchBefore!==getStoredBranchSnapshot()||pickupBefore!==getPickupSlotSnapshot()||getPendingOrderSnapshot()||sessionStorage.getItem('gokul-mobile-order-attempt'))throw Error('Your cart or pickup changed. Review the meal and try again.');
-   saveCart(next);setNotice('Your meal was added. Final prices, tax and pickup are checked before payment.');drafts.current.delete(active.id);close();
-  }catch(reason){if(!c.signal.aborted)setError(reason instanceof Error?reason.message:'The meal could not be added. Try again.');}finally{if(!c.signal.aborted)setBusy(false);}
+   saveCart(next);committed=true;setNotice('Your meal was added. Final prices, tax and pickup are checked before payment.');drafts.current.delete(active.id);close();
+  }catch(reason){if(!c.signal.aborted)setError(reason instanceof Error?reason.message:'The meal could not be added. Try again.');}finally{if(!c.signal.aborted&&!committed)setBusy(false);}
  }
  if(!meals.length)return null;
  const estimate=active?mealEstimate(active,selected,quantity,map):null;
