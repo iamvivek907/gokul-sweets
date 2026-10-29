@@ -7,7 +7,7 @@ const branch={id:1,name:'Meal test branch',active:true,operational:true,pickupAv
 const products=[{id:1,name:'Main dish',price:100},{id:2,name:'Side dish',price:50},{id:3,name:'Drink',price:40},{id:4,name:'Regular extra',price:20},{id:5,name:'Another dish',price:40}].map(p=>({...p,categoryId:1,categoryName:'Food',available:true,saleMode:'UNIT',description:'Freshly prepared',imageUrl:'/arrival-mithai.webp'}));
 const initial={id:1,branchId:1,version:2,title:'Your lunch meal',titleHi:'आपका लंच मील',description:'Pick the combination you want.',basePrice:130,discountType:'FIXED',discountValue:10,estimatedCost:75,active:true,groups:[{key:'main',title:'Choose your main',minimum:1,maximum:1,options:[{key:'main1',productId:1,quantity:1,weightGrams:null,upgrade:0}]},{key:'side',title:'Choose your side',minimum:1,maximum:1,options:[{key:'side1',productId:2,quantity:1,weightGrams:null,upgrade:0}]},{key:'drink',title:'Add a drink',minimum:0,maximum:1,options:[{key:'drink1',productId:3,quantity:1,weightGrams:null,upgrade:20}]}]};
 try{for(const width of [320,390,1280]){
- const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let saved=structuredClone(initial),fail=false,writes=0;
+ const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let saved=structuredClone(initial),fail=false,writes=0,heldQuote=null;
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','seen');},{...branch});
  const checkoutDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
  const checkoutSlot={id:9,branchId:1,slotDate:checkoutDate,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:50};
@@ -23,6 +23,7 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/branches/1/meals')json=[{...saved,estimatedCost:null}];
   else if(path==='/api/branches/1/meals/quote'){
    const claim=request.postDataJSON();assert.equal(claim.mealId,1);assert.equal(claim.version,2);assert.equal(claim.total,undefined,'client never submits a trusted price');
+   if(heldQuote){const held=heldQuote;held.arrived();await held.promise;}
    if(fail)return route.fulfill({status:409,headers,json:{message:'This meal changed. Rebuild it from the menu.'}});
    const options=saved.groups.flatMap(g=>g.options).filter(o=>claim.optionIds.includes(o.key));const components=options.map(o=>({productId:o.productId,quantity:o.quantity*claim.quantity,weightGrams:null,regularTotal:products.find(p=>p.id===o.productId).price*o.quantity*claim.quantity}));json={mealId:1,version:2,title:saved.title,quantity:claim.quantity,regularTotal:components.reduce((n,p)=>n+p.regularTotal,0),baseTotal:130*claim.quantity,discount:10*claim.quantity,upgrades:options.reduce((n,o)=>n+o.upgrade,0)*claim.quantity,total:(120+options.reduce((n,o)=>n+o.upgrade,0))*claim.quantity,components};
   }
@@ -45,6 +46,25 @@ try{for(const width of [320,390,1280]){
  let cart=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')));assert.equal(cart.meals.length,1);assert.equal(cart.meals[0].total,280);assert.equal(cart.items.find(p=>p.product.id===1).quantity,2);
  await page.getByRole('button',{name:'Build meal Your lunch meal'}).click();await dialog.waitFor();await dialog.getByLabel('Main dish',{exact:false}).check();await dialog.getByLabel('Side dish',{exact:false}).check();fail=true;const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));await dialog.getByRole('button',{name:/Add meal/}).click();await dialog.getByRole('alert').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),before,'failed quotes do not partially add components');await dialog.getByRole('button',{name:'Close',exact:true}).click();await dialog.waitFor({state:'hidden'});fail=false;
  await page.goto(base+'/cart');await page.getByRole('complementary',{name:'Your meals'}).waitFor();await page.getByRole('link',{name:'Edit meal',exact:true}).click();await dialog.waitFor();assert.equal(await dialog.getByLabel('Drink',{exact:false}).isChecked(),true);await dialog.getByRole('button',{name:'Decrease meal quantity'}).click();await dialog.getByRole('button',{name:/Update meal/}).click();await dialog.waitFor({state:'hidden'});cart=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')));assert.equal(cart.meals.length,1);assert.equal(cart.meals[0].quantity,1);assert.equal(cart.items.find(p=>p.product.id===1).quantity,1);
+ if(width===390){
+  // A response released during the normal exit animation must not mutate the cart.
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  for(const method of ['button','escape','backdrop']){
+   await page.getByRole('button',{name:'Build meal Your lunch meal'}).click();await dialog.waitFor();
+   await dialog.getByLabel('Main dish',{exact:false}).check();await dialog.getByLabel('Side dish',{exact:false}).check();
+   let release,arrived;const started=new Promise(resolve=>arrived=resolve);
+   heldQuote={promise:new Promise(resolve=>release=resolve),arrived};
+   const snapshot=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
+   await dialog.getByRole('button',{name:/Add meal/}).click();await started;
+   if(method==='button')await dialog.getByRole('button',{name:'Close',exact:true}).click();
+   else if(method==='escape')await page.keyboard.press('Escape');
+   else await page.mouse.click(2,2);
+   assert.equal(await dialog.getAttribute('data-closing'),'true','normal exit animation remains mounted');
+   release();await dialog.waitFor({state:'hidden'});heldQuote=null;
+   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),snapshot,method+' cancels immediately, before animation ends');
+  }
+  await page.emulateMedia({reducedMotion:'reduce'});
+ }
  if(width===1280){
   await page.evaluate(({date,slot})=>{localStorage.setItem('gokul-customer-details',JSON.stringify({name:'Meal customer',phone:'9876543210'}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{date:checkoutDate,slot:checkoutSlot});
   await page.goto(base+'/checkout/review');await page.getByRole('complementary',{name:'Your meals'}).waitFor();
