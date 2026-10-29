@@ -9,6 +9,8 @@ const initial={id:1,branchId:1,version:2,title:'Your lunch meal',titleHi:'आप
 try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let saved=structuredClone(initial),fail=false,writes=0;
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','seen');},{...branch});
+ const checkoutDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
+ const checkoutSlot={id:9,branchId:1,slotDate:checkoutDate,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:50};
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,x-staff-csrf','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','X-Staff-CSRF':'test-csrf'};
  await context.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;let json=[];
@@ -17,6 +19,7 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/branches')json=[branch];else if(path==='/api/branches/1')json=branch;
   else if(path==='/api/storefront/customer-identity')json={enabled:false,guestCheckoutEnabled:true};else if(path==='/api/customer/identity/me')json={authenticated:false};
   else if(path==='/api/menu')json=[{id:1,name:'Food',products}];else if(path==='/api/menu/portion-groups')json={groups:[]};
+  else if(path==='/api/branches/1/availability')json={today:checkoutDate,maximumDate:checkoutDate,dates:[{date:checkoutDate,slots:[{slot:checkoutSlot,normalAvailable:true,priorityAvailable:false}]}]};
   else if(path==='/api/branches/1/meals')json=[{...saved,estimatedCost:null}];
   else if(path==='/api/branches/1/meals/quote'){
    const claim=request.postDataJSON();assert.equal(claim.mealId,1);assert.equal(claim.version,2);assert.equal(claim.total,undefined,'client never submits a trusted price');
@@ -42,6 +45,20 @@ try{for(const width of [320,390,1280]){
  let cart=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')));assert.equal(cart.meals.length,1);assert.equal(cart.meals[0].total,280);assert.equal(cart.items.find(p=>p.product.id===1).quantity,2);
  await page.getByRole('button',{name:'Build meal Your lunch meal'}).click();await dialog.waitFor();await dialog.getByLabel('Main dish',{exact:false}).check();await dialog.getByLabel('Side dish',{exact:false}).check();fail=true;const before=await page.evaluate(()=>localStorage.getItem('gokul-cart'));await dialog.getByRole('button',{name:/Add meal/}).click();await dialog.getByRole('alert').waitFor();assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),before,'failed quotes do not partially add components');await dialog.getByRole('button',{name:'Close',exact:true}).click();await dialog.waitFor({state:'hidden'});fail=false;
  await page.goto(base+'/cart');await page.getByRole('complementary',{name:'Your meals'}).waitFor();await page.getByRole('link',{name:'Edit meal',exact:true}).click();await dialog.waitFor();assert.equal(await dialog.getByLabel('Drink',{exact:false}).isChecked(),true);await dialog.getByRole('button',{name:'Decrease meal quantity'}).click();await dialog.getByRole('button',{name:/Update meal/}).click();await dialog.waitFor({state:'hidden'});cart=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')));assert.equal(cart.meals.length,1);assert.equal(cart.meals[0].quantity,1);assert.equal(cart.items.find(p=>p.product.id===1).quantity,1);
+ if(width===1280){
+  await page.evaluate(({date,slot})=>{localStorage.setItem('gokul-customer-details',JSON.stringify({name:'Meal customer',phone:'9876543210'}));localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{date:checkoutDate,slot:checkoutSlot});
+  await page.goto(base+'/checkout/review');await page.getByRole('complementary',{name:'Your meals'}).waitFor();
+  const adjustment=page.getByRole('dialog',{name:'Adjust your pickup here'});
+  for(const change of ['pickup-only','extra-main','remove-main']){
+   await page.getByRole('button',{name:'Change time',exact:true}).click();await adjustment.waitFor();
+   if(change==='extra-main')await adjustment.getByLabel('Main dish quantity',{exact:true}).fill('2');
+   if(change==='remove-main')await adjustment.getByRole('button',{name:'Remove Main dish',exact:true}).click();
+   await adjustment.getByRole('button',{name:'Check & apply changes',exact:true}).click();await adjustment.waitFor({state:'hidden'});
+   const savedCart=await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')));
+   if(change==='remove-main'){assert.equal(savedCart.meals,undefined);assert.match(savedCart.mealNotice,/Review your total/);await page.getByRole('status').filter({hasText:'A meal deal was removed'}).waitFor();}
+   else{assert.equal(savedCart.meals.length,1,change+' retains the deal');assert.equal(savedCart.meals[0].total,140);assert.equal(savedCart.meals[0].regularTotal,190);}
+  }
+ }
  await page.goto(base+'/admin/menu/workspace');await page.getByRole('combobox',{name:'Selected branch'}).waitFor();await page.getByText('App-exclusive meals · prices, discounts & choices',{exact:true}).click();const admin=page.getByRole('region',{name:'Meal management'});await admin.getByRole('button',{name:/Your lunch meal/}).click();await admin.getByRole('combobox',{name:/^Discount/}).selectOption('PERCENT');await admin.getByLabel('Discount %',{exact:true}).fill('10');await admin.getByLabel('Estimated base-meal cost',{exact:false}).fill('70');await admin.getByText(/Estimated base margin/).waitFor();await page.screenshot({path:`/tmp/gokul-meal-shots/admin-${width}.png`});fail=true;await admin.getByRole('button',{name:'Save meal',exact:true}).click();await admin.getByRole('alert').waitFor();assert.equal(await admin.getByLabel('Discount %',{exact:true}).inputValue(),'10','conflict retains the admin draft');fail=false;await admin.getByRole('button',{name:'Save meal',exact:true}).click();await admin.getByRole('status').filter({hasText:'Meal saved'}).waitFor();assert.equal(writes,2);assert.equal(saved.discountType,'PERCENT');
  assert.deepEqual(errors,[]);await context.close();console.log(`PASS meals customer/admin ${width}px`);
 }}finally{await browser.close();}
