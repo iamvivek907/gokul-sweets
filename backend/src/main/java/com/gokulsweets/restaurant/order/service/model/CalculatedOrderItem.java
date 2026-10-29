@@ -25,4 +25,31 @@ public record CalculatedOrderItem(
         BigDecimal unitPrice,
         BigDecimal taxRate,
         BigDecimal taxAmount,
-        BigDecimal lineTotal) {}
+        BigDecimal lineTotal,
+        BigDecimal mealDiscount,
+        String mealLabel,
+        String mealDetails) {
+    /** Preserves ordinary priced-line callers. */
+    public CalculatedOrderItem(
+            Product product,
+            ProductSaleMode saleMode,
+            int quantity,
+            Integer weightGrams,
+            BigDecimal unitPrice,
+            BigDecimal taxRate,
+            BigDecimal taxAmount,
+            BigDecimal lineTotal) {
+        this(
+                product,
+                saleMode,
+                quantity,
+                weightGrams,
+                unitPrice,
+                taxRate,
+                taxAmount,
+                lineTotal,
+                BigDecimal.ZERO,
+                null,
+                null);
+    }
+}

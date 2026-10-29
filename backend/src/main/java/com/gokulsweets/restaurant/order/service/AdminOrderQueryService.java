@@ -714,7 +714,9 @@ SELECT id, service_date, starts_at, ends_at FROM delivery_capacity_windows WHERE
                     item.getUnitPrice(),
                     item.getTaxRate(),
                     item.getTaxAmount(),
-                    item.getLineTotal());
+                    item.getLineTotal(),
+                    item.getMealDiscount(),
+                    item.getMealLabel());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

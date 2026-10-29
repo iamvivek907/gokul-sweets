@@ -635,7 +635,15 @@ public class OrderService {
             for (CalculatedOrderItem calculatedItem : calculation.items()) {
                 OrderItem item = new OrderItem();
                 item.setProduct(calculatedItem.product());
-                item.setProductName(calculatedItem.product().getName());
+                String mealSuffix =
+                        calculatedItem.mealLabel() == null
+                                ? ""
+                                : " [Meal: " + calculatedItem.mealLabel() + "]";
+                String label = calculatedItem.product().getName() + mealSuffix;
+                item.setProductName(label);
+                item.setMealDiscount(calculatedItem.mealDiscount());
+                item.setMealLabel(calculatedItem.mealLabel());
+                item.setMealDetails(calculatedItem.mealDetails());
                 item.setQuantity(calculatedItem.quantity());
                 item.setSaleMode(calculatedItem.saleMode());
                 item.setWeightGrams(calculatedItem.weightGrams());
@@ -720,7 +728,9 @@ public class OrderService {
                     item.getUnitPrice(),
                     item.getTaxRate(),
                     item.getTaxAmount(),
-                    item.getLineTotal());
+                    item.getLineTotal(),
+                    item.getMealDiscount(),
+                    item.getMealLabel());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, OrderService.class, "toItemResponse(OrderItem)");

@@ -74,6 +74,10 @@ public class DeliveryOrderPreparationService {
                                     () ->
                                             new IllegalArgumentException(
                                                     "Selected branch is unavailable."));
+            if (request.items().stream()
+                    .anyMatch(i -> i.mealSelections() != null && !i.mealSelections().isEmpty()))
+                throw new IllegalArgumentException(
+                        "App-exclusive meals currently support pickup only.");
             var items = validation.validateCart(branch.getId(), request.items());
             if (items.size() != request.items().size() || items.stream().anyMatch(Objects::isNull))
                 throw new IllegalArgumentException("Review the items in your delivery cart.");

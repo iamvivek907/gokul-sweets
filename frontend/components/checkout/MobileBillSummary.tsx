@@ -8,9 +8,11 @@ const money=(n:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency
 export default function MobileBillSummary({quote,best,rewardDiscount,paymentFee,paymentFeeTax,total,onClose}:{quote:CheckoutQuote;best:AvailableRebateResponse|null|undefined;rewardDiscount:number;paymentFee?:number;paymentFeeTax?:number;total:number;onClose:()=>void}){
  const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{const surface=dialog.current,previous=document.activeElement as HTMLElement|null;surface?.showModal();return()=>{surface?.close();previous?.focus();};},[]);
- const savings=rewardDiscount+(best?.rebateAmount??0);
+ const mealSavings=quote.items.reduce((sum,i)=>sum+Number(i.mealDiscount??0),0);
+ const savings=rewardDiscount+(best?.rebateAmount??0)+mealSavings;
  return <dialog ref={dialog} className="checkout-offer-dialog mobile-bill-dialog" aria-labelledby="mobile-bill-title" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{const r=e.currentTarget.getBoundingClientRect();if(e.target===e.currentTarget&&(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom))onClose();}}><div><header><h2 id="mobile-bill-title"><T text="Bill summary"/></h2><button type="button" onClick={onClose}><T text="Close"/> ×</button></header><dl>
- <div><dt><T text="Items"/></dt><dd>{money(Number(quote.subtotal))}</dd></div>
+ <div><dt><T text="Items"/></dt><dd>{money(Number(quote.subtotal)+mealSavings)}</dd></div>
+ {mealSavings>0&&<div className="mobile-bill-saving"><dt><T text="Meal savings"/></dt><dd>−{money(mealSavings)}</dd></div>}
  <div><dt><T text="Tax"/></dt><dd>{money(Number(quote.taxAmount))}</dd></div>
  <div><dt><T text="Priority pickup"/></dt><dd>{money(Number(quote.priorityCharge??0))}</dd></div>
  <div><dt><T text="Convenience fee"/></dt><dd>{money(Number(quote.convenienceFee??0))}</dd></div>

@@ -71,6 +71,7 @@ export default function DeliveryCheckPage() {
 
     async function submit(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
+        if(cart.meals?.length){setMessage("App-exclusive meals currently support pickup only. Keep your meal and choose pickup from the menu.");return;}
         const area = locality.trim();
         if (area.length < 2 || area.length > 120) {
             setMessage("Enter a locality between 2 and 120 characters.");

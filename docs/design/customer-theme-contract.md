@@ -407,5 +407,4 @@ surface. Keep the title and action footer outside the independently scrolling co
 hide its visual scrollbar without disabling touch, wheel or keyboard scrolling. The
 Close target remains at least 44px, visible on short viewports and focusable. Legacy
 and non-menu overlays preserve their existing layout. App-exclusive meal direction
-is recorded in app-exclusive-meals.md; that document is a design contract, not a
-completed meal implementation.
+is recorded in app-exclusive-meals.md; that document records the implementation contract and current operational limits.

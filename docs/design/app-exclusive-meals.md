@@ -1,7 +1,6 @@
 # App-exclusive meals: agreed product direction and implementation contract
 
-Status: design only. The meal builder, admin configuration, special pricing and order
-integration are not implemented in PR #254. That PR contains the popup/landing fixes.
+Status: implementation in review in PR #254, with backend/PostgreSQL and browser validation in progress. The sections below describe the product contract. Current implementation limits are recorded at the end.
 
 The owner selected **Special meal price**: admin sets a base meal price and optional
 upgrade charges. Selected dishes consume their own inventory. The feature should
@@ -91,3 +90,27 @@ reorder of changed/archived meals; staff packing and invoice snapshots; permissi
 and stale admin edits; bounded query counts; Hindi, larger text, reduced motion,
 keyboard/focus restoration and mobile/desktop layouts. Verify Safari scrolling on a
 real iPhone; simulated vibration calls cannot verify physical haptics.
+
+## Current implementation and operational limits
+
+Admin meal controls are in Menu workspace → App-exclusive meals. Branch-scoped menu
+permission is required. Up to 32 versioned definitions per branch support NONE, FIXED
+or PERCENT discounts, required/optional groups and paid upgrades. Internal cost estimates
+are not returned to public clients. Publish only complete, valid branch recipes.
+
+Customer selection adds real dish quantities atomically with versioned meal claims.
+The cart shows a meal summary with Edit/Remove controls alongside aggregated dish rows.
+Ordinary quantities of the same SKU remain independent of meal removal. Changing an
+included dish so the recipe is no longer complete removes that deal and displays a
+review-total notice. Server quotes, idempotency and persisted item allocations carry
+meal identity; inventory/capacity/refund lifecycle still uses actual component items.
+
+The first version supports pickup, ten customized selections per order and quantity
+1–10 per selection. Each SKU appears once per recipe. Weight portions retain the SKU's
+retail minimum/step and must have an exact paisa price, so combined weighted meals
+cannot accumulate rounding errors. Meal deals do not stack with other offers or coin
+redemptions. Existing net-spend earning rules still apply.
+
+Reordering a historical meal directs the customer to rebuild against current choices
+and prices. Archive/pause and stale versions require review. Costs/margins are owner-
+entered estimates before tax, payment fees and overhead, not guaranteed profits.

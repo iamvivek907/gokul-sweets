@@ -355,6 +355,9 @@ public class OrderCalculationService {
                             : unitPrice
                                     .multiply(BigDecimal.valueOf(validatedItem.quantity()))
                                     .setScale(MONEY_SCALE, ROUNDING_MODE);
+            lineSubtotal = lineSubtotal.subtract(validatedItem.mealDiscount());
+            if (lineSubtotal.signum() < 0)
+                throw new IllegalArgumentException("Meal savings exceed the included item amount.");
             BigDecimal taxRate =
                     collectTax
                             ? determineTaxRate(validatedItem.product().getTaxCategory())
@@ -381,7 +384,10 @@ public class OrderCalculationService {
                     unitPrice,
                     taxRate,
                     taxAmount,
-                    lineTotal);
+                    lineTotal,
+                    validatedItem.mealDiscount(),
+                    validatedItem.mealLabel(),
+                    validatedItem.mealDetails());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -401,14 +407,7 @@ public class OrderCalculationService {
                 MethodTiming.start(
                         OrderCalculationService.class, "lineSubtotal(CalculatedOrderItem)");
         try {
-            if (item.saleMode() == ProductSaleMode.WEIGHT) {
-                return item.unitPrice()
-                        .multiply(BigDecimal.valueOf(item.weightGrams()))
-                        .divide(ONE_THOUSAND, MONEY_SCALE, ROUNDING_MODE);
-            }
-            return item.unitPrice()
-                    .multiply(BigDecimal.valueOf(item.quantity()))
-                    .setScale(MONEY_SCALE, ROUNDING_MODE);
+            return item.lineTotal().subtract(item.taxAmount()).setScale(MONEY_SCALE, ROUNDING_MODE);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
