@@ -47,7 +47,7 @@ try{for(const [width,reduced,supported] of [[320,false,true],[390,false,false],[
  await page.locator('#gokul-product-3').getByRole('button',{name:'Add Sweet 3 to cart',exact:true}).click();
  const weight=page.getByRole('dialog',{name:'Sweet 3',exact:true});await weight.waitFor();await weight.getByRole('button',{name:'Close weight selection'}).click();await weight.waitFor({state:'hidden'});
  await page.evaluate(()=>{testPulses=[];});
- const grouped=page.locator('.mobile-portion-card').filter({has:page.getByRole('heading',{name:'Sweet box',exact:true})});
+ const grouped=page.locator('.mobile-portion-card,.desktop-portion-card').filter({has:page.getByRole('heading',{name:'Sweet box',exact:true})});
  await grouped.locator('.menu-card-open').click();const sizes=page.getByRole('dialog',{name:'Sweet box',exact:true});await sizes.waitFor();
  assert.deepEqual(await page.evaluate(()=>testPulses),[],'group card opens silently');
  await sizes.getByRole('button',{name:'Close',exact:false}).click();await sizes.waitFor({state:'hidden'});
