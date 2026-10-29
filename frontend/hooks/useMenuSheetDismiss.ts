@@ -11,7 +11,7 @@ export function useMenuSheetDismiss(surface:RefObject<HTMLElement|null>,onClose:
         if(tactile&&feedback)menuTapFeedback();
         const node=surface.current;
         if(window.location.pathname!=="/menu"||!node?.closest('.future-storefront')||window.matchMedia('(prefers-reduced-motion: reduce)').matches){onClose();return;}
-        node.dataset.closing="true";
+        node.setAttribute("data-closing","true");
         timer.current=setTimeout(onClose,180);
     };
 }
