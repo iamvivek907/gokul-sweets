@@ -761,7 +761,7 @@ export default function MenuScreen() {
         );
 
 
-    useEffect(()=>{if(!branch||!new URLSearchParams(window.location.search).has("mealEdit"))return;queueMicrotask(()=>{setSearch("");setSelectedCategoryId(null);setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);setBrowseCategory(null);changeSavedFilter(false);});},[branch]);
+    useEffect(()=>{if(!branch||!new URLSearchParams(window.location.search).has("mealEdit"))return;queueMicrotask(()=>{setSearch("");setSelectedCategoryId(null);setMobileCategories([]);setMaximumPrice(null);setPortionsOnly(false);setBrowseCategory(null);setSavedOnly(false);const url=new URL(location.href);url.searchParams.delete("saved");url.searchParams.delete("category");history.replaceState(history.state,"",url);});},[branch]);
 
     const [browseScroll,setBrowseScroll]=useState<{branchId:number;id:number;revision:number}|null>(null);
     const completedBrowseScroll=useRef<object|null>(null);
