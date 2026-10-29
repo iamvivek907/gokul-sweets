@@ -34,6 +34,7 @@ try{for(const [width,reduced,supported] of [[320,false,true],[390,false,false],[
  assert.deepEqual(await page.evaluate(()=>testPulses),[],'opening details does not vibrate');
  await dialog.evaluate(async e=>{await Promise.all(e.getAnimations({subtree:true}).map(a=>a.finished.catch(()=>{})));});
  const close=dialog.getByRole('button',{name:'Close',exact:true}),body=dialog.locator('.mobile-menu-suggestion-body');
+ assert.equal(await dialog.evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)','floating Close sits over the backdrop without a white strip');
  assert.equal(await body.evaluate(e=>getComputedStyle(e).scrollbarWidth),'none','the content scrolls without a visible scrollbar');
  const closeBox=await close.boundingBox(),headBox=await dialog.locator('header').boundingBox();
  assert.ok(closeBox.width>=44&&closeBox.height>=44&&closeBox.y+closeBox.height<headBox.y,'circular Close sits above the food surface');
