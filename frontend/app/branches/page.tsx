@@ -8,8 +8,8 @@ import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 export default function BranchesPage() {
     const features = useStorefrontFeatures();
     useEffect(() => {
-        // Enter at the branch cards while keeping the welcome hero directly above them.
-        document.getElementById("gokul-branches")?.scrollIntoView({behavior: "instant"});
+        // Reveal the selected branch shortcuts before the branch gallery.
+        document.getElementById("gokul-discovery")?.scrollIntoView({behavior: "instant"});
     }, []);
     return <AppShell editorial showSocialPopup={false}>
         <EditorialArrival campaignsEnabled={features?.homepageCampaigns === true}

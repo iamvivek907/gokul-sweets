@@ -1,4 +1,7 @@
 "use client";
+import {menuTapFeedback} from "@/lib/menuHaptics";
+import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
+import motionStyles from "./MenuDiscoverySheet.module.css";
 import {T} from "@/lib/language";
 
 import {
@@ -167,6 +170,9 @@ function WeightSelectorDialog({
     onConfirm
 }: WeightSelectorDialogProps) {
     const dialogRef = useRef<HTMLElement>(null);
+    const dismiss = useMenuSheetDismiss(dialogRef,onClose,true);
+    const dismissRef = useRef(dismiss);
+    useEffect(() => { dismissRef.current=dismiss; });
     useEffect(() => {
         const previouslyFocused = document.activeElement;
         const dialog = dialogRef.current;
@@ -262,7 +268,7 @@ function WeightSelectorDialog({
                     event.key === "Escape"
                 ) {
 
-                    onClose();
+                    dismissRef.current();
                 }
             }
 
@@ -482,7 +488,7 @@ function WeightSelectorDialog({
     return (
         <div
             role="presentation"
-            className="gokul-weight-overlay fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5"
+            className={`${motionStyles.overlay} gokul-weight-overlay fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5`}
             onMouseDown={
                 event => {
 
@@ -491,7 +497,7 @@ function WeightSelectorDialog({
                         event.currentTarget
                     ) {
 
-                        onClose();
+                        dismissRef.current();
                     }
                 }
             }
@@ -502,7 +508,7 @@ function WeightSelectorDialog({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="weight-selector-title"
-                className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6"
+                className={`${motionStyles.motion} max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6`}
             >
 
                 <div
@@ -548,9 +554,7 @@ function WeightSelectorDialog({
 
                     <button
                         type="button"
-                        onClick={
-                            onClose
-                        }
+                        onClick={() => dismiss(true)}
                         aria-label="Close weight selection"
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fff4e5] text-xl text-[#7a1625] transition active:scale-95"
                     >
@@ -841,6 +845,7 @@ function WeightSelectorDialog({
                                 }
 
 
+                                if (!editing) menuTapFeedback();
                                 onConfirm(
                                     product,
                                     validWeight

@@ -1,10 +1,12 @@
 "use client";
 import {useEffect,useId,useRef,type ReactNode} from "react";
 import styles from "./MenuDiscoverySheet.module.css";
+import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
 import {T} from "@/lib/language";
 
-export default function MenuDiscoverySheet({title,children,onClose,className,returnFocusId,restoreFocus}:{title:string;children:ReactNode;onClose:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null}){
+export default function MenuDiscoverySheet({title,children,onClose,className,returnFocusId,restoreFocus,tactile=false}:{title:string;children:ReactNode;onClose:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;tactile?:boolean}){
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
+ const dismiss=useMenuSheetDismiss(dialog,onClose,tactile);
  useEffect(()=>{
   const surface=dialog.current,previous=restoreFocus??document.activeElement as HTMLElement|null;
   const body=document.body,root=document.documentElement,y=window.scrollY,x=window.scrollX;
@@ -28,8 +30,8 @@ export default function MenuDiscoverySheet({title,children,onClose,className,ret
    }
   };
  },[returnFocusId,restoreFocus]);
- return <dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();onClose();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom))onClose();}}>
-  <header><h2 id={titleId}><T text={title}/></h2><button type="button" onClick={onClose} autoFocus><T text="Close"/> ×</button></header>
+ return <dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else onClose();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else onClose();}}}>
+  <header><h2 id={titleId}><T text={title}/></h2><button type="button" onClick={()=>tactile?dismiss(true):onClose()} autoFocus><T text="Close"/> ×</button></header>
   <div className="mobile-menu-suggestion-body">{children}</div>
  </dialog>;
 }

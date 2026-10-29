@@ -125,3 +125,5 @@
 :global(.future-storefront[data-customer-design=reference]) .branchCard:only-child .branchPhoto{height:100%!important;min-height:320px}
 :global(.future-storefront[data-customer-design=reference]) .branchCard:only-child picture{height:100%}
 }
+
+.discovery{display:flow-root;scroll-margin-top:16px}
