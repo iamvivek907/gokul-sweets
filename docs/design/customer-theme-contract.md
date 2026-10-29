@@ -399,3 +399,13 @@ Unsupported/blocked vibration never changes ordering; reduced motion suppresses 
 Dish, size and quantity sheets slide/fade on entry and exit while retaining their
 modal focus and scroll protection until dismissal finishes. Reduced motion skips
 these transitions. No native iPhone haptic guarantee or hidden form controls.
+
+## Food detail sheet refinement (October 29)
+
+Modern menu dish/size/quantity sheets use a labelled circular Close above the white
+surface. Keep the title and action footer outside the independently scrolling content;
+hide its visual scrollbar without disabling touch, wheel or keyboard scrolling. The
+Close target remains at least 44px, visible on short viewports and focusable. Legacy
+and non-menu overlays preserve their existing layout. App-exclusive meal direction
+is recorded in app-exclusive-meals.md; that document is a design contract, not a
+completed meal implementation.

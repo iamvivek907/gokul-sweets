@@ -1,4 +1,7 @@
 "use client";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
+import {usePathname} from "next/navigation";
+import MenuDiscoverySheet from "./MenuDiscoverySheet";
 import {menuTapFeedback} from "@/lib/menuHaptics";
 import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
 import motionStyles from "./MenuDiscoverySheet.module.css";
@@ -169,11 +172,14 @@ function WeightSelectorDialog({
     onClose,
     onConfirm
 }: WeightSelectorDialogProps) {
+    const features=useStorefrontFeatures(),pathname=usePathname();
+    const nativeMenuSheet=pathname==="/menu"&&!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2);
     const dialogRef = useRef<HTMLElement>(null);
     const dismiss = useMenuSheetDismiss(dialogRef,onClose,true);
     const dismissRef = useRef(dismiss);
     useEffect(() => { dismissRef.current=dismiss; });
     useEffect(() => {
+        if(nativeMenuSheet)return;
         const previouslyFocused = document.activeElement;
         const dialog = dialogRef.current;
         const focusable = () => Array.from(dialog?.querySelectorAll<HTMLElement>(
@@ -193,7 +199,7 @@ function WeightSelectorDialog({
             dialog?.removeEventListener("keydown", trapFocus);
             if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus({preventScroll:true});
         };
-    }, []);
+    }, [nativeMenuSheet]);
 
     const minimum =
         product.minimumWeightGrams
@@ -259,7 +265,7 @@ function WeightSelectorDialog({
 
     useEffect(
         () => {
-
+            if(nativeMenuSheet)return;
             function handleKeyDown(
                 event: KeyboardEvent
             ): void {
@@ -286,7 +292,7 @@ function WeightSelectorDialog({
                 );
         },
         [
-            onClose
+            onClose,nativeMenuSheet
         ]
     );
 
@@ -485,38 +491,83 @@ function WeightSelectorDialog({
     }
 
 
-    return (
-        <div
-            role="presentation"
-            className={`${motionStyles.overlay} gokul-weight-overlay fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5`}
-            onMouseDown={
-                event => {
+    const footer=(
+<div
+                    className={nativeMenuSheet?"flex w-full items-center justify-between gap-4":"mt-5 flex items-center justify-between gap-4 border-t border-[#eadfd6] pt-4"}
+                >
 
-                    if (
-                        event.target ===
-                        event.currentTarget
-                    ) {
+                    <div>
 
-                        dismissRef.current();
-                    }
-                }
-            }
-        >
+                        <p
+                            className="text-xs text-[#756763]"
+                        >
+                            <T text="Estimated price" /></p>
 
+
+                        <p
+                            className="text-xl font-bold text-[#241715]"
+                        >
+                            {
+                                estimatedPrice === null
+                                    ? "—"
+                                    : formatCurrency(
+                                        estimatedPrice
+                                    )
+                            }
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        type="button"
+                        disabled={
+                            validWeight === null
+                        }
+                        onClick={
+                            () => {
+
+                                if (
+                                    validWeight === null
+                                ) {
+
+                                    return;
+                                }
+
+
+                                if (!editing) menuTapFeedback();
+                                onConfirm(
+                                    product,
+                                    validWeight
+                                );
+                            }
+                        }
+                        className="min-h-12 rounded-xl bg-[#7a1625] px-5 text-sm font-bold text-white shadow-[0_5px_14px_rgba(122,22,37,0.22)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#c9b9b4] disabled:shadow-none disabled:active:scale-100"
+                    >
+                        {
+                            validWeight === null
+                                ? <T text="Check quantity"/>
+                                : editing ? <T text="Update quantity"/> : <><T text="Add"/> {formatWeight(validWeight)}</>
+                        }
+                    </button>
+
+                </div>
+    );
+    const content=(
             <section
                 ref={dialogRef}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="weight-selector-title"
-                className={`${motionStyles.motion} max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6`}
+                role={nativeMenuSheet?undefined:"dialog"}
+                aria-modal={nativeMenuSheet?undefined:true}
+                aria-labelledby={nativeMenuSheet?undefined:"weight-selector-title"}
+                className={nativeMenuSheet?undefined:`${motionStyles.motion} max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-6`}
             >
 
-                <div
+                {!nativeMenuSheet&&<div
                     className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-[#dfd2ca] sm:hidden"
-                />
+                />}
 
 
-                <div
+                {!nativeMenuSheet&&<div
                     className="flex items-start justify-between gap-4"
                 >
 
@@ -561,7 +612,7 @@ function WeightSelectorDialog({
                         ×
                     </button>
 
-                </div>
+                </div>}
 
 
                 <div
@@ -802,67 +853,7 @@ function WeightSelectorDialog({
                 </div>
 
 
-                <div
-                    className="mt-5 flex items-center justify-between gap-4 border-t border-[#eadfd6] pt-4"
-                >
-
-                    <div>
-
-                        <p
-                            className="text-xs text-[#756763]"
-                        >
-                            <T text="Estimated price" /></p>
-
-
-                        <p
-                            className="text-xl font-bold text-[#241715]"
-                        >
-                            {
-                                estimatedPrice === null
-                                    ? "—"
-                                    : formatCurrency(
-                                        estimatedPrice
-                                    )
-                            }
-                        </p>
-
-                    </div>
-
-
-                    <button
-                        type="button"
-                        disabled={
-                            validWeight === null
-                        }
-                        onClick={
-                            () => {
-
-                                if (
-                                    validWeight === null
-                                ) {
-
-                                    return;
-                                }
-
-
-                                if (!editing) menuTapFeedback();
-                                onConfirm(
-                                    product,
-                                    validWeight
-                                );
-                            }
-                        }
-                        className="min-h-12 rounded-xl bg-[#7a1625] px-5 text-sm font-bold text-white shadow-[0_5px_14px_rgba(122,22,37,0.22)] transition active:scale-[0.98] disabled:cursor-not-allowed disabled:bg-[#c9b9b4] disabled:shadow-none disabled:active:scale-100"
-                    >
-                        {
-                            validWeight === null
-                                ? <T text="Check quantity"/>
-                                : editing ? <T text="Update quantity"/> : <><T text="Add"/> {formatWeight(validWeight)}</>
-                        }
-                    </button>
-
-                </div>
-
+                {!nativeMenuSheet&&footer}
 
                 <p
                     className="mt-3 text-center text-[11px] leading-4 text-[#756763]"
@@ -870,8 +861,9 @@ function WeightSelectorDialog({
                     <T text="Final amount is calculated by Gokul Sweets using the selected weight." /></p>
 
             </section>
-
-        </div>
+    );
+    return nativeMenuSheet?<MenuDiscoverySheet tactile title={product.name} closeLabel="Close weight selection" className="menu-weight-sheet" footer={footer} onClose={onClose}>{content}</MenuDiscoverySheet>:(
+      <div role="presentation" className={`${motionStyles.overlay} gokul-weight-overlay fixed inset-0 z-70 flex items-end justify-center bg-black/45 p-0 sm:items-center sm:p-5`} onMouseDown={event=>{if(event.target===event.currentTarget)dismissRef.current();}}>{content}</div>
     );
 }
 

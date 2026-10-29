@@ -1,10 +1,13 @@
 "use client";
 import {useEffect,useId,useRef,type ReactNode} from "react";
+import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import styles from "./MenuDiscoverySheet.module.css";
 import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
-import {T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
-export default function MenuDiscoverySheet({title,children,onClose,className,returnFocusId,restoreFocus,tactile=false}:{title:string;children:ReactNode;onClose:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;tactile?:boolean}){
+export default function MenuDiscoverySheet({title,children,onClose,className,returnFocusId,restoreFocus,tactile=false,footer,closeLabel="Close"}:{title:string;children:ReactNode;onClose:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string}){
+ const translate=useTranslation(),features=useStorefrontFeatures();
+ const polished=tactile&&!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2);
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
  const dismiss=useMenuSheetDismiss(dialog,onClose,tactile);
  useEffect(()=>{
@@ -30,8 +33,13 @@ export default function MenuDiscoverySheet({title,children,onClose,className,ret
    }
   };
  },[returnFocusId,restoreFocus]);
- return <dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else onClose();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else onClose();}}}>
-  <header><h2 id={titleId}><T text={title}/></h2><button type="button" onClick={()=>tactile?dismiss(true):onClose()} autoFocus><T text="Close"/> ×</button></header>
-  <div className="mobile-menu-suggestion-body">{children}</div>
+ const content=<>
+  <header><h2 id={titleId}><T text={title}/></h2>{!polished&&<button type="button" aria-label={closeLabel==="Close"?undefined:translate(closeLabel)} onClick={()=>tactile?dismiss(true):onClose()} autoFocus><T text="Close"/> ×</button>}</header>
+  <div tabIndex={polished?0:undefined} className={`mobile-menu-suggestion-body ${polished?styles.scrollBody:""}`}>{children}</div>
+  {footer&&<footer className={styles.footer}>{typeof footer==="function"?footer(()=>tactile?dismiss():onClose()):footer}</footer>}
+ </>;
+ return <dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${polished?styles.polished:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else onClose();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else onClose();}}}>
+  {polished&&<button type="button" className={styles.floatingClose} aria-label={translate(closeLabel)} onClick={()=>dismiss(true)} autoFocus><span aria-hidden="true">×</span></button>}
+  {polished?<div className={styles.frame}>{content}</div>:content}
  </dialog>;
 }

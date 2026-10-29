@@ -3,7 +3,7 @@ import {createRequire} from 'node:module';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
 const branch={id:1,name:'Gokul Test',city:'Tamkuhi road',active:true,operational:true,pickupAvailable:true};
-const products=Array.from({length:20},(_,i)=>({id:i+1,name:`Sweet ${i+1}`,categoryId:1,categoryName:'Sweets',price:50,available:i!==1,saleMode:i===2?'WEIGHT':'UNIT',minimumWeightGrams:250,weightStepGrams:50,imageUrl:null}));
+const products=Array.from({length:20},(_,i)=>({id:i+1,name:`Sweet ${i+1}`,description:i===0?"A freshly prepared sweet. ".repeat(120):null,categoryId:1,categoryName:'Sweets',price:50,available:i!==1,saleMode:i===2?'WEIGHT':'UNIT',minimumWeightGrams:250,weightStepGrams:50,imageUrl:null}));
 const browser=await chromium.launch({headless:true});
 try{for(const [width,reduced,supported] of [[320,false,true],[390,false,false],[1280,false,true],[390,true,true]]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:reduced?'reduce':'no-preference'}),page=await context.newPage();
@@ -32,6 +32,13 @@ try{for(const [width,reduced,supported] of [[320,false,true],[390,false,false],[
  const card=page.locator('#gokul-product-1');
  await card.locator('.menu-card-open').click();const dialog=page.getByRole('dialog',{name:'Sweet 1',exact:true});await dialog.waitFor();
  assert.deepEqual(await page.evaluate(()=>testPulses),[],'opening details does not vibrate');
+ await dialog.evaluate(async e=>{await Promise.all(e.getAnimations({subtree:true}).map(a=>a.finished.catch(()=>{})));});
+ const close=dialog.getByRole('button',{name:'Close',exact:true}),body=dialog.locator('.mobile-menu-suggestion-body');
+ assert.equal(await body.evaluate(e=>getComputedStyle(e).scrollbarWidth),'none','the content scrolls without a visible scrollbar');
+ const closeBox=await close.boundingBox(),headBox=await dialog.locator('header').boundingBox();
+ assert.ok(closeBox.width>=44&&closeBox.height>=44&&closeBox.y+closeBox.height<headBox.y,'circular Close sits above the food surface');
+ await body.focus();await page.keyboard.press('End');await page.waitForFunction(()=>document.querySelector('.menu-product-details .mobile-menu-suggestion-body')?.scrollTop>0);assert.ok(await body.evaluate(e=>e.scrollTop)>0,'long content remains scrollable');
+ assert.ok(Math.abs((await dialog.locator('header').boundingBox()).y-headBox.y)<1,'title stays fixed as content scrolls');
  if(!reduced)assert.notEqual(await dialog.evaluate(e=>getComputedStyle(e).animationName),'none');
  await dialog.getByRole('button',{name:'Close',exact:false}).click();await dialog.waitFor({state:'hidden'});
  assert.deepEqual(await page.evaluate(()=>testPulses),supported&&!reduced?[12]:[],'only explicit close requests a pulse');
