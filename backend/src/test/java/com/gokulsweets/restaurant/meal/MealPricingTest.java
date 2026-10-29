@@ -118,4 +118,47 @@ class MealPricingTest {
         assertThat(new OrderCalculationService().calculateDelivery(lines).subtotal())
                 .isEqualByComparingTo("149.99");
     }
+
+    @Test
+    void snapshotsAndPackingLabelsSeparateSharedWeightedAndUnitComponents() {
+        var service = mock(MealService.class);
+        when(service.catalog(1, false)).thenReturn(List.of(meal()));
+        var pricing = new MealPricing(service, JsonMapper.builder().build());
+        var first = new MealModels.Claim("first", 1, 2, 1, List.of("main1", "side1", "sweet1"));
+        var second = new MealModels.Claim("second", 1, 2, 2, List.of("main1", "side1", "sweet1"));
+        var sweet = item(3, "200.00", 1);
+        sweet.product().setSaleMode(ProductSaleMode.WEIGHT);
+        sweet.product().setMinimumWeightGrams(250);
+        sweet.product().setWeightStepGrams(50);
+        var weighted =
+                new ValidatedOrderItem(
+                        sweet.product(), sweet.branchProduct(), ProductSaleMode.WEIGHT, 1, 1000);
+        var result =
+                pricing.apply(
+                        1,
+                        List.of(
+                                new CreateOrderItemRequest(1L, 3, null, List.of(first, second)),
+                                new CreateOrderItemRequest(2L, 3, null),
+                                new CreateOrderItemRequest(3L, null, 1000)),
+                        List.of(item(1, "100.00", 3), item(2, "50.00", 3), weighted));
+        assertThat(result.get(0).mealLabel())
+                .contains("#first ×1 (1 units)", "#second ×2 (2 units)");
+        assertThat(result.get(2).mealLabel()).contains("#first ×1 (250 g)", "#second ×2 (500 g)");
+        assertThat(result.get(2).weightGrams()).isEqualTo(1000);
+        assertThat(result.get(2).mealDetails())
+                .contains(
+                        "\"weightGrams\":250",
+                        "\"weightGrams\":500",
+                        "\"mealQuantity\":2",
+                        "\"productName\":\"Dish 3\"",
+                        "\"title\":\"Lunch\"",
+                        "\"version\":2",
+                        "\"unitPrice\":200",
+                        "\"regularTotal\":50",
+                        "\"mealDiscount\":");
+        // Later recipe edits cannot change the stored names, portions or allocations.
+        when(service.catalog(1, false)).thenReturn(List.of());
+        assertThat(result.get(2).mealDetails())
+                .contains("\"title\":\"Lunch\"", "\"weightGrams\":250");
+    }
 }

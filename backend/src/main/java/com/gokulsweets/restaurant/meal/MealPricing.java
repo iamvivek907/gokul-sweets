@@ -47,7 +47,7 @@ public class MealPricing {
             Map<Long, Long> remaining = new HashMap<>();
             Map<Long, BigDecimal> discounts = new HashMap<>();
             Map<Long, List<String>> labels = new HashMap<>();
-            Map<Long, List<Claim>> snapshots = new HashMap<>();
+            Map<Long, List<ComponentSnapshot>> snapshots = new HashMap<>();
             for (var item : items) {
                 var p = item.product();
                 var bp = item.branchProduct();
@@ -103,8 +103,29 @@ public class MealPricing {
                                                                     claim.instanceId().length()
                                                                             - 6))
                                             + " ×"
-                                            + claim.quantity());
-                    snapshots.computeIfAbsent(part.productId(), k -> new ArrayList<>()).add(claim);
+                                            + claim.quantity()
+                                            + " ("
+                                            + (part.weightGrams() == null
+                                                    ? part.quantity() + " units"
+                                                    : part.weightGrams() + " g")
+                                            + ")");
+                    snapshots
+                            .computeIfAbsent(part.productId(), k -> new ArrayList<>())
+                            .add(
+                                    new ComponentSnapshot(
+                                            claim.instanceId(),
+                                            quote.mealId(),
+                                            quote.version(),
+                                            quote.title(),
+                                            quote.quantity(),
+                                            List.copyOf(claim.optionIds()),
+                                            part.productId(),
+                                            products.get(part.productId()).name(),
+                                            part.quantity(),
+                                            part.weightGrams(),
+                                            part.unitPrice(),
+                                            part.regularTotal(),
+                                            amount));
                 }
             }
             List<ValidatedOrderItem> priced = new ArrayList<>();

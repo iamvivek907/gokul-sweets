@@ -76,6 +76,22 @@ public final class MealModels {
         }
     }
 
+    /** Immutable packing facts; historical portions never depend on a later recipe edit. */
+    public record ComponentSnapshot(
+            String instanceId,
+            long mealId,
+            long version,
+            String title,
+            int mealQuantity,
+            List<String> optionIds,
+            long productId,
+            String productName,
+            int quantity,
+            Integer weightGrams,
+            BigDecimal unitPrice,
+            BigDecimal regularTotal,
+            BigDecimal mealDiscount) {}
+
     /** Transparent meal breakdown before item taxes and checkout charges. */
     public record Quote(
             long mealId,

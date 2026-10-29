@@ -19,6 +19,11 @@ export function reconcileCartMeals(cart:CartState):CartState {
  const identity=valid.length?JSON.stringify(valid.map(mealClaim)):undefined;
  return {...cart,meals:valid.length?valid:undefined,mealNotice:removed?'A meal deal was removed because its included dishes changed. Review your total.':cart.mealNotice,items:cart.items.map(i=>{const {mealIdentity:old,...plain}=i;void old;return identity?{...plain,mealIdentity:identity}:plain;})};
 }
+/** Checkout recovery changes quantities, never silently discards complete meal selections. */
+export function adjustCartItems(cart:CartState,branchId:number,items:CartItem[]):CartState {
+ if(cart.branchId!==branchId)throw Error('Your cart branch changed. Reopen checkout adjustments.');
+ return reconcileCartMeals({...cart,items});
+}
 export function mealClaim(m:CartMeal):MealClaim {return {instanceId:m.instanceId,mealId:m.mealId,version:m.version,quantity:m.quantity,optionIds:[...m.optionIds].sort()};}
 /** An atomic builder edit preserves independently ordered quantities of identical dishes. */
 export function removeMeal(cart:CartState,id:string):CartState {
@@ -35,7 +40,7 @@ export function addMeal(cart:CartState,meal:CartMeal,products:MealProducts,branc
   if(existing){existing.product=product;if(product.saleMode==='WEIGHT')existing.weightGrams=(existing.weightGrams??0)+(part.weightGrams??0);else existing.quantity+=part.quantity;}
   else items.push({product,quantity:product.saleMode==='WEIGHT'?1:part.quantity,weightGrams:part.weightGrams});
  }
- const labels=new Map<number,string[]>();for(const chosen of [...(current.meals??[]),meal])for(const part of chosen.components){const text=`${chosen.title} #${chosen.instanceId.slice(-6)} ×${chosen.quantity}`;labels.set(part.productId,[...(labels.get(part.productId)??[]),text]);}if([...labels.values()].some(v=>v.join('; ').length>500))throw Error('Use fewer meal selections sharing the same dish in this order.');
+ const labels=new Map<number,string[]>();for(const chosen of [...(current.meals??[]),meal])for(const part of chosen.components){const text=`${chosen.title} #${chosen.instanceId.slice(-6)} ×${chosen.quantity} (${part.weightGrams==null?`${part.quantity} units`:`${part.weightGrams} g`})`;labels.set(part.productId,[...(labels.get(part.productId)??[]),text]);}if([...labels.values()].some(v=>v.join('; ').length>500))throw Error('Use fewer meal selections sharing the same dish in this order.');
  if(items.length>50)throw Error('This cart has too many different dishes. Use fewer meal choices.');
  return reconcileCartMeals({branchId,items,meals:[...(current.meals??[]),meal]});
 }
