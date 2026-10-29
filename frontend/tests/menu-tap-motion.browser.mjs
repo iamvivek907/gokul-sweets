@@ -58,7 +58,7 @@ try{for(const [width,reduced,supported] of [[320,false,true],[390,false,false],[
  await page.keyboard.press('Escape');await sizes.waitFor({state:'hidden'});
  await page.evaluate(()=>{testPulses=[];});
  const lower=page.locator('#gokul-product-15 .menu-card-open');await lower.scrollIntoViewIfNeeded();const y=await page.evaluate(()=>scrollY);await lower.click();
- const lowerDetails=page.getByRole('dialog',{name:'Sweet 15',exact:true});await lowerDetails.waitFor();await lowerDetails.getByRole('button',{name:'Close',exact:false}).click();await lowerDetails.waitFor({state:'hidden'});
- assert.ok(Math.abs(await page.evaluate(()=>scrollY)-y)<3,'closing restores the menu position');
+ const lowerDetails=page.getByRole('dialog',{name:'Sweet 15',exact:true});await lowerDetails.waitFor();const lockedTop=await page.evaluate(()=>document.body.style.top);await lowerDetails.getByRole('button',{name:'Close',exact:false}).click();await lowerDetails.waitFor({state:'hidden'});
+ await page.waitForFunction(expected=>Math.abs(scrollY-expected)<3,y);const after=await page.evaluate(()=>scrollY);assert.ok(Math.abs(after-y)<3,`closing restores the menu position: before=${y}, locked=${lockedTop}, after=${after}`);
  assert.deepEqual(errors,[]);await context.close();console.log(`PASS landing/tap/motion ${width}px reduced=${reduced} vibration=${supported}`);
 }}finally{await browser.close();}
