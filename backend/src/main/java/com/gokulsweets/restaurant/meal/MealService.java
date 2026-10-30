@@ -161,8 +161,35 @@ public class MealService {
                             edit.groups(),
                             edit.pricingMode(),
                             edit.maximumDiscount());
-            MealPolicy.validate(value, products(branchId, optionIds(value)));
-            String groups = mapper.writeValueAsString(edit.groups());
+            var facts = products(branchId, optionIds(value));
+            MealPolicy.validate(value, facts);
+            // Retain trusted names when a disabled dish is absent from the public menu.
+            var namedGroups =
+                    edit.groups().stream()
+                            .map(
+                                    g ->
+                                            new Group(
+                                                    g.key(),
+                                                    g.title(),
+                                                    g.titleHi(),
+                                                    g.minimum(),
+                                                    g.maximum(),
+                                                    g.options().stream()
+                                                            .map(
+                                                                    o ->
+                                                                            new Option(
+                                                                                    o.key(),
+                                                                                    o.productId(),
+                                                                                    o.quantity(),
+                                                                                    o.weightGrams(),
+                                                                                    o.upgrade(),
+                                                                                    facts.get(
+                                                                                                    o
+                                                                                                            .productId())
+                                                                                            .name()))
+                                                            .toList()))
+                            .toList();
+            String groups = mapper.writeValueAsString(namedGroups);
             // Serialize the 32-meal branch bound even when two admins create concurrently.
             var branches =
                     jdbc.queryForList(

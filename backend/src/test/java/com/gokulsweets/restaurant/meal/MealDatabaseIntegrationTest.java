@@ -157,10 +157,30 @@ class MealDatabaseIntegrationTest {
         doThrow(new SecurityException("forbidden")).when(authorization).requireBranchAccess(2L);
         assertThatThrownBy(() -> tx.execute(s -> meals.save(2, 0, edit(0, true))))
                 .isInstanceOf(SecurityException.class);
-        jdbc.update("UPDATE branch_products SET available=false WHERE product_id=1");
+        jdbc.update("DELETE FROM branch_products WHERE product_id=1");
         assertThatThrownBy(() -> tx.execute(s -> meals.save(1, 0, edit(0, true))))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM branch_meals", Long.class)).isZero();
+    }
+
+    @Test
+    void disabledDishCanBePublishedWithTrustedNameButCannotBeQuoted() {
+        jdbc.update("UPDATE branch_products SET available=false WHERE product_id=1");
+        var saved = tx.execute(s -> meals.save(1, 0, edit(0, true)));
+        assertThat(saved.active()).isTrue();
+        assertThat(saved.groups().getFirst().options().getFirst().productName()).isEqualTo("Main");
+        assertThat(meals.catalog(1, false)).hasSize(1);
+        assertThatThrownBy(
+                        () ->
+                                meals.quote(
+                                        1,
+                                        new MealModels.Claim(
+                                                "disabled",
+                                                saved.id(),
+                                                saved.version(),
+                                                1,
+                                                List.of("main1", "side1"))))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

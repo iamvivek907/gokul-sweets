@@ -44,7 +44,7 @@ Each branch owns a bounded collection of draft/published meals. Configuration in
 Use existing staff permission and branch-scope checks. Validate bounds, unique option
 identities, positive portions, valid unit/gram steps, prices, schedules and references.
 Reject stale edits with a version conflict. Archiving preserves historical order data.
-Do not publish meals with missing required choices, unavailable branch references or
+Do not publish meals with missing required choices, missing branch references or
 unsupported inventory/tax mappings. Publishing needs no new public write endpoints.
 
 ## Backend and order integrity
@@ -144,3 +144,15 @@ updated prices and a Confirm price action. Confirmation obtains a fresh quote;
 a further change requires another review. Consent is scoped to the recipe,
 choices, quantity, selected catalog prices, branch, cart and pickup snapshots,
 and is discarded when the builder closes or its choices change.
+
+## Unavailable choices and inventory dates
+Published meals may include disabled branch dishes. Keep them visible and disable their
+selection. A required group must have enough eligible choices; optional unavailable
+groups do not prevent ordering. The menu reuses selected-pickup availability for stock,
+service hours and included portions; the final whole-cart check remains authoritative.
+Trusted dish names are retained with newly saved options so disabled dishes remain
+identifiable even when absent from the public menu.
+The inventory workspace advances expired dates at midnight IST and on foreground
+return. Restored expired dates are clamped to today; future dates remain selected.
+Date-scoped stock editors and bulk selections close/reset on rollover to avoid applying
+yesterday's draft to today's inventory. Individual stock draft keys retain their date.
