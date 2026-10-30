@@ -137,3 +137,10 @@ Cards show the cheapest required combination as the starting price. The customer
 builder displays the actual selected dish total crossed out and the discounted
 meal total on the shared yellow price treatment. Selected portion prices and the
 Add total update on each change; no artificial comparison price is invented.
+
+If the server meal quote differs from the displayed total or regular dish total,
+the builder remains open and leaves the cart untouched. Show the previous and
+updated prices and a Confirm price action. Confirmation obtains a fresh quote;
+a further change requires another review. Consent is scoped to the recipe,
+choices, quantity, selected catalog prices, branch, cart and pickup snapshots,
+and is discarded when the builder closes or its choices change.
