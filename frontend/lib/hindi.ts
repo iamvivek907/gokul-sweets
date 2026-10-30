@@ -1565,3 +1565,7 @@ Object.assign(hindi,{
 });
 
 Object.assign(hindi,{"Meal price change":"मील की कीमत में बदलाव"});
+
+Object.assign(hindi,{"Choose your dishes":"अपने व्यंजन चुनें"});
+
+Object.assign(hindi,{"Meal price changed":"मील की कीमत बदल गई है","Previously shown":"पहले दिखाई गई कीमत","Updated meal price":"मील की नई कीमत","Review the updated price, then confirm to add your meal. Your cart has not changed.":"नई कीमत जांचें, फिर मील जोड़ने की पुष्टि करें। आपका कार्ट नहीं बदला है।","Confirm price & add meal":"कीमत की पुष्टि करके मील जोड़ें","Confirm price & update meal":"कीमत की पुष्टि करके मील अपडेट करें"});

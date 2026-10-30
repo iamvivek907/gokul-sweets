@@ -30,7 +30,20 @@ public final class MealPolicy {
         try {
             if (meal.discountType() == null)
                 throw new IllegalArgumentException("Choose a meal discount type.");
-            BigDecimal price = money(meal.basePrice()), value = money(meal.discountValue());
+            BigDecimal price = money(meal.basePrice());
+            return price.subtract(discount(meal, price));
+        } finally {
+            MethodTiming.finish(started, MealPolicy.class, "base(Definition)");
+        }
+    }
+
+    /** Exact per-meal discount against its selected price basis, optionally capped. */
+    public static BigDecimal discount(Definition meal, BigDecimal price) {
+        long started = MethodTiming.start(MealPolicy.class, "discount(Definition,BigDecimal)");
+        try {
+            if (meal.discountType() == null)
+                throw new IllegalArgumentException("Choose a meal discount type.");
+            BigDecimal value = money(meal.discountValue());
             if (price.signum() <= 0 || value.signum() < 0)
                 throw new IllegalArgumentException(
                         "Meal prices must be positive and discounts nonnegative.");
@@ -54,12 +67,18 @@ public final class MealPolicy {
                                 throw new IllegalArgumentException(
                                         "Choose NONE, FIXED or PERCENT discount.");
                     };
+            if (meal.maximumDiscount() != null) {
+                BigDecimal cap = money(meal.maximumDiscount());
+                if (cap.signum() <= 0)
+                    throw new IllegalArgumentException("Maximum discount must be positive.");
+                discount = discount.min(cap);
+            }
             if (discount.compareTo(price) >= 0)
                 throw new IllegalArgumentException(
                         "The discount must leave a positive meal price.");
-            return price.subtract(discount);
+            return discount;
         } finally {
-            MethodTiming.finish(started, MealPolicy.class, "base(Definition)");
+            MethodTiming.finish(started, MealPolicy.class, "discount(Definition,BigDecimal)");
         }
     }
 
@@ -81,7 +100,13 @@ public final class MealPolicy {
                                     || meal.imageUrl().startsWith("/")
                                             && !meal.imageUrl().startsWith("//"))))
                 throw new IllegalArgumentException("Use an HTTPS or local meal image.");
-            BigDecimal effective = base(meal), minimum = BigDecimal.ZERO;
+            boolean automatic = "SELECTED_ITEMS".equals(meal.pricingMode());
+            if (!automatic && !"FIXED".equals(meal.pricingMode()))
+                throw new IllegalArgumentException("Choose a valid meal pricing mode.");
+            if (automatic && (meal.basePrice() == null || money(meal.basePrice()).signum() != 0))
+                throw new IllegalArgumentException("Automatic meals do not use a base price.");
+            BigDecimal effective = automatic ? BigDecimal.ZERO : base(meal),
+                    minimum = BigDecimal.ZERO;
             if (meal.estimatedCost() != null && money(meal.estimatedCost()).signum() < 0)
                 throw new IllegalArgumentException("Estimated cost cannot be negative.");
             if (meal.groups() == null || meal.groups().isEmpty() || meal.groups().size() > 8)
@@ -127,7 +152,9 @@ public final class MealPolicy {
                                 "Every option must reference a product in this branch.");
                     BigDecimal regular = portion(option, product),
                             upgrade = money(option.upgrade());
-                    if (upgrade.signum() < 0 || upgrade.compareTo(regular) > 0)
+                    if (upgrade.signum() < 0
+                            || upgrade.compareTo(regular) > 0
+                            || automatic && upgrade.signum() != 0)
                         throw new IllegalArgumentException(
                                 "An upgrade must be between zero and its component price.");
                     values.add(regular.subtract(upgrade));
@@ -141,7 +168,8 @@ public final class MealPolicy {
             if (required == 0 || total > 30)
                 throw new IllegalArgumentException(
                         "Require at least one dish and at most 30 choices.");
-            if (effective.compareTo(minimum) > 0)
+            if (automatic) discount(meal, minimum);
+            if (!automatic && effective.compareTo(minimum) > 0)
                 throw new IllegalArgumentException(
                         "The discounted base exceeds the cheapest valid selection. Lower the base"
                                 + " or adjust required choices.");
@@ -219,6 +247,10 @@ public final class MealPolicy {
                         if (product == null || !product.available())
                             throw new IllegalArgumentException(
                                     "A selected meal dish is unavailable. Review the meal.");
+                        if ("SELECTED_ITEMS".equals(meal.pricingMode())
+                                && money(option.upgrade()).signum() != 0)
+                            throw new IllegalArgumentException(
+                                    "Automatic meals cannot have upgrade charges.");
                         BigDecimal amount =
                                 portion(option, product)
                                         .multiply(BigDecimal.valueOf(claim.quantity()));
@@ -243,9 +275,24 @@ public final class MealPolicy {
             }
             if (found != selected.size())
                 throw new IllegalArgumentException("A meal option does not belong to this recipe.");
+            boolean automatic = "SELECTED_ITEMS".equals(meal.pricingMode());
+            if (!automatic && !"FIXED".equals(meal.pricingMode()))
+                throw new IllegalArgumentException("Choose a valid meal pricing mode.");
             BigDecimal fullBase =
-                    money(meal.basePrice()).multiply(BigDecimal.valueOf(claim.quantity()));
-            BigDecimal discounted = base(meal).multiply(BigDecimal.valueOf(claim.quantity()));
+                    automatic
+                            ? regular
+                            : money(meal.basePrice())
+                                    .multiply(BigDecimal.valueOf(claim.quantity()));
+            BigDecimal onePrice =
+                    automatic
+                            ? regular.divide(
+                                    BigDecimal.valueOf(claim.quantity()),
+                                    2,
+                                    RoundingMode.UNNECESSARY)
+                            : money(meal.basePrice());
+            BigDecimal discounted =
+                    onePrice.subtract(discount(meal, onePrice))
+                            .multiply(BigDecimal.valueOf(claim.quantity()));
             BigDecimal total = discounted.add(extras);
             if (total.signum() <= 0 || total.compareTo(regular) > 0)
                 throw new IllegalArgumentException(

@@ -408,3 +408,12 @@ hide its visual scrollbar without disabling touch, wheel or keyboard scrolling. 
 Close target remains at least 44px, visible on short viewports and focusable. Legacy
 and non-menu overlays preserve their existing layout. App-exclusive meal direction
 is recorded in app-exclusive-meals.md; that document records the implementation contract and current operational limits.
+
+## Automatic meal prices (October 30)
+
+Meal cards and builders show actual branch dish totals as the comparison price,
+with a strikethrough and a yellow discounted price consistent with menu dishes.
+Starting prices use the cheapest required options, and the builder updates prices
+with selected portions, quantity and the per-meal discount cap. Existing fixed
+meals keep their price formula. Admin-created meals default to selected-dish
+pricing and omit manual base/upgrade fields in that mode.
