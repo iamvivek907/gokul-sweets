@@ -7,7 +7,18 @@ import java.util.List;
 public final class MealModels {
     /** An existing branch SKU and an explicitly included retail-valid portion. */
     public record Option(
-            String key, long productId, int quantity, Integer weightGrams, BigDecimal upgrade) {}
+            String key,
+            long productId,
+            int quantity,
+            Integer weightGrams,
+            BigDecimal upgrade,
+            String productName) {
+        /** Existing recipes do not require a stored display name. */
+        public Option(
+                String key, long productId, int quantity, Integer weightGrams, BigDecimal upgrade) {
+            this(key, productId, quantity, weightGrams, upgrade, null);
+        }
+    }
 
     /** Bounded required/optional choice group. */
     public record Group(
@@ -135,6 +146,9 @@ public final class MealModels {
             int minimumGrams,
             int stepGrams,
             boolean available) {}
+
+    /** Cursor-bounded admin recipe picker, including disabled branch dishes. */
+    public record ProductPage(List<Product> products, Long nextAfter) {}
 
     /** Exact component demand for a complete meal selection. */
     public record Component(

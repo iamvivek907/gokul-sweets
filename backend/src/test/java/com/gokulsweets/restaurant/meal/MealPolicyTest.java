@@ -125,6 +125,19 @@ class MealPolicyTest {
     }
 
     @Test
+    void publishedRecipeAllowsDisabledChoicesButQuoteStillRejectsThem() {
+        var map = new HashMap<>(products());
+        map.put(1L, new Product(1, "Main", "UNIT", n("100.00"), 250, 50, false));
+        assertThatCode(() -> MealPolicy.validate(meal(), map)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> MealPolicy.quote(meal(), claim(1, "main1", "side1"), map))
+                .isInstanceOf(IllegalArgumentException.class);
+        map.put(1L, products().get(1L));
+        map.put(3L, new Product(3, "Sweet", "WEIGHT", n("200.00"), 250, 50, false));
+        assertThatCode(() -> MealPolicy.quote(meal(), claim(1, "main1", "side1"), map))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
     void rejectsUnavailableForeignAndInvalidWeightPortions() {
         var product = products().get(3L);
         assertThatThrownBy(() -> MealPolicy.portion(new Option("s", 3, 1, 200, n("0.00")), product))

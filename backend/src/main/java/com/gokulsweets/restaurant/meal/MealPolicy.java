@@ -158,9 +158,6 @@ public final class MealPolicy {
                         throw new IllegalArgumentException(
                                 "An upgrade must be between zero and its component price.");
                     values.add(regular.subtract(upgrade));
-                    if (meal.active() && !product.available())
-                        throw new IllegalArgumentException(
-                                "Publish only options that are enabled in this branch.");
                 }
                 values.sort(Comparator.naturalOrder());
                 for (int i = 0; i < group.minimum(); i++) minimum = minimum.add(values.get(i));

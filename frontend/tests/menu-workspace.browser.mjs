@@ -420,6 +420,13 @@ try {
       .click();
     await dialog.waitFor({ state: "hidden" });
     assert.equal(creates, 1);
+    const selectPage = page.getByRole("button", {name:"Select all on this page",exact:true});
+    await selectPage.click();
+    for (const name of ["Kaju Katli", "Samosa", "Rasmalai"]) assert.equal(await page.getByLabel(`Select ${name}`,{exact:true}).isChecked(),true);
+    assert.equal(await selectPage.isDisabled(),true);
+    await page.getByRole("button",{name:"Clear selection",exact:true}).click();
+    for (const name of ["Kaju Katli", "Samosa", "Rasmalai"]) assert.equal(await page.getByLabel(`Select ${name}`,{exact:true}).isChecked(),false);
+    assert.equal(await page.getByRole("button",{name:"Set availability",exact:true}).isDisabled(),true);
     await page.getByLabel("Select Kaju Katli", { exact: true }).check();
     await page.getByLabel("Select Samosa", { exact: true }).check();
     await page

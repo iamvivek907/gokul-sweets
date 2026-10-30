@@ -1,4 +1,5 @@
 export const hindi: Record<string,string> = {
+ "A required group has too few available dishes. Choose another pickup time or try later.":"ज़रूरी समूह में पर्याप्त व्यंजन उपलब्ध नहीं हैं। दूसरा पिकअप समय चुनें या बाद में कोशिश करें।",
  "Find a dish without losing your place.":"अपनी जगह खोए बिना पसंद का व्यंजन खोजें।",
  "Show results":"नतीजे देखें",
  "Standard pickup is unavailable for the checked dates. Check other pickup options or call the branch; the shop may still be open.":"जाँची गई तारीखों पर सामान्य पिकअप उपलब्ध नहीं है। अन्य पिकअप विकल्प देखें या शाखा को कॉल करें; दुकान खुली हो सकती है।",

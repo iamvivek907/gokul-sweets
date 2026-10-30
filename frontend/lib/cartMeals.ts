@@ -69,7 +69,7 @@ export function mealEstimate(meal:MealDefinition,selected:string[],quantity:numb
 }
 /** Cheapest required choices give an honest starting price for either pricing mode. */
 export function mealStartingEstimate(meal:MealDefinition,products:MealProducts){
- const keys=meal.groups.flatMap(group=>[...group.options].sort((a,b)=>{
+ const keys=meal.groups.flatMap(group=>[...group.options].filter(o=>products.get(o.productId)?.available).sort((a,b)=>{
   const value=(o:typeof a)=>meal.pricingMode==='SELECTED_ITEMS'?cents((products.get(o.productId)?.price??0)*(o.weightGrams!==null?o.weightGrams/1000:o.quantity)):cents(Number(o.upgrade));
   return value(a)-value(b);
  }).slice(0,group.minimum).map(option=>option.key));
