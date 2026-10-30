@@ -7,7 +7,7 @@ const branch={id:1,name:'Meal test branch',active:true,operational:true,pickupAv
 const products=[{id:1,name:'Main dish',price:100},{id:2,name:'Side dish',price:50},{id:3,name:'Drink',price:40},{id:4,name:'Regular extra',price:20},{id:5,name:'Another dish',price:40}].map(p=>({...p,categoryId:1,categoryName:'Food',available:true,saleMode:'UNIT',description:'Freshly prepared',imageUrl:'/arrival-mithai.webp'}));
 const initial={id:1,branchId:1,version:2,title:'Your lunch meal',titleHi:'आपका लंच मील',description:'Pick the combination you want.',basePrice:130,discountType:'FIXED',discountValue:10,estimatedCost:75,active:true,groups:[{key:'main',title:'Choose your main',minimum:1,maximum:1,options:[{key:'main1',productId:1,quantity:1,weightGrams:null,upgrade:0}]},{key:'side',title:'Choose your side',minimum:1,maximum:1,options:[{key:'side1',productId:2,quantity:1,weightGrams:null,upgrade:0}]},{key:'drink',title:'Add a drink',minimum:0,maximum:1,options:[{key:'drink1',productId:3,quantity:1,weightGrams:null,upgrade:20}]}]};
 try{for(const width of [320,390,1280]){
- const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let saved=structuredClone(initial),fail=false,writes=0,heldQuote=null;
+ const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:'reduce'}),page=await context.newPage();page.setDefaultTimeout(15000);const errors=[];page.on('pageerror',e=>errors.push(e.message));let saved=structuredClone(initial),fail=false,writes=0,heldQuote=null,uploads=0,uploadFailure=false,heldUpload=null;
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','seen');},{...branch});
  const checkoutDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
  const checkoutSlot={id:9,branchId:1,slotDate:checkoutDate,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:50};
@@ -30,6 +30,12 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/admin/auth/me')json={staffId:77,username:'owner',fullName:'Test owner',roleName:'OWNER_ADMIN',branchIds:[1],permissions:['MENU_MANAGE','INVENTORY_VIEW','INVENTORY_MANAGE']};
   else if(path==='/api/admin/branches/1/menu/workspace')json={content:[],totalElements:0,page:0,totalPages:0,categories:[],branchCategories:[],taxes:[]};
   else if(path.endsWith('/workspace/groups'))json={version:0,groups:[],total:0,page:0,totalPages:0};
+  else if(path==='/api/admin/branches/1/meals/image'){
+   uploads++;assert.match(request.headers()['content-type'],/multipart\/form-data; boundary=/);assert.equal(request.headers()['x-staff-csrf'],'test-csrf');
+   if(heldUpload){heldUpload.arrived();await heldUpload.promise;}
+   if(uploadFailure)return route.fulfill({status:400,headers,json:{message:'File content does not match its media type.'}});
+   json={url:'https://images.example/meal.png',contentType:'image/png'};
+  }
   else if(path==='/api/admin/branches/1/meals')json=[saved];
   else if(path==='/api/admin/branches/1/meals/1'){
    const input=request.postDataJSON();assert.equal(request.method(),'PUT');assert.equal(input.version,2);writes++;
@@ -79,6 +85,19 @@ try{for(const width of [320,390,1280]){
    else{assert.equal(savedCart.meals.length,1,change+' retains the deal');assert.equal(savedCart.meals[0].total,140);assert.equal(savedCart.meals[0].regularTotal,190);}
   }
  }
- await page.goto(base+'/admin/menu/workspace');await page.getByRole('combobox',{name:'Selected branch'}).waitFor();await page.getByText('App-exclusive meals · prices, discounts & choices',{exact:true}).click();const admin=page.getByRole('region',{name:'Meal management'});await admin.getByRole('button',{name:/Your lunch meal/}).click();await admin.getByRole('combobox',{name:/^Discount/}).selectOption('PERCENT');await admin.getByLabel('Discount %',{exact:true}).fill('10');await admin.getByLabel('Estimated base-meal cost',{exact:false}).fill('70');await admin.getByText(/Estimated base margin/).waitFor();await page.screenshot({path:`/tmp/gokul-meal-shots/admin-${width}.png`});fail=true;await admin.getByRole('button',{name:'Save meal',exact:true}).click();await admin.getByRole('alert').waitFor();assert.equal(await admin.getByLabel('Discount %',{exact:true}).inputValue(),'10','conflict retains the admin draft');fail=false;await admin.getByRole('button',{name:'Save meal',exact:true}).click();await admin.getByRole('status').filter({hasText:'Meal saved'}).waitFor();assert.equal(writes,2);assert.equal(saved.discountType,'PERCENT');
+ await page.goto(base+'/admin/menu/workspace');await page.getByRole('combobox',{name:'Selected branch'}).waitFor();await page.getByText('App-exclusive meals · prices, discounts & choices',{exact:true}).click();const admin=page.getByRole('region',{name:'Meal management'});await admin.getByRole('button',{name:/Your lunch meal/}).click();
+ const fileInput=admin.getByLabel('Meal photo',{exact:true}),urlInput=admin.getByLabel('Image URL (optional)',{exact:true});
+ for(const label of ['Meal name','Hindi name','Description','Meal base price ₹','Discount','Group title','Minimum choices','Maximum choices','Upgrade charge ₹','Publish on this branch menu']){
+  const field=admin.getByLabel(label,{exact:true}).first();const help=await field.getAttribute('aria-describedby');assert.ok(help,label+' has linked guidance');assert.ok((await page.locator('[id="'+help+'"]').innerText()).length>15);
+ }
+ await fileInput.setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await admin.getByRole('alert').filter({hasText:'JPG, PNG or WebP'}).waitFor();assert.equal(uploads,0);
+ let arrived;const waiting=new Promise(resolve=>arrived=resolve);let release;heldUpload={arrived,promise:new Promise(resolve=>release=resolve)};
+ await fileInput.setInputFiles({name:'meal.png',mimeType:'image/png',buffer:Buffer.from('test image')});await waiting;
+ assert.equal(await admin.getByRole('button',{name:'Save meal',exact:true}).isDisabled(),true);assert.equal(await urlInput.isDisabled(),true);release();heldUpload=null;
+ await admin.getByRole('status').filter({hasText:'Photo uploaded'}).waitFor();assert.equal(await urlInput.inputValue(),'https://images.example/meal.png');
+ uploadFailure=true;await fileInput.setInputFiles({name:'bad-content.png',mimeType:'image/png',buffer:Buffer.from('invalid')});await admin.getByRole('alert').filter({hasText:'File content'}).waitFor();assert.equal(await urlInput.inputValue(),'https://images.example/meal.png');uploadFailure=false;
+ await admin.getByRole('button',{name:'Remove meal photo',exact:true}).click();assert.equal(await urlInput.inputValue(),'');await urlInput.fill('/arrival-mithai.webp');
+ await fileInput.scrollIntoViewIfNeeded();await page.screenshot({path:`/tmp/gokul-meal-shots/photo-help-${width}.png`});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ await admin.getByRole('combobox',{name:/^Discount/}).selectOption('PERCENT');await admin.getByLabel('Discount %',{exact:true}).fill('10');await admin.getByLabel('Estimated base-meal cost',{exact:false}).fill('70');await admin.getByText(/Estimated base margin/).waitFor();await page.screenshot({path:`/tmp/gokul-meal-shots/admin-${width}.png`});fail=true;await admin.getByRole('button',{name:'Save meal',exact:true}).click();await admin.getByRole('alert').waitFor();assert.equal(await admin.getByLabel('Discount %',{exact:true}).inputValue(),'10','conflict retains the admin draft');fail=false;await admin.getByRole('button',{name:'Save meal',exact:true}).click();await admin.getByRole('status').filter({hasText:'Meal saved'}).waitFor();assert.equal(writes,2);assert.equal(saved.discountType,'PERCENT');
  assert.deepEqual(errors,[]);await context.close();console.log(`PASS meals customer/admin ${width}px`);
 }}finally{await browser.close();}
