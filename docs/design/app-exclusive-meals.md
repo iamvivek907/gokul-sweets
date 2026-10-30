@@ -156,3 +156,9 @@ The inventory workspace advances expired dates at midnight IST and on foreground
 return. Restored expired dates are clamped to today; future dates remain selected.
 Date-scoped stock editors and bulk selections close/reset on rollover to avoid applying
 yesterday's draft to today's inventory. Individual stock draft keys retain their date.
+
+Unavailable required choices never produce a partial advertised starting price or
+an incomplete Add-button total. Admin recipe options come from the branch-authorized
+meal-products cursor endpoint (50 dishes per page), including disabled dishes labelled
+Unavailable. This picker does not use the filtered public menu or query stock tables.
+A failed page fails the load rather than presenting a truncated branch catalogue.

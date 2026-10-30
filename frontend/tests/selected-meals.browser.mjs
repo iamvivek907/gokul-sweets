@@ -26,6 +26,7 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/admin/auth/me')json={staffId:77,username:'owner',fullName:'Test owner',roleName:'OWNER_ADMIN',branchIds:[1],permissions:['MENU_MANAGE','INVENTORY_VIEW','INVENTORY_MANAGE']};
   else if(path==='/api/admin/branches/1/menu/workspace')json={content:[],totalElements:0,page:0,totalPages:0,categories:[],branchCategories:[],taxes:[]};
   else if(path.endsWith('/workspace/groups'))json={version:0,groups:[],total:0,page:0,totalPages:0};
+  else if(path==='/api/admin/branches/1/meals/products')json={products:products.map(p=>({...p,minimumGrams:250,stepGrams:50,available:!unavailableIds.includes(p.id)})),nextAfter:null};
   else if(path==='/api/admin/branches/1/meals')json=[saved];
   else if(path==='/api/admin/branches/1/meals/1'){assert.equal(request.headers()['x-staff-csrf'],'test-csrf');const input=request.postDataJSON();assert.equal(input.basePrice,0);assert.equal(input.pricingMode,'SELECTED_ITEMS');assert.ok(input.groups.every(g=>g.options.every(o=>o.upgrade===0)));saved={...input,version:2};writes++;json=saved;}
   return route.fulfill({headers,json});
@@ -61,12 +62,18 @@ try{for(const width of [320,390,1280]){
  assert.equal(await dialog.getByRole('button',{name:/^Add meal/}).isEnabled(),true);
  await dialog.getByRole('button',{name:'Close',exact:true}).click();await dialog.waitFor({state:'hidden'});
  // The only required side is unavailable: retain the inspectable card and disable Add.
- unavailableIds=[1,3,4];await page.reload();await card.waitFor();assert.match(await card.innerText(),/Currently unavailable/);await card.click();
+ unavailableIds=[1,3,4];await page.reload();await card.waitFor();assert.match(await card.innerText(),/Currently unavailable/);assert.equal(await card.locator(".menu-sale-price").count(),0);await card.click();
  assert.equal(await dialog.getByLabel('Fries',{exact:false}).isDisabled(),true);assert.equal(await dialog.getByRole('button',{name:/^Add meal/}).isDisabled(),true);
  await dialog.getByText('A required group has too few available dishes. Choose another pickup time or try later.',{exact:true}).waitFor();
  await dialog.getByRole('button',{name:'Close',exact:true}).click();await dialog.waitFor({state:'hidden'});
- hideAllProducts=true;await page.reload();await card.waitFor();assert.match(await card.innerText(),/Currently unavailable/);await card.click();
+ hideAllProducts=true;await page.reload();await card.waitFor();assert.match(await card.innerText(),/Currently unavailable/);assert.equal(await card.locator(".menu-sale-price").count(),0);await card.click();
  assert.equal(await dialog.getByLabel('Paneer Burger',{exact:false}).isDisabled(),true);await dialog.getByRole('button',{name:'Close',exact:true}).click();await dialog.waitFor({state:'hidden'});hideAllProducts=false;
+ // Admin picker must retain disabled dishes even if public discovery has no dishes.
+ hideAllProducts=true;await page.goto(base+'/admin/menu/workspace');await page.getByText('App-exclusive meals · prices, discounts & choices',{exact:true}).click();
+ await admin.getByRole('button',{name:/Burger Combo/}).click();const firstDish=admin.getByLabel('Dish 1.1',{exact:true});
+ assert.match(await firstDish.locator('option[value="1"]').innerText(),/Veg Burger.*Unavailable/);
+ assert.match(await firstDish.locator('option[value="2"]').innerText(),/Paneer Burger/);
+ await admin.getByRole('button',{name:'Cancel edit',exact:true}).click();hideAllProducts=false;
  // A parked workspace follows IST midnight and also clamps yesterday on restoration.
  await page.clock.install({time:new Date('2026-10-30T18:29:59Z')});
  await page.goto(base+'/admin/menu/workspace');const inventoryDate=page.getByLabel('Inventory date · IST',{exact:false});

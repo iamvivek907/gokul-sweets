@@ -124,6 +124,38 @@ public class MealService {
         }
     }
 
+    /** Reads only 51 branch rows per request; inventory tables are not queried. */
+    public ProductPage adminProducts(long branchId, long afterId) {
+        long started = MethodTiming.start(MealService.class, "adminProducts(long,long)");
+        try {
+            authorize(branchId);
+            if (afterId < 0) throw new IllegalArgumentException("Use a nonnegative dish cursor.");
+            var rows =
+                    jdbc.query(
+                            "SELECT p.id,p.name,p.sale_mode,COALESCE(b.price_override,p.base_price)"
+                                + " price,COALESCE(p.minimum_weight_grams,250)"
+                                + " minimum_grams,COALESCE(p.weight_step_grams,50)"
+                                + " step_grams,(p.active AND b.available) available FROM"
+                                + " branch_products b JOIN products p ON p.id=b.product_id WHERE"
+                                + " b.branch_id=? AND p.id>? ORDER BY p.id LIMIT 51",
+                            (rs, n) ->
+                                    new Product(
+                                            rs.getLong("id"),
+                                            rs.getString("name"),
+                                            rs.getString("sale_mode"),
+                                            rs.getBigDecimal("price"),
+                                            rs.getInt("minimum_grams"),
+                                            rs.getInt("step_grams"),
+                                            rs.getBoolean("available")),
+                            branchId,
+                            afterId);
+            var page = List.copyOf(rows.subList(0, Math.min(50, rows.size())));
+            return new ProductPage(page, rows.size() > 50 ? page.get(page.size() - 1).id() : null);
+        } finally {
+            MethodTiming.finish(started, MealService.class, "adminProducts(long,long)");
+        }
+    }
+
     /** Returns a trusted meal quote; checkout independently repeats all validation. */
     public Quote quote(long branchId, Claim claim) {
         long started = MethodTiming.start(MealService.class, "quote(long,Claim)");

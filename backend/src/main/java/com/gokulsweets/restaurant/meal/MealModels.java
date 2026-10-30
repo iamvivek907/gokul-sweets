@@ -147,6 +147,9 @@ public final class MealModels {
             int stepGrams,
             boolean available) {}
 
+    /** Cursor-bounded admin recipe picker, including disabled branch dishes. */
+    public record ProductPage(List<Product> products, Long nextAfter) {}
+
     /** Exact component demand for a complete meal selection. */
     public record Component(
             long productId,

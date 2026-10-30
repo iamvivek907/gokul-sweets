@@ -164,6 +164,31 @@ class MealDatabaseIntegrationTest {
     }
 
     @Test
+    void adminPickerIncludesDisabledDishesWithBoundedCursorPagesAndBranchAuthorization() {
+        jdbc.update(
+                "UPDATE branch_products SET available=false,price_override=90 WHERE product_id=1");
+        jdbc.execute(
+                "INSERT INTO products SELECT id,'Dish '||id,'UNIT',100,250,50,true FROM"
+                    + " generate_series(10,60) id");
+        jdbc.execute(
+                "INSERT INTO branch_products SELECT 1,id,null,true FROM generate_series(10,60) id");
+        var first = meals.adminProducts(1, 0);
+        assertThat(first.products()).hasSize(50);
+        assertThat(first.products().getFirst().available()).isFalse();
+        assertThat(first.products().getFirst().price()).isEqualByComparingTo("90");
+        var second = meals.adminProducts(1, first.nextAfter());
+        assertThat(second.products()).hasSize(4);
+        assertThat(second.nextAfter()).isNull();
+        assertThat(second.products().getFirst().id()).isGreaterThan(first.nextAfter());
+        assertThat(meals.adminProducts(2, 0).products()).isEmpty();
+        assertThatThrownBy(() -> meals.adminProducts(1, -1))
+                .isInstanceOf(IllegalArgumentException.class);
+        doThrow(new SecurityException("forbidden")).when(authorization).requireBranchAccess(2L);
+        assertThatThrownBy(() -> meals.adminProducts(2, 0)).isInstanceOf(SecurityException.class);
+        verify(authorization, atLeastOnce()).requirePermission(PermissionName.MENU_MANAGE);
+    }
+
+    @Test
     void disabledDishCanBePublishedWithTrustedNameButCannotBeQuoted() {
         jdbc.update("UPDATE branch_products SET available=false WHERE product_id=1");
         var saved = tx.execute(s -> meals.save(1, 0, edit(0, true)));
