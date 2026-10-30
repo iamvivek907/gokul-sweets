@@ -32,7 +32,46 @@ public final class MealModels {
             BigDecimal discountValue,
             BigDecimal estimatedCost,
             boolean active,
-            List<Group> groups) {}
+            List<Group> groups,
+            String pricingMode,
+            BigDecimal maximumDiscount) {
+        public Definition {
+            pricingMode = pricingMode == null ? "FIXED" : pricingMode;
+        }
+
+        /** Existing definitions retain their fixed-base pricing. */
+        public Definition(
+                long id,
+                long branchId,
+                long version,
+                String title,
+                String titleHi,
+                String description,
+                String imageUrl,
+                BigDecimal basePrice,
+                String discountType,
+                BigDecimal discountValue,
+                BigDecimal estimatedCost,
+                boolean active,
+                List<Group> groups) {
+            this(
+                    id,
+                    branchId,
+                    version,
+                    title,
+                    titleHi,
+                    description,
+                    imageUrl,
+                    basePrice,
+                    discountType,
+                    discountValue,
+                    estimatedCost,
+                    active,
+                    groups,
+                    "FIXED",
+                    null);
+        }
+    }
 
     /** Optimistically versioned admin edit. */
     public record Edit(
@@ -46,7 +85,42 @@ public final class MealModels {
             BigDecimal discountValue,
             BigDecimal estimatedCost,
             boolean active,
-            List<Group> groups) {}
+            List<Group> groups,
+            String pricingMode,
+            BigDecimal maximumDiscount) {
+        public Edit {
+            pricingMode = pricingMode == null ? "FIXED" : pricingMode;
+        }
+
+        /** Existing API clients retain fixed-base semantics. */
+        public Edit(
+                long version,
+                String title,
+                String titleHi,
+                String description,
+                String imageUrl,
+                BigDecimal basePrice,
+                String discountType,
+                BigDecimal discountValue,
+                BigDecimal estimatedCost,
+                boolean active,
+                List<Group> groups) {
+            this(
+                    version,
+                    title,
+                    titleHi,
+                    description,
+                    imageUrl,
+                    basePrice,
+                    discountType,
+                    discountValue,
+                    estimatedCost,
+                    active,
+                    groups,
+                    "FIXED",
+                    null);
+        }
+    }
 
     /** Untrusted choice identity. Prices never come from this request. */
     public record Claim(

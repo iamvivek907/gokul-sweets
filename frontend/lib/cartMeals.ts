@@ -51,10 +51,27 @@ export function addMeal(cart:CartState,meal:CartMeal,products:MealProducts,branc
  if(items.length>50)throw Error('This cart has too many different dishes. Use fewer meal choices.');
  return reconcileCartMeals({branchId,items,meals:[...(current.meals??[]),meal]});
 }
+/** Match the server: round a discount once per meal, then multiply by meal quantity. */
 export function mealEstimate(meal:MealDefinition,selected:string[],quantity:number,products:MealProducts){
- const set=new Set(selected);let upgrades=0,regular=0,valid=quantity>=1&&quantity<=10;
+ const set=new Set(selected);let upgrades=0,regular=0,valid=Number.isInteger(quantity)&&quantity>=1&&quantity<=10,found=0;
+ const automatic=meal.pricingMode==='SELECTED_ITEMS';
  for(const group of meal.groups){const choices=group.options.filter(o=>set.has(o.key));if(choices.length<group.minimum||choices.length>group.maximum)valid=false;
-  for(const option of choices){const p=products.get(option.productId);if(!p||!p.available)valid=false;upgrades+=Number(option.upgrade);regular+=(p?.price??0)*(option.weightGrams!==null?option.weightGrams/1000:option.quantity);}}
- const discount=meal.discountType==='FIXED'?Number(meal.discountValue):meal.discountType==='PERCENT'?Math.round(cents(Number(meal.basePrice))*Math.round(Number(meal.discountValue)*100)/10000)/100:0;
- return {valid,total:Math.round((Number(meal.basePrice)-discount+upgrades)*100)*quantity/100,regularTotal:Math.round(regular*100)*quantity/100,discount:Math.round(discount*100)*quantity/100};
+  for(const option of choices){found++;const p=products.get(option.productId);if(!p||!p.available)valid=false;
+   upgrades+=cents(Number(option.upgrade));regular+=cents((p?.price??0)*(option.weightGrams!==null?option.weightGrams/1000:option.quantity));if(automatic&&Number(option.upgrade)!==0)valid=false;
+  }}
+ if(found!==selected.length||set.size!==selected.length)valid=false;
+ const basis=automatic?regular:cents(Number(meal.basePrice));
+ let discount=meal.discountType==='FIXED'?cents(Number(meal.discountValue)):meal.discountType==='PERCENT'?Math.round(basis*Math.round(Number(meal.discountValue)*100)/10000):0;
+ if(meal.maximumDiscount!=null)discount=Math.min(discount,cents(Number(meal.maximumDiscount)));
+ const total=basis-discount+(automatic?0:upgrades);
+ if(!Number.isFinite(total)||total<=0||discount<0||discount>=basis)valid=false;
+ return {valid,total:Math.max(0,total)*quantity/100,regularTotal:regular*quantity/100,discount:discount*quantity/100};
+}
+/** Cheapest required choices give an honest starting price for either pricing mode. */
+export function mealStartingEstimate(meal:MealDefinition,products:MealProducts){
+ const keys=meal.groups.flatMap(group=>[...group.options].sort((a,b)=>{
+  const value=(o:typeof a)=>meal.pricingMode==='SELECTED_ITEMS'?cents((products.get(o.productId)?.price??0)*(o.weightGrams!==null?o.weightGrams/1000:o.quantity)):cents(Number(o.upgrade));
+  return value(a)-value(b);
+ }).slice(0,group.minimum).map(option=>option.key));
+ return mealEstimate(meal,keys,1,products);
 }

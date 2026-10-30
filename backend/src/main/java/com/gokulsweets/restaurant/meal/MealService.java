@@ -58,8 +58,9 @@ public class MealService {
                                             rs.getBoolean("active"),
                                             List.of(
                                                     mapper.readValue(
-                                                            rs.getString("groups"),
-                                                            Group[].class))),
+                                                            rs.getString("groups"), Group[].class)),
+                                            rs.getString("pricing_mode"),
+                                            rs.getBigDecimal("maximum_discount")),
                             branchId)
                     .stream()
                     .limit(32)
@@ -157,7 +158,9 @@ public class MealService {
                             edit.discountValue(),
                             edit.estimatedCost(),
                             edit.active(),
-                            edit.groups());
+                            edit.groups(),
+                            edit.pricingMode(),
+                            edit.maximumDiscount());
             MealPolicy.validate(value, products(branchId, optionIds(value)));
             String groups = mapper.writeValueAsString(edit.groups());
             // Serialize the 32-meal branch bound even when two admins create concurrently.
@@ -176,8 +179,8 @@ public class MealService {
                 id =
                         jdbc.queryForObject(
                                 "INSERT INTO"
-                                    + " branch_meals(branch_id,title,title_hi,description,image_url,base_price,discount_type,discount_value,estimated_cost,active,groups)"
-                                    + " VALUES(?,?,?,?,?,?,?,?,?,?,?::jsonb) RETURNING id",
+                                    + " branch_meals(branch_id,title,title_hi,description,image_url,base_price,discount_type,discount_value,estimated_cost,active,groups,pricing_mode,maximum_discount)"
+                                    + " VALUES(?,?,?,?,?,?,?,?,?,?,?::jsonb,?,?) RETURNING id",
                                 Long.class,
                                 branchId,
                                 edit.title().trim(),
@@ -189,10 +192,12 @@ public class MealService {
                                 edit.discountValue(),
                                 edit.estimatedCost(),
                                 edit.active(),
-                                groups);
+                                groups,
+                                edit.pricingMode(),
+                                edit.maximumDiscount());
             } else if (jdbc.update(
                             "UPDATE branch_meals SET"
-                                + " title=?,title_hi=?,description=?,image_url=?,base_price=?,discount_type=?,discount_value=?,estimated_cost=?,active=?,groups=?::jsonb,version=version+1,updated_at=CURRENT_TIMESTAMP"
+                                + " title=?,title_hi=?,description=?,image_url=?,base_price=?,discount_type=?,discount_value=?,estimated_cost=?,active=?,groups=?::jsonb,pricing_mode=?,maximum_discount=?,version=version+1,updated_at=CURRENT_TIMESTAMP"
                                 + " WHERE branch_id=? AND id=? AND version=?",
                             edit.title().trim(),
                             edit.titleHi(),
@@ -204,6 +209,8 @@ public class MealService {
                             edit.estimatedCost(),
                             edit.active(),
                             groups,
+                            edit.pricingMode(),
+                            edit.maximumDiscount(),
                             branchId,
                             id,
                             edit.version())
