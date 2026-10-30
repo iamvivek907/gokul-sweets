@@ -1,5 +1,6 @@
 "use client";
 import {inventoryToday,currentInventoryDate,nextInventoryMidnight} from "@/lib/inventoryDate";
+import {selectWorkspacePage,workspacePageSelected} from "@/lib/workspaceSelection";
 import AdminMeals from "@/components/admin/AdminMeals";
 import MenuContentQuality from "@/components/admin/MenuContentQuality";
 import StorefrontExperienceReport from "@/components/admin/StorefrontExperienceReport";
@@ -557,6 +558,14 @@ export default function MenuWorkspace() {
               {selected.length} selected · {date} IST
             </span>
             <div className={styles.row}>
+              <button type="button"
+                disabled={!fresh || loading || bulkBusy || !data.content.length || workspacePageSelected(selected,data.content)}
+                onClick={() => setSelected(current => selectWorkspacePage(current,data.content))}>
+                Select all on this page
+              </button>
+              <button type="button" disabled={!selected.length || bulkBusy} onClick={() => setSelected([])}>
+                Clear selection
+              </button>
               <button
                 disabled={
                   !fresh ||
