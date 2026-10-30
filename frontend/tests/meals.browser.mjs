@@ -11,7 +11,7 @@ try{for(const width of [320,390,1280]){
  await context.addInitScript(branch=>{localStorage.setItem('gokul-selected-branch',JSON.stringify(branch));localStorage.setItem('gokul-social-follow-popup-seen','true');localStorage.setItem('gokul-ordering-tour:v1','seen');},{...branch});
  const checkoutDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
  const checkoutSlot={id:9,branchId:1,slotDate:checkoutDate,startTime:'18:00:00',endTime:'19:00:00',active:true,remainingCapacity:50};
- const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,x-staff-csrf','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','X-Staff-CSRF':'test-csrf'};
+ const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type,x-staff-csrf','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Expose-Headers':'X-Staff-CSRF','X-Staff-CSRF':'test-csrf'};
  await context.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;let json=[];
   if(request.method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -38,7 +38,7 @@ try{for(const width of [320,390,1280]){
   }
   else if(path==='/api/admin/branches/1/meals')json=[saved];
   else if(path==='/api/admin/branches/1/meals/1'){
-   const input=request.postDataJSON();assert.equal(request.method(),'PUT');assert.equal(input.version,2);writes++;
+   const input=request.postDataJSON();assert.equal(request.method(),'PUT');assert.equal(request.headers()['x-staff-csrf'],'test-csrf','meal saves carry the verified staff CSRF token');assert.equal(input.version,2);writes++;
    if(fail)return route.fulfill({status:409,headers,json:{message:'This meal was edited elsewhere. Reload before saving.'}});
    saved={...input,version:3,id:1,branchId:1};json=saved;
   }
@@ -91,7 +91,7 @@ try{for(const width of [320,390,1280]){
   const field=admin.getByLabel(label,{exact:true}).first();const help=await field.getAttribute('aria-describedby');assert.ok(help,label+' has linked guidance');assert.ok((await page.locator('[id="'+help+'"]').innerText()).length>15);
  }
  await fileInput.setInputFiles({name:'bad.svg',mimeType:'image/svg+xml',buffer:Buffer.from('<svg/>')});await admin.getByRole('alert').filter({hasText:'JPG, PNG or WebP'}).waitFor();assert.equal(uploads,0);
- let arrived;const waiting=new Promise(resolve=>arrived=resolve);let release;heldUpload={arrived,promise:new Promise(resolve=>release=resolve)};
+ const waiting=page.waitForRequest(request=>new URL(request.url()).pathname==='/api/admin/branches/1/meals/image'&&request.method()==='POST',{timeout:15000});let release;heldUpload={arrived:()=>{},promise:new Promise(resolve=>release=resolve)};
  await fileInput.setInputFiles({name:'meal.png',mimeType:'image/png',buffer:Buffer.from('test image')});await waiting;
  assert.equal(await admin.getByRole('button',{name:'Save meal',exact:true}).isDisabled(),true);assert.equal(await urlInput.isDisabled(),true);release();heldUpload=null;
  await admin.getByRole('status').filter({hasText:'Photo uploaded'}).waitFor();assert.equal(await urlInput.inputValue(),'https://images.example/meal.png');
