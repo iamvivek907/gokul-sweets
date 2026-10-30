@@ -2544,10 +2544,15 @@ try {
                     const customer=parseCustomerDetails(getCustomerSnapshot());
                     if(!customer)throw new Error("Check your contact details first.");
                     const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();
-                    const adjustedCart=adjustCartItems(parseCart(cartSnapshot),branch.id,changedItems);
+                    const storedCart=parseCart(cartSnapshot);
+                    const adjustedCart=adjustCartItems(storedCart,branch.id,changedItems);
                     const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:availabilityItems(adjustedCart.items,adjustedCart)};
                     const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;
-                    if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}
+                    if(number){
+                        const current=await getCustomerOrder(number);
+                        if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");
+                        if((current.items??[]).some(item=>item.mealLabel)&&!storedCart.meals?.length)throw new Error("This reserved meal needs its saved choices. Return to your original cart or cancel this order and rebuild the meal.");
+                    }
                     const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;
                     if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");
                     const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;
