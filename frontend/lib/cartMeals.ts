@@ -24,6 +24,13 @@ export function adjustCartItems(cart:CartState,branchId:number,items:CartItem[])
  if(cart.branchId!==branchId)throw Error('Your cart branch changed. Reopen checkout adjustments.');
  return reconcileCartMeals({...cart,items});
 }
+/** Branch-specific deals require explicit consent before keeping components at regular prices. */
+export function switchCartBranch(cart:CartState,branchId:number,items:CartItem[],allowRegularPrices=false):CartState {
+ if(cart.branchId===branchId)return adjustCartItems(cart,branchId,items);
+ const hasMeals=!!cart.meals?.length;
+ if(hasMeals&&!allowRegularPrices)throw Error('Meal deals cannot transfer between branches. Review the regular prices before switching.');
+ return reconcileCartMeals({branchId,items,mealNotice:hasMeals?'Your meal dishes were kept at regular prices for this branch. Build a new meal from its menu to use a meal deal.':undefined});
+}
 export function mealClaim(m:CartMeal):MealClaim {return {instanceId:m.instanceId,mealId:m.mealId,version:m.version,quantity:m.quantity,optionIds:[...m.optionIds].sort()};}
 /** An atomic builder edit preserves independently ordered quantities of identical dishes. */
 export function removeMeal(cart:CartState,id:string):CartState {

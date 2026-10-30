@@ -24,6 +24,7 @@
   ],
   "menu": [
     "tests/meals.browser.mjs",
+    "tests/meal-checkout-branches.browser.mjs",
     "tests/menu-tap-motion.browser.mjs",
     "tests/menu-compact-header.browser.mjs",
     "tests/menu-presentation.browser.mjs",

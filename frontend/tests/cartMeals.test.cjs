@@ -1,4 +1,4 @@
-const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');const exportsForTest={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/cartMeals.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsForTest});const {addMeal,removeMeal,reconcileCartMeals,mealSavings,mealEstimate,adjustCartItems}=exportsForTest;
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');const exportsForTest={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/cartMeals.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsForTest});const {addMeal,removeMeal,reconcileCartMeals,mealSavings,mealEstimate,adjustCartItems,switchCartBranch}=exportsForTest;
 const products=new Map([[1,{id:1,name:'Main',price:100,available:true,saleMode:'UNIT'}],[2,{id:2,name:'Side',price:50,available:true,saleMode:'UNIT'}]]),meal={instanceId:'meal1',mealId:1,version:2,quantity:1,optionIds:['a','b'],title:'Lunch',total:120,regularTotal:150,components:[{productId:1,quantity:1,weightGrams:null},{productId:2,quantity:1,weightGrams:null}]};
 test('meal components coexist with ordinary dishes and removal preserves independent quantities',()=>{const cart=addMeal({branchId:1,items:[{product:products.get(1),quantity:2,weightGrams:null}]},meal,products,1);assert.equal(cart.items[0].quantity,3);assert.equal(mealSavings(cart.meals),30);const after=removeMeal(cart,'meal1');assert.equal(after.items.length,1);assert.equal(after.items[0].quantity,2);assert.equal(after.meals,undefined);});
 test('overlapping meal demand is counted once per selection and incomplete edits drop only the invalid deal',()=>{const a=addMeal({branchId:null,items:[]},meal,products,1),b=addMeal(a,{...meal,instanceId:'meal2'},products,1);assert.equal(b.items[0].quantity,2);const changed=reconcileCartMeals({...b,items:b.items.map(i=>({...i,quantity:1}))});assert.equal(changed.meals.length,1);assert.match(changed.mealNotice,/removed/);assert.equal(mealSavings(changed.meals),30);assert.equal(changed.items[0].mealIdentity.includes('meal2'),false);});
@@ -23,4 +23,16 @@ test('checkout adjustment removes only the incomplete meal and explains the chan
  const request=exports.availabilityItems(adjusted.items,adjusted);assert.equal(request[0].mealSelections.length,1);assert.equal(request[0].mealSelections[0].instanceId,'meal1');
  const intact=adjustCartItems(original,1,original.items.map(i=>({...i,quantity:i.quantity+1})));
  assert.equal(exports.availabilityItems(intact.items,intact)[0].mealSelections.length,2);
+});
+
+test('meal branch conversion requires consent, clears claims and retains an explicit notice',()=>{
+ const cart=addMeal({branchId:1,items:[]},meal,products,1),before=JSON.stringify(cart);
+ const items=cart.items.map(i=>({...i,product:{...i.product,price:i.product.price+10}}));
+ assert.throws(()=>switchCartBranch(cart,2,items),/Review the regular prices/);
+ assert.equal(JSON.stringify(cart),before);
+ const switched=switchCartBranch(cart,2,items,true);assert.equal(switched.branchId,2);assert.equal(switched.meals,undefined);assert.match(switched.mealNotice,/regular prices/);assert.equal(switched.items[0].mealIdentity,undefined);assert.equal(mealSavings(switched.meals),0);
+});
+test('ordinary branch transfers need no meal consent; same-branch recovery retains deals',()=>{
+ const cart=addMeal({branchId:1,items:[]},meal,products,1);assert.equal(switchCartBranch(cart,1,cart.items).meals.length,1);
+ const plain=switchCartBranch({branchId:1,items:cart.items.map(({mealIdentity,...item})=>item)},2,cart.items);assert.equal(plain.branchId,2);assert.equal(plain.mealNotice,undefined);
 });

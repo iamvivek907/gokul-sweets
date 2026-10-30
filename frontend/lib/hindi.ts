@@ -1551,3 +1551,17 @@ Object.assign(hindi,{"Date range":"तारीख़ की सीमा","Appl
 Object.assign(hindi,{
 "ONLY ON THE APP":"केवल ऐप पर","Build your meal":"अपना मील बनाएं","Your favourites. Your combination.":"आपके पसंदीदा व्यंजन। आपकी पसंद का मील।","APP EXCLUSIVE":"केवल ऐप पर","Build meal":"मील बनाएं","Meal price":"मील की कीमत","Meal savings":"मील पर बचत","Before item tax and checkout charges":"वस्तुओं के कर और चेकआउट शुल्क से पहले","Edit meal":"मील बदलें","Remove meal":"मील हटाएं","Pick your favourites to complete your meal.":"अपना मील पूरा करने के लिए पसंदीदा व्यंजन चुनें।","Required":"ज़रूरी","Optional":"वैकल्पिक","Choose":"चुनें","Add meal":"मील जोड़ें","Update meal":"मील अपडेट करें","Complete the required choices to add your meal.":"मील जोड़ने के लिए ज़रूरी विकल्प पूरे करें।","Meal deals cannot be combined with another offer or coin redemption.":"मील डील के साथ दूसरा ऑफ़र या कॉइन इस्तेमाल नहीं किया जा सकता।","A meal deal was removed because its included dishes changed. Review your total.":"शामिल व्यंजन बदलने के कारण मील डील हट गई है। अपना कुल बिल जांचें।","Your meal was added. Final prices, tax and pickup are checked before payment.":"आपका मील जुड़ गया है। भुगतान से पहले कीमत, कर और पिकअप की जांच होगी।","Choose pickup, then reopen your meal. Your choices are saved.":"पिकअप चुनें, फिर अपना मील दोबारा खोलें। आपके विकल्प सुरक्षित हैं।"
 });
+
+Object.assign(hindi,{
+ "Meal deals belong to your previous branch.":"मील डील आपकी पिछली शाखा के लिए हैं।",
+ "These dishes will use regular prices here. Build a new meal from this branch’s menu to use its meal deals.":"यहाँ इन व्यंजनों की सामान्य कीमत लगेगी। इस शाखा की मील डील के लिए इसके मेनू से नया मील बनाएं।",
+ "Current food subtotal":"अभी खाने का उप-कुल",
+ "Food subtotal at this branch":"इस शाखा में खाने का उप-कुल",
+ "I understand meal deals will be removed. Keep these dishes at regular prices.":"मैं समझता/समझती हूँ कि मील डील हट जाएंगी। इन व्यंजनों को सामान्य कीमत पर रखें।",
+ "Keep dishes at regular prices":"व्यंजन सामान्य कीमत पर रखें",
+ "Meal deals cannot transfer between branches. Review the regular prices before switching.":"मील डील दूसरी शाखा में नहीं जा सकतीं। शाखा बदलने से पहले सामान्य कीमत जांचें।",
+ "Your meal dishes were kept at regular prices for this branch. Build a new meal from its menu to use a meal deal.":"इस शाखा में आपके मील के व्यंजन सामान्य कीमत पर रखे गए हैं। मील डील के लिए इसके मेनू से नया मील बनाएं।",
+ "This reserved meal needs its saved choices. Return to your original cart or cancel this order and rebuild the meal.":"इस आरक्षित मील के सुरक्षित विकल्प चाहिए। मूल कार्ट पर लौटें या यह ऑर्डर रद्द करके मील दोबारा बनाएं।"
+});
+
+Object.assign(hindi,{"Meal price change":"मील की कीमत में बदलाव"});
