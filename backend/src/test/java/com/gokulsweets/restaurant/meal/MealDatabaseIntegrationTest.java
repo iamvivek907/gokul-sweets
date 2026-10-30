@@ -169,7 +169,7 @@ class MealDatabaseIntegrationTest {
                 "UPDATE branch_products SET available=false,price_override=90 WHERE product_id=1");
         jdbc.execute(
                 "INSERT INTO products SELECT id,'Dish '||id,'UNIT',100,250,50,true FROM"
-                    + " generate_series(10,60) id");
+                        + " generate_series(10,60) id");
         jdbc.execute(
                 "INSERT INTO branch_products SELECT 1,id,null,true FROM generate_series(10,60) id");
         var first = meals.adminProducts(1, 0);
