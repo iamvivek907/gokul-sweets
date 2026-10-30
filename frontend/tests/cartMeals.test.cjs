@@ -34,5 +34,5 @@ test('meal branch conversion requires consent, clears claims and retains an expl
 });
 test('ordinary branch transfers need no meal consent; same-branch recovery retains deals',()=>{
  const cart=addMeal({branchId:1,items:[]},meal,products,1);assert.equal(switchCartBranch(cart,1,cart.items).meals.length,1);
- const plain=switchCartBranch({branchId:1,items:cart.items.map(({mealIdentity,...item})=>item)},2,cart.items);assert.equal(plain.branchId,2);assert.equal(plain.mealNotice,undefined);
+ const plain=switchCartBranch({branchId:1,items:cart.items.map(i=>({product:i.product,quantity:i.quantity,weightGrams:i.weightGrams}))},2,cart.items);assert.equal(plain.branchId,2);assert.equal(plain.mealNotice,undefined);
 });

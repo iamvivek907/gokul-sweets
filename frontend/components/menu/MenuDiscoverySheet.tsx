@@ -19,10 +19,10 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
   surface?.showModal();
   return()=>{
    surface?.close();Object.assign(body.style,{position:saved.position,top:saved.top,left:saved.left,width:saved.width,overflow:saved.overflow});root.style.overflow=saved.rootOverflow;
-   window.scrollTo({left:x,top:y,behavior:"instant"});const target=returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:null;target?.focus({preventScroll:true});
+   window.scrollTo({left:x,top:y,behavior:"instant"});const target=restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;target?.focus({preventScroll:true});
    // Header observers can briefly make the trigger inert during scroll unlock.
    // Resolve it again after the header settles; never move the viewport to focus it.
-   if(restoreFocus||returnFocusId){
+   if(restoreFocus){
     let attempts=0;
     const restore=()=>{
      const current=returnFocusId?document.getElementById(returnFocusId):target;
