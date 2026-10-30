@@ -114,3 +114,26 @@ redemptions. Existing net-spend earning rules still apply.
 Reordering a historical meal directs the customer to rebuild against current choices
 and prices. Archive/pause and stale versions require review. Costs/margins are owner-
 entered estimates before tax, payment fees and overhead, not guaranteed profits.
+
+## Automatic selected-dish pricing (October 30)
+
+New meals default to `SELECTED_ITEMS`: sum the current branch selling price of
+all selected portions, apply the configured fixed/percentage discount once per
+meal (optionally capped by `maximumDiscount`), then multiply by meal quantity.
+Percentage discounts round half-up to the paisa per meal. Taxes and checkout
+charges are calculated later. The admin enters no base price or upgrades in this
+mode; the stored base is zero and option upgrades must be zero. At least one
+required dish remains mandatory, and discounts must leave the cheapest allowed
+combination positive. A fixed rupee discount is per meal, not per order.
+
+Existing definitions remain `FIXED`, preserving their base-plus-upgrade formula.
+Changing the pricing mode or discount increments the existing version and makes
+old claims require rebuilding. Current server branch prices remain authoritative;
+client estimates never submit a price. Stock, tax allocation, pickup reservations,
+non-stacking savings rules and staff component snapshots use the same paths.
+Migration V145 adds the pricing mode and optional cap without repricing old meals.
+
+Cards show the cheapest required combination as the starting price. The customer
+builder displays the actual selected dish total crossed out and the discounted
+meal total on the shared yellow price treatment. Selected portion prices and the
+Add total update on each change; no artificial comparison price is invented.

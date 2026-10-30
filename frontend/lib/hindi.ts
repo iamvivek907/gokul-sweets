@@ -1565,3 +1565,5 @@ Object.assign(hindi,{
 });
 
 Object.assign(hindi,{"Meal price change":"मील की कीमत में बदलाव"});
+
+Object.assign(hindi,{"Choose your dishes":"अपने व्यंजन चुनें"});

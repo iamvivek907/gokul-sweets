@@ -31,6 +31,28 @@ class MealPricingTest {
     }
 
     @Test
+    void automaticDiscountFlowsThroughCheckoutAllocationsWithoutDiscountingOrdinaryExtras() {
+        var service = mock(MealService.class);
+        when(service.catalog(1, false))
+                .thenReturn(
+                        List.of(new SelectedMealPolicyTest().automatic("PERCENT", "2.00", null)));
+        var pricing = new MealPricing(service, JsonMapper.builder().build());
+        var requested =
+                List.of(
+                        new CreateOrderItemRequest(
+                                1L, 2, null, List.of(claim(1, "main1", "side1"))),
+                        new CreateOrderItemRequest(2L, 1, null));
+        var result =
+                pricing.apply(1, requested, List.of(item(1, "100.00", 2), item(2, "50.00", 1)));
+        assertThat(
+                        result.stream()
+                                .map(i -> i.mealDiscount())
+                                .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add))
+                .isEqualByComparingTo("3.00");
+        assertThat(result.get(0).quantity()).isEqualTo(2);
+    }
+
+    @Test
     void allocatesExactSavingsAcrossRealDemandWithoutChangingInventoryQuantities() {
         var service = mock(MealService.class);
         when(service.catalog(1, false)).thenReturn(List.of(meal()));

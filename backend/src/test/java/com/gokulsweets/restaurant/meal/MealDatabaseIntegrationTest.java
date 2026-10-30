@@ -63,6 +63,10 @@ class MealDatabaseIntegrationTest {
                 Files.readString(
                         Path.of("src/main/resources/db/migration/V144__app_exclusive_meals.sql")));
         authorization = mock(StaffAuthorizationService.class);
+        jdbc.execute(
+                Files.readString(
+                        Path.of(
+                                "src/main/resources/db/migration/V145__selected_item_meal_pricing.sql")));
         meals = new MealService(jdbc, JsonMapper.builder().build(), authorization);
     }
 
@@ -85,6 +89,39 @@ class MealDatabaseIntegrationTest {
                 m.estimatedCost(),
                 active,
                 m.groups());
+    }
+
+    @Test
+    void automaticMealConfigurationAndCapRoundTripWithoutChangingLegacyPrices() {
+        var m = new SelectedMealPolicyTest().automatic("PERCENT", "2.00", "2.00");
+        var edit =
+                new MealModels.Edit(
+                        0,
+                        m.title(),
+                        m.titleHi(),
+                        m.description(),
+                        m.imageUrl(),
+                        m.basePrice(),
+                        m.discountType(),
+                        m.discountValue(),
+                        null,
+                        true,
+                        m.groups(),
+                        m.pricingMode(),
+                        m.maximumDiscount());
+        var saved = tx.execute(s -> meals.save(1, 0, edit));
+        assertThat(saved.pricingMode()).isEqualTo("SELECTED_ITEMS");
+        assertThat(saved.basePrice()).isEqualByComparingTo("0.00");
+        assertThat(saved.maximumDiscount()).isEqualByComparingTo("2.00");
+        var quote =
+                meals.quote(
+                        1,
+                        new MealModels.Claim(
+                                "auto", saved.id(), saved.version(), 2, List.of("main1", "side1")));
+        assertThat(quote.regularTotal()).isEqualByComparingTo("300.00");
+        assertThat(quote.total()).isEqualByComparingTo("296.00");
+        var fixed = tx.execute(s -> meals.save(1, 0, edit(0, true)));
+        assertThat(fixed.pricingMode()).isEqualTo("FIXED");
     }
 
     @Test
