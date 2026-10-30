@@ -34,7 +34,7 @@ test('abort during verification never returns a candidate',async()=>{
 function storage(){const map=new Map(),events=[];const localStorage={getItem:key=>map.get(key)??null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key)};
  const window={localStorage,dispatchEvent:event=>events.push(event.type)};
  const mode=load('lib/menuPickupMode.ts',()=>{},{localStorage,window,Event});
- const cart=load('lib/cartStorage.ts',()=>mode,{localStorage,window,Event});
+ const cart=load('lib/cartStorage.ts',name=>name.includes('cartMeals')?load('lib/cartMeals.ts',()=>{}):mode,{localStorage,window,Event});
  const checkout=load('lib/checkoutStorage.ts',()=>mode,{localStorage,window,Event});
  return {map,mode,cart,checkout,localStorage,window};}
 test('stored mode stays conservative; incomplete recovery is evaluated separately',()=>{

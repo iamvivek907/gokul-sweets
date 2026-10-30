@@ -1,3 +1,4 @@
+import {reconcileCartMeals} from "@/lib/cartMeals";
 import {setMenuPickupMode} from "@/lib/menuPickupMode";
 import type {
     CartItem,
@@ -119,13 +120,14 @@ export function parseCart(value: string): CartState {
                 };
             });
 
-        return {
+        return reconcileCartMeals({
+            meals:parsed.meals,mealNotice:typeof parsed.mealNotice==="string"?parsed.mealNotice:undefined,
             branchId:
                 typeof parsed.branchId === "number"
                     ? parsed.branchId
                     : null,
             items
-        };
+        });
 
     } catch {
         return EMPTY_CART;
@@ -138,6 +140,7 @@ export function saveCart(cart: CartState): void {
         return;
     }
 
+    cart=reconcileCartMeals(cart);
     if (cart.items.length && cart.branchId !== null) setMenuPickupMode(cart.branchId, false);
     window.localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
     window.dispatchEvent(new Event(CART_CHANGE_EVENT));

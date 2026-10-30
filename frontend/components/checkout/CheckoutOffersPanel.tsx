@@ -1,5 +1,7 @@
 "use client";
 import {CheckoutSavingsUncertainError,CheckoutUpdateUncertainError} from "@/lib/checkoutRefresh";
+import {adjustCartItems} from "@/lib/cartMeals";
+import {availabilityItems} from "@/services/availabilityApi";
 import OrderRewards from "./OrderRewards";
 import OfferChoiceDialog from "./OfferChoiceDialog";
 import type {RewardCheckout} from "@/services/loyaltyApi";
@@ -160,7 +162,7 @@ export default function CheckoutOffersPanel({
 
 
     const {
-        items
+        items, mealNotice, branchId: cartBranchId
     } =
         useCart();
 
@@ -1091,15 +1093,17 @@ export default function CheckoutOffersPanel({
     async function refreshAfterAddition(changedItems?:CartItem[],changedPickup?:PickupSelection, signal:AbortSignal=AbortSignal.timeout(15000)) {
         setTotalChanged(true);setPriceReviewRequired(true);setAppliedRebate(null);setSuccessMessage(null);
         const cartSnapshot=getCartSnapshot(), pickupSnapshot=getPickupSlotSnapshot(), branchSnapshot=getStoredBranchSnapshot();
-        const storedCart=parseCart(cartSnapshot),cart=changedItems?{...storedCart,items:changedItems}:storedCart,pickup=changedPickup??parsePickupSlot(pickupSnapshot),customer=parseCustomerDetails(getCustomerSnapshot());
+        const storedCart=parseCart(cartSnapshot),pickup=changedPickup??parsePickupSlot(pickupSnapshot),customer=parseCustomerDetails(getCustomerSnapshot());
         const saved=parsePendingOrder(getPendingOrderSnapshot());
         const unchanged=()=>cartSnapshot===getCartSnapshot()&&pickupSnapshot===getPickupSlotSnapshot()&&branchSnapshot===getStoredBranchSnapshot()&&parsePendingOrder(getPendingOrderSnapshot())?.orderNumber===orderNumber;
-        let updateStarted=false;
+        let updateStarted=false,cart=storedCart;
         try {
+            cart=changedItems?adjustCartItems(storedCart,storedCart.branchId??-1,changedItems):storedCart;
             if(!saved || saved.orderNumber!==orderNumber || saved.branchId!==cart.branchId || !pickup || pickup.pickupType!=="NORMAL" || !customer || !cart.items.length)throw new Error("Review your cart and pickup details before refreshing the price.");
             const current=await getCustomerOrder(orderNumber,signal);
             if(current.orderStatus!=="PENDING_PAYMENT" || current.paymentStatus!==null)throw new Error("This order has a payment attempt or has changed. Review its payment status before adding items.");
-            const request={branchId:saved.branchId,pickupSlotId:pickup.slot.id,pickupType:pickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};
+            if((current.items??[]).some(item=>item.mealLabel)&&!storedCart.meals?.length)throw new Error("This reserved meal needs its saved choices. Return to your original cart or cancel this order and rebuild the meal.");
+            const request={branchId:saved.branchId,pickupSlotId:pickup.slot.id,pickupType:pickup.pickupType,customerName:customer.name,customerPhone:customer.phone,items:availabilityItems(cart.items,cart)};
             const quote=features?.acceptedCheckoutQuote?await previewCheckoutQuote(request,orderNumber,signal):null;
             if(!unchanged())throw new Error("Your cart or pickup changed during the price check. Review it again.");
             updateStarted=true;
@@ -1140,7 +1144,7 @@ export default function CheckoutOffersPanel({
                 space-y-4
             "
         >
-
+            {mealNotice&&cartBranchId===pendingOrder?.branchId&&<p role="status" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-[#573e27]"><T text={mealNotice}/></p>}
             <div
                 className={`
                     rounded-2xl

@@ -3,6 +3,7 @@ import {useMenuExperience,SaveDish,DishReviewAction} from "./MenuExperience";
 import {dishPhotoPosition} from "@/types/menuDetails";
 import {requestMenuPickup} from "@/lib/menuPickupRecovery";
 import {T,useTranslation,useLanguage} from "@/lib/language";
+import {menuTapFeedback} from "@/lib/menuHaptics";
 import ProductDetailsSheet from "./ProductDetailsSheet";
 import styles from "./ProductCard.module.css";
 import FoodPlaceholder from "./FoodPlaceholder";
@@ -493,11 +494,7 @@ export default function ProductCard({
                             aria-hidden={
                                 isInCart
                             }
-                            onClick={() =>
-                                onAdd(
-                                    product
-                                )
-                            }
+                            onClick={() => { menuTapFeedback(); onAdd(product); }}
                             aria-label={`Add ${product.name} to cart`}
                             className={`
                                 absolute

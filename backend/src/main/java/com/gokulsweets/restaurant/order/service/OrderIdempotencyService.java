@@ -58,6 +58,35 @@ public class OrderIdempotencyService {
                     canonical,
                     "offer",
                     normalize(request.offerCode()).toUpperCase(java.util.Locale.ROOT));
+            var meals =
+                    request.items().stream()
+                            .filter(i -> i.mealSelections() != null)
+                            .flatMap(i -> i.mealSelections().stream())
+                            .map(
+                                    c ->
+                                            c == null
+                                                    ? "null"
+                                                    : c.instanceId()
+                                                            + ":"
+                                                            + c.mealId()
+                                                            + ":"
+                                                            + c.version()
+                                                            + ":"
+                                                            + c.quantity()
+                                                            + ":"
+                                                            + (c.optionIds() == null
+                                                                    ? "null"
+                                                                    : c.optionIds().stream()
+                                                                            .sorted(
+                                                                                    java.util
+                                                                                            .Comparator
+                                                                                            .nullsFirst(
+                                                                                                    String
+                                                                                                            ::compareTo))
+                                                                            .toList()))
+                            .sorted()
+                            .toList();
+            if (!meals.isEmpty()) canonical.append("|meals:").append(meals);
             return sha256(canonical.toString());
         } finally {
             MethodTiming.finish(

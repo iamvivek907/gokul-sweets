@@ -249,6 +249,8 @@ export interface AdminBatchPreparationResponse {
  */
 
 export interface AdminOrderItem {
+    mealDiscount?: number;
+    mealLabel?: string|null;
 
     id: number;
 

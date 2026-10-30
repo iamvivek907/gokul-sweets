@@ -60,7 +60,21 @@ public class CheckoutQuoteService {
             String taxAmount,
             String total,
             long productId,
-            Long categoryId) {
+            Long categoryId,
+            String mealDiscount,
+            String mealLabel) {
+        /** Preserves quote callers without meals. */
+        public Line(
+                String name,
+                String unitPrice,
+                String taxRate,
+                String taxAmount,
+                String total,
+                long productId,
+                Long categoryId) {
+            this(name, unitPrice, taxRate, taxAmount, total, productId, categoryId, "0.00", null);
+        }
+
         /** Source compatibility for quote clients without category-based offer metadata. */
         public Line(
                 String name,
@@ -163,7 +177,9 @@ public class CheckoutQuoteService {
                                                     item.product().getId(),
                                                     item.product().getCategory() == null
                                                             ? null
-                                                            : item.product().getCategory().getId()))
+                                                            : item.product().getCategory().getId(),
+                                                    item.mealDiscount().toPlainString(),
+                                                    item.mealLabel()))
                             .toList(),
                     amounts.subtotal().toPlainString(),
                     amounts.taxAmount().toPlainString(),
@@ -324,6 +340,12 @@ public class CheckoutQuoteService {
                                             .append(';'));
             return value.append("|loyalty-policy:")
                     .append(lockPolicy ? loyalty.lockPolicyVersion() : loyalty.policyVersion())
+                    .append("|meals:")
+                    .append(
+                            request.items().stream()
+                                    .filter(i -> i.mealSelections() != null)
+                                    .map(i -> i.mealSelections().toString())
+                                    .toList())
                     .append("|reward:")
                     .append(request.rewardCode())
                     .append("|offer:")

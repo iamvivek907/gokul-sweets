@@ -18,4 +18,25 @@ public record ValidatedOrderItem(
         BranchProduct branchProduct,
         ProductSaleMode saleMode,
         int quantity,
-        Integer weightGrams) {}
+        Integer weightGrams,
+        java.math.BigDecimal mealDiscount,
+        String mealLabel,
+        String mealDetails) {
+    /** Preserves ordinary item validation without a meal allocation. */
+    public ValidatedOrderItem(
+            Product product,
+            BranchProduct branchProduct,
+            ProductSaleMode saleMode,
+            int quantity,
+            Integer weightGrams) {
+        this(
+                product,
+                branchProduct,
+                saleMode,
+                quantity,
+                weightGrams,
+                java.math.BigDecimal.ZERO,
+                null,
+                null);
+    }
+}

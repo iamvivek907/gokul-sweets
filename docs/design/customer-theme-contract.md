@@ -388,3 +388,23 @@ changing the active menu filter. Close/Escape discard the draft and restore the
 original browsing position and trigger focus. Only explicit submission or choosing
 a suggestion applies the filter and reveals matching dishes. Draft typing does
 not persist recent searches. Keep branch, pickup and cart unchanged.
+
+## Landing exploration and menu touch feedback (October 29)
+
+Scroll to explore reveals the selected-branch shortcuts before the branch gallery;
+with no selected branch it reveals the gallery. Menu Add buttons and explicit dish,
+size and quantity popup Close buttons request one short, best-effort vibration.
+Full-card details, Save, quantity steppers and keyboard/backdrop dismissal stay quiet.
+Unsupported/blocked vibration never changes ordering; reduced motion suppresses it.
+Dish, size and quantity sheets slide/fade on entry and exit while retaining their
+modal focus and scroll protection until dismissal finishes. Reduced motion skips
+these transitions. No native iPhone haptic guarantee or hidden form controls.
+
+## Food detail sheet refinement (October 29)
+
+Modern menu dish/size/quantity sheets use a labelled circular Close above the white
+surface. Keep the title and action footer outside the independently scrolling content;
+hide its visual scrollbar without disabling touch, wheel or keyboard scrolling. The
+Close target remains at least 44px, visible on short viewports and focusable. Legacy
+and non-menu overlays preserve their existing layout. App-exclusive meal direction
+is recorded in app-exclusive-meals.md; that document records the implementation contract and current operational limits.

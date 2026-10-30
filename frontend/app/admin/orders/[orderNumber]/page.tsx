@@ -50,7 +50,7 @@ export default function StaffAlertOrderPage({params}: {params: Promise<{orderNum
             <p className="mt-3 text-sm">{order.fulfillmentType === "DELIVERY" ? `Delivery ${order.deliveryDate ?? ""}, ${order.deliveryStartTime ?? ""}–${order.deliveryEndTime ?? ""}` : `Pickup ${order.pickupDate ?? ""}, ${order.pickupStartTime ?? ""}–${order.pickupEndTime ?? ""}`} IST</p>
             <p className="mt-2 text-sm">Payment: {order.paymentStatus?.replaceAll("_", " ") ?? "Not recorded"}</p>
             <PickupCustomerContact customerName={order.customerName} customerPhone={order.customerPhone} status={order.orderStatus} fulfillment={order.fulfillmentType}/>
-            <ul className="mt-5 space-y-2">{order.items.map((item, index) => <li key={index} className="rounded-xl bg-[#fffaf2] p-3 text-sm"><strong>{item.productName}</strong> · {item.saleMode === "WEIGHT" ? `${(item.weightGrams ?? 0) / 1000} kg` : `${item.quantity} units`}</li>)}</ul>
+            <ul className="mt-5 space-y-2">{order.items.map((item, index) => <li key={index} className="rounded-xl bg-[#fffaf2] p-3 text-sm"><strong>{item.productName}</strong>{item.mealLabel&&<p className="mt-1 text-xs text-[#087f55]">{item.mealLabel}</p>} · {item.saleMode === "WEIGHT" ? `${(item.weightGrams ?? 0) / 1000} kg` : `${item.quantity} units`}</li>)}</ul>
             <OrderCorrectionPanel orderNumber={orderNumber} branchId={order.branchId} pickupDate={order.pickupDate??null} onChanged={load}/>
             <p className="mt-4 text-sm leading-6 text-[#756763]">Start preparation only when its window opens. Mark ready only after preparation is complete. Existing eligibility, inventory and bulk-readiness checks still apply.</p>
             <div className="mt-4 flex flex-wrap gap-3">

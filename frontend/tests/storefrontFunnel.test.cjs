@@ -2,7 +2,7 @@ const test=require('node:test'),assert=require('node:assert/strict'),fs=require(
 function load(file,dependencies={},globals={}){
  const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,require:name=>{if(name in dependencies)return dependencies[name];throw Error(`Unexpected import ${name}`);},...globals});return exports;
 }
-const {parseCart}=load('lib/cartStorage.ts',{'@/lib/menuPickupMode':{setMenuPickupMode(){}}});
+const {parseCart}=load('lib/cartStorage.ts',{'@/lib/menuPickupMode':{setMenuPickupMode(){}},'@/lib/cartMeals':load('lib/cartMeals.ts')});
 const vitals=load('lib/vitals.ts');
 const weighted=grams=>({branchId:1,items:[{product:{id:123,name:'Private dish',categoryName:'Sweets',saleMode:'WEIGHT',price:400},quantity:1,weightGrams:grams}]});
 function setup({enabled=true,sampled=true,storageFails=false}={}){

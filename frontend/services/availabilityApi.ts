@@ -1,5 +1,7 @@
+import {getCartSnapshot,parseCart} from "@/lib/cartStorage";
+import {mealClaim} from "@/lib/cartMeals";
 import {apiClient} from "@/services/apiClient";
-import type {CartItem} from "@/types/cart";
+import type {CartItem,CartState} from "@/types/cart";
 import type {PickupSlot} from "@/types/pickup";
 
 export interface SlotAvailability {
@@ -48,12 +50,17 @@ function expandMenuPreview(data: CartAvailability | CompactMenuAvailability): Ca
     })}))};
 }
 
-export function availabilityItems(items: CartItem[]) {
-    return items.map(item => ({
+export function availabilityItems(items: CartItem[], adjustedCart?: CartState) {
+    const mapped: import("@/types/order").CreateOrderItemRequest[]=items.map(item => ({
         productId: item.product.id,
         quantity: item.product.saleMode === "WEIGHT" ? null : item.quantity,
         weightGrams: item.product.saleMode === "WEIGHT" ? item.weightGrams : null
     }));
+    if(adjustedCart||typeof window!=="undefined"){
+      const cart=adjustedCart??parseCart(getCartSnapshot());
+      if(cart.meals?.length&&cart.items.length===items.length&&items.every(i=>cart.items.some(c=>c.product.id===i.product.id&&c.quantity===i.quantity&&c.weightGrams===i.weightGrams)))mapped[0]={...mapped[0],mealSelections:cart.meals.map(mealClaim)};
+    }
+    return mapped;
 }
 
 export async function checkCartAvailability(

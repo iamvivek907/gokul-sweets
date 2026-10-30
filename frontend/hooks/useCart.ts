@@ -1,5 +1,6 @@
 "use client";
 
+import {mealSavings} from "@/lib/cartMeals";
 import {
     useMemo,
     useSyncExternalStore
@@ -25,6 +26,8 @@ import {
 
 
 interface UseCartResult {
+    meals?: import("@/types/meal").CartMeal[];
+    mealNotice?: string;
     items: CartItem[];
     branchId: number | null;
     itemCount: number;
@@ -101,8 +104,8 @@ export function useCart(): UseCartResult {
             () => cart.items.reduce(
                 (total, item) => total + lineSubtotal(item),
                 0
-            ),
-            [cart.items]
+            )-mealSavings(cart.meals),
+            [cart.items,cart.meals]
         );
 
     function addItem(
@@ -161,7 +164,7 @@ export function useCart(): UseCartResult {
                 }
             ];
 
-        saveCart({
+        saveCart({...cart,
             branchId: selectedBranchId,
             items: updatedItems
         });
@@ -190,7 +193,7 @@ export function useCart(): UseCartResult {
                     }
         );
 
-        saveCart({branchId: cart.branchId, items: updatedItems});
+        saveCart({...cart,branchId: cart.branchId, items: updatedItems});
     }
 
     function decreaseQuantity(productId: number): void {
@@ -226,7 +229,7 @@ export function useCart(): UseCartResult {
             return;
         }
 
-        saveCart({branchId: cart.branchId, items: updatedItems});
+        saveCart({...cart,branchId: cart.branchId, items: updatedItems});
     }
 
     function setItemWeight(
@@ -305,7 +308,7 @@ export function useCart(): UseCartResult {
 
 
         saveCart(
-            {
+            {...cart,
                 branchId:
                     cart.branchId,
 
@@ -324,7 +327,7 @@ export function useCart(): UseCartResult {
             return;
         }
 
-        saveCart({branchId: cart.branchId, items: updatedItems});
+        saveCart({...cart,branchId: cart.branchId, items: updatedItems});
     }
 
     function clearCart(): void {
@@ -352,6 +355,7 @@ export function useCart(): UseCartResult {
     }
 
     return {
+        meals:cart.meals,mealNotice:cart.mealNotice,
         items: cart.items,
         branchId: cart.branchId,
         itemCount,

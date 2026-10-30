@@ -13,4 +13,11 @@ import jakarta.validation.constraints.NotNull;
 public record CreateOrderItemRequest(
         @NotNull(message = "Product ID is required.") Long productId,
         @Min(value = 1, message = "Quantity must be at least 1.") Integer quantity,
-        @Min(value = 250, message = "Weight must be at least 250 grams.") Integer weightGrams) {}
+        @Min(value = 250, message = "Weight must be at least 250 grams.") Integer weightGrams,
+        @jakarta.validation.constraints.Size(max = 10)
+                java.util.List<com.gokulsweets.restaurant.meal.MealModels.Claim> mealSelections) {
+    /** Preserves requests without a meal selection. */
+    public CreateOrderItemRequest(Long productId, Integer quantity, Integer weightGrams) {
+        this(productId, quantity, weightGrams, null);
+    }
+}

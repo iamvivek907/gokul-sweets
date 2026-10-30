@@ -1,0 +1,38 @@
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');const exportsForTest={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('lib/cartMeals.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:exportsForTest});const {addMeal,removeMeal,reconcileCartMeals,mealSavings,mealEstimate,adjustCartItems,switchCartBranch}=exportsForTest;
+const products=new Map([[1,{id:1,name:'Main',price:100,available:true,saleMode:'UNIT'}],[2,{id:2,name:'Side',price:50,available:true,saleMode:'UNIT'}]]),meal={instanceId:'meal1',mealId:1,version:2,quantity:1,optionIds:['a','b'],title:'Lunch',total:120,regularTotal:150,components:[{productId:1,quantity:1,weightGrams:null},{productId:2,quantity:1,weightGrams:null}]};
+test('meal components coexist with ordinary dishes and removal preserves independent quantities',()=>{const cart=addMeal({branchId:1,items:[{product:products.get(1),quantity:2,weightGrams:null}]},meal,products,1);assert.equal(cart.items[0].quantity,3);assert.equal(mealSavings(cart.meals),30);const after=removeMeal(cart,'meal1');assert.equal(after.items.length,1);assert.equal(after.items[0].quantity,2);assert.equal(after.meals,undefined);});
+test('overlapping meal demand is counted once per selection and incomplete edits drop only the invalid deal',()=>{const a=addMeal({branchId:null,items:[]},meal,products,1),b=addMeal(a,{...meal,instanceId:'meal2'},products,1);assert.equal(b.items[0].quantity,2);const changed=reconcileCartMeals({...b,items:b.items.map(i=>({...i,quantity:1}))});assert.equal(changed.meals.length,1);assert.match(changed.mealNotice,/removed/);assert.equal(mealSavings(changed.meals),30);assert.equal(changed.items[0].mealIdentity.includes('meal2'),false);});
+test('cross-branch and disabled components never partially add a meal',()=>{assert.throws(()=>addMeal({branchId:2,items:[{product:products.get(1),quantity:1,weightGrams:null}]},meal,products,1),/another branch/);assert.throws(()=>addMeal({branchId:null,items:[]},meal,new Map([[1,{...products.get(1),available:false}]]),1),/no longer available/);});
+test('invalid stored claims cannot break browsing or invent savings',()=>{for(const bad of [null,{...meal,optionIds:[null]},{...meal,total:-10},{...meal,quantity:0},{...meal,components:[{productId:1,quantity:NaN}]}]){const c=reconcileCartMeals({branchId:1,items:[],meals:[bad]});assert.equal(c.meals,undefined);assert.equal(mealSavings(c.meals),0);}});
+test('required limits and percentage-discount rounding match the displayed meal price',()=>{const d={basePrice:130,discountType:'PERCENT',discountValue:12.25,groups:[{minimum:1,maximum:1,options:[{key:'a',productId:1,quantity:1,weightGrams:null,upgrade:0}]}]};assert.equal(mealEstimate(d,[],1,products).valid,false);const p=mealEstimate(d,['a'],2,products);assert.equal(p.valid,true);assert.equal(p.total,228.14);});
+
+test('refreshed component prices do not inflate an existing meal total when another meal is added',()=>{const first=addMeal({branchId:null,items:[]},meal,products,1);const fresh={...meal,instanceId:'fresh',regularTotal:160,components:meal.components.map(p=>({...p,unitPrice:p.productId===1?110:50}))};const next=addMeal(first,fresh,products,1);const regular=next.items.reduce((sum,i)=>sum+i.product.price*i.quantity,0);assert.equal(regular-mealSavings(next.meals),240);assert.equal(next.meals[0].regularTotal,160);});
+
+test('checkout pickup-only and unrelated quantity adjustments retain meal claims and savings',()=>{
+ const original=addMeal({branchId:1,items:[{product:{id:3,price:20,available:true,saleMode:'UNIT'},quantity:1,weightGrams:null}]},meal,products,1);
+ for(const items of [original.items,original.items.map(i=>i.product.id===3?{...i,quantity:2}:i)]){
+  const adjusted=adjustCartItems(original,1,items);assert.equal(mealSavings(adjusted.meals),30);assert.equal(adjusted.meals[0].instanceId,'meal1');assert.equal(adjusted.mealNotice,undefined);
+ }
+ assert.throws(()=>adjustCartItems(original,2,original.items),/branch changed/);
+});
+test('checkout adjustment removes only the incomplete meal and explains the changed total',()=>{
+ const original=addMeal(addMeal({branchId:1,items:[]},meal,products,1),{...meal,instanceId:'second'},products,1);
+ const adjusted=adjustCartItems(original,1,original.items.map(i=>({...i,quantity:1})));
+ assert.equal(adjusted.meals.length,1);assert.equal(mealSavings(adjusted.meals),30);assert.match(adjusted.mealNotice,/Review your total/);
+ const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync('services/availabilityApi.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,window:{},require:name=>name.includes('cartMeals')?exportsForTest:name.includes('cartStorage')?{getCartSnapshot:()=>JSON.stringify(original),parseCart:JSON.parse}:{}});
+ const request=exports.availabilityItems(adjusted.items,adjusted);assert.equal(request[0].mealSelections.length,1);assert.equal(request[0].mealSelections[0].instanceId,'meal1');
+ const intact=adjustCartItems(original,1,original.items.map(i=>({...i,quantity:i.quantity+1})));
+ assert.equal(exports.availabilityItems(intact.items,intact)[0].mealSelections.length,2);
+});
+
+test('meal branch conversion requires consent, clears claims and retains an explicit notice',()=>{
+ const cart=addMeal({branchId:1,items:[]},meal,products,1),before=JSON.stringify(cart);
+ const items=cart.items.map(i=>({...i,product:{...i.product,price:i.product.price+10}}));
+ assert.throws(()=>switchCartBranch(cart,2,items),/Review the regular prices/);
+ assert.equal(JSON.stringify(cart),before);
+ const switched=switchCartBranch(cart,2,items,true);assert.equal(switched.branchId,2);assert.equal(switched.meals,undefined);assert.match(switched.mealNotice,/regular prices/);assert.equal(switched.items[0].mealIdentity,undefined);assert.equal(mealSavings(switched.meals),0);
+});
+test('ordinary branch transfers need no meal consent; same-branch recovery retains deals',()=>{
+ const cart=addMeal({branchId:1,items:[]},meal,products,1);assert.equal(switchCartBranch(cart,1,cart.items).meals.length,1);
+ const plain=switchCartBranch({branchId:1,items:cart.items.map(i=>({product:i.product,quantity:i.quantity,weightGrams:i.weightGrams}))},2,cart.items);assert.equal(plain.branchId,2);assert.equal(plain.mealNotice,undefined);
+});

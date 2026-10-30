@@ -13,6 +13,7 @@ export function createCartFingerprint(
     return items
         .map(item => ({
             productId: item.product.id,
+            mealIdentity:item.mealIdentity??"",
             saleMode: item.product.saleMode,
             quantity:
                 item.product.saleMode === "UNIT"
@@ -25,7 +26,7 @@ export function createCartFingerprint(
         }))
         .sort((first, second) => first.productId - second.productId)
         .map(item =>
-            `${item.productId}:${item.saleMode}:${item.quantity ?? "-"}:${item.weightGrams ?? "-"}`
+            `${item.productId}:${item.saleMode}:${item.quantity ?? "-"}:${item.weightGrams ?? "-"}${item.mealIdentity?":meal:"+item.mealIdentity:""}`
         )
         .join("|");
 }
