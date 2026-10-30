@@ -38,6 +38,18 @@ public class MealController {
         }
     }
 
+    /** Branch-authorized picker includes unavailable dishes independently of public filters. */
+    @GetMapping("/api/admin/branches/{branchId}/meals/products")
+    public ProductPage products(
+            @PathVariable long branchId, @RequestParam(defaultValue = "0") long afterId) {
+        long started = MethodTiming.start(MealController.class, "products(long,long)");
+        try {
+            return meals.adminProducts(branchId, afterId);
+        } finally {
+            MethodTiming.finish(started, MealController.class, "products(long,long)");
+        }
+    }
+
     /** Returns bounded meal definitions after branch-scoped staff authorization. */
     @GetMapping("/api/admin/branches/{branchId}/meals")
     public List<Definition> admin(@PathVariable long branchId) {

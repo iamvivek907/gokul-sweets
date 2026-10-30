@@ -157,10 +157,55 @@ class MealDatabaseIntegrationTest {
         doThrow(new SecurityException("forbidden")).when(authorization).requireBranchAccess(2L);
         assertThatThrownBy(() -> tx.execute(s -> meals.save(2, 0, edit(0, true))))
                 .isInstanceOf(SecurityException.class);
-        jdbc.update("UPDATE branch_products SET available=false WHERE product_id=1");
+        jdbc.update("DELETE FROM branch_products WHERE product_id=1");
         assertThatThrownBy(() -> tx.execute(s -> meals.save(1, 0, edit(0, true))))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM branch_meals", Long.class)).isZero();
+    }
+
+    @Test
+    void adminPickerIncludesDisabledDishesWithBoundedCursorPagesAndBranchAuthorization() {
+        jdbc.update(
+                "UPDATE branch_products SET available=false,price_override=90 WHERE product_id=1");
+        jdbc.execute(
+                "INSERT INTO products SELECT id,'Dish '||id,'UNIT',100,250,50,true FROM"
+                        + " generate_series(10,60) id");
+        jdbc.execute(
+                "INSERT INTO branch_products SELECT 1,id,null,true FROM generate_series(10,60) id");
+        var first = meals.adminProducts(1, 0);
+        assertThat(first.products()).hasSize(50);
+        assertThat(first.products().getFirst().available()).isFalse();
+        assertThat(first.products().getFirst().price()).isEqualByComparingTo("90");
+        var second = meals.adminProducts(1, first.nextAfter());
+        assertThat(second.products()).hasSize(4);
+        assertThat(second.nextAfter()).isNull();
+        assertThat(second.products().getFirst().id()).isGreaterThan(first.nextAfter());
+        assertThat(meals.adminProducts(2, 0).products()).isEmpty();
+        assertThatThrownBy(() -> meals.adminProducts(1, -1))
+                .isInstanceOf(IllegalArgumentException.class);
+        doThrow(new SecurityException("forbidden")).when(authorization).requireBranchAccess(2L);
+        assertThatThrownBy(() -> meals.adminProducts(2, 0)).isInstanceOf(SecurityException.class);
+        verify(authorization, atLeastOnce()).requirePermission(PermissionName.MENU_MANAGE);
+    }
+
+    @Test
+    void disabledDishCanBePublishedWithTrustedNameButCannotBeQuoted() {
+        jdbc.update("UPDATE branch_products SET available=false WHERE product_id=1");
+        var saved = tx.execute(s -> meals.save(1, 0, edit(0, true)));
+        assertThat(saved.active()).isTrue();
+        assertThat(saved.groups().getFirst().options().getFirst().productName()).isEqualTo("Main");
+        assertThat(meals.catalog(1, false)).hasSize(1);
+        assertThatThrownBy(
+                        () ->
+                                meals.quote(
+                                        1,
+                                        new MealModels.Claim(
+                                                "disabled",
+                                                saved.id(),
+                                                saved.version(),
+                                                1,
+                                                List.of("main1", "side1"))))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

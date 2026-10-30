@@ -124,6 +124,38 @@ public class MealService {
         }
     }
 
+    /** Reads only 51 branch rows per request; inventory tables are not queried. */
+    public ProductPage adminProducts(long branchId, long afterId) {
+        long started = MethodTiming.start(MealService.class, "adminProducts(long,long)");
+        try {
+            authorize(branchId);
+            if (afterId < 0) throw new IllegalArgumentException("Use a nonnegative dish cursor.");
+            var rows =
+                    jdbc.query(
+                            "SELECT p.id,p.name,p.sale_mode,COALESCE(b.price_override,p.base_price)"
+                                + " price,COALESCE(p.minimum_weight_grams,250)"
+                                + " minimum_grams,COALESCE(p.weight_step_grams,50)"
+                                + " step_grams,(p.active AND b.available) available FROM"
+                                + " branch_products b JOIN products p ON p.id=b.product_id WHERE"
+                                + " b.branch_id=? AND p.id>? ORDER BY p.id LIMIT 51",
+                            (rs, n) ->
+                                    new Product(
+                                            rs.getLong("id"),
+                                            rs.getString("name"),
+                                            rs.getString("sale_mode"),
+                                            rs.getBigDecimal("price"),
+                                            rs.getInt("minimum_grams"),
+                                            rs.getInt("step_grams"),
+                                            rs.getBoolean("available")),
+                            branchId,
+                            afterId);
+            var page = List.copyOf(rows.subList(0, Math.min(50, rows.size())));
+            return new ProductPage(page, rows.size() > 50 ? page.get(page.size() - 1).id() : null);
+        } finally {
+            MethodTiming.finish(started, MealService.class, "adminProducts(long,long)");
+        }
+    }
+
     /** Returns a trusted meal quote; checkout independently repeats all validation. */
     public Quote quote(long branchId, Claim claim) {
         long started = MethodTiming.start(MealService.class, "quote(long,Claim)");
@@ -161,8 +193,35 @@ public class MealService {
                             edit.groups(),
                             edit.pricingMode(),
                             edit.maximumDiscount());
-            MealPolicy.validate(value, products(branchId, optionIds(value)));
-            String groups = mapper.writeValueAsString(edit.groups());
+            var facts = products(branchId, optionIds(value));
+            MealPolicy.validate(value, facts);
+            // Retain trusted names when a disabled dish is absent from the public menu.
+            var namedGroups =
+                    edit.groups().stream()
+                            .map(
+                                    g ->
+                                            new Group(
+                                                    g.key(),
+                                                    g.title(),
+                                                    g.titleHi(),
+                                                    g.minimum(),
+                                                    g.maximum(),
+                                                    g.options().stream()
+                                                            .map(
+                                                                    o ->
+                                                                            new Option(
+                                                                                    o.key(),
+                                                                                    o.productId(),
+                                                                                    o.quantity(),
+                                                                                    o.weightGrams(),
+                                                                                    o.upgrade(),
+                                                                                    facts.get(
+                                                                                                    o
+                                                                                                            .productId())
+                                                                                            .name()))
+                                                            .toList()))
+                            .toList();
+            String groups = mapper.writeValueAsString(namedGroups);
             // Serialize the 32-meal branch bound even when two admins create concurrently.
             var branches =
                     jdbc.queryForList(

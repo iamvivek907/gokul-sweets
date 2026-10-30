@@ -1,4 +1,6 @@
 "use client";
+import {inventoryToday,currentInventoryDate,nextInventoryMidnight} from "@/lib/inventoryDate";
+import {selectWorkspacePage,workspacePageSelected} from "@/lib/workspaceSelection";
 import AdminMeals from "@/components/admin/AdminMeals";
 import MenuContentQuality from "@/components/admin/MenuContentQuality";
 import StorefrontExperienceReport from "@/components/admin/StorefrontExperienceReport";
@@ -67,14 +69,7 @@ export default function MenuWorkspace() {
   const [mealEditorOpen,setMealEditorOpen]=useState(false);
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
   const [branch, setBranch] = useState<number | null>(null);
-  const [date, setDate] = useState(() =>
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Kolkata",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date()),
-  );
+  const [date, setDate] = useState(() => inventoryToday());
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [filter, setFilter] = useState("ALL");
@@ -131,6 +126,23 @@ export default function MenuWorkspace() {
     canStock = hasPermission("INVENTORY_MANAGE"),
     canView = hasPermission("INVENTORY_VIEW");
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const check = () => {
+      const today = inventoryToday();
+      if (date < today) {
+        setDate(today); setPage(0); setSelected([]); setBulk(false);
+        setEditor(current => current?.mode === "stock" ? null : current);
+        setNotice("Inventory date advanced to today (IST). Review today's stock before making changes.");
+      }
+      clearTimeout(timer); timer = setTimeout(check, nextInventoryMidnight());
+    };
+    const resume = () => { if (document.visibilityState === "visible") check(); };
+    timer = setTimeout(check, nextInventoryMidnight());
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", resume);
+    return () => { clearTimeout(timer); window.removeEventListener("focus", check); document.removeEventListener("visibilitychange", resume); };
+  }, [date]);
+  useEffect(() => {
     if (!profile || !authorization) return;
     const c = new AbortController();
     apiClient<{ id: number; name: string; active: boolean }[]>(
@@ -166,12 +178,12 @@ export default function MenuWorkspace() {
                   ? p.tab
                   : "items",
               );
-              if (/^\d{4}-\d{2}-\d{2}$/.test(p.date)) setDate(p.date);
+              setDate(currentInventoryDate(p.date));
               scrollRestore.current = p.scrollY || 0;
               if (p.branch === preferred) {
-                setEditor(p.editor || null);
+                setEditor(p.date < inventoryToday() && p.editor?.mode === "stock" ? null : p.editor || null);
                 setGroupEditor(p.groupEditor || null);
-                setSelected(p.selected || []);
+                setSelected(p.date < inventoryToday() ? [] : p.selected || []);
               }
             }
           } catch {}
@@ -546,6 +558,14 @@ export default function MenuWorkspace() {
               {selected.length} selected · {date} IST
             </span>
             <div className={styles.row}>
+              <button type="button"
+                disabled={!fresh || loading || bulkBusy || !data.content.length || workspacePageSelected(selected,data.content)}
+                onClick={() => setSelected(current => selectWorkspacePage(current,data.content))}>
+                Select all on this page
+              </button>
+              <button type="button" disabled={!selected.length || bulkBusy} onClick={() => setSelected([])}>
+                Clear selection
+              </button>
               <button
                 disabled={
                   !fresh ||

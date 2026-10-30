@@ -36,6 +36,7 @@ try{for(const width of [320,390,1280]){
    if(uploadFailure)return route.fulfill({status:400,headers,json:{message:'File content does not match its media type.'}});
    json={url:'https://images.example/meal.png',contentType:'image/png'};
   }
+  else if(path==='/api/admin/branches/1/meals/products')json={products:products.map(p=>({...p,minimumGrams:250,stepGrams:50,available:p.available})),nextAfter:null};
   else if(path==='/api/admin/branches/1/meals')json=[saved];
   else if(path==='/api/admin/branches/1/meals/1'){
    const input=request.postDataJSON();assert.equal(request.method(),'PUT');assert.equal(request.headers()['x-staff-csrf'],'test-csrf','meal saves carry the verified staff CSRF token');assert.equal(input.version,2);writes++;
