@@ -79,7 +79,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
    assert.ok(Math.abs(box.x+box.width/2-width/2)<=2,'desktop popup is horizontally centred');
    assert.ok(Math.abs(box.y+box.height/2-450)<=2,'desktop popup is vertically centred');
    const photo=await details.locator('.menu-details-photo').boundingBox();assert.ok(photo.height<=301&&photo.width<box.width,'photo is bounded inside padded content');
-   const close=details.getByRole('button',{name:'Close ×',exact:true});assert.ok((await close.boundingBox()).height>=44);
+   const close=details.getByRole('button',{name:/^Close(?: ×)?$/,exact:true});assert.ok((await close.boundingBox()).height>=44);
    await page.setViewportSize({width,height:540});
    assert.ok((await details.boundingBox()).height<=486+1,'short desktops keep the popup inside the viewport');
    await details.locator('.menu-details-help').scrollIntoViewIfNeeded();
@@ -89,7 +89,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   }
   await details.getByRole('term').filter({hasText:/^Selling price$/}).waitFor();assert.equal(await details.locator('.menu-comparison-price').innerText(),'₹30');
   await page.keyboard.press('Escape');await details.waitFor({state:'hidden'});assert.equal(await trigger.evaluate(node=>node===document.activeElement),true);
-  await page.getByRole('button',{name:'View details · Sweet 3',exact:true}).click();const fallback=page.getByRole('dialog',{name:'Sweet 3',exact:true});await fallback.locator('.menu-food-placeholder').waitFor();await fallback.getByRole('button',{name:'Close ×'}).click();
+  await page.getByRole('button',{name:'View details · Sweet 3',exact:true}).click();const fallback=page.getByRole('dialog',{name:'Sweet 3',exact:true});await fallback.locator('.menu-food-placeholder').waitFor();await fallback.getByRole('button',{name:/^Close(?: ×)?$/}).click();
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),original,'opening details never changes a cart');
   await page.evaluate(()=>document.documentElement.style.fontSize='200%');
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,'larger text stays within the viewport');
@@ -102,7 +102,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
   assert.ok(bounds.width>=cardBounds.width-2&&bounds.height>=cardBounds.height-2,'flag-OFF details target covers the card');
   const cart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
   await trigger.click();const popup=page.getByRole('dialog',{name:'Rasgulla',exact:true});await popup.waitFor();
-  await popup.getByRole('button',{name:'Close ×',exact:true}).click();await popup.waitFor({state:'hidden'});
+  await popup.getByRole('button',{name:/^Close(?: ×)?$/,exact:true}).click();await popup.waitFor({state:'hidden'});
   assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart,'flag-OFF details do not modify ordering');
  }
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

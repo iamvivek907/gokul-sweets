@@ -1,4 +1,5 @@
 "use client";
+import AdminMeals from "@/components/admin/AdminMeals";
 import MenuContentQuality from "@/components/admin/MenuContentQuality";
 import StorefrontExperienceReport from "@/components/admin/StorefrontExperienceReport";
 import Image from "next/image";
@@ -63,6 +64,7 @@ const empty: WorkspacePage = {
 };
 export default function MenuWorkspace() {
   const { profile, authorization, hasPermission } = useAdminAuth();
+  const [mealEditorOpen,setMealEditorOpen]=useState(false);
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
   const [branch, setBranch] = useState<number | null>(null);
   const [date, setDate] = useState(() =>
@@ -391,6 +393,7 @@ export default function MenuWorkspace() {
       {branch&&tab==="items"&&<MenuContentQuality items={data.content} onEdit={item=>setEditor({item,mode:"details"})}/>}
       {branch&&<StorefrontExperienceReport/>}
       {branch&&<BranchOrderingReadiness key={branch} branchId={branch}/>}
+      {branch&&tab==="items"&&<details className={styles.panel} onToggle={event=>setMealEditorOpen(event.currentTarget.open)}><summary>App-exclusive meals · prices, discounts & choices</summary>{mealEditorOpen&&<AdminMeals key={branch} branchId={branch}/>}</details>}
       <div className={styles.toolbar}>
         <label>
           Branch{" "}

@@ -66,7 +66,7 @@ public class OrderValidationService {
                         "validateCart(Long,List<CreateOrderItemRequest>)");
         try {
             validateBranch(branchId);
-            return validateProducts(branchId, normalizeItems(items));
+            return priceMeals(branchId, items, validateProducts(branchId, normalizeItems(items)));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -119,7 +119,7 @@ public class OrderValidationService {
             var requested = normalizeItems(items);
             var serviceAt = serviceWindows.pickupEvaluator(branchId, requested.keySet());
             var validated = validateProducts(branchId, requested, serviceAt.apply(null));
-            return new ValidatedPickupCart(validated, serviceAt);
+            return new ValidatedPickupCart(priceMeals(branchId, items, validated), serviceAt);
         } finally {
             MethodTiming.finish(
                     started,
@@ -127,6 +127,9 @@ public class OrderValidationService {
                     "validatePickupCartWithWindows(Long,List<CreateOrderItemRequest>)");
         }
     }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.gokulsweets.restaurant.meal.MealPricing mealPricing;
 
     // =========================================================
     // VALIDATE NEW ORDER
@@ -170,7 +173,11 @@ public class OrderValidationService {
                     branch.getId(),
                     pickupSlot.getId(),
                     items.size());
-            return new ValidatedOrderData(branch, pickupSlot, request.pickupType(), items);
+            return new ValidatedOrderData(
+                    branch,
+                    pickupSlot,
+                    request.pickupType(),
+                    priceMeals(branch.getId(), request.items(), items));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -313,7 +320,11 @@ public class OrderValidationService {
                     "Pending order update validation completed: orderId={}, normalizedItemCount={}",
                     order.getId(),
                     items.size());
-            return new ValidatedOrderData(branch, requestedPickupSlot, requestedPickupType, items);
+            return new ValidatedOrderData(
+                    branch,
+                    requestedPickupSlot,
+                    requestedPickupType,
+                    priceMeals(branch.getId(), requestedItems, items));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -834,4 +845,26 @@ public class OrderValidationService {
      * @param weightGrams the weight grams
      */
     private record RequestedOrderItem(Integer quantity, Integer weightGrams) {}
+
+    /** Revalidates optional meal selections without affecting ordinary item reads. */
+    private List<ValidatedOrderItem> priceMeals(
+            Long branchId, List<CreateOrderItemRequest> requested, List<ValidatedOrderItem> items) {
+        long started =
+                MethodTiming.start(
+                        OrderValidationService.class,
+                        "priceMeals(Long,List<CreateOrderItemRequest>,List<ValidatedOrderItem>)");
+        try {
+            if (requested.stream()
+                    .noneMatch(i -> i.mealSelections() != null && !i.mealSelections().isEmpty()))
+                return items;
+            if (mealPricing == null)
+                throw new IllegalStateException("Meal pricing is unavailable.");
+            return mealPricing.apply(branchId, requested, items);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    OrderValidationService.class,
+                    "priceMeals(Long,List<CreateOrderItemRequest>,List<ValidatedOrderItem>)");
+        }
+    }
 }

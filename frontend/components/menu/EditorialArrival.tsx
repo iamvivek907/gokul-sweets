@@ -123,18 +123,18 @@ export default function EditorialArrival({campaignsEnabled, accessible, branchEx
                     <Link href={occasionEnquiries ? "/occasions/branches" : "/branches"}><T text="Plan an occasion" /><LinkFeedback /></Link>
                 </div>
             </div>
-            <a className={styles.scrollCue} href="#gokul-branches" onClick={event => {
-                const target = document.getElementById("gokul-branches");
+            <a className={styles.scrollCue} href="#gokul-discovery" onClick={event => {
+                const target = document.getElementById("gokul-discovery");
                 if (!target) return;
                 event.preventDefault();
                 target.scrollIntoView({behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
-                window.history.replaceState(null, "", "#gokul-branches");
+                window.history.replaceState(window.history.state, "", "#gokul-discovery");
             }}>
                 <span className={styles.scrollCueText}><T text="Scroll to explore" /></span>
                 <span className={styles.scrollCueIcon} aria-hidden="true"><span /></span>
             </a>
         </section>
-        <HomeQuickActions/>
+        <div id="gokul-discovery" className={styles.discovery}><HomeQuickActions/></div>
         <section id="gokul-branches" className={styles.branches}>
             <div className={styles.sectionHead}>
                 <span><T text="OUR BRANCHES" /></span><h2><span className="arrival-desktop-copy"><T text="Your next visit starts here." /></span><span className="arrival-mobile-copy"><T text="Choose where you’ll collect"/></span></h2>

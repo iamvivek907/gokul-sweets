@@ -19,7 +19,7 @@ export async function downloadOrderInvoice(order: CustomerOrderResponse): Promis
         `Placed: ${formatBusinessTimestamp(order.createdAt, {day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"})} IST`,
         `Customer: ${order.customerName} (${order.maskedCustomerPhone})`, "Items",
         ...order.items.flatMap(item => [item.productName,
-            `${item.saleMode === "WEIGHT" ? formatWeight(item.weightGrams) : `${item.quantity} units`} @ ${money(item.unitPrice)}${item.saleMode === "WEIGHT" ? "/kg" : ""}   |   ${money(item.lineTotal)}`]), "Bill summary",
+            `${item.saleMode === "WEIGHT" ? formatWeight(item.weightGrams) : `${item.quantity} units`} @ ${money(item.unitPrice)}${item.saleMode === "WEIGHT" ? "/kg" : ""}   |   ${money(item.lineTotal)}`,...(Number(item.mealDiscount??0)>0?[`Included meal savings: -${money(Number(item.mealDiscount))} before item tax`]:[])]), "Bill summary",
         `Subtotal: ${money(order.subtotal)}`, ...(order.taxAmount > 0 ? [`Item tax: ${money(order.taxAmount)}`] : []),
         ...((order.convenienceFee ?? 0) > 0 ? [`Convenience fee: ${money(order.convenienceFee ?? 0)} (includes ${money(order.convenienceFeeTax ?? 0)} tax)`] : []),
         ...((order.paymentFee ?? 0) > 0 ? [`Online payment fee: ${money(order.paymentFee ?? 0)} (includes ${money(order.paymentFeeTax ?? 0)} tax)`] : []),

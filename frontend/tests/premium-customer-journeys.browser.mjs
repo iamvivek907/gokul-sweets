@@ -574,6 +574,7 @@ try {
       "failed facts cannot remain as stale ingredient claims",
     );
     await page.keyboard.press("Escape");
+    await detailsSheet.waitFor({state:"hidden"});
     if (width === 390) {
       await page.evaluate(() => scrollTo({ top: 0, behavior: "instant" }));
       await page.locator(".language-trigger").waitFor({ state: "visible" });

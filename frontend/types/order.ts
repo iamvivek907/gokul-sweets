@@ -27,6 +27,7 @@ export type OrderStatus =
 
 
 export interface CreateOrderItemRequest {
+    mealSelections?: import("./meal").MealClaim[];
     productId: number;
     quantity: number | null;
     weightGrams: number | null;
@@ -46,7 +47,7 @@ export interface CreateOrderRequest {
 }
 
 export interface CheckoutQuote {
-    items: {name: string; unitPrice: string; taxRate: string; taxAmount: string; total: string}[];
+    items: {name: string; unitPrice: string; taxRate: string; taxAmount: string; total: string;mealDiscount?:string;mealLabel?:string|null}[];
     subtotal: string;
     taxAmount: string;
     priorityCharge: string;
@@ -71,6 +72,8 @@ export interface UpdatePendingOrderRequest {
 
 
 export interface OrderItemResponse {
+    mealDiscount?: number;
+    mealLabel?: string|null;
     id: number;
     productId: number;
     productName: string;

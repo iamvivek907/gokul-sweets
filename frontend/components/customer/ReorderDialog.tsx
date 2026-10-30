@@ -45,6 +45,7 @@ export default function ReorderDialog({order,phone,features,compact,onClose}:{or
   Promise.all([apiClient<CustomerOrderResponse>(`/api/customer/identity/orders/${encodeURIComponent(order.orderNumber)}`,{credentials:"include",signal}),getMenu(order.branchId,signal),getBranch(order.branchId,signal)])
    .then(([detail,categories,currentBranch])=>{
     if(signal.aborted)return;if(!currentBranch.active||currentBranch.operational===false||currentBranch.pickupAvailable===false)throw new Error("This branch is not accepting pickup orders.");
+    if(detail.items.some(line=>line.productName.includes(" [Meal:")))throw new Error("Meal deals need fresh choices and prices. Build your meal again from the menu.");
     const menu=categories.flatMap(category=>category.products),unavailable:string[]=[];
     const lines=detail.items.flatMap(line=>{const product=menu.find(value=>value.id===line.productId&&value.saleMode===line.saleMode);
      if(!product){unavailable.push(line.productName);return [];}

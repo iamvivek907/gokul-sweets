@@ -15,18 +15,18 @@ import type {PortionGroup} from "@/lib/mobileMenu";
 import type {MenuProduct} from "@/types/menu";
 import type {ItemAvailability} from "@/services/availabilityApi";
 const money=menuMoney;
-export default function MenuVariantPicker({group,products,quantities,pickupItems,dateAware,pickupChecking,busyId,error,onAdd,onIncrease,onDecrease,onClose}:{group:PortionGroup;products:MenuProduct[];quantities:Record<number,number>;pickupItems?:ItemAvailability[];dateAware?:boolean;pickupChecking?:boolean;busyId?:number|null;error?:string;onAdd:(p:MenuProduct)=>void;onIncrease:(id:number)=>void;onDecrease:(id:number)=>void;onClose:()=>void}){
+export default function MenuVariantPicker({group,products,quantities,pickupItems,dateAware,pickupChecking,busyId,error,onAdd,onIncrease,onDecrease,onClose,returnFocusId}:{returnFocusId?:string;group:PortionGroup;products:MenuProduct[];quantities:Record<number,number>;pickupItems?:ItemAvailability[];dateAware?:boolean;pickupChecking?:boolean;busyId?:number|null;error?:string;onAdd:(p:MenuProduct)=>void;onIncrease:(id:number)=>void;onDecrease:(id:number)=>void;onClose:()=>void}){
+ const [returnFocus]=useState(()=>returnFocusId&&typeof document!=="undefined"?document.getElementById(returnFocusId):null);
  const [openedPickup]=useState(()=>dateAware?getPickupSlotSnapshot():"");
  const currentPickup=useSyncExternalStore(subscribeToPickupSlot,getPickupSlotSnapshot,getServerPickupSlotSnapshot);
  const clock=usePickupClock();
  const pickupChanged=!!dateAware&&(!clock||!pickerPickupMatches(openedPickup,currentPickup,new Date(clock)));
  const guard=(action:()=>void)=>{if(!dateAware||pickerPickupMatches(openedPickup,getPickupSlotSnapshot()))action();};
  const count=products.reduce((sum,p)=>sum+(quantities[p.id]??0),0),total=products.reduce((sum,p)=>sum+p.price*(quantities[p.id]??0),0);
- return <MenuDiscoverySheet title={group.title} className="menu-variant-sheet" onClose={onClose}>
+ return <MenuDiscoverySheet tactile returnFocusId={returnFocusId} restoreFocus={returnFocus} title={group.title} className="menu-variant-sheet" onClose={onClose} footer={close=><><strong>{count} <T text="selected"/> · {money(total)}</strong><button type="button" onClick={close}><T text="Done"/></button></>}>
   {pickupChanged&&<p role="alert"><T text="Pickup changed or expired. Close this popup and review the pickup before adding."/></p>}
   <p><T text="You can add more than one size or portion."/></p>
   <div className="menu-variant-list">{products.map(p=>{const unavailable=!p.available||(!!dateAware&&(pickupChanged||pickupChecking||pickupItems?.find(i=>i.productId===p.id)?.available!==true)),label=group.choices.find(c=>c.productId===p.id)?.label??p.name;return <article key={p.id}><div><DietaryLabel vegetarian={p.vegetarian}/><h3>{label}</h3><SaveDish inline productIds={[p.id]} name={p.name}/>{typeof p.comparisonPrice === "number"&&Number.isFinite(p.comparisonPrice)&&p.comparisonPrice>p.price?<><span className="sr-only"><T text="Regular price"/> </span><s className="menu-comparison-price">{money(p.comparisonPrice)}</s><span className="sr-only"> <T text="Selling price"/> </span><strong className="menu-sale-price">{money(p.price)}</strong></>:<strong>{money(p.price)}</strong>}{<details className="menu-variant-details"><summary><T text="About this size"/></summary><p>{p.description}</p><DishFacts productId={p.id}/></details>}{unavailable&&<p role="status"><span><T text={!p.available?"Currently unavailable":"Unavailable for selected pickup"}/></span>{p.available&&!pickupChecking&&<button type="button" className="pickup-attention-action" onClick={()=>requestMenuPickup(p.id,onClose)}><T text="Choose another pickup"/></button>}</p>}</div><MenuPurchaseControl name={`${group.title} ${label}`} quantity={quantities[p.id]??0} blocked={unavailable||(busyId!=null&&busyId!==p.id)} busy={busyId===p.id} onAdd={()=>guard(()=>quantities[p.id]>0?onIncrease(p.id):onAdd(p))} onDecrease={()=>onDecrease(p.id)}/></article>;})}</div>
   {error&&<p role="alert">{error}</p>}
-  <footer><strong>{count} <T text="selected"/> · {money(total)}</strong><button type="button" onClick={onClose}><T text="Done"/></button></footer>
  </MenuDiscoverySheet>;
 }

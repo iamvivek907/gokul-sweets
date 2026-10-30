@@ -1,4 +1,5 @@
 "use client";
+import MealCartSummary from "@/components/meal/MealCartSummary";
 import BrandLoading from "@/components/common/BrandLoading";
 import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
@@ -439,6 +440,7 @@ function CartContent() {
                                     "
                                 >
 
+                                    <MealCartSummary/>
                                     {
                                         items.map(
                                             item => (

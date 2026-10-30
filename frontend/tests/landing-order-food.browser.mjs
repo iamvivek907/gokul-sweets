@@ -20,7 +20,7 @@ try {
   });
   const links=page.getByRole('link',{name:'Order food',exact:true});
   const atBranches=()=>page.waitForFunction(()=>{const rect=document.getElementById('gokul-branches')?.getBoundingClientRect();return rect&&scrollY>100&&rect.top<innerHeight*.6&&rect.bottom>0;});
-  await page.goto(base);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await links.last().click();
+  await page.goto(base);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.getByRole('link',{name:'Scroll to explore'}).click();await atBranches();assert.equal(await page.locator('.home-quick-actions').count(),0,'a first visit has no selected-branch panel');await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await links.last().click();
   await page.waitForURL('**/branches');await atBranches();
   const historyLength=await page.evaluate(()=>history.length);
   let checked=0;

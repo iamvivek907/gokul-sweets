@@ -4,6 +4,7 @@ import type {
 
 
 export interface CartItem {
+    mealIdentity?: string;
     product: MenuProduct;
     quantity: number;
     weightGrams: number | null;
@@ -11,6 +12,8 @@ export interface CartItem {
 
 
 export interface CartState {
+    meals?: import("./meal").CartMeal[];
+    mealNotice?: string;
     branchId: number | null;
     items: CartItem[];
 }

@@ -242,6 +242,7 @@ public class RebateEligibilityService {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(RebateEligibilityService.class, "previewDraft(Order)");
         try {
+            if (order.getItems().stream().anyMatch(i -> i.getMealLabel() != null)) return List.of();
             LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
             List<Rebate> candidates =
                     rebateRepository.findActivePublicCandidates(order.getBranch().getId(), now);
@@ -322,6 +323,7 @@ public class RebateEligibilityService {
                         RebateEligibilityService.class,
                         "previewSpendTargets(Order,List<AvailableRebateResponse>)");
         try {
+            if (order.getItems().stream().anyMatch(i -> i.getMealLabel() != null)) return List.of();
             if (order.getPickupType() != com.gokulsweets.restaurant.order.enums.PickupType.NORMAL
                     || order.getFulfillmentType()
                             != com.gokulsweets.restaurant.order.enums.FulfillmentType.PICKUP)
@@ -983,6 +985,9 @@ public class RebateEligibilityService {
                         RebateEligibilityService.class,
                         "priceEligibleCode(Order,String,SelectionMode)");
         try {
+            if (order.getItems().stream().anyMatch(i -> i.getMealLabel() != null))
+                throw new IllegalArgumentException(
+                        "Meal deals cannot be combined with another offer or coin redemption.");
             String normalizedCode = rebateCode.trim().toUpperCase();
             Rebate rebate =
                     rebateRepository

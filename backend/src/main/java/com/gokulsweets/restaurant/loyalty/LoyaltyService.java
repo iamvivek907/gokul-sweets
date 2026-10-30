@@ -988,6 +988,11 @@ WHERE own.environment=? AND own.verified_subject_id=? AND o.loyalty_enrolled
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(LoyaltyService.class, "reserve(Order,String)");
         try {
+            if (code != null
+                    && !code.isBlank()
+                    && order.getItems().stream().anyMatch(i -> i.getMealLabel() != null))
+                throw invalid(
+                        "Meal deals cannot be combined with another offer or coin redemption.");
             if (!enabled()) {
                 if (code != null && !code.isBlank())
                     throw invalid(

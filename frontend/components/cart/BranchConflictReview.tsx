@@ -1,23 +1,31 @@
 "use client";
-import {T} from "@/lib/language";
+import {T,useTranslation} from "@/lib/language";
 
 import {useEffect, useState} from "react";
 import {useRouter} from "next/navigation";
 import {usePickupIntent} from "@/hooks/usePickupIntent";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
-import {getCartSnapshot, saveCart} from "@/lib/cartStorage";
+import {getCartSnapshot, parseCart, saveCart} from "@/lib/cartStorage";
 import {previewCartSwitch, type CartSwitchPreview} from "@/services/cartSwitchPreview";
+import {mealSavings,switchCartBranch} from "@/lib/cartMeals";
+import {menuMoney} from "@/lib/menuPresentationDetails";
 import type {CartItem} from "@/types/cart";
 
 export default function BranchConflictReview({branchId, items, removeItem, clearCart}: {
     branchId: number; items: CartItem[]; removeItem: (id: number) => void; clearCart: () => void;
 }) {
+    const translate=useTranslation();
     const router = useRouter();
     const features = useStorefrontFeatures();
     const {date} = usePickupIntent(branchId);
     const [result, setResult] = useState<{preview: CartSwitchPreview; cartSnapshot: string} | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [mealConsent,setMealConsent]=useState<string|null>(null);
+    const originalCart=result?parseCart(result.cartSnapshot):null;
+    const hasMeals=!!originalCart?.meals?.length;
+    const consentKey=result?JSON.stringify([branchId,result.cartSnapshot,result.preview]):null;
+    const acceptsRegularPrices=!!consentKey&&mealConsent===consentKey;
     const serviceDate = date ?? features?.today;
     useEffect(() => {
         if (!serviceDate || !items.length) return;
@@ -43,7 +51,7 @@ export default function BranchConflictReview({branchId, items, removeItem, clear
             const available = latest.lines.filter(line => line.orderable && line.proposed);
             if (!available.length || latest.availableSlots === 0) {setError("Choose another date or browse this branch's menu."); return;}
             if (latest.conflicts && !window.confirm("Remove unavailable items and keep only available items for this branch?")) return;
-            saveCart({branchId, items: available.map(line => ({...line.item, product: line.proposed!}))});
+            saveCart(switchCartBranch(parseCart(result.cartSnapshot),branchId,available.map(line => ({...line.item, product: line.proposed!})),acceptsRegularPrices));
         } catch {setError("Couldn't recheck this branch. Your original cart is unchanged.");}
         finally {setBusy(false);}
     }
@@ -52,6 +60,13 @@ export default function BranchConflictReview({branchId, items, removeItem, clear
     return <section aria-label="Review cart for selected branch" className="mt-4 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm">
         <h2 className="font-bold"><T text="Review items for this branch" /></h2>
         <p className="mt-1"><T text="Your original cart is saved. Checkout is paused until you confirm the items for this branch." /></p>
+        {result&&hasMeals&&<div className="mt-3 space-y-3 rounded-xl border border-amber-300 bg-white p-4" role="group" aria-label={translate("Meal price change")}>
+            <p className="font-semibold"><T text="Meal deals belong to your previous branch."/></p>
+            <p><T text="These dishes will use regular prices here. Build a new meal from this branch’s menu to use its meal deals."/></p>
+            <dl className="space-y-2"><div className="flex flex-wrap justify-between gap-2"><dt><T text="Current food subtotal"/></dt><dd className="font-bold">{menuMoney(Math.max(0,result.preview.oldSubtotal-mealSavings(originalCart?.meals)))}</dd></div><div className="flex flex-wrap justify-between gap-2"><dt><T text="Food subtotal at this branch"/></dt><dd className="font-bold">{menuMoney(result.preview.lines.filter(line=>line.orderable&&line.proposed).reduce((sum,line)=>sum+line.proposed!.price*(line.item.product.saleMode==='WEIGHT'?(line.item.weightGrams??0)/1000:line.item.quantity),0))}</dd></div></dl>
+            <p className="text-xs"><T text="Before item tax and checkout charges"/></p>
+            <label className="flex items-start gap-3"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-[#7a1625]" checked={acceptsRegularPrices} disabled={busy} onChange={event=>setMealConsent(event.target.checked?consentKey:null)}/><span><T text="I understand meal deals will be removed. Keep these dishes at regular prices."/></span></label>
+        </div>}
         {!result && !error && <p role="status" className="mt-2"><T text="Checking menu and stock..." /></p>}
         {result && <ul className="mt-3 space-y-2">{result.preview.lines.map(line =>
             <li key={line.item.product.id} className="rounded-lg bg-white p-3">
@@ -61,7 +76,7 @@ export default function BranchConflictReview({branchId, items, removeItem, clear
         {result?.preview.availableSlots === 0 && <p className="mt-2 font-semibold"><T text="No pickup time has capacity for this date. Choose another date." /></p>}
         {error && <p role="alert" className="mt-2 text-red-700">{error}</p>}
         <div className="mt-4 flex flex-wrap gap-4">
-            {result && result.preview.lines.some(line => line.orderable) && <button type="button" disabled={busy || result.preview.availableSlots === 0} onClick={() => void applyAvailableItems()} className="min-h-11 rounded-lg bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-50">{unavailable.length ? "Use available items" : "Confirm this branch"}</button>}
+            {result && result.preview.lines.some(line => line.orderable) && <button type="button" disabled={busy || result.preview.availableSlots === 0 || hasMeals&&!acceptsRegularPrices} onClick={() => void applyAvailableItems()} className="min-h-11 rounded-lg bg-[#7a1625] px-4 font-semibold text-white disabled:opacity-50">{hasMeals?<T text="Keep dishes at regular prices"/>:unavailable.length ? "Use available items" : "Confirm this branch"}</button>}
             {result && unavailable.length === result.preview.lines.length && <button type="button" onClick={() => {if (window.confirm("Clear the original cart and browse this branch's menu?")) {clearCart(); router.push("/menu");}}} className="min-h-11 font-bold text-[#7a1625] underline"><T text="Clear cart and choose again" /></button>}
         </div>
     </section>;

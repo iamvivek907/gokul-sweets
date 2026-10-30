@@ -28,7 +28,36 @@ public record OrderItemResponse(
         BigDecimal unitPrice,
         BigDecimal taxRate,
         BigDecimal taxAmount,
-        BigDecimal lineTotal) {
+        BigDecimal lineTotal,
+        BigDecimal mealDiscount,
+        String mealLabel) {
+
+    /** Preserves ordinary item response construction. */
+    public OrderItemResponse(
+            Long id,
+            Long productId,
+            String productName,
+            ProductSaleMode saleMode,
+            Integer quantity,
+            Integer weightGrams,
+            BigDecimal unitPrice,
+            BigDecimal taxRate,
+            BigDecimal taxAmount,
+            BigDecimal lineTotal) {
+        this(
+                id,
+                productId,
+                productName,
+                saleMode,
+                quantity,
+                weightGrams,
+                unitPrice,
+                taxRate,
+                taxAmount,
+                lineTotal,
+                BigDecimal.ZERO,
+                null);
+    }
 
     /**
      * Creates a order item response instance.

@@ -37,7 +37,7 @@ public class OrderItem {
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
 
-    @Column(name = "product_name", nullable = false, length = 200)
+    @Column(name = "product_name", nullable = false, length = 1000)
     private String productName;
 
     @Enumerated(EnumType.STRING)
@@ -63,6 +63,15 @@ public class OrderItem {
 
     @Column(name = "line_total", nullable = false, precision = 12, scale = 2)
     private BigDecimal lineTotal;
+
+    @Column(name = "meal_discount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal mealDiscount = BigDecimal.ZERO;
+
+    @Column(name = "meal_label", length = 500)
+    private String mealLabel;
+
+    @Column(name = "meal_details", columnDefinition = "text")
+    private String mealDetails;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

@@ -1,4 +1,7 @@
 "use client";
+import {adjustCartItems} from "@/lib/cartMeals";
+import MealCartSummary from "@/components/meal/MealCartSummary";
+import {availabilityItems} from "@/services/availabilityApi";
 import {T,useTranslation} from "@/lib/language";
 import LinkFeedback from "@/components/common/LinkFeedback";
 
@@ -757,8 +760,7 @@ export default function ReviewPage() {
     const initialPriceKey = branch && pickupSelection && customer && items.length
         ? JSON.stringify([{branchId: branch.id, pickupSlotId: pickupSelection.slot.id,
             pickupType: pickupSelection.pickupType, customerName: customer.name.trim()||"GOKUL_GUEST", customerPhone: customer.phone,
-            items: items.map(item => ({productId: item.product.id,
-                quantity: item.product.saleMode === "UNIT" ? item.quantity : null, weightGrams: item.weightGrams}))}, undefined])
+            items: availabilityItems(items)}, undefined])
         : "";
     const pendingOrderNumber = pendingOrder?.orderNumber;
     const visibleQuote=acceptedQuote&&initialPriceKey&&acceptedQuote.key===checkoutQuoteKey(JSON.parse(initialPriceKey)[0],pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch?.id?pendingOrderNumber:undefined)?acceptedQuote:null;
@@ -903,24 +905,7 @@ export default function ReviewPage() {
         }
 
 
-        const requestItems =
-            items.map(
-                item => ({
-                    productId:
-                        item.product.id,
-
-                    quantity:
-                        item.product.saleMode === "UNIT"
-                            ? item.quantity
-                            : null,
-
-                    weightGrams:
-                        item.product.saleMode === "WEIGHT"
-                            ? item.weightGrams
-                            : null
-                })
-            );
-
+        const requestItems=availabilityItems(items);
 
         const localPendingOrderCandidate =
             pendingOrder !== null
@@ -2122,6 +2107,7 @@ try {
                         "
                     >
 
+                        <MealCartSummary disabled={submitting||!!pendingOrder}/>
                         {
                             items.map(
                                 item => (
@@ -2399,7 +2385,7 @@ try {
                 }
 
 
-                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async(signal)=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:cart.items.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await refreshCurrentCheckoutQuote(request,number,signal);if(quote)setAcceptedQuote({key:checkoutQuoteKey(request,number),quote});}}/>}
+                {storefrontFeatures?.pickupAddOns && pickupSelection?.pickupType==="NORMAL" && branch && !preparedOrderNumber && <PickupAddOns key={`${branch.id}:${pickupSelection.date}`} branchId={branch.id} date={pickupSelection.date} disabled={submitting || pickupRecovery} onBusy={setAddonBusy} onAdjust={()=>setAdjustingCheckout(true)} onAdded={async(signal)=>{setAcceptedQuote(null);setQuoteNotice(null);setOrderError(null);setInventoryIssue(null);if(!quoteEnabled)return;const cart=parseCart(getCartSnapshot()),customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details.");const request={branchId:branch.id,pickupSlotId:pickupSelection.slot.id,pickupType:pickupSelection.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:availabilityItems(cart.items)};const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;const quote=await refreshCurrentCheckoutQuote(request,number,signal);if(quote)setAcceptedQuote({key:checkoutQuoteKey(request,number),quote});}}/>}
                 {/* Offers + final price */}
 
                 {storefrontFeatures?.simplifiedCheckout && !preparedOrderNumber && <p className="my-4 rounded-xl bg-[#e7f0e9] p-4 text-sm text-[#143936]"><T text="The best available offer is applied automatically. Add a little extra below if you like, then continue to payment."/></p>}
@@ -2554,7 +2540,26 @@ try {
                         )
                 }
 
-                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{const customer=parseCustomerDetails(getCustomerSnapshot());if(!customer)throw new Error("Check your contact details first.");const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:changedItems.map(i=>({productId:i.product.id,quantity:i.product.saleMode==="UNIT"?i.quantity:null,weightGrams:i.weightGrams}))};const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;if(number){const current=await getCustomerOrder(number);if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");}const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;saveCart({branchId:branch.id,items:changedItems});savePickupSlot(changedPickup);if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(changedItems)});setPriceRevision(value=>value+1);setAcceptedQuote(updated||!quote?null:{key:checkoutQuoteKey(request,number),quote});setInventoryIssue(null);setOrderError(null);}}/>}
+                {adjustingCheckout && <CheckoutAdjustmentDialog items={items} pickup={pickupSelection} branchId={branch.id} days={storefrontFeatures?.futureOrderingDays??30} message={inventoryIssue?inventoryIssue.items.filter(i=>!i.orderable).map(i=>`${i.productName}: requested ${i.inventoryUnit==="GRAM"?formatWeight(i.requestedQuantity):`${i.requestedQuantity} pieces`}; available ${i.inventoryUnit==="GRAM"?formatWeight(i.availableQuantity):`${i.availableQuantity} pieces`}. Reduce the quantity or choose another pickup.`).join(" "):orderError??undefined} onClose={()=>setAdjustingCheckout(false)} onApply={async(changedItems,changedPickup)=>{
+                    const customer=parseCustomerDetails(getCustomerSnapshot());
+                    if(!customer)throw new Error("Check your contact details first.");
+                    const cartSnapshot=getCartSnapshot(),pickupSnapshot=getPickupSlotSnapshot();
+                    const storedCart=parseCart(cartSnapshot);
+                    const adjustedCart=adjustCartItems(storedCart,branch.id,changedItems);
+                    const request={branchId:branch.id,pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,customerName:customer.name.trim()||"GOKUL_GUEST",customerPhone:customer.phone,items:availabilityItems(adjustedCart.items,adjustedCart)};
+                    const number=pendingOrder?.orderStatus==="PENDING_PAYMENT"&&pendingOrder.branchId===branch.id?pendingOrder.orderNumber:undefined;
+                    if(number){
+                        const current=await getCustomerOrder(number);
+                        if(current.orderStatus!=="PENDING_PAYMENT"||current.paymentStatus!=null)throw new Error("Review this order’s payment status before changing it.");
+                        if((current.items??[]).some(item=>item.mealLabel)&&!storedCart.meals?.length)throw new Error("This reserved meal needs its saved choices. Return to your original cart or cancel this order and rebuild the meal.");
+                    }
+                    const quote=quoteEnabled?await previewCheckoutQuote(request,number):null;
+                    if(cartSnapshot!==getCartSnapshot()||pickupSnapshot!==getPickupSlotSnapshot())throw new Error("Your cart or pickup changed elsewhere. Reopen adjustments.");
+                    const updated=number?await updatePendingCheckout(number,{pickupSlotId:changedPickup.slot.id,pickupType:changedPickup.pickupType,items:request.items,quoteToken:quote?.token}):null;
+                    saveCart(adjustedCart);savePickupSlot(changedPickup);
+                    if(updated&&pendingOrder)savePendingOrder({...pendingOrder,pickupSlotId:updated.pickupSlotId,totalAmount:updated.totalAmount,reservationExpiresAt:updated.reservationExpiresAt,cartFingerprint:createCartFingerprint(adjustedCart.items)});
+                    setPriceRevision(value=>value+1);setAcceptedQuote(updated||!quote?null:{key:checkoutQuoteKey(request,number),quote});setInventoryIssue(null);setOrderError(null);
+                }}/> }
                 {!preparedOrderNumber && <CheckoutMobileAction label={priceChecking ? translate("Checking your total…") : submitting ? translate("Checking…") : quoteEnabled && visibleQuote ? translate(storefrontFeatures?.simplifiedCheckout ? "Continue to payment" : "Review & reserve") : translate("Check price & offers")} amount={visibleQuote ? Number(visibleQuote.quote.totalAmount) : undefined} disabled={priceChecking || submitting || addonBusy || pickupRecovery || (accessible && !online)} onContinue={()=>void handlePlaceOrder()} />}
             </section>
 

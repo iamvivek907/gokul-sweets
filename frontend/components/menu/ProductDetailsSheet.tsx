@@ -15,7 +15,7 @@ export default function ProductDetailsSheet({product,onClose}:{product:MenuProdu
     const [failed,setFailed]=useState(false);
     const {details}=useMenuExperience();
     const previous=comparisonPrice(product);
-    return <MenuDiscoverySheet title={product.name} className="menu-product-details" onClose={onClose}>
+    return <MenuDiscoverySheet tactile title={product.name} className="menu-product-details" onClose={onClose}>
         <div className="menu-details-photo">{product.imageUrl&&!failed?<Image style={{objectPosition:dishPhotoPosition(details[product.id])}} src={product.imageUrl} alt={product.name} fill sizes="(max-width:640px) 90vw, 480px" className="object-cover" onError={()=>setFailed(true)}/>:<FoodPlaceholder/>}</div>
         <DietaryLabel vegetarian={product.vegetarian}/>
         <p className="menu-details-category">{product.categoryName}</p>
