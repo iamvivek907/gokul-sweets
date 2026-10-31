@@ -31,6 +31,25 @@
   "overrides": {
     "@next/eslint-plugin-next": {
       "fast-glob": "file:../../../tools/next-lint-glob"
+    },
+    "minimatch@>=4": "11.0.1",
+    "eslint": {
+      "minimatch": "file:../../tools/minimatch-compat"
+    },
+    "eslint-plugin-import": {
+      "minimatch": "file:../../tools/minimatch-compat"
+    },
+    "eslint-plugin-jsx-a11y": {
+      "minimatch": "file:../../tools/minimatch-compat"
+    },
+    "eslint-plugin-react": {
+      "minimatch": "file:../../tools/minimatch-compat"
+    },
+    "@eslint/config-array": {
+      "minimatch": "file:../../../tools/minimatch-compat"
+    },
+    "@eslint/eslintrc": {
+      "minimatch": "file:../../../tools/minimatch-compat"
     }
   }
 }

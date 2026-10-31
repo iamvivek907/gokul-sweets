@@ -22,6 +22,7 @@ try{for(const width of [320,390,640]){
   else if(path==='/api/reviews/product-summaries')json=route.request().postDataJSON().productIds.filter(id=>id===1||id===113).map(productId=>({productId,averageRating:4.4,ratingCount:5}));
   else if(path==='/api/menu/portion-groups')json={groups:[{key:'dahi',title:'Dahi',choices:dairy.map(p=>({productId:p.id,label:p.name.replace('Dahi ', '')}))}]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
+  else if(path.endsWith('/pickup-discovery'))json={today:date,maximumDate:date,dates:[{date,available:true,slots:[{slot,normalAvailable:true,priorityAvailable:false,issues:[]}]}]};
   else if(path.endsWith('/availability')){
    const body=route.request().postDataJSON();assert.ok(body.items.length<=100);if(url.searchParams.get('menuPreview')==='true'){assert.equal(body.days,1);requests.push(body.items);}else{assert.equal(body.days,31);assert.ok(body.items.some(item=>item.productId===113),'direct recovery checks the chosen unavailable item');}
    if(fail&&body.items.some(p=>p.productId===113))return route.fulfill({status:503,json:{message:'Unavailable'},headers});
@@ -46,6 +47,7 @@ try{for(const width of [320,390,640]){
  const blocked=page.locator('#gokul-product-113'),change=blocked.getByRole('button',{name:'Choose another pickup',exact:true});await change.scrollIntoViewIfNeeded();
  const savedPickup=await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),savedCart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
  await change.click();const pickupDialog=page.getByRole('dialog',{name:'Choose pickup date & time',exact:true});await pickupDialog.waitFor();
+ await pickupDialog.getByRole('button',{name:/18:00–19:00/}).waitFor();
  await pickupDialog.getByRole('button',{name:'Cancel',exact:true}).click();await pickupDialog.waitFor({state:'hidden'});
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-selected-pickup-slot')),savedPickup,'opening and cancelling recovery must preserve pickup');
  assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),savedCart,'pickup recovery must preserve cart');

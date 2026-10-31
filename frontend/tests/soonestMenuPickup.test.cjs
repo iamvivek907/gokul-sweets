@@ -7,15 +7,15 @@ const slot=(date,id,time='08:00:00',extra={})=>({slot:{id,branchId:1,slotDate:da
 const data=(dates)=>({today,maximumDate:'2026-10-15',dates});
 const day=(date,slots)=>({date,slots});
 const signal=()=>new AbortController().signal;
-test('soonest verifies service/stock rather than trusting discovery, and crosses into tomorrow',async()=>{
+test('empty-cart soonest chooses branch capacity even when every dish is unavailable',async()=>{
  const calls=[];const discovery=data([day(tomorrow,[slot(tomorrow,3)]),day(today,[slot(today,2,'11:00:00'),slot(today,1)])]);
  const first=await findSoonestMenuPickup(discovery,[1],today,7,async date=>{calls.push(date);return data([day(date,date===today?[{...slot(date,1),issues:[{productId:1,available:false}]},{...slot(date,2),issues:[{productId:1,available:false}]}]:[slot(date,3)])]);},signal(),now);
- assert.deepEqual(calls,[today,tomorrow]);assert.equal(first.date,tomorrow);assert.equal(first.slot.id,3);assert.equal(first.pickupType,'NORMAL');
+ assert.deepEqual(calls,[]);assert.equal(first.date,today);assert.equal(first.slot.id,1);assert.equal(first.pickupType,'NORMAL');
 });
 test('earliest eligible time wins and later dates are never queried unnecessarily',async()=>{
  let calls=0;const value=data([day(today,[slot(today,2,'11:00:00'),slot(today,1)]),day(tomorrow,[slot(tomorrow,3)])]);
  const first=await findSoonestMenuPickup(value,[1,2],today,7,async()=>{calls++;return value;},signal(),now);
- assert.equal(first.slot.id,1);assert.equal(calls,1);
+ assert.equal(first.slot.id,1);assert.equal(calls,0);
 });
 test('priority, elapsed slots, dates beyond window and server maximum are excluded',async()=>{
  let calls=0;const value=data([day(today,[slot(today,1,'08:00:00',{remainingCapacity:0,priorityEnabled:true,priorityRemainingCapacity:10})]),day('2026-10-20',[slot('2026-10-20',2)])]);
@@ -25,11 +25,11 @@ test('priority, elapsed slots, dates beyond window and server maximum are exclud
 });
 test('an outage cannot be mistaken for an empty day or skipped to a later date',async()=>{
  const value=data([day(today,[slot(today,1)]),day(tomorrow,[slot(tomorrow,2)])]);let calls=0;
- await assert.rejects(findSoonestMenuPickup(value,[1],today,7,async()=>{calls++;throw Error('offline');},signal(),now),/offline/);assert.equal(calls,1);
+ await assert.rejects(findSoonestMenuPickup(value,[1],today,7,async()=>{calls++;throw Error('offline');},signal(),now,true),/offline/);assert.equal(calls,1);
 });
 test('abort during verification never returns a candidate',async()=>{
  const c=new AbortController();const value=data([day(today,[slot(today,1)])]);
- await assert.rejects(findSoonestMenuPickup(value,[1],today,7,async()=>{c.abort();return value;},c.signal,now),{name:'AbortError'});
+ await assert.rejects(findSoonestMenuPickup(value,[1],today,7,async()=>{c.abort();return value;},c.signal,now,true),{name:'AbortError'});
 });
 function storage(){const map=new Map(),events=[];const localStorage={getItem:key=>map.get(key)??null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key)};
  const window={localStorage,dispatchEvent:event=>events.push(event.type)};

@@ -206,3 +206,5 @@
 @media (max-width:640px) {
  .future-storefront[data-premium-menu=true] .menu-pickup-notices button {min-height:44px;text-decoration:underline;font-weight:700}
 }
+
+.future-storefront .menu-leading-campaign{order:-10!important;min-width:0}
