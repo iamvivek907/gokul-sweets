@@ -417,3 +417,15 @@ Starting prices use the cheapest required options, and the builder updates price
 with selected portions, quantity and the per-meal discount cap. Existing fixed
 meals keep their price formula. Admin-created meals default to selected-dish
 pricing and omit manual base/upgrade fields in that mode.
+
+## October 31 pickup discovery and menu discovery motion
+
+Empty-cart pickup selection uses branch capacity and booking windows, independent
+of dish inventory. Item availability remains at dish/meal-choice level for the chosen
+time. Existing carts and checkout still require full inventory and preparation checks.
+Published menu campaigns lead the menu, above pickup and filter controls. Meal and
+campaign carousels support manual swipe, timed advance, dots and pause controls;
+stop auto-advance offscreen, in background tabs, during modal/keyboard/pointer
+interaction and for reduced motion. Hide the meal rail scrollbar, preserving scrolling.
+A colourful animated Build a meal shortcut beside Filters clears browse filters and
+reveals the meal cards. Its labels do not claim unconfigured savings or prices.

@@ -181,3 +181,6 @@
  :global(.future-storefront[data-premium-menu=true]) .slide .copy p{font-size:13px;line-height:1.45;margin:6px 0 10px}
  :global(.future-storefront[data-premium-menu=true]) .slide .copy button{font-size:13px;min-height:44px;padding:9px 14px}
 }
+
+.autoToggle{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:1px solid #e4d8d1;border-radius:50%;background:#fff9ee;color:#8f1838}.autoToggle:focus-visible{outline:3px solid #8f1838;outline-offset:2px}
+@media(max-width:640px){.carouselNavigation{justify-content:center;gap:8px}.carouselNavigation .hint{display:none}}
