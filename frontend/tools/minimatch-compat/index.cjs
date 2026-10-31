@@ -1,5 +1,6 @@
 // ESLint's older plugins call the module as a function. Use the patched engine,
 // retaining that interface and its named helpers without vendoring the old parser.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Legacy lint plugins load this CommonJS adapter.
 const core = require('minimatch-core');
 const api = core.minimatch;
 function minimatch(path, pattern, options) { return api(path, pattern, options); }
