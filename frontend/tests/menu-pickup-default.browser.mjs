@@ -25,6 +25,7 @@ try {for(const width of (process.env.BROWSER_WIDTH?[Number(process.env.BROWSER_W
   else if(path==='/api/menu')json=[{id:1,name:'Food',products:[products[0]]},{id:2,name:'Breakfast',products:[products[1]]},{id:3,name:'Sweets',products:[products[2]]}].map(c=>({...c,products:c.products.map(p=>({...p,availabilityRevision:revision}))}));
   else if(path==='/api/menu/portion-groups')json={groups:[]};
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
+  else if(path.endsWith('/pickup-discovery')&&mode==='outage')return route.fulfill({status:503,headers,json:{message:'Discovery unavailable'}});
   else if(path.endsWith('/pickup-discovery'))json={today,maximumDate:today,dates:[{date:today,available:true,slots:mode==='closed'?[]:[breakfast,lunch].map(base=>({slot:mode==='priority'?{...base,remainingCapacity:0,priorityEnabled:true,priorityRemainingCapacity:3}:base,normalAvailable:mode!=='priority',priorityAvailable:mode==='priority',issues:[]}))}]};
   else if(path.endsWith('/availability')){
    checks++;if(mode==='outage')return route.fulfill({status:503,headers,json:{message:'Unavailable'}});
