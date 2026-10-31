@@ -1,6 +1,6 @@
 const assert=require('node:assert/strict'),test=require('node:test'),fs=require('node:fs'),vm=require('node:vm'),ts=require('typescript');
 function moduleAt(file,require){const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports,require,Date,Intl,Set});return exports;}
-const freshness=moduleAt('lib/pickupFreshness.ts',()=>{}),{menuPickupOptions,cartPickupOptions}=moduleAt('lib/menuPickupOptions.ts',()=>freshness);
+const freshness=moduleAt('lib/pickupFreshness.ts',()=>{}),{menuPickupOptions,cartPickupOptions,branchPickupOptions}=moduleAt('lib/menuPickupOptions.ts',()=>freshness);
 const now=new Date('2026-10-04T03:00:00Z'); // 08:30 IST
 const slot=(id,time,extra={})=>({id,branchId:1,slotDate:'2026-10-04',startTime:time,endTime:'11:00:00',active:true,remainingCapacity:10,priorityEnabled:false,...extra});
 const value=slots=>({dates:[{date:'2026-10-04',slots}]});
@@ -18,3 +18,5 @@ test('cart choices require the server to approve the whole cart rather than one 
  const data=value([{slot:slot(1,'09:00:00'),normalAvailable:false,priorityAvailable:false,issues:[{productId:1,available:false}]},{slot:slot(2,'10:00:00'),normalAvailable:true,priorityAvailable:false},{slot:slot(3,'08:00:00'),normalAvailable:true}]);
  assert.deepEqual(Array.from(cartPickupOptions(data,now),o=>o.slot.id),[2]);
 });
+
+test('empty-cart branch choices ignore stock issues but honor capacity, closure and time',()=>{const data=value([{slot:slot(1,'09:00:00'),normalAvailable:false,issues:[{productId:1,available:false}]},{slot:slot(2,'09:30:00'),code:'PICKUP_WINDOW'},{slot:slot(3,'10:00:00',{remainingCapacity:0})},{slot:slot(4,'08:00:00'),normalAvailable:true}]);assert.deepEqual(Array.from(branchPickupOptions(data,now),o=>o.slot.id),[1]);assert.equal(cartPickupOptions(data,now).length,0);});

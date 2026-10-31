@@ -1,9 +1,9 @@
-import {menuPickupOptions,cartPickupOptions} from "./menuPickupOptions";
+import {menuPickupOptions,cartPickupOptions,branchPickupOptions} from "./menuPickupOptions";
 import {validPickupDate} from "./pickupFreshness";
 import type {CartAvailability} from "../services/availabilityApi";
 import type {PickupSelection} from "../types/pickup";
-/** Discovery is capacity-only. Validate each candidate date against the full menu,
- * sequentially, stopping at the first verified normal slot. Never skip a failed read. */
+/** Empty carts use branch discovery only. Existing carts still require a fresh
+ * whole-cart check for each candidate date; never skip failed verification. */
 export async function findSoonestMenuPickup(discovery: CartAvailability, ids: number[], today: string, days: number,
     check: (date: string) => Promise<CartAvailability>, signal: AbortSignal,
     now: () => Date = () => new Date(), cart = false): Promise<PickupSelection | null> {
@@ -11,7 +11,10 @@ export async function findSoonestMenuPickup(discovery: CartAvailability, ids: nu
         .sort((a,b) => a.date.localeCompare(b.date));
     for (const day of dates) {
         signal.throwIfAborted();
-        if (!menuPickupOptions({...discovery,dates:[day]},ids,now()).some(value => value.pickupType === "NORMAL")) continue;
+        const candidates = branchPickupOptions({...discovery,dates:[day]},now())
+            .filter(value=>value.pickupType === "NORMAL").sort((a,b)=>a.slot.startTime.localeCompare(b.slot.startTime));
+        if (!candidates.length) continue;
+        if (!cart) return candidates[0];
         const verified = await check(day.date);
         signal.throwIfAborted();
         const dayCheck = {...verified,dates:verified.dates.filter(value => value.date === day.date)};

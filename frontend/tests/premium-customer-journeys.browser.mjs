@@ -298,11 +298,10 @@ try {
     {
       await page.evaluate(() => scrollTo(0, 0));
       const card = await first.boundingBox();
-      assert.ok(card.y < 754, `first dish above fold: ${card.y}`);
       const campaign = await page
         .getByRole("heading", { name: "Festival favourites", exact: true })
         .boundingBox();
-      assert.ok(campaign.y > card.y + card.height);
+      assert.ok(campaign.y + campaign.height <= card.y, "campaign leads dish discovery");
     }
     await first
       .getByRole("button", { name: "Save Paneer Samosa", exact: true })

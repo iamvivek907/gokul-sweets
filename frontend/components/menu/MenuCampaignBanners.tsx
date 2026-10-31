@@ -1,5 +1,6 @@
 /* eslint-disable @next/next/no-img-element -- Managed media uses the saved crop and public URL. */
 "use client";
+import {useCarouselAutoplay} from "@/hooks/useCarouselAutoplay";
 import {useEffect, useLayoutEffect, useRef, useState} from "react";
 import {useLanguage, translate} from "@/lib/language";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
@@ -77,6 +78,7 @@ function CampaignCarousel({slides, reduced, locale, compact, render,position,onP
     const viewport = useRef<HTMLDivElement>(null);
     const [initialPosition]=useState(()=>Math.max(0,Math.min(slides.length-1,position)));
     const [active, setActive] = useState(initialPosition);
+    const [paused,setPaused]=useState(false);
     // Category filtering can remount this discovery slot. Restore the branch/content position
     // before paint, without replaying an entrance scroll or resetting the selected slide.
     useLayoutEffect(()=>{
@@ -90,6 +92,7 @@ function CampaignCarousel({slides, reduced, locale, compact, render,position,onP
         pendingTarget.current = index;
         if (target && viewport.current) viewport.current.scrollTo({left: target.offsetLeft - (viewport.current.children[0] as HTMLElement).offsetLeft, behavior: reduced ? "instant" : "smooth"});
     };
+    useCarouselAutoplay(viewport,slides.length,()=>go((active+1)%slides.length),paused||reduced);
     return <section className={`${styles.carousel} ${compact ? styles.compactCarousel : ""}`} aria-label="Published menu banners" aria-roledescription={locale === "hi" ? "कैरसेल" : "carousel"}>
         <div ref={viewport} className={styles.viewport} tabIndex={slides.length > 1 ? 0 : undefined} aria-label={locale === "hi" ? "श्रेणियाँ देखने के लिए स्वाइप करें" : "Swipe to explore categories"}
             onKeyDown={event => {if (event.target !== event.currentTarget) return; if (event.key === "ArrowRight") {event.preventDefault(); go(Math.min((pendingTarget.current ?? active) + 1, slides.length - 1));} if (event.key === "ArrowLeft") {event.preventDefault(); go(Math.max((pendingTarget.current ?? active) - 1, 0));}}}
@@ -110,8 +113,9 @@ function CampaignCarousel({slides, reduced, locale, compact, render,position,onP
         {slides.length > 1 && <div className={styles.carouselNavigation}>
             <span className={styles.hint}>{locale === "hi" ? "हर खुशी का स्वाद" : "A little more to celebrate"}</span>
             <div className={styles.dots} aria-label={locale === "hi" ? "बैनर चुनें" : "Choose a banner"}>{slides.map((slide,index) => <button key={slide.key} type="button" aria-label={`${locale === "hi" ? "बैनर" : "Show banner"} ${index + 1}`} aria-current={index === active ? "true" : undefined} onClick={() => go(index)}><span /></button>)}</div>
+            <button className={styles.autoToggle} type="button" data-carousel-rotation="true" aria-label={paused?(locale==="hi"?"बैनर अपने आप बदलें":"Resume banner carousel"):(locale==="hi"?"बैनर बदलना रोकें":"Pause banner carousel")} onClick={()=>setPaused(p=>!p)}>{paused?"▶":"Ⅱ"}</button>
             <div className={styles.arrows}><button type="button" aria-label={locale === "hi" ? "पिछला बैनर" : "Previous banner"} disabled={active === 0} onClick={() => go((pendingTarget.current ?? active) - 1)}>←</button><button type="button" aria-label={locale === "hi" ? "अगला बैनर" : "Next banner"} disabled={active === slides.length - 1} onClick={() => go((pendingTarget.current ?? active) + 1)}>→</button></div>
-            <span className={styles.srOnly} aria-live="polite">{active + 1} / {slides.length}</span>
+            <span className={styles.srOnly} aria-live={paused||reduced?"polite":"off"}>{active + 1} / {slides.length}</span>
         </div>}
     </section>;
 }

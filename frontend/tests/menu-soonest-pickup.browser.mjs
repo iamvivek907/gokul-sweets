@@ -27,6 +27,8 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/pickup-discovery')){
    discoveries++;
+   if(hold){hold=false;await new Promise(resolve=>{release=resolve;});}
+   if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
    json={today,maximumDate:later,dates:[today,tomorrow,later].map((date,index)=>({date,slots:[{slot:slot(date,index+1),normalAvailable:true,issues:[]}]}))};
   }else if(path.endsWith('/availability')){
    const date=request.postDataJSON().startDate;checks.push(date);

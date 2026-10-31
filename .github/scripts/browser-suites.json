@@ -23,6 +23,7 @@
     "tests/branch-loading-reviews.browser.mjs"
   ],
   "menu": [
+    "tests/menu-capacity-carousel.browser.mjs",
     "tests/meals.browser.mjs",
     "tests/selected-meals.browser.mjs",
     "tests/meal-checkout-branches.browser.mjs",

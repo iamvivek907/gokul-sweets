@@ -655,14 +655,18 @@ class OrderCorrectionIntegrationTest {
     }
 
     long rebate() {
+        // Offer previews use the business wall clock, independently of inventoryClock.
+        // Keep this concurrency fixture active regardless of the day CI runs.
+        var now = LocalDateTime.now(ZoneId.of("Asia/Kolkata"));
         return jdbc.queryForObject(
                 "INSERT INTO"
                     + " rebates(code,name,scope,rebate_type,rebate_value,branch_id,valid_from,valid_until,created_by)"
-                    + " VALUES (?,'Visit offer','GENERAL','FIXED_AMOUNT',5,?,TIMESTAMP '2026-10-01"
-                    + " 00:00:00',TIMESTAMP '2026-10-31 00:00:00',?) RETURNING id",
+                    + " VALUES (?,'Visit offer','GENERAL','FIXED_AMOUNT',5,?,?,?,?) RETURNING id",
                 Long.class,
                 reference,
                 source,
+                java.sql.Timestamp.valueOf(now.minusDays(1)),
+                java.sql.Timestamp.valueOf(now.plusDays(1)),
                 staff.getCurrentStaff().getId());
     }
 

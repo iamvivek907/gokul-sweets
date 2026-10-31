@@ -20,7 +20,7 @@ import {clearPickupSlot, getPickupSlotSnapshot, savePickupSlot} from "@/lib/chec
 import {getCartSnapshot} from "@/lib/cartStorage";
 import {getStoredBranchSnapshot} from "@/lib/branchStorage";
 import {findSoonestMenuPickup} from "@/lib/soonestMenuPickup";
-import {menuPickupOptions} from "@/lib/menuPickupOptions";
+import {branchPickupOptions} from "@/lib/menuPickupOptions";
 import {getMenuPickupModeSnapshot} from "@/lib/menuPickupMode";
 import type {CartSwitchPreview} from "@/services/cartSwitchPreview";
 import type {MenuProduct} from "@/types/menu";
@@ -135,12 +135,12 @@ export function useDateAvailability(products?: MenuProduct[]) {
     // Match the date-intent snapshot guard below: date-only changes must abort
     // the old verification and start a new one, even when slot/mode stay equal.
     const autoKey = JSON.stringify([branch?.id,today,features?.futureOrderingDays,itemsJson,intent.dateRaw,intent.pickupRaw,intent.modeRaw,revision,menuRevision,choosing,cart.isEmpty]);
-    const selectedStillFits = !!data && !!intent.selection && menuPickupOptions(data,candidates.map(item=>item.productId))
+    const selectedStillFits = !!data && !!intent.selection && branchPickupOptions(data)
         .some(value=>value.date===intent.selection?.date && value.slot.id===intent.selection.slot.id && value.pickupType==="NORMAL");
     const pendingCheckout = !!clock && (!!localStorage.getItem("gokul-pending-order") || !!localStorage.getItem("gokul-pending-payment") || !!sessionStorage.getItem("gokul-mobile-order-attempt"));
-    const needsAutomatic = !!features?.smartAvailability && candidates.length > 0 && !pendingCheckout && !!clock && menuPreview && (intent.automatic || intent.expired) && (cart.isEmpty || cart.branchId===branch?.id&&(!intent.selection||intent.expired)) && !choosing && (!intent.selection || !validDate || (!!data && !selectedStillFits));
+    const needsAutomatic = !!features?.smartAvailability && (candidates.length > 0 || cart.isEmpty) && !pendingCheckout && !!clock && menuPreview && (intent.automatic || intent.expired) && (cart.isEmpty || cart.branchId===branch?.id&&(!intent.selection||intent.expired)) && !choosing && (!intent.selection || !validDate || (!!data && !selectedStillFits));
     useEffect(() => {
-        if (!needsAutomatic || !branch || !features?.smartAvailability || !today || !Number.isInteger(features.futureOrderingDays) || !candidates.length) return;
+        if (!needsAutomatic || !branch || !features?.smartAvailability || !today || !Number.isInteger(features.futureOrderingDays)) return;
         const pending = () => !!localStorage.getItem("gokul-pending-order") || !!localStorage.getItem("gokul-pending-payment") || !!sessionStorage.getItem("gokul-mobile-order-attempt");
         if (pending()) return;
         const actualCart=cart.branchId===branch.id?availabilityItems(cart.items):[];

@@ -20,3 +20,12 @@ export function cartPickupOptions(data:CartAvailability,now=new Date()):PickupSe
   return [...(value.normalAvailable?[{...base,pickupType:"NORMAL" as const}]:[]),...(value.priorityAvailable?[{...base,pickupType:"PRIORITY" as const}]:[])];
  }));
 }
+
+/** Empty-cart browsing chooses branch capacity independently of dish inventory. */
+export function branchPickupOptions(data:CartAvailability,now=new Date()):PickupSelection[]{
+ return data.dates.flatMap(day=>day.slots.flatMap(value=>{
+  const base={date:day.date,slot:value.slot};
+  if(value.code==='PICKUP_WINDOW'||!pickupIsFresh({...base,pickupType:'NORMAL'},now))return [];
+  return [...(value.slot.remainingCapacity>0?[{...base,pickupType:'NORMAL' as const}]:[]),...(value.slot.priorityEnabled&&value.slot.priorityRemainingCapacity>0?[{...base,pickupType:'PRIORITY' as const}]:[])];
+ }));
+}

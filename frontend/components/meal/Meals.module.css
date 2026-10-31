@@ -4,3 +4,8 @@
 .prices{display:inline-flex;align-items:center;flex-wrap:wrap;gap:7px;font-variant-numeric:tabular-nums}.prices s{color:#74676b;font-size:.85em;font-weight:500}.salePrice{display:inline-block;background:#ffdc31!important;color:#241715!important;padding:2px 5px;border-radius:3px;font-weight:800;line-height:1.25}.startingPrice{display:flex;align-items:center;flex-wrap:wrap;gap:5px}.addMeal .prices s{color:#fff!important;font-size:12px}.addMeal .prices{justify-content:center;gap:5px}.addMeal .prices strong{font-size:inherit}
 
 .priceReview{margin-bottom:16px;padding:14px;border:1px solid #e9c76c;border-radius:12px;background:#fff8dd;color:#573d14;font-size:13px;line-height:1.5}.priceReview strong{display:block;font-size:15px}.priceReview p{margin:6px 0 0}
+
+.rail{scrollbar-width:none}.rail::-webkit-scrollbar{display:none}.carouselControls{display:none}
+@media(max-width:640px){.carouselControls{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:6px}.carouselControls>div{display:flex;align-items:center;gap:0}.carouselControls button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:44px;border:0;background:transparent;color:#8f1838;padding:8px}.carouselControls>button{min-width:44px}.carouselControls span{width:7px;height:7px;border-radius:20px;background:#cfbcc2}.carouselControls [aria-current=true] span{width:20px;background:#8f1838}.carouselControls button:focus-visible{outline:2px solid #8f1838;outline-offset:1px}}
+
+.collection{scroll-margin-top:calc(var(--menu-header-height,100px) + 16px)}.carouselControls>div{min-width:0;overflow-x:auto;scrollbar-width:none}.carouselControls>div::-webkit-scrollbar{display:none}.carouselControls button{flex-shrink:0}
