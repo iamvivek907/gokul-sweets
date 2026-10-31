@@ -9,7 +9,8 @@ export function useCarouselAutoplay(ref:RefObject<HTMLElement|null>,count:number
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');
   let timer:ReturnType<typeof setTimeout>,visible=false,hover=false,drag=false,cooldown=0;
   const tick=()=>{
-   if(visible&&!reduced.matches&&document.visibilityState==='visible'&&!hover&&!drag&&!node.parentElement?.contains(document.activeElement)&&!document.querySelector('dialog[open]')&&Date.now()>=cooldown&&node.scrollWidth>node.clientWidth+2)callback.current();
+   const rotationFocused=document.activeElement?.getAttribute('data-carousel-rotation')==='true';
+   if(visible&&!reduced.matches&&document.visibilityState==='visible'&&!hover&&!drag&&(!node.parentElement?.contains(document.activeElement)||rotationFocused)&&!document.querySelector('dialog[open]')&&Date.now()>=cooldown&&node.scrollWidth>node.clientWidth+2)callback.current();
    timer=setTimeout(tick,4500);
   };
   const enter=(e:PointerEvent)=>{if(e.pointerType==='mouse')hover=true;};
