@@ -75,6 +75,7 @@ try{for(const width of [320,390,1280]){
  assert.match(await firstDish.locator('option[value="2"]').innerText(),/Paneer Burger/);
  await admin.getByRole('button',{name:'Cancel edit',exact:true}).click();hideAllProducts=false;
  // A parked workspace follows IST midnight and also clamps yesterday on restoration.
+ await page.evaluate(()=>sessionStorage.removeItem('menu-workspace:77'));
  await page.clock.install({time:new Date('2026-10-30T18:29:59Z')});
  await page.goto(base+'/admin/menu/workspace');const inventoryDate=page.getByLabel('Inventory date · IST',{exact:false});
  await inventoryDate.waitFor();assert.equal(await inventoryDate.inputValue(),'2026-10-30');await page.clock.fastForward(2000);
