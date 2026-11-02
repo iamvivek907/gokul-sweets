@@ -78,3 +78,7 @@ html:has(.future-storefront)::-webkit-scrollbar,.future-storefront :is(.mobile-m
 @media(prefers-reduced-motion:reduce){.menu-search-premium .menu-search-example-word{animation:none}.future-storefront[data-customer-design=reference] .menu-search-premium .menu-search-input{transition:none}}
 
 .future-storefront[data-customer-design=reference] .menu-search-premium .menu-search-legacy-icon{display:none}
+
+/* Give Add a visible press response even on browsers without vibration support. */
+.future-storefront[data-customer-route="/menu"] :is(button[data-ordering-target=add],.menu-purchase-control>button,.menu-group-control):enabled:active{filter:brightness(.93);scale:.97}
+@media(prefers-reduced-motion:reduce){.future-storefront[data-customer-route="/menu"] :is(button[data-ordering-target=add],.menu-purchase-control>button,.menu-group-control):enabled:active{scale:1}}
