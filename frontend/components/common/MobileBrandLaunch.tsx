@@ -8,6 +8,7 @@ import {T} from "@/lib/language";
 import ReferenceWordmark from "@/components/layout/ReferenceWordmark";
 import "./MobileBrandLaunch.css";
 
+let entranceShown=false;
 const subscribeHydration=()=>()=>{};
 const hydratedSnapshot=()=>true;
 const serverSnapshot=()=>false;
@@ -37,9 +38,9 @@ export default function MobileBrandLaunch() {
         const resume = () => {
             if (document.visibilityState === "hidden") {hiddenAt = Date.now(); close();}
             // A long app resume gets the welcome; returning from a payment app does not.
-            else if (hiddenAt && Date.now() - hiddenAt > 60_000 && !/^\/(checkout|orders)(\/|$)/.test(location.pathname)) show();
+            else if (hiddenAt) hiddenAt=0;
         };
-        if (!/^\/(checkout\/payment|orders\/)/.test(entryPath.current)) show();
+        if (!entranceShown && !/^\/(checkout|orders)(\/|$)/.test(entryPath.current)) {entranceShown=true;show();}
         document.addEventListener("visibilitychange", resume);
         return () => {close(); document.removeEventListener("visibilitychange", resume);};
     }, [staff]);

@@ -60,7 +60,11 @@ final class RebateSpendBasis {
                                 .subtract(zero(item.getTaxAmount()))
                                 .max(BigDecimal.ZERO);
                 goods = goods.add(subtotal);
-                if (includes(rebate, item.getProduct())) included = included.add(subtotal);
+                if (includes(rebate, item.getProduct()))
+                    included =
+                            included.add(
+                                    com.gokulsweets.restaurant.meal.MealSpendBasis
+                                            .standaloneSubtotal(item));
             }
             if (goods.signum() <= 0 || included.signum() <= 0) return BigDecimal.ZERO.setScale(2);
             // Allocate an order-level loyalty discount proportionally across all product spend.
@@ -96,7 +100,11 @@ final class RebateSpendBasis {
                                 .subtract(zero(item.getTaxAmount()))
                                 .max(BigDecimal.ZERO);
                 goods = goods.add(subtotal);
-                if (includes(rebate, item.getProduct())) included = included.add(subtotal);
+                if (includes(rebate, item.getProduct()))
+                    included =
+                            included.add(
+                                    com.gokulsweets.restaurant.meal.MealSpendBasis
+                                            .standaloneSubtotal(item));
             }
             BigDecimal discount =
                     order.isLoyaltyEnrolled()

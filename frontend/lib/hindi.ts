@@ -1,4 +1,13 @@
 export const hindi: Record<string,string> = {
+"Your upcoming orders":"आपके आगामी ऑर्डर",
+"View all":"सभी देखें",
+"View":"देखें",
+"View all orders":"सभी ऑर्डर देखें",
+"Open for latest status":"नवीनतम स्थिति के लिए खोलें",
+"Meal added to your cart.":"मील कार्ट में जोड़ दिया गया।",
+"meal":"मील",
+"meals":"मील",
+"Offers apply to eligible extra items. Earned coins can also be used on meals.":"ऑफ़र पात्र अतिरिक्त वस्तुओं पर लागू हैं। कमाए गए कॉइन मील पर भी इस्तेमाल कर सकते हैं।",
  "A required group has too few available dishes. Choose another pickup time or try later.":"ज़रूरी समूह में पर्याप्त व्यंजन उपलब्ध नहीं हैं। दूसरा पिकअप समय चुनें या बाद में कोशिश करें।",
  "Find a dish without losing your place.":"अपनी जगह खोए बिना पसंद का व्यंजन खोजें।",
  "Show results":"नतीजे देखें",

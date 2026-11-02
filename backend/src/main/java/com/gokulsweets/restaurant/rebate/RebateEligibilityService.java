@@ -242,7 +242,6 @@ public class RebateEligibilityService {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(RebateEligibilityService.class, "previewDraft(Order)");
         try {
-            if (order.getItems().stream().anyMatch(i -> i.getMealLabel() != null)) return List.of();
             LocalDateTime now = LocalDateTime.now(BUSINESS_ZONE);
             List<Rebate> candidates =
                     rebateRepository.findActivePublicCandidates(order.getBranch().getId(), now);
@@ -323,7 +322,6 @@ public class RebateEligibilityService {
                         RebateEligibilityService.class,
                         "previewSpendTargets(Order,List<AvailableRebateResponse>)");
         try {
-            if (order.getItems().stream().anyMatch(i -> i.getMealLabel() != null)) return List.of();
             if (order.getPickupType() != com.gokulsweets.restaurant.order.enums.PickupType.NORMAL
                     || order.getFulfillmentType()
                             != com.gokulsweets.restaurant.order.enums.FulfillmentType.PICKUP)
@@ -355,7 +353,9 @@ public class RebateEligibilityService {
                     if (rebate.getMaximumDiscountAmount() != null)
                         saving = saving.min(rebate.getMaximumDiscountAmount());
                     var needed =
-                            RebateSpendBasis.restricted(rebate)
+                            (RebateSpendBasis.restricted(rebate)
+                                            || com.gokulsweets.restaurant.meal.MealSpendBasis
+                                                    .hasMeals(order))
                                     ? RebateSpendBasis.additionalSpend(order, rebate, threshold)
                                     : threshold.subtract(eligible);
                     if (saving.compareTo(baseline) > 0
@@ -621,7 +621,9 @@ public class RebateEligibilityService {
                 nextMinimum = nextSlab.getMinimumOrderAmount();
                 nextRebate = nextSlab.getRebateAmount();
                 amountNeeded =
-                        RebateSpendBasis.restricted(rebate)
+                        (RebateSpendBasis.restricted(rebate)
+                                        || com.gokulsweets.restaurant.meal.MealSpendBasis.hasMeals(
+                                                order))
                                 ? RebateSpendBasis.additionalSpend(order, rebate, nextMinimum)
                                 : nextMinimum
                                         .subtract(eligibleAmount)
@@ -766,7 +768,8 @@ public class RebateEligibilityService {
                 MethodTiming.start(
                         RebateEligibilityService.class, "calculateEligibleAmount(Order,Rebate)");
         try {
-            return RebateSpendBasis.restricted(rebate)
+            return (RebateSpendBasis.restricted(rebate)
+                            || com.gokulsweets.restaurant.meal.MealSpendBasis.hasMeals(order))
                     ? RebateSpendBasis.eligible(order, rebate)
                     : calculateEligibleAmount(order);
 
@@ -985,9 +988,6 @@ public class RebateEligibilityService {
                         RebateEligibilityService.class,
                         "priceEligibleCode(Order,String,SelectionMode)");
         try {
-            if (order.getItems().stream().anyMatch(i -> i.getMealLabel() != null))
-                throw new IllegalArgumentException(
-                        "Meal deals cannot be combined with another offer or coin redemption.");
             String normalizedCode = rebateCode.trim().toUpperCase();
             Rebate rebate =
                     rebateRepository

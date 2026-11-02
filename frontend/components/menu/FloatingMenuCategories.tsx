@@ -11,14 +11,16 @@ export default function FloatingMenuCategories({categories,selectedId,hasCart,on
         const navigation=document.querySelector<HTMLElement>(".customer-bottom-navigation");
         const update=()=>{
             setCartHeight(dock?Math.ceil(dock.getBoundingClientRect().height):0);
-            setBottom(Math.ceil(dock?innerHeight-dock.getBoundingClientRect().top+12:(navigation?.offsetHeight??56)+12));
+            const tracker=document.querySelector<HTMLElement>(".active-order-shortcut");
+            setBottom(Math.ceil(Math.max(dock?innerHeight-dock.getBoundingClientRect().top+12:0,tracker?innerHeight-tracker.getBoundingClientRect().top+12:0,(navigation?.offsetHeight??56)+12)));
         };
         const observer=new ResizeObserver(update);
         if(dock)observer.observe(dock);
         if(navigation)observer.observe(navigation);
+        const mutations=new MutationObserver(update);mutations.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["style"]});
         window.addEventListener("resize",update);
         queueMicrotask(update);
-        return()=>{observer.disconnect();window.removeEventListener("resize",update);};
+        return()=>{mutations.disconnect();observer.disconnect();window.removeEventListener("resize",update);};
     },[hasCart]);
     function select(id:number|null){setOpen(false);onSelect(id);}
     return <div className="menu-floating-categories" style={{"--floating-cart-height":`${cartHeight}px`,"--floating-menu-bottom":`${bottom}px`} as CSSProperties}>

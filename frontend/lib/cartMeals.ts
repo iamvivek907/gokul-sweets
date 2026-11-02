@@ -75,3 +75,17 @@ export function mealStartingEstimate(meal:MealDefinition,products:MealProducts){
  }).slice(0,group.minimum).map(option=>option.key));
  return mealEstimate(meal,keys,1,products);
 }
+/** Visible standalone lines exclude meal portions, including extra units of the same product. */
+export function standaloneCartItems(cart:Pick<CartState,'items'|'meals'>):CartItem[]{
+ const demand=new Map<number,number>();
+ for(const meal of cart.meals??[])for(const part of meal.components)demand.set(part.productId,(demand.get(part.productId)??0)+(part.weightGrams??part.quantity));
+ return cart.items.flatMap(item=>{const amount=(item.product.saleMode==='WEIGHT'?item.weightGrams??0:item.quantity)-(demand.get(item.product.id)??0);return amount<=0?[]:[item.product.saleMode==='WEIGHT'?{...item,weightGrams:amount}:{...item,quantity:amount}];});
+}
+/** Edits only independently ordered portions; included meal quantities never change here. */
+export function editStandalone(cart:CartState,id:number,change:{remove?:boolean;delta?:number;weight?:number}):CartState{
+ const extra=standaloneCartItems(cart).find(i=>i.product.id===id);if(!extra)return cart;
+ const weighted=extra.product.saleMode==='WEIGHT',old=weighted?extra.weightGrams??0:extra.quantity;
+ const next=change.remove?0:change.weight??Math.max(0,old+(change.delta??0));
+ return reconcileCartMeals({...cart,items:cart.items.flatMap(item=>{if(item.product.id!==id)return [item];const amount=(weighted?item.weightGrams??0:item.quantity)-old+next;return amount<=0?[]:[weighted?{...item,weightGrams:amount}:{...item,quantity:amount}];})});
+}
+export function cartDisplayCount(cart:Pick<CartState,'items'|'meals'>){return {meals:(cart.meals??[]).reduce((n,m)=>n+m.quantity,0),items:standaloneCartItems(cart).reduce((n,i)=>n+(i.product.saleMode==='WEIGHT'?1:i.quantity),0)};}

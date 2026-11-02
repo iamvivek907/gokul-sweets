@@ -1,6 +1,6 @@
 "use client";
 
-import {mealSavings} from "@/lib/cartMeals";
+import {standaloneCartItems,editStandalone,mealSavings} from "@/lib/cartMeals";
 import {
     useMemo,
     useSyncExternalStore
@@ -197,6 +197,7 @@ export function useCart(): UseCartResult {
     }
 
     function decreaseQuantity(productId: number): void {
+        if(cart.meals?.length){const item=standaloneCartItems(cart).find(i=>i.product.id===productId);if(!item)return;const step=item.product.saleMode==="WEIGHT"?weightStep(item.product):1;const q=item.product.saleMode==="WEIGHT"?item.weightGrams??0:item.quantity;saveCart(editStandalone(cart,productId,q-step<(item.product.saleMode==="WEIGHT"?minimumWeight(item.product):1)?{remove:true}:{delta:-step}));return;}
         if (cart.branchId === null) {
             return;
         }
@@ -301,7 +302,7 @@ export function useCart(): UseCartResult {
                         ? {
                             ...item,
                             weightGrams:
-                                requestedWeightGrams
+                                requestedWeightGrams + (cart.meals?.length ? (existingItem.weightGrams??0)-(standaloneCartItems(cart).find(i=>i.product.id===productId)?.weightGrams??0) : 0)
                         }
                         : item
             );
@@ -319,6 +320,7 @@ export function useCart(): UseCartResult {
     }
 
     function removeItem(productId: number): void {
+        if(cart.meals?.length){saveCart(editStandalone(cart,productId,{remove:true}));return;}
         const updatedItems =
             cart.items.filter(item => item.product.id !== productId);
 

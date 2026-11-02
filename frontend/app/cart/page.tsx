@@ -1,4 +1,5 @@
 "use client";
+import {standaloneCartItems} from "@/lib/cartMeals";
 import MealCartSummary from "@/components/meal/MealCartSummary";
 import BrandLoading from "@/components/common/BrandLoading";
 import {T,useTranslation} from "@/lib/language";
@@ -78,6 +79,7 @@ function CartContent() {
 
     const {
         items,
+        meals,
         branchId,
         itemCount,
         subtotal,
@@ -442,7 +444,7 @@ function CartContent() {
 
                                     <MealCartSummary/>
                                     {
-                                        items.map(
+                                        standaloneCartItems({items,meals}).map(
                                             item => (
                                                 <CartItem
                                                     refined={features?.contextualStorefrontV2 === true}
