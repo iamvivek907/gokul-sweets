@@ -184,3 +184,10 @@
 
 .autoToggle{display:inline-flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;border:1px solid #e4d8d1;border-radius:50%;background:#fff9ee;color:#8f1838}.autoToggle:focus-visible{outline:3px solid #8f1838;outline-offset:2px}
 @media(max-width:640px){.carouselNavigation{justify-content:center;gap:8px}.carouselNavigation .hint{display:none}}
+
+:global(.future-storefront[data-premium-menu=true]) .carouselNavigation{justify-content:center;min-height:36px;border:0;background:linear-gradient(0deg,#24111b99,transparent)}
+:global(.future-storefront[data-premium-menu=true]) .arrows,:global(.future-storefront[data-premium-menu=true]) .hint{display:none}
+:global(.future-storefront) .autoToggle:not(:focus-visible){position:absolute;width:1px;height:1px;min-width:0;min-height:0;padding:0;border:0;overflow:hidden;clip-path:inset(50%)}
+:global(.future-storefront) .autoToggle:focus-visible{position:relative;width:44px;height:44px;clip-path:none}
+:global(.future-storefront[data-premium-menu=true]) .copy>button{display:inline-flex;align-items:center;gap:10px;max-width:100%}
+:global(.future-storefront[data-premium-menu=true]) .copy>button svg{flex:none}

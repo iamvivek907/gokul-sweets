@@ -256,4 +256,96 @@ class RebateExclusionsTest {
         assertThat(o.getRebate()).isNull();
         assertThat(o.getTotalAmount()).isEqualByComparingTo("425");
     }
+
+    @Test
+    void mixedMealAndExtraSameDishOnlyDiscountsOrdinaryPortions() {
+        var order = basket();
+        var offer = offer(RebateType.PERCENTAGE);
+        offer.getExcludedCategoryIds().clear();
+        var item = order.getItems().getFirst();
+        item.setMealLabel("Meal");
+        item.setMealDetails(
+                tools.jackson.databind.json.JsonMapper.builder()
+                        .build()
+                        .writeValueAsString(
+                                List.of(
+                                        new com.gokulsweets.restaurant.meal.MealModels
+                                                .ComponentSnapshot(
+                                                "meal1",
+                                                1,
+                                                1,
+                                                "Meal",
+                                                1,
+                                                List.of("main"),
+                                                10,
+                                                "Dish",
+                                                1,
+                                                null,
+                                                n("200"),
+                                                n("200"),
+                                                n("20")))));
+        // Item subtotal 300 contains 180 of discounted meal plus 120 of extra dish.
+        assertThat(com.gokulsweets.restaurant.meal.MealSpendBasis.standaloneSubtotal(item))
+                .isEqualByComparingTo("120");
+        offer.setMinimumOrderAmount(n("220"));
+        assertThat(service.previewDraft(order).getFirst().rebateAmount())
+                .isEqualByComparingTo("22");
+        offer.setMinimumOrderAmount(n("221"));
+        assertThat(service.previewDraft(order)).isEmpty();
+        // Existing coin policy applies across the discounted meal and extra goods.
+        order.setLoyaltyEnrolled(true);
+        order.setLoyaltyDiscount(n("40"));
+        offer.setMinimumOrderAmount(n("220"));
+        assertThat(service.previewDraft(order).getFirst().rebateAmount())
+                .isEqualByComparingTo("22.00");
+    }
+
+    @Test
+    void mixedMealSavingsAndCoinsCannotConsumeUnfundedExtraGoods() {
+        var order = basket();
+        var offer = offer(RebateType.FIXED_AMOUNT);
+        offer.getExcludedCategoryIds().clear();
+        var item = order.getItems().getFirst();
+        item.setMealLabel("Meal");
+        item.setMealDetails(
+                tools.jackson.databind.json.JsonMapper.builder()
+                        .build()
+                        .writeValueAsString(
+                                List.of(
+                                        new com.gokulsweets.restaurant.meal.MealModels
+                                                .ComponentSnapshot(
+                                                "meal",
+                                                1,
+                                                1,
+                                                "Meal",
+                                                1,
+                                                List.of("main"),
+                                                10,
+                                                "Dish",
+                                                1,
+                                                null,
+                                                n("200"),
+                                                n("200"),
+                                                n("20")))));
+        order.setLoyaltyEnrolled(true);
+        order.setLoyaltyDiscount(n("40"));
+        offer.setMinimumOrderAmount(n("220"));
+        offer.setRebateValue(n("500"));
+        offer.setMaximumDiscountAmount(null);
+        assertThat(service.previewDraft(order).getFirst().rebateAmount())
+                .isEqualByComparingTo("198");
+    }
+
+    @Test
+    void missingOrInvalidMealAllocationsCannotUnlockAnOffer() {
+        var order = basket();
+        var offer = offer(RebateType.PERCENTAGE);
+        offer.getExcludedCategoryIds().clear();
+        for (var item : order.getItems()) item.setMealLabel("Meal");
+        for (String details :
+                new String[] {"", "bad json", "[]", "[{\"regularTotal\":5,\"mealDiscount\":6}]"}) {
+            for (var item : order.getItems()) item.setMealDetails(details);
+            assertThat(service.previewDraft(order)).isEmpty();
+        }
+    }
 }

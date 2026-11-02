@@ -1,17 +1,17 @@
 "use client";
-import {useEffect,useId,useRef,type ReactNode} from "react";
+import {useLayoutEffect,useId,useRef,type ReactNode} from "react";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import styles from "./MenuDiscoverySheet.module.css";
 import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
 import {T,useTranslation} from "@/lib/language";
 
-export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,tactile=false,footer,closeLabel="Close"}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string}){
+export default function MenuDiscoverySheet({title,children,onClose,onDismissStart,className,returnFocusId,restoreFocus,tactile=false,footer,closeLabel="Close",hideClose=false}:{title:string;children:ReactNode;onClose:()=>void;onDismissStart?:()=>void;className?:string;returnFocusId?:string;restoreFocus?:HTMLElement|null;tactile?:boolean;footer?:ReactNode|((close:()=>void)=>ReactNode);closeLabel?:string;hideClose?:boolean}){
  const translate=useTranslation(),features=useStorefrontFeatures();
  const polished=tactile&&!!(features?.futuristicStorefrontV2||features?.checkoutExperienceV2);
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
  const dismiss=useMenuSheetDismiss(dialog,onClose,tactile,onDismissStart);
  const closeImmediately=()=>{onDismissStart?.();onClose();};
- useEffect(()=>{
+ useLayoutEffect(()=>{
   const surface=dialog.current,previous=restoreFocus??document.activeElement as HTMLElement|null;
   const body=document.body,root=document.documentElement,y=window.scrollY,x=window.scrollX;
   const saved={position:body.style.position,top:body.style.top,left:body.style.left,width:body.style.width,overflow:body.style.overflow,rootOverflow:root.style.overflow};
@@ -19,13 +19,13 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
   surface?.showModal();
   return()=>{
    surface?.close();Object.assign(body.style,{position:saved.position,top:saved.top,left:saved.left,width:saved.width,overflow:saved.overflow});root.style.overflow=saved.rootOverflow;
-   window.scrollTo({left:x,top:y,behavior:"instant"});const target=restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;target?.focus({preventScroll:true});
+   window.scrollTo({left:x,top:y,behavior:"instant"});const resolveTarget=()=>restoreFocus&&returnFocusId?document.getElementById(returnFocusId):previous?.isConnected?previous:returnFocusId?document.getElementById(returnFocusId):null;resolveTarget()?.focus({preventScroll:true});
    // Header observers can briefly make the trigger inert during scroll unlock.
    // Resolve it again after the header settles; never move the viewport to focus it.
-   if(restoreFocus){
+   {
     let attempts=0;
     const restore=()=>{
-     const current=returnFocusId?document.getElementById(returnFocusId):target;
+     const current=resolveTarget();
      if(!current?.isConnected)return;
      current.focus({preventScroll:true});
      if(document.activeElement!==current&&attempts++<20)requestAnimationFrame(restore);
@@ -35,12 +35,12 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
   };
  },[returnFocusId,restoreFocus]);
  const content=<>
-  <header><h2 id={titleId}><T text={title}/></h2>{!polished&&<button type="button" aria-label={closeLabel==="Close"?undefined:translate(closeLabel)} onClick={()=>tactile?dismiss(true):closeImmediately()} autoFocus><T text="Close"/> ×</button>}</header>
+  <header><h2 id={titleId}><T text={title}/></h2>{!polished&&!hideClose&&<button type="button" aria-label={closeLabel==="Close"?undefined:translate(closeLabel)} onClick={()=>tactile?dismiss(true):closeImmediately()} autoFocus><T text="Close"/> ×</button>}</header>
   <div tabIndex={polished?0:undefined} className={`mobile-menu-suggestion-body ${polished?styles.scrollBody:""}`}>{children}</div>
   {footer&&<footer className={styles.footer}>{typeof footer==="function"?footer(()=>tactile?dismiss():closeImmediately()):footer}</footer>}
  </>;
  return <dialog ref={dialog} className={`mobile-menu-suggestion-dialog ${styles.dialog} ${tactile?styles.motion:""} ${polished?styles.polished:""} ${className??""}`} aria-labelledby={titleId} onCancel={event=>{event.preventDefault();if(tactile)dismiss();else closeImmediately();}} onClick={event=>{const box=event.currentTarget.getBoundingClientRect();if(event.target===event.currentTarget&&(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)){if(tactile)dismiss();else closeImmediately();}}}>
-  {polished&&<button type="button" className={styles.floatingClose} aria-label={translate(closeLabel)} onClick={()=>dismiss(true)} autoFocus><span aria-hidden="true">×</span></button>}
+  {polished&&!hideClose&&<button type="button" className={styles.floatingClose} aria-label={translate(closeLabel)} onClick={()=>dismiss(true)} autoFocus><span aria-hidden="true">×</span></button>}
   {polished?<div className={styles.frame}>{content}</div>:content}
  </dialog>;
 }

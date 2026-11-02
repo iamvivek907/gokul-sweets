@@ -90,13 +90,28 @@ public class BranchDiscoveryService {
     /** Fetch at most 21 matching rows per request; contact filtering occurs after the query. */
     @Transactional(readOnly = true)
     public PublicReviewPage reviews(long branchId, Long before) {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(BranchDiscoveryService.class, "reviews(long,Long)");
+        long started = MethodTiming.start(BranchDiscoveryService.class, "reviews(long,Long)");
         try {
-            if (before != null && before <= 0)
+            return reviews(branchId, before, null);
+        } finally {
+            MethodTiming.finish(started, BranchDiscoveryService.class, "reviews(long,Long)");
+        }
+    }
+
+    /** Returns a cursor page of published comments matching an optional overall rating. */
+    @Transactional(readOnly = true)
+    public PublicReviewPage reviews(long branchId, Long before, Integer stars) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(BranchDiscoveryService.class, "reviews(long,Long,Integer)");
+        try {
+            if (before != null && before <= 0 || stars != null && (stars < 1 || stars > 5))
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid review cursor.");
             if (branches.findByIdAndActiveTrue(branchId).isEmpty())
                 throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Branch not found.");
+            java.util.List<Object> parameters = new java.util.ArrayList<>();
+            parameters.add(branchId);
+            parameters.add(before == null ? Long.MAX_VALUE : before);
+            if (stars != null) parameters.add(stars);
             var rows =
                     jdbc.query(
                             """
@@ -104,6 +119,9 @@ SELECT r.id,r.comment,r.overall_rating,r.show_customer_name,o.customer_name
 FROM reviews r JOIN orders o ON o.id=r.order_id
 WHERE r.branch_id=? AND r.review_status='PUBLISHED' AND r.id < ?
 AND o.order_status IN ('PICKED_UP','DELIVERED') AND r.comment IS NOT NULL
+"""
+                                    + (stars == null ? "" : " AND r.overall_rating=? ")
+                                    + """
 ORDER BY r.id DESC LIMIT 21
 """,
                             (rs, n) ->
@@ -113,8 +131,7 @@ ORDER BY r.id DESC LIMIT 21
                                             rs.getInt(3),
                                             rs.getBoolean(4),
                                             rs.getString(5)),
-                            branchId,
-                            before == null ? Long.MAX_VALUE : before);
+                            parameters.toArray());
             var scanned = rows.stream().limit(20).toList();
             var visible =
                     scanned.stream()
@@ -129,7 +146,9 @@ ORDER BY r.id DESC LIMIT 21
             return new PublicReviewPage(visible, rows.size() > 20 ? scanned.getLast().id() : null);
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos, BranchDiscoveryService.class, "reviews(long,Long)");
+                    __gokulMethodStartedNanos,
+                    BranchDiscoveryService.class,
+                    "reviews(long,Long,Integer)");
         }
     }
 

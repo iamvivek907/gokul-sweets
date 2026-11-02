@@ -23,6 +23,7 @@
     "tests/branch-loading-reviews.browser.mjs"
   ],
   "menu": [
+    "tests/meal-dock-polish.browser.mjs",
     "tests/menu-capacity-carousel.browser.mjs",
     "tests/meals.browser.mjs",
     "tests/selected-meals.browser.mjs",
@@ -42,6 +43,7 @@
     "tests/menu-category-speed.browser.mjs",
     "tests/reference-ordering.browser.mjs",
     "tests/menu-pairings-speed.browser.mjs",
+    "tests/meal-pairing-quantities.browser.mjs",
     "tests/menu-offer-freshness.browser.mjs",
     "tests/menu-discovery.browser.mjs",
     "tests/menu-pickup-guidance.browser.mjs",

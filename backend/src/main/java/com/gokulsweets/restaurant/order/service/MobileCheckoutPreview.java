@@ -72,15 +72,6 @@ public class MobileCheckoutPreview {
                 MethodTiming.start(
                         MobileCheckoutPreview.class, "preview(CreateOrderRequest,String)");
         try {
-            if (request.rewardCode() != null
-                    && !request.rewardCode().isBlank()
-                    && request.items().stream()
-                            .anyMatch(
-                                    i ->
-                                            i.mealSelections() != null
-                                                    && !i.mealSelections().isEmpty()))
-                throw new IllegalArgumentException(
-                        "Meal deals cannot be combined with another offer or coin redemption.");
             ownership.requireVerifiedIdentity(request.customerPhone(), token);
             var quote = quotes.preview(request, null);
             var order = new Order();
@@ -111,6 +102,7 @@ public class MobileCheckoutPreview {
                 item.setProduct(product);
                 item.setProductName(line.name());
                 item.setMealLabel(line.mealLabel());
+                item.setMealDetails(line.mealDetails());
                 item.setMealDiscount(new BigDecimal(line.mealDiscount()));
                 item.setTaxAmount(new BigDecimal(line.taxAmount()));
                 item.setLineTotal(new BigDecimal(line.total()));

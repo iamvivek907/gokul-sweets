@@ -1,6 +1,6 @@
 "use client";
 
-import {mealSavings} from "@/lib/cartMeals";
+import {standaloneCartItems,editStandalone,mealSavings} from "@/lib/cartMeals";
 import {
     useMemo,
     useSyncExternalStore
@@ -132,6 +132,10 @@ export function useCart(): UseCartResult {
         const existingItem =
             cart.items.find(item => item.product.id === product.id);
 
+        // The menu weight selector edits the extra portion, never the included meal grams.
+        const includedWeight = product.saleMode === "WEIGHT" && cart.meals?.length && existingItem
+            ? (existingItem.weightGrams ?? 0) - (standaloneCartItems(cart).find(item => item.product.id === product.id)?.weightGrams ?? 0)
+            : 0;
         const updatedItems = existingItem
             ? cart.items.map(item => {
                 if (item.product.id !== product.id) {
@@ -143,7 +147,7 @@ export function useCart(): UseCartResult {
                         ...item,
                         product,
                         quantity: 1,
-                        weightGrams: requestedWeightGrams ?? item.weightGrams
+                        weightGrams: (requestedWeightGrams ?? 0) + includedWeight
                     }
                     : {
                         ...item,
@@ -197,6 +201,7 @@ export function useCart(): UseCartResult {
     }
 
     function decreaseQuantity(productId: number): void {
+        if(cart.meals?.length){const item=standaloneCartItems(cart).find(i=>i.product.id===productId);if(!item)return;const step=item.product.saleMode==="WEIGHT"?weightStep(item.product):1;const q=item.product.saleMode==="WEIGHT"?item.weightGrams??0:item.quantity;saveCart(editStandalone(cart,productId,q-step<(item.product.saleMode==="WEIGHT"?minimumWeight(item.product):1)?{remove:true}:{delta:-step}));return;}
         if (cart.branchId === null) {
             return;
         }
@@ -301,7 +306,7 @@ export function useCart(): UseCartResult {
                         ? {
                             ...item,
                             weightGrams:
-                                requestedWeightGrams
+                                requestedWeightGrams + (cart.meals?.length ? (existingItem.weightGrams??0)-(standaloneCartItems(cart).find(i=>i.product.id===productId)?.weightGrams??0) : 0)
                         }
                         : item
             );
@@ -319,6 +324,7 @@ export function useCart(): UseCartResult {
     }
 
     function removeItem(productId: number): void {
+        if(cart.meals?.length){saveCart(editStandalone(cart,productId,{remove:true}));return;}
         const updatedItems =
             cart.items.filter(item => item.product.id !== productId);
 

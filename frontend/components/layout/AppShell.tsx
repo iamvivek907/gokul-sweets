@@ -44,6 +44,8 @@ import "./ordering-tour.css";
 import "./customer-journey-refinement.css";
 import "./customer-experience.css";
 import "./menu-card-refinement.css";
+import "./order-dock.css";
+import "./discovery-refinements.css";
 
 
 interface AppShellProps {

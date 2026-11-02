@@ -781,6 +781,20 @@ class LoyaltyIntegrationTest {
     }
 
     @Test
+    void earnedCoinsCanFundMealsWithoutReducingTaxOrFees() {
+        grant(1000);
+        var order = order("PENDING_PAYMENT", true);
+        order.getItems().getFirst().setMealLabel("Burger Combo");
+        loyalty.reserve(order, "SWEET_5");
+        assertThat(order.getLoyaltyCoins()).isEqualTo(30);
+        assertThat(order.getTaxAmount()).isEqualByComparingTo("8");
+        assertThat(order.getConvenienceFee()).isEqualByComparingTo("10");
+        assertThat(loyalty.wallet("DEV", subject, null).balance()).isEqualTo(970);
+        loyalty.remove(order);
+        assertThat(loyalty.wallet("DEV", subject, null).balance()).isEqualTo(1000);
+    }
+
+    @Test
     void holdsOnlySelectedCoinsAndPreservesUndiscountedTaxAndFees() {
         grant(1000);
         var order = order("PENDING_PAYMENT", true);

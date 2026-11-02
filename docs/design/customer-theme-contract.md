@@ -1,3 +1,11 @@
+## November 2 meal checkout and order dock
+
+Active order tracking is a compact floating surface, never a card above the home hero or menu. One owner-scoped, bounded 20-order summary query prioritises ready orders then earliest booked pickup/delivery. Overflow links to normal paged history; only the expanded order loads its branch contact. Existing polling, identity invalidation, backoff and offline safeguards remain. The dock clears the cart and Categories control, preserves safe-area spacing, and opens the shared accessible sheet for order/code/call/directions actions.
+
+Meals render as one grouped cart item with immutable included portions; extra portions of identical products remain independently editable. Menu quantity controls show extra portions only. Stock reads carry product quantities/weights without recipe claims, avoiding partial-recipe pricing during menu batching. Quotes and order creation still revalidate full meal claims server-side. Ordinary resumes do not replay the launch animation. Meal additions retain scroll, drafts and the cart through stock-read failures.
+
+Meal portions never fund an offer threshold or additional offer discount. In mixed meal carts, extra goods qualify before coin redemption; coins do not revoke that qualification. The offer amount is capped to funded extra goods after proportional coin allocation, so combined savings never overdraw food spend. Trusted server-authored component snapshots determine the remaining extra portion even for the same SKU; missing or invalid legacy snapshots fail closed. Earned coins remain available on discounted meals within existing redemption, exclusion and fee rules. Product/category offer exclusions and proportional coin allocation are preserved. No client-provided savings are accepted.
+
 ## October 28 customer discovery and food-first ordering
 
 The customer-experience audit in [premium-customer-pass.md](premium-customer-pass.md)
@@ -429,3 +437,17 @@ stop auto-advance offscreen, in background tabs, during modal/keyboard/pointer
 interaction and for reduced motion. Hide the meal rail scrollbar, preserving scrolling.
 A colourful animated Build a meal shortcut beside Filters clears browse filters and
 reveals the meal cards. Its labels do not claim unconfigured savings or prices.
+
+## November 2 discovery refinement
+Modern campaign/meal rails lead with dots and swipe; rotation controls are available
+on keyboard focus. Choosing a dot pauses rotation for six seconds, then resumes automatically;
+keyboard focus, explicit pause and reduced motion continue to prevent rotation. Category navigation opens
+a bounded panel above its existing floating action; the action becomes Close.
+The native modal retains scroll locking, Escape/backdrop dismissal and focus return.
+Recommendation price and Add controls occupy separate grid rows. Review stars
+request bounded server-filtered comment pages; customer names stay opt-in.
+Visual scrollbars are hidden while touch, wheel and keyboard scrolling remain.
+
+Recommendation rails reserve the same minimum space for loading, populated, empty
+and failed responses, including a retry that supplies cards. Price and Add rows
+remain separate; cards can grow naturally for larger text.
