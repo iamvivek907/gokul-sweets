@@ -446,3 +446,7 @@ The native modal retains scroll locking, Escape/backdrop dismissal and focus ret
 Recommendation price and Add controls occupy separate grid rows. Review stars
 request bounded server-filtered comment pages; customer names stay opt-in.
 Visual scrollbars are hidden while touch, wheel and keyboard scrolling remain.
+
+Recommendation rails reserve the same minimum space for loading, populated, empty
+and failed responses, including a retry that supplies cards. Price and Add rows
+remain separate; cards can grow naturally for larger text.

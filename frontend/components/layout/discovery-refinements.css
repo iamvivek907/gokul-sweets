@@ -35,3 +35,10 @@ html:has(.future-storefront)::-webkit-scrollbar,.future-storefront :is(.mobile-m
 @media(max-width:640px){.future-storefront[data-customer-design=reference] .branch-overview-hero:has(picture){grid-template-columns:minmax(0,1fr);padding:14px;gap:14px}.future-storefront[data-customer-design=reference] .branch-overview-hero:has(picture) .branch-overview-photo{order:-1;width:100%;height:170px;margin:0;border-radius:16px}.future-storefront[data-customer-design=reference] .branch-overview-hero:has(picture) .branch-overview-copy>p:not(.gokul-overline){display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}}
 .future-storefront[data-customer-design=reference] .branch-discovery{gap:24px}
 .future-storefront[data-customer-design=reference] .branch-discovery>section{margin:0}
+
+/* Reserve the same rail space while pairings load, fail, or finish empty.
+   Keep natural card growth for larger text; do not clip controls to a fixed height. */
+.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline{--pairing-card-height:156px;min-height:calc(var(--pairing-card-height) + 3px)}
+.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline article{min-height:var(--pairing-card-height)}
+.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline .mobile-menu-pairing-skeleton{position:static;inset:auto;display:flex;flex:none;width:100%;height:var(--pairing-card-height);min-height:var(--pairing-card-height);gap:8px;overflow:hidden}
+.future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline .mobile-menu-pairing-skeleton>div{flex-basis:240px;height:var(--pairing-card-height);min-height:var(--pairing-card-height)}
