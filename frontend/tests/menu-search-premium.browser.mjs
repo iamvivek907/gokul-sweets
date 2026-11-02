@@ -12,7 +12,7 @@ const original={date,slot:slot(date),pickupType:'NORMAL'};
 try{
  for(const width of [320,390,640,1280]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block',reducedMotion:width===640?'reduce':'no-preference',hasTouch:true}),page=await context.newPage();page.setDefaultTimeout(15000);
-  const errors=[],checks=[];let failSettings=false,activeReads=0;
+  const errors=[],checks=[];let failSettings=false;
   page.on('pageerror',e=>errors.push(e.message));
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,PUT,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   await context.route('**/api/**',async route=>{
@@ -28,7 +28,7 @@ try{
    else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
    else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Customer',phone:'+919876543210'};
    else if(path==='/api/customer/identity/orders/page' && url.searchParams.get('status')==='COMPLETED'){assert.equal(url.searchParams.get('limit'),'1');json={orders:[],nextBefore:null};}
-   else if(path==='/api/customer/identity/orders/page'){activeReads++;assert.equal(url.searchParams.get('limit'),'20');assert.equal(url.searchParams.get('status'),'ACTIVE_QUEUE');json={orders:[{orderNumber:'PRIVATE-ORDER',customerOrderNumber:10,orderStatus:'PREPARING',branchId:2,branchName:orderBranch.name,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),totalAmount:40},{orderNumber:'LATE-ORDER',customerOrderNumber:12,orderStatus:'CONFIRMED',branchId:1,branchName:branch.name,fulfillmentType:'PICKUP',pickupDate:later,pickupStartTime:'19:00:00',pickupEndTime:'19:30:00'},{orderNumber:'EARLY-ORDER',customerOrderNumber:11,orderStatus:'CONFIRMED',branchId:1,branchName:branch.name,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'14:00:00',pickupEndTime:'14:30:00'}],nextBefore:null};}
+   else if(path==='/api/customer/identity/orders/page'){assert.equal(url.searchParams.get('limit'),'20');assert.equal(url.searchParams.get('status'),'ACTIVE_QUEUE');json={orders:[{orderNumber:'PRIVATE-ORDER',customerOrderNumber:10,orderStatus:'PREPARING',branchId:2,branchName:orderBranch.name,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),totalAmount:40},{orderNumber:'LATE-ORDER',customerOrderNumber:12,orderStatus:'CONFIRMED',branchId:1,branchName:branch.name,fulfillmentType:'PICKUP',pickupDate:later,pickupStartTime:'19:00:00',pickupEndTime:'19:30:00'},{orderNumber:'EARLY-ORDER',customerOrderNumber:11,orderStatus:'CONFIRMED',branchId:1,branchName:branch.name,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'14:00:00',pickupEndTime:'14:30:00'}],nextBefore:null};}
    else if(path==='/api/orders/mobile-preview')json={quote:{token:'signed',subtotal:'40',taxAmount:'0',priorityCharge:'0',convenienceFee:'0',totalAmount:'40',currency:'INR',items:[],expiresAt:new Date(Date.now()+600000).toISOString()},offers:[],paymentFee:0,paymentFeeTax:0};
    else if(path.endsWith('/availability')){
     const payload=req.postDataJSON();checks.push(payload);
