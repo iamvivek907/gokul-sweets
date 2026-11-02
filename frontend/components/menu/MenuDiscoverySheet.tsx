@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useId,useRef,type ReactNode} from "react";
+import {useLayoutEffect,useId,useRef,type ReactNode} from "react";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import styles from "./MenuDiscoverySheet.module.css";
 import {useMenuSheetDismiss} from "@/hooks/useMenuSheetDismiss";
@@ -11,7 +11,7 @@ export default function MenuDiscoverySheet({title,children,onClose,onDismissStar
  const dialog=useRef<HTMLDialogElement>(null),titleId=useId();
  const dismiss=useMenuSheetDismiss(dialog,onClose,tactile,onDismissStart);
  const closeImmediately=()=>{onDismissStart?.();onClose();};
- useEffect(()=>{
+ useLayoutEffect(()=>{
   const surface=dialog.current,previous=restoreFocus??document.activeElement as HTMLElement|null;
   const body=document.body,root=document.documentElement,y=window.scrollY,x=window.scrollX;
   const saved={position:body.style.position,top:body.style.top,left:body.style.left,width:body.style.width,overflow:body.style.overflow,rootOverflow:root.style.overflow};

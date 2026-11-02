@@ -1,4 +1,5 @@
 export const hindi: Record<string,string> = {
+"Availability check failed. Your cart is saved.":"उपलब्धता की जाँच नहीं हो सकी। आपका कार्ट सुरक्षित है।",
 "Your upcoming orders":"आपके आगामी ऑर्डर",
 "View all":"सभी देखें",
 "View":"देखें",

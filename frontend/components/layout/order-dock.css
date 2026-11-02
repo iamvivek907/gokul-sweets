@@ -5,3 +5,5 @@
 .active-order-shortcut[data-stale] .active-order-mark i{background:#a97325}.active-order-list article>button>span{min-width:0;overflow-wrap:anywhere}.active-order-list article>button>span:last-child{max-width:42%}
 
 .future-storefront .meal-offer-note{margin:8px 0;color:#72636c;font-size:12px;line-height:1.5}
+
+.future-storefront .mobile-menu-pickup .menu-pickup-refresh-error{display:flex;align-items:center;gap:8px;margin:5px 0 0!important;padding-top:6px;font-size:11px;line-height:1.4}.future-storefront .mobile-menu-pickup .menu-pickup-refresh-error>span{flex:1;letter-spacing:0;font-size:11px;font-weight:500}.future-storefront .mobile-menu-pickup .menu-pickup-refresh-error>button{flex:none;min-height:44px;font-size:11px;padding:6px 8px;white-space:nowrap}
