@@ -122,7 +122,7 @@ export default function FloatingCartButton({
                 {premium ? <>
                     <span className="reference-cart-summary">
                         <span className="reference-cart-photos" aria-hidden="true">{cart.items.slice(0,2).map(item=><span key={item.product.id}>{item.product.imageUrl?<Image src={item.product.imageUrl} alt="" fill sizes="36px"/>:<span>G</span>}</span>)}</span>
-                        <strong>{cartDisplayCount(cart).meals>0?<>{cartDisplayCount(cart).meals} <T text={cartDisplayCount(cart).meals===1?"meal":"meals"}/>{cartDisplayCount(cart).items>0&&<> + {cartDisplayCount(cart).items} <T text="items"/></>}</>:<>{itemCount} <T text={itemCount===1?"item":"items"}/></>} · {formatCurrency(total)}</strong>
+                        <strong><span className="reference-cart-count">{cartDisplayCount(cart).meals>0?<>{cartDisplayCount(cart).meals} <T text={cartDisplayCount(cart).meals===1?"meal":"meals"}/>{cartDisplayCount(cart).items>0&&<> + {cartDisplayCount(cart).items} <T text="items"/></>}</>:<>{itemCount} <T text={itemCount===1?"item":"items"}/></>}</span><span className="reference-cart-total">{formatCurrency(total)}</span></strong>
                     </span>
                     <span className="reference-cart-action"><T text="View cart"/> <span aria-hidden="true">→</span></span>
                 </> : <>
