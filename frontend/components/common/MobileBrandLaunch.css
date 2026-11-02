@@ -22,3 +22,20 @@
  @keyframes launch-dish-cycle{0%{opacity:0;transform:translateY(9px) scale(.8) rotate(-8deg)}12%,27%{opacity:1;transform:translateY(0) scale(1) rotate(0)}36%,100%{opacity:0;transform:translateY(-8px) scale(.9) rotate(5deg)}}
 }
 @media(prefers-reduced-motion:reduce){.launch-dish{animation:none!important;opacity:0}.launch-sweet{opacity:1}}
+
+/* Approved wine/ivory launch: use the same surface before and after hydration. */
+@media(max-width:640px){
+ .gokul-mobile-launch[open],.gokul-mobile-boot{isolation:isolate;overflow:hidden;background:radial-gradient(ellipse at 50% 43%,#bc5a2870,transparent 48%),linear-gradient(155deg,#71092c,#950d38 55%,#540b25);color:#fff1d7}
+ .gokul-mobile-launch::backdrop{background:#71092c}
+ .gokul-mobile-launch-copy{position:relative;z-index:1;width:100%;max-width:420px}
+ .gokul-mobile-launch[open] .brand-loading-wordmark,.gokul-mobile-boot .brand-loading-wordmark{color:#fff1d7;display:flex!important;align-items:center;justify-content:center;gap:12px}
+ .gokul-mobile-boot .brand-loading-wordmark>svg{width:48px;height:54px;flex:none}
+ .gokul-mobile-boot .brand-loading-wordmark>span{display:flex;flex-direction:column;align-items:center}
+ .gokul-mobile-boot .brand-loading-wordmark strong{font:700 36px/38px Georgia,serif;letter-spacing:-1px}
+ .gokul-mobile-boot .brand-loading-wordmark small{font:11px/16px Arial,sans-serif;letter-spacing:3px;color:inherit}
+ .gokul-mobile-launch[open] p,.gokul-mobile-boot p{color:#fff1d7;letter-spacing:.16em;font-size:11px}
+ .gokul-mobile-launch .brand-backdrop,.gokul-mobile-boot .brand-backdrop{color:#f3ba75;opacity:.2}
+ .gokul-mobile-launch .brand-backdrop>svg,.gokul-mobile-boot .brand-backdrop>svg{width:clamp(90px,28vw,160px)}
+ .gokul-launch-food{color:#f6c675;width:84px;height:84px;margin-top:32px}
+ .launch-dish{width:76px;height:76px}
+}
