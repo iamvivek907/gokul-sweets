@@ -13,8 +13,7 @@ export default function FloatingMenuCategories({categories,selectedId,hasCart,on
         const navigation=document.querySelector<HTMLElement>(".customer-bottom-navigation");
         const update=()=>{
             setCartHeight(dock?Math.ceil(dock.getBoundingClientRect().height):0);
-            const tracker=document.querySelector<HTMLElement>(".active-order-shortcut");
-            setBottom(Math.ceil(Math.max(dock?innerHeight-dock.getBoundingClientRect().top+12:0,tracker?innerHeight-tracker.getBoundingClientRect().top+12:0,(navigation?.offsetHeight??56)+12)));
+            setBottom(Math.ceil(Math.max(dock?innerHeight-dock.getBoundingClientRect().top+12:0,(navigation?.offsetHeight??56)+12)));
         };
         const observer=new ResizeObserver(update);
         if(dock)observer.observe(dock);

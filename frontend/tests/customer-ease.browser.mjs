@@ -44,7 +44,7 @@ try{
    if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify(original));
   },{branch,original,products});
   await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  const active=page.getByRole('complementary',{name:'Active order'});await active.getByRole('button').click();const orderSheet=page.locator('dialog').filter({has:page.locator('.active-order-list')});await active.getByText('Preparing',{exact:true}).waitFor();
+  const active=page.getByRole('complementary',{name:'Active order'});await active.getByRole('button').click();const orderSheet=page.locator('dialog').filter({has:page.locator('.active-order-list')});await orderSheet.getByText('Preparing',{exact:true}).waitFor();
   assert.equal(await orderSheet.getByRole('link',{name:'Call',exact:true}).getAttribute('href'),'tel:9999999999');
   assert.match(await orderSheet.getByRole('link',{name:'Directions',exact:true}).getAttribute('href'),/Order%20road/);
   assert.match(await orderSheet.getByRole('link',{name:'View pickup code',exact:true}).getAttribute('href'),/#pickup-code$/);
