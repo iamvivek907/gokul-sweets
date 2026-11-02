@@ -12,3 +12,23 @@ test('dismissal and introduction survive remounts and reset for a different iden
  let identity,revision=null;const session=load('lib/orderReminderSession.ts',()=>({subscribeCustomerIdentityChanges:fn=>{identity=fn;return()=>{};}}),{localStorage:{getItem:()=>revision}});
  let updates=0;let stop=session.subscribeOrderReminder(()=>updates++);assert.equal(session.claimOrderIntroduction(),true);assert.equal(session.claimOrderIntroduction(),false);session.dismissOrderReminder();assert.equal(session.reminderDismissed(),true);stop();stop=session.subscribeOrderReminder(()=>updates++);assert.equal(session.reminderDismissed(),true);revision='new';identity();assert.equal(session.reminderDismissed(),false);assert.equal(session.claimOrderIntroduction(),true);session.dismissOrderReminder();stop();revision='changed-away';stop=session.subscribeOrderReminder(()=>{});assert.equal(session.reminderDismissed(),false);assert.ok(updates>0);stop();
 });
+for(const blockedStorage of [false,true])test(`real login notification preserves dismissal across navigation (storage blocked: ${blockedStorage})`,()=>{
+ const window=new EventTarget(),document=new EventTarget(),values=new Map();let revision=0;
+ const localStorage={getItem:key=>values.get(key)??null,setItem:(key,value)=>{if(blockedStorage)throw new Error('Storage blocked');values.set(key,value);}};
+ const runtime={window,document,localStorage,Event,crypto:{randomUUID:()=>`identity-${++revision}`}};
+ const events=load('lib/customerIdentityEvents.ts',()=>{},runtime);
+ const session=load('lib/orderReminderSession.ts',()=>events,runtime);
+ let stop=session.subscribeOrderReminder(()=>{});
+ events.notifyCustomerIdentityChanged();
+ assert.equal(session.claimOrderIntroduction(),true);
+ session.dismissOrderReminder();assert.equal(session.reminderDismissed(),true);stop();
+ // Home/Menu remount after login must not reinterpret the same login as a new user.
+ stop=session.subscribeOrderReminder(()=>{});
+ assert.equal(session.reminderDismissed(),true);
+ assert.equal(session.claimOrderIntroduction(),false);
+ // A subsequent real identity change must still clear suppression.
+ events.notifyCustomerIdentityChanged();
+ assert.equal(session.reminderDismissed(),false);
+ assert.equal(session.claimOrderIntroduction(),true);stop();
+ assert.ok([...values.keys()].every(key=>key==='gokul-customer-identity-revision'));
+});
