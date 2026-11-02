@@ -437,3 +437,12 @@ stop auto-advance offscreen, in background tabs, during modal/keyboard/pointer
 interaction and for reduced motion. Hide the meal rail scrollbar, preserving scrolling.
 A colourful animated Build a meal shortcut beside Filters clears browse filters and
 reveals the meal cards. Its labels do not claim unconfigured savings or prices.
+
+## November 2 discovery refinement
+Modern campaign/meal rails lead with dots and swipe; rotation controls are available
+on keyboard focus, and choosing a dot pauses rotation. Category navigation opens
+a bounded panel above its existing floating action; the action becomes Close.
+The native modal retains scroll locking, Escape/backdrop dismissal and focus return.
+Recommendation price and Add controls occupy separate grid rows. Review stars
+request bounded server-filtered comment pages; customer names stay opt-in.
+Visual scrollbars are hidden while touch, wheel and keyboard scrolling remain.

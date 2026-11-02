@@ -44,6 +44,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
     const requested = [...amounts.values(),...candidates.filter(item=>!amounts.has(item.productId))].sort((a,b)=>a.productId-b.productId);
     const menuPreview=!!products;
     const itemsJson = JSON.stringify(requested);
+    const requestedScope=useRef<string|null>(null);
     const verifiedDefault=useRef<{branchId:number;date:string;itemsJson:string;menuRevision:unknown;data:CartAvailability}|null>(null);
     const [choosing,setChoosing] = useState(false);
     const [automaticResult,setAutomaticResult] = useState<{key:string; error?:string; empty?:boolean} | null>(null);
@@ -63,6 +64,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
         }
         const controller = new AbortController();
         const release = refresh.acquire();
+        const firstInScope=requestedScope.current!==scope;requestedScope.current=scope;
         const timer = window.setTimeout(() => {
             const started = performance.now();
             void (menuPreview ? checkMenuAvailability : checkCartAvailability)(branch.id, requestDate, 1, JSON.parse(itemsJson),
@@ -77,7 +79,7 @@ export function useDateAvailability(products?: MenuProduct[]) {
                     console.warn("Date availability check failed.", error);
                     setResult({key, scope, error: "We couldn't check this pickup. Your cart is saved. Try again."});
                 }}).finally(() => release());
-        }, 150);
+        }, firstInScope?0:150);
         return () => {controller.abort(); window.clearTimeout(timer); release(false);};
     }, [features?.smartAvailability, branch, requestDate, validDate, itemsJson, key,scope,menuPreview,menuRevision,refresh]);
     // Recheck slot capacity, cutoff and preparation as time passes, without changing the pickup.

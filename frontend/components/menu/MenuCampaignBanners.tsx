@@ -42,7 +42,7 @@ export default function MenuCampaignBanners({banners, categories, onSelect, comp
             {modern && slide.category && <span className={styles.eyebrow}>{translate(slide.category.name, locale)}</span>}
             <h2>{locale === "hi" && slide.banner.titleHi ? slide.banner.titleHi : slide.banner.titleEn}</h2>
             <p>{locale === "hi" && slide.banner.subtitleHi ? slide.banner.subtitleHi : slide.banner.subtitleEn}</p>
-            {slide.banner.buttonLabel && slide.category && <button type="button" onClick={() => onSelect(slide.category!.id)}>{slide.generated ? locale === "hi" ? `${translate(slide.category.name, locale)} देखें` : `Explore ${slide.category.name.toLocaleLowerCase("en-IN")}` : slide.banner.buttonLabel} <span aria-hidden="true">↗</span></button>}
+            {slide.banner.buttonLabel && slide.category && <button type="button" onClick={() => onSelect(slide.category!.id)}>{slide.generated ? locale === "hi" ? `${translate(slide.category.name, locale)} देखें` : `Explore ${slide.category.name.toLocaleLowerCase("en-IN")}` : slide.banner.buttonLabel} <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>}
         </div>
     </>;
     if (!modern) return <div className={compact ? styles.strips : undefined} aria-label="Published menu banners">
@@ -112,7 +112,7 @@ function CampaignCarousel({slides, reduced, locale, compact, render,position,onP
         </div>
         {slides.length > 1 && <div className={styles.carouselNavigation}>
             <span className={styles.hint}>{locale === "hi" ? "हर खुशी का स्वाद" : "A little more to celebrate"}</span>
-            <div className={styles.dots} aria-label={locale === "hi" ? "बैनर चुनें" : "Choose a banner"}>{slides.map((slide,index) => <button key={slide.key} type="button" aria-label={`${locale === "hi" ? "बैनर" : "Show banner"} ${index + 1}`} aria-current={index === active ? "true" : undefined} onClick={() => go(index)}><span /></button>)}</div>
+            <div className={styles.dots} aria-label={locale === "hi" ? "बैनर चुनें" : "Choose a banner"}>{slides.map((slide,index) => <button key={slide.key} type="button" aria-label={`${locale === "hi" ? "बैनर" : "Show banner"} ${index + 1}`} aria-current={index === active ? "true" : undefined} onClick={() => {setPaused(true);go(index);}}><span /></button>)}</div>
             <button className={styles.autoToggle} type="button" data-carousel-rotation="true" aria-label={paused?(locale==="hi"?"बैनर अपने आप बदलें":"Resume banner carousel"):(locale==="hi"?"बैनर बदलना रोकें":"Pause banner carousel")} onClick={()=>setPaused(p=>!p)}>{paused?"▶":"Ⅱ"}</button>
             <div className={styles.arrows}><button type="button" aria-label={locale === "hi" ? "पिछला बैनर" : "Previous banner"} disabled={active === 0} onClick={() => go((pendingTarget.current ?? active) - 1)}>←</button><button type="button" aria-label={locale === "hi" ? "अगला बैनर" : "Next banner"} disabled={active === slides.length - 1} onClick={() => go((pendingTarget.current ?? active) + 1)}>→</button></div>
             <span className={styles.srOnly} aria-live={paused||reduced?"polite":"off"}>{active + 1} / {slides.length}</span>

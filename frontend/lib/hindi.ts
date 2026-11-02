@@ -1,4 +1,9 @@
 export const hindi: Record<string,string> = {
+"Show reviews rated":"इस रेटिंग वाली समीक्षाएँ",
+"All reviews":"सभी समीक्षाएँ",
+"Gokul guest":"गोकुल अतिथि",
+"Remove offer":"ऑफ़र हटाएँ",
+"This offer is no longer available for your updated cart. Remove it to check your total.":"बदले हुए कार्ट पर यह ऑफ़र उपलब्ध नहीं है। कुल राशि देखने के लिए इसे हटाएँ।",
 "Availability check failed. Your cart is saved.":"उपलब्धता की जाँच नहीं हो सकी। आपका कार्ट सुरक्षित है।",
 "Your upcoming orders":"आपके आगामी ऑर्डर",
 "View all":"सभी देखें",

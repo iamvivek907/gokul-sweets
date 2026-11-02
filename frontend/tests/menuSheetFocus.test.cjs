@@ -13,3 +13,5 @@ test('sheets without an explicit return target preserve their previous focus',()
 
 test('fallback IDs preserve an existing close trigger, including clear-cart cancellation',()=>{const f=fixture({prefer:false});assert.equal(f.document.activeElement,f.previous);assert.equal(f.calls[0],'previous');});
 test('a fallback ID is used when clearing the cart removes its original trigger',()=>{const f=fixture({prefer:false,connected:false});assert.equal(f.document.activeElement,f.target);});
+
+test('layout cleanup resolves fallback after React removes the clear-cart trigger',()=>{const f=fixture({prefer:false});f.previous.isConnected=false;while(f.frames.length)f.frames.shift()();assert.equal(f.document.activeElement,f.target);});

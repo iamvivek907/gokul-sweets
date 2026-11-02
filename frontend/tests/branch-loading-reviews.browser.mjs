@@ -12,10 +12,14 @@ try {for(const width of [320,390,1280]){
   if(path==='/api/storefront/features')json={futuristicStorefrontV2:true,preHomeIntentGateway:true,branchExperience:true};
   else if(path==='/api/branches') {if(fail)await gate;if(fail)return route.fulfill({status:503,headers,json:{message:'unavailable'}});json=[branch];}
   else if(path==='/api/branches/1')json=branch;
-  else if(path==='/api/branches/1/discovery')json={offerings:[],overallExperience:{average:4,count:1},topRatedItems:[]};
-  else if(path==='/api/branches/1/discovery/reviews')json=new URL(route.request().url()).searchParams.has('before')
-   ? {reviews:[{comment:'Another customer enjoyed their order.',overallRating:5,displayName:'Customer'}],nextBefore:null}
-   : {reviews:[{comment:'The sweets were fresh and carefully packed.',overallRating:4,displayName:'Riya'}],nextBefore:20};
+  else if(path==='/api/branches/1/discovery')json={offerings:[],overallExperience:{average:4.7,count:23,distribution:[1,0,0,1,21]},topRatedItems:[]};
+  else if(path==='/api/branches/1/discovery/reviews'){
+   const q=new URL(route.request().url()).searchParams,stars=q.get('stars');
+   if(stars==='5')json={reviews:[{comment:q.has('before')?'Another five-star family visit.':'Delicious food and thoughtful service.',overallRating:5,displayName:'Riya'}],nextBefore:q.has('before')?null:10};
+   else if(stars==='1')json={reviews:[{comment:'The preparation needs more care.',overallRating:1,displayName:'Customer'}],nextBefore:null};
+   else if(stars)json={reviews:[],nextBefore:null};
+   else json=q.has('before')?{reviews:[{comment:'Another customer enjoyed their order.',overallRating:5,displayName:'Customer'}],nextBefore:null}:{reviews:[{comment:'The sweets were fresh and carefully packed.',overallRating:4,displayName:'Riya'}],nextBefore:20};
+  }
   else if(path==='/api/customer/identity/orders/page')return route.fulfill({status:401,headers,json:{}});
   return route.fulfill({headers,json});
  });
@@ -25,10 +29,16 @@ try {for(const width of [320,390,1280]){
  await section.getByRole('button',{name:'Retry'}).click();await section.getByText('Test branch',{exact:true}).first().waitFor();
  await page.goto(base+'/branches/1');await page.getByText('The sweets were fresh and carefully packed.').waitFor();
  assert.equal(await page.getByLabel('4 out of 5 stars').count()>0,true);
- await page.getByText('Riya · Completed order').waitFor();
+ await page.locator('figcaption').getByText('Riya',{exact:true}).waitFor();
  await page.getByRole('button',{name:'More reviews'}).click();await page.getByText('Another customer enjoyed their order.').waitFor();
  assert.equal(await page.getByText('The sweets were fresh and carefully packed.').count(),0);
- await page.getByRole('button',{name:'Latest reviews'}).click();await page.getByText('Riya · Completed order').waitFor();
+ await page.getByRole('button',{name:'Latest reviews'}).click();await page.locator('figcaption').getByText('Riya',{exact:true}).waitFor();
+ await page.getByRole('button',{name:'Show reviews rated 5 stars',exact:true}).click();await page.getByText('Delicious food and thoughtful service.').waitFor();
+ await page.getByRole('button',{name:'More reviews',exact:true}).click();await page.getByText('Another five-star family visit.').waitFor();
+ await page.getByRole('button',{name:'Show reviews rated 1 stars',exact:true}).click();await page.getByText('The preparation needs more care.').waitFor();await page.getByText('Gokul guest',{exact:true}).waitFor();
+ assert.equal(await page.getByText('Another five-star family visit.').count(),0);
+ await page.getByRole('button',{name:'Show reviews rated 2 stars',exact:true}).click();await page.getByText('No published comments yet.').waitFor();
+ await page.getByRole('button',{name:'All reviews',exact:true}).click();await page.getByText('The sweets were fresh and carefully packed.').waitFor();
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await context.close();
 }console.log('Branch loading, retry and published feedback passed');}finally{await browser.close();}

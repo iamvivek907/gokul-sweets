@@ -54,7 +54,7 @@ try{for(const [width,enabled,expired,reduced,classic] of [[320,true,true,true,fa
  if(enabled&&width<=640){
   const carousel=page.getByRole('region',{name:'Published menu banners',exact:true});
   const action=await carousel.getByRole('button',{name:'Explore sweets',exact:true}).boundingBox();
-  const next=await carousel.getByRole('button',{name:'Next banner',exact:true}).boundingBox();
+  const next=await carousel.getByRole('button',{name:'Show banner 1',exact:true}).boundingBox();
   assert.ok(action.y+action.height<=next.y,'integrated carousel controls do not overlap the category action');
   assert.ok((await carousel.boundingBox()).height<300,'short festive copy keeps the phone carousel compact');
  }

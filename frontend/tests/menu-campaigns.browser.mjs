@@ -40,8 +40,8 @@ try {for(const width of [320,390,640,1280]) {
  }
  // Rapid taps advance from the requested target while a smooth transition is still in flight.
  const rapid=page.getByRole('region',{name:'Published menu banners',exact:true});
- await rapid.getByRole('button',{name:'Next banner',exact:true}).click();
- await rapid.getByRole('button',{name:'Next banner',exact:true}).click();
+ await rapid.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowRight');
+ await rapid.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowRight');
  await rapid.getByRole('button',{name:'Explore bakery',exact:true}).waitFor();
  await rapid.getByRole('button',{name:'Show banner 1',exact:true}).click();
  await rapid.getByRole('button',{name:'Explore sweets',exact:true}).waitFor();
@@ -52,9 +52,9 @@ try {for(const width of [320,390,640,1280]) {
  await carousel.getByRole('button',{name:'Explore food',exact:true}).click();
  await page.getByRole('heading',{name:'Food favourite',exact:true}).waitFor();
  // Narrow phone and desktop use the same arrows and exact category actions.
- await carousel.getByRole('button',{name:'Next banner',exact:true}).click();
+ await carousel.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowRight');
  await carousel.getByRole('button',{name:'Explore bakery',exact:true}).waitFor();
- await carousel.getByRole('button',{name:'Previous banner',exact:true}).click();
+ await carousel.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowLeft');
  await carousel.getByRole('button',{name:'Explore food',exact:true}).waitFor();
  const track=carousel.getByLabel('Swipe to explore categories',{exact:true});
  await track.evaluate(node=>node.scrollBy({left:node.clientWidth,behavior:'smooth'}));
@@ -73,7 +73,7 @@ try {for(const width of [320,390,640,1280]) {
  await page.getByRole('group',{name:'Language / भाषा',exact:true}).getByRole('button',{name:/English/}).click();
  // Multiple admin-published banners preserve their exact ordering and content.
  banners=[banner,{...banner,key:'meals',titleEn:'Diwali meal plans',buttonLabel:'Explore meals',categoryId:1,order:1}];
- await load();await page.getByRole('button',{name:'Next banner',exact:true}).click();
+ await load();await page.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowRight');
  await page.getByRole('heading',{name:'Diwali meal plans',exact:true}).waitFor();
  await page.getByRole('button',{name:'Explore meals',exact:true}).click();
  await page.getByRole('heading',{name:'Food favourite',exact:true}).waitFor();
@@ -91,9 +91,9 @@ try {for(const width of [320,390,640,1280]) {
  const play=page.getByRole('button',{name:'Play banner animation',exact:true});await play.focus();await page.keyboard.press('Space');
  await pause.waitFor();assert.equal(await video.evaluate(v=>v.paused),false,'keyboard resumes real playback');
  await pause.focus();await page.keyboard.press('Enter');await play.waitFor();assert.equal(await video.evaluate(v=>v.paused),true);
- await page.getByRole('button',{name:'Next banner',exact:true}).click();await page.getByRole('heading',{name:'Sweet celebrations',exact:true}).waitFor();
+ await page.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowRight');await page.getByRole('heading',{name:'Sweet celebrations',exact:true}).waitFor();
  assert.equal(await video.count(),0,'inactive videos are removed');assert.equal(await page.getByRole('button',{name:/banner animation/}).count(),0);
- await page.getByRole('button',{name:'Previous banner',exact:true}).click();await pause.waitFor();
+ await page.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowLeft');await pause.waitFor();
  await page.emulateMedia({reducedMotion:'reduce'});await video.waitFor({state:'detached'});
  assert.equal(await page.getByRole('button',{name:/banner animation/}).count(),0,'reduced motion uses the poster');
  assert.ok(await page.locator('[aria-label="Published menu banners"] img').count()>0);

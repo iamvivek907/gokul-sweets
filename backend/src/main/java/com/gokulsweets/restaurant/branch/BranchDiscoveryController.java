@@ -22,16 +22,18 @@ public class BranchDiscoveryController {
      */
     @GetMapping("/reviews")
     public BranchDiscoveryService.PublicReviewPage reviews(
-            @PathVariable long branchId, @RequestParam(required = false) Long before) {
+            @PathVariable long branchId,
+            @RequestParam(required = false) Long before,
+            @RequestParam(required = false) Integer stars) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(BranchDiscoveryController.class, "reviews(long,Long)");
+                MethodTiming.start(BranchDiscoveryController.class, "reviews(long,Long,Integer)");
         try {
-            return discovery.reviews(branchId, before);
+            return discovery.reviews(branchId, before, stars);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     BranchDiscoveryController.class,
-                    "reviews(long,Long)");
+                    "reviews(long,Long,Integer)");
         }
     }
 
