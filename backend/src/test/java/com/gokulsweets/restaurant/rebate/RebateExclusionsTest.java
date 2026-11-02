@@ -264,7 +264,26 @@ class RebateExclusionsTest {
         offer.getExcludedCategoryIds().clear();
         var item = order.getItems().getFirst();
         item.setMealLabel("Meal");
-        item.setMealDetails("[{\"productId\":10,\"regularTotal\":200,\"mealDiscount\":20}]");
+        item.setMealDetails(
+                tools.jackson.databind.json.JsonMapper.builder()
+                        .build()
+                        .writeValueAsString(
+                                List.of(
+                                        new com.gokulsweets.restaurant.meal.MealModels
+                                                .ComponentSnapshot(
+                                                "meal1",
+                                                1,
+                                                1,
+                                                "Meal",
+                                                1,
+                                                List.of("main"),
+                                                10,
+                                                "Dish",
+                                                1,
+                                                null,
+                                                n("200"),
+                                                n("200"),
+                                                n("20")))));
         // Item subtotal 300 contains 180 of discounted meal plus 120 of extra dish.
         assertThat(com.gokulsweets.restaurant.meal.MealSpendBasis.standaloneSubtotal(item))
                 .isEqualByComparingTo("120");

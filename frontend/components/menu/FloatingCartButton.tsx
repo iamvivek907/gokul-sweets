@@ -40,7 +40,7 @@ function formatCurrency(
             currency:
                 "INR",
             maximumFractionDigits:
-                2, minimumFractionDigits: 2
+                2, minimumFractionDigits: 0
         }
     ).format(
         amount
