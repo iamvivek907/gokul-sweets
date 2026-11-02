@@ -67,6 +67,10 @@ final class RebateSpendBasis {
                                             .standaloneSubtotal(item));
             }
             if (goods.signum() <= 0 || included.signum() <= 0) return BigDecimal.ZERO.setScale(2);
+            // Meal carts qualify their extra goods before coins; the payable discount is capped
+            // separately so using earned coins cannot revoke a qualified offer.
+            if (com.gokulsweets.restaurant.meal.MealSpendBasis.hasMeals(order))
+                return included.setScale(2, RoundingMode.HALF_UP);
             // Allocate an order-level loyalty discount proportionally across all product spend.
             BigDecimal discount =
                     order.isLoyaltyEnrolled()
@@ -78,6 +82,29 @@ final class RebateSpendBasis {
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, RebateSpendBasis.class, "eligible(Order,Rebate)");
+        }
+    }
+
+    /** Caps a mixed-cart offer to its funded extra goods after proportional coin allocation. */
+    static BigDecimal funded(Order order, BigDecimal included) {
+        long started = MethodTiming.start(RebateSpendBasis.class, "funded(Order,BigDecimal)");
+        try {
+            BigDecimal goods =
+                    order.getItems().stream()
+                            .map(
+                                    item ->
+                                            zero(item.getLineTotal())
+                                                    .subtract(zero(item.getTaxAmount()))
+                                                    .max(BigDecimal.ZERO))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (goods.signum() <= 0) return BigDecimal.ZERO;
+            BigDecimal coins =
+                    order.isLoyaltyEnrolled()
+                            ? zero(order.getLoyaltyDiscount()).max(BigDecimal.ZERO).min(goods)
+                            : BigDecimal.ZERO;
+            return included.multiply(goods.subtract(coins)).divide(goods, 2, RoundingMode.HALF_UP);
+        } finally {
+            MethodTiming.finish(started, RebateSpendBasis.class, "funded(Order,BigDecimal)");
         }
     }
 
@@ -108,6 +135,8 @@ final class RebateSpendBasis {
             }
             BigDecimal discount =
                     order.isLoyaltyEnrolled()
+                                    && !com.gokulsweets.restaurant.meal.MealSpendBasis.hasMeals(
+                                            order)
                             ? zero(order.getLoyaltyDiscount()).max(BigDecimal.ZERO).min(goods)
                             : BigDecimal.ZERO;
             if (eligible(order, rebate).compareTo(threshold) >= 0)
