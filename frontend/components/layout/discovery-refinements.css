@@ -20,7 +20,7 @@ html:has(.future-storefront)::-webkit-scrollbar,.future-storefront :is(.mobile-m
 .future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline small{display:none}
 .future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline :is(.menu-purchase-control,.menu-pairing-group-button){position:static!important;inset:auto!important;grid-column:2;grid-row:4;width:100%!important;min-height:44px!important;align-self:end}
 .future-storefront[data-premium-menu=true] .mobile-menu-pairings-inline .menu-purchase-control :is(button,[role=group]){min-height:44px!important;height:44px!important}
-.future-storefront .branch-overview-hero{border-radius:24px;overflow:hidden;background:linear-gradient(120deg,#fff8ed,#f9e9ee)}
+.future-storefront[data-customer-design=reference] .branch-overview-hero{border-radius:24px;overflow:hidden;background:linear-gradient(120deg,#fff8ed,#f9e9ee) #fff8ed!important;border:1px solid #eee0d6;box-shadow:0 8px 28px #64182d08}
 .future-storefront .branch-overview-photo img{object-fit:cover}
 .future-storefront .branch-discovery .branch-rating{padding:24px;border:1px solid #e5dac8;border-radius:24px;background:linear-gradient(130deg,#fff8e8,#f4f9f2);gap:20px}
 @media(max-width:640px){.future-storefront .branch-overview-hero{border-radius:20px}.future-storefront .branch-discovery .branch-rating{padding:20px}.future-storefront .branch-discovery>section{margin-block:24px}}
@@ -31,3 +31,7 @@ html:has(.future-storefront)::-webkit-scrollbar,.future-storefront :is(.mobile-m
 .future-storefront .menu-floating-category-trigger{min-height:48px}
 .future-storefront .menu-category-anchored nav{margin-top:0}
 @media(max-width:640px){.future-storefront[data-premium-menu=true] .menu-category-anchored{left:12px!important;right:auto!important}.future-storefront[data-premium-menu=true] .menu-category-anchored>footer{align-self:flex-start}}
+
+@media(max-width:640px){.future-storefront[data-customer-design=reference] .branch-overview-hero:has(picture){grid-template-columns:minmax(0,1fr);padding:14px;gap:14px}.future-storefront[data-customer-design=reference] .branch-overview-hero:has(picture) .branch-overview-photo{order:-1;width:100%;height:170px;margin:0;border-radius:16px}.future-storefront[data-customer-design=reference] .branch-overview-hero:has(picture) .branch-overview-copy>p:not(.gokul-overline){display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}}
+.future-storefront[data-customer-design=reference] .branch-discovery{gap:24px}
+.future-storefront[data-customer-design=reference] .branch-discovery>section{margin:0}

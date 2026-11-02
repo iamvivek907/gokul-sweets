@@ -3,7 +3,7 @@ import {mkdir} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
-const branch={id:1,name:'Test branch',active:true,operational:true,pickupAvailable:true,address:'Test road'};
+const branch={id:1,name:'Test branch',active:true,operational:true,pickupAvailable:true,address:'Test road',coverImageUrl:'/arrival-mithai.webp',description:'Fresh sweets, savoury favourites and meals, made for everyday visits and celebrations.'};
 try {for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
  let release;const gate=new Promise(resolve=>release=resolve);let fail=true;
@@ -29,6 +29,8 @@ try {for(const width of [320,390,1280]){
  release();await section.getByRole('alert').filter({hasText:'Could not load branches'}).waitFor();fail=false;
  await section.getByRole('button',{name:'Retry'}).click();await section.getByText('Test branch',{exact:true}).first().waitFor();
  await page.goto(base+'/branches/1');await page.getByText('The sweets were fresh and carefully packed.').waitFor();
+ if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/branch-home-${width}.png`});}
+ if(width<641){const hero=page.locator('.branch-overview-hero');const photo=await hero.locator('picture').boundingBox(),copy=await hero.locator('.branch-overview-copy').boundingBox();assert.ok(photo.y+photo.height<=copy.y,'branch cover leads the compact mobile hero');}
  assert.equal(await page.getByLabel('4 out of 5 stars').count()>0,true);
  await page.locator('figcaption').getByText('Riya',{exact:true}).waitFor();
  await page.getByRole('button',{name:'More reviews'}).click();await page.getByText('Another customer enjoyed their order.').waitFor();
