@@ -1,5 +1,5 @@
 "use client";
-import {adjustCartItems} from "@/lib/cartMeals";
+import {adjustCartItems,standaloneCartItems} from "@/lib/cartMeals";
 import MealCartSummary from "@/components/meal/MealCartSummary";
 import {availabilityItems} from "@/services/availabilityApi";
 import {T,useTranslation} from "@/lib/language";
@@ -2109,7 +2109,7 @@ try {
 
                         <MealCartSummary disabled={submitting||!!pendingOrder}/>
                         {
-                            items.map(
+                            standaloneCartItems(parseCart(getCartSnapshot())).map(
                                 item => (
 
                                     <div

@@ -68,7 +68,7 @@ export async function checkCartAvailability(
     items: ReturnType<typeof availabilityItems>, signal?: AbortSignal, menuPreview = false
 ) {
     const data = await apiClient<CartAvailability | CompactMenuAvailability>(`/api/branches/${branchId}/availability${menuPreview ? "?menuPreview=true&compact=true&versioned=true" : ""}`, {
-        method: "POST", signal, body: JSON.stringify({startDate, days, items, fulfilmentType: "PICKUP"})
+        method: "POST", signal, body: JSON.stringify({startDate, days, items: items.map(({productId,quantity,weightGrams})=>({productId,quantity,weightGrams})), fulfilmentType: "PICKUP"})
     });
     return {...expandMenuPreview(data), receivedMonotonic: typeof performance === "undefined" ? 0 : performance.now()};
 }

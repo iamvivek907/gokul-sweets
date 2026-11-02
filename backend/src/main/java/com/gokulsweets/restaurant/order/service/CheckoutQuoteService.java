@@ -62,7 +62,31 @@ public class CheckoutQuoteService {
             long productId,
             Long categoryId,
             String mealDiscount,
-            String mealLabel) {
+            String mealLabel,
+            String mealDetails) {
+        public Line(
+                String name,
+                String unitPrice,
+                String taxRate,
+                String taxAmount,
+                String total,
+                long productId,
+                Long categoryId,
+                String mealDiscount,
+                String mealLabel) {
+            this(
+                    name,
+                    unitPrice,
+                    taxRate,
+                    taxAmount,
+                    total,
+                    productId,
+                    categoryId,
+                    mealDiscount,
+                    mealLabel,
+                    null);
+        }
+
         /** Preserves quote callers without meals. */
         public Line(
                 String name,
@@ -179,7 +203,8 @@ public class CheckoutQuoteService {
                                                             ? null
                                                             : item.product().getCategory().getId(),
                                                     item.mealDiscount().toPlainString(),
-                                                    item.mealLabel()))
+                                                    item.mealLabel(),
+                                                    item.mealDetails()))
                             .toList(),
                     amounts.subtotal().toPlainString(),
                     amounts.taxAmount().toPlainString(),

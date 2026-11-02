@@ -45,6 +45,12 @@ try{for(const width of [320,390,640]){for(const outcome of ["populated","empty",
  else if(outcome==='empty')await page.locator('.mobile-menu-pairings-inline').getByText('No optional additions right now.',{exact:true}).waitFor();
  else await page.getByRole('button',{name:'Retry pairings',exact:true}).waitFor();
  await page.locator('.mobile-menu-pairing-skeleton').waitFor({state:'hidden'});await stable(next,pairingBefore,`late ${outcome} pairings`);
+ if(outcome==='populated'){
+  for(const card of await page.locator('.mobile-menu-pairings-inline article').all()){
+   const price=await card.locator('strong').boundingBox(),action=await card.locator('.menu-purchase-control,.menu-pairing-group-button').boundingBox();
+   assert.ok(price.y+price.height<=action.y,'stable pairing cards keep prices above Add controls');
+  }
+ }
  if(outcome==='failed'){
   pairingOutcome='populated';await page.getByRole('button',{name:'Retry pairings',exact:true}).click();await page.locator('.mobile-menu-pairings-inline').getByRole('button',{name:'Add Butter biscuits from pairings',exact:true}).waitFor();await stable(next,pairingBefore,'pairing retry');
  }

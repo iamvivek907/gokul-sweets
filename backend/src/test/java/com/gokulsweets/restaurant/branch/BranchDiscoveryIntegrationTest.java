@@ -396,6 +396,36 @@ class BranchDiscoveryIntegrationTest {
     }
 
     @Test
+    void overallStarFilterPagesOnlyMatchingPublishedComments() {
+        long b = branch(), s = slot(b), p = product(b, "Filtered sweet", true, false);
+        for (int i = 0; i < 24; i++)
+            review(
+                    b,
+                    s,
+                    p,
+                    5,
+                    5,
+                    "PUBLISHED",
+                    "Excellent sweets for our family visit " + i,
+                    "PICKED_UP");
+        review(b, s, p, 1, 1, "PUBLISHED", "Food needed better preparation today", "PICKED_UP");
+        review(b, s, p, 1, 1, "HIDDEN", "Unpublished comment must stay hidden", "PICKED_UP");
+        var first = discovery.reviews(b, null, 5);
+        assertThat(first.reviews())
+                .hasSize(20)
+                .allSatisfy(value -> assertThat(value.overallRating()).isEqualTo(5));
+        var next = discovery.reviews(b, first.nextBefore(), 5);
+        assertThat(next.reviews()).hasSize(4);
+        assertThat(next.nextBefore()).isNull();
+        assertThat(discovery.reviews(b, null, 1).reviews()).hasSize(1);
+        assertThat(discovery.reviews(b, null, 2).reviews()).isEmpty();
+        assertThatThrownBy(() -> discovery.reviews(b, null, 0))
+                .isInstanceOf(ResponseStatusException.class);
+        assertThatThrownBy(() -> discovery.reviews(b, null, 6))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
     void shortOrContactBearingCommentsAreNotPublishedAsQuotes() {
         assertThat(BranchDiscoveryService.publicComment("Nice")).isNull();
         assertThat(BranchDiscoveryService.publicComment("Quick pickup")).isEqualTo("Quick pickup");

@@ -14,7 +14,7 @@ const browser=await chromium.launch({headless:true});
 try{for(const width of [320,390,1280]){
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();page.setDefaultTimeout(15000);
  await page.clock.install({time:new Date(`${today}T22:00:00+05:30`)});
- let outage=false,hold=false,holdDate=null,release=null,discoveries=0;const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
+ let outage=false,hold=false,holdDiscovery=false,holdDate=null,release=null,discoveries=0;const checks=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
  const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
  await context.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;let json=[];
@@ -27,7 +27,7 @@ try{for(const width of [320,390,1280]){
   else if(path==='/api/storefront/customer-identity')json={enabled:false};
   else if(path.endsWith('/pickup-discovery')){
    discoveries++;
-   if(hold){hold=false;await new Promise(resolve=>{release=resolve;});}
+   if(hold||holdDiscovery){hold=false;holdDiscovery=false;await new Promise(resolve=>{release=resolve;});}
    if(outage)return route.fulfill({status:503,headers,json:{message:'Offline'}});
    json={today,maximumDate:later,dates:[today,tomorrow,later].map((date,index)=>({date,slots:[{slot:slot(date,index+1),normalAvailable:true,issues:[]}]}))};
   }else if(path.endsWith('/availability')){
@@ -132,7 +132,8 @@ try{for(const width of [320,390,1280]){
  assert.equal(await pickup.getByText('Finding soonest pickup…',{exact:true}).count(),0);
  await page.waitForFunction(()=>document.querySelector('button[aria-label="Add Aloo Paratha to cart"]')?.disabled===false);
  // Late automatic responses cannot overwrite a confirmed manual pickup from another tab.
- await page.evaluate(()=>{for(const key of ['gokul-menu-pickup-mode:v1','gokul-selected-pickup-slot','gokul-pickup-intent'])localStorage.removeItem(key);});hold=true;release=null;
+ await page.evaluate(()=>{for(const key of ['gokul-menu-pickup-mode:v1','gokul-selected-pickup-slot','gokul-pickup-intent'])localStorage.removeItem(key);});hold=false;holdDiscovery=true;release=null;
+ // Hold discovery itself; a background inventory read must not consume this gate.
  await page.reload();await page.waitForFunction(()=>document.querySelector('.mobile-menu-pickup')?.textContent?.includes('Finding'));
  const deadline=Date.now()+15000;while(!release&&Date.now()<deadline)await page.waitForTimeout(50);assert.ok(release,"automatic verification started");
  await page.evaluate(value=>{

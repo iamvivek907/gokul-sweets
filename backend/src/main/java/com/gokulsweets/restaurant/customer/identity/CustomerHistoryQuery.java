@@ -53,6 +53,9 @@ public class CustomerHistoryQuery {
             if (criteria.limit() < 1 || criteria.limit() > 50 || before != null && after != null)
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Invalid history position.");
+            if ("ACTIVE_QUEUE".equals(criteria.status()) && (before != null || after != null))
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Use order history for pagination.");
             String cursor = before != null ? before : after;
             if (cursor != null
                     && (cursor.length() > 100 || !ownership.owns(environment, subject, cursor)))
@@ -78,11 +81,19 @@ public class CustomerHistoryQuery {
                 sql.append(" AND o.branch_id=?");
                 args.add(branch);
             }
+            if ("ACTIVE_QUEUE".equals(criteria.status())) {
+                // Sorting joins use trusted slot data, never client timestamps.
+                int where = sql.indexOf(" WHERE");
+                sql.insert(
+                        where,
+                        " LEFT JOIN pickup_slots ps ON ps.id=o.pickup_slot_id LEFT JOIN"
+                                + " delivery_capacity_windows dw ON dw.id=o.delivery_window_id");
+            }
             String status = criteria.status() == null ? "ALL" : criteria.status();
             sql.append(
                     switch (status) {
                         case "ALL" -> "";
-                        case "ACTIVE" ->
+                        case "ACTIVE", "ACTIVE_QUEUE" ->
                                 " AND o.order_status IN"
                                     + " ('PENDING_PAYMENT','CONFIRMED','PREPARING','READY_FOR_PICKUP','READY_FOR_DELIVERY','OUT_FOR_DELIVERY')";
                         case "COMPLETED" -> " AND o.order_status IN ('PICKED_UP','DELIVERED')";
@@ -140,9 +151,15 @@ public class CustomerHistoryQuery {
                 args.add(cursor);
             }
             sql.append(
-                    after != null
-                            ? " ORDER BY o.created_at ASC,o.id ASC LIMIT ?"
-                            : " ORDER BY o.created_at DESC,o.id DESC LIMIT ?");
+                    "ACTIVE_QUEUE".equals(status)
+                            ? " ORDER BY CASE WHEN o.order_status IN"
+                                  + " ('READY_FOR_PICKUP','READY_FOR_DELIVERY','OUT_FOR_DELIVERY')"
+                                  + " THEN 0 ELSE 1 END, COALESCE(ps.slot_date,dw.service_date)"
+                                  + " ASC, COALESCE(ps.start_time,dw.starts_at) ASC,o.id ASC LIMIT"
+                                  + " ?"
+                            : after != null
+                                    ? " ORDER BY o.created_at ASC,o.id ASC LIMIT ?"
+                                    : " ORDER BY o.created_at DESC,o.id DESC LIMIT ?");
             args.add(criteria.limit() + 1);
             var rows = jdbc.query(sql.toString(), (rs, row) -> rs.getString(1), args.toArray());
             var visible = new ArrayList<>(rows.stream().limit(criteria.limit()).toList());

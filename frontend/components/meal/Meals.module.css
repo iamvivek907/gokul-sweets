@@ -9,3 +9,5 @@
 @media(max-width:640px){.carouselControls{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:6px}.carouselControls>div{display:flex;align-items:center;gap:0}.carouselControls button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;min-height:44px;border:0;background:transparent;color:#8f1838;padding:8px}.carouselControls>button{min-width:44px}.carouselControls span{width:7px;height:7px;border-radius:20px;background:#cfbcc2}.carouselControls [aria-current=true] span{width:20px;background:#8f1838}.carouselControls button:focus-visible{outline:2px solid #8f1838;outline-offset:1px}}
 
 .collection{scroll-margin-top:calc(var(--menu-header-height,100px) + 16px)}.carouselControls>div{min-width:0;overflow-x:auto;scrollbar-width:none}.carouselControls>div::-webkit-scrollbar{display:none}.carouselControls button{flex-shrink:0}
+
+.collection:focus{outline:none}.collection:focus-visible{outline:2px solid #8f1838;outline-offset:3px}

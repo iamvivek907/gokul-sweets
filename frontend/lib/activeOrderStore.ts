@@ -3,8 +3,8 @@ import {ApiError} from "@/services/apiClient";
 import {subscribeCustomerIdentityChanges} from "@/lib/customerIdentityEvents";
 import type {CustomerOrderSummaryResponse} from "@/types/order";
 
-type Snapshot={order:CustomerOrderSummaryResponse|null;stale:boolean};
-const empty:Snapshot={order:null,stale:false};
+type Snapshot={order:CustomerOrderSummaryResponse|null;orders:CustomerOrderSummaryResponse[];more:boolean;stale:boolean};
+const empty:Snapshot={order:null,orders:[],more:false,stale:false};
 let snapshot=empty,controller:AbortController|null=null,timer:ReturnType<typeof setTimeout>|null=null,generation=0;
 // This contains no customer data and survives route remounts/visibility changes.
 let failures=0,retryNotBefore=0;
@@ -24,10 +24,11 @@ async function refresh(){
  if(Date.now()<retryNotBefore){schedule(retryNotBefore-Date.now());return;}
  const request=new AbortController(),revision=generation;controller=request;
  try{
-  const result=await getVerifiedOrderPage(null,AbortSignal.any([request.signal,AbortSignal.timeout(8000)]),{limit:"1",status:"ACTIVE"});
+  const result=await getVerifiedOrderPage(null,AbortSignal.any([request.signal,AbortSignal.timeout(8000)]),{limit:"20",status:"ACTIVE_QUEUE"});
   if(revision!==generation||request.signal.aborted)return;
   failures=0;retryNotBefore=0;
-  publish({order:result.orders.find(order=>active.has(order.orderStatus))??null,stale:false});
+  const orders=result.orders.filter(order=>active.has(order.orderStatus));
+  publish({order:orders[0]??null,orders,more:!!result.nextBefore,stale:false});
  }catch(error){
   if(revision!==generation||request.signal.aborted)return;
   if(error instanceof ApiError&&[401,403,404].includes(error.status)){failures=0;retryNotBefore=0;publish(empty);}

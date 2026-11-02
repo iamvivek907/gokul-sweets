@@ -29,7 +29,7 @@ try{
    else if(path==='/api/storefront/customer-identity')json={enabled:true,guestCheckoutEnabled:false};
    else if(path==='/api/customer/identity/me')json={authenticated:true,name:'Customer',phone:'+919876543210'};
    else if(path==='/api/customer/identity/orders/page' && url.searchParams.get('status')==='COMPLETED'){assert.equal(url.searchParams.get('limit'),'1');json={orders:[],nextBefore:null};}
-   else if(path==='/api/customer/identity/orders/page'){activeReads++;assert.equal(url.searchParams.get('limit'),'1');assert.equal(url.searchParams.get('status'),'ACTIVE');json={orders:[{orderNumber:'PRIVATE-ORDER',customerOrderNumber:10,orderStatus:'PREPARING',branchId:2,branchName:orderBranch.name,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),totalAmount:40}],nextBefore:null};}
+   else if(path==='/api/customer/identity/orders/page'){activeReads++;assert.equal(url.searchParams.get('limit'),'20');assert.equal(url.searchParams.get('status'),'ACTIVE_QUEUE');json={orders:[{orderNumber:'PRIVATE-ORDER',customerOrderNumber:10,orderStatus:'PREPARING',branchId:2,branchName:orderBranch.name,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),totalAmount:40}],nextBefore:null};}
    else if(path==='/api/orders/mobile-preview')json={quote:{token:'signed',subtotal:'40',taxAmount:'0',priorityCharge:'0',convenienceFee:'0',totalAmount:'40',currency:'INR',items:[],expiresAt:new Date(Date.now()+600000).toISOString()},offers:[],paymentFee:0,paymentFeeTax:0};
    else if(path.endsWith('/availability')){
     const payload=req.postDataJSON();checks.push(payload);
@@ -44,11 +44,12 @@ try{
    if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify(original));
   },{branch,original,products});
   await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
-  const active=page.getByRole('complementary',{name:'Active order'});await active.getByRole('heading',{name:'Preparing',exact:true}).waitFor();
-  assert.equal(await active.getByRole('link',{name:'Call',exact:true}).getAttribute('href'),'tel:9999999999');
-  assert.match(await active.getByRole('link',{name:'Directions',exact:true}).getAttribute('href'),/Order%20road/);
-  assert.match(await active.getByRole('link',{name:'View pickup code',exact:true}).getAttribute('href'),/#pickup-code$/);
+  const active=page.getByRole('complementary',{name:'Active order'});await active.getByRole('button').click();const orderSheet=page.locator('dialog').filter({has:page.locator('.active-order-list')});await orderSheet.getByText('Preparing',{exact:true}).waitFor();
+  assert.equal(await orderSheet.getByRole('link',{name:'Call',exact:true}).getAttribute('href'),'tel:9999999999');
+  assert.match(await orderSheet.getByRole('link',{name:'Directions',exact:true}).getAttribute('href'),/Order%20road/);
+  assert.match(await orderSheet.getByRole('link',{name:'View pickup code',exact:true}).getAttribute('href'),/#pickup-code$/);
   assert.equal(await active.getByText('PRIVATE-ORDER',{exact:true}).count(),0);
+  await orderSheet.getByRole('button',{name:'Close',exact:true}).click();await orderSheet.waitFor({state:'hidden'});
   const input=page.locator('#gokul-menu-search');await input.fill('panner');await page.getByRole('heading',{name:'Paneer Burger',exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Fresh Peda',exact:true}).count(),0);
   if(width===390){
    await page.locator('.menu-browse-chips').getByRole('button',{name:'Browse all item categories',exact:true}).click();
@@ -63,7 +64,7 @@ try{
    await picker.getByRole('button',{name:'Use this pickup',exact:true}).click();await picker.waitFor({state:'hidden'});
    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-selected-pickup-slot')).date),later);assert.equal(await page.evaluate(()=>localStorage.getItem('gokul-cart')),cart);
    assert.ok(checks.some(c=>c.days>1&&c.items?.some(i=>i.productId===1)&&c.items?.some(i=>i.productId===2)),'prospective variant and actual cart searched together');
-   await page.evaluate(()=>{localStorage.setItem('gokul-language','hi');window.dispatchEvent(new Event('storage'));});await page.getByRole('button',{name:'सभी आइटम श्रेणियाँ देखें',exact:true}).waitFor();await input.fill('पनीर');await page.getByRole('heading',{name:'Paneer Burger',exact:true}).waitFor();await active.getByRole('link',{name:'पिकअप कोड देखें',exact:true}).waitFor();
+   await page.evaluate(()=>{localStorage.setItem('gokul-language','hi');window.dispatchEvent(new Event('storage'));});await page.getByRole('button',{name:'सभी आइटम श्रेणियाँ देखें',exact:true}).waitFor();await input.fill('पनीर');await page.getByRole('heading',{name:'Paneer Burger',exact:true}).waitFor();await input.blur();await active.getByRole('button').click();await orderSheet.getByRole('link',{name:'पिकअप कोड देखें',exact:true}).waitFor();await orderSheet.getByRole('button',{name:'बंद करें',exact:true}).click();await orderSheet.waitFor({state:'hidden'});
    await page.evaluate(()=>{localStorage.setItem('gokul-language','en');window.dispatchEvent(new Event('storage'));});
   }
   assert.ok(activeReads<=2,'active order must not trigger repeated reads for menu interaction');

@@ -421,6 +421,66 @@ VALUES (?, 'DEV', ?)
                 .isInstanceOf(ResponseStatusException.class);
     }
 
+    @Test
+    void activeQueuePrioritizesReadyThenEarliestPickupAndStaysOwnerScoped() {
+        var subject = UUID.randomUUID();
+        var branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES (?,'Queue') RETURNING id",
+                        Long.class,
+                        "QUEUE-" + UUID.randomUUID());
+        var morning =
+                jdbc.queryForObject(
+                        "INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)"
+                                + " VALUES (?,CURRENT_DATE,'10:00','10:30',20) RETURNING id",
+                        Long.class,
+                        branch);
+        var evening =
+                jdbc.queryForObject(
+                        "INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity)"
+                                + " VALUES (?,CURRENT_DATE,'18:00','18:30',20) RETURNING id",
+                        Long.class,
+                        branch);
+        var early = order(branch, morning, "CONFIRMED");
+        var later = order(branch, evening, "CONFIRMED");
+        var ready = order(branch, evening, "READY_FOR_PICKUP");
+        for (var id : java.util.List.of(early, later, ready))
+            jdbc.update(
+                    "INSERT INTO verified_order_ownership(order_id,environment,verified_subject_id)"
+                            + " VALUES (?,'DEV',?)",
+                    id,
+                    subject);
+        var criteria =
+                new CustomerHistoryQuery.Criteria(
+                        null, null, 2, null, "ACTIVE_QUEUE", null, null, null);
+        var page = history.read("DEV", subject, criteria);
+        var readyRef =
+                jdbc.queryForObject(
+                        "SELECT order_number FROM orders WHERE id=?", String.class, ready);
+        var earlyRef =
+                jdbc.queryForObject(
+                        "SELECT order_number FROM orders WHERE id=?", String.class, early);
+        assertThat(page.references()).containsExactly(readyRef, earlyRef);
+        assertThat(page.hasNext()).isTrue();
+        assertThat(history.read("DEV", UUID.randomUUID(), criteria).references()).isEmpty();
+        assertThat(history.read("PROD", subject, criteria).references()).isEmpty();
+        assertThatThrownBy(
+                        () ->
+                                history.read(
+                                        "DEV",
+                                        subject,
+                                        new CustomerHistoryQuery.Criteria(
+                                                readyRef,
+                                                null,
+                                                2,
+                                                null,
+                                                "ACTIVE_QUEUE",
+                                                null,
+                                                null,
+                                                null)))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
     private Long order(Long branch, Long slot, String status) {
         return jdbc.queryForObject(
                 """

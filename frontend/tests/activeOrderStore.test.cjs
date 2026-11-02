@@ -12,7 +12,7 @@ function fixture(){
 }
 test('active-order store shares one bounded request and clears on identity change, ignoring stale responses',async()=>{
  const f=fixture(),stop=f.subscribeActiveOrder(()=>{}),second=f.subscribeActiveOrder(()=>{});
- assert.equal(f.requests.length,1);assert.equal(f.requests[0].filters.limit,'1');assert.equal(f.requests[0].filters.status,'ACTIVE');
+ assert.equal(f.requests.length,1);assert.equal(f.requests[0].filters.limit,'20');assert.equal(f.requests[0].filters.status,'ACTIVE_QUEUE');
  f.identity();assert.equal(f.requests[0].signal.aborted,true);assert.equal(f.getActiveOrder().order,null);
  f.requests[0].resolve({orders:[{orderNumber:'OLD',orderStatus:'CONFIRMED'}]});await f.flush();assert.equal(f.getActiveOrder().order,null);
  f.requests[1].resolve({orders:[{orderNumber:'NEW',orderStatus:'PREPARING'}]});await f.flush();assert.equal(f.getActiveOrder().order.orderNumber,'NEW');assert.equal([...f.timers.values()][0].ms,15000);
@@ -47,3 +47,5 @@ test('failure backoff grows to a bound and a successful response restores normal
  f.requests.at(-1).resolve({orders:[]});await f.flush();assert.equal([...f.timers.values()][0].ms,60000);await f.tick();
  f.requests.at(-1).reject(new ApiError(503,180000));await f.flush();assert.equal([...f.timers.values()][0].ms,180000);stop();
 });
+
+test('bounded multi-order snapshot retains server queue priority and overflow without extra reads',async()=>{const f=fixture(),stop=f.subscribeActiveOrder(()=>{});const orders=[{orderNumber:'READY',orderStatus:'READY_FOR_PICKUP'},{orderNumber:'LATER',orderStatus:'CONFIRMED'}];f.requests[0].resolve({orders,nextBefore:'more'});await f.flush();assert.equal(f.getActiveOrder().order.orderNumber,'READY');assert.equal(f.getActiveOrder().orders.length,2);assert.equal(f.getActiveOrder().more,true);assert.equal(f.requests.length,1);f.identity();assert.equal(f.getActiveOrder().orders.length,0);stop();});
