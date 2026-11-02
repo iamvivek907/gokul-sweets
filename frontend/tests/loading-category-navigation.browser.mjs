@@ -6,6 +6,23 @@ async function waitForMockRequest(started,label){
  try{await Promise.race([started,new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} request did not start within 15 seconds`)),15000);})]);}
  finally{clearTimeout(timer);}
 }
+async function assertCategoryPanel(page,sheet){
+ const body=sheet.locator('.mobile-menu-suggestion-body'),close=sheet.getByRole('button',{name:'Close',exact:true});
+ assert.equal(await body.evaluate(n=>getComputedStyle(n).backgroundColor),'rgb(16, 17, 20)','category list keeps its dark surface');
+ assert.equal(await sheet.evaluate(n=>getComputedStyle(n).backgroundColor),'rgba(0, 0, 0, 0)','no opaque strip behind the Close toggle');
+ const buttons=sheet.locator('nav button');
+ for(const button of await buttons.all())assert.ok(['rgb(248, 246, 247)','rgb(255, 255, 255)'].includes(await button.evaluate(n=>getComputedStyle(n).color)),'category labels stay readable on dark background');
+ const first=buttons.first();await page.keyboard.press('ArrowDown');await first.focus();assert.equal(await first.evaluate(n=>n===document.activeElement),true);assert.equal(await first.evaluate(n=>getComputedStyle(n).outlineColor),'rgb(255, 225, 160)');
+ const trigger=await page.locator('.menu-floating-category-trigger').evaluate(n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height};}),toggle=await close.boundingBox();
+ assert.ok(Math.abs(trigger.x-toggle.x)<2&&Math.abs(trigger.y-toggle.y)<2,'Close occupies the Categories anchor');
+ assert.ok(Math.abs(trigger.width-toggle.width)<2&&Math.abs(trigger.height-toggle.height)<2,'Close matches the trigger dimensions');
+ const bounds=await body.boundingBox();assert.ok(bounds.y>=0&&bounds.y+bounds.height<=toggle.y-8,'list stays above Close within the viewport');
+ const label=buttons.nth(1).locator('span').first(),original=await label.textContent();
+ await label.evaluate(n=>n.textContent='Traditional sweets and celebration gift assortments for the whole family');
+ const name=await label.boundingBox(),count=await buttons.nth(1).locator('span').last().boundingBox();assert.ok(name.x+name.width<=count.x-8,'long category names never overlap item counts');
+ assert.equal(await sheet.evaluate(n=>n.scrollWidth<=n.clientWidth),true,'category panel never scrolls sideways');
+ await label.evaluate((n,text)=>n.textContent=text,original);
+}
 const base=process.env.BROWSER_BASE??'http://127.0.0.1:3311',date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,name:'Main branch',active:true,operational:true,pickupAvailable:true};
 const product=(id,name,categoryId,categoryName,price)=>({id,name,categoryId,categoryName,price,available:true,saleMode:'UNIT',description:'Prepared for your pickup.',imageUrl:'/arrival-mithai.webp'});
@@ -70,7 +87,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
 
   await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
   await floating.click();let sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});await sheet.waitFor();
-  const close=sheet.getByRole('button',{name:'Close',exact:true});await close.waitFor();
+  const close=sheet.getByRole('button',{name:'Close',exact:true});await close.waitFor();await assertCategoryPanel(page,sheet);
   const navBounds=await sheet.locator('nav').boundingBox(),closeBounds=await close.boundingBox();assert.ok(navBounds.y+navBounds.height<=closeBounds.y,'category choices open above the Close toggle');
   await close.click();await sheet.waitFor({state:'hidden'});await floating.click();await sheet.waitFor();
   assert.ok((await sheet.boundingBox()).width<width,'category panel has side margins');
@@ -100,7 +117,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await page.locator('#gokul-product-1').getByRole('button',{name:'Add Rasgulla to cart',exact:true}).click();await page.locator('.gokul-floating-cart').waitFor();
   await page.waitForFunction(()=>{const f=document.querySelector('.menu-floating-category-trigger').getBoundingClientRect(),c=document.querySelector('.gokul-floating-cart').getBoundingClientRect();return f.bottom<=c.top-4;});
   const cart=await page.evaluate(()=>localStorage.getItem('gokul-cart'));
-  await floating.click();const sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});
+  await floating.click();const sheet=page.getByRole('dialog',{name:'Jump to a category',exact:true});await sheet.waitFor();await assertCategoryPanel(page,sheet);
   await sheet.getByRole('button',{name:/Dairy/}).click();await page.locator('#gokul-product-3').waitFor();assert.equal(await page.locator('#gokul-product-1').count(),0);
   await page.waitForFunction(()=>{const n=document.querySelector('#menu-category-2');return n&&n.getBoundingClientRect().top>=52&&n.getBoundingClientRect().top<innerHeight/2;});
   await floating.click();await sheet.getByRole('button',{name:/^All items\s*\d+$/}).click();await page.locator('#gokul-product-1').waitFor();
