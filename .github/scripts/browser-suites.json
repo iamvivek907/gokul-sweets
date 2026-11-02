@@ -43,6 +43,7 @@
     "tests/menu-category-speed.browser.mjs",
     "tests/reference-ordering.browser.mjs",
     "tests/menu-pairings-speed.browser.mjs",
+    "tests/meal-pairing-quantities.browser.mjs",
     "tests/menu-offer-freshness.browser.mjs",
     "tests/menu-discovery.browser.mjs",
     "tests/menu-pickup-guidance.browser.mjs",
