@@ -132,6 +132,10 @@ export function useCart(): UseCartResult {
         const existingItem =
             cart.items.find(item => item.product.id === product.id);
 
+        // The menu weight selector edits the extra portion, never the included meal grams.
+        const includedWeight = product.saleMode === "WEIGHT" && cart.meals?.length && existingItem
+            ? (existingItem.weightGrams ?? 0) - (standaloneCartItems(cart).find(item => item.product.id === product.id)?.weightGrams ?? 0)
+            : 0;
         const updatedItems = existingItem
             ? cart.items.map(item => {
                 if (item.product.id !== product.id) {
@@ -143,7 +147,7 @@ export function useCart(): UseCartResult {
                         ...item,
                         product,
                         quantity: 1,
-                        weightGrams: requestedWeightGrams ?? item.weightGrams
+                        weightGrams: (requestedWeightGrams ?? 0) + includedWeight
                     }
                     : {
                         ...item,

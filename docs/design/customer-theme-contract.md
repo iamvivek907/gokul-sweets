@@ -440,7 +440,8 @@ reveals the meal cards. Its labels do not claim unconfigured savings or prices.
 
 ## November 2 discovery refinement
 Modern campaign/meal rails lead with dots and swipe; rotation controls are available
-on keyboard focus, and choosing a dot pauses rotation. Category navigation opens
+on keyboard focus. Choosing a dot pauses rotation for six seconds, then resumes automatically;
+keyboard focus, explicit pause and reduced motion continue to prevent rotation. Category navigation opens
 a bounded panel above its existing floating action; the action becomes Close.
 The native modal retains scroll locking, Escape/backdrop dismissal and focus return.
 Recommendation price and Add controls occupy separate grid rows. Review stars
