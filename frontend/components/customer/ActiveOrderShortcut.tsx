@@ -22,7 +22,7 @@ export default function ActiveOrderShortcut(){
  const [trigger,setTrigger]=useState<HTMLElement|null>(null);const locale=useLanguage();
  useEffect(()=>{
   let cart:HTMLElement|null=null;
-  const update=()=>{const next=document.querySelector<HTMLElement>('.gokul-floating-cart');if(next!==cart){if(cart)observer.unobserve(cart);cart=next;if(cart)observer.observe(cart);}setBottom(cart?Math.max(0,innerHeight-cart.getBoundingClientRect().top)+4:null);};
+  const update=()=>{const next=document.querySelector<HTMLElement>('.gokul-floating-cart');if(next!==cart){if(cart)observer.unobserve(cart);cart=next;if(cart)observer.observe(cart);}setBottom(cart?Math.max(0,innerHeight-cart.getBoundingClientRect().top):null);};
   const observer=new ResizeObserver(update),mutations=new MutationObserver(update);
   mutations.observe(document.body,{childList:true,subtree:true});update();window.addEventListener('resize',update);
   return()=>{observer.disconnect();mutations.disconnect();window.removeEventListener('resize',update);};

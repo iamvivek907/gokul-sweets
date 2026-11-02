@@ -13,7 +13,7 @@ const subscribeHydration=()=>()=>{};
 const hydratedSnapshot=()=>true;
 const serverSnapshot=()=>false;
 
-/** One short entrance per document/app resume; route changes never restart it. */
+/** One short entrance per document; internal routes and app resumes never restart it. */
 export default function MobileBrandLaunch() {
     const hydrated=useSyncExternalStore(subscribeHydration,hydratedSnapshot,serverSnapshot);
     const dialog = useRef<HTMLDialogElement>(null);
@@ -37,7 +37,7 @@ export default function MobileBrandLaunch() {
         };
         const resume = () => {
             if (document.visibilityState === "hidden") {hiddenAt = Date.now(); close();}
-            // A long app resume gets the welcome; returning from a payment app does not.
+            // An existing document resumes in place, including an unfinished meal or payment.
             else if (hiddenAt) hiddenAt=0;
         };
         if (!entranceShown && !/^\/(checkout|orders)(\/|$)/.test(entryPath.current)) {entranceShown=true;show();}
