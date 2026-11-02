@@ -42,7 +42,7 @@ export default function MenuCampaignBanners({banners, categories, onSelect, comp
             {modern && slide.category && <span className={styles.eyebrow}>{translate(slide.category.name, locale)}</span>}
             <h2>{locale === "hi" && slide.banner.titleHi ? slide.banner.titleHi : slide.banner.titleEn}</h2>
             <p>{locale === "hi" && slide.banner.subtitleHi ? slide.banner.subtitleHi : slide.banner.subtitleEn}</p>
-            {slide.banner.buttonLabel && slide.category && <button type="button" onClick={() => onSelect(slide.category!.id)}>{slide.generated ? locale === "hi" ? `${translate(slide.category.name, locale)} देखें` : `Explore ${slide.category.name.toLocaleLowerCase("en-IN")}` : slide.banner.buttonLabel} <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>}
+            {slide.banner.buttonLabel && slide.category && <button type="button" onClick={() => onSelect(slide.category!.id)}>{slide.generated ? locale === "hi" ? `${translate(slide.category.name, locale)} देखें` : `Explore ${slide.category.name.toLocaleLowerCase("en-IN")}` : slide.banner.buttonLabel}</button>}
         </div>
     </>;
     if (!modern) return <div className={compact ? styles.strips : undefined} aria-label="Published menu banners">

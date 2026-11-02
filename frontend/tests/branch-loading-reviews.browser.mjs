@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {mkdir} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
@@ -39,6 +40,8 @@ try {for(const width of [320,390,1280]){
  assert.equal(await page.getByText('Another five-star family visit.').count(),0);
  await page.getByRole('button',{name:'Show reviews rated 2 stars',exact:true}).click();await page.getByText('No published comments yet.').waitFor();
  await page.getByRole('button',{name:'All reviews',exact:true}).click();await page.getByText('The sweets were fresh and carefully packed.').waitFor();
+ if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await page.getByRole('button',{name:'Show reviews rated 5 stars',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/branch-reviews-${width}.png`});}
+ assert.equal(await page.evaluate(()=>getComputedStyle(document.documentElement).scrollbarWidth),'none');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  await context.close();
 }console.log('Branch loading, retry and published feedback passed');}finally{await browser.close();}
