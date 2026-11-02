@@ -1,4 +1,5 @@
 "use client";
+import {standaloneCartItems} from "@/lib/cartMeals";
 import MealShortcut from "@/components/meal/MealShortcut";
 import {useBranchMeals} from "@/hooks/useBranchMeals";
 import MealCollection from "@/components/meal/MealCollection";
@@ -123,6 +124,7 @@ export default function MenuScreen() {
 
     const {
         items,
+        meals,
         branchId: cartBranchId,
         itemCount,
         subtotal,
@@ -532,7 +534,7 @@ export default function MenuScreen() {
                 }
 
 
-                return items.reduce<
+                return standaloneCartItems({items,meals}).reduce<
                     Record<number, number>
                 >(
                     (
@@ -553,7 +555,7 @@ export default function MenuScreen() {
             [
                 branch,
                 cartBranchId,
-                items
+                items, meals
             ]
         );
 
@@ -570,7 +572,7 @@ export default function MenuScreen() {
                 }
 
 
-                return items.reduce<
+                return standaloneCartItems({items,meals}).reduce<
                     Record<number, number>
                 >(
                     (
@@ -593,7 +595,7 @@ export default function MenuScreen() {
             [
                 branch,
                 cartBranchId,
-                items
+                items, meals
             ]
         );
 
