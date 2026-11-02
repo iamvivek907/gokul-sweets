@@ -23,6 +23,7 @@
     "tests/branch-loading-reviews.browser.mjs"
   ],
   "menu": [
+    "tests/menu-search-premium.browser.mjs",
     "tests/order-edge-reminder.browser.mjs",
     "tests/meal-dock-polish.browser.mjs",
     "tests/menu-capacity-carousel.browser.mjs",

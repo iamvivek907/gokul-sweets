@@ -6,8 +6,9 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
+import Image from "next/image";
 import MenuDiscoverySheet from "./MenuDiscoverySheet";
-import { T, useTranslation } from "@/lib/language";
+import { T, useLanguage, useTranslation } from "@/lib/language";
 import { menuSearchSuggestions, matchesMenuSearch } from "@/lib/menuSearch";
 import {
   MENU_PREFERENCE_EVENT,
@@ -59,6 +60,7 @@ export default function MenuSearch({
 }: MenuSearchProps) {
   const enabled = enhanced && refined,
     t = useTranslation(),
+    locale = useLanguage(),
     listId = useId(),
     raw = useSyncExternalStore(subscribe, read, server);
   const [focused, setFocused] = useState(false),
@@ -75,6 +77,44 @@ export default function MenuSearch({
   },[detached,premium,value,inputId]);
   const surface = useRef<HTMLDivElement>(null),
     pointerActive = useRef(false);
+  const [hintIndex,setHintIndex]=useState(0);
+  // Use this branch's real catalogue; no extra requests or invented dishes.
+  const examples:string[]=[];
+  const categories=new Set<number>();
+  for(const product of products){
+    if(!categories.has(product.categoryId)&&product.name.trim()){
+      examples.push(product.name);categories.add(product.categoryId);
+      if(examples.length===4)break;
+    }
+  }
+  if(examples.length<4)for(const product of products){
+    if(product.name.trim()&&!examples.includes(product.name))examples.push(product.name);
+    if(examples.length===4)break;
+  }
+  const exampleKey=JSON.stringify(examples),hint=examples[hintIndex%Math.max(1,examples.length)];
+  useEffect(()=>{
+    const count=JSON.parse(exampleKey).length;
+    if(!premium||overlay||focused||value||count<2)return;
+    const motion=window.matchMedia('(prefers-reduced-motion: reduce)');
+    let visible=true,timer:ReturnType<typeof setInterval>|undefined;
+    const sync=()=>{
+      if(timer)clearInterval(timer);timer=undefined;
+      if(visible&&document.visibilityState==='visible'&&!motion.matches)
+        timer=setInterval(()=>setHintIndex(index=>(index+1)%count),4000);
+    };
+    const observer=new IntersectionObserver(entries=>{visible=entries[0]?.isIntersecting??false;sync();});
+    if(surface.current)observer.observe(surface.current);
+    motion.addEventListener('change',sync);document.addEventListener('visibilitychange',sync);sync();
+    return()=>{if(timer)clearInterval(timer);observer.disconnect();motion.removeEventListener('change',sync);document.removeEventListener('visibilitychange',sync);};
+  },[premium,overlay,focused,value,exampleKey]);
+  function clearSearch(){
+    onChange('');setActive(-1);setFocused(true);
+    surface.current?.querySelector('input')?.focus({preventScroll:true});
+  }
+  function highlight(text:string){
+    const query=value.trim(),at=query?text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase()):-1;
+    return at<0?text:<>{text.slice(0,at)}<mark>{text.slice(at,at+query.length)}</mark>{text.slice(at+query.length)}</>;
+  }
   useEffect(() => {
     // Keep the in-flow suggestion height until the tap has identified its click target.
     // Keyboard focus leaving the search closes immediately through onBlur.
@@ -146,7 +186,7 @@ export default function MenuSearch({
   }, [value, branchId, products, enabled, detached]);
   return (
     <>
-    <div ref={surface} className="menu-search relative w-full">
+    <div ref={surface} className={`menu-search relative w-full ${premium?"menu-search-premium":""}`}>
       {refined && (
         <label
           htmlFor={inputId}
@@ -187,6 +227,7 @@ export default function MenuSearch({
               ? `${listId}-${activeIndex}`
               : undefined
           }
+          aria-describedby={premium?`${inputId}-hint`:undefined}
           autoComplete="off"
           maxLength={60}
           value={value}
@@ -235,13 +276,18 @@ export default function MenuSearch({
               }
             }
           }}
-          placeholder={t(
+          placeholder={premium&&hint?"":t(
             premium
               ? "Search your favourites"
               : "Search sweets, snacks & meals",
           )}
           className="min-h-13 w-full rounded-2xl border border-[#eadfd6] bg-white py-3 pl-12 pr-4 text-sm outline-none shadow-sm transition focus:border-[#c88a20] focus:ring-2 focus:ring-[#f6dfad]"
         />
+        {premium&&<span id={`${inputId}-hint`} className="sr-only">{locale==='hi'?'नाम या श्रेणी से व्यंजन खोजें।':'Search dishes by name or category.'}</span>}
+        {premium&&!value&&hint&&<span className="menu-search-example" aria-hidden="true"><span>{locale==='hi'?'खोजें':'Search'}</span> <span key={hint} className="menu-search-example-word">“{hint}”</span></span>}
+        {premium&&value&&<button type="button" className="menu-search-clear" aria-label={locale==='hi'?'खोज साफ़ करें':'Clear search'} onMouseDown={event=>event.preventDefault()} onClick={clearSearch}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m6 6 12 12M18 6 6 18"/></svg>
+        </button>}
       </div>
       {expanded && (
         <div className="menu-search-suggestions">
@@ -253,22 +299,29 @@ export default function MenuSearch({
             role="listbox"
             aria-label={t(recent ? "Recent searches" : "Menu suggestions")}
           >
-            {options.map((text, index) => (
-              <li key={text} role="presentation">
+            {options.map((text, index) => {
+              const product=products.find(product=>product.name===text);
+              return <li key={text} role="presentation">
                 <button
                   type="button"
                   role="option"
+                  aria-label={premium?text:undefined}
                   id={`${listId}-${index}`}
                   aria-selected={index === activeIndex}
                   tabIndex={-1}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => choose(text)}
                 >
-                  {text}
-                  <span aria-hidden="true">↗</span>
+                  {premium?<>
+                    <span className="menu-search-result-icon" aria-hidden="true">
+                      {!recent&&product?.imageUrl?<Image src={product.imageUrl} alt="" width={40} height={40} sizes="40px"/>:<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="1.7">{recent?<><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></>:<><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></>}</svg>}
+                    </span>
+                    <span className="menu-search-result-copy"><strong>{highlight(text)}</strong>{!recent&&product?.categoryName&&<small>{product.categoryName}</small>}</span>
+                    <svg className="menu-search-result-arrow" aria-hidden="true" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M7 17 17 7M7 7h10v10"/></svg>
+                  </>:<>{text}<span aria-hidden="true">↗</span></>}
                 </button>
-              </li>
-            ))}
+              </li>;
+            })}
           </ul>
           {recent && (
             <button
