@@ -1,3 +1,7 @@
+## November 3 quiet order reminder
+
+The owner-approved edge tab supersedes the floating bottom order tracker. Only Home (including branch Home) and Menu show it, independent of the branch being browsed. It introduces itself once per document visit, retracts after six seconds and can be swiped right to dismiss for the visit. The shared sheet provides keyboard-accessible dismissal. Cart, checkout, order pages, open dialogs and focused text inputs show no tab. No layout padding, navigation badge or cart-offer suppression is added. Keep existing cart and Categories placement. Group bounded cross-branch active orders by business date then time, with explicit branch names and pickup/delivery labels. Overflow links to paged active history; no extra polling or branch switching. Dismissal stops the reminder subscription; identity changes reset suppression. Existing owner-scoped order safeguards remain authoritative.
+
 ## November 2 meal checkout and order dock
 
 Active order tracking is a compact floating surface, never a card above the home hero or menu. One owner-scoped, bounded 20-order summary query prioritises ready orders then earliest booked pickup/delivery. Overflow links to normal paged history; only the expanded order loads its branch contact. Existing polling, identity invalidation, backoff and offline safeguards remain. The dock clears the cart and Categories control, preserves safe-area spacing, and opens the shared accessible sheet for order/code/call/directions actions.

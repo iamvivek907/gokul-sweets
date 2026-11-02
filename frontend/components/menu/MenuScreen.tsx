@@ -1288,7 +1288,7 @@ export default function MenuScreen() {
                 >
 
                     <MenuSearch enhanced={groupedMenu} products={allProducts} branchId={branch.id}
-                        premium={phoneMenu}
+                        premium={groupedMenu}
                         refined={pickupCheck.features?.contextualStorefrontV2 === true}
                         value={
                             search

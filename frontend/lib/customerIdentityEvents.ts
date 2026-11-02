@@ -3,9 +3,10 @@ const revisionKey = "gokul-customer-identity-revision";
 
 /** Publish only an invalidation token, never customer data. */
 export function notifyCustomerIdentityChanged() {
- window.dispatchEvent(new Event(eventName));
+ // Subscribers must see this revision when handling the synchronous event.
  try { localStorage.setItem(revisionKey, crypto.randomUUID()); }
- catch { /* Resume revalidation still works when storage is unavailable. */ }
+ catch { /* Local invalidation must still run when storage is unavailable. */ }
+ window.dispatchEvent(new Event(eventName));
 }
 
 export function subscribeCustomerIdentityChanges(onChange: () => void, {revalidateOnResume = true}: {revalidateOnResume?: boolean} = {}) {

@@ -41,10 +41,10 @@ try{for(const [width,reduced,supported] of [[320,false,true],[390,false,false],[
  await body.focus();await page.keyboard.press('End');await page.waitForFunction(()=>document.querySelector('.menu-product-details .mobile-menu-suggestion-body')?.scrollTop>0);assert.ok(await body.evaluate(e=>e.scrollTop)>0,'long content remains scrollable');
  assert.ok(Math.abs((await dialog.locator('header').boundingBox()).y-headBox.y)<1,'title stays fixed as content scrolls');
  if(!reduced)assert.notEqual(await dialog.evaluate(e=>getComputedStyle(e).animationName),'none');
- await dialog.getByRole('button',{name:'Close',exact:false}).click();await dialog.waitFor({state:'hidden'});
+ await close.hover();await page.mouse.down();assert.equal(await close.evaluate(n=>getComputedStyle(n).scale),reduced?'1':'0.94','Close has visible press feedback even without vibration');await page.mouse.up();await dialog.waitFor({state:'hidden'});
  assert.deepEqual(await page.evaluate(()=>testPulses),supported&&!reduced?[12]:[],'only explicit close requests a pulse');
  await page.evaluate(()=>{testPulses=[];});
- await card.getByRole('button',{name:'Add Sweet 1 to cart',exact:true}).click();
+ const add=card.getByRole('button',{name:'Add Sweet 1 to cart',exact:true});await add.hover();await page.mouse.down();if(!reduced)await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('#gokul-product-1 [data-ordering-target=add]')).scale)<.99);assert.ok(await add.evaluate((n,reduced)=>reduced?getComputedStyle(n).scale==='1':Number(getComputedStyle(n).scale)<.99,reduced),'Add has visible press feedback even without vibration');await page.mouse.up();
  assert.deepEqual(await page.evaluate(()=>testPulses),supported&&!reduced?[12]:[],'Add requests one pulse');
  await card.getByRole('button',{name:'Add one more Sweet 1',exact:true}).click();
  assert.deepEqual(await page.evaluate(()=>testPulses),supported&&!reduced?[12]:[],'quantity and card controls do not inherit Add feedback');
