@@ -90,6 +90,7 @@
     "tests/identity-journey-recovery.browser.mjs"
   ],
   "staff-bulk": [
+    "tests/admin-app-icon.browser.mjs",
     "tests/product-dietary.browser.mjs",
     "tests/inventory-centre.browser.mjs",
     "tests/menu-workspace.browser.mjs",

@@ -29,6 +29,7 @@ export const adminGroups: {label: string; items: Item[]}[] = [
         {href: "/admin/tax-categories", label: "Tax categories", permissions: ["MENU_MANAGE"]}
     ]},
     {label: "Storefront", items: [
+        {href: "/admin/app-icon", label: "App icon", ownerOnly: true},
         {href: "/admin/about", label: "About & people", permissions: ["ABOUT_MANAGE"]},
         {href: "/admin/homepage-campaigns", label: "Homepage campaigns", permissions: ["MENU_MANAGE"]},
         {href: "/admin/notifications", label: "Offers", permissions: ["REBATE_VIEW", "REBATE_MANAGE"]},
