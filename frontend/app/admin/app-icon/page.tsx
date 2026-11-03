@@ -1,6 +1,7 @@
 "use client";
 
 import {useEffect, useRef, useState, type ChangeEvent, type PointerEvent} from "react";
+import {iconImageDimensions} from "@/lib/iconImageDimensions";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminManagementApi} from "@/services/adminManagementApi";
 
@@ -79,8 +80,16 @@ export default function AppIconPage() {
         }
         const attempt = ++generation.current;
         setDecoding(true);
-        const url = URL.createObjectURL(file);
+        let url: string | undefined;
         try {
+            const dimensions = iconImageDimensions(await file.arrayBuffer(), file.type);
+            if (attempt !== generation.current) return;
+            if (!dimensions?.width || !dimensions.height) throw new Error("Invalid image header");
+            if (Math.max(dimensions.width, dimensions.height) > 4096) {
+                setError("Choose an image no larger than 4096 pixels on either side.");
+                return;
+            }
+            url = URL.createObjectURL(file);
             const draft = new Image();
             draft.src = url;
             await draft.decode();
@@ -96,7 +105,7 @@ export default function AppIconPage() {
         } catch {
             if (attempt === generation.current) setError("Could not open that image. Try a different file.");
         } finally {
-            URL.revokeObjectURL(url);
+            if (url) URL.revokeObjectURL(url);
             if (attempt === generation.current) setDecoding(false);
         }
     }

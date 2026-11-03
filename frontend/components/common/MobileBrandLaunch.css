@@ -25,7 +25,7 @@
  .gokul-mobile-launch[open]{isolation:isolate;overflow:hidden}
  .gokul-mobile-launch::backdrop{background:#980c31}
  .gokul-mobile-launch[open]::after{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(ellipse at 50% 43%,#bc5a2870,transparent 48%),linear-gradient(155deg,#71092c,#950d38 55%,#540b25);animation:gokul-launch-warmth .55s .15s both}
- .gokul-mobile-launch[open]::before{content:"";position:absolute;top:50%;left:50%;width:min(61vw,270px);aspect-ratio:1;translate:-50% -50%;z-index:2;pointer-events:none;background:var(--gokul-launch-mark) center/contain no-repeat;animation:gokul-launch-mark-out .36s both}
+ @supports (-webkit-touch-callout: none){.gokul-mobile-launch[open]::before{content:"";position:absolute;top:50%;left:50%;width:min(61vw,270px);aspect-ratio:1;translate:-50% -50%;z-index:2;pointer-events:none;background:var(--gokul-launch-mark) center/contain no-repeat;animation:gokul-launch-mark-out .36s both}}
  @keyframes gokul-launch-warmth{from{opacity:0}to{opacity:1}}
  @keyframes gokul-launch-mark-out{from{opacity:1}to{opacity:0}}
  @media(prefers-reduced-motion:reduce){.gokul-mobile-launch[open]::before{display:none}.gokul-mobile-launch[open]::after,.gokul-mobile-launch-copy{animation:none}}

@@ -101,3 +101,22 @@ test('iPhone startup image links match their real portrait PNG sizes',()=>{
   assert.equal(png.readUInt32BE(16),width*ratio);assert.equal(png.readUInt32BE(20),height*ratio);
  }
 });
+
+test('stale icon revisions redirect without caching newer bytes under the old URL',async()=>{
+ const source=ts.transpileModule(fs.readFileSync('app/pwa-icon/[variant]/route.ts','utf8'),
+  {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const exported={},requests=[];
+ const revision='9afbc2ee-a870-4bc0-8a70-f044d99ccf7a';
+ vm.runInNewContext(source,{exports:exported,require:()=>({API_BASE_URL:'https://api.example'}),
+  URL,Response,AbortSignal,fetch:async url=>{
+   requests.push(url);
+   return url.includes('revision=')?new Response(null,{status:404}):
+    new Response('current artwork',{headers:{'content-type':'image/png'}});
+  }});
+ const params={params:Promise.resolve({variant:'512'})};
+ const response=await exported.GET({url:'https://shop.example/pwa-icon/512?v='+revision},params);
+ assert.equal(requests[0],'https://api.example/api/storefront/app-icon/512?revision='+revision);
+ assert.equal(response.status,307);assert.equal(response.headers.get('location'),'/pwa-icon/512');
+ assert.equal(response.headers.get('cache-control'),'no-store');
+ assert.equal(await (await exported.GET({url:'https://shop.example/pwa-icon/512'},params)).text(),'current artwork');
+});

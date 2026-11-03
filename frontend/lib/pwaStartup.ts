@@ -26,6 +26,7 @@ export const criticalBootCss = `
 @media(max-width:640px){
  .gokul-mobile-boot,.gokul-mobile-launch{--gokul-launch-mark:url("data:image/svg+xml,${launchMark}")}
  .gokul-mobile-boot{display:flex;position:fixed;inset:0;z-index:1000;align-items:center;justify-content:center;flex-direction:column;overflow:hidden;background:#980c31;color:#fff1d7;pointer-events:none}
- .gokul-mobile-boot::before{content:"";width:min(61vw,270px);aspect-ratio:1;background:var(--gokul-launch-mark) center/contain no-repeat}
+ /* iOS startup images use the bundled mark. Android launchers may have a custom icon. */
+ @supports (-webkit-touch-callout: none){.gokul-mobile-boot::before{content:"";width:min(61vw,270px);aspect-ratio:1;background:var(--gokul-launch-mark) center/contain no-repeat}}
 }
 `;

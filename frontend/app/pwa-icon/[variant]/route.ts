@@ -7,10 +7,19 @@ const defaults: Record<string, string> = {
 export async function GET(request: Request, {params}: {params: Promise<{variant: string}>}) {
     const {variant} = await params;
     if (!Object.hasOwn(defaults, variant)) return new Response(null, {status: 404});
+    const revision = new URL(request.url).searchParams.get("v");
+    if (revision !== null && !/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i.test(revision)) {
+        return new Response(null, {status: 404, headers: {"Cache-Control": "no-store"}});
+    }
     try {
-        const icon = await fetch(`${API_BASE_URL}/api/storefront/app-icon/${variant}`, {
+        const icon = await fetch(`${API_BASE_URL}/api/storefront/app-icon/${variant}${revision ? `?revision=${revision}` : ""}`, {
             cache: "no-store", signal: AbortSignal.timeout(2500)
         });
+        if (icon.status === 404 && revision) {
+            return new Response(null, {status: 307, headers: {
+                Location: `/pwa-icon/${variant}`, "Cache-Control": "no-store"
+            }});
+        }
         if (icon.ok && icon.headers.get("content-type") === "image/png") {
             return new Response(icon.body, {
                 headers: {"Content-Type": "image/png", "Cache-Control": "public, max-age=0, s-maxage=60, must-revalidate",

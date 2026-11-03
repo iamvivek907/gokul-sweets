@@ -42,6 +42,12 @@ try {
         return route.fulfill({headers, json: []});
     });
     await page.goto(base + "/admin/app-icon");
+    const oversized = Buffer.alloc(33);
+    Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(oversized);
+    oversized.writeUInt32BE(8192, 16);
+    oversized.writeUInt32BE(8192, 20);
+    await page.getByLabel("Upload artwork").setInputFiles({name: "oversized.png", mimeType: "image/png", buffer: oversized});
+    await page.getByRole("alert").filter({hasText: "4096 pixels"}).waitFor();
     await page.getByLabel("Upload artwork").setInputFiles("public/icons/icon-512.png");
     const canvas = page.getByLabel("Icon crop preview");
     await canvas.waitFor();
