@@ -731,7 +731,10 @@ export default function MenuScreen() {
     const pickupAllows = (id:number) => !pickupCheck.features?.smartAvailability || !!pickupCheck.intent.selection && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot() && pickupIsFresh(pickupCheck.intent.selection,new Date()) && !pickupCheck.findingSoonest && !pickupChecking && pickupCheck.items?.find(item=>item.productId===id)?.available === true;
     const [availableOnly,setAvailableOnly]=useState(false);
     const filterByPickup = availableOnly && pickupCheck.features?.smartAvailability === true;
-    const pickupFilterReady = !!pickupCheck.intent.selection && !pickupChecking && !pickupCheck.selectionUnavailable
+    // The menu may keep showing an earlier preview while cart quantities refresh.
+    // Filter only from the current response; per-item results already account for
+    // the selected slot without blocking every dish when a cart item has an issue.
+    const pickupFilterReady = !!pickupCheck.intent.selection && !!pickupCheck.data && !pickupChecking
         && pickupCheck.intent.pickupRaw === getPickupSlotSnapshot()
         && pickupIsFresh(pickupCheck.intent.selection,new Date());
     const availablePickupIds = useMemo(() => filterByPickup
