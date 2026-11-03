@@ -97,7 +97,7 @@ try {
         `item and amount extract on the same row: ${name}`);
     }
     assert.match(invoiceText,/पेडा/);
-    assert.match(invoiceText,/[\u0b80-\u0bff]/u);
+    assert.match(invoiceText,/பால்கோவா/u);
     if(!order.branchAddress)assert.equal(/\b(null|undefined)\b/u.test(invoiceText),false,'missing address is omitted from invoice');
     if(fulfillment==='DELIVERY')assert.match(invoiceText,/Delivery fee\s+₹30\.00/u);
     if(width===640){assert.ok(Number(invoiceInfo.match(/Pages:\s+(\d+)/)[1])>=2,'large invoices paginate');

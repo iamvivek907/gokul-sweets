@@ -108,7 +108,22 @@ export async function createInvoicePdf(invoice: Invoice, fonts?: InvoiceFonts): 
                 span.add(doc.markStructureContent("Span", {
                     lang: run.script === "devanagari" ? "hi-IN" : run.script === "tamil" ? "ta-IN" : "en-IN",
                 }));
-                doc.font(run.script).fontSize(size).fillColor(color).text(run.text, cursor, top + i * (size + 5), {lineBreak: false, baseline: "alphabetic"});
+                const draw = () => doc.font(run.script).fontSize(size).fillColor(color)
+                    .text(run.text, cursor, top + i * (size + 5), {lineBreak: false, baseline: "alphabetic"});
+                if (run.script === "latin" || run.text === "₹") draw();
+                else {
+                    // PDFKit 0.20.2 flips the graphics state for each text object. Keep
+                    // ActualText inside BT/ET so extractors see the same coordinates
+                    // as the glyphs, while retaining the original script sequence.
+                    const add = doc.addContent;
+                    doc.addContent = function (content: string) {
+                        if (content === "ET") doc.endMarkedContent();
+                        const result = add.call(doc, content);
+                        if (content === "BT") doc.markContent("Span", {actual: run.text});
+                        return result;
+                    };
+                    try { draw(); } finally { doc.addContent = add; }
+                }
                 doc.endMarkedContent();
                 cursor += measure(run.text, size);
             }
