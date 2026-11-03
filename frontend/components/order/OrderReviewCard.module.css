@@ -11,3 +11,18 @@
 .review summary{min-height:44px;padding:10px 0;line-height:1.5}
 .review summary:focus-visible,.review textarea:focus-visible,.review input:focus-visible,.review .primary:focus-visible,.secondary:focus-visible{outline:3px solid #8f1838;outline-offset:3px}
 @media (max-width:360px){.review{padding:16px}.stars{gap:0}.review .star{min-width:44px}}
+
+.commentPanel,.sharing{margin:14px 0;padding:16px;border:1px solid #e8d8df;border-radius:16px;background:#fff9f5}
+.commentPanel textarea{border-color:#a98391}
+.commentPanel>p:last-child{margin-top:6px}
+.sharing .nameChoice{margin:0;min-height:44px;cursor:pointer}
+.sharing p{margin:0 0 0 30px}
+.review .overall{background:#fff7eb;border-color:#f0dfc6}
+.review .star{background:#fff;border:1px solid #e7d4b8;color:#766252!important;min-height:44px}
+.review .star[data-filled=true]{color:#86500b!important;background:#fff0d2;border-color:#dbad5f}
+.review .star[data-filled=true] svg{fill:#e9a934}
+.review .star[aria-pressed=true]{box-shadow:inset 0 0 0 1px #986320}
+.review .dishes{padding:8px 14px;background:#fff;border-color:#e8d8df}
+.product .stars{gap:4px;margin:8px 0}
+.review .secondary{background:#fff5f7;border-color:#dcc0cc;color:#80213f!important}
+@media(max-width:360px){.product .stars{gap:0}}

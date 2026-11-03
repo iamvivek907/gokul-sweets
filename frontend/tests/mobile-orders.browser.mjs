@@ -22,7 +22,11 @@ try {
   const order={orderNumber:'TEST-ORDER',customerOrderNumber:paymentStatus==='PAID'?1:null,branchId:1,branchName:branch.name,branchAddress:branch.address,branchPhone:branch.phone,branchFssaiLicenceNumber:'12345678901234',orderStatus:completed?'PICKED_UP':paymentStatus==='PAID'?'CONFIRMED':paymentStatus==='FAILED'?'PAYMENT_FAILED':'PENDING_PAYMENT',paymentStatus,fulfillmentType:'PICKUP',pickupDate:date,pickupStartTime:'18:00:00',pickupEndTime:'19:00:00',pickupType:'NORMAL',customerName:'Test customer',maskedCustomerPhone:'******3210',items:[{id:1,productId:1,productName:'पेडा / பால்கோவா / Milk sweet',saleMode:'WEIGHT',quantity:0,weightGrams:500,unitPrice:200,taxRate:0,taxAmount:0,lineTotal:100}],subtotal:100,taxAmount:0,priorityCharge:0,convenienceFee:10,convenienceFeeTax:0,paymentFee:2,paymentFeeTax:0,paymentFeeRate:2,totalAmount:92,reservationExpiresAt:new Date(Date.now()+600000).toISOString(),createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};
   // Customer responses may have no branch address; both forms must still download a paid invoice.
   if(width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP')order.branchAddress=null;
-  if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
+  if(width===390&&completed){
+   order.items=Array.from({length:5},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`,lineTotal:98+i}));
+   order.branchAddress="Test address\nTamkuhi Road";order.subtotal=500;order.totalAmount=492;
+  }
+  if(width===640){order.branchAddress=Array.from({length:45},(_,i)=>'Unit '+(i+1)).join('\n');order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
   if(fulfillment==='DELIVERY'){Object.assign(order,{fulfillmentType:'DELIVERY',pickupDate:null,pickupStartTime:null,pickupEndTime:null,pickupType:null,deliveryDate:date,deliveryStartTime:'18:00:00',deliveryEndTime:'19:00:00',deliveryAddressLine:'12 Main Road',deliveryLocality:'Test locality',deliveryPostalCode:'226001',deliveryFee:30,totalAmount:122});}
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   let rating=4;
@@ -78,21 +82,36 @@ try {
     const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Download invoice',exact:true}).click();
     const download=await downloadPromise;assert.equal(download.suggestedFilename(),`Gokul-${order.customerOrderNumber ?? order.orderNumber}-invoice.pdf`);
     const data=await readFile(await download.path());assert.equal(data.subarray(0,8).toString(),'%PDF-1.7');assert.ok(data.includes(Buffer.from('/Type /Page')));
-    const invoiceText=execFileSync('pdftotext',[await download.path(),'-'],{encoding:'utf8'});
+    const invoiceText=execFileSync('pdftotext',['-layout',await download.path(),'-'],{encoding:'utf8'});
     const invoiceInfo=execFileSync('pdfinfo',[await download.path()],{encoding:'utf8'});
     assert.match(invoiceInfo,/Tagged:\s+yes/);assert.match(invoiceInfo,/Suspects:\s+no/);
-    for(const marker of ['/StructTreeRoot','/S /Document','/S /H1','/S /H2','/S /P','/ToUnicode','/FontFile2'])assert.ok(data.includes(Buffer.from(marker)),marker);
-    assert.ok(invoiceText.includes(branch.name));assert.ok(invoiceText.includes('#1'),'invoice shows the customer order number');assert.ok(invoiceText.includes(`PAID TOTAL: INR ${order.totalAmount.toFixed(2)}`));
-    assert.ok(invoiceText.includes(order.items[0].productName),'Hindi and Tamil names copy in logical Unicode order');
+    for(const marker of ['/StructTreeRoot','/S /Document','/S /H1','/S /H2','/S /P','/S /Table','/S /TH','/S /TD','/ToUnicode','/FontFile2'])assert.ok(data.includes(Buffer.from(marker)),marker);
+    assert.ok(invoiceText.includes(branch.name));assert.ok(invoiceText.includes('#1'),'invoice shows the customer order number');assert.ok(invoiceText.includes(`₹${order.totalAmount.toFixed(2)}`));
+    assert.match(invoiceText,/TOTAL PAID/);
+    assert.match(invoiceText,/This is a system-generated invoice\./);
+    if(width!==640)assert.match(invoiceInfo,/Pages:\s+1\s*$/m);
+    for(const item of order.items){
+      const name=item.productName.split(' / ').at(-1);
+      const row=invoiceText.split('\n').find(line=>line.includes(name+'  '));
+      assert.ok(row?.includes('500 g')&&row.trimEnd().endsWith(`₹${item.lineTotal.toFixed(2)}`),
+        `item and amount extract on the same row: ${name}`);
+    }
+    assert.match(invoiceText,/पेडा/);
+    assert.match(invoiceText,/பால்கோவா/u);
     if(!order.branchAddress)assert.equal(/\b(null|undefined)\b/u.test(invoiceText),false,'missing address is omitted from invoice');
-    if(fulfillment==='DELIVERY')assert.ok(invoiceText.includes('Delivery fee: INR 30.00'));
+    if(fulfillment==='DELIVERY')assert.match(invoiceText,/Delivery fee\s+₹30\.00/u);
     if(width===640){assert.ok(Number(invoiceInfo.match(/Pages:\s+(\d+)/)[1])>=2,'large invoices paginate');
-      for(const text of invoiceText.split('\f').filter(text=>text.trim())){
-        assert.doesNotMatch(text.trim(),/^500 g @/u,'a page cannot start with an orphaned item quantity');
-        assert.doesNotMatch(text.trim(),/Milk sweet \d+$/u,'a page cannot end with an orphaned item name');
+      const leftColumn=invoiceText.split('\n').map(row=>row.trimStart().split(/ {2,}/u,1)[0].trimEnd());
+      for(const line of order.branchAddress.split('\n')){
+        assert.ok(leftColumn.includes(line),'address line is preserved: '+line);
       }
-      for(const item of order.items){assert.equal(invoiceText.split(`${item.productName} \n`).length-1,1,'each item appears once across page breaks');}
-      assert.ok(invoiceText.indexOf(order.items.at(-1).productName)<invoiceText.indexOf('PAID TOTAL:'));
+      const pages=invoiceText.split('\f').filter(text=>text.trim());
+      for(const page of pages.filter(text=>text.includes('Milk sweet'))){
+        assert.match(page,/QTY \/ WT/);assert.match(page,/UNIT PRICE/);assert.match(page,/AMOUNT/);
+        assert.equal(page.match(/Milk sweet \d+/gu)?.length,page.match(/500 g/gu)?.length);
+      }
+      for(const item of order.items){assert.equal(invoiceText.split(new RegExp("Milk sweet "+item.id+"\\b",'u')).length-1,1);}
+      assert.match(pages.at(-1),/Subtotal[\s\S]*TOTAL PAID/u);
     }
     if(process.env.SCREENSHOT_DIR){await mkdir(process.env.SCREENSHOT_DIR,{recursive:true});await download.saveAs(`${process.env.SCREENSHOT_DIR}/order-invoice-${width}-${fulfillment}.pdf`);}
    }

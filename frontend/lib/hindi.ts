@@ -1,4 +1,5 @@
 export const hindi: Record<string,string> = {
+ "If published, your review is anonymous unless you select this. Please avoid personal details in your comment.": "प्रकाशित होने पर आपकी समीक्षा बिना नाम के दिखेगी, जब तक आप यह विकल्प नहीं चुनते। कृपया टिप्पणी में निजी जानकारी न लिखें।",
 "Show reviews rated":"इस रेटिंग वाली समीक्षाएँ",
 "All reviews":"सभी समीक्षाएँ",
 "Gokul guest":"गोकुल अतिथि",
