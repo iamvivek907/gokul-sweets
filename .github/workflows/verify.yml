@@ -86,7 +86,8 @@ jobs:
 
   frontend-browser:
     needs: frontend-build
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 does not support the Ubuntu 26.04 image.
+    runs-on: ubuntu-24.04
     # Hosted APT mirrors can consume ~14 minutes in setup; retain a separate
     # test deadline so setup latency cannot cancel otherwise passing suites.
     timeout-minutes: 40

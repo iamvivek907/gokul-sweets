@@ -73,10 +73,6 @@ body:has(.future-storefront[data-customer-route]){background:#fff}
 .future-storefront[data-customer-route] .mobile-quantity button{color:#087f42}
 .future-storefront[data-customer-route] .mobile-checkout-pay{background:#fff;border-color:#e7e9ed;box-shadow:0 -4px 16px #20242b08}
 .future-storefront[data-customer-route] .mobile-checkout-pay button{background:#087f42;border-radius:12px}
-.future-storefront[data-customer-route] .mobile-checkout-loading{background:#fff;color:#20242b}
-.future-storefront[data-customer-route] .mobile-checkout-loading small{color:#656b75}
-.future-storefront[data-customer-route] .mobile-checkout-loading-progress{background:#e8f3ed}
-.future-storefront[data-customer-route] .mobile-checkout-loading-progress span{background:#087f42}
 .future-storefront[data-customer-route] .mobile-branch-review{background:#fff;border-color:#e7e9ed;color:#20242b}
 .future-storefront[data-customer-route] .notification-back{background:transparent}
 .future-storefront[data-customer-route] .customer-notification-inbox{border-color:#e7e9ed;padding:16px!important;box-shadow:none}

@@ -388,7 +388,7 @@
 
 /* Keep initial branch discovery a complete page state rather than a card above the footer. */
 .customer-page-state{flex:1;min-height:calc(100dvh - 200px);display:grid;place-items:center;padding:32px 24px 110px;text-align:center;background:#fff;color:#20242b}
-.customer-page-state>div,.customer-page-state>section{max-width:440px}
+.customer-page-state>div:not(.brand-backdrop),.customer-page-state>section{max-width:440px}
 .customer-page-state-brand{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 18px;border-radius:18px;background:#8f1838;color:white;font-family:Georgia,serif;font-size:38px;font-weight:700}
 .customer-page-state-spinner{display:block;width:24px;height:24px;margin:0 auto 14px;border:3px solid #ead4db;border-top-color:#8f1838;border-radius:50%;animation:customer-page-spin .8s linear infinite}
 .customer-page-state h1{font-size:22px;font-weight:700;margin-bottom:12px}

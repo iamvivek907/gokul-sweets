@@ -21,7 +21,6 @@
 .customer-brand-loading-spinner>span{display:block;width:40%;height:100%;border-radius:inherit;background:#980c31;animation:brand-loading-travel 1.5s ease-in-out infinite alternate}
 .customer-brand-loading .brand-loading-detail{display:block;max-width:340px;margin-top:12px;font-size:12px;line-height:1.7;color:#596579}
 .customer-brand-loading.customer-route-loading{display:grid;place-items:center;padding:24px;text-align:center}
-.future-storefront .customer-brand-loading.mobile-checkout-loading{background:radial-gradient(ellipse at 50% 38%,#fff0e8,white 60%);color:#596579}
 .customer-brand-loading.is-compact .customer-brand-loading-spinner{width:100px;height:4px}
 @keyframes brand-loading-travel{from{transform:translateX(-20%)}to{transform:translateX(170%)}}
 @media(prefers-reduced-motion:reduce){.customer-brand-loading-spinner>span{animation:none;margin:auto}}

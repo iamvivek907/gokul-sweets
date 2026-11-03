@@ -129,13 +129,7 @@
  .future-storefront .mobile-pickup-dialog-actions button{flex:1;min-height:48px;border:1px solid #ddc5b8;border-radius:12px;font-size:13px;font-weight:750}
  .future-storefront .mobile-pickup-dialog-actions button:last-child{background:#143936;color:white}
 
- .future-storefront .mobile-checkout-loading{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:24px;background:#123b36;color:#f7f4ed;text-align:center}
- .future-storefront .mobile-checkout-loading-brand{font-family:Georgia,serif;font-size:36px}
- .future-storefront .mobile-checkout-loading-progress{width:160px;height:4px;margin:28px auto 20px;border-radius:4px;background:#ffffff30;overflow:hidden}
- .future-storefront .mobile-checkout-loading-progress span{display:block;width:50%;height:100%;background:#e5aa83;animation:gokul-payment-loading 1.4s ease-in-out infinite alternate}
- .future-storefront .mobile-checkout-loading p{font-size:16px;margin:12px 0}.future-storefront .mobile-checkout-loading small{font-size:13px;color:#e5ebe4}
  @keyframes gokul-payment-loading{from{transform:translateX(0)}to{transform:translateX(100%)}}
- @media(prefers-reduced-motion:reduce){.future-storefront .mobile-checkout-loading-progress span{animation:none}}
 
 }
 @media(max-width:640px){

@@ -69,6 +69,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
  const loader=page.locator('.customer-brand-loading').first();
  assert.match(await loader.evaluate(n=>getComputedStyle(n).backgroundImage),/gradient/,'page loader keeps its colourful surface before feature discovery');
  assert.equal(await loader.locator('.brand-backdrop').getAttribute('aria-hidden'),'true');
+ assert.ok(await loader.evaluate(n=>Math.abs(n.querySelector('.brand-backdrop').getBoundingClientRect().width-n.clientWidth)<2),'artwork spans the entire loader at every viewport');
  assert.equal(await loader.getAttribute('aria-busy'),'true');
  assert.equal(await loader.locator('[role=progressbar]').count(),0,'no fabricated determinate progress');
  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-loading-${width}.png`});
