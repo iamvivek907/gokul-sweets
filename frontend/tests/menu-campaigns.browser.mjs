@@ -40,9 +40,15 @@ try {for(const width of [320,390,640,1280]) {
  }
  // Rapid taps advance from the requested target while a smooth transition is still in flight.
  const rapid=page.getByRole('region',{name:'Published menu banners',exact:true});
- await rapid.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowRight');
- await rapid.getByLabel('Swipe to explore categories',{exact:true}).press('ArrowRight');
+ const rapidTrack=rapid.getByLabel('Swipe to explore categories',{exact:true});
+ await rapidTrack.focus();
+ await page.keyboard.press('ArrowRight');
+ await page.keyboard.press('ArrowRight');
  await rapid.getByRole('button',{name:'Explore bakery',exact:true}).waitFor();
+ assert.ok(await rapidTrack.evaluate(node=>{
+  const track=node.getBoundingClientRect(), active=node.querySelector('article[aria-hidden="false"]')?.getBoundingClientRect();
+  return active && Math.abs(active.left-track.left)<2;
+ }),'the active banner is also aligned in the viewport');
  await rapid.getByRole('button',{name:'Show banner 1',exact:true}).click();
  await rapid.getByRole('button',{name:'Explore sweets',exact:true}).waitFor();
  // The same artwork now offers separate live category slides in one contained viewport.

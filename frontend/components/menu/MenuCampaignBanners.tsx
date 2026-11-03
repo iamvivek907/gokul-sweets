@@ -88,9 +88,16 @@ function CampaignCarousel({slides, reduced, locale, compact, render,position,onP
     const pendingTarget = useRef<number | null>(null);
     const go = (index: number) => {
         index = Math.max(0, Math.min(slides.length - 1, index));
-        const target = viewport.current?.children[index] as HTMLElement | undefined;
+        const node = viewport.current;
+        const target = node?.children[index] as HTMLElement | undefined;
+        if (!node || !target) return;
         pendingTarget.current = index;
-        if (target && viewport.current) viewport.current.scrollTo({left: target.offsetLeft - (viewport.current.children[0] as HTMLElement).offsetLeft, behavior: reduced ? "instant" : "smooth"});
+        node.scrollTo({left: target.offsetLeft - (node.children[0] as HTMLElement).offsetLeft, behavior: reduced ? "instant" : "smooth"});
+        if (reduced) {
+            // Instant navigation must not wait for a coalesced scroll event to expose the slide.
+            setActive(index);
+            onPositionChange?.(index);
+        }
     };
     const pauseForInteraction=useCarouselAutoplay(viewport,slides.length,()=>go((active+1)%slides.length),paused||reduced);
     return <section className={`${styles.carousel} ${compact ? styles.compactCarousel : ""}`} aria-label="Published menu banners" aria-roledescription={locale === "hi" ? "कैरसेल" : "carousel"}>
