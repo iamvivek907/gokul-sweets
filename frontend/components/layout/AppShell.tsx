@@ -125,7 +125,7 @@ export default function AppShell({
 
             <CustomerFooter onHowToOrder={tourAllowed ? () => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR)) : undefined} />
 
-            {showSocialPopup && !orderingGuideActive && <SocialFollowPopup eligible={orderConfirmed} />}
+            {showSocialPopup && !orderingGuideActive && <SocialFollowPopup eligible={orderConfirmed} reference={futuristic} />}
             </BranchOperationalGuard>
 
             <BottomNavigation />
