@@ -26,6 +26,8 @@ export default function AppIconPage() {
     const [error, setError] = useState("");
     const generation = useRef(0);
     const writeLock = useRef(false);
+    const publishedRead = useRef<AbortController | null>(null);
+    const androidPreview = useRef<HTMLCanvasElement>(null);
     const canvas = useRef<HTMLCanvasElement>(null);
     const frame = useRef<Frame>(centered);
     const touches = useRef(new Map<number, Point>());
@@ -33,10 +35,14 @@ export default function AppIconPage() {
     useEffect(() => {
         if (!owner || !authorization) return;
         const controller = new AbortController();
+        publishedRead.current = controller;
         adminManagementApi<IconVersion>("/api/storefront/app-icon", authorization, {signal: controller.signal})
             .then(value => {if (!controller.signal.aborted && !writeLock.current) setRevision(value.revision);})
             .catch(() => {if (!controller.signal.aborted) setError("Could not load the published icon.");});
-        return () => controller.abort();
+        return () => {
+            controller.abort();
+            if (publishedRead.current === controller) publishedRead.current = null;
+        };
     }, [owner, authorization]);
 
     useEffect(() => {
@@ -52,6 +58,14 @@ export default function AppIconPage() {
             context.fillRect(0, 0, 512, 512);
             context.imageSmoothingQuality = "high";
             context.drawImage(image, x * 512 - width / 2, y * 512 - height / 2, width, height);
+            const adaptive = androidPreview.current?.getContext("2d");
+            if (adaptive) {
+                // Match AppIconController's 288px artwork on a 512px white canvas.
+                adaptive.fillStyle = "#ffffff";
+                adaptive.fillRect(0, 0, 512, 512);
+                adaptive.imageSmoothingQuality = "high";
+                adaptive.drawImage(surface, 112, 112, 288, 288);
+            }
         };
         paint();
         const redraw = () => paint();
@@ -144,6 +158,7 @@ export default function AppIconPage() {
     async function save(restore = false) {
         if (!authorization || !owner || writeLock.current || decoding || (!restore && !canvas.current)) return;
         writeLock.current = true;
+        publishedRead.current?.abort();
         setBusy(true); setError(""); setMessage("");
         try {
             if (restore) {
@@ -180,11 +195,16 @@ export default function AppIconPage() {
         <div className="grid gap-5 md:grid-cols-[1fr_1.2fr]">
             <div className="rounded-3xl border border-[#ead8df] bg-[#fff7f3] p-5 sm:p-7">
                 <h2 className="font-semibold">Published icon</h2>
-                <div className="my-5 grid place-items-center rounded-2xl bg-[#f5e5ea] p-8">
-                    {/* The public icon URL is versioned at publication. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img className="h-24 w-24 rounded-[24%] shadow-lg" width="96" height="96" alt="Current Gokul home-screen icon"
-                        src={revision ? `/pwa-icon/512?v=${revision}` : "/icons/icon-512.png"}/>
+                <div className="my-5 grid grid-cols-2 gap-3 rounded-2xl bg-[#f5e5ea] p-4">
+                    {([
+                        ["Standard", "512", "icon-512.png", "Current Gokul home-screen icon"],
+                        ["Android adaptive", "maskable", "icon-maskable-512.png", "Published Android adaptive icon"],
+                    ] as const).map(([label, variant, fallback, alt]) => <figure key={variant} className="grid justify-items-center gap-2 text-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img className="h-16 w-16 rounded-[24%] shadow-md sm:h-24 sm:w-24" width="96" height="96" alt={alt}
+                            src={revision ? `/pwa-icon/${variant}?v=${revision}` : `/icons/${fallback}`}/>
+                        <figcaption className="text-xs font-medium">{label}</figcaption>
+                    </figure>)}
                 </div>
                 <p className="text-sm text-slate-600">New installs get the published artwork. Android checks for updates periodically. Existing iPhone installs may need to add the app again.</p>
                 {revision && (confirmRestore ? <div className="mt-4 space-y-2">
@@ -224,6 +244,12 @@ export default function AppIconPage() {
                                 if (next) {event.preventDefault(); update(next);}
                             }}/>
                     </div>
+                    <figure className="flex items-center gap-4 rounded-2xl border border-[#ead8df] p-3">
+                        <canvas ref={androidPreview} width={512} height={512} role="img" aria-label="Android adaptive draft preview"
+                            className="h-16 w-16 shrink-0 rounded-[24%] shadow-sm"/>
+                        <figcaption className="text-sm text-slate-600"><strong className="block text-slate-900">Android adaptive preview</strong>
+                            The white margin keeps the artwork inside different launcher shapes.</figcaption>
+                    </figure>
                     <p id="app-icon-gesture-help" className="text-sm text-slate-600">Pinch to resize and drag to position. On a keyboard, use arrows and + or −. Keep the important details near the centre.</p>
                     <div className="flex flex-wrap items-center gap-4">
                         <button type="button" disabled={busy || decoding} onClick={() => void save()} className="min-h-11 rounded-xl bg-[#980c31] px-5 font-semibold text-white disabled:opacity-60">{busy ? "Saving…" : "Publish app icon"}</button>

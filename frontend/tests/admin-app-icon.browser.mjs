@@ -12,6 +12,8 @@ try {
     const page = await context.newPage();
     let published = null;
     let receivedPng = false;
+    let releaseInitialRead;
+    const initialRead = new Promise(resolve => {releaseInitialRead = resolve;});
     await context.route("**/api/**", async route => {
         const request = route.request();
         const path = new URL(request.url()).pathname;
@@ -26,7 +28,12 @@ try {
             staffId: 1, username: "owner", fullName: "Test owner", roleName: "OWNER_ADMIN",
             branchIds: [], permissions: []
         }});
-        if (path === "/api/storefront/app-icon") return route.fulfill({headers, json: {revision: published}});
+        if (path === "/api/storefront/app-icon") {
+            const snapshot = published;
+            await initialRead;
+            await route.fulfill({headers, json: {revision: snapshot}}).catch(() => {});
+            return;
+        }
         if (path === "/api/admin/app-icon" && request.method() === "POST") {
             const bytes = request.postDataBuffer();
             const png = bytes.indexOf(Buffer.from("89504e470d0a1a0a", "hex"));
@@ -41,7 +48,9 @@ try {
         }
         return route.fulfill({headers, json: []});
     });
+    const initialRequest = page.waitForRequest("**/api/storefront/app-icon");
     await page.goto(base + "/admin/app-icon");
+    await initialRequest;
     const oversized = Buffer.alloc(33);
     Buffer.from("89504e470d0a1a0a0000000d49484452", "hex").copy(oversized);
     oversized.writeUInt32BE(8192, 16);
@@ -53,6 +62,9 @@ try {
     await canvas.waitFor();
     await page.waitForFunction(() => document.querySelector("canvas")?.getContext("2d").getImageData(10, 10, 1, 1).data[3] === 255);
     const original = await canvas.evaluate(node => node.toDataURL());
+    const adaptive = page.getByRole("img", {name: "Android adaptive draft preview"});
+    assert.deepEqual(await adaptive.evaluate(node => Array.from(node.getContext("2d").getImageData(50, 50, 1, 1).data)), [255, 255, 255, 255]);
+    const originalAdaptive = await adaptive.evaluate(node => node.toDataURL());
     assert.equal(await page.getByRole("slider").count(), 0);
     await canvas.scrollIntoViewIfNeeded();
     const bounds = await canvas.boundingBox();
@@ -65,8 +77,13 @@ try {
     await touch("touchMove", 42);
     await touch("touchEnd", 0);
     assert.notEqual(await canvas.evaluate(node => node.toDataURL()), original, "pinch changes the exported preview");
+    assert.notEqual(await adaptive.evaluate(node => node.toDataURL()), originalAdaptive, "Android preview follows the gesture");
+    const canceled = page.waitForEvent("requestfailed", {predicate: request => request.url().endsWith("/api/storefront/app-icon")});
     await page.getByRole("button", {name: "Publish app icon"}).click();
     await page.getByText("App icon published.", {exact: false}).waitFor();
+    releaseInitialRead();
+    await canceled;
+    assert.match(await page.getByAltText("Published Android adaptive icon").getAttribute("src"), /pwa-icon\/maskable/);
     assert.ok(receivedPng, "upload contains the cropped 512px PNG");
     assert.match(await page.getByAltText("Current Gokul home-screen icon").getAttribute("src"), new RegExp(revision));
     await page.getByRole("button", {name: "Restore default icon"}).click();
