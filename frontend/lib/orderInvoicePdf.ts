@@ -155,11 +155,26 @@ export async function createInvoicePdf(invoice: Invoice, fonts?: InvoiceFonts): 
     const half = (width - 28) / 2;
     const branch = wrap(invoice.branch.join("\n"), half, 10.5);
     const customer = wrap(invoice.customer.join("\n"), half, 10.5);
-    text(["BRANCH"], left, 131, half, 9, wine, false, "H2");
-    text(branch, left, 151, half, 10.5);
-    text(["BILLED TO"], left + half + 28, 131, half, 9, wine, false, "H2");
-    text(customer, left + half + 28, 151, half, 10.5);
-    y = 151 + Math.max(branch.length, customer.length) * 15.5 + 10;
+    const detailLineHeight = 15.5;
+    const detailLength = Math.max(branch.length, customer.length);
+    let detailTop = 151;
+    for (let offset = 0; offset < detailLength;) {
+        const count = Math.min(detailLength - offset, Math.floor((bottom - detailTop) / detailLineHeight));
+        if (offset < branch.length) {
+            text(["BRANCH"], left, detailTop - 20, half, 9, wine, false, "H2");
+            text(branch.slice(offset, offset + count), left, detailTop, half, 10.5);
+        }
+        if (offset < customer.length) {
+            text(["BILLED TO"], left + half + 28, detailTop - 20, half, 9, wine, false, "H2");
+            text(customer.slice(offset, offset + count), left + half + 28, detailTop, half, 10.5);
+        }
+        offset += count;
+        y = detailTop + count * detailLineHeight + 10;
+        if (offset < detailLength) {
+            newPage();
+            detailTop = y + 26;
+        }
+    }
 
     const columns = [
         {x: left + 10, w: width - 255, title: "ITEM"},
@@ -175,14 +190,18 @@ export async function createInvoicePdf(invoice: Invoice, fonts?: InvoiceFonts): 
         columns.forEach(({x, w, title}, i) => text([title], x, y + 17, w, 9, wine, i > 0, "TH", row));
         row.end(); y += 27;
     }
-    tableHeader();
     for (const item of invoice.items) {
         const cells = [item.name, item.quantity, item.rate, item.amount]
             .map((value, i) => wrap(value, columns[i].w, 11));
         const note = item.note ? wrap(item.note, columns[0].w, 9) : [];
         const body = Math.max(...cells.map(lines => lines.length)) * 16;
         const height = Math.max(32, body + note.length * 14 + 12);
-        if (y + height > bottom) { table.end(); newPage(); tableHeader(); }
+        if (y + height + (table === root ? 27 : 0) > bottom) {
+            if (table !== root) table.end();
+            newPage();
+            table = root;
+        }
+        if (table === root) tableHeader();
         const row = doc.struct("TR"); table.add(row);
         cells.forEach((lines, i) => {
             const {x, w} = columns[i];
@@ -196,7 +215,7 @@ export async function createInvoicePdf(invoice: Invoice, fonts?: InvoiceFonts): 
         row.end();
         y += height; divider(y);
     }
-    table.end();
+    if (table !== root) table.end();
 
     const summaryLeft = right - 255;
     const charges = invoice.charges.map(charge => ({

@@ -26,7 +26,7 @@ try {
    order.items=Array.from({length:5},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`,lineTotal:98+i}));
    order.branchAddress="Test address\nTamkuhi Road";order.subtotal=500;order.totalAmount=492;
   }
-  if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
+  if(width===640){order.branchAddress=Array.from({length:45},(_,i)=>'Unit '+(i+1)).join('\n');order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
   if(fulfillment==='DELIVERY'){Object.assign(order,{fulfillmentType:'DELIVERY',pickupDate:null,pickupStartTime:null,pickupEndTime:null,pickupType:null,deliveryDate:date,deliveryStartTime:'18:00:00',deliveryEndTime:'19:00:00',deliveryAddressLine:'12 Main Road',deliveryLocality:'Test locality',deliveryPostalCode:'226001',deliveryFee:30,totalAmount:122});}
   const headers={'Access-Control-Allow-Origin':base,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'content-type,idempotency-key'};
   let rating=4;
@@ -101,6 +101,9 @@ try {
     if(!order.branchAddress)assert.equal(/\b(null|undefined)\b/u.test(invoiceText),false,'missing address is omitted from invoice');
     if(fulfillment==='DELIVERY')assert.match(invoiceText,/Delivery fee\s+₹30\.00/u);
     if(width===640){assert.ok(Number(invoiceInfo.match(/Pages:\s+(\d+)/)[1])>=2,'large invoices paginate');
+      for(const line of order.branchAddress.split('\n')){
+        assert.ok(invoiceText.split('\n').some(row=>row.trim()===line),'address line is preserved: '+line);
+      }
       const pages=invoiceText.split('\f').filter(text=>text.trim());
       for(const page of pages.filter(text=>text.includes('Milk sweet'))){
         assert.match(page,/QTY \/ WT/);assert.match(page,/UNIT PRICE/);assert.match(page,/AMOUNT/);
