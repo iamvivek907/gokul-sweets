@@ -5,6 +5,7 @@ import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {constrainedPhoneConnection} from "@/lib/mobileConnection";
 import {warmMenu} from "@/services/menuApi";
 import {T} from "@/lib/language";
+import BrandBackdrop from "./BrandBackdrop";
 import ReferenceWordmark from "@/components/layout/ReferenceWordmark";
 import "./MobileBrandLaunch.css";
 
@@ -54,7 +55,8 @@ export default function MobileBrandLaunch() {
         const cover = branch.mobileCoverImageUrl || branch.coverImageUrl;
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
-    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"><ReferenceWordmark className="brand-loading-wordmark"/><p>Fresh for your moments</p></div>}<dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
+    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"><BrandBackdrop/><ReferenceWordmark className="brand-loading-wordmark"/><p>Fresh for your moments</p></div>}<dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
+        <BrandBackdrop/>
         <div className="gokul-mobile-launch-copy">
             <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>
             <p><T text="Fresh for your moments" /></p>

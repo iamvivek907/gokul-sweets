@@ -412,6 +412,8 @@ export const hindi: Record<string,string> = {
  "Plan at this branch": "इस शाखा में योजना बनाएँ",
  "Branch details could not be loaded.": "शाखाओं की जानकारी लोड नहीं हो सकी।",
  "No branches are available right now.": "अभी कोई शाखा उपलब्ध नहीं है।",
+ "Getting your branch ready…": "आपकी शाखा की जानकारी तैयार हो रही है…",
+ "Fresh favourites are on their way.": "आपके पसंदीदा व्यंजन बस आने ही वाले हैं।",
  "Connecting to the branch and loading the latest details.": "शाखा से जुड़कर नई जानकारी लोड हो रही है।",
  "This is taking longer than usual. We are waiting for a response; please keep this page open.": "सामान्य से अधिक समय लग रहा है। हम जवाब की प्रतीक्षा कर रहे हैं; कृपया यह पेज खुला रखें।",
  "Confirming your order and connecting to secure payment. Please keep this page open.": "आपके ऑर्डर की पुष्टि और सुरक्षित भुगतान से जुड़ने की प्रक्रिया चल रही है। कृपया यह पेज खुला रखें।",

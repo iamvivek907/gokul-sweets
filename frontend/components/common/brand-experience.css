@@ -21,7 +21,22 @@
 .customer-brand-loading-spinner>span{display:block;width:40%;height:100%;border-radius:inherit;background:#980c31;animation:brand-loading-travel 1.5s ease-in-out infinite alternate}
 .customer-brand-loading .brand-loading-detail{display:block;max-width:340px;margin-top:12px;font-size:12px;line-height:1.7;color:#596579}
 .customer-brand-loading.customer-route-loading{display:grid;place-items:center;padding:24px;text-align:center}
-.future-storefront .customer-brand-loading.mobile-checkout-loading{background:radial-gradient(ellipse at 50% 38%,#fff0e8,white 60%);color:#596579}
 .customer-brand-loading.is-compact .customer-brand-loading-spinner{width:100px;height:4px}
 @keyframes brand-loading-travel{from{transform:translateX(-20%)}to{transform:translateX(170%)}}
 @media(prefers-reduced-motion:reduce){.customer-brand-loading-spinner>span{animation:none;margin:auto}}
+
+/* Shared decorative palette; compact loaders keep the surrounding page surface. */
+.brand-backdrop{position:absolute;inset:0;pointer-events:none;overflow:hidden;border-radius:inherit;color:#980c31;opacity:.18}
+.brand-backdrop>svg{position:absolute;width:clamp(72px,17vw,144px);height:auto}
+.brand-backdrop .brand-sprig{left:-18px;top:0;transform:rotate(15deg)}
+.brand-backdrop .brand-mithai{right:-22px;top:14px;transform:rotate(-10deg)}
+.brand-backdrop .brand-ladoo{left:-16px;bottom:0}
+.brand-backdrop .brand-tea{right:-14px;bottom:-12px;transform:rotate(-18deg)}
+.customer-brand-loading:not(.is-compact){isolation:isolate;position:relative;overflow:hidden;border-radius:20px;background:radial-gradient(ellipse at 85% 80%,#ffe9af80,transparent 60%),radial-gradient(ellipse at 5% 10%,#ffd9c780,transparent 60%),linear-gradient(135deg,#fff9ef,#fff0e8);color:#50312b}
+.customer-brand-loading.customer-route-loading{position:fixed;border-radius:0;overflow:auto}
+.customer-brand-loading .brand-loading-content{position:relative;z-index:1;max-width:100%;padding:12px 8px}
+.customer-brand-loading:not(.is-compact) p{color:#50312b;font-weight:600;font-size:16px;line-height:1.6}
+.customer-brand-loading:not(.is-compact) .brand-loading-detail{color:#68504a;font-size:13px}
+.customer-brand-loading:not(.is-compact) .customer-brand-loading-spinner{width:min(180px,65vw);height:5px;background:#e9c6c9}
+.customer-brand-loading .brand-loading-wordmark{max-width:100%}
+@media(max-width:360px){.customer-brand-loading .brand-loading-wordmark strong{font-size:30px}.customer-brand-loading .brand-loading-wordmark>svg{width:40px;height:46px}}

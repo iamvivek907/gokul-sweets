@@ -54,13 +54,25 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await page.locator('.gokul-mobile-launch[open]').waitFor();
   const logo=page.locator('.gokul-mobile-launch .brand-loading-wordmark');
   assert.equal(await page.locator('.gokul-launch-food svg').count(),3,'launch cycles through food illustrations');
+  assert.match(await page.locator('.gokul-mobile-launch').evaluate(n=>getComputedStyle(n).backgroundImage),/113, 9, 44/,'launch uses the burgundy gradient');
+  assert.equal(await page.locator('.gokul-mobile-launch .brand-backdrop').getAttribute('aria-hidden'),'true');
+  assert.equal(await page.locator('.gokul-mobile-launch').evaluate(n=>n.scrollWidth<=n.clientWidth),true);
+  if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-launch-${width}.png`});
   if(width===640)assert.equal(await page.locator('.launch-sweet').evaluate(n=>getComputedStyle(n).animationName),'none','reduced motion keeps a static illustration');
-  assert.equal(await logo.evaluate(n=>getComputedStyle(n).color),'rgb(152, 12, 49)');
+  assert.equal(await logo.evaluate(n=>getComputedStyle(n).color),'rgb(255, 241, 215)');
   if(width===640)assert.equal(await logo.locator('strong').evaluate(n=>getComputedStyle(n).animationName),'none');
  }
  await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
  await page.locator('.customer-brand-loading .brand-loading-wordmark').waitFor();
  assert.equal(await page.locator('.customer-brand-loading .brand-loading-wordmark').evaluate(n=>getComputedStyle(n).color),'rgb(152, 12, 49)');
+
+ const loader=page.locator('.customer-brand-loading').first();
+ assert.match(await loader.evaluate(n=>getComputedStyle(n).backgroundImage),/gradient/,'page loader keeps its colourful surface before feature discovery');
+ assert.equal(await loader.locator('.brand-backdrop').getAttribute('aria-hidden'),'true');
+ assert.ok(await loader.evaluate(n=>Math.abs(n.querySelector('.brand-backdrop').getBoundingClientRect().width-n.clientWidth)<2),'artwork spans the entire loader at every viewport');
+ assert.equal(await loader.getAttribute('aria-busy'),'true');
+ assert.equal(await loader.locator('[role=progressbar]').count(),0,'no fabricated determinate progress');
+ if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-loading-${width}.png`});
  await waitForMockRequest(branchStarted,"Branch");holdBranch=false;releaseBranch();
  await page.locator('.customer-menu-loading').waitFor();
  if(width===640)assert.equal(await page.locator('.customer-brand-loading-spinner>span').evaluate(n=>getComputedStyle(n).animationName),'none');

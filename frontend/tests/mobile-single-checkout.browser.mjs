@@ -267,6 +267,8 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  }
  if(scenario==='gateway-loading'){
   await rebateReady;await page.getByText('Opening secure payment…',{exact:true}).waitFor();assert.equal(await page.getByRole('heading',{name:'Continue your existing order',exact:true}).count(),0);assert.equal(orders.length,1);assert.equal(payments,0);
+  const loader=page.locator('.mobile-checkout-loading');
+  assert.match(await loader.evaluate(n=>getComputedStyle(n).backgroundImage),/255, 233, 175/,'secure payment handoff uses the shared warm loader');
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/gateway-loading.png`});
   releaseRebate();await gatewayReady;await new Promise(resolve=>setTimeout(resolve,150));assert.equal(handoffEvents.at(-1)?.loading,true);assert.equal(handoffEvents.at(-1)?.reservation,false);releaseGateway();await page.waitForURL('https://gateway.example.invalid/pay');assert.equal(orders.length,1);assert.equal(payments,1);await context.close();continue;
  }

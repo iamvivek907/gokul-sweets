@@ -40,7 +40,7 @@ try{for(const mode of ['shared','branch-timeout','menu-timeout','inbox-timeout']
  }else{
   await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
   if(mode==='menu-timeout')await page.getByRole('region',{name:'Loading menu',exact:true}).waitFor();
-  else await page.getByText('Loading your page…',{exact:true}).waitFor();
+  else await page.getByText('Getting your branch ready…',{exact:true}).waitFor();
   assert.equal(await page.locator('.customer-site-footer').isVisible().catch(()=>false),false,'footer is not shown below partial loading content');
   assert.equal(await page.getByText('Checking branch availability…',{exact:true}).count(),0);
   if(mode==='shared'){
