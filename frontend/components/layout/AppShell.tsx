@@ -123,7 +123,7 @@ export default function AppShell({
                 {children}
             </main>
 
-            <CustomerFooter onHowToOrder={tourAllowed ? () => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR)) : undefined} />
+            {pathname !== "/menu" && pathname !== "/orders" && !pathname.startsWith("/orders/") && <CustomerFooter onHowToOrder={tourAllowed ? () => window.dispatchEvent(new Event(OPEN_ORDERING_TOUR)) : undefined} />}
 
             {showSocialPopup && !orderingGuideActive && <SocialFollowPopup eligible={orderConfirmed} reference={futuristic} />}
             </BranchOperationalGuard>
