@@ -57,10 +57,11 @@ test('unavailable cross-tab locking fails gracefully without leaving a dead prom
  const h=harness({locks:{async request(){throw Error('Lock denied');}}});const native=h.prompt();assert.equal(await h.store.promptInstall(),false);assert.equal(native.calls,0);assert.equal(h.store.getSnapshot().isInstallPromptAvailable,false);assert.match(h.store.getSnapshot().error,/keep ordering/);assert.equal(h.store.getSnapshot().isPromptInProgress,false);
 });
 
-test('all declared install and push icons exist at their advertised PNG sizes',()=>{
+test('all declared install and push icons exist at their advertised PNG sizes',async()=>{
  const manifestJs=ts.transpileModule(fs.readFileSync('app/manifest.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
- const exported={};vm.runInNewContext(manifestJs,{exports:exported,require,process});
- const manifest=exported.default();assert.equal(manifest.id,'/');assert.equal(manifest.start_url,'/');assert.equal(manifest.scope,'/');
+ let revision=null;
+ const exported={};vm.runInNewContext(manifestJs,{exports:exported,require:id=>id==='@/lib/constants'?{API_BASE_URL:'https://shop.example'}:require(id),process,AbortSignal,fetch:async()=>({ok:true,json:async()=>({revision})})});
+ const manifest=await exported.default();assert.equal(manifest.id,'/');assert.equal(manifest.start_url,'/');assert.equal(manifest.scope,'/');
  assert.equal(manifest.icons.length,3);assert.equal(manifest.background_color,'#980c31');
  for(const {src} of manifest.icons){
   const [path,version]=src.split('?v=');
@@ -68,8 +69,11 @@ test('all declared install and push icons exist at their advertised PNG sizes',(
   const bytes=fs.readFileSync('public'+path),size=path.includes('192')?192:512;
   assert.equal(bytes.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);
  }
+ revision='9afbc2ee-a870-4bc0-8a70-f044d99ccf7a';
+ const custom=await exported.default();assert.equal(custom.id,manifest.id);
+ assert.deepEqual(Array.from(custom.icons,icon=>icon.src),['192','512','maskable'].map(size=>'/pwa-icon/'+size+'?v='+revision));
  assert.deepEqual(fs.readFileSync('public/icon-192.png'),fs.readFileSync('public/icons/icon-192.png'));
- const apple=fs.readFileSync('app/apple-icon.png');assert.equal(apple.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(apple.readUInt32BE(16),180);assert.equal(apple.readUInt32BE(20),180);
+ const apple=fs.readFileSync('public/icons/apple-default.png');assert.equal(apple.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(apple.readUInt32BE(16),180);assert.equal(apple.readUInt32BE(20),180);
 });
 
 test('existing image caches do not hide the versioned corrected install assets',async()=>{

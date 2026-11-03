@@ -29,6 +29,7 @@ export const metadata: Metadata = {
     twitter: {card: "summary", title: "Gokul Sweets | Fresh Sweets, Snacks & Meals", description: APP_DESCRIPTION},
     ...(process.env.NEXT_PUBLIC_API_URL?.includes("api-dev.gokulsweets.in") ? {robots: {index: false, follow: false}} : {}),
     applicationName: "Gokul",
+    icons: {apple: {url: "/pwa-icon/apple", sizes: "180x180", type: "image/png"}},
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
