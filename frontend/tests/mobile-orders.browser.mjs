@@ -23,7 +23,7 @@ try {
   // Customer responses may have no branch address; both forms must still download a paid invoice.
   if(width===390&&enabled&&paymentStatus==='PAID'&&fulfillment==='PICKUP')order.branchAddress=null;
   if(width===390&&completed){
-   order.items=Array.from({length:5},(_,i)=>({...order.items[0],id:i+1,productId:i+1}));
+   order.items=Array.from({length:5},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`,lineTotal:98+i}));
    order.branchAddress="Test address\nTamkuhi Road";order.subtotal=500;order.totalAmount=492;
   }
   if(width===640){delete order.branchAddress;order.items=Array.from({length:40},(_,i)=>({...order.items[0],id:i+1,productId:i+1,productName:`पेडा / பால்கோவா / Milk sweet ${i+1}`}));order.subtotal=4000;order.totalAmount=3992;}
@@ -82,7 +82,7 @@ try {
     const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Download invoice',exact:true}).click();
     const download=await downloadPromise;assert.equal(download.suggestedFilename(),`Gokul-${order.customerOrderNumber ?? order.orderNumber}-invoice.pdf`);
     const data=await readFile(await download.path());assert.equal(data.subarray(0,8).toString(),'%PDF-1.7');assert.ok(data.includes(Buffer.from('/Type /Page')));
-    const invoiceText=execFileSync('pdftotext',['-raw',await download.path(),'-'],{encoding:'utf8'});
+    const invoiceText=execFileSync('pdftotext',['-layout',await download.path(),'-'],{encoding:'utf8'});
     const invoiceInfo=execFileSync('pdfinfo',[await download.path()],{encoding:'utf8'});
     assert.match(invoiceInfo,/Tagged:\s+yes/);assert.match(invoiceInfo,/Suspects:\s+no/);
     for(const marker of ['/StructTreeRoot','/S /Document','/S /H1','/S /H2','/S /P','/S /Table','/S /TH','/S /TD','/ToUnicode','/FontFile2'])assert.ok(data.includes(Buffer.from(marker)),marker);
@@ -90,7 +90,14 @@ try {
     assert.match(invoiceText,/TOTAL PAID/);
     assert.match(invoiceText,/This is a system-generated invoice\./);
     if(width!==640)assert.match(invoiceInfo,/Pages:\s+1\s*$/m);
-    assert.ok(invoiceText.includes(order.items[0].productName),'Hindi and Tamil names copy in logical Unicode order');
+    for(const item of order.items){
+      const name=item.productName.split(' / ').at(-1);
+      const row=invoiceText.split('\n').find(line=>line.includes(name+'  '));
+      assert.ok(row?.includes('500 g')&&row.trimEnd().endsWith(`₹${item.lineTotal.toFixed(2)}`),
+        `item and amount extract on the same row: ${name}`);
+    }
+    assert.match(invoiceText,/पेडा/);
+    assert.match(invoiceText,/[\u0b80-\u0bff]/u);
     if(!order.branchAddress)assert.equal(/\b(null|undefined)\b/u.test(invoiceText),false,'missing address is omitted from invoice');
     if(fulfillment==='DELIVERY')assert.match(invoiceText,/Delivery fee\s+₹30\.00/u);
     if(width===640){assert.ok(Number(invoiceInfo.match(/Pages:\s+(\d+)/)[1])>=2,'large invoices paginate');

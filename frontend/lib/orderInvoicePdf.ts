@@ -101,14 +101,18 @@ export async function createInvoicePdf(invoice: Invoice, fonts?: InvoiceFonts): 
         lines.forEach((line, i) => {
             if (!line) return;
             let cursor = alignRight ? x + maxWidth - measure(line, size) : x;
-            element.add(doc.markStructureContent("Span", {actual: line}));
+            // Keep logical text on the structure element. ActualText on the content
+            // stream collapses glyph coordinates in geometry-based PDF extractors.
+            const span = doc.struct("Span", {actual: line}); element.add(span);
             for (const run of runs(line)) {
-                doc.markContent("Span", {lang: run.script === "devanagari" ? "hi-IN" : run.script === "tamil" ? "ta-IN" : "en-IN"});
+                span.add(doc.markStructureContent("Span", {
+                    lang: run.script === "devanagari" ? "hi-IN" : run.script === "tamil" ? "ta-IN" : "en-IN",
+                }));
                 doc.font(run.script).fontSize(size).fillColor(color).text(run.text, cursor, top + i * (size + 5), {lineBreak: false, baseline: "alphabetic"});
                 doc.endMarkedContent();
                 cursor += measure(run.text, size);
             }
-            doc.endMarkedContent();
+            span.end();
         });
         element.end();
     }

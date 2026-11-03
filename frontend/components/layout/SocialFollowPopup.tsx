@@ -18,7 +18,7 @@ export default function SocialFollowPopup({eligible = false}: {eligible?: boolea
                 ["Instagram", "https://www.instagram.com/_gokulsweets"],
                 ["Facebook", "https://www.facebook.com/visitgokulsweets"],
             ].map(([label, href]) => <a key={label} href={href} target="_blank" rel="noopener noreferrer">
-                {label}<svg aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12 12 4M5 4h7v7" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                {label}<span className={styles.legacyArrow} aria-hidden="true"> ↗</span><svg className={styles.linkIcon} aria-hidden="true" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 12 12 4M5 4h7v7" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </a>)}
         </div>
     </aside>;
