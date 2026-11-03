@@ -24,6 +24,8 @@ export default function AppIconPage() {
     const [confirmRestore, setConfirmRestore] = useState(false);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
+    const [readError, setReadError] = useState("");
+    const [readAttempt, setReadAttempt] = useState(0);
     const generation = useRef(0);
     const writeLock = useRef(false);
     const publishedRead = useRef<AbortController | null>(null);
@@ -36,14 +38,19 @@ export default function AppIconPage() {
         if (!owner || !authorization) return;
         const controller = new AbortController();
         publishedRead.current = controller;
-        adminManagementApi<IconVersion>("/api/storefront/app-icon", authorization, {signal: controller.signal})
-            .then(value => {if (!controller.signal.aborted && !writeLock.current) setRevision(value.revision);})
-            .catch(() => {if (!controller.signal.aborted) setError("Could not load the published icon.");});
+        adminManagementApi<IconVersion>("/api/storefront/app-icon", authorization, {signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)])})
+            .then(value => {
+                if (!controller.signal.aborted && !writeLock.current) {
+                    setRevision(value.revision);
+                    setReadError("");
+                }
+            })
+            .catch(() => {if (!controller.signal.aborted) setReadError("Could not check the published icon.");});
         return () => {
             controller.abort();
             if (publishedRead.current === controller) publishedRead.current = null;
         };
-    }, [owner, authorization]);
+    }, [owner, authorization, readAttempt]);
 
     useEffect(() => {
         const surface = canvas.current;
@@ -175,10 +182,11 @@ export default function AppIconPage() {
                 });
                 setRevision(value.revision);
             }
-            setImage(null); setConfirmRestore(false);
+            setImage(null); setConfirmRestore(false); setReadError("");
             setMessage(restore ? "Default icon restored." : "App icon published. Installed devices refresh on their own schedule.");
         } catch (cause) {
             setError(cause instanceof Error ? cause.message : "Could not save the icon. Try again.");
+            setReadAttempt(attempt => attempt + 1);
         } finally {
             writeLock.current = false;
             setBusy(false);
@@ -258,6 +266,7 @@ export default function AppIconPage() {
                 </> : <p className="rounded-2xl bg-[#fff7f3] p-5 text-sm text-slate-600">PNG, JPG or WebP up to 8 MB. A simple mark with clear contrast works best at small sizes.</p>}
             </div>
         </div>
+        {readError && <p role="alert" className="text-sm text-red-800">{readError} <button type="button" disabled={busy} className="underline" onClick={() => setReadAttempt(attempt => attempt + 1)}>Retry check</button></p>}
         {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}
         {message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900">{message}</p>}
     </section>;

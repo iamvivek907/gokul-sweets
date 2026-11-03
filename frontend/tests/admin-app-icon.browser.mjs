@@ -10,7 +10,10 @@ try {
         viewport: {width: 390, height: 844}, hasTouch: true, serviceWorkers: "block"
     });
     const page = await context.newPage();
-    let published = null;
+    const previousRevision = "32435d1d-cc39-4d9c-a00b-a75ece40eb89";
+    let published = previousRevision;
+    let reads = 0;
+    let failNextPublish = true;
     let receivedPng = false;
     let releaseInitialRead;
     const initialRead = new Promise(resolve => {releaseInitialRead = resolve;});
@@ -30,7 +33,7 @@ try {
         }});
         if (path === "/api/storefront/app-icon") {
             const snapshot = published;
-            await initialRead;
+            if (++reads === 1) await initialRead;
             await route.fulfill({headers, json: {revision: snapshot}}).catch(() => {});
             return;
         }
@@ -39,6 +42,10 @@ try {
             const png = bytes.indexOf(Buffer.from("89504e470d0a1a0a", "hex"));
             receivedPng = png >= 0 && bytes.readUInt32BE(png + 16) === 512 && bytes.readUInt32BE(png + 20) === 512;
             assert.equal(request.headers()["x-staff-csrf"], "test-csrf");
+            if (failNextPublish) {
+                failNextPublish = false;
+                return route.fulfill({status: 503, headers, json: {message: "Could not publish the icon. Try again."}});
+            }
             published = revision;
             return route.fulfill({headers, json: {revision}});
         }
@@ -80,9 +87,14 @@ try {
     assert.notEqual(await adaptive.evaluate(node => node.toDataURL()), originalAdaptive, "Android preview follows the gesture");
     const canceled = page.waitForEvent("requestfailed", {predicate: request => request.url().endsWith("/api/storefront/app-icon")});
     await page.getByRole("button", {name: "Publish app icon"}).click();
-    await page.getByText("App icon published.", {exact: false}).waitFor();
+    await page.getByRole("alert").filter({hasText: "Could not publish the icon."}).waitFor();
     releaseInitialRead();
     await canceled;
+    await page.waitForFunction(revision => document.querySelector('img[alt="Current Gokul home-screen icon"]')?.getAttribute("src")?.includes(revision), previousRevision);
+    await page.getByRole("button", {name: "Restore default icon"}).waitFor();
+    await canvas.waitFor();
+    await page.getByRole("button", {name: "Publish app icon"}).click();
+    await page.getByText("App icon published.", {exact: false}).waitFor();
     assert.match(await page.getByAltText("Published Android adaptive icon").getAttribute("src"), /pwa-icon\/maskable/);
     assert.ok(receivedPng, "upload contains the cropped 512px PNG");
     assert.match(await page.getByAltText("Current Gokul home-screen icon").getAttribute("src"), new RegExp(revision));
