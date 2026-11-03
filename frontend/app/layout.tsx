@@ -3,6 +3,8 @@ import type {
     Viewport
 } from "next";
 
+import {appleStartupImages, criticalBootCss} from "@/lib/pwaStartup";
+
 import "./globals.css";
 import "@/components/layout/customer-ease.css";
 import "@/components/common/brand-experience.css";
@@ -30,6 +32,7 @@ export const metadata: Metadata = {
     appleWebApp: {
         capable: true,
         statusBarStyle: "default",
+        startupImage: appleStartupImages,
         title: "Gokul"
     },
     formatDetection: {
@@ -55,7 +58,7 @@ export default function RootLayout({
             lang="en"
             data-scroll-behavior="smooth"
         >
-            <head>{API_BASE_URL.startsWith("https://")&&<link rel="preconnect" href={new URL(API_BASE_URL).origin} crossOrigin="anonymous"/>}</head>
+            <head><style dangerouslySetInnerHTML={{__html: criticalBootCss}} />{API_BASE_URL.startsWith("https://")&&<link rel="preconnect" href={new URL(API_BASE_URL).origin} crossOrigin="anonymous"/>}</head>
             <body>
                 <AppProviders>
                     {children}

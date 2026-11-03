@@ -55,7 +55,7 @@ export default function MobileBrandLaunch() {
         const cover = branch.mobileCoverImageUrl || branch.coverImageUrl;
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
-    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"><BrandBackdrop/><ReferenceWordmark className="brand-loading-wordmark"/><p>Fresh for your moments</p></div>}<dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
+    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"/>}<dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
         <BrandBackdrop/>
         <div className="gokul-mobile-launch-copy">
             <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>

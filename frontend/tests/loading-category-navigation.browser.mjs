@@ -54,7 +54,7 @@ try{for(const [width,themed] of [[320,true],[390,true],[640,true],[1280,true],[3
   await page.locator('.gokul-mobile-launch[open]').waitFor();
   const logo=page.locator('.gokul-mobile-launch .brand-loading-wordmark');
   assert.equal(await page.locator('.gokul-launch-food svg').count(),3,'launch cycles through food illustrations');
-  assert.match(await page.locator('.gokul-mobile-launch').evaluate(n=>getComputedStyle(n).backgroundImage),/113, 9, 44/,'launch uses the burgundy gradient');
+  assert.match(await page.locator('.gokul-mobile-launch').evaluate(n=>getComputedStyle(n,'::after').backgroundImage),/113, 9, 44/,'launch uses the burgundy gradient');
   assert.equal(await page.locator('.gokul-mobile-launch .brand-backdrop').getAttribute('aria-hidden'),'true');
   assert.equal(await page.locator('.gokul-mobile-launch').evaluate(n=>n.scrollWidth<=n.clientWidth),true);
   if(process.env.SCREENSHOT_DIR)await page.screenshot({path:`${process.env.SCREENSHOT_DIR}/colour-launch-${width}.png`});

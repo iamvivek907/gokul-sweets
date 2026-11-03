@@ -58,9 +58,13 @@ test('unavailable cross-tab locking fails gracefully without leaving a dead prom
 });
 
 test('all declared install and push icons exist at their advertised PNG sizes',()=>{
- const manifest=fs.readFileSync('app/manifest.ts','utf8');
- for(const src of [...manifest.matchAll(/src: "([^"]+\.png[^"]*)"/g)].map(match=>match[1])){
-  const path=src.split('?')[0];assert.match(src,/\?v=20261007g2$/);
+ const manifestJs=ts.transpileModule(fs.readFileSync('app/manifest.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const exported={};vm.runInNewContext(manifestJs,{exports:exported,require,process});
+ const manifest=exported.default();assert.equal(manifest.id,'/');assert.equal(manifest.start_url,'/');assert.equal(manifest.scope,'/');
+ assert.equal(manifest.icons.length,3);assert.equal(manifest.background_color,'#980c31');
+ for(const {src} of manifest.icons){
+  const [path,version]=src.split('?v=');
+  assert.equal(version,require('node:crypto').createHash('sha256').update(fs.readFileSync('public'+path)).digest('hex').slice(0,16));
   const bytes=fs.readFileSync('public'+path),size=path.includes('192')?192:512;
   assert.equal(bytes.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);
  }
@@ -77,4 +81,19 @@ test('existing image caches do not hide the versioned corrected install assets',
  assert.equal(await cached.get('https://shop.example/icons/icon-192.png').text(),'old-icon');
  assert.equal(await stores.get('gokul-images-v3').get('https://shop.example/icons/icon-192.png?v=20261007g2').clone().text(),'corrected-icon');
  let intercepted=false;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/api/orders/1',destination:''},respondWith(){intercepted=true;}});assert.equal(intercepted,false);
+});
+
+
+test('iPhone startup image links match their real portrait PNG sizes',()=>{
+ const js=ts.transpileModule(fs.readFileSync('lib/pwaStartup.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const exported={};vm.runInNewContext(js,{exports:exported,require,process});
+ const images=exported.appleStartupImages;assert.ok(images.length>0);
+ assert.equal(new Set(images.map(image=>image.media)).size,images.length);
+ for(const {url,media} of images){
+  const [width,height,ratio]=Array.from(media.matchAll(/: (\d+)/g),match=>Number(match[1]));
+  assert.match(media,/orientation: portrait/);
+  const png=fs.readFileSync('public'+url);
+  assert.equal(png.toString('hex',0,8),'89504e470d0a1a0a');
+  assert.equal(png.readUInt32BE(16),width*ratio);assert.equal(png.readUInt32BE(20),height*ratio);
+ }
 });
