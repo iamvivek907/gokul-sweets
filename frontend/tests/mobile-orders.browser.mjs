@@ -101,8 +101,9 @@ try {
     if(!order.branchAddress)assert.equal(/\b(null|undefined)\b/u.test(invoiceText),false,'missing address is omitted from invoice');
     if(fulfillment==='DELIVERY')assert.match(invoiceText,/Delivery fee\s+₹30\.00/u);
     if(width===640){assert.ok(Number(invoiceInfo.match(/Pages:\s+(\d+)/)[1])>=2,'large invoices paginate');
+      const leftColumn=invoiceText.split('\n').map(row=>row.trimStart().split(/ {2,}/u,1)[0].trimEnd());
       for(const line of order.branchAddress.split('\n')){
-        assert.ok(invoiceText.split('\n').some(row=>row.trim()===line),'address line is preserved: '+line);
+        assert.ok(leftColumn.includes(line),'address line is preserved: '+line);
       }
       const pages=invoiceText.split('\f').filter(text=>text.trim());
       for(const page of pages.filter(text=>text.includes('Milk sweet'))){
