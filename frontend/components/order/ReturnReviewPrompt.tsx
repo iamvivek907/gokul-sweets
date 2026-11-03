@@ -73,7 +73,7 @@ export default function ReturnReviewPrompt() {
             <p className={styles.kicker}><T text="A little note from Gokul"/></p>
             <h2><T text="How was your last treat?"/></h2>
             <p><T text="Tell us about your last order from"/> {order.branchName}. <T text="A few stars can make our day."/></p>
-            <OrderReviewCard orderNumber={order.orderNumber} prompt />
+            <OrderReviewCard orderNumber={order.orderNumber} />
             <button className={styles.later} type="button" onClick={() => setOrder(null)}><T text="Maybe later"/></button>
         </div>}
     </dialog>;

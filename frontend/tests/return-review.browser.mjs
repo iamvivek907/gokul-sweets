@@ -28,7 +28,7 @@ async function setup({orders=[row('LATEST')],historyStatus=200,reviewStatus=200,
    }else{
     reviewReads.push(number);
     if(reviewStatus!==200)return route.fulfill({status:reviewStatus,headers,json:{message:'Unavailable'}});
-    json={eligible,products:[],review:existing};
+    json={eligible,products:[{productId:1,productName:"Kaju Katli"}],review:existing};
    }
   }else if(path==='/api/customer/identity/me')json={authenticated:true};
   return route.fulfill({headers,json});
@@ -40,6 +40,10 @@ try {
  for(const width of [320,390,1280]){
   const t=await setup({width,putFailure:true,orders:[row('LATEST'),row('OLDER')]});
   const sheet=t.page.getByRole('dialog',{name:'Rate your last order'});await sheet.waitFor({state:'visible',timeout:15000});
+  await sheet.getByLabel('Tell us more (optional)').waitFor(); // Visible before choosing stars or opening any disclosure.
+  assert.equal(await sheet.getByLabel('Show my first name with my published review').isChecked(),false);
+  await sheet.getByText('Rate your ordered dishes (optional)',{exact:true}).click();
+  await sheet.getByRole('group',{name:'Kaju Katli · Dish rating'}).getByRole('button',{name:'4 stars',exact:true}).click();
   const stars=sheet.getByRole('group',{name:'Overall order rating'});await stars.getByRole('button',{name:'1 star',exact:true}).click();
   const choices=sheet.getByRole('group',{name:'Feedback suggestions'});
   await choices.getByRole('button',{name:'Taste needs improvement'}).click();await choices.getByRole('button',{name:'Price felt too high'}).click();
@@ -50,6 +54,7 @@ try {
   await sheet.getByLabel('Show my first name with my published review').check();
   await sheet.getByRole('button',{name:'Submit Review'}).click();await sheet.getByRole('alert').filter({hasText:'could not be confirmed'}).waitFor();
   assert.equal(await sheet.getByLabel('Tell us more (optional)').inputValue(),'Please improve the value');
+  assert.deepEqual(t.writes[0].body.itemRatings,[{productId:1,rating:4}]);
   assert.equal(t.writes[0].body.showCustomerName,true);assert.equal(t.writes[0].number,'LATEST');assert.equal(t.writes[0].body.comment,'Price felt too high. Please improve the value');
   t.allowSave();await sheet.getByRole('button',{name:'Submit Review'}).click();await sheet.getByText('Thank you for your valuable feedback!').waitFor();
   assert.equal(t.writes[1].body.overallRating,1);assert.equal(new URL(t.page.url()).pathname,'/');
