@@ -1076,7 +1076,7 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     .anyMatch(sweet -> sweet.id() == f.product() && !sweet.published());
             jdbc.update(
                     "UPDATE branch_products SET occasion_published = true WHERE branch_id=? AND"
-                        + " product_id=?",
+                            + " product_id=?",
                     f.branch(),
                     f.product());
             var photos =
