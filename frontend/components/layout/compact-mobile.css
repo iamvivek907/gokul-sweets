@@ -266,9 +266,9 @@
  .future-storefront .occasion-categories img,.future-storefront .occasion-category-fallback{height:60px}
  .future-storefront .occasion-categories span{padding:8px;gap:2px;font-size:12px}
  .future-storefront .occasion-categories small{font-size:10px}
- .future-storefront .occasion-product{display:block;padding:12px;border-radius:14px}
+ .future-storefront .occasion-journey .occasion-product{display:block;padding:12px;border-radius:14px}
  .future-storefront .occasion-product>img,.future-storefront .occasion-product>div:first-child:not(:last-child){float:right;width:88px;height:88px;margin:0 0 10px 10px;border-radius:12px;object-fit:cover;font-size:0}
- .future-storefront .occasion-product>div:last-child{display:block;padding:0}
+ .future-storefront .occasion-journey .occasion-product>div:last-child{display:block;padding:0}
  .future-storefront .occasion-product>div:last-child>:not(.occasion-quantity){min-width:0;margin-top:6px;font-size:12px;line-height:1.5}
  .future-storefront .occasion-product>div:last-child>h3{font-size:15px;font-weight:750}
  .future-storefront .occasion-quantity{clear:both;grid-template-columns:minmax(0,1fr) 100px;padding-top:4px;gap:8px}

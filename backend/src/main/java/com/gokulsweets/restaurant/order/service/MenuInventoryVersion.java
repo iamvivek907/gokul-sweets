@@ -32,7 +32,7 @@ SELECT r.token::text || ':' ||
     JOIN branch_products bp ON bp.id=a.branch_product_id
     WHERE bp.branch_id=? AND a.service_date=?), 'empty') || ':' ||
   COALESCE((SELECT md5(string_agg(s.availability_token::text, ',' ORDER BY s.id))
-    FROM pickup_slots s WHERE s.branch_id=? AND s.slot_date=?), 'empty')
+    FROM pickup_slots s WHERE s.branch_id=? AND s.slot_date=? AND s.occasion_enquiry_id IS NULL), 'empty')
 FROM menu_catalog_revision r WHERE r.id=true
 """,
                             String.class,
