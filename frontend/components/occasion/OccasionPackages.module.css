@@ -1,0 +1,12 @@
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:16px;margin-top:16px}
+.card{min-width:0;display:flex;flex-direction:column;overflow:hidden;border:1px solid #ecdee4;border-radius:20px;background:white;box-shadow:0 8px 24px #5520390c}
+.card img{display:block;width:100%;height:auto;aspect-ratio:8/5;object-fit:cover;background:#f9edf1}
+.copy{display:flex;flex:1;flex-direction:column;gap:8px;padding:18px}
+.copy h3{font-size:1.2rem;font-weight:750;color:#30202a;overflow-wrap:anywhere}
+.copy p,.copy li{font-size:.875rem;line-height:1.5;overflow-wrap:anywhere}
+.copy ul{list-style:disc;padding-inline-start:20px}
+.copy .kicker{color:#8f1838;font-weight:750;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase}
+.copy .meta{font-weight:650;color:#63505a}
+.add{margin-top:auto;min-height:44px;border-radius:12px;padding:8px 12px;background:#8f1838;color:#fff;font-weight:700}
+.add:disabled{opacity:.5}
+.add:focus-visible{outline:2px solid #8f1838;outline-offset:3px}

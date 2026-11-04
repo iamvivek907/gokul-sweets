@@ -288,14 +288,26 @@ public class OccasionCatalogue {
             @Size(max = 1000) String imageUrl,
             boolean published) {}
 
+    /** Branch-authored recipe and photo for one complete bulk gift package. */
+    public record PackagePreset(
+            @Positive Long id,
+            @Positive long boxId,
+            @NotBlank @Size(max = 100) String name,
+            @NotNull @Size(max = 300) String description,
+            @Size(max = 1000) String imageUrl,
+            @NotEmpty @Size(max = 100) List<@NotNull Recipe> recipe,
+            boolean published) {}
+
     /**
      * Immutable catalogue data contract.
      *
      * @param sweets the sweets
      * @param boxes the boxes
      * @param branding the branding
+     * @param packages branch-curated packages
      */
-    public record Catalogue(List<Sweet> sweets, List<Box> boxes, Branding branding) {
+    public record Catalogue(
+            List<Sweet> sweets, List<Box> boxes, Branding branding, List<PackagePreset> packages) {
 
         /**
          * Creates a catalogue instance.
@@ -304,7 +316,7 @@ public class OccasionCatalogue {
          * @param boxes the boxes
          */
         public Catalogue(List<Sweet> sweets, List<Box> boxes) {
-            this(sweets, boxes, null);
+            this(sweets, boxes, null, List.of());
         }
     }
 
@@ -555,10 +567,131 @@ ORDER BY bp.occasion_only DESC,bp.display_order,p.name
                                             rs.getBoolean("published")),
                             branchId,
                             admin);
-            return new Catalogue(sweets, boxes, branding.isEmpty() ? null : branding.getFirst());
+            var packages =
+                    jdbc.query(
+                            """
+SELECT id, box_id, name, description, image_url, recipe, published
+FROM occasion_packages WHERE branch_id=? AND (? OR published) ORDER BY id
+""",
+                            (rs, row) ->
+                                    new PackagePreset(
+                                            rs.getLong("id"),
+                                            rs.getLong("box_id"),
+                                            rs.getString("name"),
+                                            rs.getString("description"),
+                                            rs.getString("image_url"),
+                                            mapper.readValue(
+                                                    rs.getString("recipe"),
+                                                    new tools.jackson.core.type.TypeReference<
+                                                            List<Recipe>>() {}),
+                                            rs.getBoolean("published")),
+                            branchId,
+                            admin);
+            if (!admin) {
+                var productIds = new HashSet<Long>();
+                sweets.forEach(sweet -> productIds.add(sweet.id()));
+                var boxCapacity = new HashMap<Long, Integer>();
+                boxes.forEach(box -> boxCapacity.put(box.id(), box.capacityPieces()));
+                packages =
+                        packages.stream()
+                                .filter(
+                                        preset ->
+                                                preset.recipe().stream()
+                                                                        .mapToInt(Recipe::pieces)
+                                                                        .sum()
+                                                                <= boxCapacity.getOrDefault(
+                                                                        preset.boxId(), 0)
+                                                        && preset.recipe().stream()
+                                                                .allMatch(
+                                                                        line ->
+                                                                                productIds.contains(
+                                                                                        line
+                                                                                                .productId())))
+                                .toList();
+            }
+            return new Catalogue(
+                    sweets, boxes, branding.isEmpty() ? null : branding.getFirst(), packages);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, OccasionCatalogue.class, "catalogue(long,boolean)");
+        }
+    }
+
+    /** Saves a preset without changing any existing request or quote. */
+    @Transactional
+    public void savePackage(long branchId, PackagePreset input) {
+        long started =
+                MethodTiming.start(OccasionCatalogue.class, "savePackage(long,PackagePreset)");
+        try {
+            var source = catalogue(branchId, true);
+            var box =
+                    source.boxes().stream()
+                            .filter(item -> item.id() == input.boxId())
+                            .findFirst()
+                            .orElseThrow(
+                                    () ->
+                                            new ResponseStatusException(
+                                                    HttpStatus.BAD_REQUEST,
+                                                    "Choose a box from this branch."));
+            var products = new HashSet<Long>();
+            source.sweets().stream()
+                    .filter(sweet -> !input.published() || sweet.published())
+                    .forEach(sweet -> products.add(sweet.id()));
+            var ids = new HashSet<Long>();
+            if (input.recipe().stream()
+                            .anyMatch(
+                                    line ->
+                                            line.pieces() < 1
+                                                    || line.pieces() > box.capacityPieces()
+                                                    || !ids.add(line.productId())
+                                                    || !products.contains(line.productId()))
+                    || input.recipe().stream().mapToInt(Recipe::pieces).sum()
+                            > box.capacityPieces())
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Choose eligible items and keep the recipe within the box capacity.");
+            if (input.published()
+                    && (!box.published() || input.imageUrl() == null || input.imageUrl().isBlank()))
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Publish the box and add a photo of the complete package first.");
+            if (input.imageUrl() != null && !input.imageUrl().startsWith("https://"))
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Use the uploaded package photo URL.");
+            String recipe = mapper.writeValueAsString(input.recipe());
+            if (input.id() == null) {
+                jdbc.update(
+                        """
+INSERT INTO occasion_packages(branch_id,box_id,name,description,image_url,recipe,published)
+VALUES (?,?,?,?,?,CAST(? AS jsonb),?)
+""",
+                        branchId,
+                        input.boxId(),
+                        input.name().trim(),
+                        input.description().trim(),
+                        input.imageUrl(),
+                        recipe,
+                        input.published());
+            } else if (jdbc.update(
+                            """
+UPDATE occasion_packages SET box_id=?,name=?,description=?,image_url=?,recipe=CAST(? AS jsonb),published=?
+WHERE branch_id=? AND id=?
+""",
+                            input.boxId(),
+                            input.name().trim(),
+                            input.description().trim(),
+                            input.imageUrl(),
+                            recipe,
+                            input.published(),
+                            branchId,
+                            input.id())
+                    != 1) {
+                throw new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Package not found for this branch.");
+            }
+        } finally {
+            MethodTiming.finish(
+                    started, OccasionCatalogue.class, "savePackage(long,PackagePreset)");
         }
     }
 

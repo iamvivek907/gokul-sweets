@@ -1120,6 +1120,26 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
             assertThat(live.sweets().getFirst().categoryName()).isEqualTo("Occasion category");
             assertThat(live.boxes().getFirst().imageUrls()).containsExactlyElementsOf(photos);
             assertThat(live.branding().published()).isTrue();
+            var preset =
+                    new OccasionCatalogue.PackagePreset(
+                            null,
+                            box.id(),
+                            "Celebration box",
+                            "A filled box",
+                            photos.getFirst(),
+                            java.util.List.of(new OccasionCatalogue.Recipe(f.product(), 4)),
+                            true);
+            catalogue.savePackage(f.branch(), preset);
+            assertThat(catalogue.catalogue(f.branch(), false).packages())
+                    .singleElement()
+                    .satisfies(item -> assertThat(item.recipe()).isEqualTo(preset.recipe()));
+            jdbc.update(
+                    "UPDATE branch_products SET occasion_published=false WHERE branch_id=? AND"
+                        + " product_id=?",
+                    f.branch(),
+                    f.product());
+            assertThat(catalogue.catalogue(f.branch(), false).packages()).isEmpty();
+            assertThat(catalogue.catalogue(f.branch(), true).packages()).hasSize(1);
             assertThatThrownBy(
                             () ->
                                     catalogue.saveBox(

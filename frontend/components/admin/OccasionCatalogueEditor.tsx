@@ -1,6 +1,7 @@
 
 /* eslint-disable @next/next/no-img-element -- Admin previews managed image uploads. */
 "use client";
+import OccasionPackageEditor from "./OccasionPackageEditor";
 import {T} from "@/lib/language";
 import {useEffect, useState} from "react";
 import {adminFetch} from "@/services/adminApi";
@@ -19,8 +20,8 @@ export default function OccasionCatalogueEditor({branchId, authorization}: {bran
     async function save(url:string,body:object,method="PUT") {
         if(busy||loading||!catalogue)return;
         setBusy(true);setMessage("");
-        try {const response=await adminFetch(url,authorization,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!response.ok)throw Error();if(url.endsWith("/boxes")){const saved=await response.json() as OccasionBox;if(saved.id==null)throw Error();setBox(saved);}const fresh=await adminFetch(path,authorization);if(!fresh.ok)throw Error();setCatalogue(await fresh.json());setMessage("Catalogue saved. Existing enquiry and quote snapshots are unchanged.");}
-        catch {setMessage("Could not confirm the change. Check the fields and refresh before retrying.");}finally{setBusy(false);}
+        try {const response=await adminFetch(url,authorization,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});if(!response.ok)throw Error();if(url.endsWith("/boxes")){const saved=await response.json() as OccasionBox;if(saved.id==null)throw Error();setBox(saved);}const fresh=await adminFetch(path,authorization);if(!fresh.ok)throw Error();setCatalogue(await fresh.json());setMessage("Catalogue saved. Existing enquiry and quote snapshots are unchanged.");return true;}
+        catch {setMessage("Could not confirm the change. Check the fields and refresh before retrying.");return false;}finally{setBusy(false);}
     }
     async function upload(files:FileList|null, hero=false) {
         if(!files?.length)return;
@@ -64,6 +65,8 @@ export default function OccasionCatalogueEditor({branchId, authorization}: {bran
             <label className="text-sm"><input type="checkbox" checked={box.published} onChange={event=>setBox(current=>({...current,published:event.target.checked}))} /> Publish packaging<span className="mt-1 block text-xs">Only published boxes can be selected in new customer requests. Unpublish to stop new requests; existing snapshots remain.</span></label>
             <button disabled={busy} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white">Save packaging</button>
         </form>
+        <OccasionPackageEditor catalogue={catalogue} path={path} authorization={authorization} busy={busy}
+            onSave={preset=>save(`${path}/packages`,preset,"POST")} />
         <form onSubmit={event=>{event.preventDefault();void save(`${path}/branding`,branding);}} className="mt-6 space-y-4 rounded-xl border p-4"><h3 className="text-lg font-bold">Occasion page branding & promotion</h3><p className="text-sm">Branch-specific content shown above category browsing. Use genuine shop photos and accurate claims. Saving never changes existing quotes.</p><label className="block">Campaign headline<input required maxLength={100} value={branding.headline} onChange={event=>setBranding(current=>({...current,headline:event.target.value}))} className="mt-1 block w-full rounded-lg border p-2" /><span className="text-xs">A short invitation for weddings, family celebrations or corporate gifting.</span></label><label className="block">Campaign description<textarea required maxLength={500} value={branding.description} onChange={event=>setBranding(current=>({...current,description:event.target.value}))} className="mt-1 block w-full rounded-lg border p-2" /><span className="text-xs">Explain what the branch offers. Prices and promises must match the reviewed quote.</span></label><label className="block">Upload campaign photo<input type="file" accept="image/jpeg,image/png,image/webp" disabled={busy} onChange={event=>{void upload(event.target.files,true);event.target.value="";}} className="mt-1 block w-full" /><span className="text-xs">One real JPG, PNG or WebP photo, up to 5 MB. Text remains readable beside the photo.</span></label>{branding.imageUrl&&<div><img src={branding.imageUrl} alt="Occasion campaign preview" className="h-40 w-full rounded-xl object-cover" /><button type="button" disabled={busy} onClick={()=>setBranding(current=>({...current,imageUrl:null}))} className="min-h-11 underline">Remove campaign photo</button></div>}<label className="block"><input type="checkbox" checked={branding.published} onChange={event=>setBranding(current=>({...current,published:event.target.checked}))} /> Publish occasion campaign<span className="block text-xs">Unpublished content is hidden from customers; the standard Gokul introduction remains.</span></label><button disabled={busy} className="min-h-11 rounded-xl bg-[#173c39] px-4 font-bold text-white">Save occasion campaign</button></form>
     </fieldset>}
     </details>;

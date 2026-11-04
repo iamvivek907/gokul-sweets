@@ -6,6 +6,8 @@ import BrandLoading from "@/components/common/BrandLoading";
 import {notifyCustomerIdentityChanged} from "@/lib/customerIdentityEvents";
 import {T} from "@/lib/language";
 
+import OccasionPackages from "@/components/occasion/OccasionPackages";
+import styles from "./BulkPlanner.module.css";
 import OccasionPackingBuilder from "@/components/occasion/OccasionPackingBuilder";
 import {buildOccasionItems,packingError,inclusiveRate,indicativeFood} from "@/lib/occasionPacking";
 import {useRouter} from "next/navigation";
@@ -17,7 +19,7 @@ import CustomerIdentityPanel, {type CustomerSession} from "@/components/customer
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {useStorefrontFeatures} from "@/hooks/useStorefrontFeatures";
 import {apiClient, ApiError} from "@/services/apiClient";
-import type {OccasionSweet, OccasionBox, OccasionCatalogue, OccasionBranding, GiftSnapshot, PackingDraft} from "@/types/occasionCatalogue";
+import type {OccasionSweet, OccasionBox, OccasionCatalogue, OccasionBranding, OccasionPackage, GiftSnapshot, PackingDraft} from "@/types/occasionCatalogue";
 
 type Item = {productName?: string; productId: number; quantity: number; unit: "GRAM" | "PIECE"};
 type Enquiry = {id: string; branchId: number; occasionType: string; serviceDate: string; guestCount: number;
@@ -30,6 +32,7 @@ export default function OccasionsPage() {
     const router=useRouter();
     const features = useStorefrontFeatures();
     const {branch} = useSelectedBranch();
+    const branchId=branch?.id;
     const home = features?.branchExperience ? branch ? `/branches/${branch.id}` : "/branches" : "/";
     const homeLabel = features?.branchExperience ? branch ? "Branch home" : "All branches" : "Home";
     const [sessionVersion, setSessionVersion] = useState(0);
@@ -41,6 +44,8 @@ export default function OccasionsPage() {
     const [specialOnly, setSpecialOnly] = useState(false);
     const [products, setProducts] = useState<OccasionSweet[]>([]);
     const [boxes, setBoxes] = useState<OccasionBox[]>([]);
+    const [packages,setPackages]=useState<OccasionPackage[]>([]);
+    const [path,setPath]=useState<"package"|"custom">("custom");
     const [groups,setGroups]=useState<PackingDraft[]>([]);
     const [units, setUnits] = useState<Record<number, "KG" | "PIECE">>({});
     const [items, setItems] = useState<Record<number, number>>({});
@@ -57,20 +62,19 @@ export default function OccasionsPage() {
     useEffect(()=>{const query=new URLSearchParams(window.location.search);if(query.has("enquiry")||window.location.hash.startsWith("#occasion-")&&window.location.hash!=="#occasion-plan"){if(!query.has("enquiry"))query.set("enquiry",window.location.hash.slice(10));router.replace(`/occasions/requests?${query}`);}},[router]);
 
     useEffect(() => {
-        if (!branch || !features?.occasionEnquiries) return;
+        if (!branchId || !features?.occasionEnquiries) return;
         const controller = new AbortController();
-        apiClient<OccasionCatalogue>(`/api/branches/${branch.id}/occasion-catalogue`, {signal: AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])}).then(catalogue => {
-            if (!controller.signal.aborted) {setCatalogueError(null);setCatalogueBranchId(branch.id);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setGroups([]);}
-        }).catch(() => {if (!controller.signal.aborted) setCatalogueError({branchId:branch.id,retry:catalogueRetry});});
+        apiClient<OccasionCatalogue>(`/api/branches/${branchId}/occasion-catalogue`, {signal: AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])}).then(catalogue => {
+            if (!controller.signal.aborted) {setCatalogueError(null);setCatalogueBranchId(branchId);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setPackages(catalogue.packages??[]);setPath(catalogue.packages?.length?"package":"custom");setUnits({});setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setGroups([]);}
+        }).catch(() => {if (!controller.signal.aborted) setCatalogueError({branchId:branchId,retry:catalogueRetry});});
         return () => controller.abort();
-    }, [branch, features?.occasionEnquiries,catalogueRetry]);
+    }, [branchId, features?.occasionEnquiries,catalogueRetry]);
 
     async function submit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         if (!branch || busy || catalogueBranchId!==branch.id) return;
         if (!session.authenticated) {setMessage("Verify your phone before sending your enquiry. Your selection is saved on this page."); return;}
         if (!date || date < earliest || date > latest) {setMessage("Choose a future service date in India."); return;}
-        const chosen=buildOccasionItems(products,items,units,groups);
         const packingIssue=packingError(groups,chosen,boxes);
         if(packingIssue){setMessage(packingIssue);return;}
         if (!chosen.length) {setMessage("Add at least one product and quantity."); return;}
@@ -96,6 +100,14 @@ export default function OccasionsPage() {
     const campaign=catalogueBranchId===branch?.id?branding:null;
     const categories=Array.from(new Set(products.map(product=>product.categoryName??"Selection")));
     const chosen=buildOccasionItems(products,items,units,groups);
+    function addPackage(preset:OccasionPackage){
+        const boxCount=Math.max(1,Math.min(10000,Math.trunc(guests)||1));
+        setGroups(current=>current.length>=30?current:[...current,{
+            key:Math.max(0,...current.map(group=>group.key))+1,kind:"MIXED",boxId:preset.boxId,
+            boxCount,recipe:preset.recipe,productId:null,totalGrams:null,packGrams:null,includeSpoons:false,
+        }]);
+        document.getElementById("plan-packing")?.scrollIntoView({block:"start"});
+    }
     const selected=products.filter(product=>chosen.some(item=>item.productId===product.id));
     const selectedBoxes=boxes.filter(box=>groups.some(group=>group.boxId===box.id));
     const earliest=features?.today?addDays(features.today,Math.max(1,...selectedBoxes.map(box=>box.leadDays),...selected.map(product=>product.leadDays))):"";
@@ -106,16 +118,16 @@ export default function OccasionsPage() {
     const packingEstimate=groups.reduce((sum,group)=>sum+(boxes.find(box=>box.id===group.boxId)?.price??0)*group.boxCount,0);
     const incompletePrice=prices.some(price=>price==null)||groups.some(group=>boxes.find(box=>box.id===group.boxId)?.price==null||group.includeSpoons);
     return <AppShell editorial showSocialPopup={false}>
-        <div className="occasion-journey mx-auto max-w-7xl px-4 py-8 text-[#173a37] sm:px-6">
+        <div className={`occasion-journey mx-auto max-w-7xl px-4 py-8 sm:px-6 ${styles.planner}`}>
             <nav className="mobile-occasion-navigation" aria-label="Celebration navigation"><MobilePageBack href={home} label={homeLabel} /><Link href="/occasions/requests"><T text="Requests & quotes" /></Link></nav>
             <header className="occasion-hero"><p className="text-sm font-bold uppercase tracking-widest text-[#b55f4a]"><span className="desktop-celebration-label">Occasions at Gokul</span><span className="mobile-celebration-label"><T text="Bulk order" /></span></p>
             <h1 className="mt-3 font-serif text-4xl sm:text-6xl">{campaign?.headline||"Sweet moments. Thoughtfully planned."}</h1>
-            <p className="mt-4 max-w-2xl">{campaign?.description||"Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment."}</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div>{campaign?.imageUrl&&<img src={campaign.imageUrl} alt={`${branch?.name??"Gokul"} occasion collection`} className="occasion-campaign-photo" />}<div className="occasion-hero-actions"><a href="#occasion-plan" className="occasion-primary">Build your celebration</a><Link href="/occasions/requests" className="occasion-secondary">Track requests & quotes</Link></div></header>
+            <p className="mt-4 max-w-2xl">{campaign?.description||"Share the date, guests and food you have in mind. Our team reviews availability and gives you a clear quote before any payment."}</p><div className="mt-6 flex flex-wrap gap-2 text-sm"><span>Weddings & family celebrations</span><span>Corporate gifting</span><span>Made-to-order sweets</span></div>{campaign?.imageUrl&&<img src={campaign.imageUrl} alt={`${branch?.name??"Gokul"} occasion collection`} className="occasion-campaign-photo" />}<div className="occasion-hero-actions"><a href="#occasion-plan" className="occasion-primary"><T text="Plan a bulk order"/></a><Link href="/occasions/requests" className="occasion-secondary">Track requests & quotes</Link></div></header>
             {!features && <BrandLoading label="Checking availability…" />}
             {features && !features.occasionEnquiries && <p className="mt-8 rounded-xl bg-white p-6">Occasion enquiries are not available yet. <Link href="/menu" className="underline">Explore pickup ordering</Link>.</p>}
             {features?.occasionEnquiries && <>
                 {!branch ? <p className="mt-8 rounded-xl bg-white p-6">Choose a branch first. <Link href="/branches" className="underline">Explore branches</Link>.</p> : <>
-                    <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline"><T text="Change branch" /></Link></p>
+                    <p className="mt-5 font-semibold">Planning with {branch.name} · <Link href="/branches" className="underline"><T text="Change branch" /></Link>{branch.phone&&<> · <a className="underline" href={`tel:${branch.phone.replace(/[^+0-9]/g,"")}`}><T text="Call for help planning" /></a></>}</p>
                     <div className="mt-7 rounded-2xl border border-[#d9e5df] bg-white p-5"><CustomerIdentityPanel key={sessionVersion} mode="occasion" onSessionChange={setSession} /></div>
                     {catalogueBranchId!==branch.id?(catalogueError?.branchId===branch.id&&catalogueError.retry===catalogueRetry?<div role="alert" className="occasion-catalogue-error"><p><T text="The occasion collection could not load. Please try again."/></p><button type="button" onClick={()=>setCatalogueRetry(n=>n+1)}><T text="Retry occasion collection"/></button></div>:<BrandLoading compact label="Loading this branch’s occasion collection…" />):<form id="occasion-plan" onSubmit={submit} className="mt-7 space-y-5 rounded-2xl border border-[#d9e5df] bg-white p-5 sm:p-8">
                         <nav className="occasion-stages" aria-label="Celebration planning steps"><a href="#plan-date"><T text="1 · Plan"/></a><a href="#plan-food"><T text="2 · Food"/></a><a href="#plan-packing"><T text="3 · Packing"/></a><a href="#plan-review"><T text="4 · Review"/></a></nav>
@@ -133,7 +145,15 @@ export default function OccasionsPage() {
                         </label>
                         {mode === "DELIVERY_REQUEST" && <label className="block">Delivery address for review <textarea required maxLength={500} value={address} onChange={event => setAddress(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>}
                         </section>
-                        <fieldset id="plan-food" className="occasion-stage"><legend className="font-serif text-2xl">02 · Choose food & quantities</legend>
+                        <section id="plan-food" className="occasion-stage">
+                            <h2 className="font-serif text-2xl"><T text="02 · Choose your food" /></h2>
+                            <div className={styles.chooser} role="group" aria-label="Bulk order options">
+                                <button type="button" aria-pressed={path==="package"} onClick={()=>setPath("package")}><T text="Choose a package" /><small><T text="Start with a complete box" /></small></button>
+                                <button type="button" aria-pressed={path==="custom"} onClick={()=>setPath("custom")}><T text="Build your own" /><small><T text="Pick items and quantities" /></small></button>
+                            </div>
+                            {path==="package" ? packages.length ? <OccasionPackages packages={packages} boxes={boxes} products={products} guests={guests} onAdd={addPackage} full={groups.length>=30} />
+                                : <p className={styles.empty}><T text="No ready-made packages at this branch yet. You can build your own." /></p>
+                            : <fieldset>
                             <p className="mt-2 text-sm">Choose from the items this branch has selected for bulk orders. Piece requests for weight-based sweets are sized by the branch before quoting.</p>
                             {products.length===0&&<p className="mt-3 rounded-xl border p-3 text-sm" role="status">This branch has not published its bulk catalogue yet. Contact the branch or choose another location.</p>}
                             <div className="occasion-categories" aria-label="Occasion categories">{categories.map(name=>{const categoryProducts=products.filter(product=>(product.categoryName??"Selection")===name);const photo=categoryProducts.find(product=>product.imageUrl)?.imageUrl;return <button key={name} type="button" aria-label={`${name} category, ${categoryProducts.length} options`} aria-pressed={category===name} onClick={()=>{setCategory(name);setCatalogueSearch("");}}>{photo?<img src={photo} alt={`${name} selection`} />:<div className="occasion-category-fallback">G</div>}<span><strong>{name}</strong><small>{categoryProducts.length} options · {categoryProducts.filter(product=>chosen.some(item=>item.productId===product.id)).length} selected</small></span></button>;})}</div>
@@ -144,12 +164,13 @@ export default function OccasionsPage() {
                                 <p className="mt-3 font-semibold">{inclusiveRate(product)==null?"Price available on branch review":`${money(inclusiveRate(product)!)} per ${product.saleMode==="WEIGHT"?"kg":"piece"} · tax included`}</p>{product.saleMode==="WEIGHT"&&<p className="mt-1 text-xs">Pieces are priced from measured kg; the branch confirms the weight estimate.</p>}
                                 <div className="occasion-quantity mt-3"><label className="text-sm">{"Bulk quantity without individual boxes"}<input aria-label={`${product.name} quantity`} type="number" min={0} max={100000} step={ (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? 1 : 0.001} value={items[product.id] ?? 0} onChange={event => setItems(current => ({...current, [product.id]: Number(event.target.value)}))} className="mt-1 w-full rounded-xl border p-3" /></label>{<label className="text-sm">Unit<select aria-label={`${product.name} unit`} value={units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")} onChange={event => {setUnits(current => ({...current, [product.id]: event.target.value as "KG" | "PIECE"})); setItems(current => ({...current, [product.id]: 0}));}} className="mt-1 rounded-xl border p-3">{product.saleMode === "WEIGHT" && <option value="KG">kg</option>}<option value="PIECE">pieces</option></select></label>}</div>
                                 </div></div>)}</div>
-                        </fieldset>
+                        </fieldset>}
+                        </section>
                         <section id="plan-packing" className="occasion-stage"><h2 className="text-xl font-bold"><T text="03 · Choose packing"/></h2><p><T text="Optional. Keep quantities in bulk or plan individual boxes for branch review."/></p><OccasionPackingBuilder products={products} boxes={boxes} groups={groups} onChange={setGroups} /></section>
                         <h2 id="plan-review" className="occasion-stage text-xl font-bold"><T text="04 · Review & request a quote"/></h2><aside className="occasion-selection" aria-label="Your occasion selection"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest">Your celebration basket</p><h3 className="text-lg font-semibold">{chosen.length} items · {groups.length} packing groups</h3></div><strong>{incompletePrice?"Known-price subtotal":"Indicative total"} {money(foodEstimate+packingEstimate)}</strong></div><details className="mt-2"><summary className="min-h-11 cursor-pointer text-sm font-semibold">Review quantities & indicative costs</summary><ul>{chosen.map((item,index)=>{const product=products.find(p=>p.id===item.productId)!;return <li key={item.productId}><span>{product.name}<small className="block">{item.unit==="GRAM"?`${item.quantity/1000} kg`:`${item.quantity.toLocaleString("en-IN")} pieces`}{item.supplementalGrams?` + ${item.supplementalGrams/1000} kg`:""}</small></span><strong>{prices[index]==null?"Weight / price review needed":money(prices[index]!)}</strong><button type="button" aria-label={`Remove ${product.name} from occasion selection`} onClick={()=>{setItems(current=>({...current,[product.id]:0}));setGroups(current=>current.filter(group=>group.productId!==product.id).map(group=>({...group,recipe:group.recipe.filter(line=>line.productId!==product.id)})));}}><T text="Remove" /></button></li>;})}</ul><p className="text-sm">Packaging estimate {money(packingEstimate)}{groups.some(g=>g.includeSpoons)?" · spoon price follows branch review":""}.</p></details><p className="mt-2 text-xs">{incompletePrice?"Some items need measured weight or reviewed prices, so this is a partial estimate. ":""}The branch confirms rates, rebates, fit and final quote before any advance. No payment is taken when you send this request.</p></aside>
                         <label className="block">Anything else? <textarea maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
                         <div className="flex flex-wrap gap-3">
-                            <button disabled={busy || !products.length || !session.authenticated || !date || date<earliest || date>latest} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
+                            <button disabled={busy || !chosen.length || !session.authenticated || !date || date<earliest || date>latest} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
                         </div>
                         <p className="text-sm text-[#4e605c]">{session.authenticated?"You are signed in with a verified phone. Your request will appear in Requests & quotes.":"Verify your phone above to send your request."} The branch confirms the price and collection time before you pay.</p>
                     </form>}
