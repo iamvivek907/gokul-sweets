@@ -269,6 +269,21 @@ public class OccasionEnquiryController {
         }
     }
 
+    /** Lists requests awaiting a quote or decline for an authorized branch. */
+    @GetMapping("/api/admin/branches/{branchId}/occasion-enquiries/review-queue")
+    @PreAuthorize("hasAuthority('ORDER_VIEW')")
+    public OccasionEnquiryService.ReviewQueue reviewQueue(
+            @PathVariable long branchId, @RequestParam(required = false) UUID after) {
+        final long started =
+                MethodTiming.start(OccasionEnquiryController.class, "reviewQueue(long,UUID)");
+        try {
+            staff.requireBranchAccess(branchId);
+            return service.reviewQueue(environment(), branchId, after);
+        } finally {
+            MethodTiming.finish(started, OccasionEnquiryController.class, "reviewQueue(long,UUID)");
+        }
+    }
+
     /**
      * Handles {@code GET /api/admin/branches/{branchId}/occasion-enquiries/planning} for occasion
      * enquiry.
