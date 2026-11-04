@@ -312,6 +312,15 @@ public class OccasionCommitmentService {
                                             "QUOTED",
                                             "Accepted actual packed-weight pricing at agreed rates;"
                                                     + " advance credited toward final invoice");
+                                Integer dedicated =
+                                        jdbc.queryForObject(
+                                                "SELECT count(*) FROM"
+                                                        + " occasion_production_allocations WHERE"
+                                                        + " enquiry_id = ?",
+                                                Integer.class,
+                                                id);
+                                boolean bulk = dedicated != null && dedicated > 0;
+                                Instant bulkPaymentExpiry = null;
                                 long reservedSlotId;
                                 Instant serviceStart;
                                 if (acceptedPickupAt != null) {
@@ -336,6 +345,12 @@ WHERE a.enquiry_id = ? AND a.state = 'PLANNED'
                                         throw conflict(
                                                 "The bulk pickup time changed or expired. Refresh"
                                                         + " the quote.");
+                                    serviceStart = proposed.atZone(IST).toInstant();
+                                    bulkPaymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
+                                    if (!bulkPaymentExpiry.isBefore(serviceStart))
+                                        throw conflict(
+                                                "There is not enough time to pay before bulk pickup."
+                                                        + " Ask the branch for a later appointment.");
                                     LocalTime startTime = proposed.toLocalTime();
                                     LocalTime endTime =
                                             startTime.isBefore(LocalTime.of(23, 30))
@@ -359,7 +374,6 @@ VALUES (?, ?, ?, ?, 1, 1, FALSE, ?) RETURNING id
                                                             startTime,
                                                             endTime,
                                                             id));
-                                    serviceStart = proposed.atZone(IST).toInstant();
                                 } else {
                                     reservedSlotId = pickupSlotId;
                                     serviceStart =
@@ -386,6 +400,13 @@ WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
                                         throw conflict(
                                                 "Choose an available future pickup time for this"
                                                         + " branch and date.");
+                                    if (bulk) {
+                                        bulkPaymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
+                                        if (!bulkPaymentExpiry.isBefore(serviceStart))
+                                            throw conflict(
+                                                    "There is not enough time to pay before bulk pickup."
+                                                            + " Ask the branch for a later appointment.");
+                                    }
                                     // The standard order path takes its slot lock before allocation
                                     // locks; keep that order.
                                     try {
@@ -396,14 +417,7 @@ WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
                                     }
                                 }
                                 Instant earliestHoldExpiry;
-                                Integer dedicated =
-                                        jdbc.queryForObject(
-                                                "SELECT count(*) FROM"
-                                                        + " occasion_production_allocations WHERE"
-                                                        + " enquiry_id = ?",
-                                                Integer.class,
-                                                id);
-                                if (dedicated != null && dedicated > 0) {
+                                if (bulk) {
                                     if (!features.isOccasionBulkProduction())
                                         throw conflict(
                                                 "Bulk checkout is paused. Contact the branch.");
@@ -562,13 +576,10 @@ WHERE i.enquiry_id = ? AND bp.available AND p.active ORDER BY bp.id
                                                 key);
                                     }
                                 }
-                                Instant paymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
-                                if (dedicated != null
-                                        && dedicated > 0
-                                        && !paymentExpiry.isBefore(serviceStart))
-                                    throw conflict(
-                                            "There is not enough time to pay before bulk pickup."
-                                                    + " Ask the branch for a later appointment.");
+                                Instant paymentExpiry =
+                                        bulkPaymentExpiry == null
+                                                ? clock.instant().plus(PAYMENT_WINDOW)
+                                                : bulkPaymentExpiry;
                                 if (earliestHoldExpiry == null
                                         || !earliestHoldExpiry.isAfter(
                                                 paymentExpiry.plusSeconds(30)))
