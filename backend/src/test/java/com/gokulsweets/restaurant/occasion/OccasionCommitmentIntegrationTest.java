@@ -1135,7 +1135,7 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     .satisfies(item -> assertThat(item.recipe()).isEqualTo(preset.recipe()));
             jdbc.update(
                     "UPDATE branch_products SET occasion_published=false WHERE branch_id=? AND"
-                        + " product_id=?",
+                            + " product_id=?",
                     f.branch(),
                     f.product());
             assertThat(catalogue.catalogue(f.branch(), false).packages()).isEmpty();
