@@ -22,6 +22,8 @@ import java.util.*;
 @RequiredArgsConstructor
 public class OccasionCatalogue {
 
+    private static final int MAX_MIXED_RECIPE_ITEMS = 30;
+
     private final JdbcTemplate jdbc;
 
     private final EnhancementProperties features;
@@ -295,7 +297,7 @@ public class OccasionCatalogue {
             @NotBlank @Size(max = 100) String name,
             @NotNull @Size(max = 300) String description,
             @Size(max = 1000) String imageUrl,
-            @NotEmpty @Size(max = 100) List<@NotNull Recipe> recipe,
+            @NotEmpty @Size(max = MAX_MIXED_RECIPE_ITEMS) List<@NotNull Recipe> recipe,
             boolean published) {}
 
     /**
@@ -623,6 +625,9 @@ FROM occasion_packages WHERE branch_id=? AND (? OR published) ORDER BY id
         long started =
                 MethodTiming.start(OccasionCatalogue.class, "savePackage(long,PackagePreset)");
         try {
+            if (input.recipe().size() > MAX_MIXED_RECIPE_ITEMS)
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST, "Use at most 30 different items per box.");
             var source = catalogue(branchId, true);
             var box =
                     source.boxes().stream()
@@ -868,7 +873,7 @@ UPDATE occasion_packaging SET name=?,image_url=?,dimensions=?,material=?,compart
                     || gift.boxCount() > 10000
                     || gift.recipe() == null
                     || gift.recipe().isEmpty()
-                    || gift.recipe().size() > 30)
+                    || gift.recipe().size() > MAX_MIXED_RECIPE_ITEMS)
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST, "Choose 1–10,000 boxes and a valid assortment.");
             Box box =
@@ -976,7 +981,7 @@ UPDATE occasion_packaging SET name=?,image_url=?,dimensions=?,material=?,compart
                             || group.packGrams() != null
                             || group.recipe() == null
                             || group.recipe().isEmpty()
-                            || group.recipe().size() > 30)
+                            || group.recipe().size() > MAX_MIXED_RECIPE_ITEMS)
                         badPacking("Choose pieces per mixed box.");
                     long count = 0;
                     var seen = new HashSet<Long>();

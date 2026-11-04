@@ -588,6 +588,44 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                                             "https://pay.example/bulk",
                                             null,
                                             null));
+            var nearPickup =
+                    java.time.LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Kolkata")))
+                            .plusMinutes(5)
+                            .withNano(0);
+            jdbc.update(
+                    "UPDATE occasion_enquiries SET service_date=? WHERE id=?",
+                    nearPickup.toLocalDate(),
+                    fixture.enquiry());
+            jdbc.update(
+                    "UPDATE occasion_production_allocations SET expected_ready_at=? WHERE"
+                            + " enquiry_id=?",
+                    Timestamp.valueOf(nearPickup),
+                    fixture.enquiry());
+            assertThatThrownBy(
+                            () ->
+                                    commitments.beginDeposit(
+                                            ConsentEnvironment.DEV,
+                                            fixture.subject(),
+                                            fixture.enquiry(),
+                                            0,
+                                            false,
+                                            nearPickup))
+                    .hasMessageContaining("not enough time to pay before bulk pickup");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM pickup_slots WHERE occasion_enquiry_id=?",
+                                    Integer.class,
+                                    fixture.enquiry()))
+                    .isZero();
+            jdbc.update(
+                    "UPDATE occasion_enquiries SET service_date=? WHERE id=?",
+                    date,
+                    fixture.enquiry());
+            jdbc.update(
+                    "UPDATE occasion_production_allocations SET expected_ready_at=? WHERE"
+                            + " enquiry_id=?",
+                    Timestamp.valueOf(date.toLocalDate().atTime(12, 0)),
+                    fixture.enquiry());
             var checkout =
                     commitments.beginDeposit(
                             ConsentEnvironment.DEV,
@@ -1129,6 +1167,19 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                             photos.getFirst(),
                             java.util.List.of(new OccasionCatalogue.Recipe(f.product(), 4)),
                             true);
+            var oversized =
+                    new OccasionCatalogue.PackagePreset(
+                            null,
+                            box.id(),
+                            "Too many items",
+                            "",
+                            photos.getFirst(),
+                            java.util.stream.LongStream.rangeClosed(1, 31)
+                                    .mapToObj(id -> new OccasionCatalogue.Recipe(id, 1))
+                                    .toList(),
+                            true);
+            assertThatThrownBy(() -> catalogue.savePackage(f.branch(), oversized))
+                    .hasMessageContaining("at most 30 different items");
             catalogue.savePackage(f.branch(), preset);
             assertThat(catalogue.catalogue(f.branch(), false).packages())
                     .singleElement()

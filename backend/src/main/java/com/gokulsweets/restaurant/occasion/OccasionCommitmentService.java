@@ -563,6 +563,12 @@ WHERE i.enquiry_id = ? AND bp.available AND p.active ORDER BY bp.id
                                     }
                                 }
                                 Instant paymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
+                                if (dedicated != null
+                                        && dedicated > 0
+                                        && !paymentExpiry.isBefore(serviceStart))
+                                    throw conflict(
+                                            "There is not enough time to pay before bulk pickup."
+                                                    + " Ask the branch for a later appointment.");
                                 if (earliestHoldExpiry == null
                                         || !earliestHoldExpiry.isAfter(
                                                 paymentExpiry.plusSeconds(30)))

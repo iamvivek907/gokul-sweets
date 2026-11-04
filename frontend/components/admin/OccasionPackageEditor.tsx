@@ -2,7 +2,7 @@
 
 import {useState} from "react";
 import {adminFetch} from "@/services/adminApi";
-import type {OccasionCatalogue, OccasionPackage} from "@/types/occasionCatalogue";
+import {MAX_MIXED_RECIPE_ITEMS, type OccasionCatalogue, type OccasionPackage} from "@/types/occasionCatalogue";
 
 const empty: OccasionPackage = {id:null,boxId:0,name:"",description:"",imageUrl:null,recipe:[],published:false};
 
@@ -17,6 +17,7 @@ export default function OccasionPackageEditor({catalogue, path, authorization, b
     const [uploading,setUploading]=useState(false);
     const [error,setError]=useState("");
     const disabled=busy||uploading;
+    const recipeFull=draft.recipe.length>=MAX_MIXED_RECIPE_ITEMS;
     const box=catalogue.boxes.find(item=>item.id===draft.boxId);
     const pieces=draft.recipe.reduce((total,line)=>total+line.pieces,0);
     async function upload(file:File|undefined){
@@ -56,11 +57,12 @@ export default function OccasionPackageEditor({catalogue, path, authorization, b
             <label className="block">Photo of the finished box<input className="block" type="file" accept="image/jpeg,image/png,image/webp" disabled={disabled}
                 onChange={event=>{void upload(event.target.files?.[0]);event.target.value="";}}/></label>
             {draft.imageUrl&&<p className="text-sm"><a className="underline" href={draft.imageUrl} target="_blank" rel="noopener noreferrer">Preview uploaded photo</a></p>}
-            <label className="block">Add a product<select className="block w-full rounded-lg border p-2" value=""
-                onChange={event=>{const productId=Number(event.target.value);if(productId)setDraft({...draft,recipe:[...draft.recipe,{productId,pieces:1}]});}}>
+            <label className="block">Add a product<select className="block w-full rounded-lg border p-2" value="" disabled={disabled||recipeFull}
+                onChange={event=>{const productId=Number(event.target.value);if(productId&&!recipeFull)setDraft({...draft,recipe:[...draft.recipe,{productId,pieces:1}]});}}>
                 <option value="">Choose a published product</option>
                 {catalogue.sweets.filter(item=>item.published&&!draft.recipe.some(line=>line.productId===item.id)).map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
             </select></label>
+            {recipeFull&&<p className="text-sm">A box can contain up to {MAX_MIXED_RECIPE_ITEMS} different items.</p>}
             {draft.recipe.map(line=><div className="flex flex-wrap items-center gap-3" key={line.productId}>
                 <label>{catalogue.sweets.find(item=>item.id===line.productId)?.name??"Unavailable item"} · pieces
                     <input className="ml-2 w-20 rounded-lg border p-2" type="number" required min={1} max={box?.capacityPieces??1000} value={line.pieces}
@@ -71,7 +73,7 @@ export default function OccasionPackageEditor({catalogue, path, authorization, b
             <p className="text-sm">{pieces} pieces per box{box?` · capacity ${box.capacityPieces}`:""}</p>
             <label className="flex gap-2"><input type="checkbox" checked={draft.published} onChange={event=>setDraft({...draft,published:event.target.checked})}/>Publish package</label>
             <button className="min-h-11 rounded-xl bg-[#8f1838] px-4 font-semibold text-white disabled:opacity-50"
-                disabled={disabled||!box||pieces<1||pieces>box.capacityPieces||draft.published&&(!box.published||!draft.imageUrl)}>Save package</button>
+                disabled={disabled||!box||draft.recipe.length>MAX_MIXED_RECIPE_ITEMS||pieces<1||pieces>box.capacityPieces||draft.published&&(!box.published||!draft.imageUrl)}>Save package</button>
             {error&&<p role="alert">{error}</p>}
         </form>
     </section>;
