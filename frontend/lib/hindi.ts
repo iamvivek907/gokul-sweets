@@ -1,4 +1,6 @@
 export const hindi: Record<string,string> = {
+ "Bulk pickup appointment": "बल्क ऑर्डर का पिकअप समय",
+ "I can collect at this time": "मैं इस समय ऑर्डर ले सकता/सकती हूँ",
  "Available at selected pickup time": "चुने हुए पिकअप समय पर उपलब्ध",
  "Pickup availability is not ready": "पिकअप की उपलब्धता अभी तय नहीं है",
  "No items match at this pickup time. Try another time or clear your filters.": "इस पिकअप समय पर कोई आइटम नहीं मिला। कोई और समय चुनें या फ़िल्टर हटाएँ।",

@@ -507,8 +507,22 @@ public class MenuWorkspaceService {
      */
     @Transactional
     public long create(long branch, Details d, List<Long> branches) {
-        final long __gokulMethodStartedNanos =
+        long started =
                 MethodTiming.start(MenuWorkspaceService.class, "create(long,Details,List<Long>)");
+        try {
+            return create(branch, d, branches, false);
+        } finally {
+            MethodTiming.finish(
+                    started, MenuWorkspaceService.class, "create(long,Details,List<Long>)");
+        }
+    }
+
+    /** Creates a product and applies the branch visibility policy in the same transaction. */
+    @Transactional
+    public long create(long branch, Details d, List<Long> branches, boolean occasionOnly) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        MenuWorkspaceService.class, "create(long,Details,List<Long>,boolean)");
         try {
             authorize(branch, false);
             validate(d);
@@ -544,17 +558,18 @@ public class MenuWorkspaceService {
             for (long b : new TreeSet<>(branches))
                 jdbc.update(
                         "INSERT INTO"
-                            + " branch_products(branch_id,product_id,available,display_order,created_at,updated_at)"
-                            + " VALUES (?,?,false,0,now(),now())",
+                            + " branch_products(branch_id,product_id,available,occasion_only,display_order,created_at,updated_at)"
+                            + " VALUES (?,?,false,?,0,now(),now())",
                         b,
-                        id);
+                        id,
+                        occasionOnly);
             audit(branch, id, "CREATE_PRODUCT", null, d);
             return id;
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     MenuWorkspaceService.class,
-                    "create(long,Details,List<Long>)");
+                    "create(long,Details,List<Long>,boolean)");
         }
     }
 

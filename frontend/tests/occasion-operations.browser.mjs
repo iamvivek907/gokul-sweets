@@ -51,13 +51,14 @@ try {
  await page.getByText("Request updated.",{exact:false}).waitFor();
  await page.goto(`${base}/occasions/requests?enquiry=${id}`);
  await page.getByText("Booking estimate — final weight after packing",{exact:true}).waitFor();
- await page.getByRole("button",{name:"Choose a live pickup time"}).click();
- assert.equal(await page.getByRole("button",{name:"09:00–09:30"}).count(),0);
- await page.getByRole("button",{name:"11:00–11:30"}).click();
+ assert.equal(await page.getByRole("button",{name:"Choose a live pickup time"}).count(),0);
+ await page.getByRole("heading",{name:"Bulk pickup appointment"}).waitFor();
  const deposit=page.getByRole("button",{name:/Pay advance/});assert.equal(await deposit.isDisabled(),true);
+ await page.getByRole("checkbox",{name:"I can collect at this time"}).check();
+ assert.equal(await deposit.isDisabled(),true);
  await page.getByRole("checkbox",{name:/I understand this is an estimate/}).check();
  await deposit.click();await page.getByText("Checkout is being prepared.",{exact:false}).waitFor();
- assert.equal(depositBody.estimateAccepted,true);assert.equal(depositBody.pickupSlotId,5);assert.ok(acknowledged>0);
+ assert.equal(depositBody.estimateAccepted,true);assert.equal(depositBody.pickupSlotId,0);assert.equal(depositBody.acceptedPickupAt,"2026-10-10T10:00:00");assert.ok(acknowledged>0);
  enquiry={...enquiry,status:"PAID",paidAmount:10387.5,balancePaymentOpen:false};
  await page.reload();await page.getByText("Advance received. The branch will finalize",{exact:false}).waitFor();
  assert.equal(await page.getByRole("button",{name:/Pay balance/}).count(),0);

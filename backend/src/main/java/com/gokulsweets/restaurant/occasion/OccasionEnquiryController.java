@@ -130,7 +130,10 @@ public class OccasionEnquiryController {
      * @param pickupSlotId the pickup slot id
      * @param estimateAccepted the estimate accepted
      */
-    public record DepositChoice(long pickupSlotId, boolean estimateAccepted) {}
+    public record DepositChoice(
+            long pickupSlotId,
+            boolean estimateAccepted,
+            java.time.LocalDateTime acceptedPickupAt) {}
 
     /**
      * Handles {@code POST /api/occasion-enquiries/{id}/deposit} for occasion enquiry.
@@ -154,7 +157,8 @@ public class OccasionEnquiryController {
                     subject(request),
                     id,
                     choice.pickupSlotId(),
-                    choice.estimateAccepted());
+                    choice.estimateAccepted(),
+                    choice.acceptedPickupAt());
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

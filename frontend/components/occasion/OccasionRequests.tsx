@@ -25,6 +25,11 @@ type Enquiry = {calculation?:{foodBase:number;foodTax:number;rebateTotal?:number
 type Checkout = {attemptId: string; stage: string; status: string; amount: number; expiresAt: string; paymentUrl: string | null};
 
 
+function bulkPickupAt(enquiry: Enquiry): string | undefined {
+    return enquiry.productionPlan?.reduce<string | undefined>((latest, line) =>
+        !latest || line.expectedReadyAt > latest ? line.expectedReadyAt : latest, undefined);
+}
+
 const money=(value:number)=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(value);
 export default function OccasionRequests({embeddedSession}:{embeddedSession?:CustomerSession}={}) {
     const query=useSearchParams();const target=query.get("enquiry")??"";
@@ -38,6 +43,7 @@ export default function OccasionRequests({embeddedSession}:{embeddedSession?:Cus
     const [historyLimit,setHistoryLimit]=useState(10);const [historySearch,setHistorySearch]=useState("");
     const [slots,setSlots]=useState<Record<string,PickupSlot[]>>({});const [selectedSlots,setSelectedSlots]=useState<Record<string,number>>({});
     const [attempts,setAttempts]=useState<Record<string,Checkout>>({});const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");
+    const [acceptedPickup,setAcceptedPickup]=useState<Record<string,string>>({});
     const [accepted,setAccepted]=useState<Record<string,boolean>>({});
     useEffect(()=>{if(target&&history.length)document.getElementById(`occasion-${target}`)?.scrollIntoView({block:"start"});},[target,history.length]);
     useEffect(() => {
@@ -90,12 +96,14 @@ export default function OccasionRequests({embeddedSession}:{embeddedSession?:Cus
     }
 
     async function pay(enquiry: Enquiry, stage: "deposit" | "balance") {
-        if (busy || stage === "deposit" && !selectedSlots[enquiry.id]) return;
+        const proposed = bulkPickupAt(enquiry);
+        if (busy || stage === "deposit" && (proposed
+            ? acceptedPickup[enquiry.id] !== proposed : !selectedSlots[enquiry.id])) return;
         setBusy(true); setMessage("");
         try {
             const result = await apiClient<Checkout>(`/api/occasion-enquiries/${enquiry.id}/${stage}`,
                 {method: "POST", credentials: "include", body: JSON.stringify(stage === "deposit"
-                    ? {pickupSlotId: selectedSlots[enquiry.id],estimateAccepted:accepted[enquiry.id]??false} : {})});
+                    ? {pickupSlotId: proposed ? 0 : selectedSlots[enquiry.id], acceptedPickupAt: proposed, estimateAccepted:accepted[enquiry.id]??false} : {})});
             setAttempts(current => ({...current, [enquiry.id]: result}));
             if (result.paymentUrl) window.location.assign(result.paymentUrl);
             else setMessage("Checkout is being prepared. Refresh this page to check its status before retrying.");
@@ -146,7 +154,7 @@ export default function OccasionRequests({embeddedSession}:{embeddedSession?:Cus
                             {enquiry.pricedLines.map(line => <p key={line.productId} className="mt-1">{line.productName}: ₹{line.grossAmount} (base ₹{line.subtotal}, tax ₹{line.taxAmount}; {line.cgstRate}% CGST + {line.sgstRate}% SGST)</p>)}
                         </details>}
                         {enquiry.orderNumber && <p className="mt-2">Confirmed order <Link href={`/orders/${encodeURIComponent(enquiry.orderNumber)}`} className="underline">{enquiry.orderNumber}</Link></p>}
-                        {enquiry.productionPlan?.[0] && <p className="mt-3 text-sm">Planned ready time: {prettyDate(enquiry.serviceDate)}{" "}<T text="at" />{" "}{enquiry.productionPlan[0].expectedReadyAt.slice(11,16)} IST. Follow your linked order for preparation updates.</p>}
+                        {bulkPickupAt(enquiry) && enquiry.status !== "QUOTED" && <p className="mt-3 text-sm">Planned ready time: {prettyDate(enquiry.serviceDate)}{" "}<T text="at" />{" "}{bulkPickupAt(enquiry)?.slice(11,16)} IST. Follow your linked order for preparation updates.</p>}
                         {enquiry.cancellationReview && <div className="mt-3 rounded-xl bg-[#fff0dc] p-3 text-sm">
                             <p>Cancellation reason: {enquiry.cancellationReview.reason}</p>
                             <p>₹{enquiry.cancellationReview.paidAmount} already paid needs branch finance review under your booking terms. No refund is confirmed yet. Please contact the branch.</p>
@@ -154,11 +162,21 @@ export default function OccasionRequests({embeddedSession}:{embeddedSession?:Cus
                         {enquiry.quoteTerms && <p className="mt-2">{enquiry.quoteTerms}</p>}
                         {enquiry.balanceDueAt && (!enquiry.estimated||enquiry.packingFinalizedAt) && <p className="mt-2">Balance due {new Date(enquiry.balanceDueAt).toLocaleString("en-IN", {timeZone: "Asia/Kolkata"})} IST.</p>}
                         {features.occasionPayments && enquiry.status === "QUOTED" && enquiry.fulfilment === "PICKUP" && <div className="mt-4 space-y-3">
+                            {bulkPickupAt(enquiry) ? <div className="rounded-xl border border-[#d9e5df] bg-[#f5faf7] p-4">
+                                <h3 className="font-semibold"><T text="Bulk pickup appointment" /></h3>
+                                <p>{prettyDate(enquiry.serviceDate)} · {bulkPickupAt(enquiry)?.slice(11,16)} IST</p>
+                                <label className="mt-2 flex min-h-11 items-center gap-2">
+                                    <input type="checkbox" checked={acceptedPickup[enquiry.id] === bulkPickupAt(enquiry)}
+                                        onChange={event=>setAcceptedPickup(current=>({...current,[enquiry.id]:event.target.checked ? bulkPickupAt(enquiry)! : ""}))} />
+                                    <T text="I can collect at this time" />
+                                </label>
+                            </div> : <>
                             <button type="button" disabled={busy} onClick={() => void loadSlots(enquiry)} className="min-h-11 rounded-full border border-[#173a37] px-5">Choose a live pickup time</button>
                             {slots[enquiry.id] && <fieldset><legend className="text-sm font-semibold">Pickup time on {prettyDate(enquiry.serviceDate)} · IST</legend><div className="mt-2 flex flex-wrap gap-2">{slots[enquiry.id].map(slot=><button key={slot.id} type="button" aria-pressed={selectedSlots[enquiry.id]===slot.id} onClick={()=>setSelectedSlots(current=>({...current,[enquiry.id]:slot.id}))} className={`min-h-12 rounded-xl border px-4 ${selectedSlots[enquiry.id]===slot.id?"bg-[#143936] text-white":"bg-white"}`}>{slot.startTime.slice(0,5)}–{slot.endTime.slice(0,5)}</button>)}</div></fieldset>}
                             {slots[enquiry.id] && slots[enquiry.id].length === 0 && <p>No pickup capacity remains on this date. Contact the branch for a new quote.</p>}
+                            </>}
                             {enquiry.estimated&&<label className="flex gap-2 rounded-xl border p-3 text-sm"><input type="checkbox" checked={accepted[enquiry.id]??false} onChange={event=>setAccepted(current=>({...current,[enquiry.id]:event.target.checked}))} />I understand this is an estimate: actual packed weights at the agreed rates determine my final invoice; the advance is credited and I can review the balance before collection.</label>}
-                            <button type="button" disabled={busy || !selectedSlots[enquiry.id] || enquiry.estimated&&!accepted[enquiry.id]} onClick={() => void pay(enquiry, "deposit")}
+                            <button type="button" disabled={busy || (bulkPickupAt(enquiry) ? acceptedPickup[enquiry.id] !== bulkPickupAt(enquiry) : !selectedSlots[enquiry.id]) || enquiry.estimated&&!accepted[enquiry.id]} onClick={() => void pay(enquiry, "deposit")}
                                 className="min-h-11 rounded-full bg-[#c76752] px-5 font-bold text-white disabled:opacity-50">Pay advance {money(enquiry.depositAmount??0)}</button>
                         </div>}
                         {features.occasionPayments && enquiry.status === "PAID" && enquiry.quotedAmount != null

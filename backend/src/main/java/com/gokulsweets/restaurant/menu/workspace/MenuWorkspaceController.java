@@ -65,10 +65,12 @@ public class MenuWorkspaceController {
      *
      * @param details the details
      * @param branchIds the branch ids
+     * @param occasionOnly whether to exclude this product from ordinary ordering
      */
     public record Create(
             @NotNull @Valid MenuWorkspaceService.Details details,
-            @NotNull @Size(min = 1, max = 50) List<@Positive Long> branchIds) {}
+            @NotNull @Size(min = 1, max = 50) List<@Positive Long> branchIds,
+            boolean occasionOnly) {}
 
     /**
      * Handles {@code POST /api/admin/branches/{branch}/menu/workspace} for menu workspace.
@@ -84,7 +86,10 @@ public class MenuWorkspaceController {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(MenuWorkspaceController.class, "create(long,Create)");
         try {
-            return Map.of("productId", service.create(branch, input.details(), input.branchIds()));
+            return Map.of(
+                    "productId",
+                    service.create(
+                            branch, input.details(), input.branchIds(), input.occasionOnly()));
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,

@@ -563,7 +563,7 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             "SELECT pickup_slot_id FROM occasion_enquiries WHERE id = ?",
                             Long.class,
                             fixture.enquiry());
-            jdbc.update("UPDATE pickup_slots SET booked_count = 0 WHERE id = ?", slot);
+            jdbc.update("UPDATE pickup_slots SET booked_count = capacity WHERE id = ?", slot);
             Date date =
                     jdbc.queryForObject(
                             "SELECT service_date FROM occasion_enquiries WHERE id = ?",
@@ -576,7 +576,7 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
 """,
                     fixture.enquiry(),
                     fixture.product(),
-                    Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
+                    Timestamp.valueOf(date.toLocalDate().atTime(12, 0)));
             when(phonePe.createPayment(
                             anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
                     .thenAnswer(
@@ -590,7 +590,25 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                                             null));
             var checkout =
                     commitments.beginDeposit(
-                            ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+                            ConsentEnvironment.DEV,
+                            fixture.subject(),
+                            fixture.enquiry(),
+                            0,
+                            false,
+                            date.toLocalDate().atTime(12, 0));
+            Long appointment =
+                    jdbc.queryForObject(
+                            "SELECT id FROM pickup_slots WHERE occasion_enquiry_id = ? AND NOT"
+                                    + " active",
+                            Long.class,
+                            fixture.enquiry());
+            assertThat(appointment).isNotNull().isNotEqualTo(slot);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT booked_count FROM pickup_slots WHERE id = ?",
+                                    Integer.class,
+                                    slot))
+                    .isEqualTo(10);
             commitments.verifiedWebhook(
                     merchant(checkout.attemptId()), "checkout.order.failed", "FAILED", null);
             commitments.verifiedWebhook(
@@ -606,7 +624,7 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                             jdbc.queryForObject(
                                     "SELECT booked_count FROM pickup_slots WHERE id = ?",
                                     Integer.class,
-                                    slot))
+                                    appointment))
                     .isZero();
             assertThat(
                             jdbc.queryForObject(
@@ -842,8 +860,9 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
         try {
             features.setOccasionBulkProduction(true);
             jdbc.update(
-                    "INSERT INTO branch_products(branch_id,product_id,occasion_only)"
-                            + " VALUES(?,?,true)",
+                    "INSERT INTO"
+                        + " branch_products(branch_id,product_id,occasion_only,occasion_published)"
+                        + " VALUES(?,?,true,true)",
                     f.branch(),
                     f.product());
             jdbc.update(
@@ -1050,6 +1069,14 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
             features.setOccasionEnquiries(true);
             jdbc.update(
                     "INSERT INTO branch_products(branch_id,product_id) VALUES(?,?)",
+                    f.branch(),
+                    f.product());
+            assertThat(catalogue.catalogue(f.branch(), false).sweets()).isEmpty();
+            assertThat(catalogue.catalogue(f.branch(), true).sweets())
+                    .anyMatch(sweet -> sweet.id() == f.product() && !sweet.published());
+            jdbc.update(
+                    "UPDATE branch_products SET occasion_published = true WHERE branch_id=? AND"
+                        + " product_id=?",
                     f.branch(),
                     f.product());
             var photos =

@@ -27,6 +27,10 @@ public interface PickupSlotRepository extends JpaRepository<PickupSlot, Long> {
      *     result
      */
     @EntityGraph(attributePaths = "branch")
+    @Query(
+            """
+SELECT p FROM PickupSlot p WHERE p.branch.id = :branchId AND p.slotDate BETWEEN :startDate AND :endDate AND p.occasionEnquiryId IS NULL ORDER BY p.slotDate, p.startTime
+""")
     List<PickupSlot> findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
             Long branchId, LocalDate startDate, LocalDate endDate);
 
@@ -61,6 +65,10 @@ public interface PickupSlotRepository extends JpaRepository<PickupSlot, Long> {
      * @param id the id
      * @return the exists by branch id and slot date and start time and end time and id not result
      */
+    @Query(
+            """
+SELECT COUNT(p) > 0 FROM PickupSlot p WHERE p.branch.id = :branchId AND p.slotDate = :slotDate AND p.startTime = :startTime AND p.endTime = :endTime AND p.id <> :id AND p.occasionEnquiryId IS NULL
+""")
     boolean existsByBranchIdAndSlotDateAndStartTimeAndEndTimeAndIdNot(
             Long branchId, LocalDate slotDate, LocalTime startTime, LocalTime endTime, Long id);
 
@@ -74,6 +82,10 @@ public interface PickupSlotRepository extends JpaRepository<PickupSlot, Long> {
      * @param endTime the end time
      * @return the find by branch id and slot date and start time and end time result
      */
+    @Query(
+            """
+SELECT p FROM PickupSlot p WHERE p.branch.id = :branchId AND p.slotDate = :slotDate AND p.startTime = :startTime AND p.endTime = :endTime AND p.occasionEnquiryId IS NULL
+""")
     Optional<PickupSlot> findByBranchIdAndSlotDateAndStartTimeAndEndTime(
             Long branchId, LocalDate slotDate, LocalTime startTime, LocalTime endTime);
 
@@ -88,6 +100,10 @@ public interface PickupSlotRepository extends JpaRepository<PickupSlot, Long> {
      * @return the exists by branch id and slot date and start time less than and end time greater
      *     than result
      */
+    @Query(
+            """
+SELECT COUNT(p) > 0 FROM PickupSlot p WHERE p.branch.id = :branchId AND p.slotDate = :slotDate AND p.startTime < :endTime AND p.endTime > :startTime AND p.occasionEnquiryId IS NULL
+""")
     boolean existsByBranchIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThan(
             Long branchId, LocalDate slotDate, LocalTime endTime, LocalTime startTime);
 
@@ -103,6 +119,10 @@ public interface PickupSlotRepository extends JpaRepository<PickupSlot, Long> {
      * @return the exists by branch id and slot date and start time less than and end time greater
      *     than and id not result
      */
+    @Query(
+            """
+SELECT COUNT(p) > 0 FROM PickupSlot p WHERE p.branch.id = :branchId AND p.slotDate = :slotDate AND p.startTime < :endTime AND p.endTime > :startTime AND p.id <> :id AND p.occasionEnquiryId IS NULL
+""")
     boolean existsByBranchIdAndSlotDateAndStartTimeLessThanAndEndTimeGreaterThanAndIdNot(
             Long branchId, LocalDate slotDate, LocalTime endTime, LocalTime startTime, Long id);
 
