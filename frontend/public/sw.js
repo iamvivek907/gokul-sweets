@@ -113,6 +113,9 @@ self.addEventListener(
             );
 
 
+        // Published app icons must follow HTTP freshness, including the stable Apple URL.
+        if (url.origin === self.location.origin && url.pathname.startsWith("/pwa-icon/")) return;
+
         /*
          * Never cache transactional API calls.
          */

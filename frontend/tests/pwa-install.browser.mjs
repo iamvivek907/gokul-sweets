@@ -61,6 +61,11 @@ try{
  // Declared image assets decode at their actual manifest sizes, including maskable.
  const assets=await setup();const manifest=await (await assets.page.request.get(`${base}/manifest.webmanifest`)).json();
  assert.equal(manifest.id,'/');assert.equal(manifest.start_url,'/');assert.equal(manifest.scope,'/');
+ assert.equal(manifest.background_color,'#980c31');
+ const startup=assets.page.locator('link[rel="apple-touch-startup-image"][href="/startup/launch-1206x2622.png"]');
+ assert.match(await startup.getAttribute('media'),/device-width: 402px/);
+ assert.ok((await assets.page.request.get(base+'/startup/launch-1206x2622.png')).ok(),'native startup image is served');
+ assert.ok(await assets.page.evaluate(()=>Array.from(document.head.querySelectorAll('style')).some(style=>style.textContent.includes('.gokul-mobile-boot'))),'boot styling arrives in the document head');
  for(const icon of manifest.icons){const size=Number(icon.sizes.split('x')[0]);const dimensions=await assets.page.evaluate(async src=>{const image=new Image();image.src=src;await image.decode();return [image.naturalWidth,image.naturalHeight];},icon.src);assert.deepEqual(dimensions,[size,size]);}
  await assets.context.close();
  // Native signal, rapid taps, consumed event, preference persistence and unavailable state.

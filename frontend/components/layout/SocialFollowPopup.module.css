@@ -1,0 +1,16 @@
+.postOrder {
+    width: min(calc(100% - 48px), 760px);
+    margin: 0 auto 24px;
+}
+
+@media (max-width: 640px) {
+    .postOrder {
+        max-width: 512px;
+        /* This card sits outside the main content's fixed-navigation clearance. */
+        margin-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+
+    :global(.future-storefront):has(.postOrder) :global(.mobile-order-detail) {
+        padding-bottom: 24px;
+    }
+}

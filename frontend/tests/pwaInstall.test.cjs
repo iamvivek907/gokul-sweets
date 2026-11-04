@@ -57,15 +57,23 @@ test('unavailable cross-tab locking fails gracefully without leaving a dead prom
  const h=harness({locks:{async request(){throw Error('Lock denied');}}});const native=h.prompt();assert.equal(await h.store.promptInstall(),false);assert.equal(native.calls,0);assert.equal(h.store.getSnapshot().isInstallPromptAvailable,false);assert.match(h.store.getSnapshot().error,/keep ordering/);assert.equal(h.store.getSnapshot().isPromptInProgress,false);
 });
 
-test('all declared install and push icons exist at their advertised PNG sizes',()=>{
- const manifest=fs.readFileSync('app/manifest.ts','utf8');
- for(const src of [...manifest.matchAll(/src: "([^"]+\.png[^"]*)"/g)].map(match=>match[1])){
-  const path=src.split('?')[0];assert.match(src,/\?v=20261007g2$/);
+test('all declared install and push icons exist at their advertised PNG sizes',async()=>{
+ const manifestJs=ts.transpileModule(fs.readFileSync('app/manifest.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ let revision=null;
+ const exported={};vm.runInNewContext(manifestJs,{exports:exported,require:id=>id==='@/lib/constants'?{API_BASE_URL:'https://shop.example'}:require(id),process,AbortSignal,fetch:async()=>({ok:true,json:async()=>({revision})})});
+ const manifest=await exported.default();assert.equal(manifest.id,'/');assert.equal(manifest.start_url,'/');assert.equal(manifest.scope,'/');
+ assert.equal(manifest.icons.length,3);assert.equal(manifest.background_color,'#980c31');
+ for(const {src} of manifest.icons){
+  const [path,version]=src.split('?v=');
+  assert.equal(version,require('node:crypto').createHash('sha256').update(fs.readFileSync('public'+path)).digest('hex').slice(0,16));
   const bytes=fs.readFileSync('public'+path),size=path.includes('192')?192:512;
   assert.equal(bytes.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(bytes.readUInt32BE(16),size);assert.equal(bytes.readUInt32BE(20),size);
  }
+ revision='9afbc2ee-a870-4bc0-8a70-f044d99ccf7a';
+ const custom=await exported.default();assert.equal(custom.id,manifest.id);
+ assert.deepEqual(Array.from(custom.icons,icon=>icon.src),['192','512','maskable'].map(size=>'/pwa-icon/'+size+'?v='+revision));
  assert.deepEqual(fs.readFileSync('public/icon-192.png'),fs.readFileSync('public/icons/icon-192.png'));
- const apple=fs.readFileSync('app/apple-icon.png');assert.equal(apple.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(apple.readUInt32BE(16),180);assert.equal(apple.readUInt32BE(20),180);
+ const apple=fs.readFileSync('public/icons/apple-default.png');assert.equal(apple.toString('hex',0,8),'89504e470d0a1a0a');assert.equal(apple.readUInt32BE(16),180);assert.equal(apple.readUInt32BE(20),180);
 });
 
 test('existing image caches do not hide the versioned corrected install assets',async()=>{
@@ -77,4 +85,38 @@ test('existing image caches do not hide the versioned corrected install assets',
  assert.equal(await cached.get('https://shop.example/icons/icon-192.png').text(),'old-icon');
  assert.equal(await stores.get('gokul-images-v3').get('https://shop.example/icons/icon-192.png?v=20261007g2').clone().text(),'corrected-icon');
  let intercepted=false;handlers.get('fetch')({request:{method:'GET',url:'https://shop.example/api/orders/1',destination:''},respondWith(){intercepted=true;}});assert.equal(intercepted,false);
+});
+
+
+test('iPhone startup image links match their real portrait PNG sizes',()=>{
+ const js=ts.transpileModule(fs.readFileSync('lib/pwaStartup.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const exported={};vm.runInNewContext(js,{exports:exported,require,process});
+ const images=exported.appleStartupImages;assert.ok(images.length>0);
+ assert.equal(new Set(images.map(image=>image.media)).size,images.length);
+ for(const {url,media} of images){
+  const [width,height,ratio]=Array.from(media.matchAll(/: (\d+)/g),match=>Number(match[1]));
+  assert.match(media,/orientation: portrait/);
+  const png=fs.readFileSync('public'+url);
+  assert.equal(png.toString('hex',0,8),'89504e470d0a1a0a');
+  assert.equal(png.readUInt32BE(16),width*ratio);assert.equal(png.readUInt32BE(20),height*ratio);
+ }
+});
+
+test('stale icon revisions redirect without caching newer bytes under the old URL',async()=>{
+ const source=ts.transpileModule(fs.readFileSync('app/pwa-icon/[variant]/route.ts','utf8'),
+  {compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
+ const exported={},requests=[];
+ const revision='9afbc2ee-a870-4bc0-8a70-f044d99ccf7a';
+ vm.runInNewContext(source,{exports:exported,require:()=>({API_BASE_URL:'https://api.example'}),
+  URL,Response,AbortSignal,fetch:async url=>{
+   requests.push(url);
+   return url.includes('revision=')?new Response(null,{status:404}):
+    new Response('current artwork',{headers:{'content-type':'image/png'}});
+  }});
+ const params={params:Promise.resolve({variant:'512'})};
+ const response=await exported.GET({url:'https://shop.example/pwa-icon/512?v='+revision},params);
+ assert.equal(requests[0],'https://api.example/api/storefront/app-icon/512?revision='+revision);
+ assert.equal(response.status,307);assert.equal(response.headers.get('location'),'/pwa-icon/512');
+ assert.equal(response.headers.get('cache-control'),'no-store');
+ assert.equal(await (await exported.GET({url:'https://shop.example/pwa-icon/512'},params)).text(),'current artwork');
 });
