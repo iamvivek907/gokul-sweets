@@ -670,7 +670,9 @@ UPDATE occasion_enquiries SET status = 'PAYMENT_PENDING', pickup_slot_id = ?,
                                 if (enquiry.balanceDue() != null
                                         && Duration.between(clock.instant(), enquiry.balanceDue())
                                                         .toSeconds()
-                                                < PhonePeClient.MIN_EXPIRY_SECONDS)
+                                                < PhonePeClient.MIN_EXPIRY_SECONDS
+                                                        + phonePeProperties
+                                                                .getRequestTimeoutSeconds())
                                     throw conflict(
                                             "There is not enough time to pay the balance. Contact"
                                                     + " the branch to review this booking.");
@@ -878,16 +880,18 @@ ORDER BY created_at DESC, id DESC LIMIT 1
                             + attempt.enquiryId()
                             + "&payment="
                             + attempt.id();
-            long remainingSeconds =
-                    Duration.between(clock.instant(), attempt.expiresAt()).toSeconds();
-            if (remainingSeconds < PhonePeClient.MIN_EXPIRY_SECONDS)
-                throw conflict("There is not enough time to open payment. Refresh your quote.");
-            var created =
-                    phonePe.createPayment(
-                            attempt.merchantOrderId(),
-                            attempt.amount(),
-                            redirect,
-                            Math.toIntExact(remainingSeconds));
+            PhonePeClient.CreatePaymentResponse created;
+            try {
+                created =
+                        phonePe.createPayment(
+                                attempt.merchantOrderId(),
+                                attempt.amount(),
+                                redirect,
+                                attempt.expiresAt());
+            } catch (PhonePeClient.CheckoutDeadlineException rejected) {
+                failed(attempt.merchantOrderId());
+                throw conflict("There is not enough time to open payment. Contact the branch.");
+            }
             if (created.redirectUrl() == null || created.orderId() == null)
                 throw new ResponseStatusException(
                         HttpStatus.SERVICE_UNAVAILABLE, "Payment provider did not start checkout.");

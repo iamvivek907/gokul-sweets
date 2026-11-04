@@ -97,6 +97,26 @@ public class PhonePeClient {
      */
     public CreatePaymentResponse createPayment(
             String merchantOrderId, BigDecimal amount, String redirectUrl, int expireAfterSeconds) {
+        return createPayment(merchantOrderId, amount, redirectUrl, expireAfterSeconds, null);
+    }
+
+    /** Creates checkout within a merchant deadline rather than a fixed provider lifetime. */
+    public CreatePaymentResponse createPayment(
+            String merchantOrderId, BigDecimal amount, String redirectUrl, Instant deadline) {
+        return createPayment(
+                merchantOrderId,
+                amount,
+                redirectUrl,
+                0,
+                java.util.Objects.requireNonNull(deadline));
+    }
+
+    private CreatePaymentResponse createPayment(
+            String merchantOrderId,
+            BigDecimal amount,
+            String redirectUrl,
+            int expireAfterSeconds,
+            Instant deadline) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         PhonePeClient.class, "createPayment(String,BigDecimal,String,int)");
@@ -108,22 +128,20 @@ public class PhonePeClient {
             if (redirectUrl == null || redirectUrl.isBlank()) {
                 throw new IllegalArgumentException("PhonePe redirect URL is required.");
             }
-            if (expireAfterSeconds < MIN_EXPIRY_SECONDS || expireAfterSeconds > 3600) {
+            if (deadline == null
+                    && (expireAfterSeconds < MIN_EXPIRY_SECONDS || expireAfterSeconds > 3600)) {
                 throw new IllegalArgumentException(
                         "Payment expiry must be between 300 and 3600 seconds.");
             }
             ObjectNode payload = objectMapper.createObjectNode();
             payload.put("merchantOrderId", merchantOrderId);
             payload.put("amount", toSubunits(amount));
-            /*
-             * PhonePe allows 300-3600 seconds.
-             * 20 minutes is a reasonable checkout lifetime.
-             */
-            payload.put("expireAfter", expireAfterSeconds);
+            if (deadline == null) payload.put("expireAfter", expireAfterSeconds);
             ObjectNode paymentFlow = payload.putObject("paymentFlow");
             paymentFlow.put("type", "PG_CHECKOUT");
             paymentFlow.putObject("merchantUrls").put("redirectUrl", redirectUrl);
-            JsonNode response = sendApiRequest("POST", properties.getCreatePaymentPath(), payload);
+            JsonNode response =
+                    sendApiRequest("POST", properties.getCreatePaymentPath(), payload, deadline);
             String orderId = textOrNull(response, "orderId");
             String state = textOrNull(response, "state");
             String responseRedirectUrl = textOrNull(response, "redirectUrl");
@@ -388,6 +406,10 @@ public class PhonePeClient {
      * @return the send api request result
      */
     private JsonNode sendApiRequest(String method, String path, JsonNode body) {
+        return sendApiRequest(method, path, body, null);
+    }
+
+    private JsonNode sendApiRequest(String method, String path, JsonNode body, Instant deadline) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(PhonePeClient.class, "sendApiRequest(String,String,JsonNode)");
         try {
@@ -406,8 +428,7 @@ public class PhonePeClient {
                     builder.header("Content-Type", "application/json");
                     builder.method(
                             method,
-                            HttpRequest.BodyPublishers.ofString(
-                                    objectMapper.writeValueAsString(body)));
+                            HttpRequest.BodyPublishers.ofString(requestBody(body, deadline)));
                 }
                 HttpResponse<String> response =
                         httpClient.send(
@@ -422,7 +443,7 @@ public class PhonePeClient {
                 if (response.statusCode() == 401) {
                     invalidateToken(token);
                     String refreshedToken = getAccessToken();
-                    return sendApiRequestWithToken(method, path, body, refreshedToken);
+                    return sendApiRequestWithToken(method, path, body, refreshedToken, deadline);
                 }
                 return handleApiResponse(response, method, path);
             } catch (PaymentGatewayException exception) {
@@ -459,7 +480,7 @@ public class PhonePeClient {
      * @return the send api request with token result
      */
     private JsonNode sendApiRequestWithToken(
-            String method, String path, JsonNode body, String token) {
+            String method, String path, JsonNode body, String token, Instant deadline) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         PhonePeClient.class,
@@ -478,8 +499,7 @@ public class PhonePeClient {
                 } else {
                     builder.method(
                             method,
-                            HttpRequest.BodyPublishers.ofString(
-                                    objectMapper.writeValueAsString(body)));
+                            HttpRequest.BodyPublishers.ofString(requestBody(body, deadline)));
                 }
                 HttpResponse<String> response =
                         httpClient.send(
@@ -507,6 +527,25 @@ public class PhonePeClient {
                     __gokulMethodStartedNanos,
                     PhonePeClient.class,
                     "sendApiRequestWithToken(String,String,JsonNode,String)");
+        }
+    }
+
+    private String requestBody(JsonNode body, Instant deadline) {
+        if (deadline != null) {
+            // Leave a full request timeout for transit and provider processing.
+            long seconds =
+                    Duration.between(Instant.now(), deadline).toSeconds()
+                            - properties.getRequestTimeoutSeconds();
+            if (seconds < MIN_EXPIRY_SECONDS) throw new CheckoutDeadlineException();
+            ((ObjectNode) body).put("expireAfter", Math.min(seconds, 3600));
+        }
+        return objectMapper.writeValueAsString(body);
+    }
+
+    /** No checkout was created: the deadline failed locally or after a rejected 401. */
+    public static final class CheckoutDeadlineException extends PaymentGatewayException {
+        public CheckoutDeadlineException() {
+            super("PHONEPE_CHECKOUT_DEADLINE", "There is not enough time to open payment.", false);
         }
     }
 

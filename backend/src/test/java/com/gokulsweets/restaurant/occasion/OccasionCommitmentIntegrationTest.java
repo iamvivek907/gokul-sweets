@@ -21,6 +21,7 @@ import java.sql.Date;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.UUID;
@@ -76,6 +77,49 @@ class OccasionCommitmentIntegrationTest {
     }
 
     @Test
+    void providerDeadlineRejectionDoesNotLeaveBalancePending() {
+        var fixture = paidDeposit();
+        boolean enquiriesEnabled = features.isOccasionEnquiries();
+        boolean paymentsEnabled = features.isOccasionPayments();
+        try {
+            features.setOccasionEnquiries(true);
+            features.setOccasionPayments(true);
+            when(phonePe.createPayment(anyString(), any(), anyString(), any(Instant.class)))
+                    .thenThrow(new PhonePeClient.CheckoutDeadlineException())
+                    .thenAnswer(
+                            invocation ->
+                                    new PhonePeClient.CreatePaymentResponse(
+                                            "provider-retry",
+                                            invocation.getArgument(0),
+                                            "PENDING",
+                                            "https://pay.example/checkout",
+                                            null,
+                                            null));
+            assertThatThrownBy(
+                            () ->
+                                    commitments.beginBalance(
+                                            ConsentEnvironment.DEV,
+                                            fixture.subject(),
+                                            fixture.enquiry()))
+                    .hasMessageContaining("not enough time to open payment");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT status FROM occasion_payment_attempts WHERE"
+                                            + " enquiry_id=? AND stage='BALANCE'",
+                                    String.class,
+                                    fixture.enquiry()))
+                    .isEqualTo("FAILED");
+            var retry =
+                    commitments.beginBalance(
+                            ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry());
+            assertThat(retry.paymentUrl()).isEqualTo("https://pay.example/checkout");
+        } finally {
+            features.setOccasionEnquiries(enquiriesEnabled);
+            features.setOccasionPayments(paymentsEnabled);
+        }
+    }
+
+    @Test
     void balanceRetryUsesOneCheckoutAndVerifiedPaymentConfirmsOnce() {
         var fixture = paidDeposit();
         boolean enquiries = features.isOccasionEnquiries(),
@@ -91,7 +135,11 @@ class OccasionCommitmentIntegrationTest {
                             anyString(),
                             eq(new BigDecimal("800.00")),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 360)))
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(360)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -113,7 +161,11 @@ class OccasionCommitmentIntegrationTest {
                             anyString(),
                             any(),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 360));
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(360))));
             String merchant = merchant(first.attemptId());
             commitments.verifiedWebhook(
                     merchant, "checkout.order.completed", "COMPLETED", "transaction-1");
@@ -295,7 +347,11 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             anyString(),
                             eq(new BigDecimal("200.00")),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -327,7 +383,11 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             anyString(),
                             any(),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 600));
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600))));
         } finally {
             features.setOccasionEnquiries(oldEnquiries);
             features.setOccasionPayments(oldPayments);
@@ -400,7 +460,11 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                             anyString(),
                             eq(new BigDecimal("1000.00")),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -604,7 +668,11 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                             anyString(),
                             eq(new BigDecimal("200.00")),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -735,7 +803,11 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                             anyString(),
                             eq(new BigDecimal("800.00")),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -851,7 +923,11 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                             anyString(),
                             eq(new BigDecimal("800.00")),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -1451,7 +1527,11 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                             anyString(),
                             eq(new BigDecimal("8940.00")),
                             anyString(),
-                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
+                            argThat(
+                                    (Instant deadline) ->
+                                            deadline.isAfter(clock.instant())
+                                                    && !deadline.isAfter(
+                                                            clock.instant().plusSeconds(600)))))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
