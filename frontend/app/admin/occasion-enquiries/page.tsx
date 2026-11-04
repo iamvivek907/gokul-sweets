@@ -60,7 +60,17 @@ export default function OccasionEnquiriesPage() {
         const controller = new AbortController();
         getActiveBranches(controller.signal).then(list => {if (!controller.signal.aborted) {
             const allowed=profile?.roleName==="OWNER_ADMIN"?list:list.filter(branch=>profile?.branchIds.includes(branch.id));
-            setBranches(allowed); setBranchId(current => preferredAdminBranchId(profile!.staffId,allowed,current??Number(new URLSearchParams(window.location.search).get("branch"))));
+            const query=new URLSearchParams(window.location.search);
+            const linkedBranchId=Number(query.get("branch"));
+            const linkedEnquiry=query.get("enquiry");
+            setBranches(allowed);
+            setBranchId(current=>preferredAdminBranchId(profile!.staffId,allowed,current??linkedBranchId));
+            if(!deepLinkHandled.current){
+                deepLinkHandled.current=true;
+                if(linkedEnquiry&&allowed.some(branch=>branch.id===linkedBranchId)){
+                    setReviewTarget(current=>current??{id:linkedEnquiry,branchId:linkedBranchId});
+                }
+            }
         }}).catch(() => {if (!controller.signal.aborted) setNotice("Could not load branches.");});
         return () => controller.abort();
     }, [authorization, profile]);
@@ -104,7 +114,7 @@ export default function OccasionEnquiriesPage() {
         }
         void loadReview();
         return()=>controller.abort();
-    },[authorization,activeReview]);
+    },[authorization,activeReview,refresh]);
     useEffect(()=>{
         if(activeReview)document.getElementById("occasion-active-review")?.scrollIntoView({block:"start"});
     },[activeReview]);
@@ -114,22 +124,9 @@ export default function OccasionEnquiriesPage() {
         async function load() {
             if(running||document.visibilityState==="hidden")return;running=true;
             try {
-                let from=weekFrom,selected=serviceDate;
-                const query=new URLSearchParams(window.location.search),target=query.get("enquiry");
-                if(!deepLinkHandled.current&&target&&Number(query.get("branch"))===branchId) {
-                    const response=await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries/${encodeURIComponent(target)}`,authorization!,{signal:controller.signal});
-                    if(response.ok){
-                        const enquiry=await response.json() as Enquiry;
-                        if(controller.signal.aborted)return;
-                        from=enquiry.serviceDate;selected=enquiry.serviceDate;
-                        const linked={id:enquiry.id,branchId};
-                        setReviewTarget(linked);
-                        setWeekFrom(from);setServiceDate(selected);
-                    }
-                    deepLinkHandled.current=true;
-                }
-                const planning=await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries/planning${from?`?from=${from}`:""}`,authorization!,{signal:controller.signal});if(!planning.ok)throw Error("Could not refresh production totals.");
-                const nextWeek=await planning.json() as ProductionWeek;selected=selected||nextWeek.today;
+                const planning=await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries/planning${weekFrom?`?from=${weekFrom}`:""}`,authorization!,{signal:controller.signal});if(!planning.ok)throw Error("Could not refresh production totals.");
+                const nextWeek=await planning.json() as ProductionWeek;
+                const selected=serviceDate||nextWeek.today;
                 const list:Enquiry[]=[];let before="";
                 for(let n=0;n<pages;n++) {const response=await adminFetch(`/api/admin/branches/${branchId}/occasion-enquiries?serviceDate=${selected}${before?`&before=${before}`:""}`,authorization!,{signal:controller.signal});if(!response.ok)throw Error("Could not refresh bookings.");const batch=await response.json() as Enquiry[];list.push(...batch);if(batch.length<50)break;before=batch.at(-1)!.id;}
                 if(!controller.signal.aborted){setWeek(nextWeek);setRequests(list);setPlanningError("");setRefreshedAt(new Date().toLocaleTimeString("en-IN",{timeZone:"Asia/Kolkata",hour:"numeric",minute:"2-digit",second:"2-digit"}));setLoading(false);}
