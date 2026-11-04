@@ -75,6 +75,15 @@ try {
    if(paymentStatus==='FAILED')assert.equal(await page.getByRole('link',{name:'Retry checkout',exact:true}).getAttribute('href'),'/checkout/payment/TEST-ORDER');
    assert.equal(await page.getByRole('button',{name:'Download invoice',exact:true}).count(),paymentStatus==='PAID'?1:0);
    if(paymentStatus==='PAID'){
+    if(width===390){
+     const social=page.getByRole('region',{name:'Follow Gokul Sweets'});
+     await social.getByRole('link',{name:/Instagram/}).waitFor();
+     await social.getByRole('link',{name:/Facebook/}).waitFor();
+     await page.evaluate(()=>window.scrollTo({top:document.documentElement.scrollHeight,behavior:'instant'}));
+     const card=await social.boundingBox();
+     const nav=await page.getByRole('navigation',{name:'Primary navigation'}).boundingBox();
+     assert.ok(card&&nav&&nav.y-(card.y+card.height)>=12,'social card clears fixed bottom navigation');
+    }
     if(fulfillment==='PICKUP'&&!completed)await page.getByLabel('Pickup code: 1 2 3 4',{exact:true}).waitFor();
     if(fulfillment==='DELIVERY')await page.getByText('Delivery fee',{exact:true}).waitFor();
     await page.getByText('Offer savings',{exact:true}).waitFor();

@@ -1,4 +1,8 @@
 export const hindi: Record<string,string> = {
+ "Available at selected pickup time": "चुने हुए पिकअप समय पर उपलब्ध",
+ "Pickup availability is not ready": "पिकअप की उपलब्धता अभी तय नहीं है",
+ "No items match at this pickup time. Try another time or clear your filters.": "इस पिकअप समय पर कोई आइटम नहीं मिला। कोई और समय चुनें या फ़िल्टर हटाएँ।",
+ "Choose a pickup time or retry the availability check.": "पिकअप समय चुनें या उपलब्धता दोबारा जाँचें।",
  "If published, your review is anonymous unless you select this. Please avoid personal details in your comment.": "प्रकाशित होने पर आपकी समीक्षा बिना नाम के दिखेगी, जब तक आप यह विकल्प नहीं चुनते। कृपया टिप्पणी में निजी जानकारी न लिखें।",
 "Show reviews rated":"इस रेटिंग वाली समीक्षाएँ",
 "All reviews":"सभी समीक्षाएँ",

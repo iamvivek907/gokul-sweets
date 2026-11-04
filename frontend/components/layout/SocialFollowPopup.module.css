@@ -1,13 +1,16 @@
-.mark,.linkIcon{display:none}
-:global(.future-storefront[data-customer-design="reference"]) .card{width:min(calc(100% - 24px),760px);margin:16px auto 32px;padding:18px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;border:1px solid #e8d5dd;border-radius:20px;background:linear-gradient(135deg,#fff6eb,#fdf0f4);color:#3e2731}
-:global(.future-storefront[data-customer-design="reference"]) .intro{display:flex;align-items:flex-start;gap:12px;flex:1 1 290px;min-width:0}
-:global(.future-storefront[data-customer-design="reference"]) .intro strong{font-size:1rem;line-height:1.4;color:#6e1836}
-:global(.future-storefront[data-customer-design="reference"]) .intro p{margin:3px 0 0;font-size:.875rem;line-height:1.5;color:#644d55}
-:global(.future-storefront[data-customer-design="reference"]) .mark{display:grid;place-items:center;width:40px;height:40px;flex:none;border-radius:13px;background:#f6e2e9;color:#8f1838}
-:global(.future-storefront[data-customer-design="reference"]) .mark svg{width:22px;height:22px}
-:global(.future-storefront[data-customer-design="reference"]) .links{display:flex;flex-wrap:wrap;gap:8px}
-:global(.future-storefront[data-customer-design="reference"]) .card .links a{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:8px 12px;border:1px solid #dfbecb;border-radius:12px;background:#fff;color:#801b3d;font-size:.875rem;font-weight:700;text-decoration:none}
-:global(.future-storefront[data-customer-design="reference"]) .links a:hover{background:#fbebf0}
-:global(.future-storefront[data-customer-design="reference"]) .links a:focus-visible{outline:2px solid #8f1838;outline-offset:2px}
-:global(.future-storefront[data-customer-design="reference"]) .links .linkIcon{display:block;width:14px;height:14px;flex:none}
-:global(.future-storefront[data-customer-design="reference"]) .legacyArrow{display:none}
+.postOrder {
+    width: min(calc(100% - 48px), 760px);
+    margin: 0 auto 24px;
+}
+
+@media (max-width: 640px) {
+    .postOrder {
+        max-width: 512px;
+        /* This card sits outside the main content's fixed-navigation clearance. */
+        margin-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+
+    :global(.future-storefront):has(.postOrder) :global(.mobile-order-detail) {
+        padding-bottom: 24px;
+    }
+}
