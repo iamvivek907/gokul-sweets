@@ -35,6 +35,7 @@ import javax.crypto.spec.SecretKeySpec;
 @Component
 @Slf4j
 public class PhonePeClient {
+    public static final int MIN_EXPIRY_SECONDS = 300;
 
     private static final String BEARER_PREFIX = AppConstant.PHONE_PE_CLIENT_BEARER_PREFIX;
 
@@ -107,7 +108,7 @@ public class PhonePeClient {
             if (redirectUrl == null || redirectUrl.isBlank()) {
                 throw new IllegalArgumentException("PhonePe redirect URL is required.");
             }
-            if (expireAfterSeconds < 300 || expireAfterSeconds > 3600) {
+            if (expireAfterSeconds < MIN_EXPIRY_SECONDS || expireAfterSeconds > 3600) {
                 throw new IllegalArgumentException(
                         "Payment expiry must be between 300 and 3600 seconds.");
             }

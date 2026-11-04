@@ -83,8 +83,15 @@ class OccasionCommitmentIntegrationTest {
         try {
             features.setOccasionEnquiries(true);
             features.setOccasionPayments(true);
+            jdbc.update(
+                    "UPDATE occasion_enquiries SET balance_due_at=? WHERE id=?",
+                    Timestamp.from(clock.instant().plusSeconds(360)),
+                    fixture.enquiry());
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("800.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("800.00")),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 360)))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -101,7 +108,12 @@ class OccasionCommitmentIntegrationTest {
                     commitments.beginBalance(
                             ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry());
             assertThat(retry.attemptId()).isEqualTo(first.attemptId());
-            verify(phonePe, times(1)).createPayment(anyString(), any(), anyString(), eq(600));
+            verify(phonePe, times(1))
+                    .createPayment(
+                            anyString(),
+                            any(),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 360));
             String merchant = merchant(first.attemptId());
             commitments.verifiedWebhook(
                     merchant, "checkout.order.completed", "COMPLETED", "transaction-1");
@@ -280,7 +292,10 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     Timestamp.valueOf(date.toLocalDate().atTime(12, 0)),
                     bp);
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("200.00")),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -307,7 +322,12 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                                     BigDecimal.class,
                                     bp))
                     .isEqualByComparingTo("10");
-            verify(phonePe).createPayment(anyString(), any(), anyString(), eq(600));
+            verify(phonePe)
+                    .createPayment(
+                            anyString(),
+                            any(),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 600));
         } finally {
             features.setOccasionEnquiries(oldEnquiries);
             features.setOccasionPayments(oldPayments);
@@ -377,7 +397,10 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                     jdbc.queryForObject(
                             "SELECT count(*) FROM inventory_daily_allocations", Integer.class);
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("1000.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("1000.00")),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -578,7 +601,10 @@ VALUES (?, ?, 10, 'PIECE', ?, 'PLANNED', 'manager')
                     fixture.product(),
                     Timestamp.valueOf(date.toLocalDate().atTime(12, 0)));
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("200.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("200.00")),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -706,7 +732,10 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     fixture.product(),
                     Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("800.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("800.00")),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -819,7 +848,10 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     fixture.product(),
                     Timestamp.valueOf(date.toLocalDate().atTime(11, 0)));
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("800.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("800.00")),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(
@@ -1416,7 +1448,10 @@ VALUES (?, ?, 10, 'PIECE', ?, 'COMMITTED', 'manager')
                     "UPDATE occasion_payment_attempts SET amount=2910 WHERE enquiry_id=?",
                     f.enquiry());
             when(phonePe.createPayment(
-                            anyString(), eq(new BigDecimal("8940.00")), anyString(), eq(600)))
+                            anyString(),
+                            eq(new BigDecimal("8940.00")),
+                            anyString(),
+                            intThat(seconds -> seconds >= 300 && seconds <= 600)))
                     .thenAnswer(
                             invocation ->
                                     new PhonePeClient.CreatePaymentResponse(

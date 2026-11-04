@@ -663,15 +663,17 @@ UPDATE occasion_enquiries SET status = 'PAYMENT_PENDING', pickup_slot_id = ?,
                                     throw conflict(
                                             "The deposit must be verified before paying the"
                                                     + " balance.");
-                                if (enquiry.balanceDue() != null
-                                        && !enquiry.balanceDue().isAfter(clock.instant()))
-                                    throw conflict(
-                                            "The balance deadline passed. Contact the branch to"
-                                                    + " review this booking.");
                                 Attempt existing = pendingAttempt(id, "BALANCE");
                                 if (existing != null
                                         && existing.expiresAt().isAfter(clock.instant()))
                                     return new Start(existing, false);
+                                if (enquiry.balanceDue() != null
+                                        && Duration.between(clock.instant(), enquiry.balanceDue())
+                                                        .toSeconds()
+                                                < PhonePeClient.MIN_EXPIRY_SECONDS)
+                                    throw conflict(
+                                            "There is not enough time to pay the balance. Contact"
+                                                    + " the branch to review this booking.");
                                 if (existing != null)
                                     jdbc.update(
                                             "UPDATE occasion_payment_attempts SET status ="
@@ -868,8 +870,7 @@ ORDER BY created_at DESC, id DESC LIMIT 1
             if (attempt.url() != null) return response(attempt);
             // An uncertain provider response must remain pending for status reconciliation; never
             // create a second charge.
-            if (attempt.expiresAt().isBefore(clock.instant()))
-                throw conflict("The payment window ended. Refresh the status.");
+
             String storefront = phonePeProperties.getRedirectUrl().replaceAll("/checkout/?$", "");
             String redirect =
                     storefront
@@ -877,9 +878,16 @@ ORDER BY created_at DESC, id DESC LIMIT 1
                             + attempt.enquiryId()
                             + "&payment="
                             + attempt.id();
+            long remainingSeconds =
+                    Duration.between(clock.instant(), attempt.expiresAt()).toSeconds();
+            if (remainingSeconds < PhonePeClient.MIN_EXPIRY_SECONDS)
+                throw conflict("There is not enough time to open payment. Refresh your quote.");
             var created =
                     phonePe.createPayment(
-                            attempt.merchantOrderId(), attempt.amount(), redirect, 600);
+                            attempt.merchantOrderId(),
+                            attempt.amount(),
+                            redirect,
+                            Math.toIntExact(remainingSeconds));
             if (created.redirectUrl() == null || created.orderId() == null)
                 throw new ResponseStatusException(
                         HttpStatus.SERVICE_UNAVAILABLE, "Payment provider did not start checkout.");

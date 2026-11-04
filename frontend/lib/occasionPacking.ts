@@ -4,6 +4,10 @@ export function buildOccasionItems(products:OccasionSweet[],quantities:Record<nu
  return products.flatMap<RequestedOccasionItem>(product=>{const bulk=Number(quantities[product.id]??0);const unit=units[product.id]??(product.saleMode==="WEIGHT"?"KG":"PIECE");const boxPieces=groups.filter(g=>g.kind==="MIXED").reduce((sum,g)=>sum+(g.recipe.find(x=>x.productId===product.id)?.pieces??0)*g.boxCount,0);const pieces=boxPieces+(unit==="PIECE"?bulk:0),grams=(unit==="KG"?Math.round(bulk*1000):0)+groups.filter(g=>g.kind==="WEIGHT"&&g.productId===product.id).reduce((sum,g)=>sum+(g.totalGrams??0),0);
  if(pieces>0)return [{productId:product.id,quantity:pieces,unit:"PIECE" as const,...(grams>0?{supplementalGrams:grams}:{})}];if(grams>0)return [{productId:product.id,quantity:grams,unit:"GRAM" as const}];return [];});
 }
+export const OCCASION_PRODUCT_LIMIT_MESSAGE = "You can select up to 30 different products per request. Remove a product to add another.";
+export function exceedsOccasionProductLimit(items: RequestedOccasionItem[]): boolean {
+ return new Set(items.map(item => item.productId)).size > 30;
+}
 export function packingError(groups:PackingDraft[],items:RequestedOccasionItem[],boxes:OccasionBox[]):string|null {
  const allocated=new Map<number,number>();for(const [n,g]of groups.entries()){const prefix=`Packing group ${n+1}: `;const box=boxes.find(b=>b.id===g.boxId);if(!box)return prefix+"choose a published box.";if(!Number.isInteger(g.boxCount)||g.boxCount<1||g.boxCount>10000)return prefix+"choose a quantity that fills 1–10,000 whole boxes.";
  if(g.kind==="MIXED"){if(!g.recipe.length)return prefix+"add at least one item to each box.";if(g.recipe.some(x=>!Number.isInteger(x.pieces)||x.pieces<1))return prefix+"pieces must be whole numbers.";if(g.recipe.reduce((s,x)=>s+x.pieces,0)>box.capacityPieces)return prefix+"the assortment exceeds this box's piece capacity.";}

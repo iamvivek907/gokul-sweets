@@ -9,7 +9,7 @@ import {T} from "@/lib/language";
 import OccasionPackages from "@/components/occasion/OccasionPackages";
 import styles from "./BulkPlanner.module.css";
 import OccasionPackingBuilder from "@/components/occasion/OccasionPackingBuilder";
-import {buildOccasionItems,packingError,inclusiveRate,indicativeFood} from "@/lib/occasionPacking";
+import {buildOccasionItems,packingError,inclusiveRate,indicativeFood,exceedsOccasionProductLimit,OCCASION_PRODUCT_LIMIT_MESSAGE} from "@/lib/occasionPacking";
 import {useRouter} from "next/navigation";
 import OccasionDatePicker,{addDays} from "@/components/occasion/OccasionDatePicker";
 import {useEffect, useState} from "react";
@@ -46,6 +46,7 @@ export default function OccasionsPage() {
     const [boxes, setBoxes] = useState<OccasionBox[]>([]);
     const [packages,setPackages]=useState<OccasionPackage[]>([]);
     const [path,setPath]=useState<"package"|"custom">("custom");
+    const [limitFeedback,setLimitFeedback]=useState<"food"|"packing"|null>(null);
     const [groups,setGroups]=useState<PackingDraft[]>([]);
     const [units, setUnits] = useState<Record<number, "KG" | "PIECE">>({});
     const [items, setItems] = useState<Record<number, number>>({});
@@ -65,7 +66,7 @@ export default function OccasionsPage() {
         if (!branchId || !features?.occasionEnquiries) return;
         const controller = new AbortController();
         apiClient<OccasionCatalogue>(`/api/branches/${branchId}/occasion-catalogue`, {signal: AbortSignal.any([controller.signal,AbortSignal.timeout(10000)])}).then(catalogue => {
-            if (!controller.signal.aborted) {setCatalogueError(null);setCatalogueBranchId(branchId);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setPackages(catalogue.packages??[]);setPath(catalogue.packages?.length?"package":"custom");setUnits({});setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setGroups([]);}
+            if (!controller.signal.aborted) {setCatalogueError(null);setCatalogueBranchId(branchId);setProducts(catalogue.sweets); setBoxes(catalogue.boxes);setPackages(catalogue.packages??[]);setPath(catalogue.packages?.length?"package":"custom");setUnits({});setBranding(catalogue.branding??null);setCategory(catalogue.sweets[0]?.categoryName??"Selection"); setItems({}); setGroups([]);setLimitFeedback(null);}
         }).catch(() => {if (!controller.signal.aborted) setCatalogueError({branchId:branchId,retry:catalogueRetry});});
         return () => controller.abort();
     }, [branchId, features?.occasionEnquiries,catalogueRetry]);
@@ -75,6 +76,7 @@ export default function OccasionsPage() {
         if (!branch || busy || catalogueBranchId!==branch.id) return;
         if (!session.authenticated) {setMessage("Verify your phone before sending your enquiry. Your selection is saved on this page."); return;}
         if (!date || date < earliest || date > latest) {setMessage("Choose a future service date in India."); return;}
+        if (overProductLimit) {setMessage(OCCASION_PRODUCT_LIMIT_MESSAGE); return;}
         const packingIssue=packingError(groups,chosen,boxes);
         if(packingIssue){setMessage(packingIssue);return;}
         if (!chosen.length) {setMessage("Add at least one product and quantity."); return;}
@@ -100,12 +102,25 @@ export default function OccasionsPage() {
     const campaign=catalogueBranchId===branch?.id?branding:null;
     const categories=Array.from(new Set(products.map(product=>product.categoryName??"Selection")));
     const chosen=buildOccasionItems(products,items,units,groups);
+    const overProductLimit=exceedsOccasionProductLimit(chosen);
+    function updateSelection(nextItems: typeof items, nextGroups: PackingDraft[], section: "food"|"packing") {
+        if (exceedsOccasionProductLimit(buildOccasionItems(products,nextItems,units,nextGroups))) {
+            setLimitFeedback(section);
+            return false;
+        }
+        setLimitFeedback(null);
+        setItems(nextItems);
+        setGroups(nextGroups);
+        return true;
+    }
     function addPackage(preset:OccasionPackage){
         const boxCount=Math.max(1,Math.min(10000,Math.trunc(guests)||1));
-        setGroups(current=>current.length>=30?current:[...current,{
-            key:Math.max(0,...current.map(group=>group.key))+1,kind:"MIXED",boxId:preset.boxId,
+        if (groups.length>=30) return;
+        const nextGroups=[...groups,{
+            key:Math.max(0,...groups.map(group=>group.key))+1,kind:"MIXED" as const,boxId:preset.boxId,
             boxCount,recipe:preset.recipe,productId:null,totalGrams:null,packGrams:null,includeSpoons:false,
-        }]);
+        }];
+        if (!updateSelection(items,nextGroups,"food")) return;
         document.getElementById("plan-packing")?.scrollIntoView({block:"start"});
     }
     const selected=products.filter(product=>chosen.some(item=>item.productId===product.id));
@@ -151,6 +166,7 @@ export default function OccasionsPage() {
                                 <button type="button" aria-pressed={path==="package"} onClick={()=>setPath("package")}><T text="Choose a package" /><small><T text="Start with a complete box" /></small></button>
                                 <button type="button" aria-pressed={path==="custom"} onClick={()=>setPath("custom")}><T text="Build your own" /><small><T text="Pick items and quantities" /></small></button>
                             </div>
+                            {limitFeedback==="food"&&<p role="alert" className="mt-3 text-sm">{OCCASION_PRODUCT_LIMIT_MESSAGE}</p>}
                             {path==="package" ? packages.length ? <OccasionPackages packages={packages} boxes={boxes} products={products} guests={guests} onAdd={addPackage} full={groups.length>=30} />
                                 : <p className={styles.empty}><T text="No ready-made packages at this branch yet. You can build your own." /></p>
                             : <fieldset>
@@ -162,15 +178,15 @@ export default function OccasionsPage() {
                                 {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-40 w-full object-cover" /> : <div className="flex h-24 items-center justify-center bg-[#fffaf2] font-serif text-xl">Gokul celebration selection</div>}
                                 <div className="p-4">{product.occasionOnly && <p className="text-xs font-bold uppercase tracking-wider text-[#c76752]">Made for occasions</p>}<h3 className="mt-1 text-lg font-semibold">{product.name}</h3>{product.description && <p className="mt-1 text-sm">{product.description}</p>}<p className="mt-2 text-xs">{product.leadDays} days advance notice{product.pieceGrams ? ` · configured piece size ${product.pieceGrams} g` : ""}</p>
                                 <p className="mt-3 font-semibold">{inclusiveRate(product)==null?"Price available on branch review":`${money(inclusiveRate(product)!)} per ${product.saleMode==="WEIGHT"?"kg":"piece"} · tax included`}</p>{product.saleMode==="WEIGHT"&&<p className="mt-1 text-xs">Pieces are priced from measured kg; the branch confirms the weight estimate.</p>}
-                                <div className="occasion-quantity mt-3"><label className="text-sm">{"Bulk quantity without individual boxes"}<input aria-label={`${product.name} quantity`} type="number" min={0} max={100000} step={ (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? 1 : 0.001} value={items[product.id] ?? 0} onChange={event => setItems(current => ({...current, [product.id]: Number(event.target.value)}))} className="mt-1 w-full rounded-xl border p-3" /></label>{<label className="text-sm">Unit<select aria-label={`${product.name} unit`} value={units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")} onChange={event => {setUnits(current => ({...current, [product.id]: event.target.value as "KG" | "PIECE"})); setItems(current => ({...current, [product.id]: 0}));}} className="mt-1 rounded-xl border p-3">{product.saleMode === "WEIGHT" && <option value="KG">kg</option>}<option value="PIECE">pieces</option></select></label>}</div>
+                                <div className="occasion-quantity mt-3"><label className="text-sm">{"Bulk quantity without individual boxes"}<input aria-label={`${product.name} quantity`} type="number" min={0} max={100000} step={ (units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")) === "PIECE" ? 1 : 0.001} value={items[product.id] ?? 0} onChange={event => updateSelection({...items,[product.id]:Number(event.target.value)},groups,"food")} className="mt-1 w-full rounded-xl border p-3" /></label>{<label className="text-sm">Unit<select aria-label={`${product.name} unit`} value={units[product.id] ?? (product.saleMode === "WEIGHT" ? "KG" : "PIECE")} onChange={event => {setUnits(current => ({...current, [product.id]: event.target.value as "KG" | "PIECE"})); setItems(current => ({...current, [product.id]: 0}));}} className="mt-1 rounded-xl border p-3">{product.saleMode === "WEIGHT" && <option value="KG">kg</option>}<option value="PIECE">pieces</option></select></label>}</div>
                                 </div></div>)}</div>
                         </fieldset>}
                         </section>
-                        <section id="plan-packing" className="occasion-stage"><h2 className="text-xl font-bold"><T text="03 · Choose packing"/></h2><p><T text="Optional. Keep quantities in bulk or plan individual boxes for branch review."/></p><OccasionPackingBuilder products={products} boxes={boxes} groups={groups} onChange={setGroups} /></section>
+                        <section id="plan-packing" className="occasion-stage"><h2 className="text-xl font-bold"><T text="03 · Choose packing"/></h2><p><T text="Optional. Keep quantities in bulk or plan individual boxes for branch review."/></p>{limitFeedback==="packing"&&<p role="alert" className="mt-3 text-sm">{OCCASION_PRODUCT_LIMIT_MESSAGE}</p>}<OccasionPackingBuilder products={products} boxes={boxes} groups={groups} onChange={next=>updateSelection(items,next,"packing")} /></section>
                         <h2 id="plan-review" className="occasion-stage text-xl font-bold"><T text="04 · Review & request a quote"/></h2><aside className="occasion-selection" aria-label="Your occasion selection"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-bold uppercase tracking-widest">Your celebration basket</p><h3 className="text-lg font-semibold">{chosen.length} items · {groups.length} packing groups</h3></div><strong>{incompletePrice?"Known-price subtotal":"Indicative total"} {money(foodEstimate+packingEstimate)}</strong></div><details className="mt-2"><summary className="min-h-11 cursor-pointer text-sm font-semibold">Review quantities & indicative costs</summary><ul>{chosen.map((item,index)=>{const product=products.find(p=>p.id===item.productId)!;return <li key={item.productId}><span>{product.name}<small className="block">{item.unit==="GRAM"?`${item.quantity/1000} kg`:`${item.quantity.toLocaleString("en-IN")} pieces`}{item.supplementalGrams?` + ${item.supplementalGrams/1000} kg`:""}</small></span><strong>{prices[index]==null?"Weight / price review needed":money(prices[index]!)}</strong><button type="button" aria-label={`Remove ${product.name} from occasion selection`} onClick={()=>{setItems(current=>({...current,[product.id]:0}));setGroups(current=>current.filter(group=>group.productId!==product.id).map(group=>({...group,recipe:group.recipe.filter(line=>line.productId!==product.id)})));}}><T text="Remove" /></button></li>;})}</ul><p className="text-sm">Packaging estimate {money(packingEstimate)}{groups.some(g=>g.includeSpoons)?" · spoon price follows branch review":""}.</p></details><p className="mt-2 text-xs">{incompletePrice?"Some items need measured weight or reviewed prices, so this is a partial estimate. ":""}The branch confirms rates, rebates, fit and final quote before any advance. No payment is taken when you send this request.</p></aside>
                         <label className="block">Anything else? <textarea maxLength={1000} value={notes} onChange={event => setNotes(event.target.value)} className="mt-2 block w-full rounded-xl border p-3" /></label>
                         <div className="flex flex-wrap gap-3">
-                            <button disabled={busy || !chosen.length || !session.authenticated || !date || date<earliest || date>latest} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
+                            <button disabled={busy || overProductLimit || !chosen.length || !session.authenticated || !date || date<earliest || date>latest} className="min-h-12 rounded-full bg-[#c76752] px-6 font-bold text-white disabled:opacity-50">{busy ? "Sending…" : "Request a reviewed quote"}</button>
                         </div>
                         <p className="text-sm text-[#4e605c]">{session.authenticated?"You are signed in with a verified phone. Your request will appear in Requests & quotes.":"Verify your phone above to send your request."} The branch confirms the price and collection time before you pay.</p>
                     </form>}
