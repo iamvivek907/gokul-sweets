@@ -474,9 +474,28 @@ VALUES (?, ?, 'APPROVED', 'PIECE', 100, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
                                             "https://pay.example/bulk",
                                             null,
                                             null));
+            assertThatThrownBy(
+                            () ->
+                                    commitments.beginDeposit(
+                                            ConsentEnvironment.DEV,
+                                            fixture.subject(),
+                                            fixture.enquiry(),
+                                            slot))
+                    .hasMessageContaining("Accept the approved bulk pickup appointment");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT booked_count FROM pickup_slots WHERE id = ?",
+                                    Integer.class,
+                                    slot))
+                    .isZero();
             var checkout =
                     commitments.beginDeposit(
-                            ConsentEnvironment.DEV, fixture.subject(), fixture.enquiry(), slot);
+                            ConsentEnvironment.DEV,
+                            fixture.subject(),
+                            fixture.enquiry(),
+                            0,
+                            false,
+                            date.atTime(12, 0));
             assertThat(
                             jdbc.queryForObject(
                                     "SELECT state FROM occasion_production_allocations WHERE"

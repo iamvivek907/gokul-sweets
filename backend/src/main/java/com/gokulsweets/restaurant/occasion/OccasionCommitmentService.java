@@ -323,6 +323,8 @@ public class OccasionCommitmentService {
                                 Instant bulkPaymentExpiry = null;
                                 long reservedSlotId;
                                 Instant serviceStart;
+                                if (bulk && acceptedPickupAt == null)
+                                    throw conflict("Accept the approved bulk pickup appointment.");
                                 if (acceptedPickupAt != null) {
                                     if (pickupSlotId != 0 || !features.isOccasionBulkProduction())
                                         throw conflict(
@@ -349,8 +351,9 @@ WHERE a.enquiry_id = ? AND a.state = 'PLANNED'
                                     bulkPaymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
                                     if (!bulkPaymentExpiry.isBefore(serviceStart))
                                         throw conflict(
-                                                "There is not enough time to pay before bulk pickup."
-                                                        + " Ask the branch for a later appointment.");
+                                                "There is not enough time to pay before bulk"
+                                                        + " pickup. Ask the branch for a later"
+                                                        + " appointment.");
                                     LocalTime startTime = proposed.toLocalTime();
                                     LocalTime endTime =
                                             startTime.isBefore(LocalTime.of(23, 30))
@@ -400,13 +403,6 @@ WHERE id = ? AND branch_id = ? AND slot_date = ? AND active
                                         throw conflict(
                                                 "Choose an available future pickup time for this"
                                                         + " branch and date.");
-                                    if (bulk) {
-                                        bulkPaymentExpiry = clock.instant().plus(PAYMENT_WINDOW);
-                                        if (!bulkPaymentExpiry.isBefore(serviceStart))
-                                            throw conflict(
-                                                    "There is not enough time to pay before bulk pickup."
-                                                            + " Ask the branch for a later appointment.");
-                                    }
                                     // The standard order path takes its slot lock before allocation
                                     // locks; keep that order.
                                     try {
