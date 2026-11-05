@@ -8,7 +8,7 @@ import {getActiveBranches} from "@/services/branchApi";
 
 type Template={policyId:number;quantity:number;autoApprove:boolean};
 type Plan={enabled:boolean;openingTime:string;closingTime:string;slotMinutes:number;capacity:number;maintainDays:number;weekdays:number;version:number;templates:Template[]};
-type Policy={id:number;name:string;unit:string;bookingDays:number;buffer:number;maximum:number|null;readyStockRequired:boolean;eligible:boolean};
+type Policy={id:number;name:string;unit:string;bookingDays:number;buffer:number;maximum:number|null;readyStockRequired:boolean;eligible:boolean;selectable:boolean;unavailableReason:string|null};
 type Workspace={plan:Plan|null;policies:Policy[];lastAttempt:string|null;lastSuccess:string|null;message:string|null};
 const initial:Plan={enabled:false,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:-1,templates:[]};
 const control="mt-2 block min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2";
@@ -87,7 +87,7 @@ export default function RollingAutomationPage(){
         {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-900">{error}</p>}
         {notice&&<p role="status" className="rounded-xl bg-green-50 p-3 text-green-900">{notice}</p>}
         {!workspace&&!error&&branchId&&<p role="status">Loading schedule…</p>}
-        {workspace&&<form className="space-y-6" onSubmit={event=>{event.preventDefault();void submit(false);}}>
+        {workspace&&<form className="space-y-6" noValidate={!draft.enabled} onSubmit={event=>{event.preventDefault();void submit(false);}}>
             <fieldset disabled={busy||!canManage} className="space-y-6 disabled:opacity-75">
                 <section className="space-y-4 rounded-2xl border bg-white p-5">
                     <h2 className="text-xl font-bold">1. Choose when pickup is offered</h2>
@@ -105,17 +105,17 @@ export default function RollingAutomationPage(){
                 </section>
                 <section className="space-y-4 rounded-2xl border bg-white p-5">
                     <h2 className="text-xl font-bold">2. Select configured inventory policies</h2>
-                    <p className="text-sm text-stone-600">Only policies configured for this branch appear. Menu items without a policy are excluded. Quantities use the unit shown below: grams for GRAM policies, whole units otherwise. Policies, safety buffers and booking windows are not changed here.</p>
+                    <p className="text-sm text-stone-600">Only policies configured for this branch appear. Menu items without a policy, capacity-only policies and manual-control policies are excluded. Saved selections that become unsupported stay visible so you can remove them or pause safely. Quantities use the unit shown below: grams for GRAM policies, whole units otherwise. Policies, safety buffers and booking windows are not changed here.</p>
                     {!workspace.policies.length&&<p>No inventory policies configured for this branch yet.</p>}
                     {workspace.policies.map(policy=>{
                         const template=draft.templates.find(item=>item.policyId===policy.id);
                         return <div key={policy.id} className="space-y-3 rounded-xl border p-4">
-                            <label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" checked={!!template} onChange={event=>change({templates:event.target.checked?[...draft.templates,{policyId:policy.id,quantity:0,autoApprove:false}]:draft.templates.filter(item=>item.policyId!==policy.id)})}/>{policy.name}</label>
+                            <label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" checked={!!template} disabled={!policy.selectable&&!template} onChange={event=>change({templates:event.target.checked?[...draft.templates,{policyId:policy.id,quantity:0,autoApprove:false}]:draft.templates.filter(item=>item.policyId!==policy.id)})}/>{policy.name}</label>
                             <p className="text-sm text-stone-600">Unit: {policy.unit} · Buffer: {policy.buffer} · Maximum: {policy.maximum??"Not set"} · Booking window: {policy.bookingDays} days ahead</p>
-                            {!policy.eligible&&<p className="text-sm text-amber-900">Skipped while this policy is offline or set to manual control.</p>}
+                            {policy.unavailableReason&&<p className="text-sm text-amber-900">{policy.unavailableReason}</p>}
                             {template&&<div className="grid gap-4 sm:grid-cols-2">
-                                <label>Guaranteed daily quantity · {policy.unit}<input className={control} type="number" min={policy.unit==="GRAM"?0.001:1} step={policy.unit==="GRAM"?0.001:1} max={policy.maximum??undefined} required value={template.quantity||""} onChange={event=>changeTemplate(policy.id,{quantity:Number(event.target.value)})}/><small className="mt-2 block text-stone-600">Enter the quantity you can reliably provide. It must exceed the safety buffer and stay within the policy maximum.</small></label>
-                                <label>Approval mode<select className={control} value={template.autoApprove?"approved":"draft"} onChange={event=>changeTemplate(policy.id,{autoApprove:event.target.value==="approved"})}><option value="draft">Create a draft for staff review</option><option value="approved">Approve this guaranteed quantity automatically</option></select><small className="mt-2 block text-stone-600">{policy.readyStockRequired?"Actual production must still be marked ready. Approval does not prove the food exists.":"Draft quantities are not sellable until staff approve them."}</small></label>
+                                <label>Guaranteed daily quantity · {policy.unit}<input className={control} type="number" disabled={!policy.selectable} min={policy.unit==="GRAM"?0.001:1} step={policy.unit==="GRAM"?0.001:1} max={policy.maximum??undefined} required value={template.quantity||""} onChange={event=>changeTemplate(policy.id,{quantity:Number(event.target.value)})}/><small className="mt-2 block text-stone-600">Enter the quantity you can reliably provide. It must exceed the safety buffer and stay within the policy maximum.</small></label>
+                                <label>Approval mode<select className={control} disabled={!policy.selectable} value={template.autoApprove?"approved":"draft"} onChange={event=>changeTemplate(policy.id,{autoApprove:event.target.value==="approved"})}><option value="draft">Create a draft for staff review</option><option value="approved">Approve this guaranteed quantity automatically</option></select><small className="mt-2 block text-stone-600">{policy.readyStockRequired?"Actual production must still be marked ready. Approval does not prove the food exists.":"Draft quantities are not sellable until staff approve them."}</small></label>
                             </div>}
                         </div>;
                     })}

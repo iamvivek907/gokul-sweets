@@ -7,8 +7,9 @@ try{
  for(const width of [390,1280]){
   const context=await browser.newContext({viewport:{width,height:900}});
   let plan=null,saved=null,runs=0;
-  const policies=[{id:6,name:"Samosa",unit:"PIECE",bookingDays:14,buffer:2,maximum:100,readyStockRequired:false,eligible:true},
-   {id:7,name:"Rasmalai",unit:"PIECE",bookingDays:3,buffer:1,maximum:40,readyStockRequired:true,eligible:true}];
+  const policies=[{id:6,name:"Samosa",unit:"PIECE",bookingDays:14,buffer:2,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},
+   {id:7,name:"Rasmalai",unit:"PIECE",bookingDays:3,buffer:1,maximum:40,readyStockRequired:true,eligible:true,selectable:true,unavailableReason:null},
+   {id:8,name:"Counter capacity",unit:"CAPACITY_POINT",bookingDays:14,buffer:0,maximum:100,readyStockRequired:false,eligible:false,selectable:false,unavailableReason:"Capacity-only policies do not support physical inventory automation."}];
   await context.route("**/api/**",async route=>{
    const request=route.request(),path=new URL(request.url()).pathname;
    if(path==="/api/admin/auth/me")return route.fulfill({json:{staffId:77,roleName:"OWNER_ADMIN",username:"owner",fullName:"Owner",branchIds:[1],permissions:["BRANCH_MANAGE","INVENTORY_VIEW","INVENTORY_MANAGE","APPROVAL_MANAGE"]},headers:{"X-Staff-CSRF":"test-csrf"}});
@@ -28,6 +29,8 @@ try{
   assert.equal(await enabled.isChecked?.()??await enabled.evaluate(e=>e.checked),false);
   const run=page.getByRole("button",{name:"Generate missing coverage now",exact:true});
   assert.equal(await run.isDisabled(),true);
+  assert.equal(await page.getByRole("checkbox",{name:"Counter capacity",exact:true}).isDisabled(),true);
+  await page.getByText("Capacity-only policies do not support physical inventory automation.",{exact:true}).waitFor();
   await enabled.check();
   await page.getByRole("checkbox",{name:"Samosa",exact:true}).check();
   await page.getByLabel(/Guaranteed daily quantity/).fill("80");
@@ -39,14 +42,35 @@ try{
   await run.click();
   await page.getByText("2 slots created; 1 allocations created",{exact:true}).waitFor();
   assert.equal(runs,1);
+  // A previously selected dish may become bulk-only after this schedule was saved.
+  policies[0]={...policies[0],eligible:false,selectable:false,unavailableReason:"Bulk-only items are excluded from daily automation. Remove this saved selection."};
+  await page.getByRole("button",{name:"Reload saved settings",exact:true}).click();
+  await page.getByText("Bulk-only items are excluded from daily automation. Remove this saved selection.",{exact:true}).waitFor();
+  assert.equal(await page.getByRole("checkbox",{name:"Samosa",exact:true}).isChecked(),true);
+  assert.equal(await page.getByRole("checkbox",{name:"Samosa",exact:true}).isDisabled(),false,"saved unsupported selections can be removed");
   await enabled.uncheck();
   assert.equal(await run.isDisabled(),true,"unsaved edits cannot be used by generation");
   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
   await page.getByText("Schedule saved.",{exact:false}).waitFor();
   assert.equal(saved.enabled,false);
   assert.equal(await run.isDisabled(),true);
+  await page.getByRole("checkbox",{name:"Samosa",exact:true}).uncheck();
+  await enabled.check();
+  await page.getByRole("checkbox",{name:"Rasmalai",exact:true}).check();
+  await page.getByLabel(/Guaranteed daily quantity/).fill("30");
+  await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
+  await page.getByText("Schedule saved.",{exact:false}).waitFor();
+  assert.deepEqual(saved.templates,[{policyId:7,quantity:30,autoApprove:false}]);
+  policies[1]={...policies[1],maximum:5};
+  await page.getByRole("button",{name:"Reload saved settings",exact:true}).click();
+  await page.getByText(/Maximum: 5 ·/).waitFor();
+  await enabled.uncheck();
+  await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
+  await page.getByText("Schedule saved.",{exact:false}).waitFor();
+  assert.equal(saved.enabled,false,"pause succeeds even after a policy limit becomes stricter");
+  assert.equal(saved.templates[0].quantity,30);
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,"automation form fits viewport");
   await context.close();
  }
- console.log("PASS: separate opt-in automation, configured-policy selection, explicit guarantee approval, saved-setting generation, pause and responsive help text.");
+ console.log("PASS: separate opt-in automation, configured-policy selection, explicit guarantee approval, saved-setting generation, safe pause, removal of unsupported selections, capacity exclusions and responsive help text.");
 }finally{await browser.close();}

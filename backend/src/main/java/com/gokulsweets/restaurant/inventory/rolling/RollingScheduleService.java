@@ -63,7 +63,9 @@ public class RollingScheduleService {
             BigDecimal maximum,
             boolean readyStockRequired,
             boolean eligible,
-            long branchProductId) {}
+            long branchProductId,
+            boolean selectable,
+            String unavailableReason) {}
 
     /** Persisted execution diagnostics without claiming skipped items were published. */
     public record Workspace(
@@ -119,10 +121,18 @@ public class RollingScheduleService {
                             """
 SELECT p.id,pr.name,p.inventory_unit,p.booking_horizon_days,p.default_safety_buffer,
        p.maximum_daily_allocation,p.ready_stock_required,
-       (p.online_enabled AND p.control_mode<>'MANUAL' AND bp.available),p.branch_product_id
+       (p.online_enabled AND p.control_mode IN ('READY_STOCK','DAILY_PRODUCTION')
+         AND bp.available AND NOT bp.occasion_only),p.branch_product_id,
+       (p.control_mode IN ('READY_STOCK','DAILY_PRODUCTION') AND NOT bp.occasion_only),
+       CASE WHEN bp.occasion_only THEN 'Bulk-only items are excluded from daily automation. Remove this saved selection.'
+            WHEN p.control_mode='SLOT_CAPACITY' THEN 'Capacity-only policies do not support physical inventory automation. Remove this saved selection if selected.'
+            WHEN p.control_mode='MANUAL' THEN 'Manual policies are managed through the manual inventory tools.'
+            WHEN NOT p.online_enabled THEN 'Skipped while online inventory is disabled for this policy.'
+            WHEN NOT bp.available THEN 'Skipped while this dish is unavailable at the branch.' END
 FROM branch_inventory_policies p JOIN branch_products bp ON bp.id=p.branch_product_id
 JOIN products pr ON pr.id=bp.product_id
-WHERE bp.branch_id=? AND NOT bp.occasion_only
+WHERE bp.branch_id=? AND (NOT bp.occasion_only OR EXISTS (
+    SELECT 1 FROM rolling_inventory_templates t WHERE t.branch_id=bp.branch_id AND t.policy_id=p.id))
 ORDER BY pr.name,p.id
 """,
                             (rs, n) ->
@@ -135,7 +145,9 @@ ORDER BY pr.name,p.id
                                             rs.getBigDecimal(6),
                                             rs.getBoolean(7),
                                             rs.getBoolean(8),
-                                            rs.getLong(9)),
+                                            rs.getLong(9),
+                                            rs.getBoolean(10),
+                                            rs.getString(11)),
                             branchId);
             return jdbc.query(
                     "SELECT last_attempt_at,last_success_at,last_message FROM"
@@ -208,6 +220,10 @@ ORDER BY pr.name,p.id
                                     HttpStatus.BAD_REQUEST,
                                     "Check times, duration, capacity, days and selected policies.");
                         var eligible = workspace(branchId).policies();
+                        var previouslySelected =
+                                templates(branchId).stream()
+                                        .map(Template::policyId)
+                                        .collect(java.util.stream.Collectors.toSet());
                         var seen = new java.util.HashSet<Long>();
                         for (var template : plan.templates()) {
                             if (template == null)
@@ -224,6 +240,12 @@ ORDER BY pr.name,p.id
                                                                     "Select a configured inventory"
                                                                             + " policy from this"
                                                                             + " branch."));
+                            if (!policy.selectable()
+                                    && !previouslySelected.contains(template.policyId()))
+                                throw new ResponseStatusException(
+                                        HttpStatus.BAD_REQUEST,
+                                        "Select a supported physical inventory policy. "
+                                                + policy.unavailableReason());
                             if (!seen.add(template.policyId())
                                     || template.quantity() == null
                                     || template.quantity().signum() <= 0
@@ -231,10 +253,16 @@ ORDER BY pr.name,p.id
                                     || template.quantity()
                                                     .compareTo(new BigDecimal("99999999999.999"))
                                             > 0
-                                    || (!"GRAM".equals(policy.unit())
-                                            && template.quantity().stripTrailingZeros().scale() > 0)
                                     || plan.enabled()
-                                            && (template.quantity().compareTo(policy.buffer()) <= 0
+                                            && policy.selectable()
+                                            && ((!"GRAM".equals(policy.unit())
+                                                            && template.quantity()
+                                                                            .stripTrailingZeros()
+                                                                            .scale()
+                                                                    > 0)
+                                                    || template.quantity()
+                                                                    .compareTo(policy.buffer())
+                                                            <= 0
                                                     || policy.maximum() != null
                                                             && template.quantity()
                                                                             .compareTo(
@@ -445,7 +473,7 @@ forecast_quantity,safety_buffer_quantity,expected_ready_at,note,created_at,updat
 SELECT p.branch_product_id,?,'DRAFT',p.inventory_unit,?,p.default_safety_buffer,?,
 'Created by separate rolling automation',now(),now()
 FROM branch_inventory_policies p JOIN branch_products bp ON bp.id=p.branch_product_id
-WHERE p.id=? AND bp.branch_id=? AND bp.available AND p.online_enabled AND p.control_mode<>'MANUAL'
+WHERE p.id=? AND bp.branch_id=? AND bp.available AND p.online_enabled AND p.control_mode IN ('READY_STOCK','DAILY_PRODUCTION')
 AND NOT bp.occasion_only AND ? > p.default_safety_buffer
 AND (p.maximum_daily_allocation IS NULL OR ?<=p.maximum_daily_allocation)
 ON CONFLICT(branch_product_id,service_date) DO NOTHING

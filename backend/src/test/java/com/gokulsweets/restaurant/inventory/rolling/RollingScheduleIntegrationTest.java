@@ -326,4 +326,97 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
             features.setSmartAvailability(previousSmart);
         }
     }
+
+    @Test
+    void bulkOnlySavedSelectionRemainsRemovableAndDoesNotPreventPause() {
+        var f = fixture();
+        service.save(f.branch(), plan(f, -1, true), "manager");
+        jdbc.update("UPDATE branch_products SET occasion_only=TRUE WHERE id=?", f.product());
+        var policy = service.workspace(f.branch()).policies().getFirst();
+        assertThat(policy.selectable()).isFalse();
+        assertThat(policy.eligible()).isFalse();
+        assertThat(policy.unavailableReason()).contains("Bulk-only");
+        service.reconcile(f.branch());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=?",
+                                Integer.class,
+                                f.product()))
+                .isZero();
+        service.save(f.branch(), plan(f, 0, false), "manager");
+        assertThat(service.ownsInventory(f.branch())).isFalse();
+        assertThat(service.workspace(f.branch()).plan().templates()).hasSize(1);
+        var saved = plan(f, 1, true);
+        service.save(
+                f.branch(),
+                new RollingScheduleService.Plan(
+                        true,
+                        saved.openingTime(),
+                        saved.closingTime(),
+                        30,
+                        5,
+                        2,
+                        127,
+                        1,
+                        List.of()),
+                "manager");
+        assertThat(service.workspace(f.branch()).plan().templates()).isEmpty();
+        assertThat(service.workspace(f.branch()).policies()).isEmpty();
+    }
+
+    @Test
+    void capacityAndManualPoliciesCannotGeneratePhysicalAllocations() {
+        var f = fixture();
+        service.save(f.branch(), plan(f, -1, true), "manager");
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET"
+                    + " control_mode='SLOT_CAPACITY',inventory_unit='CAPACITY_POINT' WHERE id=?",
+                f.policy());
+        var capacity = service.workspace(f.branch()).policies().getFirst();
+        assertThat(capacity.selectable()).isFalse();
+        assertThat(capacity.eligible()).isFalse();
+        assertThat(capacity.unavailableReason()).contains("Capacity-only");
+        service.reconcile(f.branch());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=?",
+                                Integer.class,
+                                f.product()))
+                .isZero();
+        // Existing selections remain safe to retain or remove after a control-mode change.
+        service.save(f.branch(), plan(f, 0, true), "manager");
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET control_mode='MANUAL',inventory_unit='PIECE'"
+                        + " WHERE id=?",
+                f.policy());
+        assertThat(service.workspace(f.branch()).policies().getFirst().selectable()).isFalse();
+        service.reconcile(f.branch());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=?",
+                                Integer.class,
+                                f.product()))
+                .isZero();
+    }
+
+    @Test
+    void rejectsNewCapacitySelectionAndAllowsPauseAfterLimitsChange() {
+        var f = fixture();
+        service.save(f.branch(), plan(f, -1, true), "manager");
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET maximum_daily_allocation=5 WHERE id=?",
+                f.policy());
+        service.save(f.branch(), plan(f, 0, false), "manager");
+        assertThat(service.ownsInventory(f.branch())).isFalse();
+        var other = fixture();
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET"
+                    + " control_mode='SLOT_CAPACITY',inventory_unit='CAPACITY_POINT' WHERE id=?",
+                other.policy());
+        assertThatThrownBy(() -> service.save(other.branch(), plan(other, -1, true), "manager"))
+                .hasMessageContaining("supported physical inventory policy");
+    }
 }

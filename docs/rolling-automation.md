@@ -12,7 +12,11 @@ readiness, customer reservations, private occasion appointments or legacy automa
    orders per slot and 1–60 calendar days including today.
 2. Select selling weekdays. Closed weekdays are skipped within that calendar horizon.
 3. Select only existing inventory policies for that branch and configure their quantities.
-   Items without policies, bulk-only products and unselected policies are not automated.
+   Items without policies, bulk-only products, capacity-only/manual-control policies and unselected
+   policies are not automated. A previously selected policy that becomes unsupported stays visible
+   with an explanation and can be removed. Pausing retains existing templates without requiring
+   quantities to match subsequently changed policy limits or units; enabling revalidates supported
+   selections. Newly selecting unsupported policies is rejected by the API.
 4. Choose draft creation or explicitly approve a guaranteed quantity for each selected policy.
    Physical readiness remains a separate staff action where the policy requires it.
 5. Save enabled settings, then use Generate missing coverage now for the initial run.
