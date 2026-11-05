@@ -75,7 +75,7 @@ try{
   assert.equal(await reload.isDisabled(),false,"a failed reload can be retried");
   assert.equal(await page.getByLabel(/Guaranteed daily quantity/).inputValue(),"81");
   await reload.click();
-  await page.getByRole("alert").waitFor({state:"hidden"});
+  await page.getByRole("alert").filter({hasText:"Could not load this branch"}).waitFor({state:"hidden"});
   await page.getByText("Loading saved settings…",{exact:true}).waitFor({state:"hidden"});
   await run.click();
   await page.getByText("2 slots created; 1 allocations created",{exact:true}).waitFor();
