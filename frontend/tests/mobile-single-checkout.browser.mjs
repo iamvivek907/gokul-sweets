@@ -3,11 +3,13 @@ import {createRequire} from 'node:module';
 import {mkdir} from 'node:fs/promises';
 const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??'playwright');
 const browser=await chromium.launch({headless:true}),base=process.env.BROWSER_BASE??'http://127.0.0.1:3311';
+// Wait for the launch decision as well as closure: hidden alone also matches before hydration.
+const waitForLaunch=page=>page.locator('.gokul-mobile-launch[data-launch-initialized="true"]:not([open])').waitFor({state:'attached'});
 const date=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata'}).format(new Date(Date.now()+86400000));
 const branch={id:1,code:'TEST',name:'Test Gokul branch',active:true,address:'Test address',city:'Test city',phone:'9876543210',pickupAvailable:true};
 const half={id:10,name:'Paneer meal Half',categoryId:1,categoryName:'Meals',description:'Serves one person.',price:100,imageUrl:null,available:true,saleMode:'UNIT',minimumWeightGrams:null,weightStepGrams:null},full={...half,id:11,name:'Paneer meal Full',price:180,imageUrl:'/arrival-mithai.webp',description:'Serves two people.'},drink={...half,id:12,name:'Fresh drink',categoryId:2,categoryName:'Drinks',price:40};
 const baseSlot={id:1,branchId:1,slotDate:date,startTime:'18:00:00',endTime:'19:00:00',active:true,capacity:50,remainingCapacity:50,priorityEnabled:true,priorityCharge:25};
-try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','desktop','ratings-phone','ratings-desktop','anchors-phone','anchors-desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','minus-unit','minus-weight','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority','menu-pickup-date-only','menu-pickup-no-selection','menu-pickup-expired'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
+try{for(const scenario of ['slow-menu-search','stalled-offer','pincode-change','phone','boundary','desktop','ratings-phone','ratings-desktop','anchors-phone','anchors-desktop','changed-total','uncertain-order','uncertain-identity','stale-identity','priority-only','stored-priority','uncertain-changed','fee-with-offer','fee-no-offer','cart-removal','minus-unit','minus-weight','clear-cart','pickup-popup','pickup-unavailable','pickup-network','gateway-loading','cart-entry','menu-pickup-tomorrow','menu-pickup-later','menu-pickup-quantity','menu-pickup-priority','menu-pickup-date-only','menu-pickup-no-selection','menu-pickup-expired'].filter(s=>!process.env.MOBILE_CHECKOUT_SCENARIOS||process.env.MOBILE_CHECKOUT_SCENARIOS.split(',').includes(s))){
  console.log('Scenario:',scenario);
  const pickupRegression=scenario.startsWith('menu-pickup-');
  const slot=pickupRegression?{...baseSlot,startTime:'20:30:00',endTime:'21:00:00'}:baseSlot;
@@ -17,6 +19,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  let fullHasPhoto=true;
  const width=(scenario==='desktop'||scenario==='ratings-desktop'||scenario==='anchors-desktop')?1280:scenario==='boundary'?640:390;
  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:'block'}),page=await context.newPage();
+ if(scenario==='slow-menu-search'){const session=await context.newCDPSession(page);await session.send('Emulation.setCPUThrottlingRate',{rate:6});}
  const handoffEvents=[];page.on("console",message=>{if(message.text().startsWith("GOKUL_HANDOFF:"))handoffEvents.push(JSON.parse(message.text().slice(14)));});
  const errors=[];page.on("pageerror",e=>errors.push(e.message));page.on("console",m=>{if(m.type()==="error"&&/hydration|hydrated/i.test(m.text()))errors.push(m.text());});
  page.setDefaultTimeout(15000);page.setDefaultNavigationTimeout(15000);
@@ -83,7 +86,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  if(pickupRegression&&scenario!=='menu-pickup-date-only'&&scenario!=='menu-pickup-no-selection')await context.addInitScript(({date,slot})=>{if(!localStorage.getItem('gokul-selected-pickup-slot'))localStorage.setItem('gokul-selected-pickup-slot',JSON.stringify({date,slot,pickupType:'NORMAL'}));},{date,slot});
  if(scenario==='menu-pickup-date-only')await context.addInitScript(({date})=>{if(!localStorage.getItem('gokul-pickup-intent'))localStorage.setItem('gokul-pickup-intent',JSON.stringify({branchId:1,date}));},{date});
  if(scenario==='stored-priority')await context.addInitScript(({date,slot})=>localStorage.setItem("gokul-selected-pickup-slot",JSON.stringify({date,slot,pickupType:"PRIORITY"})),{date,slot});
- await page.goto(`${base}/menu`);await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.locator('.gokul-menu-product-card').first().waitFor();
+ await page.goto(`${base}/menu`);await waitForLaunch(page);await page.locator('.gokul-menu-product-card').first().waitFor();
  if(scenario.startsWith('anchors-')){
   const card=page.locator(width>640?'.desktop-portion-card':'.mobile-portion-card');await card.waitFor();
   // Extra preceding content makes native fragment scrolling observable on both viewports.
@@ -103,7 +106,7 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
   const card=page.locator(width>640?'.desktop-portion-card':'.mobile-portion-card');
   const score=card.getByLabel('5.0 out of 5 from 101 ratings',{exact:true});
   await score.waitFor();assert.match(await card.innerText(),/From ₹100/);
-  fullHasPhoto=false;await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+  fullHasPhoto=false;await page.reload();await waitForLaunch(page);
   await score.waitFor();assert.equal(await score.count(),1,'changing only the photo owner must preserve the weighted group rating');
   assert.equal(errors.length,0,errors.join('\n'));await context.close();continue;
  }
@@ -115,8 +118,19 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  if(!pickupRegression&&scenario!=='priority-only')await collectionMeal.waitFor();
  assert.ok(await collectionMeal.count()<=1,'curated collections contain one entry per grouped dish');
  assert.equal(await page.getByRole('button',{name:'View Paneer meal Full on the menu',exact:true}).count(),0);
- if(!pickupRegression){await page.getByLabel('Find a favourite',{exact:true}).fill('Paneer meal');
- await portion.waitFor();await page.locator('#gokul-menu-items').getByRole('button',{name:'Clear filters',exact:true}).click();assert.equal(await page.locator('.gokul-menu-product-card').count(),2);}
+ if(!pickupRegression){
+  const search=page.getByLabel('Find a favourite',{exact:true});
+  await search.fill('Paneer meal');
+  // A pre-existing portion card does not prove that the input event reached React.
+  await page.locator('#gokul-menu-items .menu-result-heading[data-filtered="true"]').waitFor();
+  assert.equal(await search.inputValue(),'Paneer meal');
+  assert.equal(await page.locator('#gokul-product-12').count(),0,'search excludes the nonmatching drink');
+  await page.locator('#gokul-menu-items').getByRole('button',{name:'Clear filters',exact:true}).click();
+  assert.equal(await search.inputValue(),'');
+  await page.locator('#gokul-product-12').waitFor();
+  assert.equal(await page.locator('.gokul-menu-product-card').count(),2);
+ }
+ if(scenario==='slow-menu-search'){assert.deepEqual(errors,[]);await context.close();continue;}
  const menuDocument=await page.evaluate(()=>{window.__menuDocument=crypto.randomUUID();return window.__menuDocument;});
  const menuRows=page.locator('.gokul-menu-product-card');const firstRow=await menuRows.first().elementHandle();
  if(!pickupRegression){await portion.getByRole('button',{name:'Choose options for Paneer meal',exact:true}).click();const choices=page.getByRole('dialog',{name:'Paneer meal',exact:true});if(scenario==='phone'){const fullSize=choices.locator('article').filter({has:page.getByRole('heading',{name:'Full',exact:true})});await fullSize.getByText('About this size',{exact:true}).click();await fullSize.getByText('Serves two people.',{exact:true}).waitFor();}await choices.getByRole('button',{name:'Add Paneer meal Full to cart',exact:true}).click();await choices.getByRole('button',{name:'Add Paneer meal Half to cart',exact:true}).click();await choices.getByRole('button',{name:'Done',exact:true}).click();assert.deepEqual(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.map(i=>i.product.id).sort()),[10,11]);}
@@ -274,10 +288,10 @@ try{for(const scenario of ['stalled-offer','pincode-change','phone','boundary','
  }
  if(scenario==='stale-identity'){await page.getByRole('alert').filter({hasText:'Verify the order'}).waitFor();assert.equal(orders.length,0);assert.equal(payments,0);await page.getByRole('button',{name:'Verify phone to continue',exact:true}).click();await ready();await page.getByRole('button',{name:'Pay now',exact:true}).click();await page.waitForURL('https://gateway.example.invalid/pay');assert.equal(orders.length,1);assert.equal(payments,1);}
  else if(scenario==='changed-total'){await page.getByRole('alert').filter({hasText:'total changed'}).waitFor();assert.equal(orders.length,1);assert.equal(payments,0);assert.equal(await page.getByRole('link',{name:'Continue payment',exact:true}).count(),1);}
- else if(scenario==='uncertain-changed'){await page.getByRole('alert').filter({hasText:'couldn’t confirm'}).waitFor();await page.evaluate(()=>{localStorage.setItem('gokul-cart',JSON.stringify({branchId:2,items:[]}));localStorage.removeItem('gokul-selected-branch');localStorage.removeItem('gokul-selected-pickup-slot');});await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.getByRole('button',{name:'Retry checkout',exact:true}).click();await page.getByRole('alert').filter({hasText:'checkout changed elsewhere'}).waitFor();assert.equal(orders.length,2);assert.equal(payments,0);assert.deepEqual(orders[0],orders[1]);assert.equal(await page.getByRole('link',{name:'Continue payment',exact:true}).count(),1);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),0);}
- else{if(scenario.startsWith('uncertain-')){await page.getByRole('alert').filter({hasText:'couldn’t confirm'}).waitFor();assert.equal(await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Clear cart',exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Remove Paneer meal Half from cart',exact:true}).isDisabled(),true);await page.reload();await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});await page.getByRole('button',{name:'Retry checkout',exact:true}).click();if(scenario==='uncertain-identity'){await page.getByRole('button',{name:'Verify phone to continue',exact:true}).click();await page.getByRole('button',{name:'Retry checkout',exact:true}).click();}}await page.waitForURL('https://gateway.example.invalid/pay');assert.equal(payments,1);assert.equal(orders.length,scenario==='uncertain-identity'?3:scenario==='uncertain-order'?2:1);assert.equal(checkoutRequest.items.find(i=>i.productId===11).quantity,1);assert.equal(checkoutRequest.quoteToken,'signed-quote');if(scenario==='priority-only'||scenario==='stored-priority')assert.equal(checkoutRequest.pickupType,'PRIORITY');if(scenario.startsWith('uncertain-')){for(const attempt of orders){assert.equal(orders[0].key,attempt.key);assert.deepEqual(orders[0].request,attempt.request);}}}
+ else if(scenario==='uncertain-changed'){await page.getByRole('alert').filter({hasText:'couldn’t confirm'}).waitFor();await page.evaluate(()=>{localStorage.setItem('gokul-cart',JSON.stringify({branchId:2,items:[]}));localStorage.removeItem('gokul-selected-branch');localStorage.removeItem('gokul-selected-pickup-slot');});await page.reload();await waitForLaunch(page);await page.getByRole('button',{name:'Retry checkout',exact:true}).click();await page.getByRole('alert').filter({hasText:'checkout changed elsewhere'}).waitFor();assert.equal(orders.length,2);assert.equal(payments,0);assert.deepEqual(orders[0],orders[1]);assert.equal(await page.getByRole('link',{name:'Continue payment',exact:true}).count(),1);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('gokul-cart')).items.length),0);}
+ else{if(scenario.startsWith('uncertain-')){await page.getByRole('alert').filter({hasText:'couldn’t confirm'}).waitFor();assert.equal(await page.getByRole('button',{name:'Add one Paneer meal Half',exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Clear cart',exact:true}).isDisabled(),true);assert.equal(await page.getByRole('button',{name:'Remove Paneer meal Half from cart',exact:true}).isDisabled(),true);await page.reload();await waitForLaunch(page);await page.getByRole('button',{name:'Retry checkout',exact:true}).click();if(scenario==='uncertain-identity'){await page.getByRole('button',{name:'Verify phone to continue',exact:true}).click();await page.getByRole('button',{name:'Retry checkout',exact:true}).click();}}await page.waitForURL('https://gateway.example.invalid/pay');assert.equal(payments,1);assert.equal(orders.length,scenario==='uncertain-identity'?3:scenario==='uncertain-order'?2:1);assert.equal(checkoutRequest.items.find(i=>i.productId===11).quantity,1);assert.equal(checkoutRequest.quoteToken,'signed-quote');if(scenario==='priority-only'||scenario==='stored-priority')assert.equal(checkoutRequest.pickupType,'PRIORITY');if(scenario.startsWith('uncertain-')){for(const attempt of orders){assert.equal(orders[0].key,attempt.key);assert.deepEqual(orders[0].request,attempt.request);}}}
  if(scenario==='phone'){
-  await page.goto(`${base}/checkout/mobile`);await page.waitForURL('**/checkout/payment/TEST-SINGLE');await page.locator('.gokul-mobile-launch').waitFor({state:'hidden'});
+  await page.goto(`${base}/checkout/mobile`);await page.waitForURL('**/checkout/payment/TEST-SINGLE');await waitForLaunch(page);
   await page.getByRole('link',{name:'Back to menu',exact:true}).click();
   await page.waitForURL('**/menu');
   await page.locator('.gokul-floating-cart a').click();await page.waitForURL('**/checkout/mobile');
