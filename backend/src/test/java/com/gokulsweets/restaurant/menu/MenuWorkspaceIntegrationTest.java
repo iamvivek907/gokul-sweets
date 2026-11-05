@@ -741,8 +741,8 @@ class MenuWorkspaceIntegrationTest {
                 enabled);
         jdbc.update(
                 "INSERT INTO rolling_inventory_templates(branch_id,policy_id,quantity,auto_approve)"
-                    + " SELECT ?,id,10,TRUE FROM branch_inventory_policies WHERE"
-                    + " branch_product_id=?",
+                        + " SELECT ?,id,10,TRUE FROM branch_inventory_policies WHERE"
+                        + " branch_product_id=?",
                 branch,
                 bp);
     }
@@ -759,28 +759,28 @@ class MenuWorkspaceIntegrationTest {
             assertThat(
                             jdbc.queryForObject(
                                     "SELECT count(*) FROM rolling_inventory_templates WHERE"
-                                        + " branch_id=?",
+                                            + " branch_id=?",
                                     Integer.class,
                                     b))
                     .isZero();
             assertThat(
                             jdbc.queryForObject(
                                     "SELECT count(*) FROM rolling_inventory_templates WHERE"
-                                        + " branch_id=?",
+                                            + " branch_id=?",
                                     Integer.class,
                                     other))
                     .isEqualTo(1);
             assertThat(
                             jdbc.queryForObject(
                                     "SELECT enabled FROM rolling_branch_schedules WHERE"
-                                        + " branch_id=?",
+                                            + " branch_id=?",
                                     Boolean.class,
                                     b))
                     .isEqualTo(enabled);
             assertThat(
                             jdbc.queryForObject(
                                     "SELECT count(*) FROM branch_products WHERE branch_id=? AND"
-                                        + " product_id=?",
+                                            + " product_id=?",
                                     Integer.class,
                                     b,
                                     id))
@@ -788,7 +788,7 @@ class MenuWorkspaceIntegrationTest {
             assertThat(
                             jdbc.queryForObject(
                                     "SELECT count(*) FROM branch_products WHERE branch_id=? AND"
-                                        + " product_id=?",
+                                            + " product_id=?",
                                     Integer.class,
                                     other,
                                     id))
@@ -862,7 +862,7 @@ class MenuWorkspaceIntegrationTest {
         assertThat(
                         jdbc.queryForObject(
                                 "SELECT count(*) FROM rolling_inventory_templates WHERE"
-                                    + " branch_id=?",
+                                        + " branch_id=?",
                                 Integer.class,
                                 b))
                 .isEqualTo(1);
