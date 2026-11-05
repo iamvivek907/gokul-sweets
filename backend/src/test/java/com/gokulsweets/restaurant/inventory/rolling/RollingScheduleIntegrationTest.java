@@ -23,6 +23,7 @@ import java.util.UUID;
 @Transactional
 class RollingScheduleIntegrationTest {
     @Autowired JdbcTemplate jdbc;
+    @Autowired jakarta.persistence.EntityManager entityManager;
     @Autowired RollingScheduleService service;
     @Autowired Clock clock;
     @Autowired EnhancementProperties features;
@@ -101,6 +102,10 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         service.save(f.branch(), plan(f, -1, true), "manager");
         assertThat(service.ownsInventory(f.branch())).isTrue();
         service.reconcile(f.branch());
+        // Approval uses JPA inside this test's outer transaction; make it visible to JDBC,
+        // then clear managed entities before simulating a separate manual update.
+        entityManager.flush();
+        entityManager.clear();
         LocalDate tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
         assertThat(
                         jdbc.queryForObject(
