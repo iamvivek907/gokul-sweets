@@ -744,6 +744,52 @@ ORDER BY e.created_at DESC,e.id DESC LIMIT 100
         }
     }
 
+    /** Minimal staff queue entry; full customer details are loaded only when opened. */
+    public record ReviewEntry(
+            UUID id, String occasionType, LocalDate serviceDate, int guestCount) {}
+
+    /** A page of requests that still need a branch decision. */
+    public record ReviewQueue(List<ReviewEntry> requests, UUID nextAfter) {}
+
+    /** Lists unreviewed requests across pickup dates, with the longest waiting first. */
+    @Transactional(readOnly = true)
+    public ReviewQueue reviewQueue(ConsentEnvironment environment, long branchId, UUID after) {
+        final long started =
+                MethodTiming.start(
+                        OccasionEnquiryService.class, "reviewQueue(ConsentEnvironment,long,UUID)");
+        try {
+            List<ReviewEntry> rows =
+                    jdbc.query(
+                            """
+SELECT e.id,e.occasion_type,e.service_date,e.guest_count
+FROM occasion_enquiries e
+LEFT JOIN occasion_enquiries cursor ON cursor.id=? AND cursor.environment=e.environment
+    AND cursor.branch_id=e.branch_id
+WHERE e.environment=? AND e.branch_id=? AND e.status='REQUESTED'
+    AND (CAST(? AS uuid) IS NULL OR (e.created_at,e.id)>(cursor.created_at,cursor.id))
+ORDER BY e.created_at,e.id LIMIT 51
+""",
+                            (rs, row) ->
+                                    new ReviewEntry(
+                                            rs.getObject("id", UUID.class),
+                                            rs.getString("occasion_type"),
+                                            rs.getObject("service_date", LocalDate.class),
+                                            rs.getInt("guest_count")),
+                            after,
+                            environment.name(),
+                            branchId,
+                            after);
+            return rows.size() > 50
+                    ? new ReviewQueue(List.copyOf(rows.subList(0, 50)), rows.get(49).id())
+                    : new ReviewQueue(rows, null);
+        } finally {
+            MethodTiming.finish(
+                    started,
+                    OccasionEnquiryService.class,
+                    "reviewQueue(ConsentEnvironment,long,UUID)");
+        }
+    }
+
     /**
      * Staffs list.
      *
