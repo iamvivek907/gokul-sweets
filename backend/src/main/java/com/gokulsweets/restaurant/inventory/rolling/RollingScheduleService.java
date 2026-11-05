@@ -433,8 +433,7 @@ AND occasion_enquiry_id IS NULL AND (slot_date<>? OR start_time>?)
                                             || !policy.eligible()
                                             || existing.contains(policy.branchProductId())
                                             || offset > policy.bookingDays()
-                                            || features.isInventoryAutomationV2()
-                                                    && offset > features.getFutureOrderingDays()) {
+                                            || offset > features.getFutureOrderingDays()) {
                                         retained++;
                                         continue;
                                     }

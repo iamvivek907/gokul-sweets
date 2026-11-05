@@ -245,7 +245,11 @@ class MenuServiceWindowsIntegrationTest {
                         inventory,
                         validation,
                         new com.gokulsweets.restaurant.order.service.SmartOrderingRules(
-                                flags, settings, clock),
+                                flags,
+                                settings,
+                                clock,
+                                org.mockito.Mockito.mock(
+                                        org.springframework.jdbc.core.JdbcTemplate.class)),
                         policy,
                         allocations,
                         new com.gokulsweets.restaurant.inventory.service

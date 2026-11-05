@@ -34,7 +34,12 @@ Database slot-write serialization prevents a concurrent manual generator from cr
 overlapping automatic timetable. Exact existing intervals remain reusable by the manual generator.
 
 Inventory creation follows dates with active regular slots, within the product booking horizon
-and effective storefront inventory horizon. Only missing allocations are inserted. Existing
+and effective storefront inventory horizon. While this flow is enabled, customer pickup discovery,
+cart availability and checkout use the rolling calendar horizon (maintain days minus one day ahead),
+capped by the storefront limit, instead of the manual advance-booking limit. Each item's policy can
+still shorten that window. The branch pickup closed switch remains authoritative. Disabling this
+flow restores the original manual booking window without editing the saved manual settings.
+Only missing allocations are inserted. Existing
 drafts, approved quantities, reservations, sales, wastage and manual overrides are not replenished
 or overwritten. Inventory approval uses the existing audited inventory service.
 

@@ -26,6 +26,11 @@ class RollingScheduleIntegrationTest {
     @Autowired RollingScheduleService service;
     @Autowired Clock clock;
     @Autowired EnhancementProperties features;
+    @Autowired com.gokulsweets.restaurant.menu.MenuPickupDiscoveryService discovery;
+    @Autowired com.gokulsweets.restaurant.order.service.CartAvailabilityService cart;
+    @Autowired com.gokulsweets.restaurant.order.service.SmartOrderingRules ordering;
+    @Autowired com.gokulsweets.restaurant.pickup.repository.PickupSlotRepository slots;
+    @Autowired com.gokulsweets.restaurant.inventory.config.InventoryProperties inventoryProperties;
 
     private record Fixture(long branch, long policy, long product) {}
 
@@ -231,5 +236,89 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                                 f.branch(),
                                 tomorrow))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void generatedWindowMatchesDiscoveryCartAndCheckoutWithoutEditingManualSettings() {
+        var f = fixture();
+        jdbc.update(
+                "INSERT INTO"
+                    + " branch_pickup_settings(branch_id,advance_booking_days,opening_time,closing_time)"
+                    + " VALUES(?,1,'10:00','11:00')",
+                f.branch());
+        var configured =
+                new RollingScheduleService.Plan(
+                        true,
+                        LocalTime.of(10, 0),
+                        LocalTime.of(11, 0),
+                        30,
+                        5,
+                        14,
+                        127,
+                        -1,
+                        List.of(
+                                new RollingScheduleService.Template(
+                                        f.policy(), BigDecimal.TEN, true)));
+        service.save(f.branch(), configured, "manager");
+        service.reconcile(f.branch());
+        LocalDate today = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+        LocalDate last = today.plusDays(13);
+        var discovered = discovery.discover(f.branch(), last, 1);
+        assertThat(discovered.maximumDate()).isEqualTo(last);
+        assertThat(discovered.dates().getFirst().available()).isTrue();
+        long productId =
+                jdbc.queryForObject(
+                        "SELECT product_id FROM branch_products WHERE id=?",
+                        Long.class,
+                        f.product());
+        boolean previousEnforcement = inventoryProperties.isEnforcementEnabled();
+        boolean previousSmart = features.isSmartAvailability();
+        try {
+            inventoryProperties.setEnforcementEnabled(true);
+            features.setSmartAvailability(true);
+            var preview =
+                    cart.check(
+                            f.branch(),
+                            last,
+                            1,
+                            List.of(
+                                    new com.gokulsweets.restaurant.order.dto.CreateOrderItemRequest(
+                                            productId, 1, null)));
+            assertThat(preview.maximumDate()).isEqualTo(last);
+            assertThat(preview.dates().getFirst().available()).isTrue();
+            var slot =
+                    slots.findByBranchIdAndSlotDateBetweenOrderBySlotDateAscStartTimeAsc(
+                                    f.branch(), last, last)
+                            .getFirst();
+            assertThatCode(() -> ordering.validateWindow(slot)).doesNotThrowAnyException();
+            assertThatThrownBy(() -> discovery.discover(f.branch(), last.plusDays(1), 1))
+                    .hasMessageContaining("window");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT advance_booking_days FROM branch_pickup_settings WHERE"
+                                            + " branch_id=?",
+                                    Integer.class,
+                                    f.branch()))
+                    .isEqualTo(1);
+            service.save(
+                    f.branch(),
+                    new RollingScheduleService.Plan(
+                            false,
+                            configured.openingTime(),
+                            configured.closingTime(),
+                            30,
+                            5,
+                            14,
+                            127,
+                            0,
+                            configured.templates()),
+                    "manager");
+            assertThatThrownBy(() -> discovery.discover(f.branch(), last, 1))
+                    .hasMessageContaining("window");
+            assertThatThrownBy(() -> ordering.validateWindow(slot)).hasMessageContaining("window");
+        } finally {
+            inventoryProperties.setEnforcementEnabled(previousEnforcement);
+            features.setSmartAvailability(previousSmart);
+        }
     }
 }

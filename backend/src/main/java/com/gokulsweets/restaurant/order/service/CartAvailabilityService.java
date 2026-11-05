@@ -122,10 +122,8 @@ public class CartAvailabilityService {
                                             Function.identity()));
             var settings = settingsRepository.findByBranchId(branchId).orElse(null);
             LocalDate lastDate = startDate.plusDays(days - 1L);
-            LocalDate maximumDate = today.plusDays(features.getFutureOrderingDays());
-            if (settings != null
-                    && today.plusDays(settings.getAdvanceBookingDays()).isBefore(maximumDate))
-                maximumDate = today.plusDays(settings.getAdvanceBookingDays());
+            int bookingDays = rules.bookingDays(branchId, settings);
+            LocalDate maximumDate = today.plusDays(bookingDays);
             if (inventoryProperties.isEnforcementEnabled() && !menuPreview) {
                 for (var policy : policies.values())
                     if (today.plusDays(policy.getBookingHorizonDays()).isBefore(maximumDate))
@@ -172,7 +170,7 @@ public class CartAvailabilityService {
                 }
                 for (PickupSlot slot : slotsByDate.getOrDefault(date, List.of())) {
                     var service = serviceAt.apply(slot.getSlotDate().atTime(slot.getStartTime()));
-                    String reason = rules.windowReason(slot, settings);
+                    String reason = rules.windowReason(slot, settings, bookingDays);
                     List<ItemAvailability> issues = new ArrayList<>();
                     for (int index = 0; index < items.size(); index++) {
                         var item = items.get(index);

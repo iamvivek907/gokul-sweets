@@ -57,13 +57,8 @@ public class MenuPickupDiscoveryService {
                 throw new IllegalArgumentException(
                         "Choose a date within the advance ordering window.");
             var policy = settings.findByBranchId(branchId).orElse(null);
-            LocalDate maximum =
-                    today.plusDays(
-                            policy == null
-                                    ? features.getFutureOrderingDays()
-                                    : Math.min(
-                                            features.getFutureOrderingDays(),
-                                            policy.getAdvanceBookingDays()));
+            int bookingDays = rules.bookingDays(branchId, policy);
+            LocalDate maximum = today.plusDays(bookingDays);
             if (startDate.isAfter(maximum))
                 throw new IllegalArgumentException(
                         "Choose a date within the branch's advance ordering window.");
@@ -81,7 +76,8 @@ public class MenuPickupDiscoveryService {
                         byDate.getOrDefault(date, List.of()).stream()
                                 .map(
                                         s -> {
-                                            String reason = rules.windowReason(s, policy);
+                                            String reason =
+                                                    rules.windowReason(s, policy, bookingDays);
                                             boolean normal =
                                                     reason == null
                                                             && s.getBookedCount() < s.getCapacity();
