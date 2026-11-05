@@ -114,6 +114,7 @@
     "tests/menu-categories.browser.mjs",
     "tests/offer-exclusions.browser.mjs",
     "tests/marketing-push.browser.mjs",
-    "tests/premium-menu-admin.browser.mjs"
+    "tests/premium-menu-admin.browser.mjs",
+    "tests/rolling-automation.browser.mjs"
   ]
 }

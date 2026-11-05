@@ -724,6 +724,82 @@ class MenuWorkspaceIntegrationTest {
                 .isEqualTo(1);
     }
 
+    private void selectRollingPolicy(long branch, long product, boolean enabled) {
+        entityManager.flush();
+        long bp = branchProduct(branch, product);
+        jdbc.update(
+                "INSERT INTO"
+                    + " branch_inventory_policies(branch_product_id,control_mode,inventory_unit,created_at,updated_at)"
+                    + " VALUES(?,'DAILY_PRODUCTION','PIECE',now(),now()) ON"
+                    + " CONFLICT(branch_product_id) DO NOTHING",
+                bp);
+        jdbc.update(
+                "INSERT INTO rolling_branch_schedules(branch_id,enabled,opening_time,closing_time,"
+                        + "slot_minutes,capacity,maintain_days,weekdays,updated_by)"
+                        + " VALUES(?,?,'10:00','21:00',30,10,14,127,'test')",
+                branch,
+                enabled);
+        jdbc.update(
+                "INSERT INTO rolling_inventory_templates(branch_id,policy_id,quantity,auto_approve)"
+                        + " SELECT ?,id,10,TRUE FROM branch_inventory_policies WHERE"
+                        + " branch_product_id=?",
+                branch,
+                bp);
+    }
+
+    @Test
+    void deletionClearsUnusedRollingSelectionOnlyForRemovedBranch() {
+        for (boolean enabled : new boolean[] {false, true}) {
+            long b = branch(), other = branch(), c = category(), id = product(b, c);
+            jdbc.update(
+                    "INSERT INTO branch_products(branch_id,product_id) VALUES (?,?)", other, id);
+            selectRollingPolicy(b, id, enabled);
+            selectRollingPolicy(other, id, true);
+            workspace.deleteBranchItem(b, id, 0);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM rolling_inventory_templates WHERE"
+                                            + " branch_id=?",
+                                    Integer.class,
+                                    b))
+                    .isZero();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM rolling_inventory_templates WHERE"
+                                            + " branch_id=?",
+                                    Integer.class,
+                                    other))
+                    .isEqualTo(1);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT enabled FROM rolling_branch_schedules WHERE"
+                                            + " branch_id=?",
+                                    Boolean.class,
+                                    b))
+                    .isEqualTo(enabled);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM branch_products WHERE branch_id=? AND"
+                                            + " product_id=?",
+                                    Integer.class,
+                                    b,
+                                    id))
+                    .isZero();
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM branch_products WHERE branch_id=? AND"
+                                            + " product_id=?",
+                                    Integer.class,
+                                    other,
+                                    id))
+                    .isEqualTo(1);
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT count(*) FROM products WHERE id=?", Integer.class, id))
+                    .isEqualTo(1);
+        }
+    }
+
     @Test
     void staleOrUnauthorizedDeletionIsRejected() {
         long b = branch(), c = category(), id = product(b, c);
@@ -764,6 +840,7 @@ class MenuWorkspaceIntegrationTest {
                         14,
                         0,
                         null));
+        selectRollingPolicy(b, id, true);
         inventory.approveAllocation(
                 bp,
                 LocalDate.now(inventoryClock),
@@ -781,6 +858,13 @@ class MenuWorkspaceIntegrationTest {
                                         + " branch_product_id=?",
                                 Integer.class,
                                 bp))
+                .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM rolling_inventory_templates WHERE"
+                                        + " branch_id=?",
+                                Integer.class,
+                                b))
                 .isEqualTo(1);
     }
 

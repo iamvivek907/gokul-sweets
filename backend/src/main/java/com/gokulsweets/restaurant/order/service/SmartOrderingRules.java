@@ -26,17 +26,56 @@ public class SmartOrderingRules {
 
     private final Clock inventoryClock;
 
-    /**
-     * Windows reason.
-     *
-     * @param slot the slot
-     * @param settings the settings
-     * @return the window reason result
-     */
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
+
+    /** Resolves the active rolling horizon once per request, falling back to manual settings. */
+    public int bookingDays(long branchId, BranchPickupSettings settings) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        SmartOrderingRules.class, "bookingDays(long,BranchPickupSettings)");
+        try {
+            var rolling =
+                    jdbc.queryForList(
+                            "SELECT maintain_days - 1 FROM rolling_branch_schedules WHERE"
+                                    + " branch_id=? AND enabled",
+                            Integer.class,
+                            branchId);
+            int branchDays =
+                    rolling.isEmpty()
+                            ? (settings == null
+                                    ? features.getFutureOrderingDays()
+                                    : settings.getAdvanceBookingDays())
+                            : rolling.getFirst();
+            return Math.min(features.getFutureOrderingDays(), branchDays);
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    SmartOrderingRules.class,
+                    "bookingDays(long,BranchPickupSettings)");
+        }
+    }
+
+    /** Checks a single slot using the effective branch booking horizon. */
     public String windowReason(PickupSlot slot, BranchPickupSettings settings) {
         final long __gokulMethodStartedNanos =
                 MethodTiming.start(
                         SmartOrderingRules.class, "windowReason(PickupSlot,BranchPickupSettings)");
+        try {
+            return windowReason(slot, settings, bookingDays(slot.getBranch().getId(), settings));
+        } finally {
+            MethodTiming.finish(
+                    __gokulMethodStartedNanos,
+                    SmartOrderingRules.class,
+                    "windowReason(PickupSlot,BranchPickupSettings)");
+        }
+    }
+
+    /** Checks a slot with a request-scoped horizon, avoiding a database query for every slot. */
+    public String windowReason(PickupSlot slot, BranchPickupSettings settings, int bookingDays) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(
+                        SmartOrderingRules.class,
+                        "windowReason(PickupSlot,BranchPickupSettings,int)");
         try {
             LocalDateTime now = LocalDateTime.now(inventoryClock);
             if (!slot.isActive() || !slot.getSlotDate().atTime(slot.getStartTime()).isAfter(now)) {
@@ -44,23 +83,16 @@ public class SmartOrderingRules {
             }
             if (settings != null && !settings.isEnabled())
                 return "Pickup is currently closed at this branch.";
-            int days =
-                    settings == null
-                            ? features.getFutureOrderingDays()
-                            : Math.min(
-                                    features.getFutureOrderingDays(),
-                                    settings.getAdvanceBookingDays());
-            if (slot.getSlotDate().isAfter(now.toLocalDate().plusDays(days))) {
+            if (slot.getSlotDate().isAfter(now.toLocalDate().plusDays(bookingDays))) {
                 return "This date is outside the branch's advance ordering window.";
             }
-            // Opening hours are generation defaults; existing slots intentionally retain their own
-            // schedule.
+            // Opening hours are generation defaults; existing slots retain their own schedule.
             return null;
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
                     SmartOrderingRules.class,
-                    "windowReason(PickupSlot,BranchPickupSettings)");
+                    "windowReason(PickupSlot,BranchPickupSettings,int)");
         }
     }
 

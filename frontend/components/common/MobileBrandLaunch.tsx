@@ -1,5 +1,5 @@
 "use client";
-import {useEffect, useRef, useSyncExternalStore} from "react";
+import {useEffect, useRef, useState, useSyncExternalStore} from "react";
 import {usePathname, useRouter} from "next/navigation";
 import {useSelectedBranch} from "@/hooks/useSelectedBranch";
 import {constrainedPhoneConnection} from "@/lib/mobileConnection";
@@ -18,6 +18,7 @@ const serverSnapshot=()=>false;
 export default function MobileBrandLaunch() {
     const hydrated=useSyncExternalStore(subscribeHydration,hydratedSnapshot,serverSnapshot);
     const dialog = useRef<HTMLDialogElement>(null);
+    const [initialized,setInitialized]=useState(false);
     const pathname = usePathname();
     const entryPath = useRef(pathname);
     const router = useRouter();
@@ -42,6 +43,8 @@ export default function MobileBrandLaunch() {
             else if (hiddenAt) hiddenAt=0;
         };
         if (!entranceShown && !/^\/(checkout|orders)(\/|$)/.test(entryPath.current)) {entranceShown=true;show();}
+        // A closed dialog before this effect runs is not a completed entrance.
+        setInitialized(true);
         document.addEventListener("visibilitychange", resume);
         return () => {close(); document.removeEventListener("visibilitychange", resume);};
     }, [staff]);
@@ -55,7 +58,7 @@ export default function MobileBrandLaunch() {
         const cover = branch.mobileCoverImageUrl || branch.coverImageUrl;
         if (cover) {const image = new Image(); image.src = cover;}
     }, [branch, staff, paymentReturn, router]);
-    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"/>}<dialog ref={dialog} className="gokul-mobile-launch" aria-labelledby="gokul-launch-title">
+    return <>{!hydrated&&!staff&&!paymentReturn&&<div className="gokul-mobile-boot" role="status" aria-label="Opening Gokul"/>}<dialog ref={dialog} className="gokul-mobile-launch" data-launch-initialized={initialized?"true":undefined} aria-labelledby="gokul-launch-title">
         <BrandBackdrop/>
         <div className="gokul-mobile-launch-copy">
             <h1 id="gokul-launch-title"><span className="sr-only"><T text="Gokul Sweets" /></span><ReferenceWordmark className="brand-loading-wordmark" /></h1>
