@@ -4,9 +4,10 @@ const {chromium}=createRequire(import.meta.url)(process.env.PLAYWRIGHT_MODULE??"
 const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXECUTABLE?{executablePath:process.env.BROWSER_EXECUTABLE,args:["--no-sandbox"]}:{})});
 const base=process.env.BROWSER_BASE??"http://127.0.0.1:3311";
 try{
- for(const width of [390,1280]){
+ for(const [width,viewOnly] of [[390,false],[1280,false],[390,true],[1280,true]]){
   const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});
   let plan=null,saved=null,runs=0,delayReload=false,releaseReload=null,reloadEntered=null,failReload=false;
+  if(viewOnly)plan={enabled:true,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:0,templates:[{policyId:6,quantity:80,autoApprove:true}]};
   const policies=[{id:6,name:"Samosa",unit:"PIECE",bookingDays:14,buffer:2,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null},
    {id:7,name:"Rasmalai",unit:"PIECE",bookingDays:3,buffer:1,maximum:40,readyStockRequired:true,eligible:true,selectable:true,unavailableReason:null},
    {id:8,name:"Counter capacity",unit:"CAPACITY_POINT",bookingDays:14,buffer:0,maximum:100,readyStockRequired:false,eligible:false,selectable:false,unavailableReason:"Capacity-only policies do not support physical inventory automation."}];
@@ -16,7 +17,7 @@ try{
     "Access-Control-Allow-Headers":"content-type,x-staff-csrf","Access-Control-Allow-Methods":"GET,POST,PUT,OPTIONS",
     "Access-Control-Expose-Headers":"X-Staff-CSRF","X-Staff-CSRF":"test-csrf"};
    if(request.method()==="OPTIONS")return route.fulfill({status:204,headers});
-   if(path==="/api/admin/auth/me")return route.fulfill({headers,json:{staffId:77,roleName:"OWNER_ADMIN",username:"owner",fullName:"Owner",branchIds:[1],permissions:["BRANCH_MANAGE","INVENTORY_VIEW","INVENTORY_MANAGE","APPROVAL_MANAGE"]}});
+   if(path==="/api/admin/auth/me")return route.fulfill({headers,json:{staffId:77,roleName:viewOnly?"MANAGER":"OWNER_ADMIN",username:"owner",fullName:"Owner",branchIds:[1],permissions:viewOnly?["BRANCH_MANAGE","INVENTORY_VIEW"]:["BRANCH_MANAGE","INVENTORY_VIEW","INVENTORY_MANAGE","APPROVAL_MANAGE"]}});
    if(path==="/api/branches")return route.fulfill({headers,json:[{id:1,name:"Test branch",active:true}]});
    if(path.endsWith("/rolling-automation")&&request.method()==="PUT"){
     assert.equal(request.headers()["x-staff-csrf"],"test-csrf","writes carry the exposed CSRF token");
@@ -60,6 +61,17 @@ try{
   ])await checkHelp(title,copy);
   assert.equal(saved,null,"opening help never saves the plan");
   assert.equal(runs,0,"opening help never runs generation");
+  if(viewOnly){
+   await checkHelp("Guaranteed daily quantity · PIECE",/1,000 means 1 kg/);
+   await checkHelp("Approval mode",/staff must still record actual production readiness/);
+   const controls=page.locator('form input, form select, form button[type="submit"]');
+   assert.ok(await controls.count()>10);
+   for(const control of await controls.all())assert.equal(await control.isDisabled(),true,"view-only configuration stays disabled");
+   assert.equal(await page.getByRole("button",{name:"Generate missing coverage now",exact:true}).isDisabled(),true);
+   assert.equal(saved,null);assert.equal(runs,0);
+   console.log(`PASS: read-only field help and write protection at ${width}px`);
+   await context.close();continue;
+  }
   assert.equal(await enabled.isChecked?.()??await enabled.evaluate(e=>e.checked),false);
   const run=page.getByRole("button",{name:"Generate missing coverage now",exact:true});
   assert.equal(await run.isDisabled(),true);
