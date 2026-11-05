@@ -36,6 +36,30 @@ try{
   await page.getByRole("heading",{name:"Automatic slots & inventory",exact:true}).waitFor();
   const enabled=page.getByRole("checkbox",{name:"Enable rolling automation for this branch",exact:true});
   await enabled.waitFor();
+  async function checkHelp(title,copy){
+   const trigger=page.getByRole("button",{name:`Help for ${title}`,exact:true});
+   await trigger.click();
+   const dialog=page.getByRole("dialog",{name:title,exact:true});
+   await dialog.waitFor({state:"visible"});
+   assert.match(await dialog.innerText(),copy);
+   assert.equal(await dialog.evaluate(node=>{const box=node.getBoundingClientRect();return box.left>=0&&box.right<=innerWidth&&box.top>=0&&box.bottom<=innerHeight;}),true,"help fits the viewport");
+   await page.keyboard.press("Escape");
+   await dialog.waitFor({state:"hidden"});
+   assert.equal(await trigger.evaluate(node=>node===document.activeElement),true,"help returns focus to its icon");
+  }
+  for(const [title,copy] of [
+   ["Branch",/does not configure another branch/],
+   ["Enable rolling automation",/every ten minutes/],
+   ["Start time · IST",/10:00/],
+   ["End time · IST",/20:30–21:00/],
+   ["Slot duration · minutes",/5–180/],
+   ["Orders per slot",/independent of dish stock/],
+   ["Calendar days to maintain",/existing future-dated regular slots/],
+   ["Selling weekdays",/No new allocations are generated on unselected weekdays/],
+   ["Inventory policy: Samosa",/Unselected dishes receive no allocation/],
+  ])await checkHelp(title,copy);
+  assert.equal(saved,null,"opening help never saves the plan");
+  assert.equal(runs,0,"opening help never runs generation");
   assert.equal(await enabled.isChecked?.()??await enabled.evaluate(e=>e.checked),false);
   const run=page.getByRole("button",{name:"Generate missing coverage now",exact:true});
   assert.equal(await run.isDisabled(),true);
@@ -43,8 +67,11 @@ try{
   await page.getByText("Capacity-only policies do not support physical inventory automation.",{exact:true}).waitFor();
   await enabled.check();
   await page.getByRole("checkbox",{name:"Samosa",exact:true}).check();
-  await page.getByLabel(/Guaranteed daily quantity/).fill("80");
-  await page.getByLabel("Approval mode",{exact:false}).selectOption("approved");
+  await checkHelp("Guaranteed daily quantity · PIECE",/1,000 means 1 kg/);
+  await checkHelp("Approval mode",/staff must still record actual production readiness/);
+  assert.equal(saved,null,"policy help never submits the form");
+  await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).fill("80");
+  await page.getByRole("combobox",{name:"Approval mode",exact:true}).selectOption("approved");
   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
   await page.getByText("Schedule saved.",{exact:false}).waitFor();
   assert.deepEqual(saved.templates,[{policyId:6,quantity:80,autoApprove:true}]);
@@ -64,7 +91,7 @@ try{
   });
   assert.equal(typeof releaseReload,"function");releaseReload();
   await page.getByText("Loading saved settings…",{exact:true}).waitFor({state:"hidden"});
-  await page.getByLabel(/Guaranteed daily quantity/).fill("81");
+  await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).fill("81");
   await save.click();
   await page.getByText("Schedule saved.",{exact:false}).waitFor();
   assert.equal(saved.templates[0].quantity,81,"new edits after reload remain authoritative");
@@ -73,7 +100,7 @@ try{
   await page.getByRole("alert").filter({hasText:"Could not load this branch"}).waitFor();
   await page.getByText("Loading saved settings…",{exact:true}).waitFor({state:"hidden"});
   assert.equal(await reload.isDisabled(),false,"a failed reload can be retried");
-  assert.equal(await page.getByLabel(/Guaranteed daily quantity/).inputValue(),"81");
+  assert.equal(await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).inputValue(),"81");
   await reload.click();
   await page.getByRole("alert").filter({hasText:"Could not load this branch"}).waitFor({state:"hidden"});
   await page.getByText("Loading saved settings…",{exact:true}).waitFor({state:"hidden"});
@@ -96,7 +123,7 @@ try{
   await page.getByRole("checkbox",{name:"Samosa",exact:true}).uncheck();
   await enabled.check();
   await page.getByRole("checkbox",{name:"Rasmalai",exact:true}).check();
-  await page.getByLabel(/Guaranteed daily quantity/).fill("30");
+  await page.getByRole("spinbutton",{name:/Guaranteed daily quantity/}).fill("30");
   await page.getByRole("button",{name:"Save automation settings",exact:true}).click();
   await page.getByText("Schedule saved.",{exact:false}).waitFor();
   assert.deepEqual(saved.templates,[{policyId:7,quantity:30,autoApprove:true}]);
