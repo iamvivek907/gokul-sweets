@@ -39,8 +39,9 @@ export default function OccasionEnquiriesPage() {
     const [week,setWeek]=useState<ProductionWeek|null>(null);const [weekFrom,setWeekFrom]=useState("");const [serviceDate,setServiceDate]=useState("");
     const [pages,setPages]=useState(1);const [loading,setLoading]=useState(true);const [refresh,setRefresh]=useState(0);const [refreshedAt,setRefreshedAt]=useState("");
     const [openRequest,setOpenRequest]=useState<string|null>(null);const deepLinkHandled=useRef(false);
-    const [reviewTarget,setReviewTarget]=useState<{id:string;branchId:number}|null>(null);
+    const [reviewTarget,setReviewTarget]=useState<{id:string;branchId:number;syncCalendar?:boolean}|null>(null);
     const [reviewResult,setReviewResult]=useState<{target:NonNullable<typeof reviewTarget>;enquiry:Enquiry|null}|null>(null);
+    const calendarSyncedReview=useRef<NonNullable<typeof reviewTarget>|null>(null);
     const [planningError,setPlanningError]=useState("");
     const activeReview=reviewTarget?.branchId===branchId?reviewTarget:null;
     const activeResult=activeReview&&reviewResult?.target===activeReview?reviewResult:null;
@@ -68,7 +69,7 @@ export default function OccasionEnquiriesPage() {
             if(!deepLinkHandled.current){
                 deepLinkHandled.current=true;
                 if(linkedEnquiry&&allowed.some(branch=>branch.id===linkedBranchId)){
-                    setReviewTarget(current=>current??{id:linkedEnquiry,branchId:linkedBranchId});
+                    setReviewTarget(current=>current??{id:linkedEnquiry,branchId:linkedBranchId,syncCalendar:true});
                 }
             }
         }}).catch(() => {if (!controller.signal.aborted) setNotice("Could not load branches.");});
@@ -107,7 +108,16 @@ export default function OccasionEnquiriesPage() {
                 const response=await adminFetch(`/api/admin/branches/${target.branchId}/occasion-enquiries/${encodeURIComponent(target.id)}`,authorization!,{signal:controller.signal});
                 if(!response.ok)throw Error("Could not open this request.");
                 const enquiry=await response.json() as Enquiry;
-                if(!controller.signal.aborted)setReviewResult({target,enquiry});
+                if(!controller.signal.aborted){
+                    setReviewResult({target,enquiry});
+                    if(target.syncCalendar&&calendarSyncedReview.current!==target){
+                        calendarSyncedReview.current=target;
+                        setWeekFrom(enquiry.serviceDate);
+                        setServiceDate(enquiry.serviceDate);
+                        setPages(1);
+                        setOpenRequest(null);
+                    }
+                }
             } catch {
                 if(!controller.signal.aborted)setReviewResult({target,enquiry:null});
             }

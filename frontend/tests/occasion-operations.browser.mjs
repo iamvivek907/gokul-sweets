@@ -12,6 +12,7 @@ const linkedFinished=new Promise(resolve=>{linkedFetchFinished=resolve;});
 const box={id:8,name:"400 ml plastic box",dimensions:"400 ml",material:"Food-safe plastic",compartments:1,capacityPieces:3,price:10,branding:"",leadDays:1,published:true};
 let enquiry={id,branchId:1,occasionType:"Family gathering",serviceDate:"2026-10-10",guestCount:600,fulfilment:"PICKUP",status:"REQUESTED",customerPhone:"+919876543210",paidAmount:0,quoteTerms:null,pricedLines:[],items:["Kaju katli","Mathari","Chena roll"].map((productName,index)=>({productId:index+1,productName,quantity:600,unit:"PIECE",productionUnit:"GRAM",suggestedProductionQuantity:null})),gift:{box,boxCount:600,recipe:[{productId:1,pieces:1},{productId:2,pieces:1},{productId:3,pieces:1}],packagingEstimate:6000,approvedPackagingTotal:null,includeSpoons:true},nextStep:"Under branch review",productionPlan:[]};
 let planningUnavailable=true, reviewAttempts=0;
+const planningFroms=[];
 let previewBody=null,depositBody=null,packedBody=null,acknowledged=0;
 const calculation={lines:enquiry.items.map((item,index)=>({productId:item.productId,name:item.productName,unit:"GRAM",unitPrice:300,pieceGrams:null,productionQuantity:[10000,15000,20000][index],cgstRate:2.5,sgstRate:2.5,foodBase:[3000,4500,6000][index],foodTax:[150,225,300][index],packagingAmount:2200,grossAmount:[5350,6925,8500][index]})),foodBase:13500,foodTax:675,packagingTotal:6600,total:20775,deposit:10387.5,balance:10387.5,expiresAt:"2026-10-01T12:00:00Z",balanceDueAt:"2026-10-10T18:29:59Z",expectedReadyAt:"2026-10-10T10:00:00",estimated:true,extras:[{name:"Plastic spoons",quantity:600,priceIncludingTax:1}]};
 await context.route("**/api/**",async route=>{
@@ -26,7 +27,7 @@ await context.route("**/api/**",async route=>{
  else if(path.endsWith("/occasion-enquiries/review-queue"))json={requests:enquiry.status==="REQUESTED"?[enquiry]:[],nextAfter:null};
  else if(path.endsWith("/occasion-enquiries/"+linkedId)){
   await linkedRelease;
-  try {await route.fulfill({json:{...enquiry,id:linkedId,occasionType:"Notification request"}});} catch { /* The newer selection aborts the old request. */ }
+  try {await route.fulfill({json:{...enquiry,id:linkedId,occasionType:"Notification request",serviceDate:"2027-01-15"}});} catch { /* The newer selection aborts the old request. */ }
   finally {linkedFetchFinished();}
   return;
  }
@@ -34,7 +35,10 @@ await context.route("**/api/**",async route=>{
   if(++reviewAttempts===1)return route.fulfill({status:503,json:{message:"Enquiry temporarily unavailable"}});
   json=enquiry;
  }
- else if(path.endsWith("/occasion-enquiries/planning")&&planningUnavailable)return route.fulfill({status:503,json:{message:"Planning temporarily unavailable"}});
+ else if(path.endsWith("/occasion-enquiries/planning")&&planningUnavailable){
+  planningFroms.push(url.searchParams.get("from"));
+  return route.fulfill({status:503,json:{message:"Planning temporarily unavailable"}});
+ }
  else if(path.endsWith("/occasion-enquiries/planning"))json={today:enquiry.serviceDate,days:Array.from({length:7},(_,n)=>({date:`2026-10-${10+n}`,orderCount:n===0?1:0,needsReview:enquiry.status==="REQUESTED"?1:0,committedOrders:enquiry.status==="PAID"?1:0,products:[]}))};
  else if(path.endsWith("/dashboard/today"))json={today:"2026-09-30",orders:7,preparing:2,ready:3,completed:2,updatedAt:"2026-09-30T12:00:00Z"};
  else if(path==="/api/occasion-enquiries")json=[enquiry];
@@ -74,6 +78,7 @@ try {
  await page.getByRole("button",{name:"Refresh now"}).click();
  await selectedRequest.getByText("Customer notes: Customer updated their packing instructions").waitFor();
  assert.equal(await selectedRequest.getByText("Notification request",{exact:true}).count(),0);
+ assert.equal(planningFroms.includes("2027-01-15"),false,"late notification response cannot move the calendar");
  await page.getByRole("checkbox",{name:/Final weight measured/}).check();
  for(const [index,value]of ["10","15","20"].entries())await page.getByLabel("Estimated total kg",{exact:false}).nth(index).fill(value);
  await page.getByLabel("₹ each including tax").fill("1");
