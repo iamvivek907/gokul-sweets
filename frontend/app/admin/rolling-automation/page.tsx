@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {useEffect, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {useAdminAuth} from "@/contexts/AdminAuthContext";
 import {adminFetch} from "@/services/adminApi";
 import {getActiveBranches} from "@/services/branchApi";
@@ -23,6 +23,8 @@ export default function RollingAutomationPage(){
     const [draft,setDraft]=useState<Plan>(initial);
     const [dirty,setDirty]=useState(false);
     const [reload,setReload]=useState(0);
+    const [settledLoad,setSettledLoad]=useState<{branchId:number;reload:number}|null>(null);
+    const requestVersion=useRef(0);
     const [error,setError]=useState("");
     const [notice,setNotice]=useState("");
     const [busy,setBusy]=useState(false);
@@ -40,21 +42,25 @@ export default function RollingAutomationPage(){
     useEffect(()=>{
         if(!authorization||!branchId)return;
         const controller=new AbortController();
+        const operation=++requestVersion.current;
         adminFetch(`/api/admin/branches/${branchId}/rolling-automation`,authorization,{signal:controller.signal}).then(async response=>{
             if(!response.ok)throw Error("Could not load this branch's automation.");
             const data=await response.json() as Workspace;
-            if(!controller.signal.aborted){setSnapshot({branchId,data});setDraft(data.plan??{...initial,templates:[]});setDirty(false);setError("");}
-        }).catch(reason=>{if(!controller.signal.aborted)setError(reason.message);});
+            if(!controller.signal.aborted&&operation===requestVersion.current){setSnapshot({branchId,data});setDraft(data.plan??{...initial,templates:[]});setDirty(false);setError("");}
+        }).catch(reason=>{if(!controller.signal.aborted&&operation===requestVersion.current)setError(reason.message);})
+            .finally(()=>{if(!controller.signal.aborted&&operation===requestVersion.current)setSettledLoad({branchId,reload});});
         return()=>controller.abort();
     },[authorization,branchId,reload]);
+    const loading=branchId!==null&&(settledLoad?.branchId!==branchId||settledLoad?.reload!==reload);
     const workspace=snapshot?.branchId===branchId?snapshot.data:null;
     function change(patch:Partial<Plan>){setDraft(current=>({...current,...patch}));setDirty(true);setNotice("");}
     function changeTemplate(policyId:number,patch:Partial<Template>){
         change({templates:draft.templates.map(item=>item.policyId===policyId?{...item,...patch}:item)});
     }
     async function submit(run:boolean){
-        if(!branchId||!authorization||!workspace||busy||!canManage)return;
+        if(!branchId||!authorization||!workspace||busy||loading||!canManage)return;
         const selectedBranch=branchId;
+        const operation=++requestVersion.current;
         setBusy(true);setError("");setNotice("");
         try{
             const response=await adminFetch(`/api/admin/branches/${selectedBranch}/rolling-automation${run?"/reconcile":""}`,authorization,{
@@ -64,12 +70,13 @@ export default function RollingAutomationPage(){
                 throw Error(detail.detail||detail.message||"Could not complete the request. Reload and retry.");
             }
             const data=await response.json() as Workspace;
+            if(operation!==requestVersion.current)return;
             setSnapshot({branchId:selectedBranch,data});setDraft(data.plan??initial);setDirty(false);
             setNotice(run?"Coverage check finished. Review the run result below.":"Schedule saved. The next background check will use these settings.");
-        }catch(reason){setError(reason instanceof Error?reason.message:"Could not save.");}
+        }catch(reason){if(operation===requestVersion.current)setError(reason instanceof Error?reason.message:"Could not save.");}
         finally{setBusy(false);}
     }
-    return <main className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    return <main aria-busy={busy||loading} className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
         <header><p className="text-sm font-semibold uppercase tracking-widest text-[#8f1838]">Separate automation</p>
             <h1 className="mt-2 text-3xl font-bold">Automatic slots & inventory</h1>
             <p className="mt-2 text-stone-600">Configure once per branch. The system fills missing pickup dates and allocations for your selected policies.</p>
@@ -78,17 +85,17 @@ export default function RollingAutomationPage(){
             Your manual tools stay available. Enabling this flow gives it ownership of scheduled inventory for this branch, so the legacy inventory scheduler skips the branch. Turning it off allows the legacy scheduler to resume its existing rules. Neither action deletes slots, stock or bookings.
         </aside>
         <div className="flex flex-wrap items-end gap-3">
-            <label className="min-w-0 flex-1 font-semibold">Branch<select className={control} value={branchId??""} disabled={busy||dirty} onChange={event=>{setBranchId(Number(event.target.value));setError("");setNotice("");}}>
+            <label className="min-w-0 flex-1 font-semibold">Branch<select className={control} value={branchId??""} disabled={busy||dirty||loading} onChange={event=>{requestVersion.current++;setBranchId(Number(event.target.value));setError("");setNotice("");}}>
                 {!branches.length&&<option value="">No accessible branches</option>}{branches.map(branch=><option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </select></label>
-            <button className={action} disabled={busy||!branchId} onClick={()=>{setReload(value=>value+1);setNotice("");}}>Reload saved settings</button>
+            <button className={action} disabled={busy||loading||!branchId} onClick={()=>{requestVersion.current++;setReload(value=>value+1);setNotice("");setError("");}}>Reload saved settings</button>
         </div>
         <p className="text-sm text-stone-600">Save or reload unsaved edits before switching branches. Reload discards your unsaved changes.</p>
         {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-900">{error}</p>}
         {notice&&<p role="status" className="rounded-xl bg-green-50 p-3 text-green-900">{notice}</p>}
-        {!workspace&&!error&&branchId&&<p role="status">Loading schedule…</p>}
+        {loading&&<p role="status">Loading saved settings…</p>}
         {workspace&&<form className="space-y-6" noValidate={!draft.enabled} onSubmit={event=>{event.preventDefault();void submit(false);}}>
-            <fieldset disabled={busy||!canManage} className="space-y-6 disabled:opacity-75">
+            <fieldset disabled={busy||loading||!canManage} className="space-y-6 disabled:opacity-75">
                 <section className="space-y-4 rounded-2xl border bg-white p-5">
                     <h2 className="text-xl font-bold">1. Choose when pickup is offered</h2>
                     <label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" checked={draft.enabled} onChange={event=>change({enabled:event.target.checked})}/>Enable rolling automation for this branch</label>
@@ -110,12 +117,12 @@ export default function RollingAutomationPage(){
                     {workspace.policies.map(policy=>{
                         const template=draft.templates.find(item=>item.policyId===policy.id);
                         return <div key={policy.id} className="space-y-3 rounded-xl border p-4">
-                            <label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" checked={!!template} disabled={!policy.selectable&&!template} onChange={event=>change({templates:event.target.checked?[...draft.templates,{policyId:policy.id,quantity:0,autoApprove:false}]:draft.templates.filter(item=>item.policyId!==policy.id)})}/>{policy.name}</label>
+                            <label className="flex min-h-11 items-center gap-3 font-semibold"><input type="checkbox" checked={!!template} disabled={!policy.selectable&&!template} onChange={event=>change({templates:event.target.checked?[...draft.templates,{policyId:policy.id,quantity:0,autoApprove:true}]:draft.templates.filter(item=>item.policyId!==policy.id)})}/>{policy.name}</label>
                             <p className="text-sm text-stone-600">Unit: {policy.unit} · Buffer: {policy.buffer} · Maximum: {policy.maximum??"Not set"} · Booking window: {policy.bookingDays} days ahead</p>
                             {policy.unavailableReason&&<p className="text-sm text-amber-900">{policy.unavailableReason}</p>}
                             {template&&<div className="grid gap-4 sm:grid-cols-2">
                                 <label>Guaranteed daily quantity · {policy.unit}<input className={control} type="number" disabled={!policy.selectable} min={policy.unit==="GRAM"?0.001:1} step={policy.unit==="GRAM"?0.001:1} max={policy.maximum??undefined} required value={template.quantity||""} onChange={event=>changeTemplate(policy.id,{quantity:Number(event.target.value)})}/><small className="mt-2 block text-stone-600">Enter the quantity you can reliably provide. It must exceed the safety buffer and stay within the policy maximum.</small></label>
-                                <label>Approval mode<select className={control} disabled={!policy.selectable} value={template.autoApprove?"approved":"draft"} onChange={event=>changeTemplate(policy.id,{autoApprove:event.target.value==="approved"})}><option value="draft">Create a draft for staff review</option><option value="approved">Approve this guaranteed quantity automatically</option></select><small className="mt-2 block text-stone-600">{policy.readyStockRequired?"Actual production must still be marked ready. Approval does not prove the food exists.":"Draft quantities are not sellable until staff approve them."}</small></label>
+                                <label>Approval mode<select className={control} disabled={!policy.selectable} value={template.autoApprove?"approved":"draft"} onChange={event=>changeTemplate(policy.id,{autoApprove:event.target.value==="approved"})}><option value="approved">Automatic approval · no daily approval needed</option><option value="draft">Manual review · create a daily draft</option></select><small className="mt-2 block text-stone-600">{policy.readyStockRequired?"Actual production must still be marked ready. Approval does not prove the food exists.":"Automatic approval publishes the guaranteed quantity without daily approval. Manual review requires staff approval each day."}</small></label>
                             </div>}
                         </div>;
                     })}
@@ -128,9 +135,9 @@ export default function RollingAutomationPage(){
         {workspace&&<section className="space-y-3 rounded-2xl border bg-white p-5">
             <h2 className="text-xl font-bold">3. Check generation</h2>
             <p className="text-sm">Last attempt: {workspace.lastAttempt??"Not run"} · Last success: {workspace.lastSuccess??"Not run"}</p>
-            <p role="status">{workspace.message??"Save and enable a schedule, then run the first coverage check."}</p>
-            <button type="button" className={action} disabled={busy||dirty||!workspace.plan?.enabled||!canManage} onClick={()=>void submit(true)}>Generate missing coverage now</button>
-            <p className="text-sm text-stone-600">Uses saved settings. Safe to repeat: existing dates and allocations are preserved. A failed run is retried at the next background check. If a run fails, resolve the reported setup problem and try again.</p>
+            <p role="status">{workspace.message??"Save and enable a schedule. Coverage is generated automatically at the next background check."}</p>
+            <button type="button" className={action} disabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage} onClick={()=>void submit(true)}>Generate missing coverage now</button>
+            <p className="text-sm text-stone-600">Optional immediate check using saved settings; daily generation and retries do not require this button. Safe to repeat: existing dates and allocations are preserved. A failed run is retried at the next background check. If a run fails, resolve the reported setup problem and try again.</p>
             <Link href="/admin/inventory" className="inline-flex min-h-11 items-center font-semibold underline">Review daily allocations and drafts</Link>
         </section>}
     </main>;
