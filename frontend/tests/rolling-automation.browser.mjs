@@ -213,5 +213,28 @@ try{
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,"automation form fits viewport");
   await context.close();
  }
+ for(const width of [390,1280]) for(const readOnly of [false,true]) {
+  const context=await browser.newContext({viewport:{width,height:900},serviceWorkers:"block"});let runs=0;
+  const plan={enabled:true,openingTime:"10:00",closingTime:"11:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:0,templates:[],usePolicyMaximum:true};
+  await context.route("**/api/**",async route=>{
+   const request=route.request(),path=new URL(request.url()).pathname;
+   const headers={"Access-Control-Allow-Origin":base,"Access-Control-Allow-Credentials":"true","Access-Control-Allow-Headers":"content-type,x-staff-csrf","Access-Control-Allow-Methods":"GET,POST,PUT,OPTIONS","Access-Control-Expose-Headers":"X-Staff-CSRF","X-Staff-CSRF":"test-csrf"};
+   if(request.method()==="OPTIONS")return route.fulfill({status:204,headers});
+   if(path==="/api/admin/auth/me")return route.fulfill({headers,json:{staffId:77,roleName:readOnly?"MANAGER":"OWNER_ADMIN",username:"owner",fullName:"Owner",branchIds:[1],permissions:readOnly?["BRANCH_MANAGE","INVENTORY_VIEW"]:["BRANCH_MANAGE","INVENTORY_VIEW","INVENTORY_MANAGE","APPROVAL_MANAGE"]}});
+   if(path==="/api/branches")return route.fulfill({headers,json:[{id:1,name:"Test branch",active:true}]});
+   if(path.includes("/rolling-automation")){
+    if(request.method()==="POST"){assert.equal(readOnly,false);assert.equal(request.headers()["x-staff-csrf"],"test-csrf");runs++;}
+    const health={status:runs?"COMPLETE":"NEEDS_ATTENTION",overdue:!runs,lastRunFailed:!runs,interrupted:false,missingSlots:runs?0:2,missingAllocations:runs?0:1,expectedAllocations:1,closedDates:0,includedPolicies:1,excludedPolicies:0,drafts:0,readinessPending:1,issues:runs?[]:[{date:"2026-11-07",item:"Samosa",reason:"Daily allocation is missing."}],message:runs?"Expected setup records are present. Stock and readiness checks still apply.":"Review missing coverage and retry."};
+    return route.fulfill({headers,json:{plan,policies:[{id:6,name:"Samosa",unit:"PIECE",bookingDays:14,buffer:2,maximum:100,readyStockRequired:false,eligible:true,selectable:true,unavailableReason:null}],lastAttempt:"2026-11-06T00:00:00Z",lastSuccess:runs?"2026-11-06T01:00:00Z":null,message:runs?"Coverage restored":"Generation failed",health,runs:[{id:2,trigger:runs?"MANUAL":"SCHEDULED",actor:runs?"test-manager":"SYSTEM_ROLLING_AUTOMATION",status:runs?"SUCCESS":"FAILED",startedAt:"2026-11-06T00:00:00Z",finishedAt:"2026-11-06T00:00:01Z",durationMs:1000,lockWaitMs:100,lockHeldMs:800,slotsCreated:runs?2:0,allocationsCreated:runs?1:0,summary:runs?"Coverage restored":"Branch must be active and operational."}]}});
+   }
+   return route.fulfill({headers,json:path.endsWith("/notifications")?{messages:[],unreadCount:0,nextBefore:null}:[]});
+  });
+  const page=await context.newPage();await page.goto(base+"/admin/rolling-automation");await page.getByRole("heading",{name:"Coverage needs attention",exact:true}).waitFor();
+  await page.getByText(/Daily generation is overdue/).waitFor();await page.getByText(/The latest run failed/).waitFor();await page.getByText("View missing dates and dishes",{exact:true}).click();await page.getByText("2026-11-07 · Samosa",{exact:true}).waitFor();
+  await page.getByText(/Recent automation runs ·/).click();await page.getByText("Branch must be active and operational.",{exact:true}).waitFor();
+  assert.equal(await page.getByRole("button",{name:"Retry coverage now",exact:true}).isDisabled(),readOnly);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,"health and history fit viewport");
+  if(!readOnly){await page.getByRole("spinbutton",{name:"Calendar days to maintain",exact:true}).fill("15");assert.equal(await page.getByRole("button",{name:"Retry coverage now",exact:true}).isDisabled(),true,"unsaved settings cannot be used by retry");await page.getByRole("button",{name:"Reload saved settings",exact:true}).click();await page.getByRole("button",{name:"Retry coverage now",exact:true}).click();await page.getByRole("heading",{name:"Coverage complete",exact:true}).waitFor();assert.equal(runs,1);await page.getByText("Triggered by test-manager",{exact:false}).waitFor();}
+  await context.close();console.log(`PASS: coverage alerts, bounded history and ${readOnly?"read-only safety":"manual recovery"} at ${width}px`);
+ }
  console.log("PASS: separate opt-in automation, configured-policy selection, explicit guarantee approval, saved-setting generation, safe pause, removal of unsupported selections, capacity exclusions, authenticated production writes, reload protection/recovery and responsive help text.");
 }finally{await browser.close();}

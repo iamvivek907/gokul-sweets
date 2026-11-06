@@ -141,3 +141,31 @@ without changing the next daily execution. Existing allocations are never topped
 Inactive dishes and inactive categories are skipped in both quantity modes and remain visible
 with a reason in admin. Reactivating them allows the next daily or manual run to create missing
 allocations within the maintained window. Existing allocations are not rewritten.
+
+## Coverage health, overdue alerts and execution history
+
+Admin audits coverage when loaded using bulk reads across the effective calendar window. It
+never generates stock while checking health and adds no background polling. Missing intervals
+and item/date allocations appear separately, with up to 15 slot and 15 dish examples. Disabled
+intervals, elapsed times, unselected weekdays and product/storefront booking limits are respected.
+Draft approval and physical readiness are separate from missing setup records; complete coverage
+still requires normal stock, approval, readiness and service checks before customer ordering.
+
+A plan saved before today's midnight is overdue if no successful check has completed since
+midnight, with a 15-minute grace period. A successful manual run satisfies that day's check.
+Plans saved later today are due at the following midnight. Failed and interrupted runs raise an
+inline admin alert. Authorized admins can retry saved settings; unsaved edits and read-only
+access disable retry. Paused plans do not raise overdue alerts.
+
+History records scheduled/manual triggers, authenticated staff username or system actor,
+start/finish times, result, created counts, elapsed time, lock wait and lock-held time. Keep the
+latest thirty completed runs per branch plus in-progress runs; the API returns at most thirty
+recent entries. Failures are recorded after branch rollback. RUNNING entries older than an hour
+are marked failed on the next invocation; health warns after ten minutes. Earlier last-success
+timestamps remain valid after upgrade.
+
+Generation retains an atomic branch transaction with a five-minute transaction deadline bounding
+its database work and lock waits. Existing allocations and bookings are preserved. Timings identify
+whether a branch needs smaller recoverable batches; this change does not introduce partial commits
+or repeated generation attempts. The schedule mutex permits run-audit foreign keys while continuing
+to serialize schedule writers and protect overlapping intervals.

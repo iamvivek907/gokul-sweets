@@ -44,7 +44,7 @@ public class RollingScheduleWorker {
                                     + " branch_id",
                             Long.class)) {
                 try {
-                    service.reconcile(branch);
+                    service.reconcile(branch, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
                 } catch (RuntimeException error) {
                     log.error("Rolling automation failed for branch {}", branch, error);
                 }

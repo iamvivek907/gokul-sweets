@@ -36,6 +36,8 @@ public class RollingScheduleService {
 
     private final EnhancementProperties features;
 
+    private final RollingAutomationDiagnostics diagnostics;
+
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
     /** Existing regular interval whose time range must remain untouched during gap repair. */
@@ -101,7 +103,54 @@ public class RollingScheduleService {
             List<Policy> policies,
             String lastAttempt,
             String lastSuccess,
-            String message) {}
+            String message,
+            RollingAutomationDiagnostics.Health health,
+            List<RollingAutomationDiagnostics.Run> runs) {
+        /** Internal configuration reads omit expensive admin-only diagnostics. */
+        public Workspace(
+                Plan plan,
+                List<Policy> policies,
+                String lastAttempt,
+                String lastSuccess,
+                String message) {
+            this(plan, policies, lastAttempt, lastSuccess, message, null, List.of());
+        }
+    }
+
+    /** Reads configuration with bounded history and effective coverage for admin. */
+    public Workspace inspect(long branchId) {
+        final long started = MethodTiming.start(RollingScheduleService.class, "inspect(long)");
+        try {
+            var workspace = workspace(branchId);
+            var runs = diagnostics.runs(branchId);
+            return new Workspace(
+                    workspace.plan(),
+                    workspace.policies(),
+                    workspace.lastAttempt(),
+                    workspace.lastSuccess(),
+                    workspace.message(),
+                    diagnostics.health(branchId, workspace, runs),
+                    runs);
+        } finally {
+            MethodTiming.finish(started, RollingScheduleService.class, "inspect(long)");
+        }
+    }
+
+    /** Tests a policy maximum without subtracting its safety buffer twice. */
+    public static boolean usableMaximum(Policy policy) {
+        final long started =
+                MethodTiming.start(RollingScheduleService.class, "usableMaximum(Policy)");
+        try {
+            return policy.eligible()
+                    && policy.maximum() != null
+                    && policy.maximum().signum() > 0
+                    && policy.maximum().compareTo(policy.buffer()) > 0
+                    && ("GRAM".equals(policy.unit())
+                            || policy.maximum().stripTrailingZeros().scale() <= 0);
+        } finally {
+            MethodTiming.finish(started, RollingScheduleService.class, "usableMaximum(Policy)");
+        }
+    }
 
     /** Reports whether the new scheduler owns inventory generation for this branch. */
     public boolean ownsInventory(long branchId) {
@@ -372,7 +421,7 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
         try {
             var active =
                     jdbc.query(
-                            "SELECT TRUE FROM branches WHERE id=? FOR UPDATE",
+                            "SELECT TRUE FROM branches WHERE id=? FOR NO KEY UPDATE",
                             rs -> rs.next() ? rs.getBoolean(1) : null,
                             branchId);
             if (!Boolean.TRUE.equals(active))
@@ -383,15 +432,43 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
         }
     }
 
-    /** Fills missing future dates once; existing manual dates and allocations are retained. */
+    /** Reconciles using the system actor for trusted internal callers. */
     public void reconcile(long branchId) {
-        final long __gokulMethodStartedNanos =
-                MethodTiming.start(RollingScheduleService.class, "reconcile(long)");
+        final long started = MethodTiming.start(RollingScheduleService.class, "reconcile(long)");
         try {
+            reconcile(branchId, "MANUAL", "SYSTEM_ROLLING_AUTOMATION");
+        } finally {
+            MethodTiming.finish(started, RollingScheduleService.class, "reconcile(long)");
+        }
+    }
+
+    /**
+     * Repairs coverage with a five-minute transaction deadline and durable execution diagnostics.
+     */
+    public void reconcile(long branchId, String trigger, String actor) {
+        final long __gokulMethodStartedNanos =
+                MethodTiming.start(RollingScheduleService.class, "reconcile(long,String,String)");
+        try {
+            long began = System.nanoTime();
+            long runId = diagnostics.start(branchId, trigger, actor);
+            long[] waitMs = {0}, heldSince = {0};
+            int[] counts = {0, 0};
+            boolean[] completed = {false};
+            String[] result = {"No enabled plan; nothing generated."};
+            var boundedTransaction = new TransactionTemplate(transactions.getTransactionManager());
+            boundedTransaction.setTimeout(300);
             try {
-                transactions.executeWithoutResult(
+                boundedTransaction.executeWithoutResult(
                         tx -> {
-                            lock(branchId);
+                            long waiting = System.nanoTime();
+                            try {
+                                lock(branchId);
+                                heldSince[0] = System.nanoTime();
+                            } finally {
+                                waitMs[0] =
+                                        java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                                                System.nanoTime() - waiting);
+                            }
                             if (!Boolean.TRUE.equals(
                                     jdbc.queryForObject(
                                             "SELECT active AND operational FROM branches WHERE"
@@ -423,25 +500,7 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
                             var effectiveTemplates =
                                     plan.usePolicyMaximum()
                                             ? config.policies().stream()
-                                                    .filter(
-                                                            p ->
-                                                                    p.eligible()
-                                                                            && p.maximum() != null
-                                                                            && p.maximum().signum()
-                                                                                    > 0
-                                                                            && p.maximum()
-                                                                                            .compareTo(
-                                                                                                    p
-                                                                                                            .buffer())
-                                                                                    > 0
-                                                                            && ("GRAM"
-                                                                                            .equals(
-                                                                                                    p
-                                                                                                            .unit())
-                                                                                    || p.maximum()
-                                                                                                    .stripTrailingZeros()
-                                                                                                    .scale()
-                                                                                            <= 0))
+                                                    .filter(RollingScheduleService::usableMaximum)
                                                     .map(
                                                             p ->
                                                                     new Template(
@@ -653,19 +712,61 @@ ON CONFLICT(branch_product_id,service_date) DO NOTHING
                                         + " last_success_at=now(),last_message=? WHERE branch_id=?",
                                     message,
                                     branchId);
+                            completed[0] = true;
+                            counts[0] = slots;
+                            counts[1] = allocations;
+                            result[0] = message;
                         });
             } catch (RuntimeException failure) {
-                jdbc.update(
-                        "UPDATE rolling_branch_schedules SET last_attempt_at=now(),last_message=?"
-                                + " WHERE branch_id=?",
-                        "Generation failed. Existing records were retained; retry after checking"
-                                + " policies and branch status.",
-                        branchId);
+                String failureSummary =
+                        "Generation failed; new branch changes were rolled back. Review setup and"
+                                + " retry. Cause: "
+                                + (failure instanceof ResponseStatusException response
+                                        ? response.getReason()
+                                        : failure.getClass().getSimpleName());
+                try {
+                    jdbc.update(
+                            "UPDATE rolling_branch_schedules SET"
+                                    + " last_attempt_at=now(),last_message=? WHERE branch_id=?",
+                            failureSummary,
+                            branchId);
+                    diagnostics.finish(
+                            runId,
+                            branchId,
+                            "FAILED",
+                            java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                                    System.nanoTime() - began),
+                            waitMs[0],
+                            heldSince[0] == 0
+                                    ? 0
+                                    : java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                                            System.nanoTime() - heldSince[0]),
+                            0,
+                            0,
+                            failureSummary);
+                } catch (RuntimeException loggingFailure) {
+                    failure.addSuppressed(loggingFailure);
+                }
                 throw failure;
             }
+            diagnostics.finish(
+                    runId,
+                    branchId,
+                    completed[0] ? "SUCCESS" : "SKIPPED",
+                    java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - began),
+                    waitMs[0],
+                    heldSince[0] == 0
+                            ? 0
+                            : java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(
+                                    System.nanoTime() - heldSince[0]),
+                    counts[0],
+                    counts[1],
+                    result[0]);
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos, RollingScheduleService.class, "reconcile(long)");
+                    __gokulMethodStartedNanos,
+                    RollingScheduleService.class,
+                    "reconcile(long,String,String)");
         }
     }
 }

@@ -42,15 +42,15 @@ class RollingScheduleWorkerTest {
         doThrow(new IllegalStateException("Temporary database failure"))
                 .doNothing()
                 .when(service)
-                .reconcile(1L);
+                .reconcile(1L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
         var worker = new RollingScheduleWorker(jdbc, service);
         worker.reconcile();
         worker.reconcile();
         var calls = inOrder(service);
-        calls.verify(service).reconcile(1L);
-        calls.verify(service).reconcile(2L);
-        calls.verify(service).reconcile(1L);
-        calls.verify(service).reconcile(2L);
+        calls.verify(service).reconcile(1L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
+        calls.verify(service).reconcile(2L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
+        calls.verify(service).reconcile(1L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
+        calls.verify(service).reconcile(2L, "SCHEDULED", "SYSTEM_ROLLING_AUTOMATION");
         verifyNoMoreInteractions(service);
     }
 

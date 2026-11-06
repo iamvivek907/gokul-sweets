@@ -31,7 +31,7 @@ public class RollingScheduleController {
                 MethodTiming.start(RollingScheduleController.class, "get(long)");
         try {
             staff.requireBranchAccess(branchId);
-            return service.workspace(branchId);
+            return service.inspect(branchId);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos, RollingScheduleController.class, "get(long)");
@@ -54,7 +54,7 @@ public class RollingScheduleController {
         try {
             staff.requireBranchAccess(branchId);
             service.save(branchId, plan, authentication.getName());
-            return service.workspace(branchId);
+            return service.inspect(branchId);
         } finally {
             MethodTiming.finish(
                     __gokulMethodStartedNanos,
@@ -68,16 +68,20 @@ public class RollingScheduleController {
     @PreAuthorize(
             "hasAuthority('BRANCH_MANAGE') and hasAuthority('INVENTORY_MANAGE') and"
                     + " hasAuthority('APPROVAL_MANAGE')")
-    public RollingScheduleService.Workspace reconcile(@PathVariable long branchId) {
+    public RollingScheduleService.Workspace reconcile(
+            @PathVariable long branchId, Authentication authentication) {
         final long __gokulMethodStartedNanos =
-                MethodTiming.start(RollingScheduleController.class, "reconcile(long)");
+                MethodTiming.start(
+                        RollingScheduleController.class, "reconcile(long,Authentication)");
         try {
             staff.requireBranchAccess(branchId);
-            service.reconcile(branchId);
-            return service.workspace(branchId);
+            service.reconcile(branchId, "MANUAL", authentication.getName());
+            return service.inspect(branchId);
         } finally {
             MethodTiming.finish(
-                    __gokulMethodStartedNanos, RollingScheduleController.class, "reconcile(long)");
+                    __gokulMethodStartedNanos,
+                    RollingScheduleController.class,
+                    "reconcile(long,Authentication)");
         }
     }
 }

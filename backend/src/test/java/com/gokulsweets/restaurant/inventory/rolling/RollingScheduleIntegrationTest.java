@@ -975,4 +975,182 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                                 tomorrow))
                 .isEqualTo(preserved);
     }
+
+    @Test
+    void coverageHealthDistinguishesMissingRecordsFromDisabledDatesAndBookingLimits() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var today = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata")));
+        var audit =
+                new RollingAutomationDiagnostics(
+                        jdbc,
+                        Clock.fixed(
+                                today.atTime(12, 0).atZone(ZoneId.of("Asia/Kolkata")).toInstant(),
+                                ZoneId.of("Asia/Kolkata")),
+                        features);
+        var before = audit.health(f.branch(), service.workspace(f.branch()), List.of());
+        assertThat(before.status()).isEqualTo("NEEDS_ATTENTION");
+        assertThat(before.missingSlots()).isEqualTo(2);
+        assertThat(before.missingAllocations()).isEqualTo(1);
+        service.reconcile(f.branch(), "MANUAL", "test-manager");
+        entityManager.flush();
+        entityManager.clear();
+        var after = audit.health(f.branch(), service.workspace(f.branch()), List.of());
+        assertThat(after.status()).isEqualTo("COMPLETE");
+        assertThat(after.missingSlots()).isZero();
+        assertThat(after.missingAllocations()).isZero();
+        jdbc.update("UPDATE pickup_slots SET active=FALSE WHERE branch_id=?", f.branch());
+        var disabled = audit.health(f.branch(), service.workspace(f.branch()), List.of());
+        assertThat(disabled.status()).isEqualTo("COMPLETE");
+        assertThat(disabled.expectedAllocations()).isZero();
+        jdbc.update("UPDATE pickup_slots SET active=TRUE WHERE branch_id=?", f.branch());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET booking_horizon_days=0 WHERE id=?",
+                f.policy());
+        assertThat(
+                        audit.health(f.branch(), service.workspace(f.branch()), List.of())
+                                .expectedAllocations())
+                .isZero();
+        var run = service.inspect(f.branch()).runs().getFirst();
+        assertThat(run.trigger()).isEqualTo("MANUAL");
+        assertThat(run.actor()).isEqualTo("test-manager");
+        assertThat(run.status()).isEqualTo("SUCCESS");
+        assertThat(run.durationMs()).isGreaterThanOrEqualTo(run.lockWaitMs());
+        assertThat(run.lockHeldMs()).isGreaterThanOrEqualTo(0);
+    }
+
+    @Test
+    void overdueAlertsRespectMidnightGraceNewPlansAndSuccessfulManualRecovery() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        var tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var zone = ZoneId.of("Asia/Kolkata");
+        var grace =
+                new RollingAutomationDiagnostics(
+                        jdbc,
+                        Clock.fixed(tomorrow.atTime(0, 10).atZone(zone).toInstant(), zone),
+                        features);
+        var overdue =
+                new RollingAutomationDiagnostics(
+                        jdbc,
+                        Clock.fixed(tomorrow.atTime(0, 16).atZone(zone).toInstant(), zone),
+                        features);
+        assertThat(grace.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isFalse();
+        assertThat(overdue.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isTrue();
+        jdbc.update(
+                "UPDATE rolling_branch_schedules SET last_success_at=? WHERE branch_id=?",
+                java.sql.Timestamp.from(tomorrow.atTime(0, 5).atZone(zone).toInstant()),
+                f.branch());
+        assertThat(overdue.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isFalse();
+        jdbc.update(
+                "UPDATE rolling_branch_schedules SET last_success_at=NULL,updated_at=? WHERE"
+                        + " branch_id=?",
+                java.sql.Timestamp.from(tomorrow.atTime(0, 15).atZone(zone).toInstant()),
+                f.branch());
+        assertThat(overdue.health(f.branch(), service.workspace(f.branch()), List.of()).overdue())
+                .isFalse();
+    }
+
+    @Test
+    void healthExamplesAndExecutionHistoryRemainBounded() {
+        var f = fixture();
+        service.save(f.branch(), maximumPlan(-1, 60), "manager");
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        var health = audit.health(f.branch(), service.workspace(f.branch()), List.of());
+        assertThat(health.issues()).hasSizeLessThanOrEqualTo(30);
+        assertThat(health.missingSlots()).isGreaterThan(30);
+        assertThat(health.missingAllocations())
+                .isEqualTo(
+                        Math.min(14, features.getFutureOrderingDays())
+                                + (LocalTime.now(clock.withZone(ZoneId.of("Asia/Kolkata")))
+                                                .isBefore(LocalTime.of(10, 30))
+                                        ? 1
+                                        : 0));
+        for (int i = 0; i < 35; i++) {
+            long run = audit.start(f.branch(), "MANUAL", "manager-" + i);
+            audit.finish(run, f.branch(), "SUCCESS", 12, 3, 8, 0, 0, "Coverage checked");
+        }
+        assertThat(audit.runs(f.branch())).hasSize(30);
+        assertThat(audit.runs(f.branch()).getFirst().actor()).isEqualTo("manager-34");
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM rolling_automation_runs WHERE branch_id=?",
+                                Integer.class,
+                                f.branch()))
+                .isEqualTo(30);
+        assertThat(audit.runs(f.branch() + 999999)).isEmpty();
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void failedExecutionHistorySurvivesBranchTransactionRollback() {
+        long branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES(?,'Failure history test') RETURNING"
+                                + " id",
+                        Long.class,
+                        "FAIL-HISTORY-" + UUID.randomUUID());
+        try {
+            service.save(branch, maximumPlan(-1, 2), "manager");
+            jdbc.update("UPDATE branches SET operational=FALSE WHERE id=?", branch);
+            assertThatThrownBy(() -> service.reconcile(branch, "MANUAL", "test-manager"))
+                    .hasMessageContaining("active and operational");
+            var run = service.inspect(branch).runs().getFirst();
+            assertThat(run.status()).isEqualTo("FAILED");
+            assertThat(run.actor()).isEqualTo("test-manager");
+            assertThat(run.slotsCreated()).isZero();
+            assertThat(run.allocationsCreated()).isZero();
+            assertThat(service.inspect(branch).health().lastRunFailed()).isTrue();
+        } finally {
+            jdbc.update("DELETE FROM rolling_branch_schedules WHERE branch_id=?", branch);
+            jdbc.update("DELETE FROM branches WHERE id=?", branch);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void durableRunStartDoesNotWaitForAnUncommittedSlotWriter() throws Exception {
+        long branch =
+                jdbc.queryForObject(
+                        "INSERT INTO branches(code,name) VALUES(?,'Run lock test') RETURNING id",
+                        Long.class,
+                        "RUN-LOCK-" + UUID.randomUUID());
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var audit = new RollingAutomationDiagnostics(jdbc, clock, features);
+        try {
+            var transaction =
+                    new org.springframework.transaction.support.TransactionTemplate(
+                            transactionManager);
+            transaction.executeWithoutResult(
+                    status -> {
+                        jdbc.update(
+                                "INSERT INTO"
+                                    + " pickup_slots(branch_id,slot_date,start_time,end_time,capacity,active)"
+                                    + " VALUES(?,?,'10:00','11:00',5,TRUE)",
+                                branch,
+                                LocalDate.now(clock).plusDays(1));
+                        var future =
+                                executor.submit(
+                                        () -> audit.start(branch, "MANUAL", "concurrent-manager"));
+                        try {
+                            assertThat(future.get(5, java.util.concurrent.TimeUnit.SECONDS))
+                                    .isPositive();
+                        } catch (Exception failure) {
+                            throw new IllegalStateException(
+                                    "Run audit must not block on the schedule mutex", failure);
+                        }
+                        status.setRollbackOnly();
+                    });
+        } finally {
+            executor.shutdownNow();
+            executor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS);
+            jdbc.update("DELETE FROM pickup_slots WHERE branch_id=?", branch);
+            jdbc.update("DELETE FROM branches WHERE id=?", branch);
+        }
+    }
 }

@@ -10,7 +10,9 @@ import {getActiveBranches} from "@/services/branchApi";
 type Template={policyId:number;quantity:number;autoApprove:boolean};
 type Plan={enabled:boolean;openingTime:string;closingTime:string;slotMinutes:number;capacity:number;maintainDays:number;weekdays:number;version:number;templates:Template[];usePolicyMaximum?:boolean};
 type Policy={id:number;name:string;unit:string;bookingDays:number;buffer:number;maximum:number|null;readyStockRequired:boolean;eligible:boolean;selectable:boolean;unavailableReason:string|null};
-type Workspace={plan:Plan|null;policies:Policy[];lastAttempt:string|null;lastSuccess:string|null;message:string|null};
+type Run={id:number;trigger:string;actor:string;status:string;startedAt:string;finishedAt:string|null;durationMs:number;lockWaitMs:number;lockHeldMs:number;slotsCreated:number;allocationsCreated:number;summary:string};
+type Health={status:string;overdue:boolean;lastRunFailed:boolean;interrupted:boolean;missingSlots:number;missingAllocations:number;expectedAllocations:number;closedDates:number;includedPolicies:number;excludedPolicies:number;drafts:number;readinessPending:number;issues:{date:string;item:string;reason:string}[];message:string};
+type Workspace={plan:Plan|null;policies:Policy[];lastAttempt:string|null;lastSuccess:string|null;message:string|null;health?:Health;runs?:Run[]};
 const initial:Plan={enabled:false,openingTime:"10:00",closingTime:"21:00",slotMinutes:30,capacity:10,maintainDays:14,weekdays:127,version:-1,templates:[],usePolicyMaximum:false};
 const control="mt-2 block min-h-11 w-full rounded-xl border border-stone-300 bg-white px-3 py-2";
 const action="min-h-11 rounded-xl border border-stone-300 bg-white px-4 py-2 disabled:opacity-50";
@@ -48,6 +50,28 @@ function needsQuantity(template:Template,policy:Policy|undefined,enabled:boolean
     const q=template.quantity;
     return !Number.isFinite(q)||q<=0||q>99999999999.999||Math.abs(q*1000-Math.round(q*1000))>0.000001
         ||!!(enabled&&policy?.selectable&&(q<=policy.buffer||(policy.maximum!==null&&q>policy.maximum)||(policy.unit!=="GRAM"&&!Number.isInteger(q))));
+}
+
+function CoveragePanel({health,runs,retryDisabled,onRetry}:{health:Health;runs:Run[];retryDisabled:boolean;onRetry:()=>void}){
+    const attention=health.status==="NEEDS_ATTENTION";
+    const title=health.status==="COMPLETE"?"Coverage complete":health.status==="RUNNING"?"Generation in progress":health.status==="PAUSED"?"Automation paused":"Coverage needs attention";
+    const labels:Record<string,string>={SUCCESS:"Completed",FAILED:"Failed",RUNNING:"Running",SKIPPED:"Skipped"};
+    return <section aria-label="Automation coverage health" className={`space-y-4 rounded-2xl border p-4 ${attention?"border-amber-300 bg-amber-50":health.status==="COMPLETE"?"border-emerald-200 bg-emerald-50":"border-stone-200 bg-stone-50"}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="text-lg font-bold">{title}</h3>{attention&&<button type="button" className={action} disabled={retryDisabled} onClick={onRetry}>Retry coverage now</button>}</div>
+        {health.overdue&&<p role="alert" className="font-semibold text-amber-950">Daily generation is overdue. No successful check has completed for today’s due schedule. Review the run history and trigger a manual check.</p>}
+        {health.lastRunFailed&&<p role="alert" className="font-semibold text-red-900">The latest run failed. Review its result below and retry after resolving the reported setup problem.</p>}
+        {health.interrupted&&<p role="alert" className="font-semibold text-red-900">The latest run has not finished within the expected time. Check application health before retrying.</p>}
+        <p className="text-sm">{health.message}</p>
+        {health.status!=="PAUSED"&&<>
+            <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">{[["Missing slots",health.missingSlots],["Missing allocations",health.missingAllocations],["Expected allocations",health.expectedAllocations],["Included policies",health.includedPolicies]].map(([label,value])=><div key={label} className="rounded-xl bg-white/80 p-3"><dt className="text-sm text-stone-600">{label}</dt><dd className="text-2xl font-bold">{value}</dd></div>)}</dl>
+            {health.includedPolicies===0&&<p className="font-semibold">No eligible policies are included. Review quantity source, policy maximums and dish availability below.</p>}
+            <p className="text-sm">{health.excludedPolicies} excluded policies · {health.closedDates} closed or elapsed dates. Selected weekdays, policy/storefront booking limits and intentionally disabled intervals are respected.</p>
+            <p className="text-sm">{health.drafts} existing drafts await approval · {health.readinessPending} approved allocations await physical readiness. Existing manual restrictions and exhausted stock remain governed by inventory controls.</p>
+            {!!health.issues.length&&<details><summary className="min-h-11 cursor-pointer py-3 font-semibold">View missing dates and dishes</summary><ul className="space-y-2">{health.issues.map((issue,index)=><li key={`${issue.date}-${index}`} className="rounded-xl bg-white p-3 text-sm"><strong>{issue.date} · {issue.item}</strong><p>{issue.reason}</p></li>)}</ul><p className="mt-2 text-xs">Examples are bounded; totals cover the entire effective window.</p></details>}
+        </>}
+        <p className="text-xs text-stone-600">Overdue alerts allow 15 minutes after midnight IST. Plans saved later today begin their daily schedule tomorrow. Save changes before retrying; there is no additional background polling.</p>
+        <details><summary className="min-h-11 cursor-pointer py-3 font-semibold">Recent automation runs · {runs.length} of at most 30</summary>{!runs.length?<p className="text-sm">No recorded runs yet. Earlier success timestamps remain available above.</p>:<ol className="space-y-3">{runs.map(run=><li key={run.id} className="space-y-2 rounded-xl border border-stone-200 bg-white p-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><strong><span className={`mr-2 rounded-full px-2 py-1 text-xs ${run.status==="FAILED"?"bg-red-50 text-red-900":run.status==="SUCCESS"?"bg-emerald-50 text-emerald-900":"bg-stone-100 text-stone-700"}`}>{labels[run.status]??run.status}</span>{run.trigger==="SCHEDULED"?"Scheduled":"Manual"}</strong><span>{runTime(run.startedAt)}</span></div><p className="break-words">Triggered by {run.actor} · {run.finishedAt?`Finished ${runTime(run.finishedAt)}`:"Awaiting completion"}</p><p>{run.slotsCreated} slots · {run.allocationsCreated} allocations · {(run.durationMs/1000).toFixed(2)}s total · {(run.lockWaitMs/1000).toFixed(2)}s waiting for branch lock · {(run.lockHeldMs/1000).toFixed(2)}s holding branch lock</p><p className="break-words">{run.summary||"Execution is in progress."}</p></li>)}</ol>}</details>
+    </section>;
 }
 
 export default function RollingAutomationPage(){
@@ -128,7 +152,7 @@ export default function RollingAutomationPage(){
             const data=await response.json() as Workspace;
             if(operation!==requestVersion.current)return;
             setSnapshot({branchId:selectedBranch,data});setDraft(data.plan??initial);setDirty(false);
-            setNotice(run?"Coverage check finished. Review the run result below.":"Schedule saved. The next background check will use these settings.");
+            setNotice(run?"Coverage check finished. Review the run result below.":"Schedule saved. The next daily run at 12:00 AM IST will use these settings, or generate missing coverage now.");
         }catch(reason){if(operation===requestVersion.current)setError(reason instanceof Error?reason.message:"Could not save.");}
         finally{setBusy(false);}
     }
@@ -157,6 +181,7 @@ export default function RollingAutomationPage(){
             {workspace.plan?.usePolicyMaximum&&savedSelectionCount===0&&<p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm">No usable policy maximums yet. Configure online physical policies with maximum quantities greater than their buffers; the next daily run or manual check will include them automatically.</p>}
             {dirty&&<p className="text-sm text-amber-900">Unsaved changes are not used by the scheduler. Save or reload before running a check.</p>}
             <p className="text-sm">Last attempt: {runTime(workspace.lastAttempt)} · Last completed check: {runTime(workspace.lastSuccess)}</p>
+            {workspace.health&&<CoveragePanel health={workspace.health} runs={workspace.runs??[]} retryDisabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage} onRetry={()=>void submit(true)}/>}
             <p role="status" className="rounded-xl bg-stone-50 p-3 leading-relaxed">{workspace.message??"Save and enable a schedule. Coverage is generated at the next daily run (12:00 AM IST), or use Generate missing coverage now after saving."}</p>
             <button type="button" className={action} disabled={busy||loading||dirty||!workspace.plan?.enabled||!canManage} onClick={()=>void submit(true)}>Generate missing coverage now</button>
             <p className="text-sm text-stone-600">Uses saved settings to reconcile the entire maintained calendar window immediately, including newly configured policies. Save changes first. Automatic generation runs once daily at 12:00 AM IST; after later changes or a failed/missed daily run, use this action or wait for the next daily run. Safe to repeat: existing stock, bookings and disabled slots are preserved.</p>
