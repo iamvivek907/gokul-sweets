@@ -15,6 +15,7 @@ import com.gokulsweets.restaurant.observability.MethodTiming;
 
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +31,8 @@ public class AdminInventoryWorkspaceService {
 
     private static final int MAX_PAGE_SIZE =
             AppConstant.ADMIN_INVENTORY_WORKSPACE_SERVICE_MAX_PAGE_SIZE;
+
+    private final JdbcTemplate jdbc;
 
     private final BranchProductRepository branchProductRepository;
 
@@ -152,6 +155,10 @@ public class AdminInventoryWorkspaceService {
                         AdminInventoryWorkspaceService.class,
                         "updatePolicies(Long,AdminBulkPolicyRequest)");
         try {
+            // Serialize the entire bulk request before acquiring policies in request order.
+            // The rolling job and manual stock editor use this same branch mutex.
+            jdbc.queryForList(
+                    "SELECT id FROM branches WHERE id=? FOR NO KEY UPDATE", Long.class, branchId);
             validateBranchProducts(branchId, request.branchProductIds());
             List<InventoryPolicyResponse> results =
                     request.branchProductIds().stream()

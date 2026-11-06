@@ -258,3 +258,11 @@ and readiness writes. An edit committed first is visible to the job's unit check
 arrives later waits until the job completes. The existing five-minute transaction limit bounds
 the job's database work and lock waits. Product policies are not rewritten by the job. Policies inserted after the lock scan are deferred
 to the next daily or manual check rather than used without a policy lock.
+
+
+Manual menu-workspace stock edits, branch-item deletion and bulk policy updates acquire the same branch mutex before
+product, policy or allocation locks. This serializes them with rolling generation and prevents
+opposite-order child-row deadlocks, including reverse-order bulk selections. Existing permission,
+validation, audit and optimistic-version checks are retained. If the job changes an allocation
+before a waiting stock edit obtains the mutex, the edit still requires a reload after the normal
+version conflict rather than silently overwriting that change.

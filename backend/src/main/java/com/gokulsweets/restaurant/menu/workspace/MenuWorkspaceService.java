@@ -659,6 +659,9 @@ public class MenuWorkspaceService {
         try {
             authorize(branch, true);
             staff.requirePermission(PermissionName.INVENTORY_MANAGE);
+            // Deletion removes policy rows too; take the branch mutex before child locks.
+            jdbc.queryForList(
+                    "SELECT id FROM branches WHERE id=? FOR NO KEY UPDATE", Long.class, branch);
             var rows =
                     jdbc.queryForList(
                             "SELECT * FROM branch_products WHERE branch_id=? AND product_id=? FOR"
@@ -864,6 +867,10 @@ public class MenuWorkspaceService {
         try {
             authorize(branch, true);
             staff.requirePermission(PermissionName.INVENTORY_MANAGE);
+            // Take the same branch mutex as rolling generation before any product,
+            // allocation or policy locks, avoiding policy/allocation lock inversion.
+            jdbc.queryForList(
+                    "SELECT id FROM branches WHERE id=? FOR NO KEY UPDATE", Long.class, branch);
             var ids =
                     jdbc.queryForList(
                             "SELECT id FROM branch_products WHERE branch_id=? AND product_id=? FOR"

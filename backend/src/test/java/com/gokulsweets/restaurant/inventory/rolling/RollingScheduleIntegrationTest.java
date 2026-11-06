@@ -1717,6 +1717,9 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                             jdbc.update(
                                     "DELETE FROM branch_inventory_policies WHERE id=?", f.policy());
                             jdbc.update("DELETE FROM branch_products WHERE id=?", f.product());
+                            jdbc.update(
+                                    "DELETE FROM menu_workspace_audit WHERE branch_id=?",
+                                    f.branch());
                             jdbc.update("DELETE FROM products WHERE id=?", details.get("id"));
                             jdbc.update(
                                     "DELETE FROM categories WHERE id=?",
@@ -1888,6 +1891,390 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
             executor.shutdownNow();
             assertThat(executor.awaitTermination(20, java.util.concurrent.TimeUnit.SECONDS))
                     .isTrue();
+            cleanupCommittedReadinessFixture(f);
+        }
+    }
+
+    @Autowired com.gokulsweets.restaurant.menu.workspace.MenuWorkspaceService menuWorkspace;
+
+    @Autowired
+    com.gokulsweets.restaurant.inventory.service.AdminInventoryWorkspaceService inventoryWorkspace;
+
+    private com.gokulsweets.restaurant.inventory.dto.AdminInventoryPolicyRequest gramPolicy(
+            String maximum) {
+        return new com.gokulsweets.restaurant.inventory.dto.AdminInventoryPolicyRequest(
+                com.gokulsweets.restaurant.inventory.enums.InventoryControlMode.DAILY_PRODUCTION,
+                com.gokulsweets.restaurant.inventory.enums.InventoryUnit.GRAM,
+                true,
+                true,
+                new BigDecimal("2"),
+                new BigDecimal(maximum),
+                14,
+                0,
+                null);
+    }
+
+    private com.gokulsweets.restaurant.menu.workspace.MenuWorkspaceService.StockEdit stockEdit(
+            Fixture f, LocalDate date) {
+        return new com.gokulsweets.restaurant.menu.workspace.MenuWorkspaceService.StockEdit(
+                jdbc.queryForObject(
+                        "SELECT version FROM inventory_daily_allocations WHERE branch_product_id=?"
+                                + " AND service_date=?",
+                        Long.class,
+                        f.product(),
+                        date),
+                jdbc.queryForObject(
+                        "SELECT version FROM branch_inventory_policies WHERE id=?",
+                        Long.class,
+                        f.policy()),
+                "Concurrent staff stock edit",
+                new com.gokulsweets.restaurant.inventory.dto.AdminAllocationApprovalRequest(
+                        new BigDecimal("80"),
+                        new BigDecimal("2"),
+                        null,
+                        null,
+                        date.atTime(10, 0),
+                        null),
+                gramPolicy("150"),
+                new com.gokulsweets.restaurant.inventory.dto.AdminReadinessUpdateRequest(
+                        com.gokulsweets.restaurant.inventory.enums.InventoryAllocationStatus.READY,
+                        new BigDecimal("30"),
+                        date.atTime(10, 0),
+                        null));
+    }
+
+    private String stockActor() {
+        String username = "rolling-stock-" + UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO staff_users(username,password_hash,full_name,role_id) SELECT"
+                    + " ?,'disabled','Rolling stock actor',id FROM roles WHERE name='OWNER_ADMIN'",
+                username);
+        return username;
+    }
+
+    private void asStockActor(String username, Runnable work) {
+        var previous = org.springframework.security.core.context.SecurityContextHolder.getContext();
+        var context =
+                org.springframework.security.core.context.SecurityContextHolder
+                        .createEmptyContext();
+        context.setAuthentication(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        username,
+                        "",
+                        List.of(
+                                new org.springframework.security.core.authority
+                                        .SimpleGrantedAuthority("MENU_MANAGE"),
+                                new org.springframework.security.core.authority
+                                        .SimpleGrantedAuthority("INVENTORY_VIEW"),
+                                new org.springframework.security.core.authority
+                                        .SimpleGrantedAuthority("INVENTORY_MANAGE"))));
+        org.springframework.security.core.context.SecurityContextHolder.setContext(context);
+        try {
+            work.run();
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.setContext(previous);
+        }
+    }
+
+    private void assertWaitingAtBranchMutex(int pid) {
+        assertThat(
+                        jdbc.queryForObject(
+                                        "SELECT query FROM pg_stat_activity WHERE pid=?",
+                                        String.class,
+                                        pid)
+                                .toLowerCase(java.util.Locale.ROOT))
+                .contains("from branches");
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void actualManualStockEditCommitsBeforeJobAndItsCountIsPreserved() throws Exception {
+        var f = committedReadinessFixture();
+        var actor = stockActor();
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var pid = new java.util.concurrent.atomic.AtomicInteger();
+        var future =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        long product =
+                jdbc.queryForObject(
+                        "SELECT product_id FROM branch_products WHERE id=?",
+                        Long.class,
+                        f.product());
+        var edit = stockEdit(f, date);
+        try {
+            concurrentTransaction()
+                    .executeWithoutResult(
+                            status -> {
+                                int writer =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                asStockActor(
+                                        actor,
+                                        () -> menuWorkspace.stock(f.branch(), product, date, edit));
+                                future.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        job -> {
+                                                                            pid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            service.reconcile(
+                                                                                    f.branch());
+                                                                        })));
+                                awaitDatabaseBlock(pid, writer, future.get());
+                                assertWaitingAtBranchMutex(pid.get());
+                            });
+            future.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            var row =
+                    jdbc.queryForMap(
+                            "SELECT approved_quantity,ready_quantity,status FROM"
+                                    + " inventory_daily_allocations WHERE branch_product_id=? AND"
+                                    + " service_date=?",
+                            f.product(),
+                            date);
+            assertThat((BigDecimal) row.get("approved_quantity")).isEqualByComparingTo("80");
+            assertThat((BigDecimal) row.get("ready_quantity")).isEqualByComparingTo("30");
+            assertThat(row.get("status")).isEqualTo("READY");
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(20, java.util.concurrent.TimeUnit.SECONDS))
+                    .isTrue();
+            cleanupCommittedReadinessFixture(f);
+            jdbc.update("DELETE FROM staff_users WHERE username=?", actor);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void actualManualStockEditWaitsForJobThenReportsNormalVersionConflict() throws Exception {
+        var f = committedReadinessFixture();
+        var actor = stockActor();
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var jobPid = new java.util.concurrent.atomic.AtomicInteger();
+        var editPid = new java.util.concurrent.atomic.AtomicInteger();
+        var jobFuture =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var editFuture =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        long product =
+                jdbc.queryForObject(
+                        "SELECT product_id FROM branch_products WHERE id=?",
+                        Long.class,
+                        f.product());
+        var edit = stockEdit(f, date);
+        try {
+            concurrentTransaction()
+                    .executeWithoutResult(
+                            status -> {
+                                int holder =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                jdbc.queryForObject(
+                                        "SELECT id FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=? AND service_date=? FOR UPDATE",
+                                        Long.class,
+                                        f.product(),
+                                        date);
+                                jobFuture.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        job -> {
+                                                                            jobPid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            service.reconcile(
+                                                                                    f.branch());
+                                                                        })));
+                                awaitDatabaseBlock(jobPid, holder, jobFuture.get());
+                                editFuture.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        writer -> {
+                                                                            editPid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            asStockActor(
+                                                                                    actor,
+                                                                                    () ->
+                                                                                            menuWorkspace
+                                                                                                    .stock(
+                                                                                                            f
+                                                                                                                    .branch(),
+                                                                                                            product,
+                                                                                                            date,
+                                                                                                            edit));
+                                                                        })));
+                                awaitDatabaseBlock(editPid, jobPid.get(), editFuture.get());
+                                assertWaitingAtBranchMutex(editPid.get());
+                            });
+            jobFuture.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            try {
+                editFuture.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+                fail("A stale manual edit must require reload");
+            } catch (java.util.concurrent.ExecutionException failure) {
+                assertThat(failure.getCause())
+                        .isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+                assertThat(
+                                ((org.springframework.web.server.ResponseStatusException)
+                                                failure.getCause())
+                                        .getStatusCode())
+                        .isEqualTo(org.springframework.http.HttpStatus.CONFLICT);
+            }
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT ready_quantity FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=? AND service_date=?",
+                                    BigDecimal.class,
+                                    f.product(),
+                                    date))
+                    .isEqualByComparingTo("100.500");
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(20, java.util.concurrent.TimeUnit.SECONDS))
+                    .isTrue();
+            cleanupCommittedReadinessFixture(f);
+            jdbc.update("DELETE FROM staff_users WHERE username=?", actor);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void actualReverseOrderBulkPolicyUpdateWaitsAtBranchMutexAndDoesNotDeadlock() throws Exception {
+        var f = committedReadinessFixture();
+        var other = fixture();
+        jdbc.update(
+                "UPDATE branch_products SET branch_id=? WHERE id=?", f.branch(), other.product());
+        jdbc.update(
+                "UPDATE products SET sale_mode='WEIGHT' WHERE id=(SELECT product_id FROM"
+                        + " branch_products WHERE id=?)",
+                other.product());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET"
+                    + " inventory_unit='GRAM',ready_stock_required=TRUE,maximum_daily_allocation=100.500"
+                    + " WHERE id=?",
+                other.policy());
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var jobPid = new java.util.concurrent.atomic.AtomicInteger();
+        var editPid = new java.util.concurrent.atomic.AtomicInteger();
+        var jobFuture =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var editFuture =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        try {
+            concurrentTransaction()
+                    .executeWithoutResult(
+                            status -> {
+                                int holder =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                jdbc.queryForObject(
+                                        "SELECT id FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=? AND service_date=? FOR UPDATE",
+                                        Long.class,
+                                        f.product(),
+                                        date);
+                                jobFuture.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        job -> {
+                                                                            jobPid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            service.reconcile(
+                                                                                    f.branch());
+                                                                        })));
+                                awaitDatabaseBlock(jobPid, holder, jobFuture.get());
+                                editFuture.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        writer -> {
+                                                                            editPid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            inventoryWorkspace
+                                                                                    .updatePolicies(
+                                                                                            f
+                                                                                                    .branch(),
+                                                                                            new com
+                                                                                                    .gokulsweets
+                                                                                                    .restaurant
+                                                                                                    .inventory
+                                                                                                    .dto
+                                                                                                    .AdminBulkPolicyRequest(
+                                                                                                    List
+                                                                                                            .of(
+                                                                                                                    other
+                                                                                                                            .product(),
+                                                                                                                    f
+                                                                                                                            .product()),
+                                                                                                    gramPolicy(
+                                                                                                            "200")));
+                                                                        })));
+                                awaitDatabaseBlock(editPid, jobPid.get(), editFuture.get());
+                                assertWaitingAtBranchMutex(editPid.get());
+                            });
+            jobFuture.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            editFuture.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            for (var item : List.of(f, other))
+                assertThat(
+                                jdbc.queryForObject(
+                                        "SELECT maximum_daily_allocation FROM"
+                                                + " branch_inventory_policies WHERE id=?",
+                                        BigDecimal.class,
+                                        item.policy()))
+                        .isEqualByComparingTo("200");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT ready_quantity FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=? AND service_date=?",
+                                    BigDecimal.class,
+                                    f.product(),
+                                    date))
+                    .isEqualByComparingTo("100.500");
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(20, java.util.concurrent.TimeUnit.SECONDS))
+                    .isTrue();
+            cleanupCommittedReadinessFixture(other);
             cleanupCommittedReadinessFixture(f);
         }
     }
