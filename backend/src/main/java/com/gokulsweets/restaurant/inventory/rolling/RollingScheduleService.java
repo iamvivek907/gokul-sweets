@@ -477,6 +477,27 @@ capacity,maintain_days,weekdays,use_policy_maximum,auto_ready,updated_by) VALUES
         }
     }
 
+    /** Keeps policy units stable from the workspace read through audited readiness writes. */
+    private java.util.Set<Long> lockPolicies(long branchId) {
+        final long started = MethodTiming.start(RollingScheduleService.class, "lockPolicies(long)");
+        try {
+            // Lock before reading the workspace: a policy writer that commits first is observed,
+            // while later writers wait for this branch transaction to complete. The deterministic
+            // order avoids opposite-order policy locks; NO KEY UPDATE permits FK readers.
+            return java.util.Set.copyOf(
+                    jdbc.queryForList(
+                            """
+SELECT p.id FROM branch_inventory_policies p
+JOIN branch_products bp ON bp.id=p.branch_product_id
+WHERE bp.branch_id=? ORDER BY p.id FOR NO KEY UPDATE OF p
+""",
+                            Long.class,
+                            branchId));
+        } finally {
+            MethodTiming.finish(started, RollingScheduleService.class, "lockPolicies(long)");
+        }
+    }
+
     /** Reconciles using the system actor for trusted internal callers. */
     public void reconcile(long branchId) {
         final long started = MethodTiming.start(RollingScheduleService.class, "reconcile(long)");
@@ -536,7 +557,13 @@ capacity,maintain_days,weekdays,use_policy_maximum,auto_ready,updated_by) VALUES
                                 throw new ResponseStatusException(
                                         HttpStatus.CONFLICT,
                                         "Branch must be active and operational.");
+                            var lockedPolicyIds = lockPolicies(branchId);
                             var config = workspace(branchId);
+                            // A policy inserted after the lock scan is deferred to the next check.
+                            var lockedPolicies =
+                                    config.policies().stream()
+                                            .filter(p -> lockedPolicyIds.contains(p.id()))
+                                            .toList();
                             var plan = config.plan();
                             if (expectedVersion != null
                                     && (plan == null || plan.version() != expectedVersion))
@@ -558,7 +585,7 @@ capacity,maintain_days,weekdays,use_policy_maximum,auto_ready,updated_by) VALUES
                                     limited = 0,
                                     readinessUnitMismatches = 0;
                             var policyMap =
-                                    config.policies().stream()
+                                    lockedPolicies.stream()
                                             .collect(
                                                     java.util.stream.Collectors.toMap(
                                                             Policy::id, policy -> policy));
@@ -566,7 +593,7 @@ capacity,maintain_days,weekdays,use_policy_maximum,auto_ready,updated_by) VALUES
                             // withholds the policy buffer once; do not subtract it here.
                             var effectiveTemplates =
                                     plan.usePolicyMaximum()
-                                            ? config.policies().stream()
+                                            ? lockedPolicies.stream()
                                                     .filter(RollingScheduleService::usableMaximum)
                                                     .map(
                                                             p ->

@@ -250,3 +250,11 @@ current policy unit, before calling the readiness service. It never converts or 
 quantities. The run summary counts skipped mismatches; coverage reports attention with bounded
 per-dish/date examples showing both units. Other compatible allocations and new dates continue
 normally, so one outdated gram/piece allocation cannot roll back the branch's generation.
+
+
+Policy edits are serialized with a running rolling job: the branch transaction locks configured
+policy rows in ID order before reading its workspace, and retains those locks through allocation
+and readiness writes. An edit committed first is visible to the job's unit check; an edit that
+arrives later waits until the job completes. The existing five-minute transaction limit bounds
+the job's database work and lock waits. Product policies are not rewritten by the job. Policies inserted after the lock scan are deferred
+to the next daily or manual check rather than used without a policy lock.

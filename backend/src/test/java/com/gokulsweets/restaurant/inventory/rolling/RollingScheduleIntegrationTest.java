@@ -1624,4 +1624,271 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
         assertThat(allocation(fractional, date)).isEqualTo(beforeFractional);
         assertThat(allocation(whole, date)).isEqualTo(beforeWhole);
     }
+
+    private Fixture committedReadinessFixture() {
+        var f = fixture();
+        jdbc.update(
+                "UPDATE products SET sale_mode='WEIGHT' WHERE id=(SELECT product_id FROM"
+                        + " branch_products WHERE id=?)",
+                f.product());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET"
+                    + " inventory_unit='GRAM',ready_stock_required=TRUE,maximum_daily_allocation=100.500"
+                    + " WHERE id=?",
+                f.policy());
+        service.save(f.branch(), readinessPlan(-1, false), "manager");
+        service.reconcile(f.branch());
+        service.save(f.branch(), readinessPlan(0, true), "manager");
+        return f;
+    }
+
+    private org.springframework.transaction.support.TransactionTemplate concurrentTransaction() {
+        var transaction =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        transaction.setTimeout(20);
+        return transaction;
+    }
+
+    private void awaitDatabaseBlock(
+            java.util.concurrent.atomic.AtomicInteger waiter,
+            int blocker,
+            java.util.concurrent.Future<?> future) {
+        long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+        boolean blocked = false;
+        while (System.nanoTime() < deadline && !future.isDone()) {
+            if (waiter.get() > 0
+                    && Boolean.TRUE.equals(
+                            jdbc.queryForObject(
+                                    "SELECT ?=ANY(pg_blocking_pids(?))",
+                                    Boolean.class,
+                                    blocker,
+                                    waiter.get()))) {
+                blocked = true;
+                break;
+            }
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException failure) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(failure);
+            }
+        }
+        assertThat(blocked)
+                .as("database backend %s must wait for backend %s", waiter.get(), blocker)
+                .isTrue();
+    }
+
+    private void cleanupCommittedReadinessFixture(Fixture f) {
+        concurrentTransaction()
+                .executeWithoutResult(
+                        status -> {
+                            jdbc.queryForObject(
+                                    "SELECT id FROM branches WHERE id=? FOR UPDATE",
+                                    Long.class,
+                                    f.branch());
+                            var details =
+                                    jdbc.queryForMap(
+                                            "SELECT p.id,p.category_id,p.tax_category_id FROM"
+                                                    + " products p JOIN branch_products bp ON"
+                                                    + " bp.product_id=p.id WHERE bp.id=?",
+                                            f.product());
+                            jdbc.update(
+                                    "DELETE FROM inventory_stock_transactions WHERE"
+                                            + " branch_product_id=?",
+                                    f.product());
+                            jdbc.update(
+                                    "DELETE FROM inventory_allocation_plan_audit WHERE"
+                                            + " branch_product_id=?",
+                                    f.product());
+                            jdbc.update(
+                                    "DELETE FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=?",
+                                    f.product());
+                            jdbc.update(
+                                    "DELETE FROM rolling_inventory_templates WHERE branch_id=?",
+                                    f.branch());
+                            jdbc.update(
+                                    "DELETE FROM rolling_schedule_dates WHERE branch_id=?",
+                                    f.branch());
+                            jdbc.update(
+                                    "DELETE FROM rolling_branch_schedules WHERE branch_id=?",
+                                    f.branch());
+                            jdbc.update("DELETE FROM pickup_slots WHERE branch_id=?", f.branch());
+                            jdbc.update(
+                                    "DELETE FROM branch_inventory_policies WHERE id=?", f.policy());
+                            jdbc.update("DELETE FROM branch_products WHERE id=?", f.product());
+                            jdbc.update("DELETE FROM products WHERE id=?", details.get("id"));
+                            jdbc.update(
+                                    "DELETE FROM categories WHERE id=?",
+                                    details.get("category_id"));
+                            jdbc.update(
+                                    "DELETE FROM tax_categories WHERE id=?",
+                                    details.get("tax_category_id"));
+                            jdbc.update("DELETE FROM branches WHERE id=?", f.branch());
+                        });
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void policyEditCommittingFirstIsReadBeforeRecoveryAndDoesNotRollBackTheRun() throws Exception {
+        var f = committedReadinessFixture();
+        var executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        var jobPid = new java.util.concurrent.atomic.AtomicInteger();
+        var future =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        var before =
+                jdbc.queryForMap(
+                        "SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        f.product(),
+                        date);
+        try {
+            concurrentTransaction()
+                    .executeWithoutResult(
+                            status -> {
+                                int writerPid =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                jdbc.update(
+                                        "UPDATE products SET sale_mode='UNIT' WHERE id=(SELECT"
+                                                + " product_id FROM branch_products WHERE id=?)",
+                                        f.product());
+                                jdbc.update(
+                                        "UPDATE branch_inventory_policies SET"
+                                            + " inventory_unit='PIECE',maximum_daily_allocation=100"
+                                            + " WHERE id=?",
+                                        f.policy());
+                                future.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        job -> {
+                                                                            jobPid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            service.reconcile(
+                                                                                    f.branch());
+                                                                        })));
+                                awaitDatabaseBlock(jobPid, writerPid, future.get());
+                            });
+            future.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            assertThat(
+                            jdbc.queryForMap(
+                                    "SELECT * FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=? AND service_date=?",
+                                    f.product(),
+                                    date))
+                    .isEqualTo(before);
+            var workspace = service.inspect(f.branch());
+            assertThat(workspace.runs().getFirst().status()).isEqualTo("SUCCESS");
+            assertThat(workspace.message())
+                    .containsPattern("[1-9][0-9]* allocations skipped for inventory unit mismatch");
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(20, java.util.concurrent.TimeUnit.SECONDS))
+                    .isTrue();
+            cleanupCommittedReadinessFixture(f);
+        }
+    }
+
+    @Test
+    @Transactional(
+            propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void policyEditArrivingDuringRecoveryWaitsUntilReadinessHasCommitted() throws Exception {
+        var f = committedReadinessFixture();
+        var executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var jobPid = new java.util.concurrent.atomic.AtomicInteger();
+        var editPid = new java.util.concurrent.atomic.AtomicInteger();
+        var jobFuture =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var editFuture =
+                new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<?>>();
+        var date = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        try {
+            concurrentTransaction()
+                    .executeWithoutResult(
+                            status -> {
+                                int holderPid =
+                                        jdbc.queryForObject(
+                                                "SELECT pg_backend_pid()", Integer.class);
+                                jdbc.queryForObject(
+                                        "SELECT id FROM inventory_daily_allocations WHERE"
+                                            + " branch_product_id=? AND service_date=? FOR UPDATE",
+                                        Long.class,
+                                        f.product(),
+                                        date);
+                                jobFuture.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        job -> {
+                                                                            jobPid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            service.reconcile(
+                                                                                    f.branch());
+                                                                        })));
+                                awaitDatabaseBlock(jobPid, holderPid, jobFuture.get());
+                                editFuture.set(
+                                        executor.submit(
+                                                () ->
+                                                        concurrentTransaction()
+                                                                .executeWithoutResult(
+                                                                        edit -> {
+                                                                            editPid.set(
+                                                                                    jdbc
+                                                                                            .queryForObject(
+                                                                                                    "SELECT"
+                                                                                                        + " pg_backend_pid()",
+                                                                                                    Integer
+                                                                                                            .class));
+                                                                            jdbc.update(
+                                                                                    "UPDATE"
+                                                                                        + " branch_inventory_policies"
+                                                                                        + " SET inventory_unit='PIECE',maximum_daily_allocation=100"
+                                                                                        + " WHERE"
+                                                                                        + " id=?",
+                                                                                    f.policy());
+                                                                        })));
+                                awaitDatabaseBlock(editPid, jobPid.get(), editFuture.get());
+                            });
+            jobFuture.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            editFuture.get().get(20, java.util.concurrent.TimeUnit.SECONDS);
+            var after =
+                    jdbc.queryForMap(
+                            "SELECT status,inventory_unit,ready_quantity FROM"
+                                    + " inventory_daily_allocations WHERE branch_product_id=? AND"
+                                    + " service_date=?",
+                            f.product(),
+                            date);
+            assertThat(after.get("status")).isEqualTo("READY");
+            assertThat(after.get("inventory_unit")).isEqualTo("GRAM");
+            assertThat((BigDecimal) after.get("ready_quantity")).isEqualByComparingTo("100.500");
+            assertThat(
+                            jdbc.queryForObject(
+                                    "SELECT inventory_unit FROM branch_inventory_policies WHERE"
+                                            + " id=?",
+                                    String.class,
+                                    f.policy()))
+                    .isEqualTo("PIECE");
+            assertThat(service.inspect(f.branch()).runs().getFirst().status()).isEqualTo("SUCCESS");
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(20, java.util.concurrent.TimeUnit.SECONDS))
+                    .isTrue();
+            cleanupCommittedReadinessFixture(f);
+        }
+    }
 }
