@@ -38,6 +38,7 @@ public class RollingScheduleService {
 
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
+    /** Existing regular interval whose time range must remain untouched during gap repair. */
     private record SlotInterval(LocalTime start, LocalTime end) {}
 
     /** Explicit inventory template tied to an existing policy in this branch. */
