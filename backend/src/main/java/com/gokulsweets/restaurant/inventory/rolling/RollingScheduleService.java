@@ -38,6 +38,8 @@ public class RollingScheduleService {
 
     private static final ZoneId IST = ZoneId.of("Asia/Kolkata");
 
+    private record SlotInterval(LocalTime start, LocalTime end) {}
+
     /** Explicit inventory template tied to an existing policy in this branch. */
     public record Template(long policyId, BigDecimal quantity, boolean autoApprove) {}
 
@@ -453,47 +455,57 @@ capacity,maintain_days,weekdays,use_policy_maximum,updated_by) VALUES(?,?,?,?,?,
                                 LocalDate date = today.plusDays(offset);
                                 if ((plan.weekdays() & (1 << (date.getDayOfWeek().getValue() - 1)))
                                         == 0) continue;
-                                boolean dateClaimed =
-                                        jdbc.update(
-                                                        "INSERT INTO rolling_schedule_dates"
-                                                            + " VALUES(?,?) ON CONFLICT DO NOTHING",
-                                                        branchId,
-                                                        date)
-                                                > 0;
-                                if (dateClaimed
-                                        && !Boolean.TRUE.equals(
-                                                jdbc.queryForObject(
-                                                        "SELECT EXISTS(SELECT 1 FROM pickup_slots"
-                                                            + " WHERE branch_id=? AND slot_date=?"
-                                                            + " AND occasion_enquiry_id IS NULL)",
-                                                        Boolean.class,
-                                                        branchId,
-                                                        date))) {
-                                    int start = plan.openingTime().toSecondOfDay() / 60,
-                                            end = plan.closingTime().toSecondOfDay() / 60;
-                                    for (int minute = start;
-                                            minute + plan.slotMinutes() <= end;
-                                            minute += plan.slotMinutes()) {
-                                        LocalTime from = LocalTime.of(minute / 60, minute % 60);
-                                        LocalTime to =
-                                                LocalTime.of(
-                                                        (minute + plan.slotMinutes()) / 60,
-                                                        (minute + plan.slotMinutes()) % 60);
-                                        if (date.equals(today) && !from.isAfter(now.toLocalTime()))
-                                            continue;
-                                        slots +=
-                                                jdbc.update(
-                                                        """
+                                jdbc.update(
+                                        "INSERT INTO rolling_schedule_dates VALUES(?,?) ON CONFLICT"
+                                                + " DO NOTHING",
+                                        branchId,
+                                        date);
+                                // Disabled and manual intervals reserve their time too. Load once
+                                // per
+                                // date so repeat checks do not attempt an INSERT for every existing
+                                // slot.
+                                var intervals =
+                                        jdbc.query(
+                                                "SELECT start_time,end_time FROM pickup_slots WHERE"
+                                                        + " branch_id=? AND slot_date=? AND"
+                                                        + " occasion_enquiry_id IS NULL",
+                                                (rs, row) ->
+                                                        new SlotInterval(
+                                                                rs.getObject(1, LocalTime.class),
+                                                                rs.getObject(2, LocalTime.class)),
+                                                branchId,
+                                                date);
+                                int start = plan.openingTime().toSecondOfDay() / 60,
+                                        end = plan.closingTime().toSecondOfDay() / 60;
+                                for (int minute = start;
+                                        minute + plan.slotMinutes() <= end;
+                                        minute += plan.slotMinutes()) {
+                                    LocalTime from = LocalTime.of(minute / 60, minute % 60);
+                                    LocalTime to =
+                                            LocalTime.of(
+                                                    (minute + plan.slotMinutes()) / 60,
+                                                    (minute + plan.slotMinutes()) % 60);
+                                    if (date.equals(today) && !from.isAfter(now.toLocalTime()))
+                                        continue;
+                                    if (intervals.stream()
+                                            .anyMatch(
+                                                    interval ->
+                                                            interval.start().isBefore(to)
+                                                                    && interval.end()
+                                                                            .isAfter(from)))
+                                        continue;
+                                    slots +=
+                                            jdbc.update(
+                                                    """
 INSERT INTO pickup_slots(branch_id,slot_date,start_time,end_time,capacity,booked_count,
 priority_enabled,priority_capacity,priority_booked_count,priority_charge,active,rolling_generated)
 VALUES(?,?,?,?,?,0,FALSE,0,0,0,TRUE,TRUE) ON CONFLICT DO NOTHING
 """,
-                                                        branchId,
-                                                        date,
-                                                        from,
-                                                        to,
-                                                        plan.capacity());
-                                    }
+                                                    branchId,
+                                                    date,
+                                                    from,
+                                                    to,
+                                                    plan.capacity());
                                 }
                                 var first =
                                         jdbc.query(

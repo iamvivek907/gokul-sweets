@@ -34,12 +34,14 @@ When the new flow is enabled for a branch, the legacy inventory scheduler skips 
 When disabled, the old scheduler resumes its existing rules. Manual APIs remain
 available in both cases. The ownership guard is the only legacy scheduler behavior change.
 
-New regular slots are created only for dates without any existing regular slots. Existing
-manual dates, including disabled slots, are preserved. Private occasion appointments do not
-claim normal dates. A generated date is recorded once, so later setting changes or manual
-deletion do not recreate its timetable. Use manual pickup scheduling to change existing dates.
-Database slot-write serialization prevents a concurrent manual generator from creating an
-overlapping automatic timetable. Exact existing intervals remain reusable by the manual generator.
+Every check reconciles each selected weekday throughout the maintained calendar range, including
+already-generated dates. Missing regular intervals within the configured hours are inserted;
+existing intervals retain their times, capacity, bookings and active/disabled state. Overlapping
+manual or disabled intervals block generation in their time range. To intentionally pause a slot,
+disable it instead of deleting it: a deleted interval may be recreated on the next check.
+Private occasion appointments neither claim nor satisfy regular coverage.
+Existing date-tracking rows do not prevent recovery of a partial or missing timetable.
+Database slot-write serialization and overlap protection also coordinate concurrent manual writers.
 
 Inventory creation follows dates with active regular slots, within the product booking horizon
 and effective storefront inventory horizon. While this flow is enabled, customer pickup discovery,
@@ -51,7 +53,7 @@ Only missing allocations are inserted. Existing
 drafts, approved quantities, reservations, sales, wastage and manual overrides are not replenished
 or overwritten. Inventory approval uses the existing audited inventory service.
 
-Changing a schedule affects newly generated dates. It does not cancel reservations or retire
+Changing a schedule affects missing intervals; existing intervals are not resized or removed. It does not cancel reservations or retire
 old future slots when the horizon shrinks. Review those through manual scheduling.
 
 ## Recovery and operations
@@ -118,3 +120,16 @@ weekdays throughout the rolling horizon, capped by product and storefront bookin
 As dates enter that horizon, later checks create missing allocations using current policy
 maximums. Existing disabled/manual slot schedules and private occasion appointments retain
 their protections. No admin page or daily button action is required for scheduled checks.
+
+## Ready quantity and automatic recovery
+
+An existing daily allocation is authoritative, including recorded ready quantity, an explicit zero,
+manual drafts, unavailable/closed status and reservations. Reconciliation does not change it just
+because a policy maximum changes or a check is repeated. Ready-stock availability continues to
+use recorded ready stock capped by the approved quantity, less buffer and commitments.
+For an item/date without an allocation, maximum mode creates an approved allocation from the
+policy maximum; it does not invent ready stock or mark production ready. A maximum is a planning
+limit, not evidence of physical stock. Policies requiring ready stock retain that requirement.
+Missing slots and missing item/date allocations are recovered independently on every check.
+The worker checks every ten minutes rather than waiting for tomorrow, and daily horizon rollover
+is automatic. Existing allocations are never topped up to replace sold or reserved quantity.

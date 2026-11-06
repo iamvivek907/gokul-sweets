@@ -259,7 +259,7 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
     }
 
     @Test
-    void preservesManualDatesRatherThanAddingAnotherTimetable() {
+    void preservesManualSlotsAndFillsOnlyMissingConfiguredIntervals() {
         var f = fixture();
         LocalDate tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
         jdbc.update(
@@ -277,7 +277,141 @@ VALUES(?,'DAILY_PRODUCTION','PIECE',TRUE,FALSE,2,100,14,now(),now()) RETURNING i
                                 Integer.class,
                                 f.branch(),
                                 tomorrow))
+                .isEqualTo(3);
+    }
+
+    @Test
+    void repairsDeletedIntervalsOnClaimedDatesWithoutChangingDisabledOrBookedSlots() {
+        var f = fixture();
+        LocalDate tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        service.reconcile(f.branch());
+        entityManager.flush();
+        entityManager.clear();
+        jdbc.update(
+                "UPDATE pickup_slots SET active=FALSE,booked_count=1 WHERE branch_id=? AND"
+                        + " slot_date=? AND start_time='10:00'",
+                f.branch(),
+                tomorrow);
+        var original =
+                jdbc.queryForMap(
+                        "SELECT * FROM pickup_slots WHERE branch_id=? AND slot_date=? AND"
+                                + " start_time='10:00'",
+                        f.branch(),
+                        tomorrow);
+        var allocation =
+                jdbc.queryForMap(
+                        "SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        f.product(),
+                        tomorrow);
+        jdbc.update(
+                "DELETE FROM pickup_slots WHERE branch_id=? AND slot_date=? AND start_time='10:30'",
+                f.branch(),
+                tomorrow);
+        for (int i = 0; i < 3; i++) service.reconcile(f.branch());
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT * FROM pickup_slots WHERE branch_id=? AND slot_date=? AND"
+                                        + " start_time='10:00'",
+                                f.branch(),
+                                tomorrow))
+                .isEqualTo(original);
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND"
+                                        + " slot_date=? AND active AND start_time='10:30'",
+                                Integer.class,
+                                f.branch(),
+                                tomorrow))
                 .isEqualTo(1);
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                f.product(),
+                                tomorrow))
+                .isEqualTo(allocation);
+        // The date remains claimed, but losing every interval must still be repairable.
+        jdbc.update(
+                "DELETE FROM pickup_slots WHERE branch_id=? AND slot_date=?", f.branch(), tomorrow);
+        service.reconcile(f.branch());
+        assertThat(
+                        jdbc.queryForObject(
+                                "SELECT count(*) FROM pickup_slots WHERE branch_id=? AND"
+                                        + " slot_date=? AND active",
+                                Integer.class,
+                                f.branch(),
+                                tomorrow))
+                .isEqualTo(2);
+    }
+
+    @Test
+    void recordedReadyStockIncludingZeroWinsWhileMissingAllocationsUseMaximum() {
+        var f = fixture();
+        var zero = fixture();
+        var missing = fixture();
+        jdbc.update(
+                "UPDATE branch_products SET branch_id=? WHERE id IN (?,?)",
+                f.branch(),
+                zero.product(),
+                missing.product());
+        jdbc.update(
+                "UPDATE branch_inventory_policies SET ready_stock_required=TRUE WHERE id IN"
+                        + " (?,?,?)",
+                f.policy(),
+                zero.policy(),
+                missing.policy());
+        LocalDate tomorrow = LocalDate.now(clock.withZone(ZoneId.of("Asia/Kolkata"))).plusDays(1);
+        for (var item : List.of(f, zero)) {
+            jdbc.update(
+                    "INSERT INTO"
+                        + " inventory_daily_allocations(branch_product_id,service_date,status,inventory_unit,approved_quantity,ready_quantity,safety_buffer_quantity,actual_ready_at,created_at,updated_at)"
+                        + " VALUES(?,?,'READY','PIECE',100,?,2,now(),now(),now())",
+                    item.product(),
+                    tomorrow,
+                    item == f ? 30 : 0);
+        }
+        var readyBefore =
+                jdbc.queryForMap(
+                        "SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        f.product(),
+                        tomorrow);
+        var zeroBefore =
+                jdbc.queryForMap(
+                        "SELECT * FROM inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        zero.product(),
+                        tomorrow);
+        service.save(f.branch(), maximumPlan(-1, 2), "manager");
+        for (int i = 0; i < 3; i++) service.reconcile(f.branch());
+        entityManager.flush();
+        entityManager.clear();
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                f.product(),
+                                tomorrow))
+                .isEqualTo(readyBefore);
+        assertThat(
+                        jdbc.queryForMap(
+                                "SELECT * FROM inventory_daily_allocations WHERE"
+                                        + " branch_product_id=? AND service_date=?",
+                                zero.product(),
+                                tomorrow))
+                .isEqualTo(zeroBefore);
+        var generated =
+                jdbc.queryForMap(
+                        "SELECT approved_quantity,ready_quantity,status FROM"
+                                + " inventory_daily_allocations WHERE branch_product_id=? AND"
+                                + " service_date=?",
+                        missing.product(),
+                        tomorrow);
+        assertThat((BigDecimal) generated.get("approved_quantity")).isEqualByComparingTo("100");
+        assertThat((BigDecimal) generated.get("ready_quantity")).isZero();
+        assertThat(generated.get("status")).isEqualTo("APPROVED");
     }
 
     @Test
